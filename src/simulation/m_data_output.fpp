@@ -48,24 +48,24 @@ module m_data_output
               s_close_probe_files, &
               s_finalize_data_output_module
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
+    real(wp), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
+    real(wp), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
+    real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
+    real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
 
-    real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
-    real(kind(0d0)) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
-    real(kind(0d0)) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
-    real(kind(0d0)) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
+    real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
+    real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
+    real(wp) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
+    real(wp) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
     !$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
     !> @{
-    real(kind(0d0)) :: icfl_max !< ICFL criterion maximum
-    real(kind(0d0)) :: vcfl_max !< VCFL criterion maximum
-    real(kind(0d0)) :: ccfl_max !< CCFL criterion maximum
-    real(kind(0d0)) :: Rc_min !< Rc criterion maximum
+    real(wp) :: icfl_max !< ICFL criterion maximum
+    real(wp) :: vcfl_max !< VCFL criterion maximum
+    real(wp) :: ccfl_max !< CCFL criterion maximum
+    real(wp) :: Rc_min !< Rc criterion maximum
     !> @}
 
 contains
@@ -74,11 +74,14 @@ contains
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
-    subroutine s_write_data_files(q_cons_vf, q_prim_vf, t_step)
+    subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(in) :: q_cons_vf
+
+        type(scalar_field), &
+            intent(inout) :: q_T_sf
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -87,10 +90,11 @@ contains
         integer, intent(in) :: t_step
 
         if (.not. parallel_io) then
-            call s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step)
+            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step)
         else
             call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step)
         end if
+
     end subroutine s_write_data_files
 
     !>  The purpose of this subroutine is to open a new or pre-
@@ -215,16 +219,16 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
 
-        real(kind(0d0)) :: rho        !< Cell-avg. density
-        real(kind(0d0)), dimension(num_dims) :: vel        !< Cell-avg. velocity
-        real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
-        real(kind(0d0)) :: pres       !< Cell-avg. pressure
-        real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
-        real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
-        real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
-        real(kind(0d0)) :: c          !< Cell-avg. sound speed
-        real(kind(0d0)) :: H          !< Cell-avg. enthalpy
-        real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
+        real(wp) :: rho        !< Cell-avg. density
+        real(wp), dimension(num_dims) :: vel        !< Cell-avg. velocity
+        real(wp) :: vel_sum    !< Cell-avg. velocity sum
+        real(wp) :: pres       !< Cell-avg. pressure
+        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(wp) :: gamma      !< Cell-avg. sp. heat ratio
+        real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
+        real(wp) :: c          !< Cell-avg. sound speed
+        real(wp) :: H          !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step ================
@@ -233,7 +237,8 @@ contains
             do k = 0, n
                 do j = 0, m
                     call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0d0, c)
+
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
 
                     if (viscous) then
                         call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
@@ -312,7 +317,7 @@ contains
 
             if (icfl_max_glb /= icfl_max_glb) then
                 call s_mpi_abort('ICFL is NaN. Exiting ...')
-            elseif (icfl_max_glb > 1d0) then
+            elseif (icfl_max_glb > 1._wp) then
                 print *, 'icfl', icfl_max_glb
                 call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
             end if
@@ -320,7 +325,7 @@ contains
             if (viscous) then
                 if (vcfl_max_glb /= vcfl_max_glb) then
                     call s_mpi_abort('VCFL is NaN. Exiting ...')
-                elseif (vcfl_max_glb > 1d0) then
+                elseif (vcfl_max_glb > 1._wp) then
                     print *, 'vcfl', vcfl_max_glb
                     call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')
                 end if
@@ -336,9 +341,10 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step)
+    subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
 
@@ -355,7 +361,7 @@ contains
 
         integer :: i, j, k, l, r
 
-        real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
+        real(wp) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
 
         ! Creating or overwriting the time-step root directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'
@@ -452,7 +458,7 @@ contains
         end if
 
         gamma = fluid_pp(1)%gamma
-        lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
+        lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
         pi_inf = fluid_pp(1)%pi_inf
         qv = fluid_pp(1)%qv
 
@@ -471,13 +477,13 @@ contains
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
-            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf, idwint)
+            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
             end do
-            ! q_prim_vf(bubxb) stores the value of nb needed in riemann solvers, so replace with true primitive value (=1d0)
+            ! q_prim_vf(bubxb) stores the value of nb needed in riemann solvers, so replace with true primitive value (=1._wp)
             if (qbmm) then
-                q_prim_vf(bubxb)%sf = 1d0
+                q_prim_vf(bubxb)%sf = 1._wp
             end if
         end if
 
@@ -770,8 +776,8 @@ contains
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8d0, MPI_OFFSET_KIND)
-            MOK = int(1d0, MPI_OFFSET_KIND)
+            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
@@ -781,7 +787,7 @@ contains
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
                 !Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
@@ -789,7 +795,7 @@ contains
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                MPI_DOUBLE_PRECISION, status, ierr)
+                                                mpi_p, status, ierr)
                     end do
                 end if
             else
@@ -797,7 +803,7 @@ contains
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
             end if
 
@@ -827,8 +833,8 @@ contains
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8d0, MPI_OFFSET_KIND)
-            MOK = int(1d0, MPI_OFFSET_KIND)
+            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
@@ -840,10 +846,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
                 !Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
@@ -853,10 +859,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                MPI_DOUBLE_PRECISION, status, ierr)
+                                                mpi_p, status, ierr)
                     end do
                 end if
             else
@@ -866,10 +872,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
             end if
 
@@ -888,89 +894,91 @@ contains
 
         integer, intent(in) :: t_step
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(in) :: accel_mag
+        real(wp), dimension(0:m, 0:n, 0:p), intent(in) :: accel_mag
 
-        real(kind(0d0)), dimension(-1:m) :: distx
-        real(kind(0d0)), dimension(-1:n) :: disty
-        real(kind(0d0)), dimension(-1:p) :: distz
+        real(wp), dimension(-1:m) :: distx
+        real(wp), dimension(-1:n) :: disty
+        real(wp), dimension(-1:p) :: distz
 
         ! The cell-averaged partial densities, density, velocity, pressure,
         ! volume fractions, specific heat ratio function, liquid stiffness
         ! function, and sound speed.
-        real(kind(0d0)) :: lit_gamma, nbub
-        real(kind(0d0)) :: rho
-        real(kind(0d0)), dimension(num_dims) :: vel
-        real(kind(0d0)) :: pres
-        real(kind(0d0)) :: ptilde
-        real(kind(0d0)) :: ptot
-        real(kind(0d0)) :: alf
-        real(kind(0d0)) :: alfgr
-        real(kind(0d0)), dimension(num_fluids) :: alpha
-        real(kind(0d0)) :: gamma
-        real(kind(0d0)) :: pi_inf
-        real(kind(0d0)) :: qv
-        real(kind(0d0)) :: c
-        real(kind(0d0)) :: M00, M10, M01, M20, M11, M02
-        real(kind(0d0)) :: varR, varV
-        real(kind(0d0)), dimension(Nb) :: nR, R, nRdot, Rdot
-        real(kind(0d0)) :: nR3
-        real(kind(0d0)) :: accel
-        real(kind(0d0)) :: int_pres
-        real(kind(0d0)) :: max_pres
-        real(kind(0d0)), dimension(2) :: Re
-        real(kind(0d0)), dimension(6) :: tau_e
-        real(kind(0d0)) :: G
-        real(kind(0d0)) :: dyn_p, Temp
+        real(wp) :: lit_gamma, nbub
+        real(wp) :: rho
+        real(wp), dimension(num_dims) :: vel
+        real(wp) :: pres
+        real(wp) :: ptilde
+        real(wp) :: ptot
+        real(wp) :: alf
+        real(wp) :: alfgr
+        real(wp), dimension(num_fluids) :: alpha
+        real(wp) :: gamma
+        real(wp) :: pi_inf
+        real(wp) :: qv
+        real(wp) :: c
+        real(wp) :: M00, M10, M01, M20, M11, M02
+        real(wp) :: varR, varV
+        real(wp), dimension(Nb) :: nR, R, nRdot, Rdot
+        real(wp) :: nR3
+        real(wp) :: accel
+        real(wp) :: int_pres
+        real(wp) :: max_pres
+        real(wp), dimension(2) :: Re
+        real(wp), dimension(6) :: tau_e
+        real(wp) :: G
+        real(wp) :: dyn_p, T
 
         integer :: i, j, k, l, s, d !< Generic loop iterator
 
-        real(kind(0d0)) :: nondim_time !< Non-dimensional time
+        real(wp) :: nondim_time !< Non-dimensional time
 
-        real(kind(0d0)) :: tmp !<
+        real(wp) :: tmp !<
             !! Temporary variable to store quantity for mpi_allreduce
 
         integer :: npts !< Number of included integral points
-        real(kind(0d0)) :: rad, thickness !< For integral quantities
+        real(wp) :: rad, thickness !< For integral quantities
         logical :: trigger !< For integral quantities
 
-        real(kind(0d0)) :: rhoYks(1:num_species)
+        real(wp) :: rhoYks(1:num_species)
+
+        T = dflt_T_guess
 
         ! Non-dimensional time calculation
         if (time_stepper == 23) then
             nondim_time = mytime
         else
             if (t_step_old /= dflt_int) then
-                nondim_time = real(t_step + t_step_old, kind(0d0))*dt
+                nondim_time = real(t_step + t_step_old, wp)*dt
             else
-                nondim_time = real(t_step, kind(0d0))*dt
+                nondim_time = real(t_step, wp)*dt
             end if
         end if
 
         do i = 1, num_probes
             ! Zeroing out flow variables for all processors
-            rho = 0d0
+            rho = 0._wp
             do s = 1, num_dims
-                vel(s) = 0d0
+                vel(s) = 0._wp
             end do
-            pres = 0d0
-            gamma = 0d0
-            pi_inf = 0d0
-            qv = 0d0
-            c = 0d0
-            accel = 0d0
-            nR = 0d0; R = 0d0
-            nRdot = 0d0; Rdot = 0d0
-            nbub = 0d0
-            M00 = 0d0
-            M10 = 0d0
-            M01 = 0d0
-            M20 = 0d0
-            M11 = 0d0
-            M02 = 0d0
-            varR = 0d0; varV = 0d0
-            alf = 0d0
+            pres = 0._wp
+            gamma = 0._wp
+            pi_inf = 0._wp
+            qv = 0._wp
+            c = 0._wp
+            accel = 0._wp
+            nR = 0._wp; R = 0._wp
+            nRdot = 0._wp; Rdot = 0._wp
+            nbub = 0._wp
+            M00 = 0._wp
+            M10 = 0._wp
+            M01 = 0._wp
+            M20 = 0._wp
+            M11 = 0._wp
+            M02 = 0._wp
+            varR = 0._wp; varV = 0._wp
+            alf = 0._wp
             do s = 1, (num_dims*(num_dims + 1))/2
-                tau_e(s) = 0d0
+                tau_e(s) = 0._wp
             end do
 
             ! Find probe location in terms of indices on a
@@ -979,7 +987,7 @@ contains
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     do s = -1, m
                         distx(s) = x_cb(s) - probe(i)%x
-                        if (distx(s) < 0d0) distx(s) = 1000d0
+                        if (distx(s) < 0._wp) distx(s) = 1000._wp
                     end do
                     j = minloc(distx, 1)
                     if (j == 1) j = 2 ! Pick first point if probe is at edge
@@ -1005,24 +1013,24 @@ contains
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
                     end do
 
-                    dyn_p = 0.5d0*rho*dot_product(vel, vel)
+                    dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                     if (hypoelasticity) then
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, Temp, &
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
                     else
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, Temp)
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T)
                     end if
 
                     if (model_eqns == 4) then
-                        lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
+                        lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
                     else if (hypoelasticity) then
                         tau_e(1) = q_cons_vf(stress_idx%end)%sf(j - 2, k, l)/rho
                     end if
@@ -1040,12 +1048,12 @@ contains
                         if (adv_n) then
                             nbub = q_cons_vf(n_idx)%sf(j - 2, k, l)
                         else
-                            nR3 = 0d0
+                            nR3 = 0._wp
                             do s = 1, nb
-                                nR3 = nR3 + weight(s)*(nR(s)**3d0)
+                                nR3 = nR3 + weight(s)*(nR(s)**3._wp)
                             end do
 
-                            nbub = dsqrt((4.d0*pi/3.d0)*nR3/alf)
+                            nbub = sqrt((4._wp*pi/3._wp)*nR3/alf)
                         end if
 #ifdef DEBUG
                         print *, 'In probe, nbub: ', nbub
@@ -1064,8 +1072,8 @@ contains
                             M11 = M11/M00
                             M02 = M02/M00
 
-                            varR = M20 - M10**2d0
-                            varV = M02 - M01**2d0
+                            varR = M20 - M10**2._wp
+                            varV = M02 - M01**2._wp
                         end if
                         R(:) = nR(:)/nbub
                         Rdot(:) = nRdot(:)/nbub
@@ -1076,7 +1084,7 @@ contains
 
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, 0d0, c)
+                                                  ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1091,11 +1099,11 @@ contains
                     if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
                         do s = -1, m
                             distx(s) = x_cb(s) - probe(i)%x
-                            if (distx(s) < 0d0) distx(s) = 1000d0
+                            if (distx(s) < 0._wp) distx(s) = 1000._wp
                         end do
                         do s = -1, n
                             disty(s) = y_cb(s) - probe(i)%y
-                            if (disty(s) < 0d0) disty(s) = 1000d0
+                            if (disty(s) < 0._wp) disty(s) = 1000._wp
                         end do
                         j = minloc(distx, 1)
                         k = minloc(disty, 1)
@@ -1111,7 +1119,7 @@ contains
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
 
-                        dyn_p = 0.5d0*rho*dot_product(vel, vel)
+                        dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                         if (hypoelasticity) then
                             call s_compute_pressure( &
@@ -1120,18 +1128,18 @@ contains
                                 dyn_p, pi_inf, gamma, rho, qv, &
                                 rhoYks, &
                                 pres, &
-                                Temp, &
+                                T, &
                                 q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
                         else
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
                                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
                                                     dyn_p, pi_inf, gamma, rho, qv, &
-                                                    rhoYks, pres, Temp)
+                                                    rhoYks, pres, T)
                         end if
 
                         if (model_eqns == 4) then
-                            lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
+                            lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
                         else if (hypoelasticity) then
                             do s = 1, 3
                                 tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
@@ -1148,12 +1156,12 @@ contains
                             if (adv_n) then
                                 nbub = q_cons_vf(n_idx)%sf(j - 2, k - 2, l)
                             else
-                                nR3 = 0d0
+                                nR3 = 0._wp
                                 do s = 1, nb
-                                    nR3 = nR3 + weight(s)*(nR(s)**3d0)
+                                    nR3 = nR3 + weight(s)*(nR(s)**3._wp)
                                 end do
 
-                                nbub = dsqrt((4.d0*pi/3.d0)*nR3/alf)
+                                nbub = sqrt((4._wp*pi/3._wp)*nR3/alf)
                             end if
 
                             R(:) = nR(:)/nbub
@@ -1162,7 +1170,7 @@ contains
 
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, 0d0, c)
+                                                      ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c)
 
                         accel = accel_mag(j - 2, k - 2, l)
                     end if
@@ -1173,15 +1181,15 @@ contains
                         if ((probe(i)%z >= z_cb(-1)) .and. (probe(i)%z <= z_cb(p))) then
                             do s = -1, m
                                 distx(s) = x_cb(s) - probe(i)%x
-                                if (distx(s) < 0d0) distx(s) = 1000d0
+                                if (distx(s) < 0._wp) distx(s) = 1000._wp
                             end do
                             do s = -1, n
                                 disty(s) = y_cb(s) - probe(i)%y
-                                if (disty(s) < 0d0) disty(s) = 1000d0
+                                if (disty(s) < 0._wp) disty(s) = 1000._wp
                             end do
                             do s = -1, p
                                 distz(s) = z_cb(s) - probe(i)%z
-                                if (distz(s) < 0d0) distz(s) = 1000d0
+                                if (distz(s) < 0._wp) distz(s) = 1000._wp
                             end do
                             j = minloc(distx, 1)
                             k = minloc(disty, 1)
@@ -1198,7 +1206,7 @@ contains
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l - 2)/rho
                             end do
 
-                            dyn_p = 0.5d0*rho*dot_product(vel, vel)
+                            dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                             if (chemistry) then
                                 do d = 1, num_species
@@ -1211,19 +1219,19 @@ contains
                                     q_cons_vf(1)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
                                     dyn_p, pi_inf, gamma, rho, qv, &
-                                    rhoYks, pres, Temp, &
+                                    rhoYks, pres, T, &
                                     q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G)
                             else
                                 call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
                                                         q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
                                                         dyn_p, pi_inf, gamma, rho, qv, &
-                                                        rhoYks, pres, Temp)
+                                                        rhoYks, pres, T)
                             end if
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, 0d0, c)
+                                                          ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
@@ -1390,20 +1398,20 @@ contains
         if (integral_wrt .and. bubbles) then
             if (n == 0) then ! 1D simulation
                 do i = 1, num_integrals
-                    int_pres = 0d0
-                    max_pres = 0d0
+                    int_pres = 0._wp
+                    max_pres = 0._wp
                     k = 0; l = 0
                     npts = 0
                     do j = 1, m
-                        pres = 0d0
+                        pres = 0._wp
                         do s = 1, num_dims
-                            vel(s) = 0d0
+                            vel(s) = 0._wp
                         end do
-                        rho = 0d0
-                        pres = 0d0
-                        gamma = 0d0
-                        pi_inf = 0d0
-                        qv = 0d0
+                        rho = 0._wp
+                        pres = 0._wp
+                        gamma = 0._wp
+                        pi_inf = 0._wp
+                        qv = 0._wp
 
                         if ((integral(i)%xmin <= x_cb(j)) .and. (integral(i)%xmax >= x_cb(j))) then
                             npts = npts + 1
@@ -1415,14 +1423,14 @@ contains
 
                             pres = ( &
                                    (q_cons_vf(E_idx)%sf(j, k, l) - &
-                                    0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, k, l)**2.d0)/rho)/ &
-                                   (1.d0 - q_cons_vf(alf_idx)%sf(j, k, l)) - &
+                                    0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, k, l)**2._wp)/rho)/ &
+                                   (1._wp - q_cons_vf(alf_idx)%sf(j, k, l)) - &
                                    pi_inf - qv &
                                    )/gamma
-                            int_pres = int_pres + (pres - 1.d0)**2.d0
+                            int_pres = int_pres + (pres - 1._wp)**2._wp
                         end if
                     end do
-                    int_pres = dsqrt(int_pres/(1.d0*npts))
+                    int_pres = sqrt(int_pres/(1._wp*npts))
 
                     if (num_procs > 1) then
                         tmp = int_pres
@@ -1445,8 +1453,8 @@ contains
                 thickness = integral(1)%xmin
 
                 do i = 1, num_integrals
-                    int_pres = 0d0
-                    max_pres = 0d0
+                    int_pres = 0._wp
+                    max_pres = 0._wp
                     l = 0
                     npts = 0
                     do j = 1, m
@@ -1454,28 +1462,28 @@ contains
                             trigger = .false.
                             if (i == 1) then
                                 !inner portion
-                                if (dsqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) < (rad - 0.5d0*thickness)) &
+                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) < (rad - 0.5_wp*thickness)) &
                                     trigger = .true.
                             elseif (i == 2) then
                                 !net region
-                                if (dsqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) > (rad - 0.5d0*thickness) .and. &
-                                    dsqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) < (rad + 0.5d0*thickness)) &
+                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) > (rad - 0.5_wp*thickness) .and. &
+                                    sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) < (rad + 0.5_wp*thickness)) &
                                     trigger = .true.
                             elseif (i == 3) then
                                 !everything else
-                                if (dsqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) > (rad + 0.5d0*thickness)) &
+                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) > (rad + 0.5_wp*thickness)) &
                                     trigger = .true.
                             end if
 
-                            pres = 0d0
+                            pres = 0._wp
                             do s = 1, num_dims
-                                vel(s) = 0d0
+                                vel(s) = 0._wp
                             end do
-                            rho = 0d0
-                            pres = 0d0
-                            gamma = 0d0
-                            pi_inf = 0d0
-                            qv = 0d0
+                            rho = 0._wp
+                            pres = 0._wp
+                            gamma = 0._wp
+                            pi_inf = 0._wp
+                            qv = 0._wp
 
                             if (trigger) then
                                 npts = npts + 1
@@ -1487,21 +1495,21 @@ contains
 
                                 pres = ( &
                                        (q_cons_vf(E_idx)%sf(j, k, l) - &
-                                        0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, k, l)**2.d0)/rho)/ &
-                                       (1.d0 - q_cons_vf(alf_idx)%sf(j, k, l)) - &
+                                        0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, k, l)**2._wp)/rho)/ &
+                                       (1._wp - q_cons_vf(alf_idx)%sf(j, k, l)) - &
                                        pi_inf - qv &
                                        )/gamma
-                                int_pres = int_pres + abs(pres - 1.d0)
-                                max_pres = max(max_pres, abs(pres - 1.d0))
+                                int_pres = int_pres + abs(pres - 1._wp)
+                                max_pres = max(max_pres, abs(pres - 1._wp))
                             end if
 
                         end do
                     end do
 
                     if (npts > 0) then
-                        int_pres = int_pres/(1.d0*npts)
+                        int_pres = int_pres/(1._wp*npts)
                     else
-                        int_pres = 0.d0
+                        int_pres = 0._wp
                     end if
 
                     if (num_procs > 1) then
@@ -1531,7 +1539,7 @@ contains
         !!      all of the time-steps and the simulation run-time.
     subroutine s_close_run_time_information_file
 
-        real(kind(0d0)) :: run_time !< Run-time of the simulation
+        real(wp) :: run_time !< Run-time of the simulation
         ! Writing the footer of and closing the run-time information file
         write (3, '(A)') '----------------------------------------'// &
             '----------------------------------------'
@@ -1569,14 +1577,14 @@ contains
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
-        icfl_max = 0d0
+        icfl_max = 0._wp
 
         if (viscous) then
             @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
             @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
 
-            vcfl_max = 0d0
-            Rc_min = 1d3
+            vcfl_max = 0._wp
+            Rc_min = 1e3_wp
         end if
 
     end subroutine s_initialize_data_output_module

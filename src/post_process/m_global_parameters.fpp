@@ -58,18 +58,19 @@ module m_global_parameters
 
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
-    real(kind(0d0)), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
-    real(kind(0.0)), allocatable, dimension(:) :: x_cb_s, y_cb_s, z_cb_s
+    real(wp), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
+    real(wp), allocatable, dimension(:) :: x_cb_s, y_cb_s, z_cb_s
     !> @}
 
     !> @name Cell-center locations in the x-, y- and z-coordinate directions
     !> @{
-    real(kind(0d0)), allocatable, dimension(:) :: x_cc, x_root_cc, y_cc, z_cc
+    real(wp), allocatable, dimension(:) :: x_cc, x_root_cc, y_cc, z_cc
+    real(sp), allocatable, dimension(:) :: x_root_cc_s, x_cc_s
     !> @}
 
     !> Cell-width distributions in the x-, y- and z-coordinate directions
     !> @{
-    real(kind(0d0)), allocatable, dimension(:) :: dx, dy, dz
+    real(wp), allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
     integer :: buff_size !<
@@ -84,9 +85,9 @@ module m_global_parameters
     !> @name IO options for adaptive time-stepping
     !> @{
     logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
-    real(kind(0d0)) :: t_save
-    real(kind(0d0)) :: t_stop
-    real(kind(0d0)) :: cfl_target
+    real(wp) :: t_save
+    real(wp) :: t_stop
+    real(wp) :: cfl_target
     integer :: n_save
     integer :: n_start
     !> @}
@@ -129,7 +130,6 @@ module m_global_parameters
     type(int_bounds_info) :: stress_idx            !< Indices of elastic stresses
     integer :: c_idx                               !< Index of color function
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
-    integer :: T_idx                               !< Index of temperature eqn.
     !> @}
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
@@ -182,7 +182,7 @@ module m_global_parameters
 
     ! ==========================================================================
 
-    real(kind(0d0)), allocatable, dimension(:) :: adv !< Advection variables
+    real(wp), allocatable, dimension(:) :: adv !< Advection variables
 
     ! Formatted Database File(s) Structure Parameters ==========================
 
@@ -231,7 +231,7 @@ module m_global_parameters
     logical :: chem_wrt_T
     !> @}
 
-    real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
+    real(wp), dimension(num_fluids_max) :: schlieren_alpha    !<
     !! Amplitude coefficients of the numerical Schlieren function that are used
     !! to adjust the intensity of numerical Schlieren renderings for individual
     !! fluids. This enables waves and interfaces of varying strengths and in all
@@ -251,34 +251,35 @@ module m_global_parameters
 
     !> @name Reference parameters for Tait EOS
     !> @{
-    real(kind(0d0)) :: rhoref, pref
+    real(wp) :: rhoref, pref
     !> @}
 
     !> @name Bubble modeling variables and parameters
     !> @{
     integer :: nb
-    real(kind(0d0)) :: R0ref
-    real(kind(0d0)) :: Ca, Web, Re_inv
-    real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
+    real(wp) :: R0ref
+    real(wp) :: Ca, Web, Re_inv
+    real(wp), dimension(:), allocatable :: weight, R0, V0
     logical :: bubbles
     logical :: qbmm
     logical :: polytropic
     logical :: polydisperse
     logical :: adv_n
     integer :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
-    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, G, pv, M_n, M_v
-    real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
-    real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
-    real(kind(0d0)) :: gamma_m, gamma_n, mu_n
-    real(kind(0d0)) :: poly_sigma
-    real(kind(0d0)) :: sigR
+    real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, G, pv, M_n, M_v
+    real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
+    real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
+    real(wp) :: mul0, ss, gamma_v, mu_v
+    real(wp) :: gamma_m, gamma_n, mu_n
+    real(wp) :: poly_sigma
+    real(wp) :: sigR
     integer :: nmom
     !> @}
 
     !> @name surface tension coefficient
     !> @{
-    real(kind(0d0)) :: sigma
+
+    real(wp) :: sigma
     logical :: surface_tension
     !> #}
 
@@ -338,8 +339,8 @@ contains
 
         #:for DIM in ['x', 'y', 'z']
             #:for DIR in [1, 2, 3]
-                bc_${DIM}$%vb${DIR}$ = 0d0
-                bc_${DIM}$%ve${DIR}$ = 0d0
+                bc_${DIM}$%vb${DIR}$ = 0._wp
+                bc_${DIM}$%ve${DIR}$ = 0._wp
             #:endfor
         #:endfor
 
@@ -347,9 +348,9 @@ contains
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
-            fluid_pp(i)%cv = 0d0
-            fluid_pp(i)%qv = 0d0
-            fluid_pp(i)%qvp = 0d0
+            fluid_pp(i)%cv = 0._wp
+            fluid_pp(i)%qv = 0._wp
+            fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%G = dflt_real
         end do
 
@@ -518,12 +519,12 @@ contains
                 end if
 
                 if (nb == 1) then
-                    weight(:) = 1d0
-                    R0(:) = 1d0
-                    V0(:) = 0d0
+                    weight(:) = 1._wp
+                    R0(:) = 1._wp
+                    V0(:) = 0._wp
                 else if (nb > 1) then
                     !call s_simpson
-                    V0(:) = 0d0
+                    V0(:) = 0._wp
                 else
                     stop 'Invalid value of nb'
                 end if
@@ -531,8 +532,8 @@ contains
                 if (polytropic .neqv. .true.) then
                     !call s_initialize_nonpoly
                 else
-                    rhoref = 1.d0
-                    pref = 1.d0
+                    rhoref = 1._wp
+                    pref = 1._wp
                 end if
 
             end if
@@ -613,18 +614,18 @@ contains
                 end do
 
                 if (nb == 1) then
-                    weight(:) = 1d0
-                    R0(:) = 1d0
-                    V0(:) = 0d0
+                    weight(:) = 1._wp
+                    R0(:) = 1._wp
+                    V0(:) = 0._wp
                 else if (nb > 1) then
-                    V0(:) = 0d0
+                    V0(:) = 0._wp
                 else
                     stop 'Invalid value of nb'
                 end if
 
                 if (polytropic) then
-                    rhoref = 1.d0
-                    pref = 1.d0
+                    rhoref = 1._wp
+                    pref = 1._wp
                 end if
             end if
         end if
@@ -633,13 +634,9 @@ contains
             species_idx%beg = sys_size + 1
             species_idx%end = sys_size + num_species
             sys_size = species_idx%end
-
-            T_idx = sys_size + 1
-            sys_size = T_idx
         else
             species_idx%beg = 1
             species_idx%end = 1
-            T_idx = 1
         end if
 
         momxb = mom_idx%beg
@@ -726,6 +723,8 @@ contains
                     allocate (z_cb_s(-1 - offset_x%beg:m + offset_x%end))
                 end if
             end if
+        else
+            allocate (x_cc_s(-buff_size:m + buff_size))
         end if
 
         ! Allocating the grid variables in the x-coordinate direction
@@ -752,6 +751,10 @@ contains
 
             allocate (x_root_cb(-1:m_root))
             allocate (x_root_cc(0:m_root))
+
+            if (precision == 1) then
+                allocate (x_root_cc_s(0:m_root))
+            end if
 
         end if
 

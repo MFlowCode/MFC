@@ -51,9 +51,9 @@ module m_fftw
 #if defined(MFC_OpenACC)
     !$acc declare create(real_size, cmplx_size, x_size, batch_size, Nfq)
 
-    real(kind(0d0)), allocatable, target :: data_real_gpu(:)
-    complex(kind(0d0)), allocatable, target :: data_cmplx_gpu(:)
-    complex(kind(0d0)), allocatable, target :: data_fltr_cmplx_gpu(:)
+    real(dp), allocatable, target :: data_real_gpu(:)
+    complex(dp), allocatable, target :: data_cmplx_gpu(:)
+    complex(dp), allocatable, target :: data_fltr_cmplx_gpu(:)
 !$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
 
 #if defined(__PGI)
@@ -146,7 +146,7 @@ contains
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, cmplx_size
-                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0d0, 0d0)
+                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
                 end do
             end do
         end do
@@ -198,7 +198,7 @@ contains
         do k = 1, sys_size
             do j = 0, m
                 do l = 0, p
-                    data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, kind(0d0))
+                    data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, dp)
                     q_cons_vf(k)%sf(j, 0, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                 end do
             end do
@@ -210,7 +210,7 @@ contains
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, cmplx_size
-                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0d0, 0d0)
+                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
                     end do
                 end do
             end do
@@ -233,7 +233,7 @@ contains
 #endif
             !$acc end host_data
 
-            Nfq = min(floor(2d0*real(i, kind(0d0))*pi), cmplx_size)
+            Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
             !$acc update device(Nfq)
 
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -258,7 +258,7 @@ contains
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
-                        data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, kind(0d0))
+                        data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, dp)
                         q_cons_vf(k)%sf(j, i, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                     end do
                 end do
@@ -270,27 +270,27 @@ contains
         Nfq = 3
         do j = 0, m
             do k = 1, sys_size
-                data_fltr_cmplx(:) = (0d0, 0d0)
+                data_fltr_cmplx(:) = (0_dp, 0_dp)
                 data_real(1:p + 1) = q_cons_vf(k)%sf(j, 0, 0:p)
                 call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
                 data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)
                 call fftw_execute_dft_c2r(bwd_plan, data_fltr_cmplx, data_real)
-                data_real(:) = data_real(:)/real(real_size, kind(0d0))
+                data_real(:) = data_real(:)/real(real_size, dp)
                 q_cons_vf(k)%sf(j, 0, 0:p) = data_real(1:p + 1)
             end do
         end do
 
         ! Apply Fourier filter to additional rings
         do i = 1, fourier_rings
-            Nfq = min(floor(2d0*real(i, kind(0d0))*pi), cmplx_size)
+            Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
             do j = 0, m
                 do k = 1, sys_size
-                    data_fltr_cmplx(:) = (0d0, 0d0)
+                    data_fltr_cmplx(:) = (0_dp, 0_dp)
                     data_real(1:p + 1) = q_cons_vf(k)%sf(j, i, 0:p)
                     call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
                     data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)
                     call fftw_execute_dft_c2r(bwd_plan, data_fltr_cmplx, data_real)
-                    data_real(:) = data_real(:)/real(real_size, kind(0d0))
+                    data_real(:) = data_real(:)/real(real_size, dp)
                     q_cons_vf(k)%sf(j, i, 0:p) = data_real(1:p + 1)
                 end do
             end do

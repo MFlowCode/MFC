@@ -5,7 +5,7 @@ import cantera     as ct
 
 from ..printer import cons
 from ..        import common, build
-from ..state   import ARGS
+from ..state   import ARGS, ARG
 from ..case    import Case
 
 @dataclasses.dataclass(init=False)
@@ -69,23 +69,29 @@ class MFCInputFile(Case):
         # (Thermo)Chemistry source file
         modules_dir = os.path.join(target.get_staging_dirpath(self), "modules", target.name)
         common.create_directory(modules_dir)
+
+        # Determine the real type based on the single precision flag
+        real_type = 'real(sp)' if ARG('single') else 'real(dp)'
+
+        # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
         common.file_write(
             os.path.join(modules_dir, "m_thermochem.f90"),
             pyro.codegen.fortran90.gen_thermochem_code(
                 self.get_cantera_solution(),
-                module_name="m_thermochem"
+                module_name="m_thermochem",
+                real_type=real_type
             ),
             True
         )
 
         cons.unindent()
 
+
     # Generate case.fpp & [target.name].inp
     def generate(self, target) -> None:
         self.generate_inp(target)
         cons.print()
         self.generate_fpp(target)
-
 
     def clean(self, _targets) -> None:
         targets = [build.get_target(target) for target in _targets]
