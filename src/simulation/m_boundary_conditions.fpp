@@ -221,7 +221,7 @@ contains
         real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer :: j, k, l, q, i
-        real(kind(0d0)) :: bc_sum
+        real(wp) :: bc_sum
 
         !< x-direction =========================================================
         if (bc_dir == 1) then !< x-direction
@@ -246,7 +246,7 @@ contains
                      do l = 0, p
                         do k = 0, n
                            do i = xibeg, xiend
-                              bc_sum = 0d0
+                              bc_sum = 0_wp
                               !$acc loop seq
                               do q = 1, j
                                  bc_sum = bc_sum - dx(-q)
@@ -280,7 +280,7 @@ contains
                      do l = 0, p
                         do k = 0, n
                            do i = xibeg, xiend
-                              bc_sum = 0d0
+                              bc_sum = 0_wp
                               !$acc loop seq
                               do q = 1, j
                                  bc_sum = bc_sum + dx(m + q)
@@ -318,7 +318,7 @@ contains
                      do l = -buff_size, m + buff_size
                         do k = 0, p
                            do i = xibeg, xiend
-                              bc_sum = 0d0
+                              bc_sum = 0_wp
                               !$acc loop seq
                               do q = 1, j
                                  bc_sum = bc_sum - dy(-q)
@@ -352,7 +352,7 @@ contains
                      do l = -buff_size, m + buff_size
                         do k = 0, p
                            do i = xibeg, xiend
-                              bc_sum = 0d0
+                              bc_sum = 0_wp
                               !$acc loop seq
                             do q = 1, j
                                  bc_sum = bc_sum + dy(n + q)
@@ -391,7 +391,7 @@ contains
                      do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
                            do i = xibeg, xiend
-                              bc_sum = 0d0
+                              bc_sum = 0_wp
                               !$acc loop seq
                               do q = 1, j
                                  bc_sum = bc_sum - dx(-q)
@@ -424,7 +424,7 @@ contains
                      do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
                            do i = xibeg, xiend
-                              bc_sum = 0d0
+                              bc_sum = 0_wp
                               !$acc loop seq
                               do q = 1, j
                                  bc_sum = bc_sum + dz(p + q)

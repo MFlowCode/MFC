@@ -2246,7 +2246,7 @@ contains
 
     end subroutine s_convert_cylindrical_to_spherical_coord
 
-    !> Archimedes spiral funcreal(kind(0d0)) :: theta_cc, r, x_p, P2, P3, P4, P5, P6, P7tion
+    !> Archimedes spiral function :: theta_cc, r, x_p, P2, P3, P4, P5, P6, P7
     !! @param myth Angle
     !! @param offset Thickness
     !! @param a Starting position
