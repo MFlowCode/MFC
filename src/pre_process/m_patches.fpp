@@ -1444,7 +1444,6 @@ contains
         ! smoothed out, the pseudo volume fraction is set to 1 to make sure
         ! that only the current patch contributes to the fluid state in the
         ! cells that this patch covers.
-        eps = 1.d-32
         eta = 1._wp
         eps = 1.e-32_wp
 

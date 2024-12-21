@@ -1045,10 +1045,10 @@ contains
 #ifdef MFC_POST_PROCESS
                     if (hyperelasticity) then
                     ! to save von Mises stress instead of elastic internal energy
-                    qK_prim_vf(xiend+1)%sf(j, k, l) = sqrt((3d0/2d0)* (qK_prim_vf(strxb)%sf(j, k, l)**2d0 + &
-                                            2d0*qK_prim_vf(strxb+1)%sf(j, k, l)**2d0 + qK_prim_vf(strxb+2)%sf(j, k, l)**2d0 + &
-                                            2d0*qK_prim_vf(strxb+3)%sf(j, k, l)**2d0 + 2d0*qK_prim_vf(strxb+4)%sf(j, k, l)**2d0 + &
-                                            qK_prim_vf(strxe)%sf(j, k, l)**2d0) )
+                    qK_prim_vf(xiend+1)%sf(j, k, l) = sqrt((3_wp/2_wp)* (qK_prim_vf(strxb)%sf(j, k, l)**2_wp + &
+                                            2_wp*qK_prim_vf(strxb+1)%sf(j, k, l)**2_wp + qK_prim_vf(strxb+2)%sf(j, k, l)**2_wp + &
+                                            2_wp*qK_prim_vf(strxb+3)%sf(j, k, l)**2_wp + 2_wp*qK_prim_vf(strxb+4)%sf(j, k, l)**2_wp + &
+                                            qK_prim_vf(strxe)%sf(j, k, l)**2_wp) )
                     end if
 #endif
 
