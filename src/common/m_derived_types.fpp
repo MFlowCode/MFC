@@ -178,8 +178,6 @@ module m_derived_types
 
         logical :: non_axis_sym
 
-        logical :: non_axis_sym
-
         real(wp) :: a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12 !<
         !! The parameters needed for the spherical harmonic patch
 

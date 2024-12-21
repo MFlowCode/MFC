@@ -156,7 +156,6 @@ contains
                     end do
                 end do
             end do
-            call s_derive_center_of_mass(q_prim_ts(3)%vf, c_mass)
 
             call s_derive_center_of_mass(q_prim_ts(3)%vf, c_mass)
 

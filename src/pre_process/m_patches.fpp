@@ -792,7 +792,7 @@ contains
                                      ((y_cc(j) - y_centroid)/b)**2) &
                                 - 1._wp))*(-0.5_wp) + 0.5_wp
                 end if
-                print *, "a :", a, "b :", b
+
                 if ((((x_cc(i) - x_centroid)/a)**2 + &
                      ((y_cc(j) - y_centroid)/b)**2 <= 1._wp &
                      .and. &
@@ -2245,7 +2245,7 @@ contains
 
     end subroutine s_convert_cylindrical_to_spherical_coord
 
-    !> Archimedes spiral function :: theta_cc, r, x_p, P2, P3, P4, P5, P6, P7
+    !> Archimedes spiral function
     !! @param myth Angle
     !! @param offset Thickness
     !! @param a Starting position
