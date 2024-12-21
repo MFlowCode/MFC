@@ -112,9 +112,9 @@ contains
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, &
         !$acc rho, gamma, pi_inf, qv, G, Re, tensora, tensorb)
-        do l = 0, p-2
-            do k = 0, n-2
-                do j = 2, m-2
+        do l = 0, p - 2
+            do k = 0, n - 2
+                do j = 2, m - 2
                     !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho_k(i) = q_cons_vf(i)%sf(j, k, l)

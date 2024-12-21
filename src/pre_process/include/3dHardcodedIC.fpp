@@ -59,37 +59,37 @@
             q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
-    
+
     case (302) ! (3D lung geometry in X direction - axisym, with smoothing)
-        lam = 200.E-06_wp
+        lam = 200.e-06_wp
         amp = patch_icpp(patch_id)%a2
         h = 0.125_wp*amp
-        
+
         intH = amp/2._wp*(sin(2._wp*pi*y_cc(j)/lam + pi/2._wp) + sin(2._wp*pi*z_cc(k)/lam + pi/2._wp))
-        
-        alph = patch_icpp(2)%alpha(1) + (patch_icpp(1)%alpha(1)-patch_icpp(2)%alpha(1))/(h)*(x_cc(i)-(intH-h/2._wp))
-        
+
+        alph = patch_icpp(2)%alpha(1) + (patch_icpp(1)%alpha(1) - patch_icpp(2)%alpha(1))/(h)*(x_cc(i) - (intH - h/2._wp))
+
         if (x_cc(i) > intH + h/2) then
-        
+
             q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
             q_prim_vf(contxb)%sf(i, j, k) = patch_icpp(1)%alpha_rho(1)
             q_prim_vf(contxe)%sf(i, j, k) = patch_icpp(1)%alpha_rho(2)
             q_prim_vf(E_idx)%sf(i, j, k) = patch_icpp(1)%pres
-        
-        else if ((x_cc(i) .le. intH + h/2) .and. (x_cc(i) .ge. intH - h/2._wp)) then
-        
+
+        else if ((x_cc(i) <= intH + h/2) .and. (x_cc(i) >= intH - h/2._wp)) then
+
             q_prim_vf(advxb)%sf(i, j, k) = alph !0.5
             q_prim_vf(advxe)%sf(i, j, k) = 1._wp - alph !0.5
             q_prim_vf(contxb)%sf(i, j, k) = patch_icpp(1)%alpha_rho(1)/patch_icpp(1)%alpha(1)*alph!0.5
-            q_prim_vf(contxe)%sf(i, j, k) = patch_icpp(2)%alpha_rho(2)/patch_icpp(2)%alpha(2)*(1-alph)!0.5
+            q_prim_vf(contxe)%sf(i, j, k) = patch_icpp(2)%alpha_rho(2)/patch_icpp(2)%alpha(2)*(1 - alph)!0.5
             q_prim_vf(E_idx)%sf(i, j, k) = patch_icpp(1)%pres
-        
+
         end if
-    
+
     case (303) ! pre_stress for hyperelasticity, bubble in material
 
-        R0ref = 30E-6_wp    ! equilibrium radius
+        R0ref = 30e-6_wp    ! equilibrium radius
         Rinit = patch_icpp(3)%radius ! initial radius
         x_bcen = patch_icpp(3)%x_centroid
         y_bcen = patch_icpp(3)%y_centroid
@@ -101,7 +101,7 @@
         phi = atan2(y_ccs, x_ccs)
         theta = atan2(sqrt(x_ccs**2._wp + y_ccs**2._wp), z_ccs)
         !spherical coord, assuming Rmax=1
-        xi_sph = (rcoord**3._wp - R0ref**3._wp + Rinit**3._wp)**(1._wp/3._wp) 
+        xi_sph = (rcoord**3._wp - R0ref**3._wp + Rinit**3._wp)**(1._wp/3._wp)
         xi_cart(1) = xi_sph*sin(theta)*cos(phi)
         xi_cart(2) = xi_sph*sin(theta)*sin(phi)
         xi_cart(3) = xi_sph*cos(theta)

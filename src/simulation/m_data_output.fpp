@@ -322,7 +322,7 @@ contains
             !$acc end kernels
         end if
 #endif
-     
+
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
@@ -338,7 +338,7 @@ contains
             if (viscous) vcfl_max_glb = vcfl_max_loc
             if (viscous) Rc_min_glb = Rc_min_loc
         end if
-        
+
         ! Determining the stability criteria extrema over all the time-steps
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
 
