@@ -244,7 +244,7 @@ contains
         end do
 
         allocate (gathered_vector(sum(recounts)))
-        call MPI_GATHERV(my_vector, counts, MPI_DOUBLE_PRECISION, gathered_vector, recounts, displs, MPI_DOUBLE_PRECISION, &
+        call MPI_GATHERV(my_vector, counts, mpi_p, gathered_vector, recounts, displs, mpi_p, &
                          root, MPI_COMM_WORLD, ierr)
 #endif
     end subroutine s_mpi_gather_data

@@ -91,7 +91,7 @@ contains
             #:endfor
 
             #:for VAR in [ '2', '3', '4', '5', '6', '7', '8', '9']
-                call MPI_BCAST(patch_icpp(i)%a(${VAR}$), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_icpp(i)%a(${VAR}$), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
             call MPI_BCAST(patch_icpp(i)%model_filepath, len(patch_icpp(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
@@ -106,7 +106,7 @@ contains
             ! Broadcast IB variables
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%model_filepath, len(patch_ib(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%model_threshold, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%model_threshold, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%model_spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in [ 'x_centroid', 'y_centroid', 'z_centroid',           &
@@ -115,7 +115,7 @@ contains
             #:endfor
 
             #:for VAR in [ 'model_translate', 'model_scale', 'model_rotate']
-                call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
 
