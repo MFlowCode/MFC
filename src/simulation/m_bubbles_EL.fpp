@@ -439,8 +439,8 @@ contains
         end if
 
         call MPI_BCAST(tot_data, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(mytime, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(dt, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(mytime, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
         gsizes(1) = tot_data
         gsizes(2) = 21
@@ -450,7 +450,7 @@ contains
         start_idx_part(2) = 0
 
         call MPI_type_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, &
-                                      MPI_ORDER_FORTRAN, MPI_doUBLE_PRECISION, view, ierr)
+                                      MPI_ORDER_FORTRAN, mpi_p, view, ierr)
         call MPI_type_COMMIT(view, ierr)
 
         ! Open the file to write all flow variables
@@ -462,11 +462,11 @@ contains
             call MPI_FILE_open(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, &
                                mpi_info_int, ifile, ierr)
             disp = 0._wp
-            call MPI_FILE_SET_VIEW(ifile, disp, MPI_doUBLE_PRECISION, view, &
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, &
                                    'native', mpi_info_null, ierr)
             allocate (MPI_IO_DATA_lag_bubbles(tot_data, 1:21))
             call MPI_FILE_read_ALL(ifile, MPI_IO_DATA_lag_bubbles, 21*tot_data, &
-                                   MPI_doUBLE_PRECISION, status, ierr)
+                                   mpi_p, status, ierr)
             do i = 1, tot_data
                 id = int(MPI_IO_DATA_lag_bubbles(i, 1))
                 inputvals(1:20) = MPI_IO_DATA_lag_bubbles(i, 2:21)
@@ -1777,7 +1777,7 @@ contains
         end if
 
         call MPI_type_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, &
-                                      MPI_ORDER_FORTRAN, MPI_doUBLE_PRECISION, view, ierr)
+                                      MPI_ORDER_FORTRAN, mpi_p, view, ierr)
         call MPI_type_COMMIT(view, ierr)
 
         allocate (MPI_IO_DATA_lag_bubbles(1:max(1, bub_id), 1:21))
@@ -1795,7 +1795,7 @@ contains
 
         disp = 0._wp
 
-        call MPI_FILE_SET_VIEW(ifile, disp, MPI_doUBLE_PRECISION, view, &
+        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, &
                                'native', mpi_info_null, ierr)
 
         ! Cycle through list
@@ -1834,7 +1834,7 @@ contains
         end if
 
         call MPI_FILE_write_ALL(ifile, MPI_IO_DATA_lag_bubbles, 21*max(1, bub_id), &
-                                MPI_doUBLE_PRECISION, status, ierr)
+                                mpi_p, status, ierr)
 
         call MPI_FILE_CLOSE(ifile, ierr)
 

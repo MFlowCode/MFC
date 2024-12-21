@@ -427,7 +427,7 @@ contains
         real(wp), intent(out) :: h
 
         real(wp) :: h0, h1 !< Time step size
-        real(wp) :: d0, d1, d2 !< norms
+        real(wp) :: d_0, d1, d2 !< norms
         real(wp), dimension(2) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration
 
         ! Determine the starting time step
@@ -438,13 +438,13 @@ contains
                              fpb, fpbdot, alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu)
 
-        ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
-        d0 = sqrt((myR_tmp(1)**2._wp + myV_tmp(1)**2._wp)/2._wp)
-        d1 = sqrt((myV_tmp(1)**2._wp + myA_tmp(1)**2._wp)/2._wp)
-        if (d0 < 1e-5_wp .or. d1 < 1e-5_wp) then
+        ! Compute d_0 = ||y0|| and d1 = ||f(x0,y0)||
+        d_0 = sqrt((myR_tmp(1)**2._wp + myV_tmp(1)**2._wp)/2._wp)
+        d_1 = sqrt((myV_tmp(1)**2._wp + myA_tmp(1)**2._wp)/2._wp)
+        if (d_0 < 1e-5_wp .or. d1 < 1e-5_wp) then
             h0 = 1e-6_wp
         else
-            h0 = 1e-2_wp*(d0/d1)
+            h0 = 1e-2_wp*(d_0/d1)
         end if
 
         ! Evaluate f(x0+h0,y0+h0*f(x0,y0))

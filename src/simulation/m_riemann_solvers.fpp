@@ -1717,7 +1717,7 @@ contains
                         end do
                     end do
                     !$acc end parallel loop
-                    
+
                 elseif (model_eqns == 2 .and. bubbles_euler) then
                     !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
                     !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp)

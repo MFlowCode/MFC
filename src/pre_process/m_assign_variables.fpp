@@ -493,7 +493,7 @@ contains
                      + (1._wp - eta)*orig_prim_vf(i + stress_idx%beg - 1))
             end do
         end if
-        
+
         ! Elastic Shear Stress
         if (hyperelasticity) then
 

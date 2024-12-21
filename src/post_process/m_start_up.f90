@@ -699,7 +699,7 @@ contains
                 varname(:) = ' '
             end if
         end if
-        
+
         ! Adding the lagrangian subgrid variables  to the formatted database file ---------
         if (bubbles_lagrange) then
             !! Void fraction field

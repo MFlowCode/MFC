@@ -1232,7 +1232,7 @@ contains
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
         end if
-        
+
         if (hyperelasticity) then
             do i = xibeg, xiend + 1
                 @:DEALLOCATE(q_prim_vf(i)%sf)

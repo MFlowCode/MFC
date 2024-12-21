@@ -1076,7 +1076,7 @@ contains
         end if
 
         call MPI_BCAST(tot_data, 1, MPI_integer, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(time_real, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(time_real, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
         gsizes(1) = tot_data
         gsizes(2) = 21
@@ -1086,7 +1086,7 @@ contains
         start_idx_part(2) = 0
 
         call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, &
-                                      MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, view, ierr)
+                                      MPI_ORDER_FORTRAN, mpi_p, view, ierr)
         call MPI_TYPE_COMMIT(view, ierr)
 
         write (file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
@@ -1099,13 +1099,13 @@ contains
                                mpi_info_int, ifile, ierr)
 
             disp = 0._wp
-            call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, view, &
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, &
                                    'native', mpi_info_null, ierr)
 
             allocate (MPI_IO_DATA_lg_bubbles(tot_data, 1:21))
 
             call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lg_bubbles, 21*tot_data, &
-                                   MPI_DOUBLE_PRECISION, status, ierr)
+                                   mpi_p, status, ierr)
 
             write (file_loc, '(A,I0,A)') 'lag_bubbles_post_process_', t_step, '.dat'
             file_loc = trim(case_dir)//'/lag_bubbles_post_process/'//trim(file_loc)
