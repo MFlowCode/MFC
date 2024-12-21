@@ -16,6 +16,8 @@ module m_data_output
 
     use m_global_parameters     ! Global parameters for the code
 
+    use m_derived_variables     !< Procedures used to compute quantities derived
+
     use m_mpi_proxy             ! Message passing interface (MPI) module proxy
 
     use m_compile_specific
@@ -27,10 +29,16 @@ module m_data_output
 
     private; public :: s_initialize_data_output_module, &
  s_open_formatted_database_file, &
+ s_open_intf_data_file, &
+ s_open_energy_data_file, &
  s_write_grid_to_formatted_database_file, &
  s_write_variable_to_formatted_database_file, &
  s_write_lag_bubbles_results, &
+ s_write_intf_data_file, &
+ s_write_energy_data_file, &
  s_close_formatted_database_file, &
+ s_close_intf_data_file, &
+ s_close_energy_data_file, &
  s_finalize_data_output_module
 
     ! Including the Silo Fortran interface library that features the subroutines
@@ -540,6 +548,38 @@ contains
         ! END: Binary Database Format ======================================
 
     end subroutine s_open_formatted_database_file ! ------------------------
+
+    subroutine s_open_intf_data_file() ! ------------------------
+
+        character(LEN=path_len + 3*name_len) :: file_path !<
+              !! Relative path to a file in the case directory
+
+        write (file_path, '(A)') '/intf_data.dat'
+        file_path = trim(case_dir)//trim(file_path)
+
+        ! Opening the simulation data file
+        open (211, FILE=trim(file_path), &
+              FORM='formatted', &
+              POSITION='append', &
+              STATUS='unknown')
+
+    end subroutine s_open_intf_data_file ! ---------------------------------------
+
+    subroutine s_open_energy_data_file() ! ------------------------
+
+        character(LEN=path_len + 3*name_len) :: file_path !<
+              !! Relative path to a file in the case directory
+
+        write (file_path, '(A)') '/eng_data.dat'
+        file_path = trim(case_dir)//trim(file_path)
+
+        ! Opening the simulation data file
+        open (251, FILE=trim(file_path), &
+              FORM='formatted', &
+              POSITION='append', &
+              STATUS='unknown')
+
+    end subroutine s_open_energy_data_file ! ----------------------------------------
 
     subroutine s_write_grid_to_formatted_database_file(t_step) ! -----------
         ! Description: The general objective of this subroutine is to write the
@@ -1102,6 +1142,196 @@ contains
 #endif
 
     end subroutine s_write_lag_bubbles_results
+    subroutine s_write_intf_data_file(q_prim_vf)
+
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        integer :: i, j, k, l, w, cent !< Generic loop iterators
+        integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
+        real(wp), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
+        real(wp), parameter :: pi = 4._wp*tan(1._wp)
+        real(wp), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
+        real(wp) :: axp, axm, ayp, aym, azm, azp, tgp, euc_d, thres, maxalph_loc, maxalph_glb
+
+        allocate (x_d1(m*n))
+        allocate (y_d1(m*n))
+        counter = 0
+        maxalph_loc = 0_wp
+        do k = 0, p
+            do j = 0, n
+                do i = 0, m
+                    if (q_prim_vf(E_idx + 2)%sf(i, j, k) > maxalph_loc) then
+                        maxalph_loc = q_prim_vf(E_idx + 2)%sf(i, j, k)
+                    end if
+                end do
+            end do
+        end do
+
+        call s_mpi_allreduce_max(maxalph_loc, maxalph_glb)
+        if (p > 0) then
+            do l = 0, p
+                if (z_cc(l) < dz(l) .and. z_cc(l) > 0) then
+                    cent = l
+                end if
+            end do
+        else
+            cent = 0
+        end if
+
+        thres = 0.9_wp*maxalph_glb
+        do k = 0, n
+            do j = 0, m
+                axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
+                axm = q_prim_vf(E_idx + 2)%sf(j, k, cent)
+                ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, cent)
+                aym = q_prim_vf(E_idx + 2)%sf(j, k, cent)
+                if ((axp > thres .and. axm < thres) .or. (axp < thres .and. axm > thres) &
+                    .or. (ayp > thres .and. aym < thres) .or. (ayp < thres .and. aym > thres)) then
+                    if (counter == 0) then
+                        counter = counter + 1
+                        x_d1(counter) = x_cc(j)
+                        y_d1(counter) = y_cc(k)
+                        euc_d = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
+                        tgp = sqrt(dx(j)**2 + dy(k)**2)
+                    else
+                        euc_d = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
+                        tgp = sqrt(dx(j)**2 + dy(k)**2)
+                        do i = 1, counter
+                            if (euc_d < tgp) then
+                                cycle
+                            elseif (euc_d > tgp .and. i == counter) then
+                                counter = counter + 1
+                                x_d1(counter) = x_cc(j)
+                                y_d1(counter) = y_cc(k)
+
+                            end if
+                        end do
+                    end if
+                end if
+            end do
+        end do
+
+        allocate (x_d(counter), y_d(counter))
+
+        do i = 1, counter
+            y_d(i) = y_d1(i)
+            x_d(i) = x_d1(i)
+        end do
+        root = 0
+
+        call s_mpi_gather_data(x_d, counter, x_td, root)
+        call s_mpi_gather_data(y_d, counter, y_td, root)
+        if (proc_rank == 0) then
+            do i = 1, size(x_td)
+                if (i == size(x_td)) then
+                    write (211, '(F12.9,1X,F12.9,1X,I4)') &
+                        x_td(i), y_td(i), size(x_td)
+                else
+                    write (211, '(F12.9,1X,F12.9,1X,F3.1)') &
+                        x_td(i), y_td(i), 0_wp
+                end if
+            end do
+        end if
+
+    end subroutine s_write_intf_data_file ! -----------------------------------
+
+    subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
+        real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
+        real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H
+        real(wp), dimension(num_dims) :: vel
+        real(wp), dimension(num_fluids) :: gammas, pi_infs, adv
+        integer :: i, j, k, l, s !looping indices
+        integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
+
+        Egk = 0_wp
+        Elp = 0_wp
+        Egint = 0_wp
+        Vb = 0_wp
+        maxvel = 0_wp
+        MaxMa = 0_wp
+        Vl = 0_wp
+        Elk = 0_wp
+        Et = 0_wp
+        Vb = 0_wp
+        dV = 0_wp
+        pres_av = 0_wp
+        pres = 0_wp
+        c = 0._wp
+
+        do k = 0, p
+            do j = 0, n
+                do i = 0, m
+                    pres = 0_wp
+                    dV = dx(i)*dy(j)*dz(k)
+                    rho = 0_wp
+                    gamma = 0_wp
+                    pi_inf = 0_wp
+                    pres = q_prim_vf(E_idx)%sf(i, j, k)
+                    Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
+                    do s = 1, num_dims
+                        vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
+                        Egk = Egk + 0.5_wp*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        Elk = Elk + 0.5_wp*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        if (abs(vel(s)) > maxvel) then
+                            maxvel = abs(vel(s))
+                        end if
+                    end do
+                    do l = 1, adv_idx%end - E_idx
+                        adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
+                        gamma = gamma + adv(l)*fluid_pp(l)%gamma
+                        pi_inf = pi_inf + adv(l)*fluid_pp(l)%pi_inf
+                        rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
+                    end do
+
+                    H = ((gamma + 1_wp)*pres + pi_inf)/rho
+
+                    call s_compute_speed_of_sound(pres, rho, &
+                                                  gamma, pi_inf, &
+                                                  H, adv, 0._wp, 0._wp, c)
+
+                    Ma = maxvel/c
+                    if (Ma > MaxMa .and. (adv(1) > (1.0_wp - 1.0e-10_wp))) then
+                        MaxMa = Ma
+                    end if
+                    Vl = Vl + adv(1)*dV
+                    Vb = Vb + adv(2)*dV
+                    pres_av = pres_av + adv(1)*pres*dV
+                    Et = Et + q_cons_vf(E_idx)%sf(i, j, k)*dV
+                end do
+            end do
+        end do
+
+        tmp = pres_av
+        call s_mpi_allreduce_sum(tmp, pres_av)
+        tmp = Vl
+        call s_mpi_allreduce_sum(tmp, Vl)
+
+        call s_mpi_allreduce_max(MaxMa, MaxMa_glb)
+        tmp = Elk
+        call s_mpi_allreduce_sum(tmp, Elk)
+        tmp = Egint
+        call s_mpi_allreduce_sum(tmp, Egint)
+        tmp = Egk
+        call s_mpi_allreduce_sum(tmp, Egk)
+        tmp = Vb
+        call s_mpi_allreduce_sum(tmp, Vb)
+        tmp = Et
+        call s_mpi_allreduce_sum(tmp, Et)
+
+        Elp = pres_av/Vl*Vb
+        if (proc_rank == 0) then
+            write (251, '(10X, 8F24.8)') &
+                Elp, &
+                Egint, &
+                Elk, &
+                Egk, &
+                Et, &
+                Vb, &
+                Vl, &
+                MaxMa_glb
+        end if
+
+    end subroutine s_write_energy_data_file
 
     subroutine s_close_formatted_database_file() ! -------------------------
         ! Description: The purpose of this subroutine is to close any formatted
@@ -1129,6 +1359,18 @@ contains
         end if
 
     end subroutine s_close_formatted_database_file ! -----------------------
+
+    subroutine s_close_intf_data_file() ! -----------------------
+
+        close (211)
+
+    end subroutine s_close_intf_data_file !---------------------
+
+    subroutine s_close_energy_data_file() ! -----------------------
+
+        close (251)
+
+    end subroutine s_close_energy_data_file !---------------------
 
     subroutine s_finalize_data_output_module() ! -------------------------
         ! Description: Deallocation procedures for the module

@@ -48,8 +48,9 @@ module m_start_up
 
     use m_derived_variables     !< Procedures used to compute quantities derived
                                 !! from the conservative and primitive variables
-
     use m_hypoelastic
+
+    use m_hyperelastic
 
     use m_phase_change          !< Phase-change module
 
@@ -145,6 +146,7 @@ contains
             teno_CT, mp_weno, weno_avg, &
             riemann_solver, low_Mach, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
+            x_a, y_a, z_a, x_b, y_b, z_b, &
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
@@ -171,7 +173,8 @@ contains
             cfl_adap_dt, cfl_const_dt, cfl_target, &
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
-            rkck_adap_dt, rkck_tolerance
+            rkck_adap_dt, rkck_tolerance, &
+            hyperelasticity, R0ref
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -363,7 +366,7 @@ contains
             end if
         end do
 
-        if ((bubbles_euler .eqv. .true.) .or. (hypoelasticity .eqv. .true.)) then
+        if (bubbles_euler .or. elasticity) then
             ! Read pb and mv for non-polytropic qbmm
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
@@ -626,7 +629,7 @@ contains
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                if (bubbles_euler .or. hypoelasticity) then
+                if (bubbles_euler .or. elasticity) then
 
                     do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
@@ -651,6 +654,7 @@ contains
                                            mpi_p, status, ierr)
                     end do
                 end if
+                
 
                 call s_mpi_barrier()
 
@@ -761,9 +765,8 @@ contains
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                if (bubbles_euler .or. hypoelasticity) then
-
-                    do i = 1, sys_size!adv_idx%end
+                if (bubbles_euler .or. elasticity) then
+                    do i = 1, sys_size !adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
@@ -1297,7 +1300,7 @@ contains
         ! Time-stepping loop controls
 
         t_step = t_step + 1
-
+        
     end subroutine s_perform_time_step
 
     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
@@ -1475,7 +1478,6 @@ contains
         call acc_present_dump()
 #endif
 
-        if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (relax) call s_initialize_phasechange_module()
 
         call s_initialize_data_output_module()
@@ -1511,9 +1513,11 @@ contains
 #endif
 
         call s_initialize_cbc_module()
-
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
+
+        if (hypoelasticity) call s_initialize_hypoelastic_module()
+        if (hyperelasticity) call s_initialize_hyperelastic_module()
 
     end subroutine s_initialize_modules
 
@@ -1595,6 +1599,7 @@ contains
         do i = 1, sys_size
             !$acc update device(q_cons_ts(1)%vf(i)%sf)
         end do
+
         if (qbmm .and. .not. polytropic) then
             !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
         end if
@@ -1631,6 +1636,8 @@ contains
     subroutine s_finalize_modules
 
         call s_finalize_time_steppers_module()
+        if (hypoelasticity) call s_finalize_hypoelastic_module() 
+        if (hyperelasticity) call s_finalize_hyperelastic_module() 
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()
