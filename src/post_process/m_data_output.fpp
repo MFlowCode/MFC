@@ -33,9 +33,9 @@ module m_data_output
  s_open_energy_data_file, &
  s_write_grid_to_formatted_database_file, &
  s_write_variable_to_formatted_database_file, &
+ s_write_lag_bubbles_results, &
  s_write_intf_data_file, &
  s_write_energy_data_file, &
- s_write_lag_bubbles_results, &
  s_close_formatted_database_file, &
  s_close_intf_data_file, &
  s_close_energy_data_file, &
