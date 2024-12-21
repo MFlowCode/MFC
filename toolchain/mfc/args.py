@@ -83,6 +83,8 @@ started, run ./mfc.sh build -h.""",
     test.add_argument(      "--no-build",     action="store_true",                    default=False,      help="(Testing) Do not rebuild MFC.")
     test.add_argument(      "--no-examples",  action="store_true",                    default=False,      help="Do not test example cases." )
     test.add_argument("--case-optimization",  action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
+    test.add_argument(      "--dry-run",      action="store_true",                    default=False,      help="Build and generate case files but do not run tests.")
+
     test_meg = test.add_mutually_exclusive_group()
     test_meg.add_argument("--generate",          action="store_true", default=False, help="(Test Generation) Generate golden files.")
     test_meg.add_argument("--add-new-variables", action="store_true", default=False, help="(Test Generation) If new variables are found in D/ when running tests, add them to the golden files.")

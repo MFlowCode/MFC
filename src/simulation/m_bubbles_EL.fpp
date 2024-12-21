@@ -332,8 +332,8 @@ contains
         mtn_vel(bub_id, 1:3, 1) = inputBubble(4:6)
 
         if (cyl_coord .and. p == 0) then
-            mtn_pos(bub_id, 2, 1) = dsqrt(mtn_pos(bub_id, 2, 1)**2._wp + &
-                                          mtn_pos(bub_id, 3, 1)**2._wp)
+            mtn_pos(bub_id, 2, 1) = sqrt(mtn_pos(bub_id, 2, 1)**2._wp + &
+                                         mtn_pos(bub_id, 3, 1)**2._wp)
             !Storing azimuthal angle (-Pi to Pi)) into the third coordinate variable
             mtn_pos(bub_id, 3, 1) = atan2(inputBubble(3), inputBubble(2))
             mtn_posPrev(bub_id, 1:3, 1) = mtn_pos(bub_id, 1:3, 1)
@@ -382,7 +382,7 @@ contains
             print *, 'location:', mtn_pos(bub_id, 1:3, 1)
             stop
         end if
-        omegaN = dsqrt(omegaN/bub_R0(bub_id)**2._wp)
+        omegaN = sqrt(omegaN/bub_R0(bub_id)**2._wp)
 
         cpparticle = concvap*cp_v + (1._wp - concvap)*cp_n
         kparticle = concvap*k_vl + (1._wp - concvap)*k_nl
@@ -654,7 +654,6 @@ contains
         real(wp), intent(out) :: cson
 
         real(wp) :: E, H
-        real(wp), dimension(3) :: scoord
         real(wp), dimension(num_dims) :: vel
         integer :: i
 
@@ -817,7 +816,7 @@ contains
         real(wp), intent(out), optional :: preterm1, term2, Romega
 
         real(wp), dimension(3) :: scoord, psi
-        real(wp) :: dc, vol, aux, dist
+        real(wp) :: dc, vol, aux
         real(wp) :: volgas, term1, Rbeq, denom
         real(wp) :: charvol, charpres, charvol2, charpres2
         integer, dimension(3) :: cellaux

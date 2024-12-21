@@ -309,6 +309,8 @@ contains
         real(wp) :: orig_qv
         real(wp) :: muR, muV
         real(wp) :: R3bar
+        real(wp) :: rcoord, theta, phi, xi_sph
+        real(wp), dimension(3) :: xi_cart
 
         real(wp), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
         real(wp) :: pres   !< pressure
@@ -484,12 +486,38 @@ contains
         end do
 
         ! Elastic Shear Stress
-        if (hypoelasticity) then
+        if (elasticity) then
             do i = 1, (stress_idx%end - stress_idx%beg) + 1
                 q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = &
                     (eta*patch_icpp(patch_id)%tau_e(i) &
                      + (1._wp - eta)*orig_prim_vf(i + stress_idx%beg - 1))
             end do
+        end if
+
+        ! Elastic Shear Stress
+        if (hyperelasticity) then
+
+            if (pre_stress) then ! pre stressed initial condition in spatial domain
+                rcoord = sqrt((x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2))
+                theta = atan2(y_cc(k), x_cc(j))
+                phi = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
+                !spherical coord, assuming Rmax=1
+                xi_sph = (rcoord**3 - R0ref**3 + 1_wp)**(1_wp/3_wp)
+                xi_cart(1) = xi_sph*sin(phi)*cos(theta)
+                xi_cart(2) = xi_sph*sin(phi)*sin(theta)
+                xi_cart(3) = xi_sph*cos(phi)
+            else
+                xi_cart(1) = x_cc(j)
+                xi_cart(2) = y_cc(k)
+                xi_cart(3) = z_cc(l)
+            end if
+
+            ! assigning the reference map to the q_prim vector field
+            do i = 1, num_dims
+                q_prim_vf(i + xibeg - 1)%sf(j, k, l) = eta*xi_cart(i) + &
+                                                       (1_wp - eta)*orig_prim_vf(i + xibeg - 1)
+            end do
+
         end if
 
         if (mpp_lim .and. bubbles_euler) then

@@ -145,9 +145,12 @@ module m_global_parameters
     integer :: wave_speeds    !< Wave speeds estimation method
     integer :: avg_state      !< Average state evaluation method
     logical :: alt_soundspeed !< Alternate mixture sound speed
-    logical :: null_weights   !< Null undesired WENO weights
-    logical :: mixture_err    !< Mixture properties correction
-    logical :: hypoelasticity !< hypoelasticity modeling
+    logical :: null_weights    !< Null undesired WENO weights
+    logical :: mixture_err     !< Mixture properties correction
+    logical :: hypoelasticity  !< hypoelasticity modeling
+    logical :: hyperelasticity !< hyperelasticity modeling
+    integer :: hyper_model     !< hyperelasticity solver algorithm
+    logical :: elasticity      !< elasticity modeling, true for hyper or hypo
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     logical :: cu_tensor
     logical :: viscous       !< Viscous effects
@@ -173,7 +176,7 @@ module m_global_parameters
         !$acc declare create(num_dims, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, low_Mach, viscous, shear_stress, bulk_stress)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -189,6 +192,8 @@ module m_global_parameters
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
     type(bounds_info) :: x_domain, y_domain, z_domain
+    real(wp) :: x_a, y_a, z_a
+    real(wp) :: x_b, y_b, z_b
 
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< shared file or not when using parallel io
@@ -218,20 +223,23 @@ module m_global_parameters
     !> @name Annotations of the structure of the state and flux vectors in terms of the
     !! size and the configuration of the system of equations to which they belong
     !> @{
-    integer :: sys_size                  !< Number of unknowns in system of eqns.
+    integer :: sys_size                                !< Number of unknowns in system of eqns.
     type(int_bounds_info) :: cont_idx                  !< Indexes of first & last continuity eqns.
     type(int_bounds_info) :: mom_idx                   !< Indexes of first & last momentum eqns.
-    integer :: E_idx                     !< Index of energy equation
-    integer :: n_idx                     !< Index of number density
+    integer :: E_idx                                   !< Index of energy equation
+    integer :: n_idx                                   !< Index of number density
     type(int_bounds_info) :: adv_idx                   !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx      !< Indexes of first & last internal energy eqns.
-    type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
-    integer :: alf_idx               !< Index of void fraction
-    integer :: gamma_idx                 !< Index of specific heat ratio func. eqn.
-    integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
+    type(bub_bounds_info) :: bub_idx                   !< Indexes of first & last bubble variable eqns.
+    integer :: alf_idx                                 !< Index of void fraction
+    integer :: gamma_idx                               !< Index of specific heat ratio func. eqn.
+    integer :: pi_inf_idx                              !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
-    integer :: c_idx         ! Index of the color function
-    type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
+    type(int_bounds_info) :: xi_idx                    !< Indexes of first and last reference map eqns.
+    integer :: b_size                                  !< Number of elements in the symmetric b tensor, plus one
+    integer :: tensor_size                             !< Number of elements in the full tensor plus one
+    type(int_bounds_info) :: species_idx               !< Indexes of first & last concentration eqns.
+    integer :: c_idx                                   !< Index of color function
     !> @}
 
     !$acc declare create(bub_idx)
@@ -287,7 +295,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, species_idx)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -313,6 +321,7 @@ module m_global_parameters
     !! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
     !! it is a measure of the half-size of the finite-difference stencil for the
     !! selected order of accuracy.
+    !$acc declare create(fd_order,fd_number)
 
     logical :: probe_wrt
     logical :: integral_wrt
@@ -439,8 +448,9 @@ module m_global_parameters
     integer :: bubxb, bubxe
     integer :: strxb, strxe
     integer :: chemxb, chemxe
-
-    !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe,  chemxb, chemxe)
+    integer :: xibeg, xiend
+    !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe, chemxb, chemxe)
+    !$acc declare create(xibeg,xiend)
 
     real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
     !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
@@ -526,6 +536,11 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         hypoelasticity = .false.
+        hyperelasticity = .false.
+        elasticity = .false.
+        hyper_model = dflt_int
+        b_size = dflt_int
+        tensor_size = dflt_int
         weno_flat = .true.
         riemann_flat = .true.
         rdma_mpi = .false.
@@ -888,11 +903,24 @@ contains
                     end if
                 end if
 
-                if (hypoelasticity) then
+                if (hypoelasticity .or. hyperelasticity) then
+                    elasticity = .true.
                     stress_idx%beg = sys_size + 1
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                     ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
                     sys_size = stress_idx%end
+                end if
+
+                if (hyperelasticity) then
+                    ! number of entries in the symmetric btensor plus the jacobian
+                    b_size = (num_dims*(num_dims + 1))/2 + 1
+                    ! storing the jacobian in the last entry
+                    tensor_size = num_dims**2 + 1
+                    xi_idx%beg = sys_size + 1
+                    xi_idx%end = sys_size + num_dims
+                    ! adding three more equations for the \xi field and the elastic energy
+                    sys_size = xi_idx%end + 1
+                    hyper_model = 1
                 end if
 
                 if (surface_tension) then
@@ -912,6 +940,25 @@ contains
                 internalEnergies_idx%beg = adv_idx%end + 1
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
+
+                if (hypoelasticity .or. hyperelasticity) then
+                    elasticity = .true.
+                    stress_idx%beg = sys_size + 1
+                    stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+                    ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
+                    sys_size = stress_idx%end
+                end if
+
+                if (hyperelasticity) then
+                    ! number of entries in the symmetric btensor plus the jacobian
+                    b_size = (num_dims*(num_dims + 1))/2 + 1
+                    ! storing the jacobian in the last entry
+                    tensor_size = num_dims**2 + 1
+                    xi_idx%beg = sys_size + 1
+                    xi_idx%end = sys_size + num_dims
+                    ! adding three more equations for the \xi field and the elastic energy
+                    sys_size = xi_idx%end + 1
+                end if
 
                 if (surface_tension) then
                     c_idx = sys_size + 1
@@ -1066,10 +1113,13 @@ contains
         ! the next one
         if (viscous) then
             buff_size = 2*weno_polyn + 2
-!        else if (hypoelasticity) then !TODO: check if necessary
-!            buff_size = 2*weno_polyn + 2
         else
             buff_size = weno_polyn + 2
+        end if
+
+        if (elasticity) then
+            fd_number = max(1, fd_order/2)
+            !buff_size = buff_size + fd_number
         end if
 
         if (probe_wrt) then
@@ -1113,6 +1163,7 @@ contains
             startz = -buff_size
         end if
 
+        !$acc update device(fd_order,fd_number)
         !$acc update device(startx, starty, startz)
 
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
@@ -1135,15 +1186,19 @@ contains
         strxe = stress_idx%end
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
+        xibeg = xi_idx%beg
+        xiend = xi_idx%end
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
         !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
+        !$acc update device(b_size, xibeg, xiend, tensor_size)
+
         !$acc update device(species_idx)
         !$acc update device(cfl_target, m, n, p)
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, low_Mach)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, low_Mach)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)
@@ -1151,7 +1206,9 @@ contains
         #:endif
 
         !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
-        !$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+
+        !$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN, mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+
         !$acc enter data copyin(dir_idx, dir_flg, dir_idx_tau)
 
         !$acc enter data copyin(relax, relax_model, palpha_eps,ptgalpha_eps)

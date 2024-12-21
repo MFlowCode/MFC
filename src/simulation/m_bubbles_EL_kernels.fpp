@@ -156,8 +156,8 @@ contains
                             nodecoord(1) = x_cc(cellaux(1))
                             nodecoord(2) = y_cc(cellaux(2))
                             if (p > 0) nodecoord(3) = z_cc(cellaux(3))
-                            call s_applygaussian(center, cellaux, nodecoord, stddsv, 0, func)
-                            if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1, func2)
+                            call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
+                            if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
 
                             ! Relocate cells for bubbles intersecting symmetric boundaries
                             if (bc_x%beg == -2 .or. bc_x%end == -2 .or. bc_y%beg == -2 .or. bc_y%end == -2 &
@@ -214,18 +214,18 @@ contains
         integer, dimension(3), intent(in) :: cellaux
         real(wp), dimension(3), intent(in) :: nodecoord
         real(wp), intent(in) :: stddsv
-        integer, intent(in) :: strength_idx
+        real(wp), intent(in) :: strength_idx
         real(wp), intent(out) :: func
 
         real(wp) :: distance
         real(wp) :: theta, dtheta, L2, dzp, Lz2
-        integer :: Nr, Nr_count
+        real(wp) :: Nr, Nr_count
 
         distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + (center(3) - nodecoord(3))**2._wp)
 
         if (num_dims == 3) then
             !< 3D gaussian function
-            func = exp(-0.5_wp*(distance/stddsv)**2._wp)/(DSQRT(2._wp*pi)*stddsv)**3._wp
+            func = exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
         else
             if (cyl_coord) then
                 !< 2D cylindrical function:
@@ -234,19 +234,19 @@ contains
                 Nr = ceiling(2._wp*pi*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
                 dtheta = 2._wp*pi/Nr
                 L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
-                distance = DSQRT((center(1) - nodecoord(1))**2._wp + L2)
+                distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
                 ! Factor 2._wp is for symmetry (upper half of the 2D field (+r) is considered)
-                func = dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(DSQRT(2._wp*pi)*stddsv)**3._wp
-                Nr_count = 0
-                do while (Nr_count < Nr - 1)
-                    Nr_count = Nr_count + 1
+                func = dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
+                Nr_count = 0._wp
+                do while (Nr_count < Nr - 1._wp)
+                    Nr_count = Nr_count + 1._wp
                     theta = Nr_count*dtheta
                     ! trigonometric relation
                     L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
-                    distance = DSQRT((center(1) - nodecoord(1))**2._wp + L2)
+                    distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
                     ! nodecoord(2)*dtheta is the azimuthal width of the cell
                     func = func + &
-                           dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(DSQRT(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1))
+                           dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1._wp))
                 end do
             else
 
@@ -254,17 +254,17 @@ contains
                 ! We smear particles considering a virtual depth (lag_params%charwidth)
                 theta = 0._wp
                 Nr = ceiling(lag_params%charwidth/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
-                Nr_count = 1 - mapCells
+                Nr_count = 1._wp - mapCells*1._wp
                 dzp = y_cb(cellaux(2) + 1) - y_cb(cellaux(2))
                 Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
-                distance = DSQRT((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
-                func = dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(DSQRT(2._wp*pi)*stddsv)**3._wp
-                do while (Nr_count < Nr - 1 + (mapCells - 1))
-                    Nr_count = Nr_count + 1
+                distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
+                func = dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
+                do while (Nr_count < Nr - 1._wp + ((mapCells - 1)*1._wp))
+                    Nr_count = Nr_count + 1._wp
                     Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
-                    distance = DSQRT((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
+                    distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
                     func = func + &
-                           dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(DSQRT(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1))
+                           dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1._wp))
                 end do
             end if
         end if
