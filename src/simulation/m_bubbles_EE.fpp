@@ -427,7 +427,7 @@ contains
         real(wp), intent(out) :: h
 
         real(wp) :: h0, h1 !< Time step size
-        real(wp) :: d0, d1, d2 !< norms
+        real(wp) :: d_0, d_1, d_2 !< norms
         real(wp), dimension(2) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration
 
         ! Determine the starting time step
@@ -438,13 +438,13 @@ contains
                              fpb, fpbdot, alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu)
 
-        ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
-        d0 = sqrt((myR_tmp(1)**2._wp + myV_tmp(1)**2._wp)/2._wp)
-        d1 = sqrt((myV_tmp(1)**2._wp + myA_tmp(1)**2._wp)/2._wp)
-        if (d0 < 1e-5_wp .or. d1 < 1e-5_wp) then
+        ! Compute d_0 = ||y0|| and d_1 = ||f(x0,y0)||
+        d_0 = sqrt((myR_tmp(1)**2._wp + myV_tmp(1)**2._wp)/2._wp)
+        d_1 = sqrt((myV_tmp(1)**2._wp + myA_tmp(1)**2._wp)/2._wp)
+        if (d_0 < 1e-5_wp .or. d_1 < 1e-5_wp) then
             h0 = 1e-6_wp
         else
-            h0 = 1e-2_wp*(d0/d1)
+            h0 = 1e-2_wp*(d_0/d_1)
         end if
 
         ! Evaluate f(x0+h0,y0+h0*f(x0,y0))
@@ -454,18 +454,17 @@ contains
                              fpb, fpbdot, alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu)
 
-        ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
-        d2 = sqrt(((myV_tmp(2) - myV_tmp(1))**2._wp + (myA_tmp(2) - myA_tmp(1))**2._wp)/2._wp)/h0
+        ! Compute d_2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
+        d_2 = sqrt(((myV_tmp(2) - myV_tmp(1))**2._wp + (myA_tmp(2) - myA_tmp(1))**2._wp)/2._wp)/h0
 
-        ! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
-        !      if max(d1,d2) < 1e-15_wp, h1 = max(1e-6_wp, h0*1e-3_wp)
-        if (max(d1, d2) < 1e-15_wp) then
+        ! Set h1 = (0.01/max(d_1,d_2))^{1/(p+1)}
+        !      if max(d_1,d_2) < 1e-15_wp, h1 = max(1e-6_wp, h0*1e-3_wp)
+        if (max(d_1, d_2) < 1e-15_wp) then
             h1 = max(1e-6_wp, h0*1e-3_wp)
         else
-            h1 = (1e-2_wp/max(d1, d2))**(1._wp/3._wp)
+            h1 = (1e-2_wp/max(d_1, d_2))**(1._wp/3._wp)
         end if
 
-        ! Set h = min(100*h0,h1)
         h = min(100._wp*h0, h1)
 
     end subroutine s_initialize_adap_dt

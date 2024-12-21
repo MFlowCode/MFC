@@ -516,10 +516,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(sys_size + 1), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(sys_size + 1), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_READ(ifile, MPI_IO_DATA%var(sys_size + 1)%sf, data_size, &
-                                       MPI_DOUBLE_PRECISION, status, ierr)
+                                       mpi_p, status, ierr)
                 end if
 
                 call s_mpi_barrier()
