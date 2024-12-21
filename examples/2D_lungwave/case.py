@@ -15,7 +15,7 @@ rhog = 1.18     #kg/m^3
 c_g = 347.2     #m/s
 G_g = 0         #pa
 
-#material2 :: lung
+    #material2 :: lung
 
 gammal = 5.5
 Bl = 492.E+06
@@ -32,7 +32,7 @@ lambda_wave = 1E-3
 #define pulse
 P_amp = 10.E+6
 P_len = 45                  #length of the impulse
-theta = -math.pi/2          #direction of propagation 
+theta = -math.pi/2          #direction of propagation
 
 #non-dim
 
