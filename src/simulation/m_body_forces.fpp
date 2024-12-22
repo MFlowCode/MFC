@@ -12,14 +12,14 @@ module m_body_forces
 
     use m_nvtx
 
-#ifdef MFC_OpenACC
-    use openacc
-#endif
+#ifdef MFC_OpenACC 
+    use openacc 
+#endif 
     ! ==========================================================================
 
     implicit none
 
-    private; 
+    private;  
     public :: s_compute_body_forces_rhs, &
               s_initialize_body_forces_module, &
               s_finalize_body_forces_module
