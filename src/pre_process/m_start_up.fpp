@@ -142,7 +142,8 @@ contains
             file_per_process, relax, relax_model, &
             palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
             sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
-            n_start_old, surface_tension, hyperelasticity, pre_stress
+            n_start_old, surface_tension, hyperelasticity, pre_stress, &
+            elasticity
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'

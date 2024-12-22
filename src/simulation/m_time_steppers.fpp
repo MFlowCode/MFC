@@ -802,6 +802,10 @@ contains
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
+        call nvtxStartRange("RHS-ELASTIC")
+        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(1)%vf, q_prim_vf)
+        call nvtxEndRange
+
         if (ib) then
             if (qbmm .and. .not. polytropic) then
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)

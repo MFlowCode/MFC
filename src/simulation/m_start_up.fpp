@@ -169,7 +169,7 @@ contains
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target,  &
             viscous, surface_tension,               & 
-            hyperelasticity, R0ref
+            hyperelasticity, R0ref, elasticity
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
