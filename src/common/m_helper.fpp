@@ -231,13 +231,13 @@ contains
         real(wp), intent(in) :: omega, peclet
         real(wp), intent(out) :: Re_trans, Im_trans
 
-        complex :: trans, c1, c2, c3
-        complex :: imag = (0._wp, 1._wp)
-        real(wp) :: f_transcoeff
+        complex(wp) :: imag, trans, c1, c2, c3
+
+        imag = (0._wp, 1._wp)
 
         c1 = imag*omega*peclet
-        c2 = csqrt(c1)
-        c3 = (cexp(c2) - cexp(-c2))/(cexp(c2) + cexp(-c2)) ! TANH(c2)
+        c2 = sqrt(c1)
+        c3 = (exp(c2) - exp(-c2))/(exp(c2) + exp(-c2)) ! TANH(c2)
         trans = ((c2/c3 - 1._wp)**(-1) - 3._wp/c1)**(-1) ! transfer function
 
         Re_trans = trans
