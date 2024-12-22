@@ -1,49 +1,16 @@
-This file was created on 2024-12-21 23:05:51.625702.
+This file was created on 2024-12-22 09:19:33.981036.
 
 mfc.sh:
 
-    Invocation: test -f 81579DD9 -t 1A1D02B7 -j 4 --generate
+    Invocation: test -f 3A98950A -t EE5A230D -j 4 --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        12de93537fb42175887b1fb9c61a3aad406810ae on lagrangian (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on login-02
-    
-        C       : GNU v12.1.0 (/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gcc)
-        Fortran : GNU v12.1.0 (/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/dgvacarevelo/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gcc
-        CXX      : /cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/g++
-        FC       : /cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        432bcff449cb3a654fcab8cd11a9fad7c651cd9c on lagrangian (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.25.2 on login-01
+        CMake v3.25.2 on login-02
     
         C       : GNU v12.1.0 (/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gcc)
         Fortran : GNU v12.1.0 (/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gfortran)
@@ -72,11 +39,44 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on login-02
+    
+        C       : GNU v12.1.0 (/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gcc)
+        Fortran : GNU v12.1.0 (/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/dgvacarevelo/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gcc
+        CXX      : /cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/g++
+        FC       : /cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 syscheck:
 
     CMake Configuration:
     
-        CMake v3.25.2 on login-01
+        CMake v3.25.2 on login-02
     
         C       : GNU v12.1.0 (/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gcc)
         Fortran : GNU v12.1.0 (/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gfortran)
@@ -105,18 +105,18 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+simulation:
 
     CMake Configuration:
     
-        CMake v3.25.2 on login-01
+        CMake v3.25.2 on login-02
     
         C       : GNU v12.1.0 (/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gcc)
         Fortran : GNU v12.1.0 (/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF

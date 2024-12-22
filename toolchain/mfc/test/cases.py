@@ -782,7 +782,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Lagrangian bubbles
         for adap_dt in ['F', 'T']:
             for couplingMethod in [1, 2]:
-                stack.push("lagrangian bubbles", {"bubbles_lagrange": 'T',
+                stack.push("Lagrange bubbles", {"bubbles_lagrange": 'T',
                     'dt': 1e-06, 'lag_params%pressure_corrector': 'T', 'bubble_model': 2,
                     'num_fluids': 2, 'lag_params%heatTransfer_model': 'T', 'lag_params%massTransfer_model': 'T', 
                     'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'fluid_pp(2)%gamma': 2.5,
@@ -806,7 +806,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 if adap_dt=='F':
                     stack.push('',{'acoustic(1)%mag': 2e+04, 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50})
                 else:
-                    stack.push('rkck_adap_dt=T',{'rkck_adap_dt': 'T', 'time_stepper': 4,
+                    stack.push('rkck stepper',{'rkck_adap_dt': 'F', 'time_stepper': 4,
                             'acoustic(1)%mag': 6e+04, 'n_start': 0, 't_save': 5e-05, 't_stop': 5e-05})
 
                 cases.append(define_case_d(stack, '', {}))
