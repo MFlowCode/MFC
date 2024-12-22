@@ -369,6 +369,7 @@ POST_PROCESS.update({
     't_stop': ParamType.REAL,
     'n_start': ParamType.INT,
     'surface_tension': ParamType.LOG,
+    'output_partial_domain': ParamType.LOG,
 })
 
 for cmp_id in range(1,3+1):
@@ -376,6 +377,9 @@ for cmp_id in range(1,3+1):
 
     POST_PROCESS[f'bc_{cmp}%beg'] = ParamType.INT
     POST_PROCESS[f'bc_{cmp}%end'] = ParamType.INT
+    
+    POST_PROCESS[f'{cmp}_output%beg'] = ParamType.REAL
+    POST_PROCESS[f'{cmp}_output%end'] = ParamType.REAL
 
     for real_attr in ["mom_wrt", "vel_wrt", "flux_wrt", "omega_wrt"]:
         POST_PROCESS[f'{real_attr}({cmp_id})'] = ParamType.LOG
