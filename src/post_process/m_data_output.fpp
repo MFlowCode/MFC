@@ -427,13 +427,13 @@ contains
 
         integer :: i
         integer :: lower_bound, upper_bound
-    
+
         #:for X, M in [('x', 'm'), ('y', 'n'), ('z', 'p')]
 
             if (${M}$ == 0) return ! Early return for y or z if simulation is 1D or 2D
 
             lower_bound = -offset_${X}$%beg
-            upper_bound = ${M}$ + offset_${X}$%end
+            upper_bound = ${M}$+offset_${X}$%end
 
             do i = lower_bound, upper_bound
                 if (${X}$_cc(i) > ${X}$_output%beg) then
@@ -549,10 +549,10 @@ contains
             ! data as well as the total number of flow variable(s) that will
             ! eventually be stored in it
             if (output_partial_domain) then
-                write (dbfile)  x_output_idx%end - x_output_idx%beg, &
-                                y_output_idx%end - y_output_idx%beg, &
-                                z_output_idx%end - z_output_idx%beg, &
-                                dbvars
+                write (dbfile) x_output_idx%end - x_output_idx%beg, &
+                    y_output_idx%end - y_output_idx%beg, &
+                    z_output_idx%end - z_output_idx%beg, &
+                    dbvars
             else
                 write (dbfile) m, n, p, dbvars
             end if
@@ -575,7 +575,7 @@ contains
                 end if
 
                 if (output_partial_domain) then
-                    write (dbroot) x_output_idx%end-x_output_idx%beg, 0, 0, dbvars
+                    write (dbroot) x_output_idx%end - x_output_idx%beg, 0, 0, dbvars
                 else
                     write (dbroot) m_root, 0, 0, dbvars
                 end if
@@ -769,9 +769,9 @@ contains
                         real(z_cb, sp)
                 else
                     if (output_partial_domain) then
-                        write (dbfile)  x_cb( x_output_idx%beg-1 : x_output_idx%end ), &
-                                        y_cb( y_output_idx%beg-1 : y_output_idx%end ), &
-                                        z_cb( z_output_idx%beg-1 : z_output_idx%end )
+                        write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end), &
+                            y_cb(y_output_idx%beg - 1:y_output_idx%end), &
+                            z_cb(z_output_idx%beg - 1:z_output_idx%end)
                     else
                         write (dbfile) x_cb, y_cb, z_cb
                     end if
@@ -783,8 +783,8 @@ contains
                         real(y_cb, sp)
                 else
                     if (output_partial_domain) then
-                        write (dbfile)  x_cb( x_output_idx%beg-1 : x_output_idx%end ), &
-                                        y_cb( y_output_idx%beg-1 : y_output_idx%end )
+                        write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end), &
+                            y_cb(y_output_idx%beg - 1:y_output_idx%end)
                     else
                         write (dbfile) x_cb, y_cb
                     end if
@@ -799,7 +799,7 @@ contains
                     write (dbfile) real(x_cb, sp)
                 else
                     if (output_partial_domain) then
-                        write (dbfile) x_cb( x_output_idx%beg-1 : x_output_idx%end )
+                        write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end)
                     else
                         write (dbfile) x_cb
                     end if
@@ -816,7 +816,7 @@ contains
                         write (dbroot) real(x_root_cb, wp)
                     else
                         if (output_partial_domain) then
-                            write (dbroot) x_root_cb( x_output_idx%beg-1 : x_output_idx%end )
+                            write (dbroot) x_root_cb(x_output_idx%beg - 1:x_output_idx%end)
                         else
                             write (dbroot) x_root_cb
                         end if

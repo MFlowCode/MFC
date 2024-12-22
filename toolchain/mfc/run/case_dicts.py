@@ -377,7 +377,7 @@ for cmp_id in range(1,3+1):
 
     POST_PROCESS[f'bc_{cmp}%beg'] = ParamType.INT
     POST_PROCESS[f'bc_{cmp}%end'] = ParamType.INT
-    
+
     POST_PROCESS[f'{cmp}_output%beg'] = ParamType.REAL
     POST_PROCESS[f'{cmp}_output%end'] = ParamType.REAL
 
