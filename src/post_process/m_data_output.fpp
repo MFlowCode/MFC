@@ -451,7 +451,8 @@ contains
 
             ! If no grid points are within the output region
             if ((${X}$_cc(lower_bound) > ${X}$_output%end) .or. (${X}$_cc(upper_bound) < ${X}$_output%beg)) then
-                call s_mpi_abort('No grid points are within the output region. Exiting ...')
+                ${X}$_output_idx%beg = 0
+                ${X}$_output_idx%end = 0
             end if
 
         #:endfor
