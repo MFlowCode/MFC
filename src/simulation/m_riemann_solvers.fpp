@@ -549,7 +549,7 @@ contains
                                     tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                                     ! Elastic contribution to energy if G large enough
                                     !TODO take out if statement if stable without
-                                    if ((G_L > 1000) .and. (G_R > 1000)) then
+                                    if ((G_L > verysmall) .and. (G_R > verysmall)) then
                                         E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                         E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                         ! Additional terms in 2D and 3D
@@ -561,37 +561,31 @@ contains
                                 end do
                             end if
 
-                            ! elastic energy update
-                            !if ( hyperelasticity ) then
-                            !    G_L = 0._wp
-                            !    G_R = 0._wp
-                            !
-                            !    !$acc loop seq
-                            !    do i = 1, num_fluids
-                            !        G_L = G_L + alpha_L(i)*Gs(i)
-                            !        G_R = G_R + alpha_R(i)*Gs(i)
-                            !    end do
-                            !    ! Elastic contribution to energy if G large enough
-                            !    if ((G_L > 1e-3_wp) .and. (G_R > 1e-3_wp)) then
-                            !    E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
-                            !    E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
-                            !    !$acc loop seq
-                            !    do i = 1, b_size-1
-                            !        tau_e_L(i) = G_L*qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
-                            !        tau_e_R(i) = G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
-                            !    end do
-                            !    !$acc loop seq
-                            !    do i = 1, b_size-1
-                            !        tau_e_L(i) = 0_wp
-                            !        tau_e_R(i) = 0_wp
-                            !    end do
-                            !    !$acc loop seq
-                            !    do i = 1, num_dims
-                            !        xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
-                            !        xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
-                            !    end do
-                            !    end if
-                            !end if
+                            ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
+                            if (hyperelasticity) then
+                                !$acc loop seq
+                                do i = 1, num_dims
+                                    xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
+                                    xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
+                                end do
+                                G_L = 0_wp; G_R = 0_wp; 
+                                !$acc loop seq
+                                do i = 1, num_fluids
+                                    ! Mixture left and right shear modulus
+                                    G_L = G_L + alpha_L(i)*Gs(i)
+                                    G_R = G_R + alpha_R(i)*Gs(i)
+                                end do
+                                ! Elastic contribution to energy if G large enough
+                                if (G_L > verysmall .and. G_R > verysmall) then
+                                    E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
+                                    E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
+                                end if
+                                !$acc loop seq
+                                do i = 1, b_size - 1
+                                    tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
+                                    tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
+                                end do
+                            end if
 
                             ! Enthalpy with elastic energy
                             H_L = (E_L + pres_L)/rho_L
@@ -648,6 +642,7 @@ contains
                                        (s_R - vel_R(dir_idx(1)))) &
                                       /(rho_L*(s_L - vel_L(dir_idx(1))) - &
                                         rho_R*(s_R - vel_R(dir_idx(1))))
+
                             elseif (wave_speeds == 2) then
                                 pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
                                                    (vel_L(dir_idx(1)) - &
@@ -705,7 +700,7 @@ contains
                                                     - rho_R*vel_R(dir_idx(i)))) &
                                         /(s_M - s_P)
                                 end do
-                            else if (hypoelasticity) then
+                            else if (elasticity) then
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
@@ -737,14 +732,14 @@ contains
                                 end do
                             end if
 
-                            ! Energy
+                            ! ENERGY UPDATE
                             if (bubbles) then
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
                                      + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
-                            else if (hypoelasticity) then
+                            else if (elasticity) then
                                 !TODO: simplify this so it's not split into 3
                                 if (num_dims == 1) then
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
@@ -785,9 +780,9 @@ contains
                                     /(s_M - s_P)
                             end if
 
-                            ! Elastic Stresses
+                            ! ELASTIC STRESSES FLUX.
                             if (hypoelasticity) then
-                                do i = 1, strxe - strxb + 1 !TODO: this indexing may be slow
+                                do i = 1, strxe - strxb + 1
                                     flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
                                               *tau_e_R(i)) &
@@ -799,7 +794,19 @@ contains
                                 end do
                             end if
 
-                            ! Advection
+                            ! REFERENCE MAP FLUX.
+                            if (hyperelasticity) then
+                                do i = 1, num_dims
+                                    flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
+                                        (s_M*rho_R*vel_R(dir_idx(1))*xi_field_R(i) &
+                                         - s_P*rho_L*vel_L(dir_idx(1))*xi_field_L(i) &
+                                         + s_M*s_P*(rho_L*xi_field_L(i) &
+                                                    - rho_R*xi_field_R(i))) &
+                                        /(s_M - s_P)
+                                end do
+                            end if
+
+                            ! ADVECTION FLUX.
                             !$acc loop seq
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -811,18 +818,6 @@ contains
                                      - s_P*qL_prim_rs${XYZ}$_vf(j, k, l, i)) &
                                     /(s_M - s_P)
                             end do
-
-                            ! Xi field
-                            !if ( hyperelasticity ) then
-                            !    do i = 1, num_dims
-                            !      flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
-                            !        (s_M*rho_R*vel_R(dir_idx(1))*xi_field_R(i) &
-                            !         - s_P*rho_L*vel_L(dir_idx(1))*xi_field_L(i) &
-                            !         + s_M*s_P*(rho_L*xi_field_L(i) &
-                            !                    - rho_R*xi_field_R(i))) &
-                            !        /(s_M - s_P)
-                            !    end do
-                            !end if
 
                             ! Div(U)?
                             !$acc loop seq

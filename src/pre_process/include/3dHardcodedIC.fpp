@@ -62,7 +62,7 @@
 
     case (302) ! (3D lung geometry in X direction - axisym, with smoothing)
         lam = 200.e-06_wp
-        amp = patch_icpp(patch_id)%a2
+        amp = patch_icpp(patch_id)%a(2)
         h = 0.125_wp*amp
 
         intH = amp/2._wp*(sin(2._wp*pi*y_cc(j)/lam + pi/2._wp) + sin(2._wp*pi*z_cc(k)/lam + pi/2._wp))

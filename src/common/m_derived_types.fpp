@@ -168,7 +168,6 @@ module m_derived_types
         !! patch geometries. It is specified through its x-, y-, and z-components
         !! respectively.
 
-        type(ic_model_parameters) :: model !<
         real(wp) :: epsilon, beta !<
         !! The isentropic vortex parameters for the amplitude of the disturbance and
         !! domain of influence.
@@ -177,9 +176,6 @@ module m_derived_types
         !! The parameters needed for the spherical harmonic patch
 
         logical :: non_axis_sym
-
-        real(wp) :: a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12 !<
-        !! The parameters needed for the spherical harmonic patch
 
         real(wp), dimension(3) :: normal !<
         !! Normal vector indicating the orientation of the patch. It is specified
