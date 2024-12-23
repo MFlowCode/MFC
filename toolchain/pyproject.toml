@@ -10,7 +10,6 @@ dependencies = [
     "rich",
     "wheel",
     "typos",
-    "typing",
     "PyYAML",
     "argparse",
     "dataclasses",

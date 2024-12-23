@@ -25,7 +25,6 @@ contains
     subroutine s_check_inputs
 
         call s_check_inputs_compilers
-
         call s_check_inputs_weno
         call s_check_inputs_riemann_solver
         call s_check_inputs_time_stepping

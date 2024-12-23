@@ -232,7 +232,7 @@ contains
 
         real(wp) :: trace
         real(wp) :: f13 = 1_wp/3_wp
-        integer :: i !< Generic loop iterators
+        integer :: i
 
         ! tensor is the symmetric tensor & calculate the trace of the tensor
         trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l) + btensor(6)%sf(j, k, l)
@@ -272,7 +272,7 @@ contains
 
         real(wp) :: trace
         real(wp) :: f13 = 1_wp/3_wp
-        integer :: i !< Generic loop iterators
+        integer :: i
 
         !TODO Make this 1D and 2D capable
         ! tensor is the symmetric tensor & calculate the trace of the tensor
