@@ -619,18 +619,6 @@ contains
                    -offset_y%beg:n + offset_y%end, &
                    -offset_z%beg:p + offset_z%end)
 
-            !do k = -offset_z%beg, p + offset_z%end
-            !    do j = -offset_y%beg, n + offset_y%end
-            !        do i = -offset_x%beg, m + offset_x%end
-            !            if (q_sf(i,j,k) > 0.5) then
-            !                q_sf(i,j,k) = 100000 + 8/0.15
-            !            else
-            !                q_sf(i,j,k) = 100000
-            !            end if
-            !        end do
-            !    end do
-            !end do
-
             write (varname, '(A,I0)') 'color_function'
             call s_write_variable_to_formatted_database_file(varname, t_step)
             varname(:) = ' '
@@ -711,11 +699,6 @@ contains
             end if
         end if
 
-!        if (proc_rank == 0 .and. sim_data) then
-!            close (211)
-!            close (251)
-!        end if
-
         if (sim_data .and. proc_rank == 0) then
             call s_close_intf_data_file()
             call s_close_energy_data_file()
@@ -778,11 +761,6 @@ contains
     subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
-
-!        if (sim_data .and. proc_rank == 0) then
-!            call s_close_intf_data_file()
-!            call s_close_energy_data_file()
-!        end if
 
         ! Deallocation procedures for the modules
         call s_finalize_data_output_module()
