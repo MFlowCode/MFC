@@ -25,13 +25,11 @@ contains
     subroutine s_check_inputs
 
         call s_check_inputs_compilers
-
         call s_check_inputs_weno
         call s_check_inputs_riemann_solver
         call s_check_inputs_time_stepping
         call s_check_inputs_model_eqns
         call s_check_inputs_acoustic_src
-        call s_check_inputs_hypoelasticity
         call s_check_inputs_bubbles
         call s_check_inputs_adapt_dt
         call s_check_inputs_alt_soundspeed
@@ -256,11 +254,6 @@ contains
         end do
 
     end subroutine s_check_inputs_acoustic_src
-
-    !> Checks constraints on hypoelasticity parameters
-    subroutine s_check_inputs_hypoelasticity
-        !@:PROHIBIT(hypoelasticity .and. riemann_solver /= 1, "hypoelasticity requires HLL Riemann solver (riemann_solver = 1)")
-    end subroutine
 
     !> Checks constraints on bubble parameters
     subroutine s_check_inputs_bubbles
