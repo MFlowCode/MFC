@@ -159,9 +159,9 @@ contains
 #endif
 
     !> Checks constraints on the elasticity parameters.
-        !! Called by s_check_inputs_common for pre-processing and simulation
+        !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_elasticity
-        @:PROHIBIT((.not. elasticity) .and. (hypoelasticity .or. hyperelasticity), &
+        @:PROHIBIT((hypoelasticity .or. hyperelasticity) .and. (.not. elasticity), &
             "Turn on elasticity to have either hyperelasticity or hypoelasticity")
         @:PROHIBIT(elasticity .and. .not. (hypoelasticity .or. hyperelasticity), &
             "Elasticity requires either hyperelasticity or hypoelasticity to be true")
@@ -171,7 +171,7 @@ contains
             "Elasticity works only for model_eqns 2 and 3")
 #ifdef MFC_SIMULATION
         @:PROHIBIT(elasticity .and. fd_order /= 4)
-        @:PROHIBIT(hyperelasticity .and. f_is_default(hyper_model), &
+        @:PROHIBIT(hyperelasticity .and. hyper_model .le. 0, &
             "Set the hyper_model in the input file")
 #endif
     end subroutine s_check_inputs_elasticity
