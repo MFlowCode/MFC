@@ -54,7 +54,7 @@ contains
         #:for VAR in [ 'old_grid','old_ic','stretch_x','stretch_y','stretch_z',&
             & 'cyl_coord','mpp_lim','hypoelasticity', 'relax', 'parallel_io',  &
             & 'perturb_flow', 'perturb_sph', 'mixlayer_vel_profile',           &
-            & 'mixlayer_perturb', 'bubbles', 'polytropic', 'polydisperse',     &
+            & 'mixlayer_perturb', 'bubbles_euler', 'polytropic', 'polydisperse',&
             & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
             & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
             & 'hyperelasticity', 'pre_stress' ]

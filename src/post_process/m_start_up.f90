@@ -79,12 +79,12 @@ contains
             omega_wrt, qm_wrt, schlieren_wrt, schlieren_alpha, &
             fd_order, mixture_err, alt_soundspeed, &
             flux_lim, flux_wrt, cyl_coord, &
-            parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
+            parallel_io, rhoref, pref, bubbles_euler, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, &
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
-            cfl_target, surface_tension, &
+            cfl_target, surface_tension, bubbles_lagrange, rkck_adap_dt, &
             sim_data, hyperelasticity
 
         ! Inquiring the status of the post_process.inp file
@@ -114,7 +114,7 @@ contains
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
 
-            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
 
         else
             call s_mpi_abort('File post_process.inp is missing. Exiting ...')
@@ -179,6 +179,7 @@ contains
         ! Populating the buffer regions of the conservative variables
         if (buff_size > 0) then
             call s_populate_conservative_variables_buffer_regions()
+            if (bubbles_lagrange) call s_populate_conservative_variables_buffer_regions(q_particle(1))
         end if
 
         ! Initialize the Temperature cache.
@@ -412,7 +413,7 @@ contains
         ! ----------------------------------------------------------------------
 
         ! Adding the volume fraction(s) to the formatted database file ---------
-        if (((model_eqns == 2) .and. (bubbles .neqv. .true.)) &
+        if (((model_eqns == 2) .and. (bubbles_euler .neqv. .true.)) &
             .or. (model_eqns == 3) &
             ) then
 
@@ -627,7 +628,7 @@ contains
         ! ----------------------------------------------------------------------
 
         ! Adding the volume fraction(s) to the formatted database file ---------
-        if (bubbles) then
+        if (bubbles_euler) then
             do i = adv_idx%beg, adv_idx%end
                 q_sf = q_cons_vf(i)%sf( &
                        -offset_x%beg:m + offset_x%end, &
@@ -641,7 +642,7 @@ contains
         end if
 
         ! Adding the bubble variables  to the formatted database file ---------
-        if (bubbles) then
+        if (bubbles_euler) then
             !nR
             do i = 1, nb
                 q_sf = q_cons_vf(bub_idx%rs(i))%sf( &
@@ -699,10 +700,19 @@ contains
             end if
         end if
 
-!        if (proc_rank == 0 .and. sim_data) then
-!            close (211)
-!            close (251)
-!        end if
+        ! Adding the lagrangian subgrid variables  to the formatted database file ---------
+        if (bubbles_lagrange) then
+            !! Void fraction field
+            q_sf = 1._wp - q_particle(1)%sf( &
+                   -offset_x%beg:m + offset_x%end, &
+                   -offset_y%beg:n + offset_y%end, &
+                   -offset_z%beg:p + offset_z%end)
+            write (varname, '(A)') 'voidFraction'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+            varname(:) = ' '
+
+            call s_write_lag_bubbles_results(t_step) !! Individual bubble evolution
+        end if
 
         if (sim_data .and. proc_rank == 0) then
             call s_close_intf_data_file()
@@ -718,10 +728,10 @@ contains
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
-        if (bubbles .and. nb > 1) then
+        if (bubbles_euler .and. nb > 1) then
             call s_simpson
         end if
-        if (bubbles .and. .not. polytropic) then
+        if (bubbles_euler .and. .not. polytropic) then
             call s_initialize_nonpoly()
         end if
         if (num_procs > 1) call s_initialize_mpi_proxy_module()
