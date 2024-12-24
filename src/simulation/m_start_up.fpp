@@ -56,7 +56,9 @@ module m_start_up
 
     use m_viscous
 
-    use m_bubbles
+    use m_bubbles_EE            !< Ensemble-averaged bubble dynamics routines
+
+    use m_bubbles_EL            !< Lagrange bubble dynamics routines
 
     use ieee_arithmetic
 
@@ -79,6 +81,7 @@ module m_start_up
     use m_surface_tension
 
     use m_body_forces
+
     ! ==========================================================================
 
     implicit none
@@ -151,7 +154,7 @@ contains
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
-            rhoref, pref, bubbles, bubble_model, &
+            rhoref, pref, bubbles_euler, bubble_model, &
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
             nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, &
@@ -169,7 +172,9 @@ contains
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target,  &
             viscous, surface_tension,               & 
-            hyperelasticity, R0ref, elasticity
+            hyperelasticity, R0ref, elasticity, &
+            bubbles_lagrange, lag_params, &
+            rkck_adap_dt, rkck_tolerance
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -201,7 +206,7 @@ contains
             n_glb = n
             p_glb = p
 
-            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
@@ -361,7 +366,7 @@ contains
             end if
         end do
 
-        if (bubbles .or. elasticity) then
+        if (bubbles_euler .or. elasticity) then
             ! Read pb and mv for non-polytropic qbmm
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
@@ -624,7 +629,7 @@ contains
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                if ( bubbles .or. elasticity ) then
+                if (bubbles_euler .or. elasticity) then
 
                     do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
@@ -760,8 +765,7 @@ contains
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                if ( bubbles .or. elasticity ) then
-
+                if (bubbles_euler .or. elasticity) then
                     do i = 1, sys_size !adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         ! Initial displacement to skip at beginning of file
@@ -1220,22 +1224,28 @@ contains
         integer :: i
 
         if (cfl_dt) then
-            if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
+            if (cfl_const_dt .and. t_step == 0 .and. .not. rkck_adap_dt) call s_compute_dt()
 
-            if (cfl_adap_dt) call s_compute_dt()
+            if (cfl_adap_dt .and. .not. rkck_adap_dt) call s_compute_dt()
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
+            if (dt < 1e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0 .and. .not. rkck_adap_dt) then
                 print*, "Delta t = ", dt
                 call s_mpi_abort("Delta t has become too small")
             end if
         end if
 
         if (cfl_dt) then
-            if ((mytime + dt) >= t_stop) dt = t_stop - mytime
+            if ((mytime + dt) >= t_stop) then
+                dt = t_stop - mytime
+                !$acc update device(dt)
+            end if
         else
-            if ((mytime + dt) >= finaltime) dt = finaltime - mytime
+            if ((mytime + dt) >= finaltime) then
+                dt = finaltime - mytime
+                !$acc update device(dt)
+            end if
         end if
 
         if (cfl_dt) then
@@ -1264,6 +1274,7 @@ contains
 
         call s_compute_derived_variables(t_step)
 
+
 #ifdef DEBUG
         print *, 'Computed derived vars'
 #endif
@@ -1279,6 +1290,9 @@ contains
             call s_3rd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
+        elseif (time_stepper == 4) then
+            ! (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepper (Cash J. and Karp A., 1990)         
+            call s_4th_5th_order_rkck(t_step, time_avg)
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
@@ -1387,7 +1401,15 @@ contains
             save_count = t_step
         end if
 
-        call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count)
+        if (bubbles_lagrange) then
+            !$acc update host(q_beta%vf(1)%sf)
+            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, q_beta%vf(1))
+            !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_rad, intfc_vel)
+            call s_write_restart_lag_bubbles(save_count) !parallel 
+            if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
+        else
+            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count)
+        end if
 
         call nvtxEndRange
         call cpu_time(finish)
@@ -1407,15 +1429,13 @@ contains
 
     subroutine s_initialize_modules
 
-        integer :: s
-
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
-        if (bubbles .and. nb > 1 .and. R0_type == 1) then
+        if (bubbles_euler .and. nb > 1 .and. R0_type == 1) then
             call s_simpson
         end if
         !Initialize variables for non-polytropic (Preston) model
-        if (bubbles .and. .not. polytropic) then
+        if (bubbles_euler .and. .not. polytropic) then
             call s_initialize_nonpoly()
         end if
         !Initialize pb based on surface tension for qbmm (polytropic)
@@ -1434,7 +1454,7 @@ contains
         if (grid_geometry == 3) call s_initialize_fftw_module()
         call s_initialize_riemann_solvers_module()
 
-        if(bubbles) call s_initialize_bubbles_module()
+        if(bubbles_euler) call s_initialize_bubbles_EE_module()
         if (ib) call s_initialize_ibm_module()
         if (qbmm) call s_initialize_qbmm_module()
 
@@ -1494,6 +1514,7 @@ contains
 
         call s_initialize_cbc_module()
         call s_initialize_derived_variables()
+        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
@@ -1585,7 +1606,7 @@ contains
         if (chemistry) then
             !$acc update device(q_T_sf%sf)
         end if
-        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, n_idx, pi_fac, low_Mach)
+        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, n_idx, pi_fac, low_Mach)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
         !$acc update device(acoustic_source, num_source)
@@ -1628,6 +1649,7 @@ contains
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
         if (relax) call s_finalize_relaxation_solver_module()
+        if (bubbles_lagrange) call s_finalize_lagrangian_solver() 
         if (viscous) then
             call s_finalize_viscous_module()
         end if

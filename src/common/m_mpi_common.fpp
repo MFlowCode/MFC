@@ -64,7 +64,8 @@ contains
     !! @param ib_markers track if a cell is within the immersed boundary
     !! @param levelset closest distance from every cell to the IB
     !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+    !! @param beta Eulerian void fraction from lagrangian bubbles
+    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -82,6 +83,9 @@ contains
             optional, &
             intent(IN) :: levelset_norm
 
+        type(scalar_field), &
+            intent(in), optional :: beta
+
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
 
@@ -90,9 +94,22 @@ contains
         ! Generic loop iterator
         integer :: i, j, q, k, l
 
+        !Altered system size for the lagrangian subgrid bubble model
+        integer :: alt_sys
+
+        if (present(beta)) then
+            alt_sys = sys_size + 1
+        else
+            alt_sys = sys_size
+        end if
+
         do i = 1, sys_size
             MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m, 0:n, 0:p)
         end do
+
+        if (present(beta)) then
+            MPI_IO_DATA%var(alt_sys)%sf => beta%sf(0:m, 0:n, 0:p)
+        end if
 
         !Additional variables pb and mv for non-polytropic qbmm
 #ifdef MFC_PRE_PROCESS
@@ -126,7 +143,7 @@ contains
         end if
 
         ! Define the view for each variable
-        do i = 1, sys_size
+        do i = 1, alt_sys
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
                                           MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)

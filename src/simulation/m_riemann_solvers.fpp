@@ -35,6 +35,8 @@ module m_riemann_solvers
 
     use m_bubbles              !< To get the bubble wall pressure function
 
+    use m_bubbles_EE
+
     use m_surface_tension      !< To get the capilary fluxes
 
     use m_chemistry
@@ -686,7 +688,7 @@ contains
                             end do
 
                             ! Momentum
-                            if (bubbles) then
+                            if (bubbles_euler) then
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
@@ -732,8 +734,8 @@ contains
                                 end do
                             end if
 
-                            ! ENERGY UPDATE
-                            if (bubbles) then
+                            ! Energy
+                            if (bubbles_euler) then
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
@@ -833,7 +835,7 @@ contains
                                       xi_P*rho_R*(s_R - vel_R(dir_idx(1))))
                             end do
 
-                            if (bubbles) then
+                            if (bubbles_euler) then
                                 ! From HLLC: Kills mass transport @ bubble gas density
                                 if (num_fluids > 1) then
                                     flux_rs${XYZ}$_vf(j, k, l, contxe) = 0._wp
@@ -1611,7 +1613,7 @@ contains
                                                 dir_flg(dir_idx(i))*pres_R)
                                 end do
 
-                                if (bubbles) then
+                                if (bubbles_euler) then
                                     ! Put p_tilde in
                                     !$acc loop seq
                                     do i = 1, num_dims
@@ -1644,7 +1646,7 @@ contains
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
                                 ! Add advection flux for bubble variables
-                                if (bubbles) then
+                                if (bubbles_euler) then
                                     !$acc loop seq
                                     do i = bubxb, bubxe
                                         flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -1707,11 +1709,10 @@ contains
                         end do
                     end do
                     !$acc end parallel loop
-                elseif (model_eqns == 2 .and. bubbles) then
-                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, &
-                    !$acc P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, &
-                    !$acc s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, &
-                    !$acc pcorr, zcoef, vel_L_tmp, vel_R_tmp)
+
+                elseif (model_eqns == 2 .and. bubbles_euler) then
+                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
+                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2024,7 +2025,7 @@ contains
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                 end do
 
-                                if (bubbles .and. (num_fluids > 1)) then
+                                if (bubbles_euler .and. (num_fluids > 1)) then
                                     ! Kill mass transport @ gas density
                                     flux_rs${XYZ}$_vf(j, k, l, contxe) = 0._wp
                                 end if
@@ -2215,7 +2216,7 @@ contains
                                 alpha_R_sum = 0._wp
 
                                 ! Change this by splitting it into the cases
-                                ! present in the bubbles
+                                ! present in the bubbles_euler
                                 if (mpp_lim) then
                                     !$acc loop seq
                                     do i = 1, num_fluids

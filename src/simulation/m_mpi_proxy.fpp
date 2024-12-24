@@ -110,6 +110,7 @@ contains
 
             v_size = sys_size + 2*nb*4
         else
+
             if (n > 0) then
                 if (p > 0) then
                     @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
@@ -128,6 +129,7 @@ contains
             @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
 
             v_size = sys_size
+
         end if
 
         if (surface_tension) then
@@ -186,16 +188,16 @@ contains
         #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',     &
             &  'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat', &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
-            & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',          &
+            & 'parallel_io', 'hypoelasticity', 'bubbles_euler', 'polytropic',    &
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
             & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',          &
             & 'adv_n', 'adap_dt', 'ib', 'bodyForces', 'bf_x', 'bf_y', 'bf_z',    &
             & 'bc_x%grcbc_in', 'bc_x%grcbc_out', 'bc_x%grcbc_vel_out',          &
             & 'bc_y%grcbc_in', 'bc_y%grcbc_out', 'bc_y%grcbc_vel_out',          &
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
-            & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
-            & 'viscous', 'shear_stress', 'bulk_stress',                          &
-            & 'hyperelasticity', 'elasticity' ]
+            & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',       &
+            & 'viscous', 'shear_stress', 'bulk_stress', 'bubbles_lagrange',     &
+            & 'hyperelasticity', 'elasticity', 'rkck_adap_dt' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -209,6 +211,22 @@ contains
             #:endfor
         end if
 
+        if (bubbles_lagrange) then
+            #:for VAR in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector', &
+                & 'write_bubbles', 'write_bubbles_stats']
+                call MPI_BCAST(lag_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in ['solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb']
+                call MPI_BCAST(lag_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in [ 'c0', 'rho0', 'T0', 'x0', 'diffcoefvap', 'epsilonb','charwidth', &
+                & 'valmaxvoid', 'Thost']
+                call MPI_BCAST(lag_params%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end if
+
         #:for VAR in [ 'dt','weno_eps','teno_CT','pref','rhoref','R0ref','Web','Ca', 'sigma', &
             & 'Re_inv', 'poly_sigma', 'palpha_eps', 'ptgalpha_eps', 'pi_fac',    &
             & 'bc_x%vb1','bc_x%vb2','bc_x%vb3','bc_x%ve1','bc_x%ve2','bc_x%ve2', &
@@ -217,7 +235,7 @@ contains
             & 'bc_x%pres_in','bc_x%pres_out','bc_y%pres_in','bc_y%pres_out', 'bc_z%pres_in','bc_z%pres_out', &
             & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',    &
             & 'z_domain%beg', 'z_domain%end', 'x_a', 'x_b', 'y_a', 'y_b', 'z_a', &
-            & 'z_b', 't_stop', 't_save', 'cfl_target' ]
+            & 'z_b', 't_stop', 't_save', 'cfl_target', 'rkck_tolerance']
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -240,7 +258,7 @@ contains
 
         do i = 1, num_fluids_max
             #:for VAR in [ 'gamma','pi_inf','mul0','ss','pv','gamma_v','M_v',  &
-                & 'mu_v','k_v','G', 'cv', 'qv', 'qvp' ]
+                & 'mu_v','k_v', 'cp_v','G', 'cv', 'qv', 'qvp' ]
                 call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             call MPI_BCAST(fluid_pp(i)%Re(1), 2, mpi_p, 0, MPI_COMM_WORLD, ierr)

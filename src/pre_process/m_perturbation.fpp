@@ -99,7 +99,7 @@ contains
                     rand_real = rand_real*perturb_flow_mag
                     q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
                     q_prim_vf(mom_idx%end)%sf(i, j, k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i, j, k)
-                    if (bubbles) then
+                    if (bubbles_euler) then
                         q_prim_vf(alf_idx)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(alf_idx)%sf(i, j, k)
                     end if
                 end do
@@ -165,7 +165,7 @@ contains
                     end if
                     q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(mixlayer_var(5), i, j, k)/uratio**2 ! p
 
-                    if (bubbles .and. (.not. qbmm)) then
+                    if (bubbles_euler .and. (.not. qbmm)) then
                         do q = 1, nb
                             call s_compute_equilibrium_state(q_prim_vf(E_idx)%sf(i, j, k), R0(q), q_prim_vf(bub_idx%rs(q))%sf(i, j, k))
                         end do
@@ -238,7 +238,7 @@ contains
         uratio = 1._wp/patch_icpp(1)%vel(1)
 
         ! Set fluid flow properties
-        if (bubbles) then
+        if (bubbles_euler) then
             adv = patch_icpp(1)%alpha(num_fluids)
         else
             adv = 0._wp
