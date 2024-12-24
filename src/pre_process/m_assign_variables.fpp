@@ -334,7 +334,7 @@ contains
             orig_prim_vf(i) = q_prim_vf(i)%sf(j, k, l)
         end do
 
-        if (mpp_lim .and. bubbles) then
+        if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
             alf_sum%sf = 0._wp
             do i = adv_idx%beg, adv_idx%end - 1
@@ -362,7 +362,7 @@ contains
             q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha(i - E_idx)
         end do
 
-        if (mpp_lim .and. bubbles) then
+        if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
             alf_sum%sf = 0._wp
             do i = adv_idx%beg, adv_idx%end - 1
@@ -407,7 +407,7 @@ contains
             q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha(i - E_idx)
         end do
 
-        if (mpp_lim .and. bubbles) then
+        if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
             alf_sum%sf = 0._wp
             do i = adv_idx%beg, adv_idx%end - 1
@@ -420,8 +420,8 @@ contains
             end do
         end if
 
-        ! Bubbles variables
-        if (bubbles) then
+        ! Bubbles euler variables
+        if (bubbles_euler) then
             do i = 1, nb
                 muR = R0(i)*patch_icpp(smooth_patch_id)%r0 ! = R0(i)
                 muV = V0(i)*patch_icpp(smooth_patch_id)%v0 ! = 0
@@ -511,7 +511,7 @@ contains
             end do
         end if
 
-        if (mpp_lim .and. bubbles) then
+        if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
             alf_sum%sf = 0._wp
             do i = adv_idx%beg, adv_idx%end - 1
@@ -599,7 +599,7 @@ contains
         end if
 
         ! Smoothed bubble variables
-        if (bubbles) then
+        if (bubbles_euler) then
             do i = 1, nb
                 muR = R0(i)*patch_icpp(patch_id)%r0 ! = 1*R0(i)
                 muV = V0(i)*patch_icpp(patch_id)%v0 ! = 1*V0(i)
@@ -648,7 +648,7 @@ contains
             end if
         end if
 
-        if (mpp_lim .and. bubbles) then
+        if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
             alf_sum%sf = 0._wp
             do i = adv_idx%beg, adv_idx%end - 1
@@ -661,7 +661,7 @@ contains
             end do
         end if
 
-        if (bubbles .and. (.not. polytropic) .and. (.not. qbmm)) then
+        if (bubbles_euler .and. (.not. polytropic) .and. (.not. qbmm)) then
             do i = 1, nb
                 if (f_is_default(q_prim_vf(bub_idx%ps(i))%sf(j, k, l))) then
                     q_prim_vf(bub_idx%ps(i))%sf(j, k, l) = pb0(i)

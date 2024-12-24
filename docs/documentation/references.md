@@ -30,6 +30,8 @@
 
 - <a id="Maeda17">Maeda, K. and Colonius, T. (2017). A source term approach for generation of one-way acoustic waves in the euler and navier–stokes equations. Wave Motion, 75:36–49.</a>
 
+- <a id="Maeda18">Maeda, K. and Colonius, T. (2018). Eulerian–lagrangian method for simulation of cloud cavitation. Journal of computational physics, 371:994–1017.</a>
+
 - <a id="Meng16">Meng, J. C. C. (2016). Numerical simulations of droplet aerobreakup. PhD thesis, California Institute of Technology.</a>
 
 - <a id="Pirozzoli13">Pirozzoli, S., and Colonius, T. (2013). Generalized characteristic relaxation boundary conditions for unsteady compressible flow simulations. Journal of Computational Physics, 248:109-126.</a>

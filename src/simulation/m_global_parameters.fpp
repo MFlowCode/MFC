@@ -210,6 +210,7 @@ module m_global_parameters
     type(mpi_io_airfoil_ib_var), public :: MPI_IO_airfoil_IB_DATA
     type(mpi_io_levelset_var), public :: MPI_IO_levelset_DATA
     type(mpi_io_levelset_norm_var), public :: MPI_IO_levelsetnorm_DATA
+    real(wp), allocatable, dimension(:, :), public :: MPI_IO_DATA_lag_bubbles
 
     !> @name MPI info for parallel IO with Lustre file systems
     !> @{
@@ -370,7 +371,7 @@ module m_global_parameters
     real(wp), dimension(:), allocatable :: V0     !< Bubble velocities
     !$acc declare create(weight, R0, V0)
 
-    logical :: bubbles      !< Bubbles on/off
+    logical :: bubbles_euler      !< Bubbles euler on/off
     logical :: polytropic   !< Polytropic  switch
     logical :: polydisperse !< Polydisperse bubbles
     logical :: adv_n        !< Solve the number density equation and compute alpha from number density
@@ -396,7 +397,7 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-    !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, pi_fac)
+    !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles_euler, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, pi_fac)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
@@ -410,8 +411,8 @@ module m_global_parameters
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
 
-    real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
-    !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v)
+    real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_vl, k_nl, cp_n, cp_v
+    !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_vl, k_nl, cp_n, cp_v)
 
     real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
@@ -465,6 +466,15 @@ module m_global_parameters
 
     !$acc declare create(pb_ts, mv_ts)
 
+    !> @name lagrangian subgrid bubble parameters
+    !> @{!
+    logical :: bubbles_lagrange                         !< Lagrangian subgrid bubble model switch
+    type(bubbles_lagrange_parameters) :: lag_params     !< Lagrange bubbles' parameters
+    logical :: rkck_adap_dt                             !< Activates the adaptive rkck time stepping algorithm
+    real(wp) :: rkck_time_tmp, rkck_tolerance    !Temp time (in rkck stepper) and tolerance error
+    real(wp) :: dt_max                           !< Maximum time step size
+    !$acc declare create(bubbles_lagrange, lag_params, rkck_adap_dt, dt_max, rkck_time_tmp, rkck_tolerance)
+    !> @}
     ! ======================================================================
 
 contains
@@ -579,6 +589,7 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
+            fluid_pp(i)%cp_v = dflt_real
             fluid_pp(i)%G = 0._wp
         end do
 
@@ -591,7 +602,7 @@ contains
         num_ibs = dflt_int
 
         ! Bubble modeling
-        bubbles = .false.
+        bubbles_euler = .false.
         bubble_model = 1
         polytropic = .true.
         polydisperse = .false.
@@ -696,6 +707,31 @@ contains
             bc_${dir}$%grcbc_vel_out = .false.
         #:endfor
 
+        ! Lagrangian subgrid bubble model
+        bubbles_lagrange = .false.
+        lag_params%solver_approach = dflt_int
+        lag_params%cluster_type = dflt_int
+        lag_params%pressure_corrector = .false.
+        lag_params%smooth_type = dflt_int
+        lag_params%heatTransfer_model = .false.
+        lag_params%massTransfer_model = .false.
+        lag_params%write_bubbles = .false.
+        lag_params%write_bubbles_stats = .false.
+        lag_params%nBubs_glb = dflt_int
+        lag_params%epsilonb = 1._wp
+        lag_params%charwidth = dflt_real
+        lag_params%valmaxvoid = dflt_real
+        lag_params%c0 = dflt_real
+        lag_params%rho0 = dflt_real
+        lag_params%T0 = dflt_real
+        lag_params%Thost = dflt_real
+        lag_params%x0 = dflt_real
+        lag_params%diffcoefvap = dflt_real
+        rkck_adap_dt = .false.
+        rkck_time_tmp = dflt_real
+        rkck_tolerance = dflt_real
+        dt_max = dflt_real
+
     end subroutine s_assign_default_values_to_user_inputs
 
     !>  The computation of parameters, the allocation of memory,
@@ -763,13 +799,13 @@ contains
 
                 sys_size = adv_idx%end
 
-                if (bubbles) then
+                if (bubbles_euler) then
                     alf_idx = adv_idx%end
                 else
                     alf_idx = 1
                 end if
 
-                if (bubbles) then
+                if (bubbles_euler) then
                     bub_idx%beg = sys_size + 1
                     if (qbmm) then
                         nmomsp = 4 !number of special moments
@@ -901,7 +937,7 @@ contains
                 alf_idx = adv_idx%end
                 sys_size = adv_idx%end
 
-                if (bubbles) then
+                if (bubbles_euler) then
                     bub_idx%beg = sys_size + 1
                     bub_idx%end = sys_size + 2*nb
                     if (.not. polytropic) then
@@ -1006,9 +1042,12 @@ contains
             sys_size = species_idx%end
         end if
 
-        if (qbmm .and. .not. polytropic) then
+        if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
+        elseif (bubbles_lagrange) then
+            allocate (MPI_IO_DATA%view(1:sys_size + 1))
+            allocate (MPI_IO_DATA%var(1:sys_size + 1))
         else
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
@@ -1018,8 +1057,13 @@ contains
             allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
             MPI_IO_DATA%var(i)%sf => null()
         end do
-        if (qbmm .and. .not. polytropic) then
+        if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        elseif (bubbles_lagrange) then
+            do i = 1, sys_size + 1
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
@@ -1061,6 +1105,11 @@ contains
             fd_number = max(1, fd_order/2)
         end if
 
+        ! Correction for smearing function in the lagrangian subgrid bubble model
+        if (bubbles_lagrange) then
+            buff_size = max(buff_size, 6)
+        end if
+
         ! Configuring Coordinate Direction Indexes =========================
         idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
         idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
@@ -1076,7 +1125,7 @@ contains
         ! ==================================================================
 
         ! Configuring Coordinate Direction Indexes =========================
-        if (bubbles) then
+        if (bubbles_euler) then
             @:ALLOCATE(ptil(&
                 & idwbuff(1)%beg:idwbuff(1)%end, &
                 & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -1128,17 +1177,15 @@ contains
         !$acc update device(cfl_target, m, n, p)
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, low_Mach)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, low_Mach)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)
             !$acc update device(wenoz_q)
         #:endif
 
-        !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
-
+        !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
         !$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN, mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
-
         !$acc enter data copyin(dir_idx, dir_flg, dir_idx_tau)
 
         !$acc enter data copyin(relax, relax_model, palpha_eps,ptgalpha_eps)
@@ -1206,9 +1253,16 @@ contains
         deallocate (proc_coords)
         if (parallel_io) then
             deallocate (start_idx)
-            do i = 1, sys_size
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
+
+            if (bubbles_lagrange) then
+                do i = 1, sys_size + 1
+                    MPI_IO_DATA%var(i)%sf => null()
+                end do
+            else
+                do i = 1, sys_size
+                    MPI_IO_DATA%var(i)%sf => null()
+                end do
+            end if
 
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)

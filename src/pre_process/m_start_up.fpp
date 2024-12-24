@@ -135,7 +135,7 @@ contains
             pi_fac, perturb_flow, perturb_flow_fluid, perturb_flow_mag, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &
             cyl_coord, loops_x, loops_y, loops_z, &
-            rhoref, pref, bubbles, R0ref, nb, &
+            rhoref, pref, bubbles_euler, R0ref, nb, &
             polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, qbmm, &
             sigR, sigV, dist_type, rhoRV, R0_type, &
@@ -143,7 +143,7 @@ contains
             palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
             sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
             n_start_old, surface_tension, hyperelasticity, pre_stress, &
-            elasticity
+            elasticity, rkck_adap_dt
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -170,7 +170,7 @@ contains
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
 
-            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
 
         else
             call s_mpi_abort('File pre_process.inp is missing. Exiting ...')
@@ -770,11 +770,11 @@ contains
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
-        if (bubbles .and. nb > 1) then
+        if (bubbles_euler .and. nb > 1) then
             call s_simpson
         end if
         !Initialize variables for non-polytropic (Preston) model
-        if (bubbles .and. .not. polytropic) then
+        if (bubbles_euler .and. .not. polytropic) then
             call s_initialize_nonpoly()
         end if
         !Initialize pb based on surface tension for qbmm (polytropic)

@@ -95,7 +95,7 @@ contains
             call s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
                                                         rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
-        else if (bubbles) then
+        else if (bubbles_euler) then
             call s_convert_species_to_mixture_variables_bubbles(q_vf, i, j, k, &
                                                                 rho, gamma, pi_inf, qv, Re_K, G_K, G)
         else
@@ -142,12 +142,12 @@ contains
         integer :: s !< Generic loop iterator
 
         #:if not chemistry
-            ! Depending on model_eqns and bubbles, the appropriate procedure
+            ! Depending on model_eqns and bubbles_euler, the appropriate procedure
             ! for computing pressure is targeted by the procedure pointer
 
-            if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
+            if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
                 pres = (energy - dyn_p - pi_inf - qv)/gamma
-            else if ((model_eqns /= 4) .and. bubbles) then
+            else if ((model_eqns /= 4) .and. bubbles_euler) then
                 pres = ((energy - dyn_p)/(1._wp - alf) - pi_inf - qv)/gamma
             else
                 pres = (pref + pi_inf)* &
@@ -244,7 +244,7 @@ contains
         !!      model to transfer the density, the specific heat ratio
         !!      function and liquid stiffness function from the vector
         !!      of conservative or primitive variables to their scalar
-        !!      counterparts. Specifically designed for when subgrid bubbles
+        !!      counterparts. Specifically designed for when subgrid bubbles_euler
         !!      must be included.
         !! @param q_vf primitive variables
         !! @param j Cell index
@@ -301,7 +301,7 @@ contains
             gamma = fluid_pp(1)%gamma    !qK_vf(gamma_idx)%sf(i,j,k)
             pi_inf = fluid_pp(1)%pi_inf   !qK_vf(pi_inf_idx)%sf(i,j,k)
             qv = fluid_pp(1)%qv
-        else if ((model_eqns == 2) .and. bubbles) then
+        else if ((model_eqns == 2) .and. bubbles_euler) then
             rho = 0._wp; gamma = 0._wp; pi_inf = 0._wp; qv = 0._wp
 
             if (mpp_lim .and. (num_fluids > 2)) then
@@ -317,7 +317,7 @@ contains
                 pi_inf = fluid_pp(1)%pi_inf
                 qv = fluid_pp(1)%qv
             else if (num_fluids > 2) then
-                !TODO: This may need fixing for hypo + bubbles
+                !TODO: This may need fixing for hypo + bubbles_euler
                 do i = 1, num_fluids - 1 !leave out bubble part of mixture
                     rho = rho + q_vf(i)%sf(j, k, l)
                     gamma = gamma + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%gamma
@@ -670,7 +670,7 @@ contains
         end if
 #endif
 
-        if (bubbles) then
+        if (bubbles_euler) then
 #ifdef MFC_SIMULATION
             @:ALLOCATE(bubrs(1:nb))
 #else
@@ -860,14 +860,14 @@ contains
 
         #:if MFC_CASE_OPTIMIZATION
 #ifndef MFC_SIMULATION
-            if (bubbles) then
+            if (bubbles_euler) then
                 allocate (nRtmp(nb))
             else
                 allocate (nRtmp(0))
             end if
 #endif
         #:else
-            if (bubbles) then
+            if (bubbles_euler) then
                 allocate (nRtmp(nb))
             else
                 allocate (nRtmp(0))
@@ -894,7 +894,7 @@ contains
                         if (elasticity) then
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                                                                             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
-                        else if (bubbles) then
+                        else if (bubbles_euler) then
                             call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                                     alpha_K, alpha_rho_K, Re_K, j, k, l)
                         else
@@ -973,7 +973,7 @@ contains
                         q_T_sf%sf(j, k, l) = T
                     end if
 
-                    if (bubbles) then
+                    if (bubbles_euler) then
                         !$acc loop seq
                         do i = 1, nb
                             nRtmp(i) = qK_cons_vf(bubrs(i))%sf(j, k, l)
@@ -1147,12 +1147,12 @@ contains
                             dyn_pres + rho*e_mix
                     else
                         ! Computing the energy from the pressure
-                        if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
+                        if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
                             ! E = Gamma*P + \rho u u /2 + \pi_inf + (\alpha\rho qv)
                             q_cons_vf(E_idx)%sf(j, k, l) = &
                                 gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf &
                                 + qv
-                        else if ((model_eqns /= 4) .and. (bubbles)) then
+                        else if ((model_eqns /= 4) .and. (bubbles_euler)) then
                             ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
                             q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
                                                            (1._wp - q_prim_vf(alf_idx)%sf(j, k, l))* &
@@ -1175,7 +1175,7 @@ contains
                         end do
                     end if
 
-                    if (bubbles) then
+                    if (bubbles_euler) then
                         ! From prim: Compute nbub = (3/4pi) * \alpha / \bar{R^3}
                         do i = 1, nb
                             Rtmp(i) = q_prim_vf(bub_idx%rs(i))%sf(j, k, l)
@@ -1332,7 +1332,7 @@ contains
                         call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                         alpha_K, alpha_rho_K, Re_K, &
                                                                         j, k, l, G_K, Gs)
-                    else if (bubbles) then
+                    else if (bubbles_euler) then
                         call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, &
                                                                                 pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K, j, k, l)
                     else
@@ -1369,7 +1369,7 @@ contains
                         end do
 
                     else
-                        ! Could be bubbles!
+                        ! Could be bubbles_euler!
                         !$acc loop seq
                         do i = advxb, advxe
                             FK_vf(j, k, l, i) = vel_K(dir_idx(1))*alpha_K(i - E_idx)
@@ -1400,12 +1400,12 @@ contains
 
 #ifdef MFC_SIMULATION
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
-        if (bubbles) then
+        if (bubbles_euler) then
             @:DEALLOCATE(bubrs)
         end if
 #else
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
-        if (bubbles) then
+        if (bubbles_euler) then
             @:DEALLOCATE(bubrs)
         end if
 #endif
@@ -1454,7 +1454,7 @@ contains
                         (pres + pi_infs(q)/(gammas(q) + 1._wp))
                 end do
                 c = c/rho
-            elseif (((model_eqns == 4) .or. (model_eqns == 2 .and. bubbles))) then
+            elseif (((model_eqns == 4) .or. (model_eqns == 2 .and. bubbles_euler))) then
                 ! Sound speed for bubble mmixture to order O(\alpha)
 
                 if (mpp_lim .and. (num_fluids > 1)) then

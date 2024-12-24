@@ -42,7 +42,7 @@ COMMON = {
     'nb': ParamType.REAL,
     'weno_order': ParamType.INT,
     'rhoref': ParamType.REAL,
-    'bubbles': ParamType.LOG,
+    'bubbles_euler': ParamType.LOG,
     'Re_inv': ParamType.REAL,
     'n': ParamType.INT,
     'precision': ParamType.INT,
@@ -57,6 +57,7 @@ COMMON = {
     'cfl_const_dt': ParamType.LOG,
     'chemistry': ParamType.LOG,
     'cantera_file': ParamType.STR,
+    'rkck_adap_dt': ParamType.LOG, 
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -129,7 +130,7 @@ for f_id in range(1, 10+1):
     PRE_PROCESS[f'fluid_rho({f_id})'] = ParamType.REAL
 
     for real_attr in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
-                      "mu_v", "k_v", "G", "cv", "qv", "qvp" ]:
+                      "mu_v", "k_v", "cp_v", "G", "cv", "qv", "qvp" ]:
         PRE_PROCESS[f"fluid_pp({f_id})%{real_attr}"] = ParamType.REAL
 
 for p_id in range(1, 10+1):
@@ -245,7 +246,20 @@ SIMULATION.update({
     'surface_tension': ParamType.LOG,
     'viscous': ParamType.LOG,
     'hypermodel': ParamType.INT,
+    'bubbles_lagrange': ParamType.LOG,
+    'rkck_tolerance': ParamType.REAL,
 })
+
+for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
+             'write_bubbles', 'write_bubbles_stats' ]:
+    SIMULATION[f'lag_params%{var}'] = ParamType.LOG
+
+for var in [ 'solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb']:
+    SIMULATION[f'lag_params%{var}'] = ParamType.INT
+
+for var in [ 'epsilonb', 'valmaxvoid', 'charwidth', 'diffcoefvap',
+            'c0', 'rho0', 'T0', 'x0', 'Thost' ]:
+    SIMULATION[f'lag_params%{var}'] = ParamType.REAL
 
 for var in [ 'diffusion', 'reactions' ]:
     SIMULATION[f'chem_params%{var}'] = ParamType.LOG
@@ -302,7 +316,7 @@ for probe_id in range(1,3+1):
 
 for f_id in range(1,10+1):
     for real_attr in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
-                      "mu_v", "k_v", "G", "cv", "qv", "qvp" ]:
+                      "mu_v", "k_v", "cp_v", "G", "cv", "qv", "qvp" ]:
         SIMULATION[f"fluid_pp({f_id})%{real_attr}"] = ParamType.REAL
 
     for re_id in [1, 2]:
@@ -372,6 +386,7 @@ POST_PROCESS.update({
     'n_start': ParamType.INT,
     'surface_tension': ParamType.LOG,
     'kymograph': ParamType.LOG,
+    'bubbles_lagrange': ParamType.LOG,
 })
 
 for cmp_id in range(1,3+1):
@@ -393,8 +408,8 @@ for fl_id in range(1,10+1):
                        ("alpha_wrt", ParamType.LOG), ("kappa_wrt", ParamType.LOG)]:
         POST_PROCESS[f'{append}({fl_id})'] = ty
 
-    for real_attr in ["gamma", "pi_inf", "ss", "pv", "gamma_v", "M_v", "mu_v", "k_v", "G", "mul0",
-                      "cv", "qv", "qvp" ]:
+    for real_attr in ["gamma", "pi_inf", "ss", "pv", "gamma_v", "M_v", "mu_v", "k_v", "cp_v",
+                      "G", "mul0", "cv", "qv", "qvp" ]:
         POST_PROCESS[f"fluid_pp({fl_id})%{real_attr}"] = ParamType.REAL
 
 IGNORE = ["cantera_file", "chemistry"]
