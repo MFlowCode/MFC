@@ -78,7 +78,7 @@ contains
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
-    subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step)
+    subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -93,10 +93,13 @@ contains
 
         integer, intent(in) :: t_step
 
+        type(scalar_field), &
+            intent(inout), optional :: beta
+
         if (.not. parallel_io) then
-            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step)
+            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
         else
-            call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step)
+            call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta)
         end if
 
     end subroutine s_write_data_files
@@ -385,12 +388,13 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step)
+    subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
+        type(scalar_field), intent(inout), optional :: beta
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the current time-step directory
@@ -607,6 +611,18 @@ contains
                 close (2)
             end do
 
+            if (present(beta)) then
+                write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/beta.', i, '.', proc_rank, '.', t_step, '.dat'
+                open (2, FILE=trim(file_path))
+                do j = 0, m
+                    do k = 0, n
+                        write (2, FMT) x_cb(j), y_cb(k), beta%sf(0:m, 0:n, 0)
+                    end do
+                    write (2, *)
+                end do
+                close (2)
+            end if
+
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
@@ -685,6 +701,21 @@ contains
                 close (2)
             end do
 
+            if (present(beta)) then
+                write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/beta.', i, '.', proc_rank, '.', t_step, '.dat'
+                open (2, FILE=trim(file_path))
+                do j = 0, m
+                    do k = 0, n
+                        do l = 0, p
+                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), beta%sf(j, k, l)
+                        end do
+                        write (2, *)
+                    end do
+                    write (2, *)
+                end do
+                close (2)
+            end if
+
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
@@ -754,11 +785,13 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step)
+        !!  @param beta Eulerian void fraction from lagrangian bubbles
+    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
+        type(scalar_field), intent(inout), optional :: beta
 
 #ifdef MFC_MPI
 
@@ -775,6 +808,14 @@ contains
         character(len=10) :: t_step_string
 
         integer :: i !< Generic loop iterator
+
+        integer :: alt_sys !< Altered system size for the lagrangian subgrid bubble model
+
+        if (present(beta)) then
+            alt_sys = sys_size + 1
+        else
+            alt_sys = sys_size
+        end if
 
         if (file_per_process) then
 
@@ -824,7 +865,7 @@ contains
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 ! Write the data for each variable
                 do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
@@ -856,6 +897,8 @@ contains
 
             if (ib) then
                 call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+            elseif (present(beta)) then
+                call s_initialize_mpi_data(q_cons_vf, beta=beta)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
@@ -879,9 +922,9 @@ contains
             WP_MOK = int(8._wp, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND)
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 ! Write the data for each variable
                 do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
@@ -920,6 +963,19 @@ contains
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                             mpi_p, status, ierr)
                 end do
+            end if
+
+            ! Correction for the lagrangian subgrid bubble model
+            if (present(beta)) then
+                var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+
+                ! Initial displacement to skip at beginning of file
+                disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(sys_size + 1), &
+                                       'native', mpi_info_int, ierr)
+                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(sys_size + 1)%sf, data_size, &
+                                        mpi_p, status, ierr)
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
@@ -1131,7 +1187,7 @@ contains
                         tau_e(1) = q_cons_vf(stress_idx%end)%sf(j - 2, k, l)/rho
                     end if
 
-                    if (bubbles) then
+                    if (bubbles_euler) then
                         alf = q_cons_vf(alf_idx)%sf(j - 2, k, l)
                         if (num_fluids == 3) then
                             alfgr = q_cons_vf(alf_idx - 1)%sf(j - 2, k, l)
@@ -1242,7 +1298,7 @@ contains
                             end do
                         end if
 
-                        if (bubbles) then
+                        if (bubbles_euler) then
                             alf = q_cons_vf(alf_idx)%sf(j - 2, k - 2, l)
                             do s = 1, nb
                                 nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k - 2, l)
@@ -1343,7 +1399,7 @@ contains
                     call s_mpi_allreduce_sum(tmp, vel(s))
                 end do
 
-                if (bubbles) then
+                if (bubbles_euler) then
                     #:for VAR in ['alf','alfgr','nbub','nR(1)','nRdot(1)','M00','R(1)','Rdot(1)','ptilde','ptot']
                         tmp = ${VAR}$
                         call s_mpi_allreduce_sum(tmp, ${VAR}$)
@@ -1366,7 +1422,7 @@ contains
             end if
             if (proc_rank == 0) then
                 if (n == 0) then
-                    if (bubbles .and. (num_fluids <= 2)) then
+                    if (bubbles_euler .and. (num_fluids <= 2)) then
                         if (qbmm) then
                             write (i + 30, '(6x,f12.6,14f28.16)') &
                                 nondim_time, &
@@ -1398,7 +1454,7 @@ contains
                             ! ptilde, &
                             ! ptot
                         end if
-                    else if (bubbles .and. (num_fluids == 3)) then
+                    else if (bubbles_euler .and. (num_fluids == 3)) then
                         write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,'// &
                                'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') &
                             nondim_time, &
@@ -1413,7 +1469,7 @@ contains
                             Rdot(1), &
                             ptilde, &
                             ptot
-                    else if (bubbles .and. num_fluids == 4) then
+                    else if (bubbles_euler .and. num_fluids == 4) then
                         write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,'// &
                                'f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8)') &
                             nondim_time, &
@@ -1438,7 +1494,7 @@ contains
                             pres
                     end if
                 elseif (p == 0) then
-                    if (bubbles) then
+                    if (bubbles_euler) then
                         write (i + 30, '(6X,10F24.8)') &
                             nondim_time, &
                             rho, &
@@ -1488,7 +1544,7 @@ contains
             end if
         end do
 
-        if (integral_wrt .and. bubbles) then
+        if (integral_wrt .and. bubbles_euler) then
             if (n == 0) then ! 1D simulation
                 do i = 1, num_integrals
                     int_pres = 0._wp
@@ -1531,7 +1587,7 @@ contains
                     end if
 
                     if (proc_rank == 0) then
-                        if (bubbles .and. (num_fluids <= 2)) then
+                        if (bubbles_euler .and. (num_fluids <= 2)) then
                             write (i + 70, '(6x,f12.6,f24.8)') &
                                 nondim_time, int_pres
                         end if
@@ -1614,7 +1670,7 @@ contains
                     end if
 
                     if (proc_rank == 0) then
-                        if (bubbles .and. (num_fluids <= 2)) then
+                        if (bubbles_euler .and. (num_fluids <= 2)) then
                             write (i + 70, '(6x,f12.6,f24.8,f24.8)') &
                                 nondim_time, int_pres, max_pres
                         end if

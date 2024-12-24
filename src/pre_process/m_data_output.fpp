@@ -312,7 +312,7 @@ contains
                                 0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2._wp)/rho, &
                                 pi_inf, gamma, rho, qv, rhoYks, pres, T)
                             write (2, FMT) x_cb(j), pres
-                        else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
+                        else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles_euler) then
 
                             if (qbmm) then
                                 nbub = q_cons_vf(bubxb)%sf(j, 0, 0)
@@ -328,7 +328,7 @@ contains
                                 end if
                             end if
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
-                        else if (i == n_idx .and. adv_n .and. bubbles) then
+                        else if (i == n_idx .and. adv_n .and. bubbles_euler) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         end if
                     end do
@@ -609,7 +609,7 @@ contains
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
             ! Write the data for each variable
-            if (bubbles) then
+            if (bubbles_euler) then
                 do i = 1, sys_size! adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -673,7 +673,7 @@ contains
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
             ! Write the data for each variable
-            if (bubbles) then
+            if (bubbles_euler) then
                 do i = 1, sys_size! adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -918,7 +918,7 @@ contains
         if (E_idx /= 0) write (1, '("[",I2,",",I2,"]",A)') E_idx, E_idx, " Energy/Pressure"
         if (advxb /= 0) write (1, '("[",I2,",",I2,"]",A)') advxb, advxe, " Advection"
         if (contxb /= 0) write (1, '("[",I2,",",I2,"]",A)') contxb, contxe, " Continuity"
-        if (bubxb /= 0) write (1, '("[",I2,",",I2,"]",A)') bubxb, bubxe, " Bubbles"
+        if (bubxb /= 0) write (1, '("[",I2,",",I2,"]",A)') bubxb, bubxe, " Bubbles_euler"
         if (strxb /= 0) write (1, '("[",I2,",",I2,"]",A)') strxb, strxe, " Stress"
         if (intxb /= 0) write (1, '("[",I2,",",I2,"]",A)') intxb, intxe, " Internal Energies"
         if (chemxb /= 0) write (1, '("[",I2,",",I2,"]",A)') chemxb, chemxe, " Chemistry"

@@ -1,4 +1,4 @@
-import os, glob, hashlib, binascii, subprocess, itertools, dataclasses
+import os, glob, hashlib, binascii, subprocess, itertools, dataclasses, shutil
 
 from typing import List, Set, Union, Callable, Optional
 
@@ -55,7 +55,7 @@ BASE_CFG = {
     'fluid_pp(1)%cv'               : 0.0,
     'fluid_pp(1)%qv'               : 0.0,
     'fluid_pp(1)%qvp'              : 0.0,   
-    'bubbles'                       : 'F',
+    'bubbles_euler'                 : 'F',
     'Ca'                            : 0.9769178386380458,
     'Web'                           : 13.927835051546392,
     'Re_inv'                        : 0.009954269975623245,
@@ -90,6 +90,25 @@ BASE_CFG = {
     'acoustic(1)%npulse'                : 1,
     'acoustic(1)%pulse'                 : 1,
     'rdma_mpi'                          : 'F',
+
+    'bubbles_lagrange'                 : 'F',
+    'rkck_adap_dt'                     : 'F',
+    'rkck_tolerance'                   : 1.0e-09,
+    'lag_params%nBubs_glb'             : 1,
+    'lag_params%solver_approach'       : 0,
+    'lag_params%cluster_type'          : 2,
+    'lag_params%pressure_corrector'    : 'F',
+    'lag_params%smooth_type'           : 1,
+    'lag_params%epsilonb'              : 1.0,
+    'lag_params%heatTransfer_model'    : 'F',
+    'lag_params%massTransfer_model'    : 'F',
+    'lag_params%valmaxvoid'            : 0.9,
+    'lag_params%c0'                    : 10.1,
+    'lag_params%rho0'                  : 1000.,
+    'lag_params%T0'                    : 298.,
+    'lag_params%x0'                    : 1.,
+    'lag_params%diffcoefvap'           : 2.5e-5,
+    'lag_params%Thost'                 : 298.,
 }
 
 def trace_to_uuid(trace: str) -> str:
@@ -117,6 +136,9 @@ class TestCase(case.Case):
         tasks             = ["-n", str(self.ppn)]
         jobs              = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
         case_optimization = ["--case-optimization"] if ARG("case_optimization") else []
+
+        if self.params.get("bubbles_lagrange", 'F') == 'T':
+            input_bubbles_lagrange(self)
 
         mfc_script = ".\\mfc.bat" if os.name == 'nt' else "./mfc.sh"
 
@@ -158,6 +180,9 @@ class TestCase(case.Case):
         common.delete_directory(os.path.join(dirpath, "p_all"))
         common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
         common.delete_directory(os.path.join(dirpath, "restart_data"))
+        if self.params.get("bubbles_lagrange", 'F') == 'T':
+            common.delete_directory(os.path.join(dirpath, "input"))
+            common.delete_directory(os.path.join(dirpath, "lag_bubbles_post_process"))
 
         for f in ["pack", "pre_process", "simulation", "post_process"]:
             common.delete_file(os.path.join(dirpath, f"{f}.txt"))
@@ -236,7 +261,7 @@ print(json.dumps({{**case, **mods}}))
             tolerance = 1e-7
         elif self.params.get("mixlayer_perturb", 'F') == 'T':
             tolerance = 1e-7
-        elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']):
+        elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles_euler', 'bubbles_lagrange']):
             tolerance = 1e-10
         elif self.params.get("low_Mach") in [1, 2]:
             tolerance = 1e-10
@@ -329,3 +354,29 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
             traces.append(trace)
 
     return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn or 1, functor, override_tol)
+
+def input_bubbles_lagrange(self):
+    if "lagrange_bubblescreen" in self.trace:
+        copy_input_lagrange(f'/3D_lagrange_bubblescreen',f'{self.get_dirpath()}')
+    elif "lagrange_shbubcollapse" in self.trace:
+        copy_input_lagrange(f'/3D_lagrange_shbubcollapse',f'{self.get_dirpath()}')
+    else:
+        create_input_lagrange(f'{self.get_dirpath()}')
+
+def create_input_lagrange(path_test):
+    folder_path_lagrange = path_test + '/input'
+    file_path_lagrange = folder_path_lagrange + '/lag_bubbles.dat'
+    if not os.path.exists(folder_path_lagrange):
+        os.mkdir(folder_path_lagrange)
+
+    with open(file_path_lagrange, "w") as file:
+        file.write('0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0')
+
+def copy_input_lagrange(path_example_input, path_test):
+    folder_path_dest = path_test + '/input/'
+    fite_path_dest = folder_path_dest + 'lag_bubbles.dat'
+    file_path_src = common.MFC_EXAMPLE_DIRPATH + path_example_input + '/input/lag_bubbles.dat'
+    if not os.path.exists(folder_path_dest):
+        os.mkdir(folder_path_dest)
+
+    shutil.copyfile(file_path_src, fite_path_dest)
