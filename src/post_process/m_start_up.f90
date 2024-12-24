@@ -213,7 +213,7 @@ contains
         if (kymograph .and. proc_rank == 0) then
             call s_open_kymo_data_file()
         end if
-       
+
         if (kymograph) then
             call s_write_kymo_data_file(q_prim_vf)
         end if

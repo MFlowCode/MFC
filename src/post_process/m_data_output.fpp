@@ -579,7 +579,7 @@ contains
         ! Relative path to a file in the case directory
         character(LEN=path_len + 3*name_len) :: file_path
 
-        ! Kymo information is in binary database format 
+        ! Kymo information is in binary database format
         ! Generates relative path to database, opened for current time-step
         write (file_path, '(A)') '/kymo_data.dat'
         file_path = trim(case_dir)//trim(file_path)
@@ -590,7 +590,7 @@ contains
               POSITION='append', &
               STATUS='unknown')
 
-   end subroutine s_open_kymo_data_file ! ----------------------------------------
+    end subroutine s_open_kymo_data_file ! ----------------------------------------
 
     subroutine s_write_grid_to_formatted_database_file(t_step) ! -----------
         ! Description: The general objective of this subroutine is to write the
@@ -1244,32 +1244,32 @@ contains
         real(kind(0d0)) :: vonMises_d, vonMises_h1  !< selected planes for kymograph comparison
         real(kind(0d0)) :: vonMises_h2, vonMises_h3 !<kymograph plane comparison continued
         real(kind(0d0)) :: i !< counting integer
-        
+
         do t = 0, t_stop
-           do j = 0, m
-              ! for bubliq, sf(j,0,0) for d and sf(0.5*xcen_bub,k,0) for h
-              ! for bubgel, sf(j,0,0) for d, sf(-xcen_bub,k,0) for h_1,
-              !                              sf(-0.5*xcen_bub,k,0) for h_2
-              vonMises_d = q_prim_vf(xiend+1)%sf(j, 0, 0)
-           end do 
-        end do   
+            do j = 0, m
+                ! for bubliq, sf(j,0,0) for d and sf(0.5*xcen_bub,k,0) for h
+                ! for bubgel, sf(j,0,0) for d, sf(-xcen_bub,k,0) for h_1,
+                !                              sf(-0.5*xcen_bub,k,0) for h_2
+                vonMises_d = q_prim_vf(xiend + 1)%sf(j, 0, 0)
+            end do
+        end do
 
         i = m/4d0
         do t = 0, t_stop
-           do k = 0, n
-              !xcen_bub is roughly +/- m/4
-              vonMises_h1 = q_prim_vf(xiend+1)%sf(0, k, 0)
-              vonMises_h2 = q_prim_vf(xiend+1)%sf(i, k, 0)
-              vonMises_h3 = q_prim_vf(xiend+1)%sf(-i, k, 0)
-           end do
+            do k = 0, n
+                !xcen_bub is roughly +/- m/4
+                vonMises_h1 = q_prim_vf(xiend + 1)%sf(0, k, 0)
+                vonMises_h2 = q_prim_vf(xiend + 1)%sf(i, k, 0)
+                vonMises_h3 = q_prim_vf(xiend + 1)%sf(-i, k, 0)
+            end do
         end do
 
-        if (proc_rank == 0) then 
+        if (proc_rank == 0) then
             write (251, '(10X, 8F24.8)') &
-                 vonMises_d, &
-                 vonMises_h1, &
-                 vonMises_h2, &
-                 vonMises_h3
+                vonMises_d, &
+                vonMises_h1, &
+                vonMises_h2, &
+                vonMises_h3
         end if
 
     end subroutine s_write_kymo_data_file
