@@ -34,6 +34,7 @@ module m_data_output
  s_open_energy_data_file, &
  s_write_grid_to_formatted_database_file, &
  s_write_variable_to_formatted_database_file, &
+ s_write_lag_bubbles_results, &
  s_write_intf_data_file, &
  s_write_energy_data_file, &
  s_close_formatted_database_file, &
@@ -294,6 +295,16 @@ contains
 
             end if
 
+        end if
+
+        if (bubbles_lagrange) then !Lagrangian solver
+            dbdir = trim(case_dir)//'/lag_bubbles_post_process'
+            file_loc = trim(dbdir)//'/.'
+            call my_inquire(file_loc, dir_check)
+
+            if (dir_check .neqv. .true.) then
+                call s_create_directory(trim(dbdir))
+            end if
         end if
 
         ! ==================================================================
@@ -1095,6 +1106,112 @@ contains
 
     end subroutine s_write_variable_to_formatted_database_file ! -----------
 
+    !>  Subroutine that writes the post processed results in the folder 'lag_bubbles_data'
+            !!  @param t_step Current time step
+    subroutine s_write_lag_bubbles_results(t_step)
+
+        integer, intent(in) :: t_step
+        character(len=len_trim(case_dir) + 2*name_len) :: t_step_dir
+        character(len=len_trim(case_dir) + 3*name_len) :: file_loc
+        logical :: dir_check
+        integer :: id, nlg_bubs
+
+#ifdef MFC_MPI
+        real(wp), dimension(20) :: inputvals
+        real(wp) :: id_real, time_real
+        integer, dimension(MPI_STATUS_SIZE) :: status
+        integer(KIND=MPI_OFFSET_KIND) :: disp
+        integer :: view
+
+        integer, dimension(3) :: cell
+        logical :: indomain, lg_bub_file, lg_bub_data, file_exist
+
+        integer, dimension(2) :: gsizes, lsizes, start_idx_part
+        integer :: ifile, ireq, ierr, data_size, tot_data
+        integer :: i
+
+        write (file_loc, '(A,I0,A)') 'lag_bubbles_mpi_io_', t_step, '.dat'
+        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+        if (file_exist) then
+            if (proc_rank == 0) then
+                open (9, FILE=trim(file_loc), FORM='unformatted', STATUS='unknown')
+                read (9) tot_data, time_real
+                close (9)
+            end if
+        else
+            print '(A)', trim(file_loc)//' is missing. Exiting ...'
+            call s_mpi_abort
+        end if
+
+        call MPI_BCAST(tot_data, 1, MPI_integer, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(time_real, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+
+        gsizes(1) = tot_data
+        gsizes(2) = 21
+        lsizes(1) = tot_data
+        lsizes(2) = 21
+        start_idx_part(1) = 0
+        start_idx_part(2) = 0
+
+        call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, &
+                                      MPI_ORDER_FORTRAN, mpi_p, view, ierr)
+        call MPI_TYPE_COMMIT(view, ierr)
+
+        write (file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
+        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+        inquire (FILE=trim(file_loc), EXIST=lg_bub_file)
+
+        if (lg_bub_file) then
+
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, &
+                               mpi_info_int, ifile, ierr)
+
+            disp = 0._wp
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, &
+                                   'native', mpi_info_null, ierr)
+
+            allocate (MPI_IO_DATA_lg_bubbles(tot_data, 1:21))
+
+            call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lg_bubbles, 21*tot_data, &
+                                   mpi_p, status, ierr)
+
+            write (file_loc, '(A,I0,A)') 'lag_bubbles_post_process_', t_step, '.dat'
+            file_loc = trim(case_dir)//'/lag_bubbles_post_process/'//trim(file_loc)
+
+            if (proc_rank == 0) then
+                open (unit=29, file=file_loc, form='formatted', position='rewind')
+                !write(29,*) 'lg_bubID, x, y, z, xPrev, yPrev, zPrev, xVel, yVel, ',   &
+                !            'zVel, radius, interfaceVelocity, equilibriumRadius',       &
+                !            'Rmax, Rmin, dphidt, pressure, mv, mg, betaT, betaC, time'
+                do i = 1, tot_data
+                    id = int(MPI_IO_DATA_lg_bubbles(i, 1))
+                    inputvals(1:20) = MPI_IO_DATA_lg_bubbles(i, 2:21)
+                    if (id > 0) then
+                        write (29, 6) int(id), inputvals(1), inputvals(2), &
+                            inputvals(3), inputvals(4), inputvals(5), inputvals(6), inputvals(7), &
+                            inputvals(8), inputvals(9), inputvals(10), inputvals(11), &
+                            inputvals(12), inputvals(13), inputvals(14), inputvals(15), &
+                            inputvals(16), inputvals(17), inputvals(18), inputvals(19), &
+                            inputvals(20), time_real
+6                       format(I6, 21(1x, E15.7))
+                    end if
+                end do
+                close (29)
+            end if
+
+            deallocate (MPI_IO_DATA_lg_bubbles)
+
+        end if
+
+        call s_mpi_barrier()
+
+        call MPI_FILE_CLOSE(ifile, ierr)
+
+#endif
+
+    end subroutine s_write_lag_bubbles_results
     subroutine s_write_intf_data_file(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
