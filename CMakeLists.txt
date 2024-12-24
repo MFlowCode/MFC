@@ -26,12 +26,19 @@ option(MFC_POST_PROCESS  "Build post_process"                                OFF
 option(MFC_SYSCHECK      "Build syscheck"                                    OFF)
 option(MFC_DOCUMENTATION "Build documentation"                               OFF)
 option(MFC_ALL           "Build everything"                                  OFF)
+option(MFC_SINGLE_PRECISION "Build single precision"                         OFF)
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
     set(MFC_SIMULATION    ON FORCE)
     set(MFC_POST_PROCESS  ON FORCE)
     set(MFC_DOCUMENTATION ON FORCE)
+endif()
+
+if (MFC_SINGLE_PRECISION)
+    add_compile_definitions(MFC_SINGLE_PRECISION)
+else()
+    add_compile_definitions(MFC_DOUBLE_PRECISION)
 endif()
 
 
@@ -165,6 +172,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         )
         add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
     endif()
+
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
@@ -188,11 +196,12 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-O0>
+            $<$<COMPILE_LANGUAGE:Fortran>:-C> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-g>
+            $<$<COMPILE_LANGUAGE:Fortran>:-traceback> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
         )
-    endif()
-
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-C -g -O0 -traceback -Minform=inform -Mbounds)
     endif()
 
     if (DEFINED ENV{MFC_CUDA_CC})

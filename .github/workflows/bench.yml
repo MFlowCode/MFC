@@ -20,7 +20,8 @@ jobs:
 
   self:
     name: Georgia Tech | Phoenix (NVHPC)
-    if: github.repository == 'MFlowCode/MFC'
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
     strategy:
       matrix:
         device: ['cpu', 'gpu']
@@ -46,8 +47,8 @@ jobs:
 
       - name: Bench (Master v. PR)
         run: |
-          (cd pr     && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
-          (cd master && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
+          (cd pr     && bash .github/workflows/phoenix/submit-bench.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
+          (cd master && bash .github/workflows/phoenix/submit-bench.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
           wait %1 && wait %2
 
       - name: Generate & Post Comment

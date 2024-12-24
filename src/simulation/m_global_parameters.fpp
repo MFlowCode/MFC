@@ -30,7 +30,7 @@ module m_global_parameters
 
     implicit none
 
-    real(kind(0d0)) :: time = 0
+    real(wp) :: time = 0
 
     ! Logistics ================================================================
     integer :: num_procs             !< Number of processors
@@ -61,21 +61,24 @@ module m_global_parameters
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
-    real(kind(0d0)), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
+
+    real(wp), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
     !> @}
 
     !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
     !> @{
-    real(kind(0d0)), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
+
+    real(wp), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
     !type(bounds_info) :: x_domain, y_domain, z_domain !<
     !! Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
-    real(kind(0d0)), target, allocatable, dimension(:) :: dx, dy, dz
+
+    real(wp), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
-    real(kind(0d0)) :: dt !< Size of the time-step
+    real(wp) :: dt !< Size of the time-step
 
     !$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
 
@@ -88,7 +91,7 @@ module m_global_parameters
     !> @name Starting time, stopping time, and time between backups, simulation time,
     !! and prescribed cfl respectively
     !> @{
-    real(kind(0d0)) :: t_stop, t_save, cfl_target
+    real(wp) :: t_stop, t_save, cfl_target
     integer :: n_start
     !> @}
     !$acc declare create(cfl_target)
@@ -119,7 +122,7 @@ module m_global_parameters
         logical, parameter :: mapped_weno = (${mapped_weno}$ /= 0)  !< WENO-M (WENO with mapping of nonlinear weights)
         logical, parameter :: wenoz = (${wenoz}$ /= 0)              !< WENO-Z
         logical, parameter :: teno = (${teno}$ /= 0)                !< TENO (Targeted ENO)
-        real(kind(0d0)), parameter :: wenoz_q = ${wenoz_q}$         !< Power constant for WENO-Z
+        real(wp), parameter :: wenoz_q = ${wenoz_q}$         !< Power constant for WENO-Z
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
@@ -129,11 +132,11 @@ module m_global_parameters
         logical :: mapped_weno    !< WENO-M (WENO with mapping of nonlinear weights)
         logical :: wenoz          !< WENO-Z
         logical :: teno           !< TENO (Targeted ENO)
-        real(kind(0d0)) :: wenoz_q  !< Power constant for WENO-Z
+        real(wp) :: wenoz_q  !< Power constant for WENO-Z
     #:endif
 
-    real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
-    real(kind(0d0)) :: teno_CT        !< Smoothness threshold for TENO
+    real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
+    real(wp) :: teno_CT        !< Smoothness threshold for TENO
     logical :: mp_weno        !< Monotonicity preserving (MP) WENO
     logical :: weno_avg       ! Average left/right cell-boundary states
     logical :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
@@ -161,10 +164,10 @@ module m_global_parameters
     !< amplitude, frequency, and phase shift sinusoid in each direction
     #:for dir in {'x', 'y', 'z'}
         #:for param in {'k','w','p','g'}
-            real(kind(0d0)) :: ${param}$_${dir}$
+            real(wp) :: ${param}$_${dir}$
         #:endfor
     #:endfor
-    real(kind(0d0)), dimension(3) :: accel_bf
+    real(wp), dimension(3) :: accel_bf
     !$acc declare create(accel_bf)
 
     integer :: cpu_start, cpu_end, cpu_rate
@@ -177,8 +180,8 @@ module m_global_parameters
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
-    real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
-    real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
+    real(wp) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
+    real(wp) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
 
 !#ifndef _CRAYFTN
 !$acc declare create(relax, relax_model, palpha_eps,ptgalpha_eps)
@@ -189,8 +192,8 @@ module m_global_parameters
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
     type(bounds_info) :: x_domain, y_domain, z_domain
-    real(kind(0d0)) :: x_a, y_a, z_a
-    real(kind(0d0)) :: x_b, y_b, z_b
+    real(wp) :: x_a, y_a, z_a
+    real(wp) :: x_b, y_b, z_b
 
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< shared file or not when using parallel io
@@ -235,8 +238,7 @@ module m_global_parameters
     integer :: b_size                                  !< Number of elements in the symmetric b tensor, plus one
     integer :: tensor_size                             !< Number of elements in the full tensor plus one
     type(int_bounds_info) :: species_idx               !< Indexes of first & last concentration eqns.
-    integer :: c_idx                                   !< Index of the color function
-    integer :: T_idx                                   !< Index of the temperature equation
+    integer :: c_idx                                   !< Index of color function
     !> @}
 
     !$acc declare create(bub_idx)
@@ -268,7 +270,7 @@ module m_global_parameters
     ! values or simply, the unaltered left and right, WENO-reconstructed, cell-
     ! boundary values.
     !> @{
-    real(kind(0d0)) :: wa_flg
+    real(wp) :: wa_flg
     !> @{
 
     !$acc declare create(wa_flg)
@@ -279,7 +281,7 @@ module m_global_parameters
     !! the dimensionally split system of equations.
     !> @{
     integer, dimension(3) :: dir_idx
-    real(kind(0d0)), dimension(3) :: dir_flg
+    real(wp), dimension(3) :: dir_flg
     integer, dimension(3) :: dir_idx_tau !!used for hypoelasticity=true
     !> @}
 
@@ -292,7 +294,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, T_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -329,7 +331,7 @@ module m_global_parameters
 
     !> @name Reference density and pressure for Tait EOS
     !> @{
-    real(kind(0d0)) :: rhoref, pref
+    real(wp) :: rhoref, pref
     !> @}
     !$acc declare create(rhoref, pref)
 
@@ -358,14 +360,14 @@ module m_global_parameters
         integer :: nb       !< Number of eq. bubble sizes
     #:endif
 
-    real(kind(0d0)) :: R0ref    !< Reference bubble size
-    real(kind(0d0)) :: Ca       !< Cavitation number
-    real(kind(0d0)) :: Web      !< Weber number
-    real(kind(0d0)) :: Re_inv   !< Inverse Reynolds number
+    real(wp) :: R0ref    !< Reference bubble size
+    real(wp) :: Ca       !< Cavitation number
+    real(wp) :: Web      !< Weber number
+    real(wp) :: Re_inv   !< Inverse Reynolds number
 
-    real(kind(0d0)), dimension(:), allocatable :: weight !< Simpson quadrature weights
-    real(kind(0d0)), dimension(:), allocatable :: R0     !< Bubble sizes
-    real(kind(0d0)), dimension(:), allocatable :: V0     !< Bubble velocities
+    real(wp), dimension(:), allocatable :: weight !< Simpson quadrature weights
+    real(wp), dimension(:), allocatable :: R0     !< Bubble sizes
+    real(wp), dimension(:), allocatable :: V0     !< Bubble velocities
     !$acc declare create(weight, R0, V0)
 
     logical :: bubbles      !< Bubbles on/off
@@ -377,10 +379,10 @@ module m_global_parameters
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
+    real(wp), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
     !$acc declare create(ptil)
 
-    real(kind(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
+    real(wp) :: poly_sigma  !< log normal sigma for polydisperse PDF
 
     logical :: qbmm      !< Quadrature moment method
     integer, parameter :: nmom = 6 !< Number of carried moments per R0 location
@@ -388,7 +390,7 @@ module m_global_parameters
     integer :: nmomtot   !< Total number of carried moments moments/transport equations
     integer :: R0_type
 
-    real(kind(0d0)) :: pi_fac   !< Factor for artificial pi_inf
+    real(wp) :: pi_fac   !< Factor for artificial pi_inf
 
     #:if not MFC_CASE_OPTIMIZATION
         !$acc declare create(nb)
@@ -407,16 +409,17 @@ module m_global_parameters
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
-    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
+
+    real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
     !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v)
 
-    real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
-    real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
+    real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
+    real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
     !$acc declare create( k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
 
-    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
-    real(kind(0d0)) :: gamma_m, gamma_n, mu_n
-    real(kind(0d0)) :: gam
+    real(wp) :: mul0, ss, gamma_v, mu_v
+    real(wp) :: gamma_m, gamma_n, mu_n
+    real(wp) :: gam
     !> @}
 
     !$acc declare create(mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
@@ -431,7 +434,8 @@ module m_global_parameters
 
     !> @name Surface tension parameters
     !> @{
-    real(kind(0d0)) :: sigma
+
+    real(wp) :: sigma
     logical :: surface_tension
     !$acc declare create(sigma, surface_tension)
     !> @}
@@ -447,11 +451,11 @@ module m_global_parameters
     !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe, chemxb, chemxe)
     !$acc declare create(xibeg,xiend)
 
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+    real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
     !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 
-    real(kind(0d0)) :: mytime       !< Current simulation time
-    real(kind(0d0)) :: finaltime    !< Final simulation time
+    real(wp) :: mytime       !< Current simulation time
+    real(wp) :: finaltime    !< Final simulation time
 
     logical :: weno_flat, riemann_flat, rdma_mpi
 
@@ -525,6 +529,8 @@ contains
         hyperelasticity = .false.
         elasticity = .false.
         hyper_model = dflt_int
+        b_size = dflt_int
+        tensor_size = dflt_int
         weno_flat = .true.
         riemann_flat = .true.
         rdma_mpi = .false.
@@ -549,8 +555,8 @@ contains
 
         #:for DIM in ['x', 'y', 'z']
             #:for DIR in [1, 2, 3]
-                bc_${DIM}$%vb${DIR}$ = 0d0
-                bc_${DIM}$%ve${DIR}$ = 0d0
+                bc_${DIM}$%vb${DIR}$ = 0._wp
+                bc_${DIM}$%ve${DIR}$ = 0._wp
             #:endfor
         #:endfor
 
@@ -562,9 +568,9 @@ contains
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
-            fluid_pp(i)%cv = 0d0
-            fluid_pp(i)%qv = 0d0
-            fluid_pp(i)%qvp = 0d0
+            fluid_pp(i)%cv = 0._wp
+            fluid_pp(i)%qv = 0._wp
+            fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%Re(:) = dflt_real
             fluid_pp(i)%mul0 = dflt_real
             fluid_pp(i)%ss = dflt_real
@@ -573,7 +579,7 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
-            fluid_pp(i)%G = 0d0
+            fluid_pp(i)%G = 0._wp
         end do
 
         ! Tait EOS
@@ -603,7 +609,7 @@ contains
         adv_n = .false.
         adap_dt = .false.
 
-        pi_fac = 1d0
+        pi_fac = 1._wp
 
         ! User inputs for qbmm for simulation code
         qbmm = .false.
@@ -682,6 +688,13 @@ contains
             integral(i)%ymin = dflt_real
             integral(i)%ymax = dflt_real
         end do
+
+        ! GRCBC flags
+        #:for dir in {'x', 'y', 'z'}
+            bc_${dir}$%grcbc_in = .false.
+            bc_${dir}$%grcbc_out = .false.
+            bc_${dir}$%grcbc_vel_out = .false.
+        #:endfor
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -786,9 +799,9 @@ contains
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
 
                     if (num_fluids == 1) then
-                        gam = 1.d0/fluid_pp(num_fluids + 1)%gamma + 1.d0
+                        gam = 1._wp/fluid_pp(num_fluids + 1)%gamma + 1._wp
                     else
-                        gam = 1.d0/fluid_pp(num_fluids)%gamma + 1.d0
+                        gam = 1._wp/fluid_pp(num_fluids)%gamma + 1._wp
                     end if
 
                     if (qbmm) then
@@ -820,11 +833,11 @@ contains
                     end if
 
                     if (nb == 1) then
-                        weight(:) = 1d0
-                        R0(:) = 1d0
-                        V0(:) = 1d0
+                        weight(:) = 1._wp
+                        R0(:) = 1._wp
+                        V0(:) = 1._wp
                     else if (nb > 1) then
-                        V0(:) = 1d0
+                        V0(:) = 1._wp
                         !R0 and weight initialized in s_simpson
                     else
                         stop 'Invalid value of nb'
@@ -833,8 +846,8 @@ contains
                     !Initialize pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
                     if (.not. qbmm) then
                         if (polytropic) then
-                            rhoref = 1.d0
-                            pref = 1.d0
+                            rhoref = 1._wp
+                            pref = 1._wp
                         end if
                     end if
 
@@ -847,31 +860,11 @@ contains
                             if ((f_is_default(Web))) then
                                 pb0 = pref
                                 pb0 = pb0/pref
-                                pref = 1d0
+                                pref = 1._wp
                             end if
-                            rhoref = 1d0
+                            rhoref = 1._wp
                         end if
                     end if
-                end if
-
-                if (hypoelasticity .or. hyperelasticity) then
-                    elasticity = .true.
-                    stress_idx%beg = sys_size + 1
-                    stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
-                    ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
-                    sys_size = stress_idx%end
-                end if
-
-                if (hyperelasticity) then
-                    ! number of entries in the symmetric btensor plus the jacobian
-                    b_size = (num_dims*(num_dims + 1))/2 + 1
-                    ! storing the jacobian in the last entry
-                    tensor_size = num_dims**2 + 1
-                    xi_idx%beg = sys_size + 1
-                    xi_idx%end = sys_size + num_dims
-                    ! adding three more equations for the \xi field and the elastic energy
-                    sys_size = xi_idx%end + 1
-                    hyper_model = 1
                 end if
 
                 if (surface_tension) then
@@ -892,26 +885,7 @@ contains
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
 
-                if (hypoelasticity .or. hyperelasticity) then
-                    elasticity = .true.
-                    stress_idx%beg = sys_size + 1
-                    stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
-                    ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
-                    sys_size = stress_idx%end
-                end if
-
-                if (hyperelasticity) then
-                    ! number of entries in the symmetric btensor plus the jacobian
-                    b_size = (num_dims*(num_dims + 1))/2 + 1
-                    ! storing the jacobian in the last entry
-                    tensor_size = num_dims**2 + 1
-                    xi_idx%beg = sys_size + 1
-                    xi_idx%end = sys_size + num_dims
-                    ! adding three more equations for the \xi field and the elastic energy
-                    sys_size = xi_idx%end + 1
-                end if
-
-                if (.not. f_is_default(sigma)) then
+                if (surface_tension) then
                     c_idx = sys_size + 1
                     sys_size = c_idx
                 end if
@@ -955,18 +929,18 @@ contains
                         end if
                     end do
                     if (nb == 1) then
-                        weight(:) = 1d0
-                        R0(:) = 1d0
-                        V0(:) = 0d0
+                        weight(:) = 1._wp
+                        R0(:) = 1._wp
+                        V0(:) = 0._wp
                     else if (nb > 1) then
-                        V0(:) = 1d0
+                        V0(:) = 1._wp
                     else
                         stop 'Invalid value of nb'
                     end if
 
                     if (polytropic) then
-                        rhoref = 1.d0
-                        pref = 1.d0
+                        rhoref = 1._wp
+                        pref = 1._wp
                     end if
                 end if
             end if
@@ -978,8 +952,8 @@ contains
                 if (fluid_pp(i)%Re(2) > 0) Re_size(2) = Re_size(2) + 1
             end do
 
-            if (Re_size(1) > 0d0) shear_stress = .true.
-            if (Re_size(2) > 0d0) bulk_stress = .true.
+            if (Re_size(1) > 0._wp) shear_stress = .true.
+            if (Re_size(2) > 0._wp) bulk_stress = .true.
 
             !$acc update device(Re_size, viscous, shear_stress, bulk_stress)
 
@@ -1008,13 +982,28 @@ contains
         end if
         ! END: Volume Fraction Model =======================================
 
+        if (elasticity) then
+            ! creates stress indices for both hypo and hyperelasticity
+            stress_idx%beg = sys_size + 1
+            stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+            ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
+            sys_size = stress_idx%end
+            if (hyperelasticity) then
+                ! number of entries in the symmetric btensor plus the jacobian
+                b_size = (num_dims*(num_dims + 1))/2 + 1
+                ! storing the jacobian in the last entry
+                tensor_size = num_dims**2 + 1
+                xi_idx%beg = sys_size + 1
+                xi_idx%end = sys_size + num_dims
+                ! adding three more equations for the \xi field and the elastic energy
+                sys_size = xi_idx%end + 1
+            end if
+        end if
+
         if (chemistry) then
             species_idx%beg = sys_size + 1
             species_idx%end = sys_size + num_species
             sys_size = species_idx%end
-
-            T_idx = sys_size + 1
-            sys_size = T_idx
         end if
 
         if (qbmm .and. .not. polytropic) then
@@ -1041,7 +1030,7 @@ contains
         ! using the arithmetic mean of left and right, WENO-reconstructed,
         ! cell-boundary values or otherwise, the unaltered left and right,
         ! WENO-reconstructed, cell-boundary values
-        wa_flg = 0d0; if (weno_avg) wa_flg = 1d0
+        wa_flg = 0._wp; if (weno_avg) wa_flg = 1._wp
         !$acc update device(wa_flg)
 
         ! Resort to default WENO-JS if no other WENO scheme is selected
@@ -1059,14 +1048,11 @@ contains
         ! the next one
         if (viscous) then
             buff_size = 2*weno_polyn + 2
-!        else if (elasticity) then !TODO: check if necessary
-!            buff_size = 2*weno_polyn + 2
         else
             buff_size = weno_polyn + 2
         end if
 
         if (elasticity) then
-            fd_order = 4
             fd_number = max(1, fd_order/2)
             !buff_size = buff_size + fd_number
         end if
@@ -1135,7 +1121,7 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, T_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
         !$acc update device(b_size, xibeg, xiend, tensor_size)
 
         !$acc update device(species_idx)

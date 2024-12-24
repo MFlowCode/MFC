@@ -26,6 +26,7 @@ jobs:
       matrix:
         os:    ['ubuntu', 'macos']
         mpi:   ['mpi']
+        precision: ['']
         debug: ['debug', 'no-debug']
         intel: [true, false]
         exclude:
@@ -35,6 +36,7 @@ jobs:
         include:
           - os:    ubuntu
             mpi:   no-mpi
+            precision: single
             debug: no-debug
             intel: false
 
@@ -49,6 +51,8 @@ jobs:
       - name: Setup MacOS
         if:   matrix.os == 'macos'
         run:  |
+          brew update
+          brew upgrade
           brew install coreutils python cmake fftw hdf5 gcc@14 boost open-mpi
           echo "FC=gfortran-14" >> $GITHUB_ENV
           echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
@@ -63,32 +67,21 @@ jobs:
       - name: Setup Ubuntu (Intel)
         if:   matrix.os == 'ubuntu' && matrix.intel == true
         run: |
-          sudo apt update -y
-          sudo apt install -y tar wget make cmake python3 python3-dev
           wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
           sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-          rm GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-          sudo echo "deb https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
+          sudo add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
           sudo apt-get update
-          sudo apt-get install -y intel-oneapi-common-vars intel-oneapi-compiler-fortran-2022.1.0 intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2022.1.0 intel-oneapi-mkl-2021.4.0 intel-oneapi-mpi-2021.7.1 intel-oneapi-mpi-devel-2021.7.1
+          sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel
           source /opt/intel/oneapi/setvars.sh
-          echo "CXX=$(which icpc)"          >> $GITHUB_ENV
-          echo "CC=$(which icc)"            >> $GITHUB_ENV
-          echo "FC=$(which ifort)"          >> $GITHUB_ENV
-          echo "OMPI_FC=$(which ifort)"     >> $GITHUB_ENV
-          echo "OMPI_CXX=$(which icpc)"     >> $GITHUB_ENV
-          echo "OMPI_MPICC=$(which icc)"    >> $GITHUB_ENV
-          echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"   >> $GITHUB_ENV
-          echo "I_MPI_ROOT=/opt/intel/oneapi/mpi/2021.7.1/" >> $GITHUB_ENV
+          printenv >> $GITHUB_ENV
+
 
       - name: Build
         run:  |
-          if [ '${{ matrix.intel }}' == 'true' ]; then . /opt/intel/oneapi/setvars.sh; fi
-          /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} 
+          /bin/bash mfc.sh test --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} 
 
       - name: Test
         run:  |
-          if [ '${{ matrix.intel }}' == 'true' ]; then . /opt/intel/oneapi/setvars.sh; fi
           /bin/bash mfc.sh test --max-attempts 3 -j $(nproc) $OPT1 $OPT2
         env:
           OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}

@@ -10,6 +10,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: MFC Python setup
+      run: ./mfc.sh init
+
     - name: Check formatting
       run: |
         ./mfc.sh format -j $(nproc)

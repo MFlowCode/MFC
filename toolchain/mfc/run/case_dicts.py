@@ -22,6 +22,7 @@ class ParamType(Enum):
         return self.STR
 
 COMMON = {
+    'elasticity': ParamType.LOG,
     'hypoelasticity': ParamType.LOG,
     'hyperelasticity': ParamType.LOG,
     'cyl_coord': ParamType.LOG,
@@ -52,7 +53,6 @@ COMMON = {
     'relax_model': ParamType.INT,
     'sigma': ParamType.REAL,
     'adv_n': ParamType.LOG,
-    'hyperelasticity': ParamType.LOG,
     'cfl_adap_dt': ParamType.LOG,
     'cfl_const_dt': ParamType.LOG,
     'chemistry': ParamType.LOG,
@@ -106,6 +106,14 @@ for ib_id in range(1, 10+1):
         PRE_PROCESS[f'patch_ib({ib_id})%{cmp}_centroid'] = ParamType.REAL
         PRE_PROCESS[f'patch_ib({ib_id})%length_{cmp}'] = ParamType.REAL
 
+    for real_attr_stl, ty_stl in [("filepath", ParamType.STR), ("spc", ParamType.INT),
+                          ("threshold", ParamType.REAL)]:
+        PRE_PROCESS[f"patch_ib({ib_id})%model_{real_attr_stl}"] = ty_stl
+
+    for real_attr_stl2 in ["translate", "scale", "rotate"]:
+        for j in range(1, 4):
+            PRE_PROCESS[f"patch_ib({ib_id})%model_{real_attr_stl2}({j})"] = ParamType.REAL
+
 for cmp in ["x", "y", "z"]:
     for prepend in ["domain%beg", "domain%end", "a", "b"]:
         PRE_PROCESS[f"{cmp}_{prepend}"] = ParamType.REAL
@@ -129,25 +137,28 @@ for p_id in range(1, 10+1):
                       ("smooth_patch_id", ParamType.INT), ("hcid", ParamType.INT)]:
         PRE_PROCESS[f"patch_icpp({p_id})%{attribute}"] = ty
 
-    for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho", "a2",
-                      "a3", "a4", "a5", "a6", "a7","a8", "a9", "a10", "a11", "a12",  'non_axis_sym',
-                      "normal", "smooth_coeff", "rho", "vel", "alpha", "gamma",
-                      "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp"]: 
-
+    for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho",
+                      'non_axis_sym', "normal", "smooth_coeff", "rho", "vel",
+                      "alpha", "gamma", "pi_inf", "r0", "v0", "p0", "m0", "cv",
+                      "qv", "qvp"]:
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
+
+    for real_attr in range(2, 9+1):
+        PRE_PROCESS[f"patch_icpp({p_id})%a({real_attr})"] = ParamType.REAL
+
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
 
     for i in range(100):
         PRE_PROCESS[f"patch_icpp({p_id})%Y({i})"] = ParamType.REAL.analytic()
 
-    PRE_PROCESS[f"patch_icpp({p_id})%model%filepath"] = ParamType.STR
+    PRE_PROCESS[f"patch_icpp({p_id})%model_filepath"] = ParamType.STR
 
     for real_attr in ["translate", "scale", "rotate"]:
         for j in range(1, 4):
-            PRE_PROCESS[f"patch_icpp({p_id})%model%{real_attr}({j})"] = ParamType.REAL
+            PRE_PROCESS[f"patch_icpp({p_id})%model_{real_attr}({j})"] = ParamType.REAL
 
-    PRE_PROCESS[f"patch_icpp({p_id})%model%spc"] = ParamType.INT
-    PRE_PROCESS[f"patch_icpp({p_id})%model%threshold"] = ParamType.REAL
+    PRE_PROCESS[f"patch_icpp({p_id})%model_spc"] = ParamType.INT
+    PRE_PROCESS[f"patch_icpp({p_id})%model_threshold"] = ParamType.REAL
 
     for cmp_id, cmp in enumerate(["x", "y", "z"]):
         cmp_id += 1
@@ -233,6 +244,7 @@ SIMULATION.update({
     'low_Mach': ParamType.INT,
     'surface_tension': ParamType.LOG,
     'viscous': ParamType.LOG,
+    'hypermodel': ParamType.INT,
 })
 
 for var in [ 'diffusion', 'reactions' ]:
@@ -262,6 +274,19 @@ for cmp in ["x", "y", "z"]:
     SIMULATION[f'bc_{cmp}%ve1'] = ParamType.REAL
     SIMULATION[f'bc_{cmp}%ve2'] = ParamType.REAL
     SIMULATION[f'bc_{cmp}%ve3'] = ParamType.REAL
+    SIMULATION[f'bc_{cmp}%pres_in'] = ParamType.REAL
+    SIMULATION[f'bc_{cmp}%pres_out'] = ParamType.REAL
+    SIMULATION[f'bc_{cmp}%grcbc_in'] = ParamType.LOG
+    SIMULATION[f'bc_{cmp}%grcbc_out'] = ParamType.LOG
+    SIMULATION[f'bc_{cmp}%grcbc_vel_out'] = ParamType.LOG
+
+    for int_id in range(1, 10+1):
+        SIMULATION[f"bc_{cmp}%alpha_rho_in({int_id})"] = ParamType.REAL
+        SIMULATION[f"bc_{cmp}%alpha_in({int_id})"] = ParamType.REAL
+
+    for int_id in range(1, 3+1):
+        SIMULATION[f"bc_{cmp}%vel_in({int_id})"] = ParamType.REAL
+        SIMULATION[f"bc_{cmp}%vel_out({int_id})"] = ParamType.REAL
 
     for var in ["k", "w", "p", "g"]:
         SIMULATION[f'{var}_{cmp}'] = ParamType.REAL

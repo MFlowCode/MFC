@@ -18,7 +18,7 @@ module m_checker_common
 
     implicit none
 
-    private; public :: s_check_inputs_common
+    private; public :: s_check_inputs_common, wp
 
 contains
 
@@ -39,7 +39,6 @@ contains
         call s_check_inputs_bubbles
         call s_check_inputs_qbmm_and_polydisperse
         call s_check_inputs_adv_n
-        call s_check_inputs_hypoelasticity
         call s_check_inputs_phase_change
         call s_check_inputs_ibm
 #endif
@@ -50,6 +49,7 @@ contains
         call s_check_inputs_weno
         call s_check_inputs_bc
         call s_check_inputs_stiffened_eos
+        call s_check_inputs_elasticity
         call s_check_inputs_surface_tension
         call s_check_inputs_moving_bc
 
@@ -61,7 +61,7 @@ contains
         !! Called by s_check_inputs_common for simulation and post-processing
     subroutine s_check_inputs_time_stepping
         if (cfl_dt) then
-            @:PROHIBIT(cfl_target < 0 .or. cfl_target > 1d0)
+            @:PROHIBIT(cfl_target < 0 .or. cfl_target > 1._wp)
             @:PROHIBIT(t_stop <= 0)
             @:PROHIBIT(t_save <= 0)
             @:PROHIBIT(t_save > t_stop)
@@ -132,31 +132,16 @@ contains
         @:PROHIBIT(adv_n .and. qbmm)
     end subroutine
 
-    !> Checks constraints on the hypoelasticity parameters.
-        !! Called by s_check_inputs_common for pre-processing and simulation
-    subroutine s_check_inputs_hypoelasticity
-        @:PROHIBIT(hypoelasticity .and. model_eqns /= 2)
-    end subroutine s_check_inputs_hypoelasticity
-
-    !> Checks constraints on the hyperelasticity parameters.
-        !! Called by s_check_inputs_common for pre-processing and simulation
-    subroutine s_check_inputs_hyperelasticity
-        if (model_eqns == 1 .or. model_eqns .gt. 3) then
-            call s_mpi_abort('hyperelasticity requires '// &
-                             '6-equation model (model_eqns = 2 or 3). Exiting ...')
-        end if
-    end subroutine s_check_inputs_hyperelasticity
-
     !> Checks constraints on the phase change parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
     subroutine s_check_inputs_phase_change
         @:PROHIBIT(relax .and. model_eqns /= 3, "phase change requires model_eqns = 3")
         @:PROHIBIT(relax .and. relax_model < 0, "relax_model must be in between 0 and 6")
         @:PROHIBIT(relax .and. relax_model > 6, "relax_model must be in between 0 and 6")
-        @:PROHIBIT(relax .and. palpha_eps <= 0d0, "palpha_eps must be positive")
-        @:PROHIBIT(relax .and. palpha_eps >= 1d0, "palpha_eps must be less than 1")
-        @:PROHIBIT(relax .and. ptgalpha_eps <= 0d0, "ptgalpha_eps must be positive")
-        @:PROHIBIT(relax .and. ptgalpha_eps >= 1d0, "ptgalpha_eps must be less than 1")
+        @:PROHIBIT(relax .and. palpha_eps <= 0._wp, "palpha_eps must be positive")
+        @:PROHIBIT(relax .and. palpha_eps >= 1._wp, "palpha_eps must be less than 1")
+        @:PROHIBIT(relax .and. ptgalpha_eps <= 0._wp, "ptgalpha_eps must be positive")
+        @:PROHIBIT(relax .and. ptgalpha_eps >= 1._wp, "ptgalpha_eps must be less than 1")
         @:PROHIBIT((.not. relax) .and. &
             ((relax_model /= dflt_int) .or. (.not. f_is_default(palpha_eps)) .or. (.not. f_is_default(ptgalpha_eps))), &
             "relax is not set as true, but other phase change parameters have been modified. " // &
@@ -172,6 +157,24 @@ contains
     end subroutine s_check_inputs_ibm
 
 #endif
+
+    !> Checks constraints on the elasticity parameters.
+        !! Called by s_check_inputs_common for all three stages
+    subroutine s_check_inputs_elasticity
+        @:PROHIBIT((hypoelasticity .or. hyperelasticity) .and. (.not. elasticity), &
+            "Turn on elasticity to have either hyperelasticity or hypoelasticity")
+        @:PROHIBIT(elasticity .and. .not. (hypoelasticity .or. hyperelasticity), &
+            "Elasticity requires either hyperelasticity or hypoelasticity to be true")
+        @:PROHIBIT(elasticity .and. model_eqns == 1, &
+            "Elasticity does not work for model_eqns = 1")
+        @:PROHIBIT(elasticity .and. model_eqns > 3, &
+            "Elasticity works only for model_eqns 2 and 3")
+#ifdef MFC_SIMULATION
+        @:PROHIBIT(elasticity .and. fd_order /= 4)
+        @:PROHIBIT(hyperelasticity .and. hyper_model .le. 0, &
+            "Set the hyper_model in the input file")
+#endif
+    end subroutine s_check_inputs_elasticity
 
     !> Checks constraints on dimensionality and the number of cells for the grid.
         !! Called by s_check_inputs_common for all three stages
@@ -271,27 +274,27 @@ contains
 
         do i = 1, num_fluids
             call s_int_to_str(i, iStr)
-            @:PROHIBIT(.not. f_is_default(fluid_pp(i)%gamma) .and. fluid_pp(i)%gamma <= 0d0, &
+            @:PROHIBIT(.not. f_is_default(fluid_pp(i)%gamma) .and. fluid_pp(i)%gamma <= 0._wp, &
                 "fluid_pp("//trim(iStr)//")%gamma must be positive")
 
             @:PROHIBIT(model_eqns == 1 .and. (.not. f_is_default(fluid_pp(i)%gamma)), &
                 "model_eqns = 1 does not support fluid_pp("//trim(iStr)//")%gamma")
 
-            @:PROHIBIT((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0d0) .or. &
+            @:PROHIBIT((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0._wp) .or. &
                 (i > num_fluids + bub_fac .and. (.not. f_is_default(fluid_pp(i)%gamma))), &
                 "for fluid_pp("//trim(iStr)//")%gamma")
 
-            @:PROHIBIT(.not. f_is_default(fluid_pp(i)%pi_inf) .and. fluid_pp(i)%pi_inf < 0d0, &
+            @:PROHIBIT(.not. f_is_default(fluid_pp(i)%pi_inf) .and. fluid_pp(i)%pi_inf < 0._wp, &
                 "fluid_pp("//trim(iStr)//")%pi_inf must be non-negative")
 
             @:PROHIBIT(model_eqns == 1 .and. (.not. f_is_default(fluid_pp(i)%pi_inf)), &
                 "model_eqns = 1 does not support fluid_pp("//trim(iStr)//")%pi_inf")
 
-            @:PROHIBIT((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0d0) .or. &
+            @:PROHIBIT((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0._wp) .or. &
                 (i > num_fluids + bub_fac .and. (.not. f_is_default(fluid_pp(i)%pi_inf))), &
                 "for fluid_pp("//trim(iStr)//")%pi_inf")
 
-            @:PROHIBIT(fluid_pp(i)%cv < 0d0, &
+            @:PROHIBIT(fluid_pp(i)%cv < 0._wp, &
                 "fluid_pp("//trim(iStr)//")%cv must be positive")
         end do
     end subroutine s_check_inputs_stiffened_eos
@@ -302,7 +305,7 @@ contains
 
         integer :: i
 
-        @:PROHIBIT(surface_tension .and. sigma < 0d0, &
+        @:PROHIBIT(surface_tension .and. sigma < 0._wp, &
             "sigma must be greater than or equal to zero")
 
         @:PROHIBIT(surface_tension .and. sigma == dflt_real, &
@@ -330,9 +333,9 @@ contains
         !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_moving_bc
         #:for X, VB2, VB3 in [('x', 'vb2', 'vb3'), ('y', 'vb3', 'vb1'), ('z', 'vb1', 'vb2')]
-            if (any((/bc_${X}$%vb1, bc_${X}$%vb2, bc_${X}$%vb3/) /= 0d0)) then
+            if (any((/bc_${X}$%vb1, bc_${X}$%vb2, bc_${X}$%vb3/) /= 0._wp)) then
                 if (bc_${X}$%beg == -15) then
-                    if (any((/bc_${X}$%${VB2}$, bc_${X}$%${VB3}$/) /= 0d0)) then
+                    if (any((/bc_${X}$%${VB2}$, bc_${X}$%${VB3}$/) /= 0._wp)) then
                         call s_mpi_abort("bc_${X}$%beg must be -15 if "// &
                                          "bc_${X}$%${VB2}$ or bc_${X}$%${VB3}$ "// &
                                          "is set. Exiting ...")
@@ -345,9 +348,9 @@ contains
         #:endfor
 
         #:for X, VE2, VE3 in [('x', 've2', 've3'), ('y', 've3', 've1'), ('z', 've1', 've2')]
-            if (any((/bc_${X}$%ve1, bc_${X}$%ve2, bc_${X}$%ve3/) /= 0d0)) then
+            if (any((/bc_${X}$%ve1, bc_${X}$%ve2, bc_${X}$%ve3/) /= 0._wp)) then
                 if (bc_${X}$%end == -15) then
-                    if (any((/bc_${X}$%${VE2}$, bc_${X}$%${VE3}$/) /= 0d0)) then
+                    if (any((/bc_${X}$%${VE2}$, bc_${X}$%${VE3}$/) /= 0._wp)) then
                         call s_mpi_abort("bc_${X}$%end must be -15 if "// &
                                          "bc_${X}$%${VE2}$ or bc_${X}$%${VE3}$ "// &
                                          "is set. Exiting ...")

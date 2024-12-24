@@ -22,7 +22,11 @@ scripts: &scripts
   - 'toolchain/bootstrap/**'
 
 yml: &yml
-  - '**/*.yml'
+  - '.github/workflows/phoenix/**'
+  - '.github/workflows/frontier/**'
+  - '.github/workflows/bench.yml'
+  - '.github/workflows/test.yml'
+  - '.github/workflows/formatting.yml'
 
 checkall: &checkall
   - *fortran_src

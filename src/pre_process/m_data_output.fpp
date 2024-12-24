@@ -114,7 +114,7 @@ contains
         character(LEN=3) :: status
 
         character(LEN= &
-                  int(floor(log10(real(sys_size, kind(0d0))))) + 1) :: file_num !< Used to store
+                  int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !< Used to store
             !! the number, in character form, of the currently
             !! manipulated conservative variable data file
 
@@ -124,16 +124,18 @@ contains
         integer :: i, j, k, l, r, c, dir !< Generic loop iterator
         integer :: t_step
 
-        real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
-        real(kind(0d0)) :: nbub                         !< Temporary bubble number density
-        real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
-        real(kind(0d0)) :: rho                          !< Temporary density
-        real(kind(0d0)) :: pres, Temp                         !< Temporary pressure
+        real(wp), dimension(nb) :: nRtmp         !< Temporary bubble concentration
+        real(wp) :: nbub                         !< Temporary bubble number density
+        real(wp) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
+        real(wp) :: rho                          !< Temporary density
+        real(wp) :: pres, T                         !< Temporary pressure
 
-        real(kind(0d0)) :: nR3
-        real(kind(0d0)) :: ntmp
+        real(wp) :: nR3
+        real(wp) :: ntmp
 
-        real(kind(0d0)) :: rhoYks(1:num_species) !< Temporary species mass fractions
+        real(wp) :: rhoYks(1:num_species) !< Temporary species mass fractions
+
+        T = dflt_T_guess
 
         t_step = 0
 
@@ -252,7 +254,7 @@ contains
         ! ==================================================================
 
         gamma = fluid_pp(1)%gamma
-        lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
+        lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
         pi_inf = fluid_pp(1)%pi_inf
         qv = fluid_pp(1)%qv
 
@@ -288,7 +290,7 @@ contains
 
                         call s_convert_to_mixture_variables(q_cons_vf, j, 0, 0, rho, gamma, pi_inf, qv)
 
-                        lit_gamma = 1d0/gamma + 1d0
+                        lit_gamma = 1._wp/gamma + 1._wp
 
                         if ((i >= chemxb) .and. (i <= chemxe)) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
@@ -297,8 +299,6 @@ contains
                                  ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
                                  .or. &
                                  ((i >= chemxb) .and. (i <= chemxe)) &
-                                 .or. &
-                                 ((i == T_idx)) &
                                  ) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else if (i == mom_idx%beg) then !u
@@ -309,8 +309,8 @@ contains
                             call s_compute_pressure( &
                                 q_cons_vf(E_idx)%sf(j, 0, 0), &
                                 q_cons_vf(alf_idx)%sf(j, 0, 0), &
-                                0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, &
-                                pi_inf, gamma, rho, qv, rhoYks, pres, Temp)
+                                0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2._wp)/rho, &
+                                pi_inf, gamma, rho, qv, rhoYks, pres, T)
                             write (2, FMT) x_cb(j), pres
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
 
@@ -603,8 +603,8 @@ contains
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8d0, MPI_OFFSET_KIND)
-            MOK = int(1d0, MPI_OFFSET_KIND)
+            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
@@ -614,7 +614,7 @@ contains
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
                 !Additional variables pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
@@ -622,7 +622,7 @@ contains
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                MPI_DOUBLE_PRECISION, status, ierr)
+                                                mpi_p, status, ierr)
                     end do
                 end if
             else
@@ -631,7 +631,7 @@ contains
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
             end if
 
@@ -667,8 +667,8 @@ contains
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8d0, MPI_OFFSET_KIND)
-            MOK = int(1d0, MPI_OFFSET_KIND)
+            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
@@ -680,10 +680,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
                 !Additional variables pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
@@ -693,10 +693,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                MPI_DOUBLE_PRECISION, status, ierr)
+                                                mpi_p, status, ierr)
                     end do
                 end if
             else
@@ -707,10 +707,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
 
             end if
@@ -753,10 +753,10 @@ contains
             ! Initial displacement to skip at beginning of file
             disp = 0
 
-            call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelset_DATA%view, &
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
                                    'native', mpi_info_int, ierr)
             call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelset_DATA%var%sf, data_size*num_ibs, &
-                                    MPI_DOUBLE_PRECISION, status, ierr)
+                                    mpi_p, status, ierr)
 
             call MPI_FILE_CLOSE(ifile, ierr)
 
@@ -773,10 +773,10 @@ contains
             ! Initial displacement to skip at beginning of file
             disp = 0
 
-            call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelsetnorm_DATA%view, &
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelsetnorm_DATA%view, &
                                    'native', mpi_info_int, ierr)
             call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size*num_ibs*3, &
-                                    MPI_DOUBLE_PRECISION, status, ierr)
+                                    mpi_p, status, ierr)
 
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
@@ -799,10 +799,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = 0
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(1), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_airfoil_IB_DATA%view(1), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_airfoil_IB_DATA%var(1:Np), 3*Np, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
 
                     call MPI_FILE_CLOSE(ifile, ierr)
 
@@ -818,10 +818,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = 0
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(2), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_airfoil_IB_DATA%view(2), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_airfoil_IB_DATA%var(Np + 1:2*Np), 3*Np, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
 
                     call MPI_FILE_CLOSE(ifile, ierr)
                 end if
@@ -911,8 +911,6 @@ contains
             do i = 1, num_species
                 write (1, '(I3,A20,A20)') chemxb + i - 1, "Y_{"//trim(species_names(i))//"} \rho", "Y_{"//trim(species_names(i))//"}"
             end do
-
-            write (1, '(I3,A20,A20)') T_idx, "T", "T"
         end if
 
         write (1, '(A)') ""
@@ -924,7 +922,6 @@ contains
         if (strxb /= 0) write (1, '("[",I2,",",I2,"]",A)') strxb, strxe, " Stress"
         if (intxb /= 0) write (1, '("[",I2,",",I2,"]",A)') intxb, intxe, " Internal Energies"
         if (chemxb /= 0) write (1, '("[",I2,",",I2,"]",A)') chemxb, chemxe, " Chemistry"
-        if (T_idx /= 0) write (1, '("[",I2,",",I2,"]",A)') T_idx, T_idx, " Temperature"
 
         close (1)
 

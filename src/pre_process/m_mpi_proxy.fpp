@@ -56,8 +56,8 @@ contains
             & 'perturb_flow', 'perturb_sph', 'mixlayer_vel_profile',           &
             & 'mixlayer_perturb', 'bubbles', 'polytropic', 'polydisperse',     &
             & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
-            & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     & 
-            & 'hyperelasticity', 'pre_stress' ]
+            & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
+            & 'hyperelasticity', 'pre_stress', 'elasticity']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
@@ -70,7 +70,7 @@ contains
             & 'Web', 'Ca', 'Re_inv', 'sigR', 'sigV', 'rhoRV', 'palpha_eps',    &
             & 'ptgalpha_eps', 'sigma', 'pi_fac', 'mixlayer_vel_coef',          &
             & 'mixlayer_domain' ]
-            call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
         do i = 1, num_patches_max
@@ -86,28 +86,36 @@ contains
                 & 'length_x', 'length_y', 'length_z', 'radius', 'epsilon',     &
                 & 'beta', 'smooth_coeff', 'rho', 'p0', 'm0', 'r0', 'v0',       &
                 & 'pres', 'gamma', 'pi_inf', 'hcid', 'cv', 'qv', 'qvp',        &
-                & 'model%threshold', 'cf_val']
-                call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+                & 'model_threshold', 'cf_val']
+                call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in [ 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11', 'a12']
-                call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            #:for VAR in [ '2', '3', '4', '5', '6', '7', '8', '9']
+                call MPI_BCAST(patch_icpp(i)%a(${VAR}$), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            call MPI_BCAST(patch_icpp(i)%model%filepath, len(patch_icpp(i)%model%filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_icpp(i)%model_filepath, len(patch_icpp(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
-            #:for VAR in [ 'model%translate', 'model%scale', 'model%rotate', &
+            #:for VAR in [ 'model_translate', 'model_scale', 'model_rotate', &
                 'normal', 'radii', 'vel', 'tau_e', 'alpha_rho', 'alpha' ]
-                call MPI_BCAST(patch_icpp(i)%${VAR}$, size(patch_icpp(i)%${VAR}$), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_icpp(i)%${VAR}$, size(patch_icpp(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            call MPI_BCAST(patch_icpp(i)%model%spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_icpp(i)%model_spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
             ! Broadcast IB variables
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%model_filepath, len(patch_ib(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%model_threshold, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%model_spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
             #:for VAR in [ 'x_centroid', 'y_centroid', 'z_centroid',           &
                 & 'length_x', 'length_y', 'length_z', 'radius', 'c', 'p', 't', 'm', 'theta', 'slip']
-                call MPI_BCAST(patch_ib(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in [ 'model_translate', 'model_scale', 'model_rotate']
+                call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
 
@@ -115,7 +123,7 @@ contains
         do i = 1, num_fluids_max
             #:for VAR in [ 'gamma','pi_inf','mul0','ss','pv','gamma_v','M_v',  &
                 & 'mu_v','k_v', 'G', 'cv', 'qv', 'qvp' ]
-                call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
 #endif
@@ -136,10 +144,10 @@ contains
 
         ! Temporary # of processors in x-, y- and z-coordinate directions
         ! used during the processor factorization optimization procedure
-        real(kind(0d0)) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
+        real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
 
         ! Processor factorization (fct) minimization parameter
-        real(kind(0d0)) :: fct_min
+        real(wp) :: fct_min
 
         ! Cartesian processor topology communicator
         integer :: MPI_COMM_CART
@@ -185,8 +193,8 @@ contains
                     tmp_num_procs_x = num_procs_x
                     tmp_num_procs_y = num_procs_y
                     tmp_num_procs_z = num_procs_z
-                    fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
-                                       - (n + 1)/tmp_num_procs_y)
+                    fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
+                                         - (n + 1)/tmp_num_procs_y)
 
                     ! Searching for optimal computational domain distribution
                     do i = 1, num_procs
@@ -229,10 +237,10 @@ contains
                     tmp_num_procs_x = num_procs_x
                     tmp_num_procs_y = num_procs_y
                     tmp_num_procs_z = num_procs_z
-                    fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
-                                       - (n + 1)/tmp_num_procs_y) &
-                              + 10d0*abs((n + 1)/tmp_num_procs_y &
-                                         - (p + 1)/tmp_num_procs_z)
+                    fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
+                                         - (n + 1)/tmp_num_procs_y) &
+                              + 10._wp*abs((n + 1)/tmp_num_procs_y &
+                                           - (p + 1)/tmp_num_procs_z)
 
                     ! Searching for optimal computational domain distribution
                     do i = 1, num_procs
@@ -311,7 +319,7 @@ contains
 
                 ! Preliminary uniform cell-width spacing
                 if (old_grid .neqv. .true.) then
-                    dz = (z_domain%end - z_domain%beg)/real(p + 1, kind(0d0))
+                    dz = (z_domain%end - z_domain%beg)/real(p + 1, wp)
                 end if
 
                 ! Optimal number of cells per processor
@@ -363,8 +371,8 @@ contains
                 ! Computing minimization variable for these initial values
                 tmp_num_procs_x = num_procs_x
                 tmp_num_procs_y = num_procs_y
-                fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
-                                   - (n + 1)/tmp_num_procs_y)
+                fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
+                                     - (n + 1)/tmp_num_procs_y)
 
                 ! Searching for optimal computational domain distribution
                 do i = 1, num_procs
@@ -426,7 +434,7 @@ contains
 
             ! Preliminary uniform cell-width spacing
             if (old_grid .neqv. .true.) then
-                dy = (y_domain%end - y_domain%beg)/real(n + 1, kind(0d0))
+                dy = (y_domain%end - y_domain%beg)/real(n + 1, wp)
             end if
 
             ! Optimal number of cells per processor
@@ -495,7 +503,7 @@ contains
 
         ! Preliminary uniform cell-width spacing
         if (old_grid .neqv. .true.) then
-            dx = (x_domain%end - x_domain%beg)/real(m + 1, kind(0d0))
+            dx = (x_domain%end - x_domain%beg)/real(m + 1, wp)
         end if
 
         ! Optimal number of cells per processor

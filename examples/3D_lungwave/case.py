@@ -32,7 +32,7 @@ lambda_wave = 200.E-6
 #define pulse
 P_amp = 10.E+6
 P_len = 45                  #length of the impulse
-theta = -math.pi/2          #direction of propagation 
+theta = -math.pi/2          #direction of propagation
 
 #non-dim
 
@@ -44,8 +44,8 @@ time_char = length_char/c_char
 stress_char = rho_char*c_char*c_char/gammal
 
 #non-dim the properties
-rhog_n  = rhog/rho_char    
-c_g_n = c_g/c_char    
+rhog_n  = rhog/rho_char
+c_g_n = c_g/c_char
 rhol_n = rhol/rho_char
 c_l_n = c_l/c_char
 Bg_n = Bg/stress_char
@@ -76,7 +76,7 @@ interface_amp = 0.03
 time_end = 50
 cfl = 0.01
 
-dt = cfl * dx/c_l_n 
+dt = cfl * dx/c_l_n
 Nt = int(time_end/dt)
 Nframes = 500
 tstart = 0
@@ -104,7 +104,6 @@ print(json.dumps({
     'a_x'                          : 4.0E+00,
     'x_a'                          : -5.,
     'x_b'                          : 5.,
-    'loops_x'                      : 0,
     'dt'                           : dt,
     't_step_start'                 : tstart,
     't_step_stop'                  : tstop,
@@ -116,13 +115,12 @@ print(json.dumps({
     'model_eqns'                   : 3,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 2,
-    #'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'T',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
-    'weno_Re_flux'                 : 'F',  
+    'weno_Re_flux'                 : 'F',
     'weno_avg'                     : 'F',
     'mapped_weno'                  : 'T',
     'null_weights'                 : 'F',
@@ -139,7 +137,7 @@ print(json.dumps({
     # ==========================================================================
 
     # Turning on Hypoelasticity ================================================
-    #'hypoelasticity'               : 'T',     
+    'hypoelasticity'               : 'F',
     'hyperelasticity'              : 'F',
     # ==========================================================================
 
@@ -149,9 +147,9 @@ print(json.dumps({
     'prim_vars_wrt'                :'T',
     'parallel_io'                  :'T',
     # ==========================================================================
- 
+
     # acoustics setting =========================================================
-    'acoustic_source'               : 'T',      
+    'acoustic_source'               : 'T',
     'num_source'                    : 1,
     'acoustic(1)%support'           : 3,
     'acoustic(1)%loc(1)'            : 4,
@@ -165,7 +163,7 @@ print(json.dumps({
     'acoustic(1)%height'            : dlengz,
     'acoustic(1)%dir'               : -math.pi,
     #===========================================================================
-    
+
     # Patch 1: Background ======================================================
     'patch_icpp(1)%geometry'       : 9,
     'patch_icpp(1)%x_centroid'     : 0.,
@@ -183,7 +181,7 @@ print(json.dumps({
     'patch_icpp(1)%alpha(1)'       : alphal_back,
     'patch_icpp(1)%alpha(2)'       : alphag_back,
     #'patch_icpp(1)%tau_e(1)'       : 0.0,
-    
+
     # ==========================================================================
 
     # Patch 2: Lung ============================================================
@@ -195,9 +193,9 @@ print(json.dumps({
     'patch_icpp(2)%y_centroid'     : dlengy/2.,
     'patch_icpp(2)%z_centroid'     : dlengz/2.,
     'patch_icpp(2)%length_x'       : 2000,#dlengx,#dlengx/2.+2,   #
-    'patch_icpp(2)%length_y'       : dlengy,  
-    'patch_icpp(2)%length_z'       : dlengz,                 
-    'patch_icpp(2)%a2'             : interface_amp,
+    'patch_icpp(2)%length_y'       : dlengy,
+    'patch_icpp(2)%length_z'       : dlengz,
+    'patch_icpp(2)%a(2)'           : interface_amp,
     'patch_icpp(2)%vel(1)'         : 0.E+00,
     'patch_icpp(2)%vel(2)'         : 0.0,
     'patch_icpp(2)%vel(3)'         : 0.0,
@@ -213,7 +211,7 @@ print(json.dumps({
     'fluid_pp(1)%pi_inf'           : gammal*Bl_n/(gammal-1.E+00),
     'fluid_pp(1)%G'                : G_l_n,
     'fluid_pp(2)%gamma'            : 1.E+00/(gammag-1.E+00),
-    'fluid_pp(2)%pi_inf'           : gammag*Bg_n/(gammag-1.E+00),   
+    'fluid_pp(2)%pi_inf'           : gammag*Bg_n/(gammag-1.E+00),
     'fluid_pp(2)%G'                : G_g_n,
  #==============================================================================
 }))

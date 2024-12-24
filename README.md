@@ -37,17 +37,23 @@ MFC has high-level documentation, visualizations, and more on [its website](http
 ## An example
 
 We keep many examples.
-Here's one!
+Here are some of them!
 MFC can execute high-fidelity simulations of shock-droplet interaction (see `examples/3d_shockdroplet`)
 
 <p align="center">
     <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="700"/>
 </p>
 
-Another example is the high-Mach flow over an airfoil, shown below.
+This one simulates high-Mach flow over an airfoil, shown below.
 
 <p align="center">
     <img src="docs/res/airfoil.png" alt="Airfoil Example" width="700"/><br/>
+</p>
+
+This one simulates high amplitude acoustic wave through a circular orifice opening, shown below.
+
+<p align="center">
+    <img src="docs/res/orifice.png" alt="Orifice Example" width="700"/><br/>
 </p>
 
 
@@ -111,13 +117,13 @@ They are organized below. Just click the drop-downs!
 	* Low Mach number treatment available
 * Multi- and single-component
 	* 4, 5, and 6 equation models for multi-component/phase features
-   	* Kapila and Allaire models
+   	* Kapila and Allaire models 5-equation models
 * Multi- and single-phase 
 	* Phase change via p, pT, and pTg schemes
 * Grids
 	* 1-3D Cartesian, cylindrical, axisymmetric. 
 	* Arbitrary grid stretching for multiple domain regions.
-	* Complex/arbitrary geometries via immersed boundary methods 
+	* Complex/arbitrary geometries via immersed boundary method
 	* STL geometry files supported
 * Surface tension for multiphase cases
 * Sub-grid Euler-Euler multiphase models for bubble dynamics and similar
@@ -135,9 +141,13 @@ They are organized below. Just click the drop-downs!
  	* WENO reconstructions of order 3, 5, and 7
   	* WENO variants: WENO-JS, WENO-M, WENO-Z, TENO
    	* Monotonicity-preserving reconstructions
-	* Reliable handling of high density ratios
+	* Reliable handling of large density ratios
 * Exact and approximate (e.g., HLL, HLLC) Riemann solvers
-* Boundary conditions: Periodic, reflective, extrapolation/Neumann, slip/no-slip, non-reflecting characteristic buffers, inflows, outflows, and more
+* Boundary conditions
+	* Periodic, reflective, extrapolation/Neumann
+	* Slip and no-slip
+ 	* Thompson-based characteristic BCs: non-reflecting sub/supersonic buffers, inflows, outflows
+	* Generalized characteristic relaxation boundary conditions
 * Runge-Kutta orders 1-3 (SSP TVD)
 * Interface sharpening (THINC-like)
 </details>
@@ -151,6 +161,7 @@ They are organized below. Just click the drop-downs!
 	* \>66K AMD GPUs on the first exascale computer, [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) (AMD MI250X-based)
 * Near compute roofline behavior
 * RDMA (remote data memory access; GPU-GPU direct communication) via GPU-aware MPI on NVIDIA (CUDA-aware MPI) and AMD GPU systems
+* Optional single-precision computation and storage
 </details>
 
 <details>
@@ -158,7 +169,7 @@ They are organized below. Just click the drop-downs!
 
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
-	* \>100 Regression tests with each PR.
+	* \>250 Regression tests with each PR.
  		* Performed with GNU (GCC), Intel, Cray (CCE), and NVIDIA (NVHPC) compilers on NVIDIA and AMD GPUs.
 		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups

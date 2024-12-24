@@ -36,6 +36,8 @@ module m_initial_condition
 
     use m_perturbation          ! Subroutines to perturb initial flow fields
 
+    use m_chemistry
+
     ! ==========================================================================
     ! ==========================================================================
 
@@ -48,6 +50,8 @@ module m_initial_condition
     type(scalar_field), allocatable, dimension(:) :: q_prim_vf !< primitive variables
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_vf !< conservative variables
+
+    type(scalar_field) :: q_T_sf !< Temperature field
 
     integer, allocatable, dimension(:, :, :) :: patch_id_fp !<
     !! Bookkepping variable used to track the patch identities (id) associated
@@ -78,6 +82,10 @@ contains
             allocate (q_prim_vf(i)%sf(0:m, 0:n, 0:p))
             allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
         end do
+
+        if (chemistry) then
+            allocate (q_T_sf%sf(0:m, 0:n, 0:p))
+        end if
 
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
@@ -128,10 +136,14 @@ contains
 
         character(len=10) :: iStr
 
+        ! First, compute the temperature field from the conservative variables.
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwbuff)
+
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
         if (old_ic) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, &
+                                                               q_T_sf, &
                                                                q_prim_vf, &
                                                                idwbuff)
         end if
@@ -149,7 +161,7 @@ contains
                 !> @{
                 ! Spherical patch
                 if (patch_icpp(i)%geometry == 8) then
-                    call s_sphere(i, patch_id_fp, q_prim_vf, .false.)
+                    call s_sphere(i, patch_id_fp, q_prim_vf)
 
                     ! Cuboidal patch
                 elseif (patch_icpp(i)%geometry == 9) then
@@ -157,7 +169,7 @@ contains
 
                     ! Cylindrical patch
                 elseif (patch_icpp(i)%geometry == 10) then
-                    call s_cylinder(i, patch_id_fp, q_prim_vf, .false.)
+                    call s_cylinder(i, patch_id_fp, q_prim_vf)
 
                     ! Swept plane patch
                 elseif (patch_icpp(i)%geometry == 11) then
@@ -197,15 +209,19 @@ contains
                 end if
 
                 if (patch_ib(i)%geometry == 8) then
-                    call s_sphere(i, ib_markers%sf, q_prim_vf, .true.)
-                    call s_compute_sphere_levelset(levelset, levelset_norm, i)
+                    call s_sphere(i, ib_markers%sf, q_prim_vf, ib)
+                    call s_sphere_levelset(levelset, levelset_norm, i)
                     ! Cylindrical patch
                 elseif (patch_ib(i)%geometry == 10) then
-                    call s_cylinder(i, ib_markers%sf, q_prim_vf, .true.)
-                    call s_compute_cylinder_levelset(levelset, levelset_norm, i)
+                    call s_cylinder(i, ib_markers%sf, q_prim_vf, ib)
+                    call s_cylinder_levelset(levelset, levelset_norm, i)
                 elseif (patch_ib(i)%geometry == 11) then
-                    call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
-                    call s_compute_3D_airfoil_levelset(levelset, levelset_norm, i)
+                    call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, ib)
+                    call s_3D_airfoil_levelset(levelset, levelset_norm, i)
+
+                    ! STL+IBM patch
+                elseif (patch_ib(i)%geometry == 12) then
+                    call s_model(i, ib_markers%sf, q_prim_vf, ib, levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -225,11 +241,11 @@ contains
                 !> @{
                 ! Circular patch
                 if (patch_icpp(i)%geometry == 2) then
-                    call s_circle(i, patch_id_fp, q_prim_vf, .false.)
+                    call s_circle(i, patch_id_fp, q_prim_vf)
 
                     ! Rectangular patch
                 elseif (patch_icpp(i)%geometry == 3) then
-                    call s_rectangle(i, patch_id_fp, q_prim_vf, .false.)
+                    call s_rectangle(i, patch_id_fp, q_prim_vf)
 
                     ! Swept line patch
                 elseif (patch_icpp(i)%geometry == 4) then
@@ -279,15 +295,18 @@ contains
                     print *, 'Processing 2D ib patch ', i
                 end if
                 if (patch_ib(i)%geometry == 2) then
-                    call s_circle(i, ib_markers%sf, q_prim_vf, .true.)
-                    call s_compute_circle_levelset(levelset, levelset_norm, i)
+                    call s_circle(i, ib_markers%sf, q_prim_vf, ib)
+                    call s_circle_levelset(levelset, levelset_norm, i)
                     ! Rectangular patch
                 elseif (patch_ib(i)%geometry == 3) then
-                    call s_rectangle(i, ib_markers%sf, q_prim_vf, .true.)
-                    call s_compute_rectangle_levelset(levelset, levelset_norm, i)
+                    call s_rectangle(i, ib_markers%sf, q_prim_vf, ib)
+                    call s_rectangle_levelset(levelset, levelset_norm, i)
                 elseif (patch_ib(i)%geometry == 4) then
-                    call s_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
-                    call s_compute_airfoil_levelset(levelset, levelset_norm, i)
+                    call s_airfoil(i, ib_markers%sf, q_prim_vf, ib)
+                    call s_airfoil_levelset(levelset, levelset_norm, i)
+                    ! STL+IBM patch
+                elseif (patch_ib(i)%geometry == 5) then
+                    call s_model(i, ib_markers%sf, q_prim_vf, ib, levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -328,6 +347,8 @@ contains
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
             call s_initialize_mv(q_cons_vf, mv%sf)
@@ -349,6 +370,10 @@ contains
 
         deallocate (q_prim_vf)
         deallocate (q_cons_vf)
+
+        if (chemistry) then
+            deallocate (q_T_sf%sf)
+        end if
 
         ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)

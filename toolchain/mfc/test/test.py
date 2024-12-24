@@ -1,5 +1,5 @@
 import os, typing, shutil, time, itertools
-from random import sample
+from random import sample, seed
 
 import rich, rich.table
 
@@ -19,9 +19,13 @@ from ..packer import packer
 nFAIL = 0
 nPASS = 0
 nSKIP = 0
+errors = []
 
+# pylint: disable=too-many-branches, trailing-whitespace
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
+    selected_cases = []
+    skipped_cases  = []
 
     # Check "--from" and "--to" exist and are in the right order
     bFoundFrom, bFoundTo = (False, False)
@@ -51,16 +55,33 @@ def __filter(cases_) -> typing.List[TestCase]:
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
             cases.remove(case)
+            skipped_cases.append(case)
+    
+    for case in cases[:]:
+        if ARG("single"):
+            skip = ['low_Mach', 'Hypoelasticity', 'teno', 'Chemistry', 'Phase Change model 6'
+            ,'Axisymmetric', 'Transducer', 'Transducer Array', 'Cylindrical', 'Example']
+            if any(label in case.trace for label in skip):
+                cases.remove(case)
+
+
+    if ARG("no_examples"):
+        cases = [case for case in cases if not "Example" in case.trace]
 
     if ARG("percent") == 100:
-        return cases
+        return cases, skipped_cases
 
-    return sample(cases, k=int(len(cases)*ARG("percent")/100.0))
+    seed(time.time())
 
+    selected_cases = sample(cases, k=int(len(cases)*ARG("percent")/100.0))
+    skipped_cases = [item for item in cases if item not in selected_cases]
+
+    return selected_cases, skipped_cases
 
 def test():
     # pylint: disable=global-statement, global-variable-not-assigned
     global nFAIL, nPASS, nSKIP
+    global errors
 
     cases = list_cases()
 
@@ -75,7 +96,8 @@ def test():
 
         return
 
-    cases = [ _.to_case() for _ in __filter(cases) ]
+    cases, skipped_cases = __filter(cases)
+    cases = [ _.to_case() for _ in cases ]
 
     if ARG("list"):
         table = rich.table.Table(title="MFC Test Cases", box=rich.table.box.SIMPLE)
@@ -125,23 +147,40 @@ def test():
         [ sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases ],
         ARG("jobs"), ARG("gpus"))
 
+    nSKIP = len(skipped_cases)
     cons.print()
     cons.unindent()
-    cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.")
+    cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.\n")
+
+    # Print a summary of all errors at the end if errors exist
+    if len(errors) != 0:
+        cons.print(f"[bold red]Failed Cases[/bold red]\n")
+        for e in errors:
+            cons.print(e)
+
+    # Print the list of skipped cases
+    if len(skipped_cases) != 0:
+        cons.print("[bold yellow]Skipped Cases[/bold yellow]\n")
+        for c in skipped_cases:
+            cons.print(f"[bold yellow]{c.trace}[/bold yellow]")
+
     exit(nFAIL)
 
 
-# pylint: disable=too-many-locals, too-many-branches, too-many-statements
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements, trailing-whitespace
 def _handle_case(case: TestCase, devices: typing.Set[int]):
+    # pylint: disable=global-statement, global-variable-not-assigned
     start_time = time.time()
 
     tol = case.compute_tolerance()
-
     case.delete_output()
     case.create_directory()
 
-    cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+    if ARG("dry_run"):
+        cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]     SKIP     {case.trace}")
+        return
 
+    cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
     common.file_write(out_filepath, cmd.stdout)
@@ -168,9 +207,13 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         golden = packer.load(golden_filepath)
 
         if ARG("add_new_variables"):
-            for pfilepath, pentry in pack.entries.items():
+            for pfilepath, pentry in list(pack.entries.items()):
                 if golden.find(pfilepath) is None:
                     golden.set(pentry)
+
+            for gfilepath, gentry in list(golden.entries.items()):
+                if pack.find(gfilepath) is None:
+                    golden.remove(gentry)
 
             golden.save(golden_filepath)
         else:
@@ -216,21 +259,29 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 def handle_case(case: TestCase, devices: typing.Set[int]):
     # pylint: disable=global-statement, global-variable-not-assigned
     global nFAIL, nPASS, nSKIP
+    global errors
 
     nAttempts = 0
+    if ARG('single'):
+        max_attempts = max(ARG('max_attempts'), 3)
+    else:
+        max_attempts = ARG('max_attempts')
 
     while True:
         nAttempts += 1
 
         try:
             _handle_case(case, devices)
-            nPASS += 1
+            if ARG("dry_run"):
+                nSKIP += 1
+            else:
+                nPASS += 1
         except Exception as exc:
-            if nAttempts < ARG("max_attempts"):
-                cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
+            if nAttempts < max_attempts:
                 continue
             nFAIL += 1
             cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
-            cons.print(f"{exc}")
+            errors.append(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
+            errors.append(f"{exc}")
 
         return
