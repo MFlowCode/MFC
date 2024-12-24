@@ -22,6 +22,7 @@ class ParamType(Enum):
         return self.STR
 
 COMMON = {
+    'elasticity': ParamType.LOG,
     'hypoelasticity': ParamType.LOG,
     'hyperelasticity': ParamType.LOG,
     'cyl_coord': ParamType.LOG,
@@ -244,6 +245,7 @@ SIMULATION.update({
     'low_Mach': ParamType.INT,
     'surface_tension': ParamType.LOG,
     'viscous': ParamType.LOG,
+    'hypermodel': ParamType.INT,
     'bubbles_lagrange': ParamType.LOG,
     'rkck_tolerance': ParamType.REAL,
 })
@@ -383,6 +385,7 @@ POST_PROCESS.update({
     't_stop': ParamType.REAL,
     'n_start': ParamType.INT,
     'surface_tension': ParamType.LOG,
+    'kymograph': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
 })
 

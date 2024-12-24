@@ -495,21 +495,13 @@ contains
         end if
 
         ! Elastic Shear Stress
-        if (hyperelasticity) then
-
-            if (pre_stress) then ! pre stressed initial condition in spatial domain
-                rcoord = sqrt((x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2))
-                theta = atan2(y_cc(k), x_cc(j))
-                phi = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
-                !spherical coord, assuming Rmax=1
-                xi_sph = (rcoord**3 - R0ref**3 + 1_wp)**(1_wp/3_wp)
-                xi_cart(1) = xi_sph*sin(phi)*cos(theta)
-                xi_cart(2) = xi_sph*sin(phi)*sin(theta)
-                xi_cart(3) = xi_sph*cos(phi)
-            else
-                xi_cart(1) = x_cc(j)
+        if (hyperelasticity .and. .not. pre_stress) then
+            xi_cart(1) = x_cc(j)
+            if (p > 0) then
                 xi_cart(2) = y_cc(k)
                 xi_cart(3) = z_cc(l)
+            elseif (n > 0) then
+                xi_cart(2) = y_cc(k)
             end if
 
             ! assigning the reference map to the q_prim vector field

@@ -850,11 +850,11 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
         call nvtxStartRange("RHS-ELASTIC")
         if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(1)%vf, q_prim_vf)
         call nvtxEndRange
-
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then

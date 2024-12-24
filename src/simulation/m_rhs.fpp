@@ -675,7 +675,10 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("RHS-ELASTIC")
-        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
+        if (hyperelasticity) then
+            call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
+            call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
+        end if
         call nvtxEndRange
 
         if (cfl_dt) then
@@ -716,7 +719,7 @@ contains
             call nvtxStartRange("RHS-WENO")
 
             if (.not. surface_tension) then
-                ! Reconstruct densitiess
+                ! Reconstruct densities
                 iv%beg = 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(1:sys_size), &
@@ -786,10 +789,8 @@ contains
             irx%end = m; iry%end = n; irz%end = p
             ! ===============================================================
 
-            call nvtxStartRange("RHS-RIEMANN-SOLVER")
-
             ! Computing Riemann Solver Flux and Source Flux =================
-            call nvtxStartRange("RHS_riemann_solver")
+            call nvtxStartRange("RHS-RIEMANN-SOLVER")
             call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                   dqR_prim_dx_n(id)%vf, &
                                   dqR_prim_dy_n(id)%vf, &
@@ -931,7 +932,6 @@ contains
             time_avg = 0._wp
         end if
         ! ==================================================================
-
         call nvtxEndRange
 
     end subroutine s_compute_rhs
