@@ -109,8 +109,7 @@ The weak scaling of MFC on this machine shows near-ideal utilization.
 MFC has many features.
 They are organized below. Just click the drop-downs!
 
-<details>
-<summary>Physics</summary>
+### Physics
 
 * 1-3D
 * Compressible
@@ -135,8 +134,7 @@ They are organized below. Just click the drop-downs!
 * Acoustic wave generation (one- and two-way sound sources)
 </details>
 
-<details>
-<summary>Numerics</summary>
+### Numerics
 
 * Shock and interface capturing schemes
 	* First-order upwinding
@@ -153,10 +151,9 @@ They are organized below. Just click the drop-downs!
 * Runge-Kutta orders 1-3 (SSP TVD), adaptive time stepping
 * RK4-5 operator splitting for Euler-Lagrange modeling
 * Interface sharpening (THINC-like)
-</details>
 
-<details>
-<summary>Large-scale and accelerated simulation</summary>
+
+### Large-scale and accelerated simulation
 
 * GPU compatible on NVIDIA (P/V/A/H100, GH200, etc.) and AMD (MI200+) hardware
 * Ideal weak scaling to 100% of the largest GPU supercomputers
@@ -165,10 +162,8 @@ They are organized below. Just click the drop-downs!
 * Near compute roofline behavior
 * RDMA (remote data memory access; GPU-GPU direct communication) via GPU-aware MPI on NVIDIA (CUDA-aware MPI) and AMD GPU systems
 * Optional single-precision computation and storage
-</details>
 
-<details>
-<summary>Software robustness and other features</summary>
+### Software robustness and other features
 
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
@@ -177,8 +172,6 @@ They are organized below. Just click the drop-downs!
 		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups
 * Continuous Deployment (CD) of [website](https://mflowcode.github.io) and [API documentation](https://mflowcode.github.io/documentation/index.html)
-</details>
-
 
 ## Citation
 
