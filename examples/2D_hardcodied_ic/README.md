@@ -1,9 +1,6 @@
 # 2D Hardcodied IC Example
 
-## Initial Condition
+## Initial Condition and Result
 
-![Initial Condition](initial.png)
-
-## Result
-
-![Result](result.png)
+<img src="initial.png" width="45%"/>
+<img src="result.png" width="45%"/>

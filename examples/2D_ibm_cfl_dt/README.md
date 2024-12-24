@@ -2,4 +2,4 @@
 
 ## Result
 
-![Result](result.png)
+<img src="result.png" height="MAX_HEIGHT"/>
