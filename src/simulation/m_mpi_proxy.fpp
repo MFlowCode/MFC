@@ -195,7 +195,7 @@ contains
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
             & 'viscous', 'shear_stress', 'bulk_stress',                          &
-            & 'hyperelasticity', 'elasticity' ]
+            & 'hyperelasticity', 'elasticity', 'hyper_model' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
