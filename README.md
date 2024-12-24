@@ -126,7 +126,9 @@ They are organized below. Just click the drop-downs!
 	* Complex/arbitrary geometries via immersed boundary method
 	* STL geometry files supported
 * Surface tension for multiphase cases
-* Sub-grid Euler-Euler multiphase models for bubble dynamics and similar
+* Sub-grid dynamics
+	* Euler-Euler particle models for bubble dynamics and similar
+	* Euler-Lagrange bubble dynamics
 * Viscous effects (high-order accurate representations)
 * Ideal and stiffened gas equations of state
 * Body forces
@@ -148,7 +150,8 @@ They are organized below. Just click the drop-downs!
 	* Slip and no-slip
  	* Thompson-based characteristic BCs: non-reflecting sub/supersonic buffers, inflows, outflows
 	* Generalized characteristic relaxation boundary conditions
-* Runge-Kutta orders 1-3 (SSP TVD)
+* Runge-Kutta orders 1-3 (SSP TVD), adaptive time stepping
+* RK4-5 operator splitting for Euler-Lagrange modeling
 * Interface sharpening (THINC-like)
 </details>
 
