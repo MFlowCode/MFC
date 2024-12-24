@@ -303,6 +303,7 @@ module m_derived_types
         real(wp) :: M_v     !< Bubble constants (see Preston (2007), Ando (2010))
         real(wp) :: mu_v    !< Bubble constants (see Preston (2007), Ando (2010))
         real(wp) :: k_v     !< Bubble constants (see Preston (2007), Ando (2010))
+        real(wp) :: cp_v
         real(wp) :: G
     end type physical_parameters
 
@@ -394,5 +395,28 @@ module m_derived_types
         !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
         integer :: gamma_method
     end type chemistry_parameters
+
+    !> Lagrangian bubble parameters
+    type bubbles_lagrange_parameters
+
+        integer :: solver_approach          !< 1: One-way coupling, 2: two-way coupling
+        integer :: cluster_type             !< Cluster model to find p_inf
+        logical :: pressure_corrector       !< Cell pressure correction term
+        integer :: smooth_type              !< Smoothing function. 1: Gaussian, 2:Delta 3x3
+        logical :: heatTransfer_model       !< Activate HEAT transfer model at the bubble-liquid interface
+        logical :: massTransfer_model       !< Activate MASS transfer model at the bubble-liquid interface
+        logical :: write_bubbles            !< Write files to track the bubble evolution each time step
+        logical :: write_bubbles_stats      !< Write the maximum and minimum radius of each bubble
+        integer :: nBubs_glb                !< Global number of bubbles
+        real(wp) :: epsilonb         !< Standard deviation scaling for the gaussian function
+        real(wp) :: charwidth        !< Domain virtual depth (z direction, for 2D simulations)
+        real(wp) :: valmaxvoid       !< Maximum void fraction permitted
+        real(wp) :: c0               !< Reference speed
+        real(wp) :: rho0             !< Reference density
+        real(wp) :: T0, Thost        !< Reference temperature and host temperature
+        real(wp) :: x0               !< Reference length
+        real(wp) :: diffcoefvap      !< Vapor diffusivity in the gas
+
+    end type bubbles_lagrange_parameters
 
 end module m_derived_types

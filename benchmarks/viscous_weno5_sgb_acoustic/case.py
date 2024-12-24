@@ -5,7 +5,7 @@
 # - viscosity enabled
 # - weno_Re_flux : T
 # - weno_order : 5
-# - bubbles : T
+# - bubbles_euler : T
 # - bubble_model : 3
 # - acoustic_source : T
 
@@ -216,7 +216,7 @@ print(json.dumps({
     # ==========================================================
 
     # Bubbles ==================================================
-    'bubbles'                      : 'T',
+    'bubbles_euler'                : 'T',
     'bubble_model'                 : 3,
     'polytropic'                   : 'T',
     'polydisperse'                 : 'F',

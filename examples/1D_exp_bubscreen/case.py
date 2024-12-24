@@ -210,7 +210,7 @@ print(json.dumps({
     # ==========================================================
 
     # Bubbles ==================================================
-    'bubbles'               : 'T',
+    'bubbles_euler'               : 'T',
     # in user guide... 1 = gilbert 2 = keller-miksis
     # but gilbert won't work for the equations that you are using... (i think)
     'bubble_model'          : 2,

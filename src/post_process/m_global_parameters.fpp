@@ -169,6 +169,7 @@ module m_global_parameters
     type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
     type(mpi_io_levelset_var), public :: MPI_IO_levelset_DATA
     type(mpi_io_levelset_norm_var), public :: MPI_IO_levelsetnorm_DATA
+    real(wp), allocatable, dimension(:, :), public :: MPI_IO_DATA_lg_bubbles
 
 #endif
 
@@ -195,6 +196,11 @@ module m_global_parameters
     integer :: format !< Format of the database file(s)
 
     integer :: precision !< Floating point precision of the database file(s)
+
+    logical :: output_partial_domain !< Specify portion of domain to output for post-processing
+
+    type(bounds_info) :: x_output, y_output, z_output !< Portion of domain to output for post-processing
+    type(int_bounds_info) :: x_output_idx, y_output_idx, z_output_idx !< Indices of domain to output for post-processing
 
     !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions.
     !! The definition of the ghost zone layers is only necessary when using the
@@ -266,7 +272,7 @@ module m_global_parameters
     real(wp) :: R0ref
     real(wp) :: Ca, Web, Re_inv
     real(wp), dimension(:), allocatable :: weight, R0, V0
-    logical :: bubbles
+    logical :: bubbles_euler
     logical :: qbmm
     logical :: polytropic
     logical :: polydisperse
@@ -299,6 +305,11 @@ module m_global_parameters
     integer :: strxb, strxe
     integer :: xibeg, xiend
     integer :: chemxb, chemxe
+    !> @}
+
+    !> @name Lagrangian bubbles
+    !> @{
+    logical :: bubbles_lagrange, rkck_adap_dt
     !> @}
 
 contains
@@ -408,7 +419,7 @@ contains
         pref = dflt_real
 
         ! Bubble modeling
-        bubbles = .false.
+        bubbles_euler = .false.
         qbmm = .false.
         R0ref = dflt_real
         nb = dflt_int
@@ -419,8 +430,21 @@ contains
         surface_tension = .false.
         adv_n = .false.
 
+        ! Lagrangian bubbles modeling
+        bubbles_lagrange = .false.
+        rkck_adap_dt = .false.
+
         ! IBM
         num_ibs = dflt_int
+
+        ! Output partial domain
+        output_partial_domain = .false.
+        x_output%beg = dflt_real
+        x_output%end = dflt_real
+        y_output%beg = dflt_real
+        y_output%end = dflt_real
+        z_output%beg = dflt_real
+        z_output%end = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -471,7 +495,7 @@ contains
 
             sys_size = adv_idx%end
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 alf_idx = adv_idx%end
             else
                 alf_idx = 1
@@ -481,7 +505,7 @@ contains
                 nmom = 6
             end if
 
-            if (bubbles) then
+            if (bubbles_euler) then
 
                 bub_idx%beg = sys_size + 1
                 if (qbmm) then
@@ -628,7 +652,7 @@ contains
             alf_idx = adv_idx%end
             sys_size = alf_idx !adv_idx%end
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 bub_idx%beg = sys_size + 1
                 bub_idx%end = sys_size + 2*nb
                 if (polytropic .neqv. .true.) then
@@ -682,6 +706,15 @@ contains
             species_idx%end = 1
         end if
 
+        if (output_partial_domain) then
+            x_output_idx%beg = 0
+            x_output_idx%end = 0
+            y_output_idx%beg = 0
+            y_output_idx%end = 0
+            z_output_idx%beg = 0
+            z_output_idx%end = 0
+        end if
+
         momxb = mom_idx%beg
         momxe = mom_idx%end
         advxb = adv_idx%beg
@@ -700,13 +733,22 @@ contains
         chemxe = species_idx%end
 
 #ifdef MFC_MPI
-        allocate (MPI_IO_DATA%view(1:sys_size))
-        allocate (MPI_IO_DATA%var(1:sys_size))
 
-        do i = 1, sys_size
-            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-            MPI_IO_DATA%var(i)%sf => null()
-        end do
+        if (bubbles_lagrange) then
+            allocate (MPI_IO_DATA%view(1:sys_size + 1))
+            allocate (MPI_IO_DATA%var(1:sys_size + 1))
+            do i = 1, sys_size + 1
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        else
+            allocate (MPI_IO_DATA%view(1:sys_size))
+            allocate (MPI_IO_DATA%var(1:sys_size))
+            do i = 1, sys_size
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        end if
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
 #endif
@@ -877,6 +919,8 @@ contains
             do i = 1, sys_size
                 MPI_IO_DATA%var(i)%sf => null()
             end do
+
+            if (bubbles_lagrange) MPI_IO_DATA%var(sys_size + 1)%sf => null()
 
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)
