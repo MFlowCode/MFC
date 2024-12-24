@@ -562,6 +562,35 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             cases.append(define_case_d(stack, '', {}))
 
+            # Hypoelasticity with acoustic source just for 2D and 2 fluids
+            if len(dimInfo[0]) == 2 and num_fluids == 2:
+                stack.push(f"Acoustic", {
+                    "patch_icpp(2)%alpha_rho(1)"    : 1,
+                    "patch_icpp(2)%alpha(1)"        : 0.001,
+                    "patch_icpp(2)%alpha_rho(2)"    : 999,
+                    "patch_icpp(2)%alpha(2)"        : 0.999,
+                    "patch_icpp(1)%pres"            : 100000.0,
+                    "patch_icpp(3)%pres"            : 100000.0,
+                    'fluid_pp(2)%G'                 : 0,
+                    'acoustic_source'               : 'T',
+                    'num_source'                    : 1,
+                    'acoustic(1)%support'           : 2,
+                    'acoustic(1)%dipole'            : 'T',
+                    'acoustic(1)%loc(1)'            : 0.5,
+                    'acoustic(1)%loc(2)'            : 0.5,
+                    'acoustic(1)%dir'               : 3.14159/2,
+                    'acoustic(1)%pulse'             : 2,
+                    'acoustic(1)%npulse'            : 1,
+                    'acoustic(1)%mag'               : 100.,
+                    'acoustic(1)%gauss_sigma_time'  : 1e-4,
+                    'acoustic(1)%delay'             : 5e-4,
+                    "dt"                            : 1e-4,
+                    "t_step_stop"                   : 200,
+                    "t_step_save"                   : 10
+                })
+                cases.append(define_case_d(stack, '', {}))
+                stack.pop()
+
             stack.pop()
 
             if num_fluids == 2:
