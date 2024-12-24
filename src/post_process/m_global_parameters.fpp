@@ -197,6 +197,11 @@ module m_global_parameters
 
     integer :: precision !< Floating point precision of the database file(s)
 
+    logical :: output_partial_domain !< Specify portion of domain to output for post-processing
+
+    type(bounds_info) :: x_output, y_output, z_output !< Portion of domain to output for post-processing
+    type(int_bounds_info) :: x_output_idx, y_output_idx, z_output_idx !< Indices of domain to output for post-processing
+
     !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions.
     !! The definition of the ghost zone layers is only necessary when using the
     !! Silo database file format in multidimensions. These zones provide VisIt
@@ -431,6 +436,15 @@ contains
 
         ! IBM
         num_ibs = dflt_int
+
+        ! Output partial domain
+        output_partial_domain = .false.
+        x_output%beg = dflt_real
+        x_output%end = dflt_real
+        y_output%beg = dflt_real
+        y_output%end = dflt_real
+        z_output%beg = dflt_real
+        z_output%end = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -690,6 +704,15 @@ contains
         else
             species_idx%beg = 1
             species_idx%end = 1
+        end if
+
+        if (output_partial_domain) then
+            x_output_idx%beg = 0
+            x_output_idx%end = 0
+            y_output_idx%beg = 0
+            y_output_idx%end = 0
+            z_output_idx%beg = 0
+            z_output_idx%end = 0
         end if
 
         momxb = mom_idx%beg
