@@ -169,11 +169,19 @@ contains
             "Elasticity does not work for model_eqns = 1")
         @:PROHIBIT(elasticity .and. model_eqns > 3, &
             "Elasticity works only for model_eqns 2 and 3")
+        #:for X in ['x', 'y', 'z']
+            #:for BOUND in ['beg', 'end']
+                @:PROHIBIT(hyperelasticity .and. ((bc_${X}$%${BOUND}$ /= -2) .or. (bc_${X}$%${BOUND}$ /= -3)), &
+                    "bc_${X}$%${BOUND}$ is not supported")
+            #:endfor
+        #:endfor
+
 #ifdef MFC_SIMULATION
         @:PROHIBIT(elasticity .and. fd_order /= 4)
         @:PROHIBIT(hyperelasticity .and. hyper_model .le. 0, &
             "Set the hyper_model in the input file")
 #endif
+
     end subroutine s_check_inputs_elasticity
 
     !> Checks constraints on dimensionality and the number of cells for the grid.
