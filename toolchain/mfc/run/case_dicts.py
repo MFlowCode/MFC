@@ -22,7 +22,6 @@ class ParamType(Enum):
         return self.STR
 
 COMMON = {
-    'elasticity': ParamType.LOG,
     'hypoelasticity': ParamType.LOG,
     'hyperelasticity': ParamType.LOG,
     'cyl_coord': ParamType.LOG,

@@ -736,6 +736,7 @@ contains
             end if
         end if
 
+        if (hypoelasticity .or. hyperelasticity) elasticity = .true.
         if (elasticity) then
             ! creates stress indices for both hypo and hyperelasticity
             stress_idx%beg = sys_size + 1

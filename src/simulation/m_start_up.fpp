@@ -172,7 +172,7 @@ contains
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target,  &
             viscous, surface_tension,               & 
-            hyperelasticity, R0ref, elasticity, &
+            hyperelasticity, R0ref, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance
 

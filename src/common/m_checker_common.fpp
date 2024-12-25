@@ -161,13 +161,9 @@ contains
     !> Checks constraints on the elasticity parameters.
         !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_elasticity
-        @:PROHIBIT((hypoelasticity .or. hyperelasticity) .and. (.not. elasticity), &
-            "Turn on elasticity to have either hyperelasticity or hypoelasticity")
-        @:PROHIBIT(elasticity .and. .not. (hypoelasticity .or. hyperelasticity), &
-            "Elasticity requires either hyperelasticity or hypoelasticity to be true")
-        @:PROHIBIT(elasticity .and. model_eqns == 1, &
+        @:PROHIBIT((hypoelasticity .or. hyperelasticity) .and. model_eqns == 1, &
             "Elasticity does not work for model_eqns = 1")
-        @:PROHIBIT(elasticity .and. model_eqns > 3, &
+        @:PROHIBIT((hypoelasticity .or. hyperelasticity) .and. model_eqns > 3, &
             "Elasticity works only for model_eqns 2 and 3")
         #:for X in ['x', 'y', 'z']
             #:for BOUND in ['beg', 'end']
