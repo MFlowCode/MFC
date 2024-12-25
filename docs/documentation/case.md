@@ -522,6 +522,9 @@ To restart the simulation from $k$-th time step, see [Restarting Cases](running.
 | `probe_wrt`          | Logical | Write the flow chosen probes data files for each time step	|
 | `num_probes`         | Integer | Number of probes	|
 | `probe(i)%[x,y,z]`   | Real	 | Coordinates of probe $i$	|
+| `output_partial_domain` | Logical | Output part of the domain |
+| `[x,y,z]_output%beg` | Real    | Beginning of the output domain in the [x,y,z]-direction |
+| `[x,y,z]_output%end` | Real    | End of the output domain in the [x,y,z]-direction |
 
 The table lists formatted database output parameters. The parameters define variables that are outputted from simulation and file types and formats of data as well as options for post-processing.
 
@@ -548,6 +551,11 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 `fd_order = 1`, `2`, and `4` correspond to the first, second, and fourth-order finite difference schemes.
 
 - `probe_wrt` activates the output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
+
+- `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%beg` and `[x,y,z]_output%end`.
+This is useful for large domains where only a portion of the domain is of interest.
+It is not supported when `precision = 1` and `format = 1`. 
+It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_wrt`, `omega_wrt`, `ib`, `schlieren_wrt`, or `qm_wrt`.
 
 ### 8. Acoustic Source {#acoustic-source}
 
