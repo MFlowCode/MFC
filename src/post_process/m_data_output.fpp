@@ -28,6 +28,7 @@ module m_data_output
     implicit none
 
     private; public :: s_initialize_data_output_module, &
+ s_define_output_region, &
  s_open_formatted_database_file, &
  s_open_intf_data_file, &
  s_open_energy_data_file, &
@@ -368,6 +369,9 @@ contains
             ! Pressure
             if (pres_wrt .or. prim_vars_wrt) dbvars = dbvars + 1
 
+            ! Elastic stresses
+            if (hypoelasticity) dbvars = dbvars + (num_dims*(num_dims + 1))/2
+
             ! Volume fraction(s)
             if ((model_eqns == 2) .or. (model_eqns == 3)) then
 
@@ -432,6 +436,42 @@ contains
         ! END: Querying Number of Flow Variable(s) in Binary Output ========
 
     end subroutine s_initialize_data_output_module ! --------------------------
+
+    subroutine s_define_output_region
+
+        integer :: i
+        integer :: lower_bound, upper_bound
+
+        #:for X, M in [('x', 'm'), ('y', 'n'), ('z', 'p')]
+
+            if (${M}$ == 0) return ! Early return for y or z if simulation is 1D or 2D
+
+            lower_bound = -offset_${X}$%beg
+            upper_bound = ${M}$+offset_${X}$%end
+
+            do i = lower_bound, upper_bound
+                if (${X}$_cc(i) > ${X}$_output%beg) then
+                    ${X}$_output_idx%beg = i + offset_${X}$%beg
+                    exit
+                end if
+            end do
+
+            do i = upper_bound, lower_bound, -1
+                if (${X}$_cc(i) < ${X}$_output%end) then
+                    ${X}$_output_idx%end = i + offset_${X}$%beg
+                    exit
+                end if
+            end do
+
+            ! If no grid points are within the output region
+            if ((${X}$_cc(lower_bound) > ${X}$_output%end) .or. (${X}$_cc(upper_bound) < ${X}$_output%beg)) then
+                ${X}$_output_idx%beg = 0
+                ${X}$_output_idx%end = 0
+            end if
+
+        #:endfor
+
+    end subroutine s_define_output_region
 
     subroutine s_open_formatted_database_file(t_step) ! --------------------
         ! Description: This subroutine opens a new formatted database file, or
@@ -523,7 +563,14 @@ contains
             ! file by describing in it the dimensionality of post-processed
             ! data as well as the total number of flow variable(s) that will
             ! eventually be stored in it
-            write (dbfile) m, n, p, dbvars
+            if (output_partial_domain) then
+                write (dbfile) x_output_idx%end - x_output_idx%beg, &
+                    y_output_idx%end - y_output_idx%beg, &
+                    z_output_idx%end - z_output_idx%beg, &
+                    dbvars
+            else
+                write (dbfile) m, n, p, dbvars
+            end if
 
             ! Next, analogous steps to the ones above are carried out by the
             ! root process to create and setup the formatted database master
@@ -542,7 +589,11 @@ contains
                                      '. Exiting ...')
                 end if
 
-                write (dbroot) m_root, 0, 0, dbvars
+                if (output_partial_domain) then
+                    write (dbroot) x_output_idx%end - x_output_idx%beg, 0, 0, dbvars
+                else
+                    write (dbroot) m_root, 0, 0, dbvars
+                end if
 
             end if
 
@@ -751,7 +802,13 @@ contains
                         real(y_cb, sp), &
                         real(z_cb, sp)
                 else
-                    write (dbfile) x_cb, y_cb, z_cb
+                    if (output_partial_domain) then
+                        write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end), &
+                            y_cb(y_output_idx%beg - 1:y_output_idx%end), &
+                            z_cb(z_output_idx%beg - 1:z_output_idx%end)
+                    else
+                        write (dbfile) x_cb, y_cb, z_cb
+                    end if
                 end if
 
             elseif (n > 0) then
@@ -759,7 +816,12 @@ contains
                     write (dbfile) real(x_cb, sp), &
                         real(y_cb, sp)
                 else
-                    write (dbfile) x_cb, y_cb
+                    if (output_partial_domain) then
+                        write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end), &
+                            y_cb(y_output_idx%beg - 1:y_output_idx%end)
+                    else
+                        write (dbfile) x_cb, y_cb
+                    end if
                 end if
 
                 ! One-dimensional local grid data is written to the formatted
@@ -768,9 +830,13 @@ contains
             else
 
                 if (precision == 1) then
-                    write (dbfile) real(x_cb, wp)
+                    write (dbfile) real(x_cb, sp)
                 else
-                    write (dbfile) x_cb
+                    if (output_partial_domain) then
+                        write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end)
+                    else
+                        write (dbfile) x_cb
+                    end if
                 end if
 
                 if (num_procs > 1) then
@@ -783,7 +849,11 @@ contains
                     if (precision == 1) then
                         write (dbroot) real(x_root_cb, wp)
                     else
-                        write (dbroot) x_root_cb
+                        if (output_partial_domain) then
+                            write (dbroot) x_root_cb(x_output_idx%beg - 1:x_output_idx%end)
+                        else
+                            write (dbroot) x_root_cb
+                        end if
                     end if
                 end if
 

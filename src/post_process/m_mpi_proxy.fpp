@@ -170,8 +170,7 @@ contains
             & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles_euler', 'qbmm',   &
             & 'polytropic', 'polydisperse', 'file_per_process', 'relax', 'cf_wrt',     &
             & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',          &
-            & 'surface_tension', 'hyperelasticity', 'kymograph',               &
-            & 'bubbles_lagrange', 'rkck_adap_dt' ]
+            & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange', 'rkck_adap_dt', 'output_partial_domain', 'kymograph']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -192,7 +191,9 @@ contains
         end do
 
         #:for VAR in [ 'pref', 'rhoref', 'R0ref', 'poly_sigma', 'Web', 'Ca', &
-            & 'Re_inv', 'sigma', 't_save', 't_stop' ]
+            & 'Re_inv', 'sigma', 't_save', 't_stop', &
+            & 'x_output%beg', 'x_output%end', 'y_output%beg', &
+            & 'y_output%end', 'z_output%beg', 'z_output%end' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(schlieren_alpha(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)

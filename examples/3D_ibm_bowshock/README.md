@@ -2,5 +2,5 @@
 
 ## Final Condition
 
-![Density](result.png)
+<img src="result.png" height="MAX_HEIGHT">
 
