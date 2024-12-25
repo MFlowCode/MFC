@@ -7,8 +7,8 @@ References:
 
 ## Initial Condition
 
-![Initial Condition](initial.png)
+<img src="initial.png" height="MAX_HEIGHT"/>
 
 ## Results
 
-![Results](result.png)
+<img src="result.png" height="MAX_HEIGHT"/>
