@@ -287,7 +287,6 @@ print(json.dumps({
     'num_patches'  : 3,        
     'model_eqns'   : 3,        
     'num_fluids'   : 4,       
-    'elasticity'   : 'T',
     'hypoelasticity' : 'F', 
     'hyperelasticity' : 'T', 
     'mpp_lim'      : 'T',      
