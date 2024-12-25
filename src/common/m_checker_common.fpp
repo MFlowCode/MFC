@@ -167,7 +167,7 @@ contains
             "Elasticity works only for model_eqns 2 and 3")
         #:for X in ['x', 'y', 'z']
             #:for BOUND in ['beg', 'end']
-                @:PROHIBIT(hyperelasticity .and. ((bc_${X}$%${BOUND}$ /= -2) .or. (bc_${X}$%${BOUND}$ /= -3)), &
+                @:PROHIBIT(hyperelasticity .and. ((bc_${X}$%${BOUND}$ .lt. -3)), &
                     "bc_${X}$%${BOUND}$ is not supported")
             #:endfor
         #:endfor
