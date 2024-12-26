@@ -4,11 +4,7 @@
 
 module m_compute_cbc
 
-    ! Dependencies =============================================================
-
     use m_global_parameters    !< Definitions of the global parameters
-
-    ! ==========================================================================
 
     implicit none
 

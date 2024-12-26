@@ -18,7 +18,6 @@
 !!              setting up the time stepping, domain decomposition and I/O procedures.
 module m_start_up
 
-    ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -81,8 +80,6 @@ module m_start_up
     use m_surface_tension
 
     use m_body_forces
-
-    ! ==========================================================================
 
     implicit none
 
@@ -225,7 +222,7 @@ contains
         ! Logical used to check the existence of the current directory file
         logical :: file_exist
 
-        ! Logistics ========================================================
+        ! Logistics
         file_path = trim(case_dir)//'/.'
 
         call my_inquire(file_path, file_exist)
@@ -233,7 +230,6 @@ contains
         if (file_exist .neqv. .true.) then
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
-        ! ==================================================================
 
         call s_check_inputs_common()
         call s_check_inputs()
@@ -278,7 +274,7 @@ contains
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
 
-        ! Cell-boundary Locations in x-direction ===========================
+        ! Cell-boundary Locations in x-direction
         file_path = trim(t_step_dir)//'/x_cb.dat'
 
         inquire (FILE=trim(file_path), EXIST=file_exist)
@@ -303,9 +299,8 @@ contains
                 end if
             end do
         end if
-        ! ==================================================================
 
-        ! Cell-boundary Locations in y-direction ===========================
+        ! Cell-boundary Locations in y-direction
         if (n > 0) then
 
             file_path = trim(t_step_dir)//'/y_cb.dat'
@@ -326,9 +321,8 @@ contains
             y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
         end if
-        ! ==================================================================
 
-        ! Cell-boundary Locations in z-direction ===========================
+        ! Cell-boundary Locations in z-direction
         if (p > 0) then
 
             file_path = trim(t_step_dir)//'/z_cb.dat'
@@ -349,7 +343,6 @@ contains
             z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
 
         end if
-        ! ==================================================================
 
         do i = 1, sys_size
             write (file_path, '(A,I0,A)') &
@@ -403,10 +396,8 @@ contains
                 end do
             end if
         end if
-        ! ==================================================================
 
-        ! Read IBM Data ====================================================
-
+        ! Read IBM Data
         if (ib) then
             ! Read IB markers
             write (file_path, '(A,I0,A)') &
@@ -949,7 +940,7 @@ contains
 
         integer :: i !< Generic loop iterator
 
-        ! Population of Buffers in x-direction =============================
+        ! Population of Buffers in x-direction
 
         ! Populating cell-width distribution buffer, at the beginning of the
         ! coordinate direction, based on the selected boundary condition. In
@@ -1013,9 +1004,9 @@ contains
             x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
         end do
 
-        ! END: Population of Buffers in x-direction ========================
+        ! END: Population of Buffers in x-direction
 
-        ! Population of Buffers in y-direction =============================
+        ! Population of Buffers in y-direction
 
         ! Populating cell-width distribution buffer, at the beginning of the
         ! coordinate direction, based on the selected boundary condition. In
@@ -1081,9 +1072,9 @@ contains
             y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
         end do
 
-        ! END: Population of Buffers in y-direction ========================
+        ! END: Population of Buffers in y-direction
 
-        ! Population of Buffers in z-direction =============================
+        ! Population of Buffers in z-direction
 
         ! Populating cell-width distribution buffer, at the beginning of the
         ! coordinate direction, based on the selected boundary condition. In
@@ -1149,7 +1140,7 @@ contains
             z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
         end do
 
-        ! END: Population of Buffers in z-direction ========================
+        ! END: Population of Buffers in z-direction
 
     end subroutine s_populate_grid_variables_buffers
 
@@ -1636,7 +1627,6 @@ contains
     subroutine s_finalize_modules
 
         call s_finalize_time_steppers_module()
-        if (hypoelasticity) call s_finalize_hypoelastic_module() 
         if (hyperelasticity) call s_finalize_hyperelastic_module() 
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()

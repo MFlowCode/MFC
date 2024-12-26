@@ -12,7 +12,6 @@
 !!          goals for the simulation.
 module m_mpi_proxy
 
-    ! Dependencies =============================================================
 #ifdef MFC_MPI
     use mpi                    !< Message passing interface (MPI) module
 #endif
@@ -30,7 +29,6 @@ module m_mpi_proxy
     use m_nvtx
 
     use ieee_arithmetic
-    ! ==========================================================================
 
     implicit none
 
@@ -162,7 +160,7 @@ contains
         !!      available to the other processors. Then, the purpose of
         !!      this subroutine is to distribute the user inputs to the
         !!      remaining processors in the communicator.
-    subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
+    subroutine s_mpi_bcast_user_inputs()
 
 #ifdef MFC_MPI
 
@@ -345,7 +343,7 @@ contains
             return
         end if
 
-        ! 3D Cartesian Processor Topology ==================================
+        ! 3D Cartesian Processor Topology
         if (n > 0) then
 
             if (p > 0) then
@@ -479,9 +477,9 @@ contains
                 ! Finding the Cartesian coordinates of the local process
                 call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, &
                                      proc_coords, ierr)
-                ! END: 3D Cartesian Processor Topology =============================
+                ! END: 3D Cartesian Processor Topology
 
-                ! Global Parameters for z-direction ================================
+                ! Global Parameters for z-direction
 
                 ! Number of remaining cells
                 rem_cells = mod(p + 1, num_procs_z)
@@ -519,9 +517,8 @@ contains
                         start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
                     end if
                 end if
-                ! ==================================================================
 
-                ! 2D Cartesian Processor Topology ==================================
+                ! 2D Cartesian Processor Topology
             else
 
                 ! Initial estimate of optimal processor topology
@@ -583,9 +580,9 @@ contains
                                      proc_coords, ierr)
 
             end if
-            ! END: 2D Cartesian Processor Topology =============================
+            ! END: 2D Cartesian Processor Topology
 
-            ! Global Parameters for y-direction ================================
+            ! Global Parameters for y-direction
 
             ! Number of remaining cells
             rem_cells = mod(n + 1, num_procs_y)
@@ -624,9 +621,7 @@ contains
                 end if
             end if
 
-            ! ==================================================================
-
-            ! 1D Cartesian Processor Topology ==================================
+            ! 1D Cartesian Processor Topology
         else
 
             ! Optimal processor topology
@@ -642,9 +637,8 @@ contains
                                  proc_coords, ierr)
 
         end if
-        ! ==================================================================
 
-        ! Global Parameters for x-direction ================================
+        ! Global Parameters for x-direction
 
         ! Number of remaining cells
         rem_cells = mod(m + 1, num_procs_x)
@@ -680,7 +674,6 @@ contains
                 start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
             end if
         end if
-        ! ==================================================================
 
 #endif
 
@@ -703,7 +696,7 @@ contains
 
 #ifdef MFC_MPI
 
-        ! MPI Communication in x-direction =================================
+        ! MPI Communication in x-direction
         if (mpi_dir == 1) then
 
             if (pbc_loc == -1) then      ! PBC at the beginning
@@ -755,9 +748,9 @@ contains
                 end if
 
             end if
-            ! END: MPI Communication in x-direction ============================
+            ! END: MPI Communication in x-direction
 
-            ! MPI Communication in y-direction =================================
+            ! MPI Communication in y-direction
         elseif (mpi_dir == 2) then
 
             if (pbc_loc == -1) then      ! PBC at the beginning
@@ -809,9 +802,9 @@ contains
                 end if
 
             end if
-            ! END: MPI Communication in y-direction ============================
+            ! END: MPI Communication in y-direction
 
-            ! MPI Communication in z-direction =================================
+            ! MPI Communication in z-direction
         else
 
             if (pbc_loc == -1) then      ! PBC at the beginning
@@ -865,7 +858,7 @@ contains
             end if
 
         end if
-        ! END: MPI Communication in z-direction ============================
+        ! END: MPI Communication in z-direction
 
 #endif
 
@@ -1338,7 +1331,7 @@ contains
 
         !nCalls_time = nCalls_time + 1
 
-        ! MPI Communication in x-direction =================================
+        ! MPI Communication in x-direction
         if (bc_x%beg >= 0) then      ! PBC at the beginning
 
             if (bc_x%end >= 0) then      ! PBC at the beginning and end
@@ -1598,9 +1591,9 @@ contains
             end do
 
         end if
-        ! END: MPI Communication in x-direction ============================
+        ! END: MPI Communication in x-direction
 
-        ! MPI Communication in y-direction =================================
+        ! MPI Communication in y-direction
 
         if (bc_y%beg >= 0) then      ! PBC at the beginning
 
@@ -1873,9 +1866,9 @@ contains
             end do
 
         end if
-        ! END: MPI Communication in y-direction ============================
+        ! END: MPI Communication in y-direction
 
-        ! MPI Communication in z-direction =================================
+        ! MPI Communication in z-direction
         if (bc_z%beg >= 0) then      ! PBC at the beginning
 
             if (bc_z%end >= 0) then      ! PBC at the beginning and end
@@ -2150,7 +2143,7 @@ contains
 
         end if
 
-        ! END: MPI Communication in z-direction ============================
+        ! END: MPI Communication in z-direction
 
 #endif
 

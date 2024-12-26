@@ -9,7 +9,6 @@
 !!      state and finally, the formatted database file(s) structure.
 module m_global_parameters
 
-    ! Dependencies =============================================================
 #ifdef MFC_MPI
     use mpi                     !< Message passing interface (MPI) module
 #endif
@@ -20,8 +19,6 @@ module m_global_parameters
 
     use m_thermochem, only: num_species, species_names
 
-    ! ==========================================================================
-
     implicit none
 
     !> @name Logistics
@@ -30,7 +27,7 @@ module m_global_parameters
     character(LEN=path_len) :: case_dir             !< Case folder location
     !> @}
 
-    ! Computational Domain Parameters ==========================================
+    ! Computational Domain Parameters
 
     integer :: proc_rank !< Rank of the local processor
 
@@ -95,8 +92,6 @@ module m_global_parameters
     ! NOTE: The variables m_root, x_root_cb and x_root_cc contain the grid data
     ! of the defragmented computational domain. They are only used in 1D. For
     ! serial simulations, they are equal to m, x_cb and x_cc, respectively.
-
-    ! ==========================================================================
 
     !> @name Simulation Algorithm Parameters
     !> @{
@@ -181,18 +176,15 @@ module m_global_parameters
     !> @}
 
     integer, private :: ierr
-    ! ==========================================================================
 
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
     !! Database of the physical parameters of each of the fluids that is present
     !! in the flow. These include the stiffened gas equation of state parameters,
     !! the Reynolds numbers and the Weber numbers.
 
-    ! ==========================================================================
-
     real(wp), allocatable, dimension(:) :: adv !< Advection variables
 
-    ! Formatted Database File(s) Structure Parameters ==========================
+    ! Formatted Database File(s) Structure Parameters
 
     integer :: format !< Format of the database file(s)
 
@@ -259,8 +251,6 @@ module m_global_parameters
     !! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
     !! it is a measure of the half-size of the finite-difference stencil for the
     !! selected order of accuracy.
-
-    ! ==========================================================================
 
     !> @name Reference parameters for Tait EOS
     !> @{
@@ -459,7 +449,7 @@ contains
         ! Setting m_root equal to m in the case of a 1D serial simulation
         if (num_procs == 1 .and. n == 0) m_root = m
 
-        ! Gamma/Pi_inf Model ===============================================
+        ! Gamma/Pi_inf Model
         if (model_eqns == 1) then
 
             ! Setting number of fluids
@@ -479,9 +469,7 @@ contains
             pi_inf_idx = adv_idx%end
             sys_size = adv_idx%end
 
-            ! ==================================================================
-
-            ! Volume Fraction Model (5-equation model) =========================
+            ! Volume Fraction Model (5-equation model)
         else if (model_eqns == 2) then
 
             ! Annotating structure of the state and flux vectors belonging
@@ -582,9 +570,7 @@ contains
                 sys_size = c_idx
             end if
 
-            ! ==================================================================
-
-            ! Volume Fraction Model (6-equation model) =========================
+            ! Volume Fraction Model (6-equation model)
         else if (model_eqns == 3) then
 
             ! Annotating structure of the state and flux vectors belonging
@@ -772,7 +758,7 @@ contains
             buff_size = buff_size + fd_number
         end if
 
-        ! Configuring Coordinate Direction Indexes =========================
+        ! Configuring Coordinate Direction Indexes
         idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
         idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
 
@@ -783,7 +769,6 @@ contains
         idwbuff(1)%end = idwint(1)%end - idwbuff(1)%beg
         idwbuff(2)%end = idwint(2)%end - idwbuff(2)%beg
         idwbuff(3)%end = idwint(3)%end - idwbuff(3)%beg
-        ! ==================================================================
 
         ! Allocating single precision grid variables if needed
         if (precision == 1) then

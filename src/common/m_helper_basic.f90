@@ -4,10 +4,7 @@
 
 module m_helper_basic
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
-    ! ==========================================================================
 
     implicit none
 
