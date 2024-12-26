@@ -8,11 +8,7 @@
 !!        in the Eulerian framework.
 module m_bubbles_EL_kernels
 
-    ! Dependencies =============================================================
-
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-
-    ! ==========================================================================
 
     implicit none
 

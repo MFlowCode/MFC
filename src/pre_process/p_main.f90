@@ -6,13 +6,9 @@
 !!              grid data for the multicomponent flow code.
 program p_main
 
-    ! Dependencies =============================================================
-
     use m_global_parameters     !< Global parameters for the code
 
     use m_start_up
-
-    ! ==========================================================================
 
     implicit none
 

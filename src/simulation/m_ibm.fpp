@@ -7,7 +7,6 @@
 !> @brief This module is used to handle all operations related to immersed
 !!              boundary methods (IBMs)
 module m_ibm
-    ! Dependencies =============================================================
 
     use m_derived_types        !< Definitions of the derived types
 
@@ -18,8 +17,6 @@ module m_ibm
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_helper
-
-    ! ==========================================================================
 
     implicit none
 

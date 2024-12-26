@@ -16,7 +16,6 @@
 !!             reading in the relevant data files.
 module m_initial_condition
 
-    ! Dependencies =============================================================
     use m_derived_types         ! Definitions of the derived types
 
     use m_global_parameters     ! Global parameters for the code
@@ -37,9 +36,6 @@ module m_initial_condition
     use m_perturbation          ! Subroutines to perturb initial flow fields
 
     use m_chemistry
-
-    ! ==========================================================================
-    ! ==========================================================================
 
     implicit none
 
@@ -148,7 +144,7 @@ contains
                                                                idwbuff)
         end if
 
-        !  3D Patch Geometries =============================================
+        !  3D Patch Geometries
         if (p > 0) then
 
             do i = 1, num_patches
@@ -226,9 +222,7 @@ contains
             end do
             !> @}
 
-            ! ==================================================================
-
-            ! 2D Patch Geometries ==============================================
+            ! 2D Patch Geometries
         elseif (n > 0) then
 
             do i = 1, num_patches
@@ -311,9 +305,7 @@ contains
             end do
             !> @}
 
-            ! ==================================================================
-
-            ! 1D Patch Geometries ==============================================
+            ! 1D Patch Geometries
         else
 
             do i = 1, num_patches
@@ -338,7 +330,6 @@ contains
             end do
 
         end if
-        ! ==================================================================
 
         if (perturb_flow) call s_perturb_surrounding_flow(q_prim_vf)
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)

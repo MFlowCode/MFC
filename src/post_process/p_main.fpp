@@ -12,11 +12,8 @@
 !!              and the numerical Schlieren function.
 program p_main
 
-    ! Dependencies =============================================================
     use m_global_parameters     !< Global parameters for the code
-
     use m_start_up
-    ! ==========================================================================
 
     implicit none
 
@@ -42,7 +39,7 @@ program p_main
         t_step = t_step_start
     end if
 
-    ! Time-Marching Loop =======================================================
+    ! Time-Marching Loop
     do
 
         ! If all time-steps are not ready to be post-processed and one rank is
@@ -81,7 +78,7 @@ program p_main
         end if
 
     end do
-    ! END: Time-Marching Loop ==================================================
+    ! END: Time-Marching Loop
 
     close (11)
 

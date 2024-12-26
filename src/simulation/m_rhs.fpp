@@ -19,7 +19,6 @@
 !!              in the volume fraction model.
 module m_rhs
 
-    ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -59,7 +58,6 @@ module m_rhs
     use m_body_forces
 
     use m_chemistry
-    ! ==========================================================================
 
     implicit none
 
@@ -237,8 +235,6 @@ contains
             @:ACC_SETUP_SFs(tau_Re_vf(E_idx))
         end if
 
-        ! ==================================================================
-
         if (qbmm) then
             @:ALLOCATE(mom_sp(1:nmomsp), mom_3d(0:2, 0:2, nb))
 
@@ -263,7 +259,7 @@ contains
             end do
         end if
 
-        ! Allocation/Association of qK_cons_n and qK_prim_n ==========
+        ! Allocation/Association of qK_cons_n and qK_prim_n
         @:ALLOCATE(qL_prim(1:num_dims))
         @:ALLOCATE(qR_prim(1:num_dims))
 
@@ -280,7 +276,7 @@ contains
         if (mpp_lim .and. bubbles_euler) then
             @:ALLOCATE(alf_sum%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end if
-        ! END: Allocation/Association of qK_cons_n and qK_prim_n ======
+        ! END: Allocation/Association of qK_cons_n and qK_prim_n
 
         @:ALLOCATE(qL_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
             idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
@@ -313,7 +309,7 @@ contains
 
         end if
 
-        ! Allocation of dq_prim_ds_qp ======================================
+        ! Allocation of dq_prim_ds_qp
 
         @:ALLOCATE(dq_prim_dx_qp(1:1))
         @:ALLOCATE(dq_prim_dy_qp(1:1))
@@ -375,9 +371,9 @@ contains
                 end if
             end do
         end if
-        ! END: Allocation of dq_prim_ds_qp =================================
+        ! END: Allocation of dq_prim_ds_qp
 
-        ! Allocation/Association of dqK_prim_ds_n =======================
+        ! Allocation/Association of dqK_prim_ds_n
         @:ALLOCATE(dqL_prim_dx_n(1:num_dims))
         @:ALLOCATE(dqL_prim_dy_n(1:num_dims))
         @:ALLOCATE(dqL_prim_dz_n(1:num_dims))
@@ -435,7 +431,7 @@ contains
                 @:ACC_SETUP_VFs(dqR_prim_dx_n(i), dqR_prim_dy_n(i), dqR_prim_dz_n(i))
             end do
         end if
-        ! END: Allocation/Association of d K_prim_ds_n ==================
+        ! END: Allocation/Association of d K_prim_ds_n
 
         if (viscous) then
             if (weno_Re_flux) then
@@ -473,14 +469,11 @@ contains
             end if
         end if
 
-        ! ==================================================================
-
-        ! Allocation of gm_alphaK_n =====================================
+        ! Allocation of gm_alphaK_n
         @:ALLOCATE(gm_alphaL_n(1:num_dims))
         @:ALLOCATE(gm_alphaR_n(1:num_dims))
-        ! ==================================================================
 
-        ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
+        ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
         @:ALLOCATE(flux_n(1:num_dims))
         @:ALLOCATE(flux_src_n(1:num_dims))
         @:ALLOCATE(flux_gsrc_n(1:num_dims))
@@ -562,7 +555,7 @@ contains
             end if
         end do
 
-        ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
+        ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
 
         if (alt_soundspeed) then
             @:ALLOCATE(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, 0:n, 0:p))
@@ -626,7 +619,7 @@ contains
         call nvtxStartRange("COMPUTE-RHS")
 
         call cpu_time(t_start)
-        ! Association/Population of Working Variables ======================
+        ! Association/Population of Working Variables
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
             do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -638,9 +631,7 @@ contains
             end do
         end do
 
-        ! ==================================================================
-
-        ! Converting Conservative to Primitive Variables ==================
+        ! Converting Conservative to Primitive Variables
 
         if (mpp_lim .and. bubbles_euler) then
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -684,8 +675,6 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        ! ==================================================================
-
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, mv, rhs_mv, idwbuff(1), idwbuff(2), idwbuff(3), nbub)
 
         if (viscous) then
@@ -707,11 +696,11 @@ contains
             call s_get_capilary(q_prim_qp%vf)
             call nvtxEndRange
         end if
-        ! Dimensional Splitting Loop =======================================
+        ! Dimensional Splitting Loop
 
         do id = 1, num_dims
 
-            ! Reconstructing Primitive/Conservative Variables ===============
+            ! Reconstructing Primitive/Conservative Variables
 
             call nvtxStartRange("RHS-WENO")
 
@@ -775,7 +764,7 @@ contains
 
             call nvtxEndRange ! WENO
 
-            ! Configuring Coordinate Direction Indexes ======================
+            ! Configuring Coordinate Direction Indexes
             if (id == 1) then
                 irx%beg = -1; iry%beg = 0; irz%beg = 0
             elseif (id == 2) then
@@ -784,11 +773,10 @@ contains
                 irx%beg = 0; iry%beg = 0; irz%beg = -1
             end if
             irx%end = m; iry%end = n; irz%end = p
-            ! ===============================================================
 
             call nvtxStartRange("RHS-RIEMANN-SOLVER")
 
-            ! Computing Riemann Solver Flux and Source Flux =================
+            ! Computing Riemann Solver Flux and Source Flux
             call nvtxStartRange("RHS_riemann_solver")
             call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                   dqR_prim_dx_n(id)%vf, &
@@ -807,8 +795,7 @@ contains
                                   id, irx, iry, irz)
             call nvtxEndRange
 
-            ! ===============================================================
-            ! Additional physics and source terms ===========================
+            ! Additional physics and source terms
             ! RHS addition for advection source
             call nvtxStartRange("RHS-ADVECTION-SRC")
             call s_compute_advection_source_term(id, &
@@ -860,10 +847,10 @@ contains
                                         rhs_mv)
                 call nvtxEndRange
             end if
-            ! END: Additional physics and source terms =========================
+            ! END: Additional physics and source terms
 
         end do
-        ! END: Dimensional Splitting Loop =================================
+        ! END: Dimensional Splitting Loop
 
         if (ib) then
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -880,7 +867,7 @@ contains
             end do
         end if
 
-        ! Additional Physics and Source Temrs ==================================
+        ! Additional Physics and Source Temrs
         ! Additions for acoustic_source
         if (acoustic_source) then
             call nvtxStartRange("RHS-ACOUSTIC-SRC")
@@ -908,7 +895,7 @@ contains
             call nvtxEndRange
         end if
 
-        ! END: Additional pphysics and source terms ============================
+        ! END: Additional pphysics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -930,7 +917,6 @@ contains
         else
             time_avg = 0._wp
         end if
-        ! ==================================================================
 
         call nvtxEndRange
 
@@ -1078,7 +1064,7 @@ contains
             end if
 
         elseif (idir == 2) then
-            ! RHS Contribution in y-direction ===============================
+            ! RHS Contribution in y-direction
             ! Applying the Riemann fluxes
 
             if (bc_y%beg <= -5 .and. bc_y%beg >= -13) then
@@ -1251,7 +1237,7 @@ contains
             end if
 
         elseif (idir == 3) then
-            ! RHS Contribution in z-direction ===============================
+            ! RHS Contribution in z-direction
 
             ! Applying the Riemann fluxes
 
@@ -1786,7 +1772,7 @@ contains
                         end do
                     end if
 
-                    ! Pressures relaxation procedure ===================================
+                    ! Pressures relaxation procedure
 
                     ! Is the pressure relaxation procedure necessary?
                     relax = 1
@@ -1869,9 +1855,7 @@ contains
                         end do
                     end if
 
-                    ! ==================================================================
-
-                    ! Mixture-total-energy correction ==================================
+                    ! Mixture-total-energy correction
 
                     ! The mixture-total-energy correction of the mixture pressure P is not necessary here
                     ! because the primitive variables are directly recovered later on by the conservative
@@ -1969,7 +1953,6 @@ contains
                             q_cons_vf(i + advxb - 1)%sf(j, k, l)* &
                             (gammas(i)*pres_relax + pi_infs(i))
                     end do
-                    ! ==================================================================
                 end do
             end do
         end do
@@ -1996,7 +1979,7 @@ contains
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
-        ! Reconstruction in s1-direction ===================================
+        ! Reconstruction in s1-direction
 
         if (norm_dir == 1) then
             is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)
@@ -2036,7 +2019,6 @@ contains
                         is1, is2, is3)
         end if
 
-        ! ==================================================================
     end subroutine s_reconstruct_cell_boundary_values
 
     subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
@@ -2050,7 +2032,7 @@ contains
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
-        ! Reconstruction in s1-direction ===================================
+        ! Reconstruction in s1-direction
 
         if (norm_dir == 1) then
             is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)

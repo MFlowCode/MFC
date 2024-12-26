@@ -10,7 +10,6 @@
 
 module m_derived_variables
 
-    ! Dependencies =============================================================
     use m_derived_types         !< Definitions of the derived types
 
     use m_global_parameters     !< Global parameters for the code
@@ -18,7 +17,6 @@ module m_derived_variables
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
     use m_variables_conversion
-    ! ==========================================================================
 
     implicit none
 
@@ -591,7 +589,7 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
 
-        ! Computing Gradient Magnitude of Density ==========================
+        ! Computing Gradient Magnitude of Density
 
         ! Contributions from the x- and y-coordinate directions
         do l = -offset_z%beg, p + offset_z%end
@@ -644,8 +642,6 @@ contains
         ! complete the desired calculation.
         gm_rho_sf = sqrt(gm_rho_sf)
 
-        ! ==================================================================
-
         ! Determining the local maximum of the gradient magnitude of density
         ! and bookkeeping the result, along with rank of the local processor
         gm_rho_max = (/maxval(gm_rho_sf), real(proc_rank, wp)/)
@@ -656,7 +652,7 @@ contains
         ! the processor on which it has occurred to be recorded.
         if (num_procs > 1) call s_mpi_reduce_maxloc(gm_rho_max)
 
-        ! Computing Numerical Schlieren Function ===========================
+        ! Computing Numerical Schlieren Function
 
         ! The form of the numerical Schlieren function depends on the choice
         ! of the multicomponent flow model. For the gamma/pi_inf model, the
@@ -691,8 +687,6 @@ contains
         ! Schlieren function has been evaluated and stored. Then, to finish
         ! the computation, the exponential of the inside quantity is taken.
         q_sf = exp(q_sf)
-
-        ! ==================================================================
 
     end subroutine s_derive_numerical_schlieren_function
 

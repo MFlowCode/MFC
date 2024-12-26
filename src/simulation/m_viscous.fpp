@@ -6,7 +6,6 @@
 !> @brief The module contains the subroutines used to compute viscous terms.
 module m_viscous
 
-    ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -16,7 +15,6 @@ module m_viscous
     use m_helper
 
     use m_finite_differences
-    ! ==========================================================================
 
     private; public s_get_viscous, &
  s_compute_viscous_stress_tensor, &
@@ -978,7 +976,7 @@ contains
 
         integer :: i, j, k, l
 
-        ! Reconstruction in s1-direction ===================================
+        ! Reconstruction in s1-direction
 
         if (norm_dir == 1) then
             is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
@@ -1059,8 +1057,6 @@ contains
                 end if
             end if
         end if
-
-        ! ==================================================================
 
     end subroutine s_reconstruct_cell_boundary_values_visc
 
@@ -1077,7 +1073,7 @@ contains
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
-        ! Reconstruction in s1-direction ===================================
+        ! Reconstruction in s1-direction
 
         if (norm_dir == 1) then
             is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
@@ -1160,7 +1156,6 @@ contains
                 end if
             end if
         end if
-        ! ==================================================================
 
     end subroutine s_reconstruct_cell_boundary_values_visc_deriv
 
@@ -1202,7 +1197,7 @@ contains
 
         !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
 
-        ! First-Order Spatial Derivatives in x-direction ===================
+        ! First-Order Spatial Derivatives in x-direction
         if (norm_dir == 1) then
 
             ! A general application of the scalar divergence theorem that
@@ -1228,9 +1223,9 @@ contains
                 end do
             end do
 
-            ! END: First-Order Spatial Derivatives in x-direction ==============
+            ! END: First-Order Spatial Derivatives in x-direction
 
-            ! First-Order Spatial Derivatives in y-direction ===================
+            ! First-Order Spatial Derivatives in y-direction
         elseif (norm_dir == 2) then
 
             ! A general application of the scalar divergence theorem that
@@ -1256,9 +1251,9 @@ contains
                 end do
             end do
 
-            ! END: First-Order Spatial Derivatives in y-direction ==============
+            ! END: First-Order Spatial Derivatives in y-direction
 
-            ! First-Order Spatial Derivatives in z-direction ===================
+            ! First-Order Spatial Derivatives in z-direction
         else
 
             ! A general application of the scalar divergence theorem that
@@ -1285,7 +1280,7 @@ contains
             end do
 
         end if
-        ! END: First-Order Spatial Derivatives in z-direction ==============
+        ! END: First-Order Spatial Derivatives in z-direction
 
     end subroutine s_apply_scalar_divergence_theorem
 

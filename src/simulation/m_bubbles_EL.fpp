@@ -7,8 +7,6 @@
 !> @brief This module is used to to compute the volume-averaged bubble model
 module m_bubbles_EL
 
-    ! Dependencies =============================================================
-
     use m_global_parameters             !< Definitions of the global parameters
 
     use m_mpi_proxy                     !< Message passing interface (MPI) module proxy
@@ -26,8 +24,6 @@ module m_bubbles_EL
     use m_sim_helpers
 
     use m_helper
-
-    ! ==========================================================================
 
     implicit none
 

@@ -7,8 +7,6 @@
 !> @brief This module is used to compute the ensemble-averaged bubble dynamic variables
 module m_bubbles_EE
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -18,8 +16,6 @@ module m_bubbles_EE
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_bubbles              !< General bubble dynamics procedures
-
-    ! ==========================================================================
 
     implicit none
 
