@@ -118,7 +118,7 @@ contains
 ! search for rows isolating an eigenvalue and push them down
 80      if (l == 1) go to 280
         l = l - 1
-! for j=l step -1 until 1 do 
+! for j=l step -1 until 1 do
 100     do 120 jj = 1, l
             j = l + 1 - jj
 
@@ -388,22 +388,22 @@ contains
             do 130 j = i, igh
                 sr = 0.0_wp
                 si = 0.0_wp
- 
+
                 do 115 k = i, igh
                     sr = sr + ortr(k)*zr(k, j) + orti(k)*zi(k, j)
                     si = si + ortr(k)*zi(k, j) - orti(k)*zr(k, j)
 115             end do
- 
+
                 sr = sr/norm
                 si = si/norm
- 
+
                 do 120 k = i, igh
                     zr(k, j) = zr(k, j) + sr*ortr(k) - si*orti(k)
                     zi(k, j) = zi(k, j) + sr*orti(k) + si*ortr(k)
 120             end do
- 
+
 130         end do
- 
+
 140     end do
 !     create real subdiagonal elements
 150     l = low + 1
@@ -416,19 +416,19 @@ contains
             yi = hi(i, i - 1)/norm
             hr(i, i - 1) = norm
             hi(i, i - 1) = 0.0_wp
- 
+
             do 155 j = i, nl
                 si = yr*hi(i, j) - yi*hr(i, j)
                 hr(i, j) = yr*hr(i, j) + yi*hi(i, j)
                 hi(i, j) = si
 155         end do
- 
+
             do 160 j = 1, ll
                 si = yr*hi(j, i) + yi*hr(j, i)
                 hr(j, i) = yr*hr(j, i) - yi*hi(j, i)
                 hi(j, i) = si
 160         end do
- 
+
             do 165 j = low, igh
                 si = yr*zi(j, i) + yi*zr(j, i)
                 zr(j, i) = yr*zr(j, i) - yi*zi(j, i)
@@ -482,19 +482,19 @@ contains
 !     form exceptional shift
 320     sr = abs(hr(en, enm1)) + abs(hr(enm1, en - 2))
         si = 0.0_wp
- 
+
 340     do 360 i = low, en
             hr(i, i) = hr(i, i) - sr
             hi(i, i) = hi(i, i) - si
 360     end do
- 
+
         tr = tr + sr
         ti = ti + si
         its = its + 1
         itn = itn - 1
 !     reduce to triangle (rows)
         lp1 = l + 1
- 
+
         do 500 i = lp1, en
             sr = hr(i, i - 1)
             hr(i, i - 1) = 0.0_wp
@@ -507,7 +507,7 @@ contains
             hr(i - 1, i - 1) = norm
             hi(i - 1, i - 1) = 0.0_wp
             hi(i, i - 1) = sr/norm
- 
+
             do 490 j = i, nl
                 yr = hr(i - 1, j)
                 yi = hi(i - 1, j)
@@ -518,9 +518,9 @@ contains
                 hr(i, j) = xr*zzr - xi*zzi - hi(i, i - 1)*yr
                 hi(i, j) = xr*zzi + xi*zzr - hi(i, i - 1)*yi
 490         end do
- 
+
 500     end do
- 
+
         si = hi(en, en)
         if (abs(si) == 0._wp) go to 540
         call pythag(hr(en, en), si, norm)
@@ -530,7 +530,7 @@ contains
         hi(en, en) = 0.0_wp
         if (en == nl) go to 540
         ip1 = en + 1
- 
+
         do 520 j = ip1, nl
             yr = hr(en, j)
             yi = hi(en, j)
@@ -541,7 +541,7 @@ contains
 540     do 600 j = lp1, en
             xr = wr(j - 1)
             xi = wi(j - 1)
- 
+
             do 580 i = 1, j
                 yr = hr(i, j - 1)
                 yi = 0.0_wp
@@ -554,7 +554,7 @@ contains
                 hr(i, j) = xr*zzr + xi*zzi - hi(j, j - 1)*yr
                 hi(i, j) = xr*zzi - xi*zzr - hi(j, j - 1)*yi
 580         end do
- 
+
             do 590 i = low, igh
                 yr = zr(i, j - 1)
                 yi = zi(i, j - 1)
@@ -566,23 +566,23 @@ contains
                 zi(i, j) = xr*zzi - xi*zzr - hi(j, j - 1)*yi
 590         end do
 600     end do
- 
+
         if (abs(si) == 0._wp) go to 240
- 
+
         do 630 i = 1, en
             yr = hr(i, en)
             yi = hi(i, en)
             hr(i, en) = sr*yr - si*yi
             hi(i, en) = sr*yi + si*yr
 630     end do
- 
+
         do 640 i = low, igh
             yr = zr(i, en)
             yi = zi(i, en)
             zr(i, en) = sr*yr - si*yi
             zi(i, en) = sr*yi + si*yr
 640     end do
- 
+
         go to 240
 !     a root found
 660     hr(en, en) = hr(en, en) + tr
@@ -668,7 +668,7 @@ contains
             do i = low, igh
                 zzr = 0.0_wp
                 zzi = 0.0_wp
- 
+
                 do 860 k = low, ml
                     zzr = zzr + zr(i, k)*hr(k, j) - zi(i, k)*hi(k, j)
                     zzi = zzi + zr(i, k)*hi(k, j) + zi(i, k)*hr(k, j)
