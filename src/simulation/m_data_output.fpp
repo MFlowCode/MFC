@@ -363,18 +363,18 @@ contains
             end if
 
             if (icfl_max_glb /= icfl_max_glb) then
-                call s_mpi_abort('ICFL is NaN. Exiting ...')
+                call s_mpi_abort('ICFL is NaN. Exiting.')
             elseif (icfl_max_glb > 1._wp) then
                 print *, 'icfl', icfl_max_glb
-                call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
+                call s_mpi_abort('ICFL is greater than 1.0. Exiting.')
             end if
 
             if (viscous) then
                 if (vcfl_max_glb /= vcfl_max_glb) then
-                    call s_mpi_abort('VCFL is NaN. Exiting ...')
+                    call s_mpi_abort('VCFL is NaN. Exiting.')
                 elseif (vcfl_max_glb > 1._wp) then
                     print *, 'vcfl', vcfl_max_glb
-                    call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')
+                    call s_mpi_abort('VCFL is greater than 1.0. Exiting.')
                 end if
             end if
         end if

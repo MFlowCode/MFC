@@ -141,7 +141,7 @@ contains
             (/rho_wrt, E_wrt, pres_wrt, gamma_wrt, heat_ratio_wrt, pi_inf_wrt, &
               pres_inf_wrt, cons_vars_wrt, prim_vars_wrt, c_wrt, schlieren_wrt/), &
             alpha_rho_wrt, mom_wrt, vel_wrt, flux_wrt, alpha_wrt, omega_wrt]), &
-            "None of the flow variables have been selected for post-process. Exiting ...")
+            "None of the flow variables have been selected for post-process. Exiting.")
     end subroutine s_check_inputs_no_flow_variables
 
 end module m_checker

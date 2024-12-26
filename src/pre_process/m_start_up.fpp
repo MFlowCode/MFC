@@ -157,7 +157,7 @@ contains
                 read (1, fmt='(A)') line
                 print *, 'Invalid line in namelist: '//trim(line)
                 call s_mpi_abort('Invalid line in pre_process.inp. It is '// &
-                                 'likely due to a datatype mismatch. Exiting ...')
+                                 'likely due to a datatype mismatch. Exiting.')
             end if
             close (1)
             ! Store m,n,p into global m,n,p
@@ -170,7 +170,7 @@ contains
             if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
 
         else
-            call s_mpi_abort('File pre_process.inp is missing. Exiting ...')
+            call s_mpi_abort('File pre_process.inp is missing. Exiting.')
         end if
 
     end subroutine s_read_input_file
@@ -198,7 +198,7 @@ contains
             print '(A)', 'WARNING: Ensure that compiler flags/choices in Makefiles match your compiler! '
             print '(A)', 'WARNING: Ensure that preprocessor flags are enabled! '
             call s_mpi_abort('Unsupported choice for the value of case_dir.'// &
-                             'Exiting ...')
+                             'Exiting.')
         end if
 
         call s_check_inputs_common()
@@ -240,7 +240,7 @@ contains
         ! If the time-step directory is missing, the pre-process exits
         if (dir_check .neqv. .true.) then
             call s_mpi_abort('Time-step folder '//trim(t_step_dir)// &
-                             ' is missing. Exiting ...')
+                             ' is missing. Exiting.')
         end if
 
         ! Reading the Grid Data File for the x-direction
@@ -257,7 +257,7 @@ contains
             close (1)
         else
             call s_mpi_abort('File x_cb.dat is missing in '// &
-                             trim(t_step_dir)//'. Exiting ...')
+                             trim(t_step_dir)//'. Exiting.')
         end if
 
         ! Computing cell-center locations
@@ -287,7 +287,7 @@ contains
                 close (1)
             else
                 call s_mpi_abort('File y_cb.dat is missing in '// &
-                                 trim(t_step_dir)//'. Exiting ...')
+                                 trim(t_step_dir)//'. Exiting.')
             end if
 
             ! Computing cell-center locations
@@ -316,7 +316,7 @@ contains
                     close (1)
                 else
                     call s_mpi_abort('File z_cb.dat is missing in '// &
-                                     trim(t_step_dir)//'. Exiting ...')
+                                     trim(t_step_dir)//'. Exiting.')
                 end if
 
                 ! Computing cell-center locations
@@ -357,7 +357,7 @@ contains
 
         if (any(x_cb(0:m) - x_cb(-1:m - 1) <= 0._wp)) then
             call s_mpi_abort('x_cb.dat in '//trim(t_step_dir)// &
-                             ' contains non-positive cell-spacings. Exiting ...')
+                             ' contains non-positive cell-spacings. Exiting.')
         end if
 
         ! Cell-boundary Data Consistency Check in y-direction
@@ -367,7 +367,7 @@ contains
             if (any(y_cb(0:n) - y_cb(-1:n - 1) <= 0._wp)) then
                 call s_mpi_abort('y_cb.dat in '//trim(t_step_dir)// &
                                  ' contains non-positive cell-spacings. '// &
-                                 'Exiting ...')
+                                 'Exiting.')
             end if
 
             ! Cell-boundary Data Consistency Check in z-direction
@@ -377,7 +377,7 @@ contains
                 if (any(z_cb(0:p) - z_cb(-1:p - 1) <= 0._wp)) then
                     call s_mpi_abort('z_cb.dat in '//trim(t_step_dir)// &
                                      ' contains non-positive cell-spacings'// &
-                                     ' .Exiting ...')
+                                     ' .Exiting.')
                 end if
 
             end if
@@ -434,7 +434,7 @@ contains
             else
                 call s_mpi_abort('File q_cons_vf'//trim(file_num)// &
                                  '.dat is missing in '//trim(t_step_dir)// &
-                                 '. Exiting ...')
+                                 '. Exiting.')
             end if
 
         end do
@@ -459,7 +459,7 @@ contains
                     else
                         call s_mpi_abort('File pb'//trim(file_num)// &
                                          '.dat is missing in '//trim(t_step_dir)// &
-                                         '. Exiting ...')
+                                         '. Exiting.')
                     end if
                 end do
 
@@ -483,7 +483,7 @@ contains
                     else
                         call s_mpi_abort('File mv'//trim(file_num)// &
                                          '.dat is missing in '//trim(t_step_dir)// &
-                                         '. Exiting ...')
+                                         '. Exiting.')
                     end if
                 end do
 
@@ -505,7 +505,7 @@ contains
             else
                 call s_mpi_abort('File ib.dat is missing in ' &
                                  //trim(t_step_dir)// &
-                                 '. Exiting ...')
+                                 '. Exiting.')
             end if
         end if
 
@@ -549,7 +549,7 @@ contains
             call MPI_FILE_READ_ALL(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
-            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting... ')
+            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting. ')
         end if
 
         ! Assigning local cell boundary locations
@@ -574,7 +574,7 @@ contains
                 call MPI_FILE_READ_ALL(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             else
-                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting... ')
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting. ')
             end if
 
             ! Assigning local cell boundary locations
@@ -599,7 +599,7 @@ contains
                     call MPI_FILE_READ_ALL(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
-                    call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting... ')
+                    call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting. ')
                 end if
 
                 ! Assigning local cell boundary locations
@@ -715,7 +715,7 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
 
         else
-            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting... ')
+            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting. ')
         end if
 
         if (ib) then
@@ -736,7 +736,7 @@ contains
                                    MPI_INTEGER, status, ierr)
 
             else
-                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
 
         end if

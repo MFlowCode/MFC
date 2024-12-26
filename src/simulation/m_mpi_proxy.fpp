@@ -465,7 +465,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     call s_mpi_abort('Unsupported combination of values '// &
                                      'of num_procs, m, n, p and '// &
-                                     'weno_order. Exiting ...')
+                                     'weno_order. Exiting.')
                 end if
 
                 ! Creating new communicator using the Cartesian topology
@@ -566,7 +566,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     call s_mpi_abort('Unsupported combination of values '// &
                                      'of num_procs, m, n and '// &
-                                     'weno_order. Exiting ...')
+                                     'weno_order. Exiting.')
                 end if
 
                 ! Creating new communicator using the Cartesian topology

@@ -102,7 +102,7 @@ contains
                 read (1, fmt='(A)') line
                 print *, 'Invalid line in namelist: '//trim(line)
                 call s_mpi_abort('Invalid line in post_process.inp. It is '// &
-                                 'likely due to a datatype mismatch. Exiting ...')
+                                 'likely due to a datatype mismatch. Exiting.')
             end if
 
             close (1)
@@ -116,7 +116,7 @@ contains
             if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
 
         else
-            call s_mpi_abort('File post_process.inp is missing. Exiting ...')
+            call s_mpi_abort('File post_process.inp is missing. Exiting.')
         end if
 
     end subroutine s_read_input_file
@@ -143,7 +143,7 @@ contains
         ! Constraint on the location of the case directory
         if (dir_check .neqv. .true.) then
             call s_mpi_abort('Unsupported choice for the value of '// &
-                             'case_dir. Exiting ...')
+                             'case_dir. Exiting.')
         end if
 
         call s_check_inputs_common()
