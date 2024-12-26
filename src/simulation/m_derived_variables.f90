@@ -9,7 +9,6 @@
 !!              sound, vorticity and the numerical Schlieren function.
 module m_derived_variables
 
-    ! Dependencies =============================================================
     use m_derived_types         !< Definitions of the derived types
 
     use m_global_parameters     !< Global parameters for the code
@@ -25,8 +24,6 @@ module m_derived_variables
     use m_helper
 
     use m_finite_differences
-
-    ! ==========================================================================
 
     implicit none
 
@@ -457,7 +454,7 @@ contains
             end do
         end if
 
-    end subroutine s_derive_center_of_mass ! ----------------------------------
+    end subroutine s_derive_center_of_mass
 
     !> Deallocation procedures for the module
     subroutine s_finalize_derived_variables_module

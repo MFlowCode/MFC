@@ -11,7 +11,6 @@
 !!              the mixture variables and the subroutines used to compute pressure.
 module m_variables_conversion
 
-    ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -25,8 +24,6 @@ module m_variables_conversion
     use m_thermochem, only: &
         num_species, get_temperature, get_pressure, gas_constant, &
         get_mixture_molecular_weight, get_mixture_energy_mass
-
-    ! ==========================================================================
 
     implicit none
 
@@ -1058,7 +1055,7 @@ contains
 
         !print *, 'I got here AA'
 
-    end subroutine s_convert_conservative_to_primitive_variables ! ---------
+    end subroutine s_convert_conservative_to_primitive_variables
 
     !>  The following procedure handles the conversion between
         !!      the primitive variables and the conservative variables.
@@ -1380,7 +1377,7 @@ contains
 #endif
     end subroutine s_convert_primitive_to_flux_variables
 
-    subroutine s_finalize_variables_conversion_module() ! ------------------
+    subroutine s_finalize_variables_conversion_module()
 
         integer :: i !< Generic loop iterators
 

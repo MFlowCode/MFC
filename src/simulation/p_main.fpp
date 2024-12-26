@@ -14,8 +14,6 @@
 !!              are only available in the volume fraction model.
 program p_main
 
-    ! Dependencies =============================================================
-
     use m_global_parameters    !< Definitions of the global parameters
 
     use m_start_up
@@ -23,7 +21,6 @@ program p_main
     use m_time_steppers
 
     use m_nvtx
-    ! ==========================================================================
 
     implicit none
 
@@ -74,7 +71,7 @@ program p_main
     call nvtxEndRange ! INIT
 
     call nvtxStartRange("SIMULATION-TIME-MARCH")
-    ! Time-stepping Loop =======================================================
+    ! Time-stepping Loop
     do
 
         if (cfl_dt) then
@@ -106,7 +103,6 @@ program p_main
 
         call system_clock(cpu_end)
     end do
-    ! ==========================================================================
 
     call nvtxEndRange ! Simulation
 

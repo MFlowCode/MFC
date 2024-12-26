@@ -7,15 +7,11 @@
 !> @brief This module is used to compute source terms for hypoelastic model
 module m_hypoelastic
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_finite_differences
     use m_helper
-    ! ==========================================================================
+    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     implicit none
 
@@ -338,7 +334,7 @@ contains
 
     end subroutine s_compute_hypoelastic_rhs
 
-    subroutine s_finalize_hypoelastic_module() ! --------------------
+    subroutine s_finalize_hypoelastic_module()
 
         @:DEALLOCATE(Gs)
         @:DEALLOCATE(rho_K_field, G_K_field)

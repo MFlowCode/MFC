@@ -13,7 +13,6 @@
 !!              and cell Reynolds (Rc) numbers.
 module m_data_output
 
-    !  Dependencies ============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -31,7 +30,6 @@ module m_data_output
     use m_delay_file_access
 
     use m_ibm
-    ! ==========================================================================
 
     implicit none
 
@@ -171,7 +169,8 @@ contains
 
     !>  This opens a formatted data file where the root processor
         !!      can write out the CoM information
-    subroutine s_open_com_files() ! ----------------------------------------
+    subroutine s_open_com_files()
+
         character(len=path_len + 3*name_len) :: file_path !<
             !! Relative path to the CoM file in the case directory
         integer :: i !< Generic loop iterator
@@ -205,7 +204,7 @@ contains
                     '=== Total Volume ==='
             end if
         end do
-    end subroutine s_open_com_files ! --------------------------------------
+    end subroutine s_open_com_files
 
     !>  This opens a formatted data file where the root processor
         !!      can write out flow probe information
@@ -276,7 +275,7 @@ contains
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         integer :: j, k, l
 
-        ! Computing Stability Criteria at Current Time-step ================
+        ! Computing Stability Criteria at Current Time-step
         !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
         do l = 0, p
             do k = 0, n
@@ -296,7 +295,7 @@ contains
         end do
         !$acc end parallel loop
 
-        ! end: Computing Stability Criteria at Current Time-step ===========
+        ! end: Computing Stability Criteria at Current Time-step
 
         ! Determining local stability criteria extrema at current time-step
 
@@ -990,7 +989,7 @@ contains
     !!  @param t_step Current time-step
     !!  @param q_com Center of mass information
     !!  @param moments Higher moment information
-    subroutine s_write_com_files(t_step, c_mass) ! -------------------
+    subroutine s_write_com_files(t_step, c_mass)
 
         integer, intent(in) :: t_step
         real(wp), dimension(num_fluids, 5), intent(in) :: c_mass
@@ -1035,7 +1034,7 @@ contains
             end if
         end if
 
-    end subroutine s_write_com_files ! -------------------------------------
+    end subroutine s_write_com_files
 
     !>  This writes a formatted data file for the flow probe information
         !!  @param t_step Current time-step
@@ -1689,9 +1688,10 @@ contains
     subroutine s_close_run_time_information_file
 
         real(wp) :: run_time !< Run-time of the simulation
+
         ! Writing the footer of and closing the run-time information file
-        write (3, '(A)') '----------------------------------------'// &
-            '----------------------------------------'
+        write (3, '(A)') '---'// &
+            '---'
         write (3, '(A)') ''
 
         write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
@@ -1702,21 +1702,21 @@ contains
 
         write (3, '(A)') ''
         write (3, '(A,I0,A)') 'Run-time: ', int(anint(run_time)), 's'
-        write (3, '(A)') '========================================'// &
-            '========================================'
+        write (3, '(A)') '===='// &
+            '==='
         close (3)
 
     end subroutine s_close_run_time_information_file
 
     !> Closes communication files
-    subroutine s_close_com_files() ! ---------------------------------------
+    subroutine s_close_com_files()
 
         integer :: i !< Generic loop iterator
         do i = 1, num_fluids
             close (i + 120)
         end do
 
-    end subroutine s_close_com_files ! -------------------------------------
+    end subroutine s_close_com_files
 
     !> Closes probe files
     subroutine s_close_probe_files

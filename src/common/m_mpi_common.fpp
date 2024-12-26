@@ -8,7 +8,6 @@
 !!          goals for the simulation.
 module m_mpi_common
 
-    ! Dependencies =============================================================
 #ifdef MFC_MPI
     use mpi                    !< Message passing interface (MPI) module
 #endif
@@ -16,7 +15,6 @@ module m_mpi_common
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
-    ! ==========================================================================
 
     implicit none
 

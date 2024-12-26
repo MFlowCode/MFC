@@ -4,8 +4,6 @@
 !> @brief This module is used to compute source terms for surface tension model
 module m_surface_tension
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -19,7 +17,6 @@ module m_surface_tension
     use m_helper
 
     use m_boundary_conditions
-    ! ==========================================================================
 
     implicit none
 
@@ -314,7 +311,7 @@ contains
 
         integer :: i, j, k, l
 
-        ! Reconstruction in s1-direction ===================================
+        ! Reconstruction in s1-direction
 
         if (norm_dir == 1) then
             is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)

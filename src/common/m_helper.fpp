@@ -5,8 +5,6 @@
 
 module m_helper
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -14,8 +12,6 @@ module m_helper
     use m_mpi_common           !< MPI modules
 
     use ieee_arithmetic        !< For checking NaN
-
-    ! ==========================================================================
 
     implicit none
 
