@@ -42,3 +42,6 @@ jobs:
       run: |
         ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
 
+    - name: Looking for junk comments in examples
+      run: |
+        ! grep -R '# ===' ./examples/**/*.py
