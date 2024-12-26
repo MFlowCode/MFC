@@ -1,12 +1,10 @@
 module m_sim_helpers
 
-    ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters
 
     use m_variables_conversion
-    ! ==========================================================================
 
     implicit none
 

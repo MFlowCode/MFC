@@ -24,7 +24,6 @@
 
 module m_riemann_solvers
 
-    ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -46,7 +45,6 @@ module m_riemann_solvers
         get_mixture_specific_heat_cv_mass, get_mixture_energy_mass, &
         get_species_specific_heats_r, get_species_enthalpies_rt, &
         get_mixture_specific_heat_cp_mass
-    ! ==========================================================================
 
     implicit none
 
@@ -212,7 +210,7 @@ contains
         !! For more information please refer to:
         !!      1) s_compute_cartesian_viscous_source_flux
         !!      2) s_compute_cylindrical_viscous_source_flux
-    subroutine s_compute_viscous_source_flux(velL_vf, & ! -------------
+    subroutine s_compute_viscous_source_flux(velL_vf, &
                                              dvelL_dx_vf, &
                                              dvelL_dy_vf, &
                                              dvelL_dz_vf, &
@@ -240,7 +238,7 @@ contains
         type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         if (grid_geometry == 3) then
-            call s_compute_cylindrical_viscous_source_flux(velL_vf, & ! -------------
+            call s_compute_cylindrical_viscous_source_flux(velL_vf, &
                                                            dvelL_dx_vf, &
                                                            dvelL_dy_vf, &
                                                            dvelL_dz_vf, &
@@ -252,7 +250,7 @@ contains
                                                            norm_dir, &
                                                            ix, iy, iz)
         else
-            call s_compute_cartesian_viscous_source_flux(velL_vf, & ! -------------
+            call s_compute_cartesian_viscous_source_flux(velL_vf, &
                                                          dvelL_dx_vf, &
                                                          dvelL_dy_vf, &
                                                          dvelL_dz_vf, &
@@ -266,7 +264,7 @@ contains
         end if
     end subroutine s_compute_viscous_source_flux
 
-    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! -------
+    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                     dqL_prim_dy_vf, &
                                     dqL_prim_dz_vf, &
                                     qL_prim_vf, &
@@ -2921,7 +2919,7 @@ contains
         !$acc update device(isx, isy, isz) ! for stuff in the same module
         !$acc update device(dir_idx, dir_flg,  dir_idx_tau) ! for stuff in different modules
 
-        ! Population of Buffers in x-direction =============================
+        ! Population of Buffers in x-direction
         if (norm_dir == 1) then
 
             if (bc_x%beg == -4) then    ! Riemann state extrap. BC at beginning
@@ -3033,9 +3031,9 @@ contains
                 end if
 
             end if
-            ! END: Population of Buffers in x-direction ========================
+            ! END: Population of Buffers in x-direction
 
-            ! Population of Buffers in y-direction =============================
+            ! Population of Buffers in y-direction
         elseif (norm_dir == 2) then
 
             if (bc_y%beg == -4) then    ! Riemann state extrap. BC at beginning
@@ -3136,9 +3134,9 @@ contains
                 end if
 
             end if
-            ! END: Population of Buffers in y-direction ========================
+            ! END: Population of Buffers in y-direction
 
-            ! Population of Buffers in z-direction =============================
+            ! Population of Buffers in z-direction
         else
 
             if (bc_z%beg == -4) then    ! Riemann state extrap. BC at beginning
@@ -3231,7 +3229,7 @@ contains
             end if
 
         end if
-        ! END: Population of Buffers in z-direction ========================
+        ! END: Population of Buffers in z-direction
 
     end subroutine s_populate_riemann_states_variables_buffers
 
@@ -3267,7 +3265,7 @@ contains
 
         integer :: i, j, k, l ! Generic loop iterators
 
-        ! Reshaping Inputted Data in x-direction ===========================
+        ! Reshaping Inputted Data in x-direction
 
         if (norm_dir == 1) then
 
@@ -3299,9 +3297,7 @@ contains
                 end do
             end if
 
-            ! ==================================================================
-
-            ! Reshaping Inputted Data in y-direction ===========================
+            ! Reshaping Inputted Data in y-direction
         elseif (norm_dir == 2) then
 
             if (viscous .or. (surface_tension)) then
@@ -3330,9 +3326,7 @@ contains
                 end do
             end if
 
-            ! ==================================================================
-
-            ! Reshaping Inputted Data in z-direction ===========================
+            ! Reshaping Inputted Data in z-direction
         else
 
             if (viscous .or. (surface_tension)) then
@@ -3362,8 +3356,6 @@ contains
             end if
 
         end if
-
-        ! ==================================================================
 
     end subroutine s_initialize_riemann_solver
 
@@ -3424,7 +3416,7 @@ contains
         ! Generic loop iterators
         integer :: i, j, k, l
 
-        ! Viscous Stresses in z-direction ==================================
+        ! Viscous Stresses in z-direction
         if (norm_dir == 1) then
             if (shear_stress) then ! Shear stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, tau_Re)
@@ -3620,9 +3612,9 @@ contains
                     end do
                 end do
             end if
-            ! END: Viscous Stresses in z-direction =============================
+            ! END: Viscous Stresses in z-direction
 
-            ! Viscous Stresses in r-direction ==================================
+            ! Viscous Stresses in r-direction
         elseif (norm_dir == 2) then
 
             if (shear_stress) then ! Shear stresses
@@ -3780,9 +3772,9 @@ contains
                     end do
                 end do
             end if
-            ! END: Viscous Stresses in r-direction =============================
+            ! END: Viscous Stresses in r-direction
 
-            ! Viscous Stresses in theta-direction ==================================
+            ! Viscous Stresses in theta-direction
         else
 
             if (shear_stress) then              ! Shear stresses
@@ -3890,7 +3882,7 @@ contains
             end if
 
         end if
-        ! END: Viscous Stresses in theta-direction =============================
+        ! END: Viscous Stresses in theta-direction
 
     end subroutine s_compute_cylindrical_viscous_source_flux
 
@@ -3947,7 +3939,7 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
 
-        ! Viscous Stresses in x-direction ==================================
+        ! Viscous Stresses in x-direction
         if (norm_dir == 1) then
 
             if (shear_stress) then              ! Shear stresses
@@ -4138,9 +4130,9 @@ contains
                     end do
                 end do
             end if
-            ! END: Viscous Stresses in x-direction =============================
+            ! END: Viscous Stresses in x-direction
 
-            ! Viscous Stresses in y-direction ==================================
+            ! Viscous Stresses in y-direction
         elseif (norm_dir == 2) then
 
             if (shear_stress) then              ! Shear stresses
@@ -4285,9 +4277,9 @@ contains
                     end do
                 end do
             end if
-            ! END: Viscous Stresses in y-direction =============================
+            ! END: Viscous Stresses in y-direction
 
-            ! Viscous Stresses in z-direction ==================================
+            ! Viscous Stresses in z-direction
         else
 
             if (shear_stress) then              ! Shear stresses
@@ -4382,7 +4374,7 @@ contains
             end if
 
         end if
-        ! END: Viscous Stresses in z-direction =============================
+        ! END: Viscous Stresses in z-direction
 
     end subroutine s_compute_cartesian_viscous_source_flux
 
@@ -4408,7 +4400,7 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
 
-        ! Reshaping Outputted Data in y-direction ==========================
+        ! Reshaping Outputted Data in y-direction
         if (norm_dir == 2) then
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
@@ -4460,8 +4452,7 @@ contains
                 end do
 
             end if
-            ! ==================================================================
-            ! Reshaping Outputted Data in z-direction ==========================
+            ! Reshaping Outputted Data in z-direction
         elseif (norm_dir == 3) then
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
@@ -4551,10 +4542,6 @@ contains
                 end do
             end if
         end if
-
-        ! ==================================================================
-
-        ! ==================================================================
 
     end subroutine s_finalize_riemann_solver
 

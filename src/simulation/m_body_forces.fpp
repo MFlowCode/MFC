@@ -2,8 +2,6 @@
 
 module m_body_forces
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -15,7 +13,6 @@ module m_body_forces
 #ifdef MFC_OpenACC
     use openacc
 #endif
-    ! ==========================================================================
 
     implicit none
 

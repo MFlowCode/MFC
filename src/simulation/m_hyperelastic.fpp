@@ -9,8 +9,6 @@
 
 module m_hyperelastic
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -18,8 +16,6 @@ module m_hyperelastic
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_finite_differences
-
-    ! ==========================================================================
 
     implicit none
 

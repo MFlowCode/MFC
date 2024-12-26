@@ -6,7 +6,6 @@
 !! boundary condiitons
 module m_boundary_conditions
 
-    ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -14,7 +13,6 @@ module m_boundary_conditions
     use m_mpi_proxy
 
     use m_constants
-    ! ==========================================================================
 
     implicit none
 
@@ -34,7 +32,7 @@ contains
 
         integer :: bc_loc, bc_dir
 
-        ! Population of Buffers in x-direction =============================
+        ! Population of Buffers in x-direction
 
         select case (bc_x%beg)
         case (-13:-3) ! Ghost-cell extrap. BC at beginning
@@ -88,9 +86,9 @@ contains
             end select
         end if
 
-        ! END: Population of Buffers in x-direction ========================
+        ! END: Population of Buffers in x-direction
 
-        ! Population of Buffers in y-direction =============================
+        ! Population of Buffers in y-direction
 
         if (n == 0) return
 
@@ -150,9 +148,9 @@ contains
 
         end if
 
-        ! END: Population of Buffers in y-direction ========================
+        ! END: Population of Buffers in y-direction
 
-        ! Population of Buffers in z-direction =============================
+        ! Population of Buffers in z-direction
 
         if (p == 0) return
 
@@ -210,7 +208,7 @@ contains
 
         end if
 
-        ! END: Population of Buffers in z-direction ========================
+        ! END: Population of Buffers in z-direction
 
     end subroutine s_populate_variables_buffers
 
@@ -221,7 +219,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer :: j, k, l, q, i
 
-        !< x-direction =========================================================
+        !< x-direction
         if (bc_dir == 1) then !< x-direction
 
             if (bc_loc == -1) then !bc_x%beg
@@ -254,7 +252,7 @@ contains
 
             end if
 
-            !< y-direction =========================================================
+            !< y-direction
         elseif (bc_dir == 2) then !< y-direction
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -287,7 +285,7 @@ contains
 
             end if
 
-            !< z-direction =========================================================
+            !< z-direction
         elseif (bc_dir == 3) then !< z-direction
 
             if (bc_loc == -1) then !< bc_z%beg
@@ -321,7 +319,6 @@ contains
             end if
 
         end if
-        !< =====================================================================
 
     end subroutine s_ghost_cell_extrapolation
 
@@ -333,7 +330,7 @@ contains
 
         integer :: j, k, l, q, i
 
-        !< x-direction =========================================================
+        !< x-direction
         if (bc_dir == 1) then
 
             if (bc_loc == -1) then !< bc_x%beg
@@ -435,7 +432,7 @@ contains
 
             end if
 
-            !< y-direction =========================================================
+            !< y-direction
         elseif (bc_dir == 2) then
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -534,7 +531,7 @@ contains
 
             end if
 
-            !< z-direction =========================================================
+            !< z-direction
         elseif (bc_dir == 3) then
 
             if (bc_loc == -1) then !< bc_z%beg
@@ -634,7 +631,6 @@ contains
             end if
 
         end if
-        !< =====================================================================
 
     end subroutine s_symmetry
 
@@ -646,7 +642,7 @@ contains
 
         integer :: j, k, l, q, i
 
-        !< x-direction =========================================================
+        !< x-direction
         if (bc_dir == 1) then
 
             if (bc_loc == -1) then !< bc_x%beg
@@ -715,7 +711,7 @@ contains
 
             end if
 
-            !< y-direction =========================================================
+            !< y-direction
         elseif (bc_dir == 2) then
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -784,7 +780,7 @@ contains
 
             end if
 
-            !< z-direction =========================================================
+            !< z-direction
         elseif (bc_dir == 3) then
 
             if (bc_loc == -1) then !< bc_z%beg
@@ -854,7 +850,6 @@ contains
             end if
 
         end if
-        !< =====================================================================
 
     end subroutine s_periodic
 
@@ -939,7 +934,7 @@ contains
 
         integer :: j, k, l, q, i
 
-        !< x-direction =========================================================
+        !< x-direction
         if (bc_dir == 1) then
 
             if (bc_loc == -1) then !< bc_x%beg
@@ -982,7 +977,7 @@ contains
 
             end if
 
-            !< y-direction =========================================================
+            !< y-direction
         elseif (bc_dir == 2) then
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -1025,7 +1020,7 @@ contains
 
             end if
 
-            !< z-direction =========================================================
+            !< z-direction
         elseif (bc_dir == 3) then
 
             if (bc_loc == -1) then !< bc_z%beg
@@ -1069,7 +1064,6 @@ contains
             end if
 
         end if
-        !< =====================================================================
 
     end subroutine s_slip_wall
 
@@ -1081,7 +1075,7 @@ contains
 
         integer :: j, k, l, q, i
 
-        !< x-direction =========================================================
+        !< x-direction
         if (bc_dir == 1) then
 
             if (bc_loc == -1) then !< bc_x%beg
@@ -1136,7 +1130,7 @@ contains
 
             end if
 
-            !< y-direction =========================================================
+            !< y-direction
         elseif (bc_dir == 2) then
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -1191,7 +1185,7 @@ contains
 
             end if
 
-            !< z-direction =========================================================
+            !< z-direction
         elseif (bc_dir == 3) then
 
             if (bc_loc == -1) then !< bc_z%beg
@@ -1247,7 +1241,6 @@ contains
             end if
 
         end if
-        !< =====================================================================
 
     end subroutine s_no_slip_wall
 
@@ -1258,7 +1251,7 @@ contains
 
         integer :: j, k, l, q, i
 
-        !< x-direction =========================================================
+        !< x-direction
         if (bc_dir == 1) then
 
             if (bc_loc == -1) then !< bc_x%beg
@@ -1299,7 +1292,7 @@ contains
 
             end if
 
-            !< y-direction =========================================================
+            !< y-direction
         elseif (bc_dir == 2) then
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -1340,7 +1333,7 @@ contains
 
             end if
 
-            !< z-direction =========================================================
+            !< z-direction
         elseif (bc_dir == 3) then
 
             if (bc_loc == -1) then !< bc_z%beg
