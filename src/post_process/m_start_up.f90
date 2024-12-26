@@ -307,7 +307,7 @@ contains
             end if
         end do
 
-        ! Adding the species' concentrations to the formatted database file ----
+        ! Adding the species' concentrations to the formatted database file
         if (chemistry) then
             do i = 1, num_species
                 if (chem_wrt_Y(i) .or. prim_vars_wrt) then
