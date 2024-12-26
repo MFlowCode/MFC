@@ -7,15 +7,11 @@
 !> @brief This module is used to compute source terms for hypoelastic model
 module m_hypoelastic
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-
-    ! ==========================================================================
 
     implicit none
 

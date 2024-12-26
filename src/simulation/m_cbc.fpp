@@ -22,7 +22,6 @@
 
 module m_cbc
 
-    ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -30,7 +29,6 @@ module m_cbc
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_compute_cbc
-    ! ==========================================================================
 
     implicit none
 
@@ -72,7 +70,7 @@ module m_cbc
 
     real(wp), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
 
-    ! CBC Coefficients =========================================================
+    ! CBC Coefficients 
 
     real(wp), allocatable, dimension(:, :) :: fd_coef_x !< Finite diff. coefficients x-dir
     real(wp), allocatable, dimension(:, :) :: fd_coef_y !< Finite diff. coefficients y-dir
@@ -91,8 +89,6 @@ module m_cbc
     !! The first dimension of the array identifies the polynomial, the
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the location of the CBC.
-
-    ! ==========================================================================
 
     type(int_bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
     !$acc declare create(is1, is2, is3)
@@ -266,7 +262,7 @@ contains
         ! Allocating the cell-width distribution in the s-direction
         @:ALLOCATE(ds(0:buff_size))
 
-        ! Allocating/Computing CBC Coefficients in x-direction =============
+        ! Allocating/Computing CBC Coefficients in x-direction 
         if (all((/bc_x%beg, bc_x%end/) <= -5) .and. all((/bc_x%beg, bc_x%end/) >= -13)) then
 
             @:ALLOCATE(fd_coef_x(0:buff_size, -1:1))
@@ -299,9 +295,8 @@ contains
             call s_compute_cbc_coefficients(1, 1)
 
         end if
-        ! ==================================================================
 
-        ! Allocating/Computing CBC Coefficients in y-direction =============
+        ! Allocating/Computing CBC Coefficients in y-direction
         if (n > 0) then
 
             if (all((/bc_y%beg, bc_y%end/) <= -5) .and. all((/bc_y%beg, bc_y%end/) >= -13)) then
@@ -338,9 +333,8 @@ contains
             end if
 
         end if
-        ! ==================================================================
 
-        ! Allocating/Computing CBC Coefficients in z-direction =============
+        ! Allocating/Computing CBC Coefficients in z-direction
         if (p > 0) then
 
             if (all((/bc_z%beg, bc_z%end/) <= -5) .and. all((/bc_z%beg, bc_z%end/) >= -13)) then
@@ -377,7 +371,6 @@ contains
             end if
 
         end if
-        ! ==================================================================
 
         !$acc update device(fd_coef_x, fd_coef_y, fd_coef_z, pi_coef_x, pi_coef_y, pi_coef_z)
 
@@ -463,7 +456,7 @@ contains
             s_cb(i + 1) = s_cb(i) + ds(i)
         end do
 
-        ! Computing CBC1 Coefficients ======================================
+        ! Computing CBC1 Coefficients
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir_in == ${CBC_DIR}$) then
                 if (weno_order == 1) then
@@ -472,9 +465,7 @@ contains
                     fd_coef_${XYZ}$ (0, cbc_loc_in) = -2._wp/(ds(0) + ds(1))
                     fd_coef_${XYZ}$ (1, cbc_loc_in) = -fd_coef_${XYZ}$ (0, cbc_loc_in)
 
-                    ! ==================================================================
-
-                    ! Computing CBC2 Coefficients ======================================
+                    ! Computing CBC2 Coefficients
                 elseif (weno_order == 3) then
 
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
@@ -484,9 +475,7 @@ contains
 
                     pi_coef_${XYZ}$ (0, 0, cbc_loc_in) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
 
-                    ! ==================================================================
-
-                    ! Computing CBC4 Coefficients ======================================
+                    ! Computing CBC4 Coefficients
                 else
 
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
@@ -535,7 +524,7 @@ contains
             end if
         #:endfor
 
-        ! END: Computing CBC4 Coefficients =================================
+        ! END: Computing CBC4 Coefficients
 
         ! Nullifying CBC coefficients
 
@@ -553,7 +542,7 @@ contains
 
         integer :: i !< Generic loop iterator
 
-        ! Associating CBC Coefficients in x-direction ======================
+        ! Associating CBC Coefficients in x-direction
         if (cbc_dir_in == 1) then
 
             !fd_coef => fd_coef_x; if (weno_order > 1) pi_coef => pi_coef_x
@@ -567,9 +556,8 @@ contains
                     ds(i) = dx(m - i)
                 end do
             end if
-            ! ==================================================================
 
-            ! Associating CBC Coefficients in y-direction ======================
+            ! Associating CBC Coefficients in y-direction
         elseif (cbc_dir_in == 2) then
 
             !fd_coef => fd_coef_y; if (weno_order > 1) pi_coef => pi_coef_y
@@ -583,9 +571,8 @@ contains
                     ds(i) = dy(n - i)
                 end do
             end if
-            ! ==================================================================
 
-            ! Associating CBC Coefficients in z-direction ======================
+            ! Associating CBC Coefficients in z-direction
         else
 
             !fd_coef => fd_coef_z; if (weno_order > 1) pi_coef => pi_coef_z
@@ -603,8 +590,6 @@ contains
         end if
 
         !$acc update device(ds)
-
-        ! ==================================================================
 
     end subroutine s_associate_cbc_coefficients_pointers
 
@@ -690,7 +675,7 @@ contains
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir == ${CBC_DIR}$) then
 
-                ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2 ==================
+                ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
                 if (weno_order == 3) then
 
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
@@ -721,9 +706,8 @@ contains
                             end do
                         end do
                     end do
-                    ! ==================================================================
 
-                    ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2 =============
+                    ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2 
                 else
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
@@ -771,14 +755,13 @@ contains
                     end do
 
                 end if
-                ! ==================================================================
 
-                ! FD2 or FD4 of RHS at j = 0 =======================================
+                ! FD2 or FD4 of RHS at j = 0 
                 !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
 
-                        ! Transferring the Primitive Variables =======================
+                        ! Transferring the Primitive Variables 
                         !$acc loop seq
                         do i = 1, contxe
                             alpha_rho(i) = q_prim_rs${XYZ}$_vf(0, k, r, i)
@@ -818,9 +801,8 @@ contains
 
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, 0._wp, c)
-                        ! ============================================================
 
-                        ! First-Order Spatial Derivatives of Primitive Variables =====
+                        ! First-Order Spatial Derivatives of Primitive Variables 
 
                         !$acc loop seq
                         do i = 1, contxe
@@ -864,9 +846,8 @@ contains
                                              dadv_ds(i)
                             end do
                         end do
-                        ! ============================================================
 
-                        ! First-Order Temporal Derivatives of Primitive Variables ====
+                        ! First-Order Temporal Derivatives of Primitive Variables
                         lambda(1) = vel(dir_idx(1)) - c
                         lambda(2) = vel(dir_idx(1))
                         lambda(3) = vel(dir_idx(1)) + c
@@ -974,9 +955,8 @@ contains
                                 dqv_dt = dqv_dt + dalpha_rho_dt(i)*qvs(i)
                             end do
                         end if
-                        ! ============================================================
 
-                        ! flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2 ==================
+                        ! flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2
                         !$acc loop seq
                         do i = 1, contxe
                             flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) &
@@ -1029,14 +1009,14 @@ contains
                             end do
 
                         end if
-                        ! END: flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2 =============
+                        ! END: flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2
 
                     end do
                 end do
             end if
         #:endfor
 
-        ! END: FD2 or FD4 of RHS at j = 0 ==================================
+        ! END: FD2 or FD4 of RHS at j = 0
 
         ! The reshaping of outputted data and disssociation of the FD and PI
         ! coefficients, or CBC coefficients, respectively, based on selected
@@ -1074,7 +1054,7 @@ contains
 
         ! Determining the indicial shift based on CBC location
 
-        ! END: Allocation/Association of Primitive and Flux Variables ======
+        ! END: Allocation/Association of Primitive and Flux Variables
 
         if (cbc_dir == 1) then
             is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = iz
@@ -1091,7 +1071,7 @@ contains
         !$acc update device(is1, is2, is3, dj)
         !$acc update device( dir_idx, dir_flg)
 
-        ! Reshaping Inputted Data in x-direction ===========================
+        ! Reshaping Inputted Data in x-direction
         if (cbc_dir == 1) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -1165,9 +1145,9 @@ contains
                 end do
             end if
 
-            ! END: Reshaping Inputted Data in x-direction ======================
+            ! END: Reshaping Inputted Data in x-direction
 
-            ! Reshaping Inputted Data in y-direction ===========================
+            ! Reshaping Inputted Data in y-direction
         elseif (cbc_dir == 2) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -1241,9 +1221,9 @@ contains
                 end do
             end if
 
-            ! END: Reshaping Inputted Data in y-direction ======================
+            ! END: Reshaping Inputted Data in y-direction
 
-            ! Reshaping Inputted Data in z-direction ===========================
+            ! Reshaping Inputted Data in z-direction
         else
 
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -1318,14 +1298,10 @@ contains
             end if
 
         end if
-        ! END: Reshaping Inputted Data in z-direction ======================
+        ! END: Reshaping Inputted Data in z-direction
 
         ! Association of the procedural pointer to the appropriate procedure
         ! that will be utilized in the evaluation of L variables for the CBC
-
-        ! ==================================================================
-
-        ! ==================================================================
 
     end subroutine s_initialize_cbc
 
@@ -1351,7 +1327,7 @@ contains
         dj = max(0, cbc_loc)
         !$acc update device(dj)
 
-        ! Reshaping Outputted Data in x-direction ==========================
+        ! Reshaping Outputted Data in x-direction
         if (cbc_dir == 1) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -1400,9 +1376,9 @@ contains
                     end do
                 end do
             end if
-            ! END: Reshaping Outputted Data in x-direction =====================
+            ! END: Reshaping Outputted Data in x-direction
 
-            ! Reshaping Outputted Data in y-direction ==========================
+            ! Reshaping Outputted Data in y-direction
         elseif (cbc_dir == 2) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -1453,9 +1429,9 @@ contains
                 end do
             end if
 
-            ! END: Reshaping Outputted Data in y-direction =====================
+            ! END: Reshaping Outputted Data in y-direction
 
-            ! Reshaping Outputted Data in z-direction ==========================
+            ! Reshaping Outputted Data in z-direction
         else
 
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -1507,13 +1483,7 @@ contains
             end if
 
         end if
-        ! END: Reshaping Outputted Data in z-direction =====================
-
-        ! Deallocation/Disassociation of Primitive and Flux Variables ======
-
-        ! ==================================================================
-
-        ! Nullifying procedural pointer used in evaluation of L for the CBC
+        ! END: Reshaping Outputted Data in z-direction
 
     end subroutine s_finalize_cbc
 
@@ -1569,16 +1539,15 @@ contains
         ! Deallocating GRCBC inputs
         @:DEALLOCATE(vel_in, vel_out, pres_in, pres_out, Del_in, Del_out, alpha_rho_in, alpha_in)
 
-        ! Deallocating CBC Coefficients in x-direction =====================
+        ! Deallocating CBC Coefficients in x-direction
         if (any((/bc_x%beg, bc_x%end/) <= -5) .and. any((/bc_x%beg, bc_x%end/) >= -13)) then
             @:DEALLOCATE(fd_coef_x)
             if (weno_order > 1) then
                 @:DEALLOCATE(pi_coef_x)
             end if
         end if
-        ! ==================================================================
 
-        ! Deallocating CBC Coefficients in y-direction =====================
+        ! Deallocating CBC Coefficients in y-direction
         if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5) .and. &
             any((/bc_y%beg, bc_y%end/) >= -13 .and. bc_y%beg /= -14)) then
             @:DEALLOCATE(fd_coef_y)
@@ -1586,19 +1555,14 @@ contains
                 @:DEALLOCATE(pi_coef_y)
             end if
         end if
-        ! ==================================================================
 
-        ! Deallocating CBC Coefficients in z-direction =====================
+        ! Deallocating CBC Coefficients in z-direction
         if (p > 0 .and. any((/bc_z%beg, bc_z%end/) <= -5) .and. any((/bc_z%beg, bc_z%end/) >= -13)) then
             @:DEALLOCATE(fd_coef_z)
             if (weno_order > 1) then
                 @:DEALLOCATE(pi_coef_z)
             end if
         end if
-        ! ==================================================================
-
-        ! Disassociating the pointer to the procedure that was utilized to
-        ! to convert mixture or species variables to the mixture variables
 
     end subroutine s_finalize_cbc_module
 

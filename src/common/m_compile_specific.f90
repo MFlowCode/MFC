@@ -5,11 +5,10 @@
 !> @brief This module contains subroutines that are compiler specific
 module m_compile_specific
 
-    ! Dependencies =============================================================
+    ! Dependencies
     use m_mpi_proxy
 
     implicit none
-    ! ==========================================================================
 
 contains
 

@@ -123,7 +123,7 @@ contains
 
         end if
 
-    end subroutine s_compute_finite_difference_coefficients ! --------------
+    end subroutine s_compute_finite_difference_coefficients
 
 end module m_finite_differences
 

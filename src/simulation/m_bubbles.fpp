@@ -7,8 +7,6 @@
 !> @brief This module contains the procedures shared by the ensemble-averaged and volume-averaged bubble models.
 module m_bubbles
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -16,8 +14,6 @@ module m_bubbles
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     use m_variables_conversion !< State variables type conversion procedures
-
-    ! ==========================================================================
 
     implicit none
 

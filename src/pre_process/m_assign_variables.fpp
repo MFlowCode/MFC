@@ -6,7 +6,6 @@
 
 module m_assign_variables
 
-    ! Dependencies =============================================================
     use m_derived_types         ! Definitions of the derived types
 
     use m_global_parameters     ! Global parameters for the code
@@ -16,9 +15,6 @@ module m_assign_variables
     use m_helper_basic          !< Functions to compare floating point numbers
 
     use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight
-
-    ! one form to another
-    ! ==========================================================================
 
     implicit none
 
@@ -355,7 +351,7 @@ contains
             orig_gamma, &
             orig_pi_inf, orig_qv)
 
-        ! Computing Mixture Variables of Current Patch =====================
+        ! Computing Mixture Variables of Current Patch
 
         ! Volume fraction(s)
         do i = adv_idx%beg, adv_idx%end
@@ -391,9 +387,8 @@ contains
             patch_icpp(patch_id)%pi_inf, &
             patch_icpp(patch_id)%qv)
 
-        ! ==================================================================
 
-        ! Computing Mixture Variables of Smoothing Patch ===================
+        ! Computing Mixture Variables of Smoothing Patch
 
         if (model_eqns /= 4) then
             ! Partial densities
@@ -470,8 +465,6 @@ contains
             patch_icpp(smooth_patch_id)%gamma, &
             patch_icpp(smooth_patch_id)%pi_inf, &
             patch_icpp(smooth_patch_id)%qv)
-
-        ! ==================================================================
 
         ! Pressure
         q_prim_vf(E_idx)%sf(j, k, l) = &

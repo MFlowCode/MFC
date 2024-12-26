@@ -6,7 +6,6 @@
 !!              initial mean flow fields.
 module m_perturbation
 
-    ! Dependencies =============================================================
     use m_derived_types         ! Definitions of the derived types
 
     use m_global_parameters     ! Global parameters for the code
@@ -17,8 +16,6 @@ module m_perturbation
     ! complex general matrix
 
     use ieee_arithmetic
-
-    ! ==========================================================================
 
     implicit none
 
@@ -174,7 +171,7 @@ contains
             end do
         end do
 
-    end subroutine s_superposition_instability_wave ! ----------------------
+    end subroutine s_superposition_instability_wave
 
     !>  This subroutine computes equilibrium bubble radius of the perturbed pressure field
     subroutine s_compute_equilibrium_state(fP, fR0, fR)

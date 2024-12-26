@@ -8,7 +8,6 @@
 !!                initial condition procedures.
 module m_start_up
 
-    ! Dependencies =============================================================
     use m_derived_types         !< Definitions of the derived types
 
     use m_global_parameters     !< Global parameters for the code
@@ -50,7 +49,6 @@ module m_start_up
     use m_checker_common
 
     use m_checker
-    ! ==========================================================================
 
     implicit none
 
@@ -70,7 +68,7 @@ module m_start_up
               s_apply_initial_condition, &
               s_save_data, s_read_grid
 
-    abstract interface ! ===================================================
+    abstract interface
 
         subroutine s_read_abstract_grid_data_files
 
@@ -91,7 +89,7 @@ module m_start_up
 
         end subroutine s_read_abstract_ic_data_files
 
-    end interface ! ========================================================
+    end interface
 
     character(LEN=path_len + name_len) :: proc_rank_dir !<
     !! Location of the folder associated with the rank of the local processor
@@ -245,7 +243,7 @@ contains
                              ' is missing. Exiting ...')
         end if
 
-        ! Reading the Grid Data File for the x-direction ===================
+        ! Reading the Grid Data File for the x-direction
 
         ! Checking whether x_cb.dat exists
         file_loc = trim(t_step_dir)//'/x_cb.dat'
@@ -273,9 +271,7 @@ contains
         x_domain%beg = x_cb(-1)
         x_domain%end = x_cb(m)
 
-        ! ==================================================================
-
-        ! Reading the Grid Data File for the y-direction ===================
+        ! Reading the Grid Data File for the y-direction
 
         if (n > 0) then
 
@@ -305,10 +301,7 @@ contains
             y_domain%beg = y_cb(-1)
             y_domain%end = y_cb(n)
 
-            ! ==================================================================
-
-            ! Reading the Grid Data File for the z-direction ===================
-
+            ! Reading the Grid Data File for the z-direction
             if (p > 0) then
 
                 ! Checking whether z_cb.dat exists
@@ -341,8 +334,6 @@ contains
 
         end if
 
-        ! ==================================================================
-
         ! If only the preexisting grid data files are read in and there will
         ! not be any preexisting initial condition data files imported, then
         ! the directory associated with the rank of the local processor may
@@ -362,16 +353,14 @@ contains
         !!      the cell-widths are positively valued
     subroutine s_check_grid_data_files
 
-        ! Cell-boundary Data Consistency Check in x-direction ==============
+        ! Cell-boundary Data Consistency Check in x-direction
 
         if (any(x_cb(0:m) - x_cb(-1:m - 1) <= 0._wp)) then
             call s_mpi_abort('x_cb.dat in '//trim(t_step_dir)// &
                              ' contains non-positive cell-spacings. Exiting ...')
         end if
 
-        ! ==================================================================
-
-        ! Cell-boundary Data Consistency Check in y-direction ==============
+        ! Cell-boundary Data Consistency Check in y-direction
 
         if (n > 0) then
 
@@ -381,9 +370,7 @@ contains
                                  'Exiting ...')
             end if
 
-            ! ==================================================================
-
-            ! Cell-boundary Data Consistency Check in z-direction ==============
+            ! Cell-boundary Data Consistency Check in z-direction
 
             if (p > 0) then
 
@@ -396,8 +383,6 @@ contains
             end if
 
         end if
-
-        ! ==================================================================
 
     end subroutine s_check_grid_data_files
 
@@ -430,7 +415,7 @@ contains
 
         integer :: i, r !< Generic loop iterator
 
-        ! Reading the Conservative Variables Data Files ====================
+        ! Reading the Conservative Variables Data Files
         do i = 1, sys_size
 
             ! Checking whether data file associated with variable position
@@ -523,8 +508,6 @@ contains
                                  '. Exiting ...')
             end if
         end if
-
-        ! ==================================================================
 
         ! Since the preexisting grid and initial condition data files have
         ! been read in, the directory associated with the rank of the local

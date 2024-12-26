@@ -9,7 +9,6 @@
 !!              and the stiffened equation of state.
 module m_global_parameters
 
-    ! Dependencies =============================================================
 #ifdef MFC_MPI
     use mpi                     ! Message passing interface (MPI) module
 #endif
@@ -20,22 +19,20 @@ module m_global_parameters
 
     use m_thermochem, only: num_species
 
-    ! ==========================================================================
 
     implicit none
 
-    ! Logistics ================================================================
+    ! Logistics
     integer :: num_procs            !< Number of processors
     character(LEN=path_len) :: case_dir             !< Case folder location
     logical :: old_grid             !< Use existing grid data
     logical :: old_ic, non_axis_sym               !< Use existing IC data
     integer :: t_step_old, t_step_start           !< Existing IC/grid folder
-    ! ==========================================================================
 
     logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
     integer :: n_start, n_start_old
 
-    ! Computational Domain Parameters ==========================================
+    ! Computational Domain Parameters
 
     integer :: proc_rank !< Rank of the local processor
 
@@ -77,9 +74,7 @@ module m_global_parameters
     real(wp) :: x_a, y_a, z_a
     real(wp) :: x_b, y_b, z_b
 
-    ! ==========================================================================
-
-    ! Simulation Algorithm Parameters ==========================================
+    ! Simulation Algorithm Parameters
     integer :: model_eqns            !< Multicomponent flow model
     logical :: relax                 !< activate phase change
     integer :: relax_model           !< Relax Model
@@ -165,9 +160,8 @@ module m_global_parameters
 #endif
 
     integer, private :: ierr
-    ! ==========================================================================
 
-    ! Initial Condition Parameters =============================================
+    ! Initial Condition Parameters
     integer :: num_patches     !< Number of patches composing initial condition
 
     type(ic_patch_parameters), dimension(num_patches_max) :: patch_icpp !<
@@ -175,15 +169,12 @@ module m_global_parameters
     !! patches employed in the configuration of the initial condition. Note that
     !! the maximum allowable number of patches, num_patches_max, may be changed
     !! in the module m_derived_types.f90.
-    ! ==========================================================================
 
-    ! Fluids Physical Parameters ===============================================
+    ! Fluids Physical Parameters
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
     !! Database of the physical parameters of each of the fluids that is present
     !! in the flow. These include the stiffened gas equation of state parameters,
     !! the Reynolds numbers and the Weber numbers.
-
-    ! ==========================================================================
 
     real(wp) :: rhoref, pref !< Reference parameters for Tait EOS
 
@@ -213,7 +204,6 @@ module m_global_parameters
     !! patches employed in the configuration of the initial condition. Note that
     !! the maximum allowable number of patches, num_patches_max, may be changed
     !! in the module m_derived_types.f90.
-    ! ==========================================================================
 
     !> @}
 
@@ -512,7 +502,7 @@ contains
         ! the system of equations, given the dimensionality and choice of
         ! the equations of motion
 
-        ! Gamma/Pi_inf Model ===============================================
+        ! Gamma/Pi_inf Model
         if (model_eqns == 1) then
 
             ! Setting number of fluids
@@ -532,9 +522,7 @@ contains
             pi_inf_idx = adv_idx%end
             sys_size = adv_idx%end
 
-            ! ==================================================================
-
-            ! Volume Fraction Model (5-equation model) =========================
+            ! Volume Fraction Model (5-equation model)
         else if (model_eqns == 2) then
 
             ! Annotating structure of the state and flux vectors belonging
@@ -671,9 +659,7 @@ contains
                 sys_size = c_idx
             end if
 
-            ! ==================================================================
-
-            ! Volume Fraction Model (6-equation model) =========================
+            ! Volume Fraction Model (6-equation model)
         else if (model_eqns == 3) then
 
             ! Annotating structure of the state and flux vectors belonging
@@ -713,7 +699,6 @@ contains
                 sys_size = c_idx
             end if
 
-            !========================
         else if (model_eqns == 4) then
             ! 4 equation model with subgrid bubbles_euler
             cont_idx%beg = 1 ! one continuity equation
@@ -795,13 +780,12 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        ! Configuring Coordinate Direction Indexes =========================
+        ! Configuring Coordinate Direction Indexes
         idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
         idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
 
         ! There is no buffer region in pre_process.
         idwbuff(1) = idwint(1); idwbuff(2) = idwint(2); idwbuff(3) = idwint(3)
-        ! ==================================================================
 
 #ifdef MFC_MPI
 
