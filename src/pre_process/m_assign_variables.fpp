@@ -387,7 +387,6 @@ contains
             patch_icpp(patch_id)%pi_inf, &
             patch_icpp(patch_id)%qv)
 
-
         ! Computing Mixture Variables of Smoothing Patch
 
         if (model_eqns /= 4) then

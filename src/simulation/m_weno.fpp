@@ -30,7 +30,6 @@ module m_weno
 
     use m_mpi_proxy
 
-
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
     !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they
@@ -191,7 +190,6 @@ contains
 
         @:ALLOCATE(v_rs_ws_y(is2_weno%beg:is2_weno%end, &
             is1_weno%beg:is1_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
-
 
         ! Allocating/Computing WENO Coefficients in z-direction
         if (p == 0) return

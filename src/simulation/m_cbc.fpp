@@ -70,7 +70,7 @@ module m_cbc
 
     real(wp), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
 
-    ! CBC Coefficients 
+    ! CBC Coefficients
 
     real(wp), allocatable, dimension(:, :) :: fd_coef_x !< Finite diff. coefficients x-dir
     real(wp), allocatable, dimension(:, :) :: fd_coef_y !< Finite diff. coefficients y-dir
@@ -262,7 +262,7 @@ contains
         ! Allocating the cell-width distribution in the s-direction
         @:ALLOCATE(ds(0:buff_size))
 
-        ! Allocating/Computing CBC Coefficients in x-direction 
+        ! Allocating/Computing CBC Coefficients in x-direction
         if (all((/bc_x%beg, bc_x%end/) <= -5) .and. all((/bc_x%beg, bc_x%end/) >= -13)) then
 
             @:ALLOCATE(fd_coef_x(0:buff_size, -1:1))
@@ -707,7 +707,7 @@ contains
                         end do
                     end do
 
-                    ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2 
+                    ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
                 else
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
@@ -756,12 +756,12 @@ contains
 
                 end if
 
-                ! FD2 or FD4 of RHS at j = 0 
+                ! FD2 or FD4 of RHS at j = 0
                 !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
 
-                        ! Transferring the Primitive Variables 
+                        ! Transferring the Primitive Variables
                         !$acc loop seq
                         do i = 1, contxe
                             alpha_rho(i) = q_prim_rs${XYZ}$_vf(0, k, r, i)
@@ -802,7 +802,7 @@ contains
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, 0._wp, c)
 
-                        ! First-Order Spatial Derivatives of Primitive Variables 
+                        ! First-Order Spatial Derivatives of Primitive Variables
 
                         !$acc loop seq
                         do i = 1, contxe

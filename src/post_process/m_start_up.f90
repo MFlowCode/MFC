@@ -8,7 +8,7 @@
 !!              MPI decomposition and I/O procedures
 module m_start_up
 
-    ! Dependencies 
+    ! Dependencies
 
     use m_derived_types         !< Definitions of the derived types
 
@@ -271,7 +271,7 @@ contains
             end do
         end if
 
-        ! Adding the density to the formatted database file 
+        ! Adding the density to the formatted database file
         if (rho_wrt &
             .or. &
             (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
@@ -283,7 +283,7 @@ contains
 
         end if
 
-        ! Adding the momentum to the formatted database file 
+        ! Adding the momentum to the formatted database file
         do i = 1, E_idx - mom_idx%beg
             if (mom_wrt(i) .or. cons_vars_wrt) then
                 q_sf = q_cons_vf(i + cont_idx%end)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
@@ -295,7 +295,7 @@ contains
             end if
         end do
 
-        ! Adding the velocity to the formatted database file 
+        ! Adding the velocity to the formatted database file
         do i = 1, E_idx - mom_idx%beg
             if (vel_wrt(i) .or. prim_vars_wrt) then
                 q_sf = q_prim_vf(i + cont_idx%end)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
@@ -342,7 +342,7 @@ contains
             end if
         end do
 
-        ! Adding the energy to the formatted database file 
+        ! Adding the energy to the formatted database file
         if (E_wrt .or. cons_vars_wrt) then
             q_sf = q_cons_vf(E_idx)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
             write (varname, '(A)') 'E'
@@ -352,7 +352,7 @@ contains
 
         end if
 
-        ! Adding the elastic shear stresses to the formatted database file 
+        ! Adding the elastic shear stresses to the formatted database file
         if (elasticity) then
             do i = 1, stress_idx%end - stress_idx%beg + 1
                 if (prim_vars_wrt) then

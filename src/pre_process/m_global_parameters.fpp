@@ -19,7 +19,6 @@ module m_global_parameters
 
     use m_thermochem, only: num_species
 
-
     implicit none
 
     ! Logistics
