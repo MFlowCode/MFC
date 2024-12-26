@@ -1636,7 +1636,6 @@ contains
     subroutine s_finalize_modules
 
         call s_finalize_time_steppers_module()
-        if (hypoelasticity) call s_finalize_hypoelastic_module() 
         if (hyperelasticity) call s_finalize_hyperelastic_module() 
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()

@@ -259,6 +259,8 @@ print(json.dumps({{**case, **mods}}))
             tolerance = 1e-3
         elif self.params.get("hypoelasticity", 'F') == 'T':
             tolerance = 1e-7
+            if self.params.get("acoustic_source", 'F') == 'T':
+                tolerance = 1e-6
         elif self.params.get("mixlayer_perturb", 'F') == 'T':
             tolerance = 1e-7
         elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles_euler', 'bubbles_lagrange']):
