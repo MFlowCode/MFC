@@ -371,10 +371,7 @@ contains
         if (elasticity) then
             if (prim_vars_wrt) then
                 do i = 1, stress_idx%end - stress_idx%beg + 1
-                    q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf( &
-                           -offset_x%beg:m + offset_x%end, &
-                           -offset_y%beg:n + offset_y%end, &
-                           -offset_z%beg:p + offset_z%end)
+                    q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
                     write (varname, '(A,I0)') 'tau', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
 
@@ -385,20 +382,14 @@ contains
         if (hyperelasticity) then
             if (prim_vars_wrt) then
                 do i = 1, xiend - xibeg + 1
-                    q_sf = q_prim_vf(i - 1 + xibeg)%sf( &
-                           -offset_x%beg:m + offset_x%end, &
-                           -offset_y%beg:n + offset_y%end, &
-                           -offset_z%beg:p + offset_z%end)
+                    q_sf = q_prim_vf(i - 1 + xibeg)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
                     write (varname, '(A,I0)') 'xi', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
 
                     varname(:) = ' '
                 end do
 
-                q_sf = q_prim_vf(xiend + 1)%sf( &
-                       -offset_x%beg:m + offset_x%end, &
-                       -offset_y%beg:n + offset_y%end, &
-                       -offset_z%beg:p + offset_z%end)
+                q_sf = q_prim_vf(xiend + 1)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
 
                 write (varname, '(A,I0)') 'vonMises'
                 call s_write_variable_to_formatted_database_file(varname, t_step)
