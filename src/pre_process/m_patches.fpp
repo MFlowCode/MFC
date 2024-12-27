@@ -2014,7 +2014,7 @@ contains
         end if
 
         if (proc_rank == 0) then
-            print *, " * Transforming model..."
+            print *, " * Transforming model."
         end if
 
         transform = f_create_transform_matrix(params)
@@ -2044,7 +2044,7 @@ contains
         ! Interpolate the STL model along the edges (2D) and on triangle facets (3D)
         if (interpolate) then
             if (proc_rank == 0) then
-                print *, ' * Interpolating STL vertices...'
+                print *, ' * Interpolating STL vertices.'
             end if
 
             if (p > 0) then
@@ -2200,7 +2200,7 @@ contains
 
         if (proc_rank == 0) then
             print *, ""
-            print *, " * Cleaning up..."
+            print *, " * Cleaning up."
         end if
 
         call s_model_free(model)

@@ -60,7 +60,7 @@ contains
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('geometry 6 (formerly "Vortex")'// &
                                      'is no longer supported for patch '//trim(iStr)// &
-                                     '. Exiting ...')
+                                     '. Exiting.')
                 elseif (patch_icpp(i)%geometry == 7) then
                     call s_check_2D_analytical_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 8) then

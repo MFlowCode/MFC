@@ -252,7 +252,7 @@ contains
                     ! Unimplemented patch (formerly isentropic vortex)
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, '// &
-                                     'which no longer exists. See Examples. Exiting ...')
+                                     'which no longer exists. See Examples. Exiting.')
 
                     ! Analytical function patch for testing purposes
                 elseif (patch_icpp(i)%geometry == 7) then

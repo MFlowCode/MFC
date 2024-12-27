@@ -21,7 +21,7 @@ contains
             = (ProcessRank/N_PROCESSES_FILE_ACCESS)*FILE_ACCESS_DELAY_UNIT
 
         do iDelay = 1, nFileAccessDelayIterations
-            !-- wait my turn
+            ! Wait my turn
             call random_number(Number)
             Dummy = Number*Number
         end do

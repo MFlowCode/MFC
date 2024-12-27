@@ -25,6 +25,7 @@ dependencies = [
     "typos",
     "pylint",
     "fprettify",
+    "black",
 
     # Profiling
     "numpy",

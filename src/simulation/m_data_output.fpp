@@ -149,19 +149,19 @@ contains
         ! Generating table header for the stability criteria to be outputted
         if (cfl_dt) then
             if (viscous) then
-                write (1, '(A)') '==== Time-steps ====== dt ===== Time ======= ICFL '// &
-                    'Max ==== VCFL Max ====== Rc Min ======='
+                write (1, '(A)') '     Time-steps        dt     = Time         ICFL '// &
+                    'Max      VCFL Max        Rc Min       ='
             else
-                write (1, '(A)') '=========== Time-steps ============== dt ===== Time '// &
-                    '============== ICFL Max ============='
+                write (1, '(A)') '            Time-steps                dt       Time '// &
+                    '               ICFL Max              '
             end if
         else
             if (viscous) then
-                write (1, '(A)') '==== Time-steps ====== Time ======= ICFL '// &
-                    'Max ==== VCFL Max ====== Rc Min ======='
+                write (1, '(A)') '     Time-steps        Time         ICFL '// &
+                    'Max      VCFL Max        Rc Min        '
             else
-                write (1, '(A)') '=========== Time-steps ============== Time '// &
-                    '============== ICFL Max ============='
+                write (1, '(A)') '            Time-steps                Time '// &
+                    '               ICFL Max              '
             end if
         end if
 
@@ -174,6 +174,7 @@ contains
         character(len=path_len + 3*name_len) :: file_path !<
             !! Relative path to the CoM file in the case directory
         integer :: i !< Generic loop iterator
+
         do i = 1, num_fluids
             ! Generating the relative path to the CoM data file
             write (file_path, '(A,I0,A)') '/fluid', i, '_com.dat'
@@ -185,23 +186,23 @@ contains
                   position='append', &
                   status='unknown')
             if (n == 0) then
-                write (i + 120, '(A)') '=== Non-Dimensional Time '// &
-                    '=== Total Mass '// &
-                    '=== x-loc '// &
-                    '=== Total Volume ==='
+                write (i + 120, '(A)') '    Non-Dimensional Time '// &
+                    '    Total Mass '// &
+                    '    x-loc '// &
+                    '    Total Volume    '
             elseif (p == 0) then
-                write (i + 120, '(A)') '=== Non-Dimensional Time '// &
-                    '=== Total Mass '// &
-                    '=== x-loc '// &
-                    '=== y-loc '// &
-                    '=== Total Volume ==='
+                write (i + 120, '(A)') '    Non-Dimensional Time '// &
+                    '    Total Mass '// &
+                    '    x-loc '// &
+                    '    y-loc '// &
+                    '    Total Volume    '
             else
-                write (i + 120, '(A)') '=== Non-Dimensional Time '// &
-                    '=== Total Mass '// &
-                    '=== x-loc '// &
-                    '=== y-loc '// &
-                    '=== z-loc '// &
-                    '=== Total Volume ==='
+                write (i + 120, '(A)') '    Non-Dimensional Time '// &
+                    '    Total Mass '// &
+                    '    x-loc '// &
+                    '    y-loc '// &
+                    '    z-loc '// &
+                    '    Total Volume    '
             end if
         end do
     end subroutine s_open_com_files
@@ -362,18 +363,18 @@ contains
             end if
 
             if (icfl_max_glb /= icfl_max_glb) then
-                call s_mpi_abort('ICFL is NaN. Exiting ...')
+                call s_mpi_abort('ICFL is NaN. Exiting.')
             elseif (icfl_max_glb > 1._wp) then
                 print *, 'icfl', icfl_max_glb
-                call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
+                call s_mpi_abort('ICFL is greater than 1.0. Exiting.')
             end if
 
             if (viscous) then
                 if (vcfl_max_glb /= vcfl_max_glb) then
-                    call s_mpi_abort('VCFL is NaN. Exiting ...')
+                    call s_mpi_abort('VCFL is NaN. Exiting.')
                 elseif (vcfl_max_glb > 1._wp) then
                     print *, 'vcfl', vcfl_max_glb
-                    call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')
+                    call s_mpi_abort('VCFL is greater than 1.0. Exiting.')
                 end if
             end if
         end if
@@ -1690,8 +1691,7 @@ contains
         real(wp) :: run_time !< Run-time of the simulation
 
         ! Writing the footer of and closing the run-time information file
-        write (3, '(A)') '---'// &
-            '---'
+        write (3, '(A)') '    '
         write (3, '(A)') ''
 
         write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
@@ -1702,8 +1702,7 @@ contains
 
         write (3, '(A)') ''
         write (3, '(A,I0,A)') 'Run-time: ', int(anint(run_time)), 's'
-        write (3, '(A)') '===='// &
-            '==='
+        write (3, '(A)') '    '
         close (3)
 
     end subroutine s_close_run_time_information_file
