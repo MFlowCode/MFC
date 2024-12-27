@@ -1247,7 +1247,7 @@ contains
         if (proc_rank == 0) then
             call s_mpi_abort('Conversion from primitive to '// &
                              'conservative variables not '// &
-                             'implemented. Exiting ...')
+                             'implemented. Exiting.')
         end if
 #endif
     end subroutine s_convert_primitive_to_conservative_variables

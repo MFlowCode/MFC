@@ -503,7 +503,7 @@ contains
             if (dbfile == -1) then
                 call s_mpi_abort('Unable to create Silo-HDF5 database '// &
                                  'slave file '//trim(file_loc)//'. '// &
-                                 'Exiting ...')
+                                 'Exiting.')
             end if
 
             ! Next, analogous steps to the ones above are carried out by the
@@ -521,7 +521,7 @@ contains
                 if (dbroot == -1) then
                     call s_mpi_abort('Unable to create Silo-HDF5 database '// &
                                      'master file '//trim(file_loc)//'. '// &
-                                     'Exiting ...')
+                                     'Exiting.')
                 end if
 
             end if
@@ -545,7 +545,7 @@ contains
             ! is not the case, the post-process exits.
             if (err /= 0) then
                 call s_mpi_abort('Unable to create Binary database slave '// &
-                                 'file '//trim(file_loc)//'. Exiting ...')
+                                 'file '//trim(file_loc)//'. Exiting.')
             end if
 
             ! Further defining the structure of the formatted database slave
@@ -575,7 +575,7 @@ contains
                 if (err /= 0) then
                     call s_mpi_abort('Unable to create Binary database '// &
                                      'master file '//trim(file_loc)// &
-                                     '. Exiting ...')
+                                     '. Exiting.')
                 end if
 
                 if (output_partial_domain) then
@@ -622,7 +622,7 @@ contains
 
     end subroutine s_open_energy_data_file
 
-    subroutine s_open_kymo_data_file() 
+    subroutine s_open_kymo_data_file()
         ! Time-step that is currently being post-processed
 
         ! Relative path to a file in the case directory
@@ -639,9 +639,9 @@ contains
               POSITION='append', &
               STATUS='unknown')
 
-    end subroutine s_open_kymo_data_file 
+    end subroutine s_open_kymo_data_file
 
-    subroutine s_write_grid_to_formatted_database_file(t_step) 
+    subroutine s_write_grid_to_formatted_database_file(t_step)
         ! Description: The general objective of this subroutine is to write the
         !              necessary grid data to the formatted database file, for
         !              the current time-step, t_step. The local processor will
@@ -1146,7 +1146,7 @@ contains
                 close (9)
             end if
         else
-            print '(A)', trim(file_loc)//' is missing. Exiting ...'
+            print '(A)', trim(file_loc)//' is missing. Exiting.'
             call s_mpi_abort
         end if
 
@@ -1444,7 +1444,7 @@ contains
 
     end subroutine s_write_kymo_data_file
 
-    subroutine s_close_formatted_database_file() 
+    subroutine s_close_formatted_database_file()
         ! Description: The purpose of this subroutine is to close any formatted
         !              database file(s) that may be opened at the time-step that
         !              is currently being post-processed. The root process must
@@ -1489,7 +1489,7 @@ contains
 
     end subroutine s_close_kymo_data_file
 
-    subroutine s_finalize_data_output_module() 
+    subroutine s_finalize_data_output_module()
         ! Description: Deallocation procedures for the module
 
         ! Deallocating the generic storage employed for the flow variable(s)

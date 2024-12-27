@@ -4,7 +4,7 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   docs:
-    name:    Code formatting
+    name:    Formatting
     runs-on: ubuntu-latest
 
     steps:

@@ -293,7 +293,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     print '(A)', 'Unable to decompose computational '// &
                         'domain for selected number of '// &
-                        'processors. Exiting ...'
+                        'processors. Exiting.'
                     call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                 end if
 
@@ -404,7 +404,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     print '(A)', 'Unable to decompose computational '// &
                         'domain for selected number of '// &
-                        'processors. Exiting ...'
+                        'processors. Exiting.'
                     call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                 end if
 

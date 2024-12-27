@@ -403,32 +403,7 @@ contains
                     end if
                 end if
             end do
-
-            ! print *, "GP Loc: ", ghost_points(q)%loc(:)
-            ! print *, "Norm: ", norm(:)
-            ! print *, "Dist: ", abs(dist)
-            ! print *, "IP Loc: ", ghost_points(q)%ip_grid(:)
-            ! print *, "------"
         end do
-
-#if 0
-        if (proc_rank == 0) then
-
-            open (unit=10, file=trim(case_dir)//'/gp.txt', status='replace')
-            do i = 1, num_gps
-                write (10, '(3F36.12)') x_cc(ghost_points(i)%loc(1)), y_cc(ghost_points(i)%loc(2))
-            end do
-            close (10)
-
-            open (unit=10, file=trim(case_dir)//'/ip.txt', status='replace')
-            do i = 1, num_gps
-                write (10, '(3F36.12)') ghost_points(i)%ip_loc(1), ghost_points(i)%ip_loc(2)
-            end do
-            close (10)
-
-        end if
-
-#endif
 
     end subroutine s_compute_image_points
 
