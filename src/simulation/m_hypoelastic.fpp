@@ -11,7 +11,6 @@ module m_hypoelastic
     use m_global_parameters    !< Definitions of the global parameters
     use m_finite_differences
     use m_helper
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     implicit none
 
