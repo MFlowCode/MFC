@@ -500,7 +500,7 @@ contains
             if (dbfile == -1) then
                 call s_mpi_abort('Unable to create Silo-HDF5 database '// &
                                  'slave file '//trim(file_loc)//'. '// &
-                                 'Exiting ...')
+                                 'Exiting.')
             end if
 
             ! Next, analogous steps to the ones above are carried out by the
@@ -518,7 +518,7 @@ contains
                 if (dbroot == -1) then
                     call s_mpi_abort('Unable to create Silo-HDF5 database '// &
                                      'master file '//trim(file_loc)//'. '// &
-                                     'Exiting ...')
+                                     'Exiting.')
                 end if
 
             end if
@@ -542,7 +542,7 @@ contains
             ! is not the case, the post-process exits.
             if (err /= 0) then
                 call s_mpi_abort('Unable to create Binary database slave '// &
-                                 'file '//trim(file_loc)//'. Exiting ...')
+                                 'file '//trim(file_loc)//'. Exiting.')
             end if
 
             ! Further defining the structure of the formatted database slave
@@ -572,7 +572,7 @@ contains
                 if (err /= 0) then
                     call s_mpi_abort('Unable to create Binary database '// &
                                      'master file '//trim(file_loc)// &
-                                     '. Exiting ...')
+                                     '. Exiting.')
                 end if
 
                 if (output_partial_domain) then
@@ -1124,7 +1124,7 @@ contains
                 close (9)
             end if
         else
-            print '(A)', trim(file_loc)//' is missing. Exiting ...'
+            print '(A)', trim(file_loc)//' is missing. Exiting.'
             call s_mpi_abort
         end if
 

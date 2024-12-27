@@ -44,7 +44,7 @@ contains
 
         ! Checking whether the MPI environment has been properly initialized
         if (ierr /= MPI_SUCCESS) then
-            print '(A)', 'Unable to initialize MPI environment. Exiting ...'
+            print '(A)', 'Unable to initialize MPI environment. Exiting.'
             call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
         end if
 
