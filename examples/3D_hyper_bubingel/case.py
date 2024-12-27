@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3
 import math, json
 
 ## 1 FOR BACKGROUND, 2 FOR BUBBLE, 3 FOR GEL
