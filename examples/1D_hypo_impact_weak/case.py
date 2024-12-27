@@ -16,7 +16,6 @@ print(
         {
             # Logistics ================================================
             "run_time_info": "T",
-            # ==========================================================
             # Computational Domain Parameters ==========================
             "x_domain%beg": 0.0e00,
             "x_domain%end": 1.0e00,
@@ -27,7 +26,6 @@ print(
             "t_step_start": 0,
             "t_step_stop": int(Nt),
             "t_step_save": int(Nt / 200),
-            # ==========================================================
             # Simulation Algorithm Parameters ==========================
             "num_patches": 2,
             "model_eqns": 2,
@@ -48,16 +46,13 @@ print(
             "avg_state": 2,
             "bc_x%beg": -3,
             "bc_x%end": -3,
-            # ==========================================================
             # Turning on Hypoelasticity ================================
             "hypoelasticity": "T",
-            # ==========================================================
             # Formatted Database Files Structure Parameters ============
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "F",
-            # ==========================================================
             # Patch 1 L ================================================
             "patch_icpp(1)%geometry": 1,
             "patch_icpp(1)%x_centroid": 0.25,
@@ -69,7 +64,6 @@ print(
             "patch_icpp(1)%alpha(1)": 1.0,
             "patch_icpp(1)%alpha(2)": 0.0,
             "patch_icpp(1)%tau_e(1)": 0.0,
-            # ==========================================================
             # Patch 2 R ================================================
             "patch_icpp(2)%geometry": 1,
             "patch_icpp(2)%x_centroid": 0.75,
@@ -81,7 +75,6 @@ print(
             "patch_icpp(2)%alpha(1)": 0.0,
             "patch_icpp(2)%alpha(2)": 1.0,
             "patch_icpp(2)%tau_e(1)": 0.0,
-            # ==========================================================
             # Fluids Physical Parameters ===============================
             "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
             "fluid_pp(1)%pi_inf": 4.4e00 * 6.0e08 / (4.4e00 - 1.0e00),
@@ -89,8 +82,6 @@ print(
             "fluid_pp(2)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
             "fluid_pp(2)%pi_inf": 4.4e00 * 6.0e08 / (4.4e00 - 1.0e00),
             "fluid_pp(2)%G": 1e010,
-            # ==========================================================
         }
     )
 )
-# ==============================================================================
