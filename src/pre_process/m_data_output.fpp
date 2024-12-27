@@ -885,7 +885,7 @@ contains
         write (1, '(A)') "This file may contain errors and not support all features."
 
         write (1, '(A3,A20,A20)') "#", "Conservative", "Primitive"
-        write (1, '(A)') "-------------------------------------------"
+        write (1, '(A)') "    "
         do i = contxb, contxe
             write (temp, '(I0)') i - contxb + 1
             write (1, '(I3,A20,A20)') i, "\alpha_{"//trim(temp)//"} \rho_{"//trim(temp)//"}", "\alpha_{"//trim(temp)//"} \rho"

@@ -430,7 +430,7 @@ contains
                 print *, 'Reading lag_bubbles_mpi_io: ', tot_data, mytime, dt
             end if
         else
-            print '(a)', trim(file_loc)//' is missing. exiting ...'
+            print '(a)', trim(file_loc)//' is missing. exiting.'
             call s_mpi_abort
         end if
 
@@ -989,7 +989,7 @@ contains
             dc = (3._wp*abs(vol)/(4._wp*pi))**(1._wp/3._wp)
         else
 
-            stop "Check cluterflag. Exiting ..."
+            stop "Check cluterflag. Exiting."
 
         end if
 

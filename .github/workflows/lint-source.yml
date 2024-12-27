@@ -38,3 +38,10 @@ jobs:
       run: |
         ! grep -iR 'double_precision\|dsqrt\|dexp\|dlog\|dble\|dabs\|double\ precision\|real(8)\|real(4)\|dprod\|dmin\|dmax\|dfloat\|dreal\|dcos\|dsin\|dtan\|dsign\|dtanh\|dsinh\|dcosh\|d0' --exclude-dir=syscheck --exclude="*nvtx*" --exclude="*precision_select*" ./src/*
 
+    - name: Looking for junk code
+      run: |
+        ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
+
+    - name: Looking for junk comments in examples
+      run: |
+        ! grep -R '# ===' ./examples/**/*.py

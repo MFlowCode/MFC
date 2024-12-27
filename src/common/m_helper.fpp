@@ -454,15 +454,15 @@ contains
     subroutine s_prohibit_abort(condition, message)
         character(len=*), intent(in) :: condition, message
 
-        print *, ""
-        print *, "===================================================================================================="
-        print *, "                                          CASE FILE ERROR                                           "
-        print *, "----------------------------------------------------------------------------------------------------"
+        print *, "    "
+        print *, "    "
+        print *, "    CASE FILE ERROR    "
+        print *, "    "
         print *, "Prohibited condition: ", trim(condition)
         if (len_trim(message) > 0) then
             print *, "Note: ", trim(message)
         end if
-        print *, "===================================================================================================="
+        print *, "    "
         print *, ""
         call s_mpi_abort
     end subroutine s_prohibit_abort
