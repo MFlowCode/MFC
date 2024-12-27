@@ -8,18 +8,15 @@
 module m_hypoelastic
 
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_finite_differences
-
     use m_helper
-
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     implicit none
 
     private; public :: s_initialize_hypoelastic_module, &
+ s_finalize_hypoelastic_module, &
  s_compute_hypoelastic_rhs
 
     real(wp), allocatable, dimension(:) :: Gs
@@ -33,11 +30,16 @@ module m_hypoelastic
     real(wp), allocatable, dimension(:, :, :) :: rho_K_field, G_K_field
     !$acc declare create(rho_K_field, G_K_field)
 
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_x_h
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_y_h
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_z_h
+    !$acc declare create(fd_coeff_x_h,fd_coeff_y_h,fd_coeff_z_h)
+
 contains
 
     subroutine s_initialize_hypoelastic_module
 
-        integer :: i
+        integer :: i, k, r
 
         @:ALLOCATE(Gs(1:num_fluids))
         @:ALLOCATE(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
@@ -55,6 +57,29 @@ contains
         end do
         !$acc update device(Gs)
 
+        @:ALLOCATE(fd_coeff_x_h(-fd_number:fd_number, 0:m))
+        if (n > 0) then
+            @:ALLOCATE(fd_coeff_y_h(-fd_number:fd_number, 0:n))
+        end if
+        if (p > 0) then
+            @:ALLOCATE(fd_coeff_z_h(-fd_number:fd_number, 0:p))
+        end if
+
+        ! Computing centered finite difference coefficients
+        call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_h, buff_size, &
+                                                      fd_number, fd_order)
+        !$acc update device(fd_coeff_x_h)
+        if (n > 0) then
+            call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_h, buff_size, &
+                                                          fd_number, fd_order)
+            !$acc update device(fd_coeff_y_h)
+        end if
+        if (p > 0) then
+            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_h, buff_size, &
+                                                          fd_number, fd_order)
+            !$acc update device(fd_coeff_z_h)
+        end if
+
     end subroutine s_initialize_hypoelastic_module
 
     !>  The purpose of this procedure is to compute the source terms
@@ -70,7 +95,7 @@ contains
 
         real(wp) :: rho_K, G_K
 
-        integer :: i, k, l, q !< Loop variables
+        integer :: i, k, l, q, r !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
 
         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
@@ -83,82 +108,91 @@ contains
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        du_dx(k, l, q) = &
-                            (q_prim_vf(momxb)%sf(k - 2, l, q) &
-                             - 8._wp*q_prim_vf(momxb)%sf(k - 1, l, q) &
-                             + 8._wp*q_prim_vf(momxb)%sf(k + 1, l, q) &
-                             - q_prim_vf(momxb)%sf(k + 2, l, q)) &
-                            /(12._wp*dx(k))
+                        du_dx(k, l, q) = 0._wp
                     end do
                 end do
             end do
+            !$acc end parallel loop
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        !$acc loop seq
+                        do r = -fd_number, fd_number
+                            du_dx(k, l, q) = du_dx(k, l, q) &
+                                             + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                        end do
+
+                    end do
+                end do
+            end do
+            !$acc end parallel loop
 
             if (ndirs > 1) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
-                            du_dy(k, l, q) = &
-                                (q_prim_vf(momxb)%sf(k, l - 2, q) &
-                                 - 8._wp*q_prim_vf(momxb)%sf(k, l - 1, q) &
-                                 + 8._wp*q_prim_vf(momxb)%sf(k, l + 1, q) &
-                                 - q_prim_vf(momxb)%sf(k, l + 2, q)) &
-                                /(12._wp*dy(l))
-                            dv_dx(k, l, q) = &
-                                (q_prim_vf(momxb + 1)%sf(k - 2, l, q) &
-                                 - 8._wp*q_prim_vf(momxb + 1)%sf(k - 1, l, q) &
-                                 + 8._wp*q_prim_vf(momxb + 1)%sf(k + 1, l, q) &
-                                 - q_prim_vf(momxb + 1)%sf(k + 2, l, q)) &
-                                /(12._wp*dx(k))
-                            dv_dy(k, l, q) = &
-                                (q_prim_vf(momxb + 1)%sf(k, l - 2, q) &
-                                 - 8._wp*q_prim_vf(momxb + 1)%sf(k, l - 1, q) &
-                                 + 8._wp*q_prim_vf(momxb + 1)%sf(k, l + 1, q) &
-                                 - q_prim_vf(momxb + 1)%sf(k, l + 2, q)) &
-                                /(12._wp*dy(l))
+                            du_dy(k, l, q) = 0._wp; dv_dx(k, l, q) = 0._wp; dv_dy(k, l, q) = 0._wp
                         end do
                     end do
                 end do
+                !$acc end parallel loop
+
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do q = 0, p
+                    do l = 0, n
+                        do k = 0, m
+                            !$acc loop seq
+                            do r = -fd_number, fd_number
+                                du_dy(k, l, q) = du_dy(k, l, q) &
+                                                 + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                                dv_dx(k, l, q) = dv_dx(k, l, q) &
+                                                 + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                                dv_dy(k, l, q) = dv_dy(k, l, q) &
+                                                 + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                            end do
+                        end do
+                    end do
+                end do
+                !$acc end parallel loop
 
                 ! 3D
                 if (ndirs == 3) then
+
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                                du_dz(k, l, q) = &
-                                    (q_prim_vf(momxb)%sf(k, l, q - 2) &
-                                     - 8._wp*q_prim_vf(momxb)%sf(k, l, q - 1) &
-                                     + 8._wp*q_prim_vf(momxb)%sf(k, l, q + 1) &
-                                     - q_prim_vf(momxb)%sf(k, l, q + 2)) &
-                                    /(12._wp*dz(q))
-                                dv_dz(k, l, q) = &
-                                    (q_prim_vf(momxb + 1)%sf(k, l, q - 2) &
-                                     - 8._wp*q_prim_vf(momxb + 1)%sf(k, l, q - 1) &
-                                     + 8._wp*q_prim_vf(momxb + 1)%sf(k, l, q + 1) &
-                                     - q_prim_vf(momxb + 1)%sf(k, l, q + 2)) &
-                                    /(12._wp*dz(q))
-                                dw_dx(k, l, q) = &
-                                    (q_prim_vf(momxe)%sf(k - 2, l, q) &
-                                     - 8._wp*q_prim_vf(momxe)%sf(k - 1, l, q) &
-                                     + 8._wp*q_prim_vf(momxe)%sf(k + 1, l, q) &
-                                     - q_prim_vf(momxe)%sf(k + 2, l, q)) &
-                                    /(12._wp*dx(k))
-                                dw_dy(k, l, q) = &
-                                    (q_prim_vf(momxe)%sf(k, l - 2, q) &
-                                     - 8._wp*q_prim_vf(momxe)%sf(k, l - 1, q) &
-                                     + 8._wp*q_prim_vf(momxe)%sf(k, l + 1, q) &
-                                     - q_prim_vf(momxe)%sf(k, l + 2, q)) &
-                                    /(12._wp*dy(l))
-                                dw_dz(k, l, q) = &
-                                    (q_prim_vf(momxe)%sf(k, l, q - 2) &
-                                     - 8._wp*q_prim_vf(momxe)%sf(k, l, q - 1) &
-                                     + 8._wp*q_prim_vf(momxe)%sf(k, l, q + 1) &
-                                     - q_prim_vf(momxe)%sf(k, l, q + 2)) &
-                                    /(12._wp*dz(q))
+                                du_dz(k, l, q) = 0_wp; dv_dz(k, l, q) = 0_wp; dw_dx(k, l, q) = 0_wp; 
+                                dw_dy(k, l, q) = 0_wp; dw_dz(k, l, q) = 0_wp; 
                             end do
                         end do
                     end do
+                    !$acc end parallel loop
+
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                !$acc loop seq
+                                do r = -fd_number, fd_number
+                                    du_dz(k, l, q) = du_dz(k, l, q) &
+                                                     + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
+                                    dv_dz(k, l, q) = dv_dz(k, l, q) &
+                                                     + q_prim_vf(momxb + 1)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
+                                    dw_dx(k, l, q) = dw_dx(k, l, q) &
+                                                     + q_prim_vf(momxe)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                                    dw_dy(k, l, q) = dw_dy(k, l, q) &
+                                                     + q_prim_vf(momxe)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                                    dw_dz(k, l, q) = dw_dz(k, l, q) &
+                                                     + q_prim_vf(momxe)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
+                                end do
+                            end do
+                        end do
+                    end do
+                    !$acc end parallel loop
                 end if
             end if
 
@@ -175,7 +209,7 @@ contains
                         G_K_field(k, l, q) = G_K
 
                         !TODO: take this out if not needed
-                        if (G_K < 1000) then
+                        if (G_K < verysmall) then
                             G_K_field(k, l, q) = 0
                         end if
                     end do
@@ -299,5 +333,22 @@ contains
         end if
 
     end subroutine s_compute_hypoelastic_rhs
+
+    subroutine s_finalize_hypoelastic_module()
+
+        @:DEALLOCATE(Gs)
+        @:DEALLOCATE(rho_K_field, G_K_field)
+        @:DEALLOCATE(du_dx)
+        @:DEALLOCATE(fd_coeff_x_h)
+        if (n > 0) then
+            @:DEALLOCATE(du_dy,dv_dx,dv_dy)
+            @:DEALLOCATE(fd_coeff_y_h)
+            if (p > 0) then
+                @:DEALLOCATE(du_dz, dv_dz, dw_dx, dw_dy, dw_dz)
+                @:DEALLOCATE(fd_coeff_z_h)
+            end if
+        end if
+
+    end subroutine s_finalize_hypoelastic_module
 
 end module m_hypoelastic
