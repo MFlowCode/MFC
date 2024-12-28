@@ -692,4 +692,4 @@ contains
 
     end subroutine s_finalize_assign_variables_module
 
-end module
+end module m_assign_variables

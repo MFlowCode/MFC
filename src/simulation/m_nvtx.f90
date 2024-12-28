@@ -23,7 +23,7 @@ module m_nvtx
         integer(c_int64_t) :: payload          ! union uint,int,double
         integer(c_int) :: messageType = 1  ! NVTX_MESSAGE_TYPE_ASCII = 1
         type(c_ptr) :: message          ! ascii char
-    end type
+    end type nvtxEventAttributes
 
 #if defined(MFC_OpenACC) && defined(__PGI)
 
@@ -33,7 +33,7 @@ module m_nvtx
             use iso_c_binding
 
             character(kind=c_char, len=*) :: name
-        end subroutine
+        end subroutine nvtxRangePushA
 
         ! push range with custom label and custom color
         subroutine nvtxRangePushEx(event) bind(C, name='nvtxRangePushEx')
@@ -41,13 +41,13 @@ module m_nvtx
 
             import :: nvtxEventAttributes
             type(nvtxEventAttributes) :: event
-        end subroutine
-    end interface
+        end subroutine nvtxRangePushEx
+    end interface nvtxRangePush
 
     interface nvtxRangePop
         subroutine nvtxRangePop() bind(C, name='nvtxRangePop')
-        end subroutine
-    end interface
+        end subroutine nvtxRangePop
+    end interface nvtxRangePop
 
 #endif
 
@@ -71,12 +71,12 @@ contains
         end if
 
 #endif
-    end subroutine
+    end subroutine nvtxStartRange
 
     subroutine nvtxEndRange
 #if defined(MFC_OpenACC) && defined(__PGI)
         call nvtxRangePop
 #endif
-    end subroutine
+    end subroutine nvtxEndRange
 
 end module m_nvtx

@@ -322,4 +322,4 @@ contains
 
     end subroutine s_finalize_fftw_module
 
-end module
+end module m_fftw 

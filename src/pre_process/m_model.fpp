@@ -215,7 +215,7 @@ contains
             call s_read_stl_binary(filepath, model)
         end if
 
-    end subroutine
+    end subroutine s_read_stl
 
     !> This procedure reads an OBJ file.
     !! @param filepath Path to the odj file.
@@ -291,7 +291,7 @@ contains
 
         close (iunit)
 
-    end subroutine
+    end subroutine s_read_obj
 
     !> This procedure reads a mesh from a file.
     !! @param filepath Path to the file to read.
