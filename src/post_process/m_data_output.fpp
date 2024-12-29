@@ -53,6 +53,7 @@ module m_data_output
     real(wp), allocatable, dimension(:, :, :), public :: q_sf
     real(wp), allocatable, dimension(:, :, :) :: q_root_sf
     real(wp), allocatable, dimension(:, :, :) :: cyl_q_sf
+
     ! Single precision storage for flow variables
     real(sp), allocatable, dimension(:, :, :), public :: q_sf_s
     real(sp), allocatable, dimension(:, :, :) :: q_root_sf_s
@@ -222,10 +223,6 @@ contains
 
             file_loc = trim(proc_rank_dir)//'/.'
 
-            !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-            !EXIST     = dir_check       )
-            ! INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-            !           EXIST     = dir_check       )
             call my_inquire(file_loc, dir_check)
             if (dir_check .neqv. .true.) then
                 call s_create_directory(trim(proc_rank_dir))
@@ -238,10 +235,6 @@ contains
 
                 file_loc = trim(rootdir)//'/.'
 
-                !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-                !        EXIST     = dir_check       )
-                !  INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-                !           EXIST     = dir_check       )
                 call my_inquire(file_loc, dir_check)
                 if (dir_check .neqv. .true.) then
                     call s_create_directory(trim(rootdir))
@@ -262,10 +255,6 @@ contains
 
             file_loc = trim(proc_rank_dir)//'/.'
 
-            !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-            !       EXIST     = dir_check       )
-            !  INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-            !           EXIST     = dir_check       )
             call my_inquire(file_loc, dir_check)
 
             if (dir_check .neqv. .true.) then
@@ -279,10 +268,6 @@ contains
 
                 file_loc = trim(rootdir)//'/.'
 
-                !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-                !        EXIST     = dir_check       )
-                !  INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-                !        EXIST     = dir_check       )
                 call my_inquire(file_loc, dir_check)
 
                 if (dir_check .neqv. .true.) then

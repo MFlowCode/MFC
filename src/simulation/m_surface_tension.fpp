@@ -70,7 +70,7 @@ contains
                                               flux_src_vf, &
                                               id, isx, isy, isz)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf !> unused so unsure what intent to give it
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsx_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsy_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsz_vf

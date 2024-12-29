@@ -110,7 +110,7 @@ contains
         !!      time-step.
     subroutine s_open_run_time_information_file
 
-        character(LEN=name_len) :: file_name = 'run_time.inf' !<
+        character(LEN=name_len), parameter :: file_name = 'run_time.inf' !<
             !! Name of the run-time information file
 
         character(LEN=path_len + name_len) :: file_path !<

@@ -227,7 +227,7 @@ contains
         integer, intent(in) :: j, k, l
 
         real(wp) :: trace
-        real(wp) :: f13 = 1_wp/3_wp
+        real(wp), parameter :: f13 = 1._wp/3._wp
         integer :: i
 
         ! tensor is the symmetric tensor & calculate the trace of the tensor
@@ -267,7 +267,7 @@ contains
         integer, intent(in) :: j, k, l
 
         real(wp) :: trace
-        real(wp) :: f13 = 1_wp/3_wp
+        real(wp), parameter :: f13 = 1._wp/3._wp
         integer :: i
 
         !TODO Make this 1D and 2D capable

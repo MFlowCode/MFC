@@ -1416,7 +1416,7 @@ contains
         integer :: i, j, k !< generic loop iterators
 
         real(wp) :: epsilon, beta
-        complex(wp) :: cmplx_i = (0._wp, 1._wp)
+        complex(wp), parameter :: cmplx_i = (0._wp, 1._wp)
         complex(wp) :: H
 
         ! Transferring the patch's centroid and radius information
