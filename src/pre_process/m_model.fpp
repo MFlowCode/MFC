@@ -709,7 +709,7 @@ contains
         integer, intent(inout) :: edge_index !< Edge index iterator
         integer, intent(inout) :: edge_count !< Total number of edges
         real(wp), intent(in), dimension(1:2, 1:2) :: edge !< Edges end points to be registered
-        real(wp), dimension(1:edge_count, 1:2, 1:2) :: temp_boundary_v !< Temporary edge end vertex buffer
+        real(wp), dimension(1:edge_count, 1:2, 1:2), intent(inout) :: temp_boundary_v !< Temporary edge end vertex buffer
 
         ! Increment edge index and store the edge
         edge_index = edge_index + 1
@@ -804,7 +804,10 @@ contains
         t_vec3, intent(in) :: spacing
         real(wp), allocatable, intent(inout), dimension(:, :) :: interpolated_boundary_v
 
-        integer :: i, j, num_segments, total_vertices, boundary_edge_count
+        integer, intent(inout) :: total_vertices, boundary_edge_count
+        integer :: num_segments
+        integer :: i, j
+
         real(wp) :: edge_length, cell_width
         real(wp), dimension(1:2) :: edge_x, edge_y, edge_del
         real(wp), allocatable :: temp_boundary_v(:, :)
