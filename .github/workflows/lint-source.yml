@@ -30,10 +30,9 @@ jobs:
 
     - name: Lint the full source
       run: |
-        shopt -s expand_aliases
-        alias lintsource='find ./src -type f -not -name '*nvtx*' -exec command fortitude check {} \;'
-        lintsource
-        lintsource | wc -l | xargs -I{} sh -c '[ {} -gt 0 ] && exit 1 || exit 0'
+        pip install fortitude ansi2txt
+        find ./src -type f -not -name '*nvtx*' -exec command fortitude check {} \;
+        find ./src -type f -not -name '*nvtx*' -exec command fortitude check {} \; | wc -l | xargs -I{} sh -c '[ {} -gt 0 ] && exit 1 || exit 0'
 
     - name: No double precision intrinsics
       run: |
