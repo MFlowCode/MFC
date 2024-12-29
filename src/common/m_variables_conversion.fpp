@@ -1081,7 +1081,7 @@ contains
         real(wp) :: dyn_pres
         real(wp) :: nbub, R3, vftmp, R3tmp
         real(wp), dimension(nb) :: Rtmp
-        real(wp) :: G = 0._wp
+        real(wp) :: G
         real(wp), dimension(2) :: Re_K
 
         integer :: i, j, k, l, q !< Generic loop iterators
@@ -1089,6 +1089,8 @@ contains
 
         real(wp), dimension(num_species) :: Ys
         real(wp) :: e_mix, mix_mol_weight, T
+
+        G = 0._wp
 
 #ifndef MFC_SIMULATION
         ! Converting the primitive variables to the conservative variables

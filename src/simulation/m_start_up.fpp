@@ -125,7 +125,7 @@ contains
     subroutine s_read_input_file
 
         ! Relative path to the input file provided by the user
-        character(LEN=name_len) :: file_path = './simulation.inp'
+        character(LEN=name_len), parameter :: file_path = './simulation.inp'
 
         logical :: file_exist !<
             !! Logical used to check the existence of the input file

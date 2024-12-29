@@ -244,7 +244,7 @@ contains
     subroutine s_int_to_str(i, res)
 
         integer, intent(in) :: i
-        character(len=*), intent(out) :: res
+        character(len=*), intent(inout) :: res
 
         write (res, '(I0)') i
         res = trim(res)
