@@ -35,15 +35,17 @@ contains
         !$acc routine seq
 #endif
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(wp), dimension(num_fluids) :: alpha_rho
-        real(wp), dimension(num_fluids) :: alpha
-        real(wp), dimension(num_dims) :: vel
-        real(wp) :: rho, gamma, pi_inf, qv, vel_sum, E, H, pres
+        type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
+        real(wp), intent(inout), dimension(num_fluids) :: alpha
+        real(wp), intent(inout), dimension(num_dims) :: vel
+        real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres
+        integer, intent(in) :: j, k, l
+
+        real(wp), dimension(num_fluids) :: alpha_rho, Gs
         real(wp), dimension(2) :: Re
-        real(wp) :: G          !< Cell-avg. fluid shear modulus
-        real(wp), dimension(num_fluids) :: Gs      !< Cell-avg. fluid shear moduli
-        integer :: i, j, k, l
+        real(wp) :: qv, E, G
+
+        integer :: i
 
         !$acc loop seq
         do i = 1, num_fluids
