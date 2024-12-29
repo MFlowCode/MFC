@@ -497,8 +497,8 @@ contains
         real(wp) :: ang, norm
         real(wp) :: tr, ti, cr, ci !< temporary memory
         real(wp) :: xratio
-        integer idx
-        integer i, j, k
+        integer :: idx
+        integer :: i, j, k
 
         xratio = mixlayer_vel_coef
 
