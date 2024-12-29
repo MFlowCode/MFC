@@ -253,48 +253,48 @@ endif()
 #
 # *  Locate all source files for <target> of the type
 #
-#               src/[<target>,common]/[.,include]/*.[f90,fpp].
+#               src/[<target>,common]/[.,include]/*.[f90,fypp].
 #
-# *  For each .fpp file found with filepath <dirpath>/<filename>.fpp, using a
+# *  For each .fypp file found with filepath <dirpath>/<filename>.fypp, using a
 #    custom command, instruct CMake how to generate a file with path
 #
 #                     src/<target>/fypp/<filename>.f90
 #
-#    by running Fypp on <dirpath>/<filename>.fpp. It is important to understand
+#    by running Fypp on <dirpath>/<filename>.fypp. It is important to understand
 #    that this does not actually run the pre-processor. Rather, it instructs
 #    CMake what to do when it finds a src/<target>/fypp/<filename>.f90 path
 #    in the source list for a target. Thus, an association is made from an .f90
-#    file to its corresponding .fpp file (if applicable) even though the
-#    generation is of the form .fpp -> .f90.
+#    file to its corresponding .fypp file (if applicable) even though the
+#    generation is of the form .fypp -> .f90.
 #
-#    This design has one limitation: If an .fpp file depends on another, for
+#    This design has one limitation: If an .fypp file depends on another, for
 #    example if it '#:include's it and uses a macro defined in it, then the
-#    dependency will not be tracked. A modification to the .fpp file it depends
-#    on will not trigger a re-run of Fypp on the .fpp file that depends on it.
+#    dependency will not be tracked. A modification to the .fypp file it depends
+#    on will not trigger a re-run of Fypp on the .fypp file that depends on it.
 #    As a compromise, both in speed and complexity, all .f90 files generated
-#    from .fpp files are re-generated not only when their corresponding .fpp
+#    from .fypp files are re-generated not only when their corresponding .fypp
 #    file is modified, but also when any file with filepath of the form
 #
-#                     src/[<target>,common]/include/*.fpp
+#                     src/[<target>,common]/include/*.fypp
 #
-#    is modified. This is a reasonable compromise as modifications to .fpp files
+#    is modified. This is a reasonable compromise as modifications to .fypp files
 #    in the include directories will be rare - by design. Other approaches would
-#    have required a more complex CMakeLists.txt file (perhaps parsing the .fpp
+#    have required a more complex CMakeLists.txt file (perhaps parsing the .fypp
 #    files to determine their dependencies) or the endurment of longer
-#    compilation times (by way of re-running Fypp on all .fpp files every time
+#    compilation times (by way of re-running Fypp on all .fypp files every time
 #    one of them is modified).
 #
-#    .fpp files in src/common are treated as if they were in src/<target> (not
+#    .fypp files in src/common are treated as if they were in src/<target> (not
 #    pre-processed to src/common/fypp/) so as not to clash with other targets'
-#    .fpp files (this has caused problems in the past).
+#    .fypp files (this has caused problems in the past).
 #
 # *  Export, in the variable <target>_SRCs, a list of all source files (.f90)
-#    that would compile to produce <target>. If <target> includes .fpp files,
+#    that would compile to produce <target>. If <target> includes .fypp files,
 #    then the list will include the paths to the corresponding .f90 files that
-#    Fypp would generate from the .fpp files.
+#    Fypp would generate from the .fypp files.
 #
 # This design allows us to be flexible in our use of Fypp as we don't have to
-# worry about running the pre-processor on .fpp files when we create executables
+# worry about running the pre-processor on .fypp files when we create executables
 # and generate documentation. Instead, we can simply include the list of .f90
 # files that will eventually be used to compile <target>.
 
@@ -316,31 +316,31 @@ macro(HANDLE_SOURCES target useCommon)
     endif()
 
     # Gather:
-    # *          src/[<target>,(common)]/*.fpp]
-    # * (if any) <build>/modules/<target>/*.fpp
-    file(GLOB ${target}_FPPs CONFIGURE_DEPENDS "${${target}_DIR}/*.fpp"
-                                               "${CMAKE_BINARY_DIR}/modules/${target}/*.fpp")
+    # *          src/[<target>,(common)]/*.fypp]
+    # * (if any) <build>/modules/<target>/*.fypp
+    file(GLOB ${target}_FYPPs CONFIGURE_DEPENDS "${${target}_DIR}/*.fypp"
+                                               "${CMAKE_BINARY_DIR}/modules/${target}/*.fypp")
     if (${useCommon})
-        file(GLOB common_FPPs CONFIGURE_DEPENDS "${common_DIR}/*.fpp")
-        list(APPEND ${target}_FPPs ${common_FPPs})
+        file(GLOB common_FYPPs CONFIGURE_DEPENDS "${common_DIR}/*.fypp")
+        list(APPEND ${target}_FYPPs ${common_FYPPs})
     endif()
 
     # Gather:
-    # *          src/[<target>,common]/include/*.fpp
-    # * (if any) <build>/include/<target>/*.fpp
-    file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fpp"
-                                               "${CMAKE_BINARY_DIR}/include/${target}/*.fpp")
+    # *          src/[<target>,common]/include/*.fypp
+    # * (if any) <build>/include/<target>/*.fypp
+    file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fypp"
+                                               "${CMAKE_BINARY_DIR}/include/${target}/*.fypp")
 
     if (${useCommon})
-        file(GLOB common_incs CONFIGURE_DEPENDS "${common_DIR}/include/*.fpp")
+        file(GLOB common_incs CONFIGURE_DEPENDS "${common_DIR}/include/*.fypp")
         list(APPEND ${target}_incs ${common_incs})
     endif()
 
-    # /path/to/*.fpp (used by <target>) -> <build>/fypp/<target>/*.f90
+    # /path/to/*.fypp (used by <target>) -> <build>/fypp/<target>/*.f90
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/fypp/${target}")
-    foreach(fpp ${${target}_FPPs})
-        cmake_path(GET fpp FILENAME fpp_filename)
-        set(f90 "${CMAKE_BINARY_DIR}/fypp/${target}/${fpp_filename}.f90")
+    foreach(fypp ${${target}_FYPPs})
+        cmake_path(GET fypp FILENAME fypp_filename)
+        set(f90 "${CMAKE_BINARY_DIR}/fypp/${target}/${fypp_filename}.f90")
 
         add_custom_command(
             OUTPUT   ${f90}
@@ -356,9 +356,9 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D chemistry=False
                                  --line-numbering
                                  --no-folding
-                                 "${fpp}" "${f90}"
-            DEPENDS  "${fpp};${${target}_incs}"
-            COMMENT  "Preprocessing (Fypp) ${fpp_filename}"
+                                 "${fypp}" "${f90}"
+            DEPENDS  "${fypp};${${target}_incs}"
+            COMMENT  "Preprocessing (Fypp) ${fypp_filename}"
             VERBATIM
         )
 

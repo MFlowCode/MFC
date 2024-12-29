@@ -5,7 +5,7 @@ yarn.lock
 .venv/
 /build/
 .vscode/
-src/*/include/case.fpp
+src/*/include/case.fypp
 src/*/autogen/
 
 *.swo

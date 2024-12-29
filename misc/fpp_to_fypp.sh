@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for file in $(find src -type f | grep -Ev 'autogen' | grep -E '\.fpp$'); do
+for file in $(find src -type f | grep -Ev 'autogen' | grep -E '\.fypp$'); do
     echo "$file"
-    mv "$file" "$(echo "$file" | sed s/\.fpp/\.fypp/)"
+    mv "$file" "$(echo "$file" | sed s/\.fypp/\.fypp/)"
 done

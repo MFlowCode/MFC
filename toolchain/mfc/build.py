@@ -39,7 +39,7 @@ class MFCTarget:
         m = hashlib.sha256()
         m.update(self.name.encode())
         m.update(CFG().make_slug().encode())
-        m.update(case.get_fpp(self, False).encode())
+        m.update(case.get_fypp(self, False).encode())
 
         if case.params.get('chemistry', 'F') == 'T':
             m.update(case.get_cantera_solution().name.encode())
@@ -150,7 +150,7 @@ class MFCTarget:
         delete_directory(build_dirpath)
         create_directory(build_dirpath)
 
-        case.generate_fpp(self)
+        case.generate_fypp(self)
 
         if system(command).returncode != 0:
             raise MFCException(f"Failed to configure the [bold magenta]{self.name}[/bold magenta] target.")
@@ -158,7 +158,7 @@ class MFCTarget:
         cons.print(no_indent=True)
 
     def build(self, case: input.MFCInputFile):
-        case.generate_fpp(self)
+        case.generate_fypp(self)
 
         command = ["cmake", "--build",    self.get_staging_dirpath(case),
                             "--target",   self.name,

@@ -3,7 +3,7 @@
 
 fortran_src: &fortran_src
   - '**/*.f90'
-  - '**/*.fpp'
+  - '**/*.fypp'
 
 python_src: &python_src
   - '**/*.py'

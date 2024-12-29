@@ -24,14 +24,14 @@ class MFCInputFile(Case):
         # Save .inp input file
         common.file_write(f"{self.dirpath}/{target.name}.inp", self.get_inp(target))
 
-    def __save_fpp(self, target, contents: str) -> None:
+    def __save_fypp(self, target, contents: str) -> None:
         inc_dir = os.path.join(target.get_staging_dirpath(self), "include", target.name)
         common.create_directory(inc_dir)
 
-        fpp_path = os.path.join(inc_dir, "case.fpp")
+        fypp_path = os.path.join(inc_dir, "case.fypp")
 
-        cons.print("Writing a (new) custom case.fpp file.")
-        common.file_write(fpp_path, contents, True)
+        cons.print("Writing a (new) custom case.fypp file.")
+        common.file_write(fypp_path, contents, True)
 
     def get_cantera_solution(self) -> ct.Solution:
         if self.params.get("chemistry", 'F') == 'T':
@@ -56,15 +56,15 @@ class MFCInputFile(Case):
 
         raise common.MFCException(f"Cantera file '{cantera_file}' not found. Searched: {', '.join(candidates)}.")
 
-    def generate_fpp(self, target) -> None:
+    def generate_fypp(self, target) -> None:
         if target.isDependency:
             return
 
-        cons.print(f"Generating [magenta]case.fpp[/magenta].")
+        cons.print(f"Generating [magenta]case.fypp[/magenta].")
         cons.indent()
 
-        # Case FPP file
-        self.__save_fpp(target, self.get_fpp(target))
+        # Case FYPP file
+        self.__save_fypp(target, self.get_fypp(target))
 
         # (Thermo)Chemistry source file
         modules_dir = os.path.join(target.get_staging_dirpath(self), "modules", target.name)
@@ -87,11 +87,11 @@ class MFCInputFile(Case):
         cons.unindent()
 
 
-    # Generate case.fpp & [target.name].inp
+    # Generate case.fypp & [target.name].inp
     def generate(self, target) -> None:
         self.generate_inp(target)
         cons.print()
-        self.generate_fpp(target)
+        self.generate_fypp(target)
 
     def clean(self, _targets) -> None:
         targets = [build.get_target(target) for target in _targets]

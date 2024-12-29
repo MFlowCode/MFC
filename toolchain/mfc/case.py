@@ -94,7 +94,7 @@ class Case:
         return False
 
     # pylint: disable=too-many-locals
-    def __get_pre_fpp(self, print: bool) -> str:
+    def __get_pre_fypp(self, print: bool) -> str:
         DATA = {
             1: {'ptypes': [1, 15, 16],                         'sf_idx': 'i, 0, 0'},
             2: {'ptypes': [2,  3,  4,  5,  6,  7, 17, 18, 21], 'sf_idx': 'i, j, 0'},
@@ -170,7 +170,7 @@ class Case:
 
         return content
 
-    def __get_sim_fpp(self, print: bool) -> str:
+    def __get_sim_fypp(self, print: bool) -> str:
         if ARG("case_optimization"):
             if print:
                 cons.print("Case optimization is enabled.")
@@ -219,7 +219,7 @@ class Case:
 ! of --case-optimization.
 """
 
-    def get_fpp(self, target, print = True) -> str:
+    def get_fypp(self, target, print = True) -> str:
         def _prepend() -> str:
             return f"""\
 #:set chemistry             = {self.params.get("chemistry", 'F') == 'T'}
@@ -229,8 +229,8 @@ class Case:
             return "! This file is purposefully empty."
 
         result = {
-            "pre_process" : self.__get_pre_fpp,
-            "simulation"  : self.__get_sim_fpp,
+            "pre_process" : self.__get_pre_fypp,
+            "simulation"  : self.__get_sim_fypp,
         }.get(build.get_target(target).name, _default)(print)
 
         return _prepend() + result

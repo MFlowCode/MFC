@@ -17,7 +17,7 @@ done
 
 log "Formatting MFC:"
 
-if ! find ${@:-src} -type f | grep -Ev 'autogen' | grep -E '\.(f90|fpp)$' \
+if ! find ${@:-src} -type f | grep -Ev 'autogen' | grep -E '\.(f90|fypp)$' \
         | xargs -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_file.sh; then
     error "Formatting MFC source failed."
     exit 1
