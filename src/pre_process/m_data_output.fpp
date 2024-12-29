@@ -831,7 +831,7 @@ contains
         ! Generic string used to store the address of a particular file
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
         character(len=15) :: temp
-        character(LEN=1), dimension(3) :: coord = (/'x', 'y', 'z'/)
+        character(LEN=1), dimension(3), parameter :: coord = (/'x', 'y', 'z'/)
 
         ! Generic logical used to check the existence of directories
         logical :: dir_check

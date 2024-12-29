@@ -25,17 +25,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Fortitude
-      run: pip install fortitude-lint ansi2txt
+    - name: Initialize MFC
+      run: ./mfc.sh init
 
-    - name: Lint the source code
-      run:  fortitude check --file-extensions=f90,fpp,fypp --ignore=E001,S001,S101,M011,F001,S041,T001,S101,S102,T002,T011 ./src/** || true
-
-    - name: Ensure kind is specified
-      run:  fortitude check --file-extensions=f90,fpp,fypp --select=P001 ./src/**
-
-    - name: Ensure subroutines are named
-      run:  fortitude check --file-extensions=f90,fpp,fypp --select=S061 ./src/**
+    - name: Lint the full source
+      run: |
+        source build/venv/bin/activate
+        find ./src -type f -not -name '*nvtx*' -exec fortitude check {} \;
+        find ./src -type f -not -name '*nvtx*' -exec fortitude check {} \; | wc -l | xargs -I{} sh -c '[ {} -gt 0 ] && exit 1 || exit 0'
 
     - name: No double precision intrinsics
       run: |
