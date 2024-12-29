@@ -40,9 +40,9 @@ contains
         real(wp), intent(inout), dimension(num_dims) :: vel
         real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres
         integer, intent(in) :: j, k, l
+        real(wp), dimension(2), intent(inout) :: Re
 
         real(wp), dimension(num_fluids) :: alpha_rho, Gs
-        real(wp), dimension(2) :: Re
         real(wp) :: qv, E, G
 
         integer :: i
@@ -98,15 +98,16 @@ contains
         !! @param Rc_sf (optional) cell centered Rc
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         !$acc routine seq
-        real(wp), dimension(num_dims) :: vel
-        real(wp) :: c, rho
-        real(wp), dimension(0:m, 0:n, 0:p) :: icfl_sf
-        real(wp), dimension(0:m, 0:n, 0:p), optional :: vcfl_sf, Rc_sf
+        real(wp), intent(in), dimension(num_dims) :: vel
+        real(wp), intent(in) :: c, rho
+        real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: icfl_sf
+        real(wp), dimension(0:m, 0:n, 0:p), intent(inout), optional :: vcfl_sf, Rc_sf
+        real(wp), dimension(2), intent(in) :: Re_l
+        integer, intent(in) :: j, k, l
+
         real(wp) :: fltr_dtheta   !<
              !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
-        integer :: j, k, l
         integer :: Nfq
-        real(wp), dimension(2) :: Re_l
 
         if (grid_geometry == 3) then
             if (k == 0) then
@@ -194,14 +195,17 @@ contains
         !! @param l z coordinate
     subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
         !$acc routine seq
-        real(wp), dimension(num_dims) :: vel
-        real(wp) :: c, icfl_dt, vcfl_dt, rho
-        real(wp), dimension(0:m, 0:n, 0:p) :: max_dt
+        real(wp), dimension(num_dims), intent(in) :: vel
+        real(wp), intent(in) :: c, rho
+        real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: max_dt
+        real(wp), dimension(2), intent(in) :: Re_l
+        integer, intent(in) :: j, k, l
+
+        real(wp) :: icfl_dt, vcfl_dt
         real(wp) :: fltr_dtheta   !<
              !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
-        integer :: j, k, l
+
         integer :: Nfq
-        real(wp), dimension(2) :: Re_l
 
         if (grid_geometry == 3) then
             if (k == 0) then
