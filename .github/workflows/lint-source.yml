@@ -28,9 +28,6 @@ jobs:
     - name: Initialize MFC
       run: ./mfc.sh init
 
-    # - name: Lint the source code
-    #   run:  fortitude check --file-extensions=f90,fpp,fypp --ignore=E001,S001,S101,M011,F001,S041,T001,S101,S102,T002,T011 ./src/** || true
-
     - name: Lint the full source
       run: |
         alias lintsource='find ./src -type f -not -name '*nvtx*' -exec command fortitude check {} \;' |
