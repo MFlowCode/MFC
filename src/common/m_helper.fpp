@@ -101,7 +101,7 @@ contains
         end do
         write (*, fmt="(A1)") " "
 
-    end subroutine
+    end subroutine s_print_2D_array
 
     !> Initializes non-polydisperse bubble modeling
     subroutine s_initialize_nonpoly
@@ -248,7 +248,7 @@ contains
 
         write (res, '(I0)') i
         res = trim(res)
-    end subroutine
+    end subroutine s_int_to_str
 
     !> Computes the Simpson weights for quadrature
     subroutine s_simpson

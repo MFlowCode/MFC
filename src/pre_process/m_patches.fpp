@@ -1406,7 +1406,7 @@ contains
 
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         real(wp) :: r, x_p, eps, phi
         real(wp), dimension(2:9) :: as, Ps

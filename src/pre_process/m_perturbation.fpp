@@ -223,7 +223,7 @@ contains
     subroutine s_instability_wave(alpha, beta, wave, shift)
         real(wp), intent(in) :: alpha, beta !<  spatial wavenumbers
         real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave !< instability wave
-        real(wp) :: shift !< phase shift
+        real(wp), intent(in) :: shift !< phase shift
         real(wp), dimension(0:nbp - 1) :: u_mean !<  mean density and velocity profiles
         real(wp) :: rho_mean, p_mean !< mean density and pressure
         real(wp), dimension(0:nbp - 1, 0:nbp - 1) :: d !< differential operator in y dir

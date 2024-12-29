@@ -234,7 +234,6 @@ contains
 
     subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
 
-        implicit none
         integer, intent(in) :: counts          ! Array of vector lengths for each process
         real(wp), intent(in), dimension(counts) :: my_vector   ! Input vector on each process
         integer, intent(in) :: root               ! Rank of the root process

@@ -37,6 +37,8 @@ module m_data_input
         !!  @param t_step Current time-step to input
         subroutine s_read_abstract_data_files(t_step)
 
+            implicit none
+
             integer, intent(in) :: t_step
 
         end subroutine s_read_abstract_data_files

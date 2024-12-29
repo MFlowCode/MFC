@@ -675,7 +675,7 @@ contains
 
         end if
 
-    end subroutine
+    end subroutine s_compute_qbmm_rhs
 
 !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
 

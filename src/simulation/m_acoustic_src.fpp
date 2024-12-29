@@ -329,7 +329,7 @@ contains
                 end do
             end do
         end do
-    end subroutine
+    end subroutine s_acoustic_src_calculations
 
     !> This subroutine gives the temporally varying amplitude of the pulse
     !! @param sim_time Simulation time
@@ -487,7 +487,7 @@ contains
         end do
 #endif
 
-    end subroutine
+    end subroutine s_precalculate_acoustic_spatial_sources
 
     !> This subroutine gives the spatial support of the acoustic source
     !! @param j x-index
