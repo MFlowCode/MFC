@@ -37,8 +37,6 @@ module m_grid
 
         subroutine s_generate_abstract_grid
 
-            ! integer, intent(IN), optional :: dummy
-
         end subroutine s_generate_abstract_grid
 
     end interface
