@@ -390,7 +390,6 @@ contains
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -405,6 +404,8 @@ contains
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
             end if
         end if
+
+        call nvtxEndRange
 
     end subroutine s_1st_order_tvd_rk
 
