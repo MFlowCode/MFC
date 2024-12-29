@@ -823,7 +823,7 @@ contains
         real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
         real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
         type(int_bounds_info), intent(in) :: ix, iy, iz
-        real(wp), dimension(startx:, starty:, startz:) :: nbub_sc !> Unused Variable not sure what to put as intent
+        real(wp), dimension(startx:, starty:, startz:), intent(inout) :: nbub_sc
 
         real(wp), dimension(nmom) :: moms, msum
         real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
