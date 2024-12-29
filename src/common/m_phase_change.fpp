@@ -794,7 +794,7 @@ contains
 
     !>  This subroutine finalizes the phase change module
     subroutine s_finalize_relaxation_solver_module
-    end subroutine
+    end subroutine s_finalize_relaxation_solver_module
 
 #endif
 

@@ -130,7 +130,7 @@ contains
         @:PROHIBIT(adv_n .and. (.not. bubbles_euler))
         @:PROHIBIT(adv_n .and. num_fluids /= 1)
         @:PROHIBIT(adv_n .and. qbmm)
-    end subroutine
+    end subroutine s_check_inputs_adv_n
 
     !> Checks constraints on the hypoelasticity parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
