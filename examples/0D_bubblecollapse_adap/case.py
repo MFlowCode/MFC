@@ -1,8 +1,8 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 import math
 import json
 
-# FLUID PROPERTIES ============================================================
+# FLUID PROPERTIES
 # Water
 n_tait = 7.1
 B_tait = 306.0e06
@@ -23,7 +23,7 @@ M_n = 28.97
 mu_n = 1.8e-05
 k_n = 0.02556
 
-# REFERENCE VALUES ============================================================
+# REFERENCE VALUES
 R0ref = 50.0e-06
 x0 = R0ref
 p0 = 8236.0  # for Ca = 1 in mixing layer scale
@@ -31,22 +31,22 @@ u0 = math.sqrt(p0 / rho0)
 patm = 1.0
 cact = math.sqrt(n_tait * (p0 + B_tait) / rho0)
 
-# NONDIMENSIONAL NUMBERS ======================================================
+# NONDIMENSIONAL NUMBERS
 Ca = (p0 - pv) / (rho0 * (u0**2.0))  # Cavitation number
 We = rho0 * (u0**2.0) * R0ref / ss  # Weber number
 Re_inv = mul0 / (rho0 * u0 * R0ref)  # Inv. bubble Reynolds number
 
-# BUBBLES =====================================================================
+# BUBBLES
 vf0 = 1e-5
 nb = 1
 
-# DOMAIN ======================================================================
+# DOMAIN
 Nx = 30
 Ldomain = 20.0e-03
 L = Ldomain / x0
 dx = L / float(Nx + 1)
 
-# TIME STEPS ==================================================================
+# TIME STEPS
 Tfinal = 0.05
 Nt = int(5e2 + 1)
 t_save = 1
@@ -56,9 +56,9 @@ dt = Tfinal / (Nt - 1)
 print(
     json.dumps(
         {
-            # Logistics ================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================
+            # Computational Domain Parameters
             "x_domain%beg": -0.5 * L,
             "x_domain%end": 0.5 * L,
             "stretch_x": "F",
@@ -70,7 +70,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": Nt,
             "t_step_save": t_save,
-            # Simulation Algorithm Parameters ==========================
+            # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -88,13 +88,13 @@ print(
             "avg_state": 2,
             "bc_x%beg": -1,
             "bc_x%end": -1,
-            # Formatted Database Files Structure Parameters ============
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
             "fd_order": 1,
-            # Patch 1 _ Background =====================================
+            # Patch 1 _ Background
             "patch_icpp(1)%geometry": 1,
             "patch_icpp(1)%x_centroid": 0.0,
             "patch_icpp(1)%length_x": L,
@@ -104,10 +104,10 @@ print(
             "patch_icpp(1)%alpha(1)": vf0,
             "patch_icpp(1)%r0": 1.0,
             "patch_icpp(1)%v0": 0.0,
-            # Non-polytropic gas compression model AND/OR Tait EOS =====
+            # Non-polytropic gas compression model AND/OR Tait EOS
             "pref": p0,
             "rhoref": rho0,
-            # Bubbles ==================================================
+            # Bubbles
             "bubbles_euler": "T",
             "bubble_model": 2,
             # Nondimensional numbers
@@ -126,14 +126,14 @@ print(
             "nb": nb,
             # QBMM
             "qbmm": "F",
-            # Fluids Physical Parameters ===============================
+            # Fluids Physical Parameters
             # Surrounding liquid
             "fluid_pp(1)%gamma": 1.0e00 / (n_tait - 1.0e00),
             "fluid_pp(1)%pi_inf": n_tait * (B_tait / p0) / (n_tait - 1.0),
             "fluid_pp(1)%ss": ss,
             "fluid_pp(1)%pv": pv,
-            # Last fluid_pp is always reserved for bubble gas state ===
-            # if applicable  ==========================================
+            # Last fluid_pp is always reserved for bubble gas state
+            # if applicable
             "fluid_pp(2)%gamma": 1.0 / (gamma_n - 1.0),
             "fluid_pp(2)%pi_inf": 0.0e00,
         }

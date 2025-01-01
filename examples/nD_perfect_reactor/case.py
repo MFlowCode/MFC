@@ -42,9 +42,9 @@ SAVE_COUNT = 20
 NS = NT // SAVE_COUNT
 
 case = {
-    # Logistics ================================================================
+    # Logistics
     "run_time_info": "T",
-    # Computational Domain Parameters ==========================================
+    # Computational Domain Parameters
     "x_domain%beg": -s / 2,
     "x_domain%end": +s / 2,
     "y_domain%beg": -s / 2,
@@ -60,7 +60,7 @@ case = {
     "t_step_save": NS,
     "t_step_print": NS,
     "parallel_io": "T" if args.ndim > 1 and args.mfc.get("mpi", True) else "F",
-    # Simulation Algorithm Parameters ==========================================
+    # Simulation Algorithm Parameters
     "model_eqns": 2,
     "num_fluids": 1,
     "num_patches": 1,
@@ -81,12 +81,12 @@ case = {
     "bc_y%end": -1,
     "bc_z%beg": -1,
     "bc_z%end": -1,
-    # Formatted Database Files Structure Parameters ============================
+    # Formatted Database Files Structure Parameters
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "T",
     "chem_wrt_T": "T",
-    # Patch 1 ==================================================================
+    # Patch 1
     "patch_icpp(1)%geometry": 3 ** (args.ndim - 1),
     "patch_icpp(1)%x_centroid": 0,
     "patch_icpp(1)%y_centroid": 0,
@@ -100,7 +100,7 @@ case = {
     "patch_icpp(1)%pres": sol.P,
     "patch_icpp(1)%alpha(1)": 1,
     "patch_icpp(1)%alpha_rho(1)": sol.density,
-    # Fluids Physical Parameters ===============================================
+    # Fluids Physical Parameters
     "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0,
 }
@@ -108,7 +108,7 @@ case = {
 if args.chemistry:
     case.update(
         {
-            # Chemistry ============================================================
+            # Chemistry
             "chemistry": "T",
             "chem_params%diffusion": "F",
             "chem_params%reactions": "T",

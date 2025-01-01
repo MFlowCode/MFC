@@ -42,9 +42,9 @@ vel = Min * cact * (beta - 1) / (beta * c0)
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "F",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": 0.0e00,
             "x_domain%end": 6.0e-03 / x0,
             "y_domain%beg": 0.0e00,
@@ -57,7 +57,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": 1000,  # 3000
             "t_step_save": 10,  # 10
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 2,
             # Use the 5 equation model
             "model_eqns": 2,
@@ -91,7 +91,7 @@ print(
             # Set IB to True and add 1 patch
             "ib": "T",
             "num_ibs": 1,
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             # Export primitive variables in double precision with parallel
             # I/O to minimize I/O computational time during large simulations
             "format": 1,
@@ -100,7 +100,7 @@ print(
             "fd_order": 1,
             "omega_wrt(3)": "T",
             "parallel_io": "T",
-            # Ambient State =====================================
+            # Ambient State
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 3.0e-03 / x0,
             "patch_icpp(1)%y_centroid": 1.50e-03 / x0,
@@ -113,7 +113,7 @@ print(
             "patch_icpp(1)%pres": patm,
             "patch_icpp(1)%r0": 1.0,
             "patch_icpp(1)%v0": 0.0e00,
-            # Shocked State =====================================
+            # Shocked State
             "patch_icpp(2)%geometry": 3,
             "patch_icpp(2)%x_centroid": 0.5e-03 / x0,
             "patch_icpp(2)%y_centroid": 1.50e-03 / x0,
@@ -127,7 +127,7 @@ print(
             "patch_icpp(2)%r0": 1.0,
             "patch_icpp(2)%v0": 0.0e00,
             "patch_icpp(2)%alter_patch(1)": "T",
-            # CBC Inflow / Outflow ========================================
+            # CBC Inflow / Outflow
             "bc_x%grcbc_in": "T",
             "bc_x%grcbc_out": "F",
             "bc_x%grcbc_vel_out": "F",
@@ -141,7 +141,7 @@ print(
             "bc_x%vel_out(2)": 0,
             "bc_x%vel_out(3)": 0,
             "bc_x%pres_out": 1.0,
-            # Patch: Cylinder Immersed Boundary ========================================
+            # Patch: Cylinder Immersed Boundary
             "patch_ib(1)%geometry": 4,
             "patch_ib(1)%x_centroid": 1.5e-03 / x0,
             "patch_ib(1)%y_centroid": 1.5e-03 / x0,
@@ -151,7 +151,7 @@ print(
             "patch_ib(1)%m": 0.02,
             "patch_ib(1)%slip": "F",
             "patch_ib(1)%theta": 15,
-            # Fluids Physical Parameters ===============================
+            # Fluids Physical Parameters
             # Surrounding liquid
             "fluid_pp(1)%gamma": 1.0e00 / (n_tait - 1.0e00),
             "fluid_pp(1)%pi_inf": n_tait * B_tait / (n_tait - 1.0),

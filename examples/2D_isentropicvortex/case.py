@@ -44,9 +44,9 @@ Nt = 1 / mydt
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": -3,
             "x_domain%end": 3,
             "y_domain%beg": -3,
@@ -68,7 +68,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": 10,
             "t_step_save": 1,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 3,
             "alt_soundspeed": "F",
@@ -88,14 +88,14 @@ print(
             "bc_x%end": -4,
             "bc_y%beg": -4,
             "bc_y%end": -4,
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "F",
             "omega_wrt(3)": "T",
             "fd_order": 2,
-            # Patch 1 ==================================================================
+            # Patch 1
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0,
             "patch_icpp(1)%y_centroid": 0,
@@ -106,7 +106,7 @@ print(
             "patch_icpp(1)%pres": pres,
             "patch_icpp(1)%alpha_rho(1)": alpha_rho1,
             "patch_icpp(1)%alpha(1)": 1.0,
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1.0e00),
             "fluid_pp(1)%pi_inf": 0.0,
         }

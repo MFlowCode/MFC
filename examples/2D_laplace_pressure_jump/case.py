@@ -25,9 +25,9 @@ mydt = 5e-6
 
 # Configuration case dictionary
 data = {
-    # Logistics =============================
+    # Logistics
     "run_time_info": "T",
-    # Computational Domain ==================
+    # Computational Domain
     "x_domain%beg": x0,
     "x_domain%end": x1,
     "y_domain%beg": y0,
@@ -40,7 +40,7 @@ data = {
     "t_step_start": 0,
     "t_step_stop": 100000,
     "t_step_save": 1000,
-    # Simulation Algorithm ==================
+    # Simulation Algorithm
     "model_eqns": 3,
     "alt_soundspeed": "F",
     "mixture_err": "T",
@@ -63,7 +63,7 @@ data = {
     "num_fluids": 2,
     "weno_avg": "T",
     "surface_tension": "T",
-    # Database Structure Parameters =========
+    # Database Structure Parameters
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "T",
@@ -71,13 +71,13 @@ data = {
     "cf_wrt": "T",
     "parallel_io": "T",
     "sigma": 8,
-    # Fluid Parameters (Water) ==============
+    # Fluid Parameters (Water)
     "fluid_pp(1)%gamma": 1.0e00 / (2.1e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 2.1e00 * 1.0e06 / (2.1e00 - 1.0e00),
-    # Fluid Parameters (Gas) ================
+    # Fluid Parameters (Gas)
     "fluid_pp(2)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(2)%pi_inf": 0.0e00,
-    # Air Patch ==========================
+    # Air Patch
     "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%x_centroid": 0,
     "patch_icpp(1)%y_centroid": 0,
@@ -92,7 +92,7 @@ data = {
     "patch_icpp(1)%alpha(1)": eps,
     "patch_icpp(1)%alpha(2)": 1 - eps,
     "patch_icpp(1)%cf_val": 0,
-    # Water Patch ========================
+    # Water Patch
     "patch_icpp(2)%alter_patch(1)": "T",
     "patch_icpp(2)%smoothen": "T",
     "patch_icpp(2)%smooth_patch_id": 1,
