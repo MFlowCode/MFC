@@ -29,4 +29,10 @@ if ! find ${@:-examples} -type f | grep -E '\.(py)$' \
     exit 1
 fi
 
+if ! find ${@:-benchmarks} -type f | grep -E '\.(py)$' \
+        | xargs -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_python.sh; then
+    error "Formatting MFC examples failed."
+    exit 1
+fi
+
 ok "Done. MFC has been formatted."
