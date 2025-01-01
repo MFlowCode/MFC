@@ -46,7 +46,7 @@ if args.scaling is None:
     parser.print_help()
     sys.exit(1)
 
-# \approx The number of cells per GB of memory. The exact value is not important.
+# approx The number of cells per GB of memory. The exact value is not important.
 cpg = 8000000 / 16.0
 # Number of ranks.
 nranks = args.mfc["nodes"] * args.mfc["tasks_per_node"]
