@@ -5,9 +5,9 @@ import json
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": 0.0e00,
             "x_domain%end": 4.0e-03 / 1.0e-03,
             "y_domain%beg": 0.0e00,
@@ -34,7 +34,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": 30,
             "t_step_save": 30,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 2,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -58,12 +58,12 @@ print(
             "bc_y%end": -6,
             "bc_z%beg": -2,
             "bc_z%end": -6,
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-            # Patch 1: High pressured water ============================================
+            # Patch 1: High pressured water
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": 80.0e-03 / 1.0e-03,
             "patch_icpp(1)%y_centroid": 80.0e-03 / 1.0e-03,
@@ -79,7 +79,7 @@ print(
             "patch_icpp(1)%alpha_rho(2)": 0.1e00,
             "patch_icpp(1)%alpha(1)": 0.9e00,
             "patch_icpp(1)%alpha(2)": 0.1e00,
-            # Patch 3: Air bubble ======================================================
+            # Patch 3: Air bubble
             "patch_icpp(2)%geometry": 8,
             "patch_icpp(2)%smoothen": "T",
             "patch_icpp(2)%smooth_patch_id": 1,
@@ -97,7 +97,7 @@ print(
             "patch_icpp(2)%alpha_rho(2)": 0.9e00,
             "patch_icpp(2)%alpha(1)": 0.1e00,
             "patch_icpp(2)%alpha(2)": 0.9e00,
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
             "fluid_pp(1)%pi_inf": 4.4e00 * 6.0e08 / (4.4e00 - 1.0e00),
             "fluid_pp(2)%gamma": 1.0e00 / (1.4e00 - 1.0e00),

@@ -64,9 +64,9 @@ alf = 4.0e-3
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "F",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": -Lx / 2.0,
             "x_domain%end": Lx / 2.0,
             "y_domain%beg": -Ly / 2.0,
@@ -79,7 +79,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": 1000,
             "t_step_save": 10,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 3,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -98,12 +98,12 @@ print(
             "bc_x%end": -1,
             "bc_y%beg": -1,
             "bc_y%end": -1,
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-            # Patch 1 ==================================================================
+            # Patch 1
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.0,
             "patch_icpp(1)%y_centroid": 0.0,
@@ -116,7 +116,7 @@ print(
             "patch_icpp(1)%pres": 1.0,
             "patch_icpp(1)%r0": 1.0e00,
             "patch_icpp(1)%v0": 0.0e00,
-            # Patch 2 ==================================================================
+            # Patch 2
             "patch_icpp(2)%geometry": 2,
             "patch_icpp(2)%alter_patch(1)": "T",
             "patch_icpp(2)%x_centroid": 0.0,
@@ -142,13 +142,13 @@ print(
             "patch_icpp(3)%alpha(1)": vf0,
             "patch_icpp(3)%r0": 1.0e00,
             "patch_icpp(3)%v0": 0.0e00,
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             # Surrounding liquid
             "fluid_pp(1)%gamma": 1.0e00 / (n_tait - 1.0e00),
             "fluid_pp(1)%pi_inf": n_tait * B_tait / (n_tait - 1.0),
             "fluid_pp(2)%gamma": 1.0 / (gamma_gas - 1.0),
             "fluid_pp(2)%pi_inf": 0.0e00,
-            # Bubbles ==================================================================
+            # Bubbles
             "bubbles_euler": "T",
             "bubble_model": 3,
             "polytropic": "T",

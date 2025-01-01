@@ -22,7 +22,7 @@ c_l = 1648.7
 G_l = 1e06
 
 
-# primitive vartiables
+# primitive variables
 patmos = 101325.0  # pa
 
 # problem specific variable
@@ -86,10 +86,10 @@ tsave = int(Nt / Nframes)
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
             #'sim_data'                     : 'T',
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": -dlengx / 2.0,
             "x_domain%end": dlengx / 2.0,
             "y_domain%beg": 0.0,
@@ -108,7 +108,7 @@ print(
             "t_step_start": tstart,
             "t_step_stop": tstop,
             "t_step_save": tsave,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 2,
             "model_eqns": 3,
             "alt_soundspeed": "F",
@@ -132,15 +132,15 @@ print(
             "bc_y%end": -1,
             "bc_z%beg": -1,
             "bc_z%end": -1,
-            # Turning on Hypoelasticity ================================================
+            # Turning on Hypoelasticity
             #'hypoelasticity'               : 'T',
             "hyperelasticity": "F",
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-            # acoustics setting =========================================================
+            # acoustics setting
             "acoustic_source": "T",
             "num_source": 1,
             "acoustic(1)%support": 3,
@@ -154,7 +154,7 @@ print(
             "acoustic(1)%length": dlengy,  # length of the place ???
             "acoustic(1)%height": dlengz,
             "acoustic(1)%dir": -math.pi,
-            # Patch 1: Background ======================================================
+            # Patch 1: Background
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": 0.0,
             "patch_icpp(1)%y_centroid": dlengy / 2.0,
@@ -171,7 +171,7 @@ print(
             "patch_icpp(1)%alpha(1)": alphal_back,
             "patch_icpp(1)%alpha(2)": alphag_back,
             #'patch_icpp(1)%tau_e(1)'       : 0.0,
-            # Patch 2: Lung ============================================================
+            # Patch 2: Lung
             "patch_icpp(2)%geometry": 13,
             "patch_icpp(2)%hcid": 301,
             #'patch_icpp(2)%geometry'       : 9,
@@ -191,7 +191,7 @@ print(
             "patch_icpp(2)%alpha_rho(2)": rhog_n * alphag_lung,
             "patch_icpp(2)%alpha(1)": alphal_lung,
             "patch_icpp(2)%alpha(2)": alphag_lung,
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gammal - 1.0e00),
             "fluid_pp(1)%pi_inf": gammal * Bl_n / (gammal - 1.0e00),
             "fluid_pp(1)%G": G_l_n,

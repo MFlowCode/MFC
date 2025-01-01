@@ -46,7 +46,7 @@ if args.scaling is None:
     parser.print_help()
     sys.exit(1)
 
-# \approx The number of cells per GB of memory. The exact value is not important.
+# approx The number of cells per GB of memory. The exact value is not important.
 cpg = 8000000 / 16.0
 # Number of ranks.
 nranks = args.mfc["nodes"] * args.mfc["tasks_per_node"]
@@ -215,10 +215,10 @@ tend = Nt * dt
 print(
     json.dumps(
         {
-            # Logistics ================================================
+            # Logistics
             "run_time_info": "T",
             "rdma_mpi": args.rdma_mpi,
-            # Computational Domain Parameters ==========================
+            # Computational Domain Parameters
             "x_domain%beg": xb,
             "x_domain%end": xe,
             "y_domain%beg": yb,
@@ -233,7 +233,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": Nt,
             "t_step_save": SF,
-            # Simulation Algorithm Parameters ==========================
+            # Simulation Algorithm Parameters
             "num_patches": 3,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -255,13 +255,13 @@ print(
             "bc_y%end": -3,
             "bc_z%beg": -2,
             "bc_z%end": -3,
-            # Formatted Database Files Structure Parameters ============
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
             # I will use 1 for WATER properties, and 2 for AIR properties
-            # Patch 1: Background (AIR - 2) =============================
+            # Patch 1: Background (AIR - 2)
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": (xb + xe) / 2 * StF,
             "patch_icpp(1)%y_centroid": (yb + ye) / 2 * StF,
@@ -277,7 +277,7 @@ print(
             "patch_icpp(1)%alpha_rho(2)": rho0a,
             "patch_icpp(1)%alpha(1)": 0.0e00,
             "patch_icpp(1)%alpha(2)": 1.0e00,
-            # Patch 2: Shocked state (AIR - 2) =========================
+            # Patch 2: Shocked state (AIR - 2)
             "patch_icpp(2)%geometry": 9,
             "patch_icpp(2)%alter_patch(1)": "T",
             "patch_icpp(2)%x_centroid": -ISD - (xe - xb) / 2 * StF,
@@ -294,7 +294,7 @@ print(
             "patch_icpp(2)%alpha_rho(2)": rhos,
             "patch_icpp(2)%alpha(1)": 0.0e00,
             "patch_icpp(2)%alpha(2)": 1.0e00,
-            # Patch 3: Droplet (WATER - 1) =============================
+            # Patch 3: Droplet (WATER - 1)
             "patch_icpp(3)%geometry": 8,
             "patch_icpp(3)%x_centroid": 0.0e00,
             "patch_icpp(3)%y_centroid": 0.0e00,
@@ -309,7 +309,7 @@ print(
             "patch_icpp(3)%alpha_rho(2)": 0.0e00,
             "patch_icpp(3)%alpha(1)": 1.0e00,
             "patch_icpp(3)%alpha(2)": 0.0e00,
-            # Fluids Physical Parameters ===============================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gamw - 1),
             "fluid_pp(1)%pi_inf": gamw * piw / (gamw - 1),
             "fluid_pp(2)%gamma": 1.0e00 / (gama - 1),

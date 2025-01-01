@@ -10,9 +10,9 @@ D = 0.1
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": -1.5 * D,
             "x_domain%end": 1.5 * D,
             # y direction
@@ -29,7 +29,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": 1500,
             "t_step_save": 30,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -56,7 +56,7 @@ print(
             "bc_z%end": -3,
             "ib": "T",
             "num_ibs": 1,
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
@@ -66,7 +66,7 @@ print(
             "omega_wrt(3)": "T",
             "parallel_io": "T",
             "fd_order": 2,
-            # Patch: Constant filled with air ==========================================
+            # Patch: Constant filled with air
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": 0.0,
             "patch_icpp(1)%y_centroid": 0.0,
@@ -80,7 +80,7 @@ print(
             "patch_icpp(1)%pres": 10918.2549,
             "patch_icpp(1)%alpha_rho(1)": (1.0) * rho1,
             "patch_icpp(1)%alpha(1)": 1.0e00,
-            # Patch: Model Immersed Boundary ===========================================
+            # Patch: Model Immersed Boundary
             "patch_ib(1)%geometry": 12,
             "patch_ib(1)%model_filepath": "3DPyramid_IBM.stl",
             "patch_ib(1)%model_translate(1)": -0.0500000984,
@@ -89,7 +89,7 @@ print(
             "patch_ib(1)%model_spc": 100,
             "patch_ib(1)%model_threshold": 0.95,
             "patch_ib(1)%slip": "F",
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),
             "fluid_pp(1)%pi_inf": 0,
             "fluid_pp(1)%Re(1)": 7535533.2,

@@ -27,9 +27,9 @@ Nt = int(tEnd / dt)
 print(
     json.dumps(
         {
-            # Logistics ================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================
+            # Computational Domain Parameters
             "x_domain%beg": -math.pi * L,
             "x_domain%end": math.pi * L,
             "y_domain%beg": -math.pi * L,
@@ -44,7 +44,7 @@ print(
             "t_step_start": 13529,
             "t_step_stop": Nt,
             "t_step_save": int(Nt / 100),
-            # Simulation Algorithm Parameters ==========================
+            # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -66,7 +66,7 @@ print(
             "bc_z%beg": -1,
             "bc_z%end": -1,
             "viscous": "T",
-            # Formatted Database Files Structure Parameters ============
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             # 'prim_vars_wrt'                :'T',
@@ -77,7 +77,7 @@ print(
             "fd_order": 4,
             "parallel_io": "T",
             # I will use 1 for WATER properties, and 2 for AIR properties
-            # Patch 1: Background (AIR - 2) =============================
+            # Patch 1: Background (AIR - 2)
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": 0,
             "patch_icpp(1)%y_centroid": 0,
@@ -91,7 +91,7 @@ print(
             "patch_icpp(1)%pres": f"{P0} + ({rho0}*{V0}**2/16)*(cos(2*x/{L}) + cos(2*y/{L}))*(cos(2*z/{L}) + 2)",
             "patch_icpp(1)%alpha_rho(1)": 1,
             "patch_icpp(1)%alpha(1)": 1,
-            # Fluids Physical Parameters ===============================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1),
             "fluid_pp(1)%pi_inf": 0,
             "fluid_pp(1)%Re(1)": 1 / mu,

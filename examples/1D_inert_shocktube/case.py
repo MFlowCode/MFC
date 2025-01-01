@@ -43,9 +43,9 @@ SAVE_COUNT = 200
 NS = NT // SAVE_COUNT
 
 case = {
-    # Logistics ================================================================
+    # Logistics
     "run_time_info": "T",
-    # Computational Domain Parameters ==========================================
+    # Computational Domain Parameters
     "x_domain%beg": -L / 2,
     "x_domain%end": +L / 2,
     "m": Nx,
@@ -57,7 +57,7 @@ case = {
     "t_step_save": NS,
     "t_step_print": NS,
     "parallel_io": "F",
-    # Simulation Algorithm Parameters ==========================================
+    # Simulation Algorithm Parameters
     "model_eqns": 2,
     "num_fluids": 1,
     "num_patches": 2,
@@ -74,11 +74,11 @@ case = {
     "avg_state": 1,
     "bc_x%beg": -2,
     "bc_x%end": -3,
-    # Chemistry ================================================================
+    # Chemistry
     "chemistry": "F" if not args.chemistry else "T",
     "chem_params%diffusion": "F",
     "chem_params%reactions": "T",
-    # Formatted Database Files Structure Parameters ============================
+    # Formatted Database Files Structure Parameters
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "T",
@@ -96,10 +96,10 @@ case = {
     "patch_icpp(2)%pres": sol_R.P,
     "patch_icpp(2)%alpha(1)": 1,
     "patch_icpp(2)%alpha_rho(1)": sol_R.density,
-    # Fluids Physical Parameters ===============================================
+    # Fluids Physical Parameters
     "fluid_pp(1)%gamma": 1.0e00 / (1.55e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0,
-    # Chemistry ================================================================
+    # Chemistry
     "cantera_file": ctfile,
 }
 

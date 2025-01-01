@@ -62,9 +62,9 @@ dt = 7.5e-9  # constant time-step - sec
 print(
     json.dumps(
         {
-            # Logistics ================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================
+            # Computational Domain Parameters
             "x_domain%beg": xb / x0,
             "x_domain%end": xe / x0,
             "y_domain%beg": yb / x0,
@@ -81,7 +81,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": 3000,
             "t_step_save": 500,
-            # Simulation Algorithm Parameters ==========================
+            # Simulation Algorithm Parameters
             "model_eqns": 2,
             "time_stepper": 3,
             "num_fluids": 2,
@@ -100,7 +100,7 @@ print(
             "bc_y%end": -1,
             "bc_z%beg": -1,
             "bc_z%end": -1,
-            # Acoustic source ==========================================
+            # Acoustic source
             "acoustic_source": "T",
             "num_source": 1,
             "acoustic(1)%support": 3,
@@ -115,12 +115,12 @@ print(
             "acoustic(1)%loc(3)": 0.0,
             "acoustic(1)%dir": 0.0,
             "acoustic(1)%delay": 0.0,
-            # Formatted Database Files Structure Parameters ============
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-            # Patch 1: Water (left) ====================================
+            # Patch 1: Water (left)
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": 0.0,
             "patch_icpp(1)%y_centroid": 0.0,
@@ -136,7 +136,7 @@ print(
             "patch_icpp(1)%alpha_rho(2)": 0.0,
             "patch_icpp(1)%alpha(1)": 1.0,
             "patch_icpp(1)%alpha(2)": 0.0,
-            # Lagrangian Bubbles ===========================
+            # Lagrangian Bubbles
             "bubbles_lagrange": "T",
             "bubble_model": 2,  # Keller-Miksis model
             "lag_params%nBubs_glb": 1194,  # Number of bubbles
@@ -156,7 +156,7 @@ print(
             "lag_params%x0": x0,
             "lag_params%diffcoefvap": diffVapor,
             "lag_params%Thost": T_host,
-            # Fluids Physical Parameters ===============================
+            # Fluids Physical Parameters
             # Host medium
             "fluid_pp(1)%gamma": 1.0 / (gamma_host - 1.0),
             "fluid_pp(1)%pi_inf": gamma_host * (pi_inf_host / p0) / (gamma_host - 1.0),

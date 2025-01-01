@@ -13,9 +13,9 @@ D = 0.1
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": -1 * D,
             "x_domain%end": 1 * D,
             "y_domain%beg": -0.3 * D,
@@ -27,7 +27,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": 6000,
             "t_step_save": 20,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -50,14 +50,14 @@ print(
             "bc_y%end": -3,
             "ib": "T",
             "num_ibs": 1,
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             # Export primitive variables in double precision with parallel
             # I/O to minimize I/O computational time during large simulations
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-            # Patch: Middle ============================================================
+            # Patch: Middle
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0,
             "patch_icpp(1)%y_centroid": 0,
@@ -75,7 +75,7 @@ print(
             "patch_ib(1)%model_spc": 200,
             "patch_ib(1)%model_threshold": 0.99,
             "patch_ib(1)%slip": "F",
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),
             "fluid_pp(1)%pi_inf": 0,
             "fluid_pp(1)%Re(1)": 10000,

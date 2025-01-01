@@ -9,9 +9,9 @@ Ny = 299
 print(
     json.dumps(
         {
-            # Logistics ================================================
+            # Logistics
             "run_time_info": "F",
-            # Computational Domain Parameters ==========================
+            # Computational Domain Parameters
             "x_domain%beg": 0,
             "x_domain%end": 7,
             "y_domain%beg": 0,
@@ -24,7 +24,7 @@ print(
             "n_start": 0,
             "t_stop": 4.0,
             "t_save": 0.04,
-            # Simulation Algorithm Parameters ==========================
+            # Simulation Algorithm Parameters
             "num_patches": 3,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -46,7 +46,7 @@ print(
             "bc_x%end": -3,  # 12
             "bc_y%beg": -3,
             "bc_y%end": -3,
-            # Formatted Database Files Structure Parameters ============
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
@@ -55,7 +55,7 @@ print(
             "schlieren_alpha(1)": 0.5,
             "schlieren_alpha(2)": 0.5,
             "parallel_io": "T",
-            # Patch 1: Left state   ====================================
+            # Patch 1: Left state
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.5,
             "patch_icpp(1)%y_centroid": 3,
@@ -68,7 +68,7 @@ print(
             "patch_icpp(1)%alpha_rho(2)": eps,
             "patch_icpp(1)%alpha(1)": 1 - eps,
             "patch_icpp(1)%alpha(2)": eps,
-            # Patch 2: Top right state  ================================
+            # Patch 2: Top right state
             "patch_icpp(2)%geometry": 3,
             "patch_icpp(2)%alter_patch(1)": "T",
             "patch_icpp(2)%x_centroid": 4,
@@ -82,7 +82,7 @@ print(
             "patch_icpp(2)%alpha_rho(2)": eps,
             "patch_icpp(2)%alpha(1)": 1 - eps,
             "patch_icpp(2)%alpha(2)": eps,
-            # Patch 3: Bottom right state  =============================
+            # Patch 3: Bottom right state
             "patch_icpp(3)%geometry": 3,
             "patch_icpp(3)%alter_patch(1)": "T",
             "patch_icpp(3)%x_centroid": 4,
@@ -96,7 +96,7 @@ print(
             "patch_icpp(3)%alpha_rho(2)": (1 - eps) * 1.0,
             "patch_icpp(3)%alpha(1)": eps,  # 0.95
             "patch_icpp(3)%alpha(2)": 1 - eps,  # 0.05,
-            # Fluids Physical Parameters ===============================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0 / (1.5 - 1.0),
             "fluid_pp(1)%pi_inf": 0,
             "fluid_pp(2)%gamma": 1.0 / (1.4 - 1.0),

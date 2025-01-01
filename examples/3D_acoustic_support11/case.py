@@ -5,9 +5,9 @@ import json, math
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": 0,
             "x_domain%end": 0.001,
             "y_domain%beg": 0,
@@ -21,7 +21,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": 200,
             "t_step_save": 10,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -44,12 +44,12 @@ print(
             "bc_y%end": -6,
             "bc_z%beg": -6,
             "bc_z%end": -6,
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-            # Patch 1 Liquid ===========================================================
+            # Patch 1 Liquid
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": 0.0005,
             "patch_icpp(1)%y_centroid": 0.0005,
@@ -63,7 +63,7 @@ print(
             "patch_icpp(1)%pres": 1e05,
             "patch_icpp(1)%alpha_rho(1)": 1100,
             "patch_icpp(1)%alpha(1)": 1.0,
-            # Acoustic source ==========================================================
+            # Acoustic source
             "acoustic_source": "T",
             "num_source": 2,
             "acoustic(1)%support": 11,
@@ -96,7 +96,7 @@ print(
             "acoustic(2)%element_on": 0,
             "acoustic(2)%rotate_angle": math.pi / 12,
             "acoustic(2)%delay": 1e-7,
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
             "fluid_pp(1)%pi_inf": 4.4e00 * 5.57e08 / (4.4e00 - 1.0e00),
         }
