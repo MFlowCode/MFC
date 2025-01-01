@@ -32,7 +32,7 @@ MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Progr
   
 Get in touch with <a href="mailto:shb@gatech.edu">Spencer</a> if you have questions!
 We have an [active Slack channel](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw) and development team.
-MFC has high-level documentation, visualizations, and more on [its website](https://mflowcode.github.io/).
+MFC has high- and low-level documentation, visualizations, and more on [its website](https://mflowcode.github.io/).
 
 ## An example
 
@@ -44,13 +44,13 @@ MFC can execute high-fidelity simulations of shock-droplet interaction (see `exa
     <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="700"/>
 </p>
 
-This one simulates high-Mach flow over an airfoil, shown below.
+This one simulates high-Mach flow over an airfoil:
 
 <p align="center">
     <img src="docs/res/airfoil.png" alt="Airfoil Example" width="700"/><br/>
 </p>
 
-This one simulates high amplitude acoustic wave through a circular orifice opening, shown below.
+And here is a high amplitude acoustic wave reflecting and emerging through a circular orifice:
 
 <p align="center">
     <img src="docs/res/orifice.png" alt="Orifice Example" width="700"/><br/>
@@ -155,8 +155,8 @@ They are organized below. Just click the drop-downs!
 
 ### Large-scale and accelerated simulation
 
-* GPU compatible on NVIDIA (P/V/A/H100, GH200, etc.) and AMD (MI200+) hardware
-* Ideal weak scaling to 100% of the largest GPU supercomputers
+* GPU compatible on NVIDIA ([P/V/A/H]100, GH200, etc.) and AMD (MI[1/2/3]00+) GPU and APU hardware
+* Ideal weak scaling to 100% of the largest GPU and superchip supercomputers
 	* \>10K NVIDIA GPUs on [OLCF Summit](https://www.olcf.ornl.gov/summit/) (NV V100-based)
 	* \>66K AMD GPUs on the first exascale computer, [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) (AMD MI250X-based)
 * Near compute roofline behavior
@@ -167,8 +167,8 @@ They are organized below. Just click the drop-downs!
 
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
-	* \>250 Regression tests with each PR.
- 		* Performed with GNU (GCC), Intel, Cray (CCE), and NVIDIA (NVHPC) compilers on NVIDIA and AMD GPUs.
+	* \>300 Regression tests with each PR.
+ 		* Performed with GNU (GCC), Intel (oneAPI), Cray (CCE), and NVIDIA (NVHPC) compilers on NVIDIA and AMD GPUs.
 		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups
 * Continuous Deployment (CD) of [website](https://mflowcode.github.io) and [API documentation](https://mflowcode.github.io/documentation/index.html)
@@ -214,11 +214,11 @@ MFC is under the MIT license (see [LICENSE](LICENSE) for full text).
 
 ## Acknowledgements
 
-Multiple federal sponsors have supported MFC development, including the US Department of Defense (DOD), National Institutes of Health (NIH), Department of Energy (DOE), and National Science Foundation (NSF).
+Federal sponsors have supported MFC development, including the US Department of Defense (DOD), the National Institutes of Health (NIH), the Department of Energy (DOE), and the National Science Foundation (NSF).
 
 MFC computations have used many supercomputing systems. A partial list is below
-  * OLCF Frontier and Summit, and testbed systems Wombat, Crusher, and Spock (allocation CFD154, PI Bryngelson)
-  * LLNL Lassen and El Capitan testbed system, Tioga
-  * PSC Bridges(1/2), NCSA Delta, SDSC Comet and Expanse, Purdue Anvil, TACC Stampede(1-3), and TAMU ACES via ACCESS-CI (allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson))
-  * DOD systems Onyx, Carpenter, and Nautilus via the DOD HPCMP program
+  * OLCF Frontier and Summit, and testbeds Wombat, Crusher, and Spock (allocation CFD154, PI Bryngelson)
+  * LLNL Tuolumne and Lassen, El Capitan early access system Tioga
+  * PSC Bridges(1/2), NCSA Delta, SDSC Comet and Expanse, Purdue Anvil, TACC Stampede(1-3), and TAMU ACES via ACCESS-CI allocations from Bryngelson, Colonius, Rodriguez, and more.
+  * DOD systems Onyx, Carpenter, Nautilus, and Narwhal via the DOD HPCMP program
   * Sandia National Labs systems Doom and Attaway and testbed systems Weaver and Vortex
