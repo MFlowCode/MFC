@@ -64,12 +64,12 @@ started, run ./mfc.sh build -h.""",
         if "g" not in mask:
             p.add_argument("-g", "--gpus", nargs="+", type=int, default=None, help="(Optional GPU override) List of GPU #s to use (environment default if unspecified).")
 
-    # === BUILD ===
+    # BUILD
     add_common_arguments(build, "g")
     build.add_argument("-i", "--input", type=str, default=None, help="(GPU Optimization) Build a version of MFC optimized for a case.")
     build.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded (requires --input).")
 
-    # === TEST ===
+    # TEST
     test_cases = list_cases()
 
     add_common_arguments(test, "t")
@@ -90,7 +90,7 @@ started, run ./mfc.sh build -h.""",
     test_meg.add_argument("--add-new-variables", action="store_true", default=False, help="(Test Generation) If new variables are found in D/ when running tests, add them to the golden files.")
     test_meg.add_argument("--remove-old-tests",  action="store_true", default=False, help="(Test Generation) Delete tests directories that are no longer.")
 
-    # === RUN ===
+    # RUN
     add_common_arguments(run)
     run.add_argument("input",                      metavar="INPUT",              type=str,                     help="Input file to run.")
     run.add_argument("-e", "--engine",             choices=["interactive", "batch"],              type=str, default="interactive", help="Job execution/submission engine choice.")
@@ -116,20 +116,20 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("--omni",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM omniperf.")
     run.add_argument("--roc",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM rocprof.")
 
-    # === BENCH ===
+    # BENCH
     add_common_arguments(bench)
     bench.add_argument("-o", "--output", metavar="OUTPUT", default=None, type=str, required="True", help="Path to the YAML output file to write the results to.")
     bench.add_argument("-m", "--mem", metavar="MEM", default=1, type=int, help="Memory per task for benchmarking cases")
 
-    # === BENCH_DIFF ===
+    # BENCH_DIFF
     add_common_arguments(bench_diff, "t")
     bench_diff.add_argument("lhs", metavar="LHS", type=str, help="Path to a benchmark result YAML file.")
     bench_diff.add_argument("rhs", metavar="RHS", type=str, help="Path to a benchmark result YAML file.")
 
-    # === COUNT ===
+    # COUNT
     add_common_arguments(count, "g")
 
-    # === COUNT ===
+    # COUNT
     add_common_arguments(count_diff, "g")
 
     try:

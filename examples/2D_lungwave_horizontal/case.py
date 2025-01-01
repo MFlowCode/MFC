@@ -21,7 +21,7 @@ rhol = 996.0
 c_l = 1648.7
 G_l = 1e3
 
-# primitive vartiables
+# primitive variables
 patmos = 101325.0  # pa
 
 # problem specific variable
@@ -82,9 +82,9 @@ tsave = int(Nt / Nframes)
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": -dlengx / 2.0,
             "x_domain%end": dlengx / 2.0,
             "y_domain%beg": 0.0,
@@ -96,7 +96,7 @@ print(
             "t_step_start": tstart,
             "t_step_stop": tstop,
             "t_step_save": tsave,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 2,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -118,12 +118,12 @@ print(
             "bc_x%end": -6,
             "bc_y%beg": -1,
             "bc_y%end": -1,
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-            # Monopole setting =========================================================
+            # Monopole setting
             "acoustic_source": "T",  # creating an acoustic wave
             "num_source": 1,  # place in the middle and expand
             "acoustic(1)%pulse": 3,  # square  wave
@@ -135,7 +135,7 @@ print(
             "acoustic(1)%loc(1)": 0.7 * dlengy,  # x_center of the domain
             "acoustic(1)%loc(2)": dlengy / 2,  # upper boundary of the domain
             "acoustic(1)%dir": -math.pi,  # direction: -pi/2
-            # Patch 1: Background ======================================================
+            # Patch 1: Background
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.0,
             "patch_icpp(1)%y_centroid": dlengy / 2.0,
@@ -148,7 +148,7 @@ print(
             "patch_icpp(1)%alpha_rho(2)": rhog_n * alphag_back,
             "patch_icpp(1)%alpha(1)": alphal_back,
             "patch_icpp(1)%alpha(2)": alphag_back,
-            # Patch 2: Lung ============================================================
+            # Patch 2: Lung
             "patch_icpp(2)%geometry": 7,
             "patch_icpp(2)%hcid": 206,
             "patch_icpp(2)%alter_patch(1)": "T",
@@ -164,7 +164,7 @@ print(
             "patch_icpp(2)%alpha_rho(2)": rhog_n * alphag_lung,
             "patch_icpp(2)%alpha(1)": alphal_lung,
             "patch_icpp(2)%alpha(2)": alphag_lung,
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gammal - 1.0e00),
             "fluid_pp(1)%pi_inf": gammal * Bl_n / (gammal - 1.0e00),
             "fluid_pp(2)%gamma": 1.0e00 / (gammag - 1.0e00),

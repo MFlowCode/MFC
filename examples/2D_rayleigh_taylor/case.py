@@ -28,9 +28,9 @@ Ns = math.ceil(Nt / 100)
 
 # Configuration case dictionary
 data = {
-    # Logistics =============================
+    # Logistics
     "run_time_info": "T",
-    # Computational Domain ==================
+    # Computational Domain
     "x_domain%beg": x0,
     "x_domain%end": x1,
     "y_domain%beg": y0,
@@ -43,7 +43,7 @@ data = {
     "t_step_start": 0,
     "t_step_stop": Nt,
     "t_step_save": Ns,
-    # Simulation Algorithm ==================
+    # Simulation Algorithm
     "model_eqns": 3,
     "alt_soundspeed": "F",
     "mixture_err": "T",
@@ -65,26 +65,26 @@ data = {
     "num_patches": 1,
     "num_fluids": 2,
     "viscous": "T",
-    # Database Structure Parameters =========
+    # Database Structure Parameters
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "T",
     "parallel_io": "T",
-    # Fluid Parameters (Heavy Gas) ==========
+    # Fluid Parameters (Heavy Gas)
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0.0e00,
     "fluid_pp(1)%Re(1)": 1 / 0.0219,
-    # Fluid Parameters (Light Gas) ==========
+    # Fluid Parameters (Light Gas)
     "fluid_pp(2)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(2)%pi_inf": 0.0e00,
     "fluid_pp(2)%Re(1)": 1 / 0.0073,
-    # Body Forces ===========================
+    # Body Forces
     "bf_y": "T",
     "k_y": 0.0,
     "w_y": 0.0,
     "p_y": 0.0,
     "g_y": -9.81,
-    # Water Patch ==========================
+    # Water Patch
     "patch_icpp(1)%geometry": 7,
     "patch_icpp(1)%hcid": 204,
     "patch_icpp(1)%x_centroid": 0,

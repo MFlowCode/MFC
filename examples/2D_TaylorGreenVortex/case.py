@@ -12,9 +12,9 @@ L = math.pi * l
 print(
     json.dumps(
         {
-            # Logistics ================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================
+            # Computational Domain Parameters
             # Periodic Domain from -pi*l to pi*l
             "x_domain%beg": -L,
             "x_domain%end": L,
@@ -27,7 +27,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": 10000,
             "t_step_save": 100,
-            # Simulation Algorithm Parameters ==========================
+            # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -50,12 +50,12 @@ print(
             "bc_y%beg": -1,
             "bc_y%end": -1,
             "viscous": "T",
-            # Formatted Database Files Structure Parameters ============
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-            # Patch 1: Base ============================================
+            # Patch 1: Base
             # Uncomment the configuration of the Taylor Green Vortex in
             # 2D analytical patch under m_patch.f90
             "patch_icpp(1)%geometry": 20,
@@ -68,7 +68,7 @@ print(
             "patch_icpp(1)%pres": 1.0e05,
             "patch_icpp(1)%alpha_rho(1)": 1.22,
             "patch_icpp(1)%alpha(1)": 1.0,
-            # Fluids Physical Parameters ===============================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),
             "fluid_pp(1)%pi_inf": 0.0,
             # Shear viscosity of STD air

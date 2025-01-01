@@ -4,9 +4,9 @@ import json, math
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": 0,
             "x_domain%end": 0.3,
             "y_domain%beg": 0,
@@ -18,7 +18,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": 1000,
             "t_step_save": 10,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -39,7 +39,7 @@ print(
             "bc_x%end": -6,
             "bc_y%beg": -6,
             "bc_y%end": -6,
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
@@ -49,7 +49,7 @@ print(
             "num_probes": 1,
             "probe(1)%x": 0.13,
             "probe(1)%y": 0.05,
-            # Patch 1 Liquid ===========================================================
+            # Patch 1 Liquid
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.15,
             "patch_icpp(1)%y_centroid": 0.05,
@@ -60,7 +60,7 @@ print(
             "patch_icpp(1)%pres": 1e05,
             "patch_icpp(1)%alpha_rho(1)": 1.19,
             "patch_icpp(1)%alpha(1)": 1.0,
-            # Acoustic source ==========================================================
+            # Acoustic source
             "acoustic_source": "T",
             "num_source": 1,
             "acoustic(1)%support": 2,
@@ -74,7 +74,7 @@ print(
             "acoustic(1)%bb_num_freq": 100,
             "acoustic(1)%bb_lowest_freq": 500.0,
             "acoustic(1)%bb_bandwidth": 500.0,
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
             "fluid_pp(1)%pi_inf": 0,
         }

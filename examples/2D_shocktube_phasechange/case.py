@@ -153,13 +153,13 @@ Nt = AS * SF
 # Total physical time
 tend = Nt * dt
 
-# Configuring case dictionary ==================================================
+# Configuring case dictionary
 print(
     json.dumps(
         {
-            # Logistics ================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================
+            # Computational Domain Parameters
             "x_domain%beg": xb,
             "x_domain%end": xe,
             "y_domain%beg": yb,
@@ -171,7 +171,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": Nt,
             "t_step_save": AS,
-            # Simulation Algorithm Parameters ==========================
+            # Simulation Algorithm Parameters
             "num_patches": 3,
             "model_eqns": 3,
             "num_fluids": 3,
@@ -194,12 +194,12 @@ print(
             "bc_x%end": -6,
             "bc_y%beg": -2,
             "bc_y%end": -6,
-            # Formatted Database Files Structure Parameters ============
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-            # Patch 1 - Background =====================================
+            # Patch 1 - Background
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": (xe + xb) * 2 / 4,
             "patch_icpp(1)%y_centroid": (ye + yb) * 2 / 4,
@@ -214,7 +214,7 @@ print(
             "patch_icpp(1)%alpha(1)": awl1,
             "patch_icpp(1)%alpha(2)": awv1,
             "patch_icpp(1)%alpha(3)": aa1,
-            # Patch 2 - Shocked State ==================================
+            # Patch 2 - Shocked State
             "patch_icpp(2)%geometry": 3,
             "patch_icpp(2)%x_centroid": (xe + xb) * 1 / 4,
             "patch_icpp(2)%y_centroid": (ye + yb) * 2 / 4,
@@ -230,7 +230,7 @@ print(
             "patch_icpp(2)%alpha(2)": awv2,
             "patch_icpp(2)%alpha(3)": aa2,
             "patch_icpp(2)%alter_patch(1)": "T",
-            # patch 3: Water ============================================
+            # patch 3: Water
             "patch_icpp(3)%geometry": 3,
             "patch_icpp(3)%x_centroid": (xe + xb) * 2.5 / 4,
             "patch_icpp(3)%y_centroid": (ye + yb) * 2 / 4,
@@ -246,7 +246,7 @@ print(
             "patch_icpp(3)%alpha(2)": awv3,
             "patch_icpp(3)%alpha(3)": aa3,
             "patch_icpp(3)%alter_patch(1)": "T",
-            # Fluids Physical Parameters ===============================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gamwl - 1),
             "fluid_pp(1)%pi_inf": gamwl * piwl / (gamwl - 1),
             "fluid_pp(1)%cv": cvwl,

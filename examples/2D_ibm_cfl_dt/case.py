@@ -8,9 +8,9 @@ gam_a = 1.4
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             # For these computations, the cylinder is placed at the (0,0,0)
             # domain origin.
             # axial direction
@@ -28,7 +28,7 @@ print(
             "n_start": 0,
             "t_save": 8e-5,
             "t_stop": 8e-3,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             # Only one patches are necessary, the air tube
             "num_patches": 1,
             # Use the 5 equation model
@@ -63,14 +63,14 @@ print(
             "ib": "T",
             "num_ibs": 1,
             "viscous": "T",
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "E_wrt": "T",
             "parallel_io": "T",
             "c_wrt": "T",
-            # Patch: Constant Tube filled with air =====================================
+            # Patch: Constant Tube filled with air
             # Specify the cylindrical air tube grid geometry
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 4.0e-03,
@@ -84,13 +84,13 @@ print(
             "patch_icpp(1)%pres": 1.0e00,
             "patch_icpp(1)%alpha_rho(1)": 1.0e00,
             "patch_icpp(1)%alpha(1)": 1.0e00,
-            # Patch: Cylinder Immersed Boundary ========================================
+            # Patch: Cylinder Immersed Boundary
             "patch_ib(1)%geometry": 2,
             "patch_ib(1)%x_centroid": 1.5e-03,
             "patch_ib(1)%y_centroid": 3e-03,
             "patch_ib(1)%radius": 0.4e-03,
             "patch_ib(1)%slip": "F",
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
             "fluid_pp(1)%pi_inf": 0,
             "fluid_pp(1)%Re(1)": 250000,
