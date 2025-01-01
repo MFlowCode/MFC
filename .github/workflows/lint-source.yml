@@ -44,4 +44,8 @@ jobs:
 
     - name: Looking for junk comments in examples
       run: |
-        ! grep -R '#' ./examples/**/*.py
+        ! grep -R '# ===' ./benchmarks **/*.py
+        ! grep -R '# ===' ./examples/**/*.py
+        ! grep -R '==='   ./benchmarks/**/*.py
+        ! grep -R '==='   ./examples/**/*.py
+

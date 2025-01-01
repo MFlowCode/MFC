@@ -22,7 +22,7 @@ rhol = 996.0
 c_l = 1648.7
 G_l = 1e3
 
-# primitive vartiables
+# primitive variables
 patmos = 101325.0  # pa
 
 # problem specific variable

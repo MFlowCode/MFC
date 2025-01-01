@@ -118,7 +118,7 @@ contains
                     ! throughout the phase-change process.
                     rM = q_cons_vf(lp + contxb - 1)%sf(j, k, l) + q_cons_vf(vp + contxb - 1)%sf(j, k, l)
 
-                    ! correcting negative (recating) mass fraction values in case they happen
+                    ! correcting negative (reacting) mass fraction values in case they happen
                     call s_correct_partial_densities(MCT, q_cons_vf, rM, j, k, l)
 
                     ! fixing m1 and m2 AFTER correcting the partial densities. Note that these values must be stored for the phase
