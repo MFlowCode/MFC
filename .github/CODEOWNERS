@@ -2,10 +2,14 @@
 # default owner of all files in the repository.
 *                  @sbryngelson
 
-# Henry Le Berre (henryleberre) and Ben Wilfong (wilfonba)
-src/               @sbryngelson @henryleberre @wilfonba
-docs/              @sbryngelson @henryleberre @wilfonba
-toolchain/         @sbryngelson @henryleberre @wilfonba
-tests/             @sbryngelson @henryleberre @wilfonba
-mfc.sh             @sbryngelson @henryleberre @wilfonba
-CMakeLists.txt     @sbryngelson @henryleberre @wilfonba
+# @core-devs
+src/               @MFlowCode/core-devs
+docs/              @MFlowCode/core-devs
+toolchain/         @MFlowCode/core-devs
+tests/             @MFlowCode/core-devs
+benchmarks/        @MFlowCode/core-devs
+mfc.sh             @MFlowCode/core-devs
+CMakeLists.txt     @MFlowCode/core-devs
+
+# @physics-devs
+src/               @MFlowCode/physics-devs
