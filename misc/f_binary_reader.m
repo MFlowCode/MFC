@@ -22,7 +22,7 @@ function mat_struct = f_binary_reader(file_loc, byte_order, precision, name_len)
 	dbfile = fopen(file_loc, 'r', byte_order);
 	
 	
-	% Input and Output of the Binary Database Structure Information ============
+	% Input and Output of the Binary Database Structure Information
 	
 	% Reading in, respectively, cell-numbers in the x-, y- and z-directions and
 	% the total number of flow variables located in the database
@@ -38,10 +38,7 @@ function mat_struct = f_binary_reader(file_loc, byte_order, precision, name_len)
 	mat_struct.('n') = n;
 	mat_struct.('p') = p;
 	
-	% ==========================================================================
-	
-	
-	% Input and Output of the Grid Data ========================================
+	% Input and Output of the Grid Data
 	
 	% Reading in the cell-boundary locations in the x-direction
 	fread(dbfile, 1, 'real*4', byte_order);
@@ -86,10 +83,7 @@ function mat_struct = f_binary_reader(file_loc, byte_order, precision, name_len)
 	% Discarding the footer of the grid data record
 	fread(dbfile, 1, 'real*4', byte_order);
 	
-	% ==========================================================================
-	
-	
-	% Input and Output of the Flow Variables ===================================
+	% Input and Output of the Flow Variables
 	for j = 1:dbvars
 		
 		% Reading in a flow variable from the database
@@ -102,11 +96,8 @@ function mat_struct = f_binary_reader(file_loc, byte_order, precision, name_len)
 		mat_struct.(varname) = q_fp;
 		
 	end
-	% ==========================================================================
-	
 	
 	% Closing the binary database file
 	fclose(dbfile);
 	
-	
-% END: function f_mfc_binary_reader ============================================
+% END: function f_mfc_binary_reader

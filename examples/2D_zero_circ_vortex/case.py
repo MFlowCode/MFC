@@ -24,9 +24,9 @@ Nt = int(Tfinal / mydt)
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": -20,
             "x_domain%end": 20,
             "y_domain%beg": -10,
@@ -38,7 +38,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": Nt,
             "t_step_save": int(Nt / 100),
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 2,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -58,14 +58,14 @@ print(
             "bc_x%end": -8,
             "bc_y%beg": -6,
             "bc_y%end": -6,
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
             "omega_wrt(3)": "T",
             "fd_order": 2,
-            # Patch 1 ==================================================================
+            # Patch 1
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0,
             "patch_icpp(1)%y_centroid": 0,
@@ -76,7 +76,7 @@ print(
             "patch_icpp(1)%pres": 101325,
             "patch_icpp(1)%alpha_rho(1)": 1,
             "patch_icpp(1)%alpha(1)": 1.0,
-            # Patch 2 ==================================================================
+            # Patch 2
             "patch_icpp(2)%geometry": 2,
             "patch_icpp(2)%x_centroid": 0,
             "patch_icpp(2)%y_centroid": 0,
@@ -87,7 +87,7 @@ print(
             "patch_icpp(2)%alpha_rho(1)": f"{rho_inf}*(1 - 0.5*({gam} - 1)*({Mv} / {M_inf})**2*exp(0.5*(1 - sqrt(x**2 + y**2))))**(1 / ({gam} - 1))",
             "patch_icpp(2)%alpha(1)": 1.0,
             "patch_icpp(2)%alter_patch(1)": "T",
-            # CBC Inflow / Outflow ========================================
+            # CBC Inflow / Outflow
             "bc_x%grcbc_in": "T",
             "bc_x%grcbc_out": "T",
             "bc_x%grcbc_vel_out": "T",
@@ -101,7 +101,7 @@ print(
             "bc_x%vel_out(2)": 0,
             "bc_x%vel_out(3)": 0,
             "bc_x%pres_out": p_inf,
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam - 1.0e00),
             "fluid_pp(1)%pi_inf": 0.0,
         }

@@ -77,9 +77,9 @@ Nt = int(Nout * Nfiles)
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "F",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": -10.0e-03 / x0,
             "x_domain%end": 10.0e-03 / x0,
             "stretch_x": "F",
@@ -91,7 +91,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": 1,
             "t_step_save": 1,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -111,7 +111,7 @@ print(
             "avg_state": 2,
             "bc_x%beg": -1,
             "bc_x%end": -1,
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
@@ -121,7 +121,7 @@ print(
             "probe_wrt": "T",
             "num_probes": 1,
             "probe(1)%x": 0.0,
-            # Patch 1 _ Background =====================================================
+            # Patch 1 _ Background
             "patch_icpp(1)%geometry": 1,
             "patch_icpp(1)%x_centroid": 0.0,
             "patch_icpp(1)%length_x": 20.0e-03 / x0,
@@ -131,7 +131,7 @@ print(
             "patch_icpp(1)%alpha(1)": vf0,
             "patch_icpp(1)%r0": 1.0,
             "patch_icpp(1)%v0": 0.0e00,
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             # Surrounding liquid
             "fluid_pp(1)%gamma": 1.0e00 / (n_tait - 1.0e00),
             "fluid_pp(1)%pi_inf": n_tait * B_tait / (n_tait - 1.0),
@@ -142,18 +142,18 @@ print(
             "fluid_pp(1)%M_v": M_v,
             "fluid_pp(1)%mu_v": mu_v,
             "fluid_pp(1)%k_v": k_v,
-            # Last fluid_pp is always reserved for bubble gas state ===================
-            # if applicable  ==========================================================
+            # Last fluid_pp is always reserved for bubble gas state
+            # if applicable
             "fluid_pp(2)%gamma": 1.0 / (gamma_gas - 1.0),
             "fluid_pp(2)%pi_inf": 0.0e00,
             "fluid_pp(2)%gamma_v": gamma_n,
             "fluid_pp(2)%M_v": M_n,
             "fluid_pp(2)%mu_v": mu_n,
             "fluid_pp(2)%k_v": k_n,
-            # Non-polytropic gas compression model AND/OR Tait EOS =====================
+            # Non-polytropic gas compression model AND/OR Tait EOS
             "pref": p0,
             "rhoref": rho0,
-            # Bubbles ==================================================================
+            # Bubbles
             "bubbles_euler": "T",
             "bubble_model": 2,
             "polytropic": "T",

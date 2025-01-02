@@ -9,9 +9,9 @@ Mu2 = 0.01
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": -0.500000000000000e00,
             "x_domain%end": 0.500000000000000e00,
             "y_domain%beg": -0.250000000000000e00,
@@ -23,7 +23,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": int(4e5),
             "t_step_save": int(1e4),
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "model_eqns": 2,
             "num_fluids": 2,
             "num_patches": 2,
@@ -43,12 +43,12 @@ print(
             "bc_y%beg": -5,
             "bc_y%end": -5,
             "viscous": "T",
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-            # Patch 1: initialize entire domain ========================================
+            # Patch 1: initialize entire domain
             "patch_icpp(2)%geometry": 3,
             "patch_icpp(2)%x_centroid": 0.00000000000000e00,
             "patch_icpp(2)%y_centroid": 0.00000000000000e00,
@@ -61,7 +61,7 @@ print(
             "patch_icpp(2)%alpha_rho(2)": 1000.0 * 1e-12,
             "patch_icpp(2)%alpha(1)": 1.00000000000000e00 - 1.0e-12,
             "patch_icpp(2)%alpha(2)": 1.0e-12,
-            # Patch 2: overwrite lower half plane ======================================
+            # Patch 2: overwrite lower half plane
             "patch_icpp(1)%geometry": 4,
             "patch_icpp(1)%x_centroid": 0.00000000000000e00,
             "patch_icpp(1)%y_centroid": 0.00000000000000e00,
@@ -78,7 +78,7 @@ print(
             "patch_icpp(1)%alpha_rho(2)": 1000.000000000000e00,
             "patch_icpp(1)%alpha(1)": 1.00000000000000e-12,
             "patch_icpp(1)%alpha(2)": 1 - 1.00000000000000e-12,
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
             "fluid_pp(1)%pi_inf": 4.4e00 * 6.0e08 / (4.4e00 - 1.0e00),
             "fluid_pp(1)%Re(1)": 1 / Mu1,

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #!/usr/bin/env python3
-# Dependencies and Logistics ===================================================
+# Dependencies and Logistics
 # Command to navigate between directories
 
 import math
@@ -17,9 +17,9 @@ c_l, c_g = math.sqrt((p_l + 4.0e8) / rho_l), math.sqrt(1.4 * p_g / rho_g)
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": -0.5,
             "x_domain%end": 0.5,
             "y_domain%beg": -0.5,
@@ -32,7 +32,7 @@ print(
             "t_step_start": 0,
             "t_step_stop": 2000,
             "t_step_save": 20,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 2,
             "model_eqns": 2,
             "alt_soundspeed": "F",
@@ -55,12 +55,12 @@ print(
             "bc_y%beg": -6,
             "bc_y%end": -6,
             "viscous": "T",
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-            # Patch 1: Top fluid, water ================================================
+            # Patch 1: Top fluid, water
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.0,
             "patch_icpp(1)%y_centroid": 0,
@@ -73,7 +73,7 @@ print(
             "patch_icpp(1)%alpha_rho(2)": rho_l,
             "patch_icpp(1)%alpha(1)": 0.5e00,
             "patch_icpp(1)%alpha(2)": 0.5e00,
-            # Patch 2: Main bottom fluid, water ========================================
+            # Patch 2: Main bottom fluid, water
             "patch_icpp(2)%geometry": 3,
             "patch_icpp(2)%x_centroid": 0.0,
             "patch_icpp(2)%y_centroid": 0.25,
@@ -87,7 +87,7 @@ print(
             "patch_icpp(2)%alpha_rho(2)": rho_g,
             "patch_icpp(2)%alpha(1)": 0.0,
             "patch_icpp(2)%alpha(2)": 1.0e00,
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
             "fluid_pp(2)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
             "fluid_pp(1)%pi_inf": 4.4e00 * 6.0e08 / (4.4e00 - 1.0e00),

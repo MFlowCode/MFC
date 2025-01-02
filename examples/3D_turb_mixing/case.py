@@ -2,7 +2,7 @@
 import math
 import json
 
-# SURROUNDING FLOW =============================================================
+# SURROUNDING FLOW
 # Nondimensional parameters
 Re0 = 50.0  # Reynolds number
 M0 = 0.2  # Mach number
@@ -46,9 +46,9 @@ t_step_stop = int(Nt)
 print(
     json.dumps(
         {
-            # Logistics ================================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================================
+            # Computational Domain Parameters
             "x_domain%beg": 0.0,
             "x_domain%end": Lx,
             "y_domain%beg": -Ly / 2.0,
@@ -62,7 +62,7 @@ print(
             "t_step_start": t_step_start,
             "t_step_stop": t_step_stop,
             "t_step_save": t_save,
-            # Simulation Algorithm Parameters ==========================================
+            # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
             "num_fluids": 1,
@@ -82,7 +82,7 @@ print(
             "bc_z%beg": -1,
             "bc_z%end": -1,
             "viscous": "T",
-            # Formatted Database Files Structure Parameters ============================
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "cons_vars_wrt": "T",
@@ -93,7 +93,7 @@ print(
             "omega_wrt(2)": "T",
             "omega_wrt(3)": "T",
             "qm_wrt": "T",
-            # Patch 1 ==================================================================
+            # Patch 1
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": Lx / 2.0,
             "patch_icpp(1)%y_centroid": 0.0,
@@ -107,12 +107,12 @@ print(
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%vel(3)": 0.0,
             "patch_icpp(1)%pres": pres0,
-            # Mixing layer === =========================================================
+            # Mixing layer
             "mixlayer_vel_profile": "T",
             "mixlayer_vel_coef": 1.0,
             "mixlayer_domain": 1.0,
             "mixlayer_perturb": "T",
-            # Fluids Physical Parameters ===============================================
+            # Fluids Physical Parameters
             # Surrounding liquid
             "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
             "fluid_pp(1)%pi_inf": 0.0,
