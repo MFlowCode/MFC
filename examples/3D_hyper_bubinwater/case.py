@@ -247,13 +247,13 @@ tstart = 0  # 2304
 # Total physical time
 # tend = Nt * dt
 
-# Configuring case dictionary ==================================================
+# Configuring case dictionary
 print(
     json.dumps(
         {
-            # Logistics ================================================
+            # Logistics
             "run_time_info": "T",
-            # Computational Domain Parameters ==========================
+            # Computational Domain Parameters
             "x_domain%beg": xb,
             "x_domain%end": xe,
             "y_domain%beg": yb,
@@ -283,7 +283,7 @@ print(
             "t_step_start": tstart,
             "t_step_stop": Nt,
             "t_step_save": AS,
-            # Simulation Algorithm Parameters ==========================
+            # Simulation Algorithm Parameters
             "num_patches": 3,
             "model_eqns": 3,
             "num_fluids": 4,
@@ -312,7 +312,7 @@ print(
             "bc_y%end": -6,
             "bc_z%beg": -2,
             "bc_z%end": -6,
-            # Formatted Database Files Structure Parameters ============
+            # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
@@ -323,7 +323,7 @@ print(
             "probe(1)%x": 0.0,
             "probe(1)%y": 0.0,
             "probe(1)%z": 0.0,
-            # Patch 1: High pressured water ============================
+            # Patch 1: High pressured water
             # Specify the cubic water background grid geometry
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": 20 * xcenl,
@@ -344,7 +344,7 @@ print(
             "patch_icpp(1)%alpha(2)": liq_wv,
             "patch_icpp(1)%alpha(3)": liq_wa,
             "patch_icpp(1)%alpha(4)": liq_wg,
-            # Patch 2: (Vapor) Bubble ==================================
+            # Patch 2: (Vapor) Bubble
             "patch_icpp(2)%geometry": 8,
             "patch_icpp(2)%x_centroid": xcenb,
             "patch_icpp(2)%y_centroid": ycenb,
@@ -363,7 +363,7 @@ print(
             "patch_icpp(2)%alpha(3)": bub_wa,
             "patch_icpp(2)%alpha(4)": bub_wg,
             "patch_icpp(2)%alter_patch(1)": "T",
-            # Patch 3: Gel Object ======================================
+            # Patch 3: Gel Object
             "patch_icpp(3)%geometry": 9,
             "patch_icpp(3)%x_centroid": 20 * xceng,
             "patch_icpp(3)%y_centroid": 20 * yceng,
@@ -384,7 +384,7 @@ print(
             "patch_icpp(3)%alpha(3)": gel_wa,
             "patch_icpp(3)%alpha(4)": gel_wg,
             "patch_icpp(3)%alter_patch(1)": "T",
-            # Fluids Physical Parameters ===============================
+            # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gamwl - 1),
             "fluid_pp(1)%pi_inf": gamwl * piwl / (gamwl - 1),
             "fluid_pp(1)%cv": cvwl,
