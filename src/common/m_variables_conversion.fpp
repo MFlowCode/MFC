@@ -1039,6 +1039,16 @@ contains
                         end do
                     end if
 
+#ifdef MFC_POST_PROCESS
+                    if (hyperelasticity) then
+                        ! to save von Mises stress instead of elastic internal energy
+                        qK_prim_vf(xiend + 1)%sf(j, k, l) = sqrt((3_wp/2_wp)*(qK_prim_vf(strxb)%sf(j, k, l)**2_wp + &
+                                                                              2_wp*qK_prim_vf(strxb + 1)%sf(j, k, l)**2_wp + qK_prim_vf(strxb + 2)%sf(j, k, l)**2_wp + &
+                                                                              2_wp*qK_prim_vf(strxb + 3)%sf(j, k, l)**2_wp + 2_wp*qK_prim_vf(strxb + 4)%sf(j, k, l)**2_wp + &
+                                                                              qK_prim_vf(strxe)%sf(j, k, l)**2_wp))
+                    end if
+#endif
+
                     !$acc loop seq
                     do i = advxb, advxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
@@ -1052,8 +1062,6 @@ contains
             end do
         end do
         !$acc end parallel loop
-
-        !print *, 'I got here AA'
 
     end subroutine s_convert_conservative_to_primitive_variables
 

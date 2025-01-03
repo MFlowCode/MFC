@@ -1523,7 +1523,8 @@ contains
 
                     if (x_cc(i) - x_centroid >= 0 &
                         .and. &
-                        r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) - as(7)*Ps(7) - as(8)*Ps(8) - as(9)*Ps(9) <= radius .and. &
+                        r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) &
+                        - as(7)*Ps(7) - as(8)*Ps(8) - as(9)*Ps(9) <= radius .and. &
                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                         then
                         call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
@@ -1531,7 +1532,8 @@ contains
 
                     elseif (x_cc(i) - x_centroid < 0 &
                             .and. &
-                            r - as(2)*Ps(2) + as(3)*Ps(3) - as(4)*Ps(4) + as(5)*Ps(5) - as(6)*Ps(6) + as(7)*Ps(7) - as(8)*Ps(8) + as(9)*Ps(9) <= radius &
+                            r - as(2)*Ps(2) + as(3)*Ps(3) - as(4)*Ps(4) + as(5)*Ps(5) - as(6)*Ps(6) &
+                            + as(7)*Ps(7) - as(8)*Ps(8) + as(9)*Ps(9) <= radius &
                             .and. &
                             patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                         then

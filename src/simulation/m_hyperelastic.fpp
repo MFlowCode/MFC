@@ -108,9 +108,9 @@ contains
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, &
         !$acc rho, gamma, pi_inf, qv, G, Re, tensora, tensorb)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        do l = 0, p - 2
+            do k = 0, n - 2
+                do j = 2, m - 2
                     !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho_k(i) = q_cons_vf(i)%sf(j, k, l)
@@ -228,7 +228,7 @@ contains
 
         real(wp) :: trace
         real(wp), parameter :: f13 = 1._wp/3._wp
-        integer :: i !< Generic loop iterators
+        integer :: i
 
         ! tensor is the symmetric tensor & calculate the trace of the tensor
         trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l) + btensor(6)%sf(j, k, l)
@@ -239,6 +239,7 @@ contains
         #:endfor
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
+
         !$acc loop seq
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
@@ -267,7 +268,7 @@ contains
 
         real(wp) :: trace
         real(wp), parameter :: f13 = 1._wp/3._wp
-        integer :: i !< Generic loop iterators
+        integer :: i
 
         !TODO Make this 1D and 2D capable
         ! tensor is the symmetric tensor & calculate the trace of the tensor

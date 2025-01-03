@@ -244,6 +244,7 @@ SIMULATION.update({
     'low_Mach': ParamType.INT,
     'surface_tension': ParamType.LOG,
     'viscous': ParamType.LOG,
+    'hypermodel': ParamType.INT,
     'bubbles_lagrange': ParamType.LOG,
     'rkck_tolerance': ParamType.REAL,
 })
@@ -383,6 +384,7 @@ POST_PROCESS.update({
     't_stop': ParamType.REAL,
     'n_start': ParamType.INT,
     'surface_tension': ParamType.LOG,
+    'kymograph': ParamType.LOG,
     'output_partial_domain': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
 })
