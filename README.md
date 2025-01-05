@@ -107,7 +107,7 @@ The weak scaling of MFC on this machine shows near-ideal utilization.
 ## What else can this thing do
 
 MFC has many features.
-They are organized below. Just click the drop-downs!
+They are organized below.
 
 ### Physics
 
