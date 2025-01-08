@@ -1978,18 +1978,18 @@ contains
 
         integer :: i, j, k !< Generic loop iterators
 
-        type(t_bbox) :: bbox
+        type(t_bbox) :: bbox, bbox_old
         type(t_model) :: model
         type(ic_model_parameters) :: params
 
-        t_vec3 :: point
+        t_vec3 :: point, model_center
 
         real(wp) :: grid_mm(1:3, 1:2)
 
         integer :: cell_num
         integer :: ncells
 
-        t_mat4x4 :: transform
+        t_mat4x4 :: transform, transform_n
 
         if (present(ib) .and. proc_rank == 0) then
             print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
@@ -2017,9 +2017,17 @@ contains
             print *, " * Transforming model."
         end if
 
-        transform = f_create_transform_matrix(params)
-        call s_transform_model(model, transform)
+        ! Get the model center before transforming the model
+        bbox_old = f_create_bbox(model)
+        model_center(1:3) = (bbox_old%min(1:3) + bbox_old%max(1:3))/2._wp
 
+        ! Compute the transform matrices for vertices and normals
+        transform = f_create_transform_matrix(params, model_center)
+        transform_n = f_create_transform_matrix(params)
+
+        call s_transform_model(model, transform, transform_n)
+
+        ! Recreate the bounding box after transformation
         bbox = f_create_bbox(model)
 
         ! Show the number of vertices in the original STL model
