@@ -158,7 +158,8 @@ They are organized below.
 * GPU compatible on NVIDIA ([P/V/A/H]100, GH200, etc.) and AMD (MI[1/2/3]00+) GPU and APU hardware
 * Ideal weak scaling to 100% of the largest GPU and superchip supercomputers
 	* \>10K NVIDIA GPUs on [OLCF Summit](https://www.olcf.ornl.gov/summit/) (NV V100-based)
-	* \>66K AMD GPUs on the first exascale computer, [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) (AMD MI250X-based)
+	* \>66K AMD GPUs (MI250X) on the first exascale computer, [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) (AMD MI250X-based)
+ 	* \>3K AMD APUs on [LLNL Tuolumne](https://hpc.llnl.gov/hardware/compute-platforms/tuolumne) (El Capitan family, AMD MI300A-based) 
 * Near compute roofline behavior
 * RDMA (remote data memory access; GPU-GPU direct communication) via GPU-aware MPI on NVIDIA (CUDA-aware MPI) and AMD GPU systems
 * Optional single-precision computation and storage
