@@ -315,10 +315,11 @@ contains
     !> This procedure creates a transformation matrix.
     !! @param  p Parameters for the transformation.
     !! @return Transformation matrix.
-    function f_create_transform_matrix(p) result(out_matrix)
+    function f_create_transform_matrix(p, center) result(out_matrix)
 
         type(ic_model_parameters), intent(in) :: p
-        t_mat4x4 :: sc, rz, rx, ry, tr, out_matrix
+        t_vec3, optional, intent(in) :: center
+        t_mat4x4 :: sc, rz, rx, ry, tr, t_back, t_to_origin, out_matrix
 
         sc = transpose(reshape([ &
                                p%scale(1), 0._wp, 0._wp, 0._wp, &
@@ -350,7 +351,25 @@ contains
                                0._wp, 0._wp, 1._wp, p%translate(3), &
                                0._wp, 0._wp, 0._wp, 1._wp], shape(tr)))
 
-        out_matrix = matmul(tr, matmul(ry, matmul(rx, matmul(rz, sc))))
+        if (present(center)) then
+            ! Translation matrix to move center to the origin
+            t_to_origin = transpose(reshape([ &
+                                            1._wp, 0._wp, 0._wp, -center(1), &
+                                            0._wp, 1._wp, 0._wp, -center(2), &
+                                            0._wp, 0._wp, 1._wp, -center(3), &
+                                            0._wp, 0._wp, 0._wp, 1._wp], shape(tr)))
+
+            ! Translation matrix to move center back to original position
+            t_back = transpose(reshape([ &
+                                       1._wp, 0._wp, 0._wp, center(1), &
+                                       0._wp, 1._wp, 0._wp, center(2), &
+                                       0._wp, 0._wp, 1._wp, center(3), &
+                                       0._wp, 0._wp, 0._wp, 1._wp], shape(tr)))
+
+            out_matrix = matmul(tr, matmul(t_back, matmul(ry, matmul(rx, matmul(rz, matmul(sc, t_to_origin))))))
+        else
+            out_matrix = matmul(ry, matmul(rx, rz))
+        end if
 
     end function f_create_transform_matrix
 
@@ -372,10 +391,10 @@ contains
     !> This procedure transforms a triangle by a matrix, one vertex at a time.
     !! @param triangle Triangle to transform.
     !! @param matrix   Transformation matrix.
-    subroutine s_transform_triangle(triangle, matrix)
+    subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
         type(t_triangle), intent(inout) :: triangle
-        t_mat4x4, intent(in) :: matrix
+        t_mat4x4, intent(in) :: matrix, matrix_n
 
         integer :: i
 
@@ -385,20 +404,22 @@ contains
             call s_transform_vec(triangle%v(i, :), matrix)
         end do
 
+        call s_transform_vec(triangle%n(1:3), matrix_n)
+
     end subroutine s_transform_triangle
 
     !> This procedure transforms a model by a matrix, one triangle at a time.
     !! @param model  Model to transform.
     !! @param matrix Transformation matrix.
-    subroutine s_transform_model(model, matrix)
+    subroutine s_transform_model(model, matrix, matrix_n)
 
         type(t_model), intent(inout) :: model
-        t_mat4x4, intent(in) :: matrix
+        t_mat4x4, intent(in) :: matrix, matrix_n
 
         integer :: i
 
         do i = 1, size(model%trs)
-            call s_transform_triangle(model%trs(i), matrix)
+            call s_transform_triangle(model%trs(i), matrix, matrix_n)
         end do
 
     end subroutine s_transform_model
