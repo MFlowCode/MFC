@@ -2486,7 +2486,7 @@ contains
                                 xi_M = (5e-1_wp + sign(5e-1_wp, s_S))
                                 xi_P = (5e-1_wp - sign(5e-1_wp, s_S))
 
-                                ! COMPUTING the hllc fluxes
+                                ! Computing the hllc fluxes
 
                                 ! mass flux.
                                 if (low_Mach == 1) then
