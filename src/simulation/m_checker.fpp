@@ -120,7 +120,7 @@ contains
         @:PROHIBIT(model_eqns == 3 .and. wave_speeds /= 1, "6-equation model (model_eqns = 3) requires wave_speeds = 1")
     end subroutine s_check_inputs_model_eqns
 
-    !> Checks constraints for GRCBC
+    !> Checks constraints for grCBC
     subroutine s_check_inputs_grcbc
         #:for DIR in ['x', 'y', 'z']
             @:PROHIBIT(bc_${DIR}$%grcbc_in .and. (bc_${DIR}$%beg /= -7 .and. bc_${DIR}$%end /= -7), "Subsonic Inflow requires bc = -7")

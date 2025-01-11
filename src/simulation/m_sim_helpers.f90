@@ -77,7 +77,7 @@ contains
 
         E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_sum + qv
 
-        ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
+        ! energy adjustments for hyperelastic energy
         if (hyperelasticity) then
             E = E + G*q_prim_vf(xiend + 1)%sf(j, k, l)
         end if

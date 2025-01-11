@@ -834,11 +834,6 @@ contains
         call MPI_INFO_CREATE(mpi_info_int, ierr)
         call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
 
-        ! Option for UNIX file system (Hooke/Thomson)
-        ! WRITE(mpiiofs, '(A)') '/ufs_'
-        ! mpiiofs = TRIM(mpiiofs)
-        ! mpi_info_int = MPI_INFO_NULL
-
         allocate (start_idx(1:num_dims))
 
 #endif
