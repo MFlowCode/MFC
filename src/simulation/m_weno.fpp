@@ -40,7 +40,6 @@ module m_weno
     !! of the characteristic decomposition are stored in custom-constructed WENO-
     !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
-
     real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
     !> @}
 
@@ -52,17 +51,12 @@ module m_weno
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the cell-location in the relevant coordinate direction.
     !> @{
-
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_z
-
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_x
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
-
-    !    real(wp), pointer, dimension(:, :, :) :: poly_coef_L => null()
-    !    real(wp), pointer, dimension(:, :, :) :: poly_coef_R => null()
     !> @}
 
     !> @name The ideal weights at the left and the right cell-boundaries and at the
@@ -70,7 +64,6 @@ module m_weno
     !! that the first dimension of the array identifies the weight, while the
     !! last denotes the cell-location in the relevant coordinate direction.
     !> @{
-
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_x
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_y
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_z
@@ -78,8 +71,6 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_x
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_y
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_z
-!    real(wp), pointer, dimension(:, :) :: d_L => null()
-!    real(wp), pointer, dimension(:, :) :: d_R => null()
     !> @}
 
     !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
@@ -87,17 +78,14 @@ module m_weno
     !! second identifies the position of its coefficients and the last denotes
     !! the cell-location in the relevant coordinate direction.
     !> @{
-
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_x
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_y
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_z
-!    real(wp), pointer, dimension(:, :, :) :: beta_coef => null()
     !> @}
 
     ! END: WENO Coefficients
 
     integer :: v_size !< Number of WENO-reconstructed cell-average variables
-
     !$acc declare create(v_size)
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
