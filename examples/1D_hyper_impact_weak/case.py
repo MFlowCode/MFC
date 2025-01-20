@@ -19,8 +19,6 @@ print(
             # Computational Domain Parameters
             "x_domain%beg": 0.0e00,
             "x_domain%end": 1.0e00,
-            "y_domain%beg": 0.0e00,
-            "y_domain%end": 0.002,
             "m": Nx,
             "n": 0,
             "p": 0,
@@ -48,10 +46,10 @@ print(
             "avg_state": 2,
             "bc_x%beg": -3,
             "bc_x%end": -3,
-            "bc_y%beg": -3,
-            "bc_y%end": -3,
             # Turning on Hyperelasticity
             "hyperelasticity": "T",
+            "hyper_model": 1,
+            "fd_order": 4,
             # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
@@ -60,11 +58,8 @@ print(
             # Patch 1 L
             "patch_icpp(1)%geometry": 1,
             "patch_icpp(1)%x_centroid": 0.25,
-            "patch_icpp(1)%y_centroid": 0.001,
             "patch_icpp(1)%length_x": 0.5,
-            "patch_icpp(1)%length_y": 0.002,
             "patch_icpp(1)%vel(1)": 10,
-            "patch_icpp(1)%vel(2)": 0,
             "patch_icpp(1)%pres": 1.0e5,
             "patch_icpp(1)%alpha_rho(1)": 1000,
             "patch_icpp(1)%alpha(1)": 1.0,
@@ -72,11 +67,8 @@ print(
             # Patch 2 R
             "patch_icpp(2)%geometry": 1,
             "patch_icpp(2)%x_centroid": 0.75,
-            "patch_icpp(2)%y_centroid": 0.001,
             "patch_icpp(2)%length_x": 0.5,
-            "patch_icpp(2)%length_y": 0.002,
             "patch_icpp(2)%vel(1)": -10,  # 10,
-            "patch_icpp(2)%vel(2)": 0,
             "patch_icpp(2)%pres": 1.0e05,
             "patch_icpp(2)%alpha_rho(1)": 1000,
             "patch_icpp(2)%alpha(1)": 1.0,

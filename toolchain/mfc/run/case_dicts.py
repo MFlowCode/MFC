@@ -244,7 +244,7 @@ SIMULATION.update({
     'low_Mach': ParamType.INT,
     'surface_tension': ParamType.LOG,
     'viscous': ParamType.LOG,
-    'hypermodel': ParamType.INT,
+    'hyper_model': ParamType.INT,
     'bubbles_lagrange': ParamType.LOG,
     'rkck_tolerance': ParamType.REAL,
 })
