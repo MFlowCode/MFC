@@ -161,23 +161,12 @@ contains
     !> Checks constraints on the elasticity parameters.
         !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_elasticity
-        @:PROHIBIT((hypoelasticity .or. hyperelasticity) .and. model_eqns == 1, &
-            "Elasticity does not work for model_eqns = 1")
-        @:PROHIBIT((hypoelasticity .or. hyperelasticity) .and. model_eqns > 3, &
-            "Elasticity works only for model_eqns 2 and 3")
+        @:PROHIBIT(elasticity .and. .not. (model_eqns == 2 .or. model_eqns == 3))
         #:for X in ['x', 'y', 'z']
             #:for BOUND in ['beg', 'end']
-                @:PROHIBIT(hyperelasticity .and. ((bc_${X}$%${BOUND}$ .lt. -3)), &
-                    "bc_${X}$%${BOUND}$ is not supported")
+                @:PROHIBIT(hyperelasticity .and. bc_${X}$%${BOUND}$ /= dflt_int .and. (bc_${X}$%${BOUND}$ < -3))
             #:endfor
         #:endfor
-
-#ifdef MFC_SIMULATION
-        @:PROHIBIT(elasticity .and. fd_order /= 4)
-        @:PROHIBIT(hyperelasticity .and. hyper_model .le. 0, &
-            "Set the hyper_model in the input file")
-#endif
-
     end subroutine s_check_inputs_elasticity
 
     !> Checks constraints on dimensionality and the number of cells for the grid.

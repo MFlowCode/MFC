@@ -345,7 +345,7 @@ contains
             if (pres_wrt .or. prim_vars_wrt) dbvars = dbvars + 1
 
             ! Elastic stresses
-            if (hypoelasticity) dbvars = dbvars + (num_dims*(num_dims + 1))/2
+            if (tau_wrt .or. prim_vars_wrt) dbvars = dbvars + (num_dims*(num_dims + 1))/2
 
             ! Volume fraction(s)
             if ((model_eqns == 2) .or. (model_eqns == 3)) then

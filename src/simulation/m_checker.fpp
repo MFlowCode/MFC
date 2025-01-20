@@ -30,6 +30,7 @@ contains
         call s_check_inputs_time_stepping
         call s_check_inputs_model_eqns
         call s_check_inputs_acoustic_src
+        call s_check_inputs_elasticity
         call s_check_inputs_bubbles_euler
         call s_check_inputs_bubbles_lagrange
         call s_check_inputs_adapt_dt
@@ -255,6 +256,12 @@ contains
         end do
 
     end subroutine s_check_inputs_acoustic_src
+
+    !> Checks constraints on elasticity parameters
+    subroutine s_check_inputs_elasticity
+        @:PROHIBIT(hyperelasticity .and. hyper_model == dflt_int)
+        @:PROHIBIT(elasticity .and. fd_order /= 4)
+    end subroutine
 
     !> Checks constraints on bubble parameters
     subroutine s_check_inputs_bubbles_euler
