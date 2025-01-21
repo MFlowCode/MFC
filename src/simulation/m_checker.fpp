@@ -260,7 +260,8 @@ contains
     !> Checks constraints on elasticity parameters
     subroutine s_check_inputs_elasticity
         @:PROHIBIT(hyperelasticity .and. hyper_model == dflt_int)
-        @:PROHIBIT((hypoelasticity .or. hyperelasticity) .and. fd_order /= 4)
+        @:PROHIBIT((hypoelasticity .or. hyperelasticity) .and. fd_order == dflt_int, &
+            "fd_order must be set for hypoelasticity or hyperelasticity")
     end subroutine
 
     !> Checks constraints on bubble parameters
