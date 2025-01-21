@@ -1,43 +1,10 @@
-This file was created on 2024-11-19 15:34:50.717176.
+This file was created on 2025-01-20 18:05:55.129669.
 
 mfc.sh:
 
-    Invocation: test -j 8 --generate -o 16574715
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        579a5781114de323052ab02506c34c372de365ce on master (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.30.3 on ipsec-10-2-65-237.vpn.gatech.edu
-    
-        C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/haochey/Documents/Github/MFChaocheyfork/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test --generate -f C7BE8FEA -t 7F70E665
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
+    Git:        f1582f6d88f0395c83a481ceea694e2ed2263ad9 on Add-slip-test (dirty)
 
 pre_process:
 
@@ -105,6 +72,39 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.30.3 on ipsec-10-2-65-237.vpn.gatech.edu
+    
+        C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/haochey/Documents/Github/MFChaocheyfork/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 post_process:
 
     CMake Configuration:
@@ -131,9 +131,9 @@ post_process:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 

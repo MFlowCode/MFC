@@ -1,10 +1,10 @@
-This file was created on 2024-11-24 15:49:07.196489.
+This file was created on 2025-01-20 18:07:46.096797.
 
 mfc.sh:
 
-    Invocation: test -j 8 -o FA8643EF --generate
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        5300f98a341af8086f365b7d5a0125a0264b8e8c on master (dirty)
+    Invocation: test --generate -f BBF7C467 -t 8D8F6424
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
+    Git:        f1582f6d88f0395c83a481ceea694e2ed2263ad9 on Add-slip-test (dirty)
 
 simulation:
 
@@ -65,9 +65,9 @@ post_process:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
