@@ -1040,7 +1040,7 @@ contains
                     end if
 
 #ifdef MFC_POST_PROCESS
-                    if (hyperelasticity) then
+                    if (hyperelasticity .and. p /= 0) then
                         ! to save von Mises stress instead of elastic internal energy
                         qK_prim_vf(xiend + 1)%sf(j, k, l) = sqrt((3_wp/2_wp)*(qK_prim_vf(strxb)%sf(j, k, l)**2_wp + &
                                                                               2_wp*qK_prim_vf(strxb + 1)%sf(j, k, l)**2_wp + qK_prim_vf(strxb + 2)%sf(j, k, l)**2_wp + &
