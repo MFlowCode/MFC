@@ -123,12 +123,12 @@ contains
                                                                     alpha_rho_k, Re, j, k, l, G, Gs)
                    rho = max(rho, sgm_eps)
                    G = max(G, sgm_eps)
-                   !if ( G <= verysmall ) G_K = 0d0
+                   !if ( G <= verysmall ) G_K = 0_wp
 
                    if ( G > verysmall ) then
                       !$acc loop seq
                       do i = 1, tensor_size
-                         tensora(i) = 0d0
+                         tensora(i) = 0_wp
                       end do
                       ! STEP 1: computing the grad_xi tensor using finite differences
                       ! grad_xi definition / organization
@@ -193,12 +193,12 @@ contains
                                                                     alpha_rho_k, Re, j, k, l, G, Gs)
                    rho = max(rho, sgm_eps)
                    G = max(G, sgm_eps)
-                   !if ( G <= verysmall ) G_K = 0d0
+                   !if ( G <= verysmall ) G_K = 0_wp
 
                    if ( G > verysmall ) then
                       !$acc loop seq
                       do i = 1, tensor_size
-                         tensora(i) = 0d0
+                         tensora(i) = 0_wp
                       end do
                       ! STEP 1: computing the grad_xi tensor using finite differences
                       ! grad_xi definition / organization
