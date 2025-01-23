@@ -169,7 +169,7 @@ contains
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target,  &
             viscous, surface_tension,               & 
-            hyperelasticity, R0ref, &
+            hyperelasticity, hyper_model, R0ref, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance
 
@@ -665,7 +665,7 @@ contains
 
                         call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size * num_ibs, &
+                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
                                            MPI_INTEGER, status, ierr)
 
                     else
@@ -834,7 +834,7 @@ contains
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size, &
+                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
                                            mpi_p, status, ierr)
 
                     else

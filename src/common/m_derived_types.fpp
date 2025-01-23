@@ -367,15 +367,13 @@ module m_derived_types
 
     !> Ghost Point for Immersed Boundaries
     type ghost_point
-
-        real(wp), dimension(3) :: loc !< Physical location of the ghost point
+        integer, dimension(3) :: loc !< Physical location of the ghost point
         real(wp), dimension(3) :: ip_loc !< Physical location of the image point
         integer, dimension(3) :: ip_grid !< Top left grid point of IP
         real(wp), dimension(2, 2, 2) :: interp_coeffs !< Interpolation Coefficients of image point
         integer :: ib_patch_id !< ID of the IB Patch the ghost point is part of
         logical :: slip
         integer, dimension(3) :: DB
-
     end type ghost_point
 
     !> Species parameters

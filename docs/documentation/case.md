@@ -508,6 +508,7 @@ To restart the simulation from $k$-th time step, see [Restarting Cases](running.
 | `vel_wrt(i)`         | Logical | Add the $i$-direction velocity to the database	  |
 | `E_wrt`              | Logical | Add the total energy to the database	 |
 | `pres_wrt`           | Logical | Add the pressure to the database	|
+| `tau_wrt`            | Logical | Add the elastic stresses to the database |
 | `alpha_wrt(i)`       | Logical | Add the volume fraction of fluid $i$ to the database	|
 | `gamma_wrt`          | Logical | Add the specific heat ratio function to the database	|
 | `heat_ratio_wrt`     | Logical | Add the specific heat ratio to the database	|

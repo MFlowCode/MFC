@@ -52,6 +52,7 @@ print(
             #'bc_y%end'                     : -3,
             # Turning on Hypoelasticity
             "hypoelasticity": "T",
+            "fd_order": 4,
             # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,

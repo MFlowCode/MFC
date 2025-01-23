@@ -561,7 +561,7 @@ contains
                                 end do
                             end if
 
-                            ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
+                            ! energy adjustments for hyperelastic energy
                             if (hyperelasticity) then
                                 !$acc loop seq
                                 do i = 1, num_dims
@@ -780,7 +780,7 @@ contains
                                     /(s_M - s_P)
                             end if
 
-                            ! ELASTIC STRESSES FLUX.
+                            ! elastic stresses flux.
                             if (hypoelasticity) then
                                 do i = 1, strxe - strxb + 1
                                     flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
@@ -794,7 +794,7 @@ contains
                                 end do
                             end if
 
-                            ! REFERENCE MAP FLUX.
+                            ! reference map flux.
                             if (hyperelasticity) then
                                 do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
@@ -806,7 +806,7 @@ contains
                                 end do
                             end if
 
-                            ! ADVECTION FLUX.
+                            ! advection flux.
                             !$acc loop seq
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -1161,7 +1161,7 @@ contains
                                 E_L = gamma_L*pres_L + pi_inf_L + 5e-1_wp*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5e-1_wp*rho_R*vel_R_rms + qv_R
 
-                                ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
+                                ! energy adjustments for hypoelastic energy
                                 if (hypoelasticity) then
                                     !$acc loop seq
                                     do i = 1, strxe - strxb + 1
@@ -1189,7 +1189,7 @@ contains
                                     end do
                                 end if
 
-                                ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
+                                ! energy adjustments for hyperelastic energy
                                 if (hyperelasticity) then
                                     !$acc loop seq
                                     do i = 1, num_dims
@@ -1238,7 +1238,7 @@ contains
                                     end do
                                 end if
 
-                                ! COMPUTING THE DIRECT WAVE SPEEDS
+                                ! computing the direct wave speeds
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
@@ -1313,8 +1313,9 @@ contains
                                 vel_K_Star = vel_L(idx1)*(1_wp - xi_MP) + xi_MP*vel_R(idx1) + &
                                              xi_MP*xi_PP*(s_S - vel_R(idx1))
 
-                                ! COMPUTING FLUXES
-                                ! MASS FLUX.
+                                ! computing fluxes
+
+                                ! mass flux.
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -1322,7 +1323,7 @@ contains
                                         xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*(vel_R(idx1) + s_P*(xi_R - 1._wp))
                                 end do
 
-                                ! MOMENTUM FLUX.
+                                ! momentum flux.
                                 ! f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
                                 !$acc loop seq
                                 do i = 1, num_dims
@@ -1331,21 +1332,21 @@ contains
                                                                                 (dir_flg(idxi)*vel_K_Star + (1_wp - dir_flg(idxi))*(xi_M*vel_L(idxi) + xi_P*vel_R(idxi))) + dir_flg(idxi)*p_Star
                                 end do
 
-                                ! ENERGY FLUX.
+                                ! energy flux.
                                 ! f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_star + p_Star)*vel_K_Star
 
-                                ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
+                                ! elasticity. elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
                                     flux_ene_e = 0_wp; 
                                     !$acc loop seq
                                     do i = 1, num_dims
                                         idxi = dir_idx(i)
-                                        ! MOMENTUM ELASTIC FLUX.
+                                        ! momentum elastic flux.
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
                                             flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) &
                                             - xi_M*tau_e_L(dir_idx_tau(i)) - xi_P*tau_e_R(dir_idx_tau(i))
-                                        ! ENERGY ELASTIC FLUX.
+                                        ! energy elastic flux.
                                         flux_ene_e = flux_ene_e - &
                                                      xi_M*(vel_L(idxi)*tau_e_L(dir_idx_tau(i)) + &
                                                            s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
@@ -1355,7 +1356,7 @@ contains
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) + flux_ene_e
                                 end if
 
-                                ! VOLUME FRACTION FLUX.
+                                ! volume fraction flux.
                                 !$acc loop seq
                                 do i = advxb, advxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -1363,7 +1364,7 @@ contains
                                         xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*s_S
                                 end do
 
-                                ! SOURCE TERM FOR VOLUME FRACTION ADVECTION FLUX.
+                                ! source term for volume fraction advection flux.
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
@@ -1372,7 +1373,7 @@ contains
                                         xi_P*(vel_R(idxi) + dir_flg(idxi)*(s_S*(xi_PP*(xi_R - 1) + 1) - vel_R(idxi)))
                                 end do
 
-                                ! INTERNAL ENERGIES ADVECTION FLUX.
+                                ! internal energies advection flux.
                                 ! K-th pressure and velocity in preparation for the internal energy flux
                                 !$acc loop seq
                                 do i = 1, num_fluids
@@ -1390,7 +1391,7 @@ contains
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
 
-                                ! HYPOELASTIC STRESS EVOLUTION FLUX.
+                                ! hypoelastic stress evolution flux.
                                 if (hypoelasticity) then
                                     !$acc loop seq
                                     do i = 1, strxe - strxb + 1
@@ -1400,7 +1401,7 @@ contains
                                     end do
                                 end if
 
-                                ! REFERENCE MAP FLUX.
+                                ! reference map flux.
                                 if (hyperelasticity) then
                                     !$acc loop seq
                                     do i = 1, num_dims
@@ -1412,7 +1413,7 @@ contains
                                     end do
                                 end if
 
-                                ! SURFACE TENSION FLUX. need to check
+                                ! surface tension flux. need to check
                                 if (surface_tension) then
                                     flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
                                         (xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, c_idx) + &
@@ -2346,7 +2347,7 @@ contains
                                     H_R = (E_R + pres_R)/rho_R
                                 end if
 
-                                ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
+                                ! energy adjustments for hypoelastic energy
                                 if (hypoelasticity) then
                                     !$acc loop seq
                                     do i = 1, strxe - strxb + 1
@@ -2375,7 +2376,7 @@ contains
                                     end do
                                 end if
 
-                                ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
+                                ! energy adjustments for hyperelastic energy
                                 if (hyperelasticity) then
                                     !$acc loop seq
                                     do i = 1, num_dims
@@ -2485,8 +2486,9 @@ contains
                                 xi_M = (5e-1_wp + sign(5e-1_wp, s_S))
                                 xi_P = (5e-1_wp - sign(5e-1_wp, s_S))
 
-                                ! COMPUTING THE HLLC FLUXES
-                                ! MASS FLUX.
+                                ! Computing the hllc fluxes
+
+                                ! mass flux.
                                 if (low_Mach == 1) then
                                     @:compute_low_Mach_correction()
                                 else
@@ -2502,7 +2504,7 @@ contains
                                         *(vel_R(idx1) + s_P*(xi_R - 1._wp))
                                 end do
 
-                                ! MOMENTUM FLUX.
+                                ! momentum flux.
                                 ! f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
                                 !$acc loop seq
                                 do i = 1, num_dims
@@ -2523,7 +2525,7 @@ contains
                                         + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
                                 end do
 
-                                ! ENERGY FLUX.
+                                ! energy flux.
                                 ! f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     xi_M*(vel_L(idx1)*(E_L + pres_L) + &
@@ -2536,17 +2538,19 @@ contains
                                                         (s_R - vel_R(idx1)))) - E_R)) &
                                     + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
-                                ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
+                                ! elasticity. elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
                                     flux_ene_e = 0_wp
                                     !$acc loop seq
                                     do i = 1, num_dims
                                         idxi = dir_idx(i)
-                                        ! MOMENTUM ELASTIC FLUX.
+
+                                        ! momentum elastic flux
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
                                             flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) &
                                             - xi_M*tau_e_L(dir_idx_tau(i)) - xi_P*tau_e_R(dir_idx_tau(i))
-                                        ! ENERGY ELASTIC FLUX.
+
+                                        ! energy elastic flux
                                         flux_ene_e = flux_ene_e - &
                                                      xi_M*(vel_L(idxi)*tau_e_L(dir_idx_tau(i)) + &
                                                            s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
@@ -2556,7 +2560,7 @@ contains
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) + flux_ene_e
                                 end if
 
-                                ! HYPOELASTIC STRESS EVOLUTION FLUX.
+                                ! hypoelastic stress evolution flux
                                 if (hypoelasticity) then
                                     !$acc loop seq
                                     do i = 1, strxe - strxb + 1
@@ -2566,7 +2570,7 @@ contains
                                     end do
                                 end if
 
-                                ! VOLUME FRACTION FLUX.
+                                ! volume fraction flux
                                 !$acc loop seq
                                 do i = advxb, advxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -2576,7 +2580,7 @@ contains
                                         *(vel_R(idx1) + s_P*(xi_R - 1._wp))
                                 end do
 
-                                ! VOLUME FRACTION SOURCE FLUX.
+                                ! volume fraction source flux
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
@@ -2589,7 +2593,7 @@ contains
                                                 s_P*(xi_R - 1._wp))
                                 end do
 
-                                ! REFERENCE MAP FLUX.
+                                ! reference map flux
                                 if (hyperelasticity) then
                                     !$acc loop seq
                                     do i = 1, num_dims

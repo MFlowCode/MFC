@@ -43,7 +43,6 @@ module m_data_output
 
     ! Including the Silo Fortran interface library that features the subroutines
     ! and parameters that are required to write in the Silo-HDF5 database format
-    ! INCLUDE 'silo.inc'
     include 'silo_f9x.inc'
 
     ! Generic storage for flow variable(s) that are to be written to formatted
@@ -346,7 +345,7 @@ contains
             if (pres_wrt .or. prim_vars_wrt) dbvars = dbvars + 1
 
             ! Elastic stresses
-            if (hypoelasticity) dbvars = dbvars + (num_dims*(num_dims + 1))/2
+            if (tau_wrt .or. prim_vars_wrt) dbvars = dbvars + (num_dims*(num_dims + 1))/2
 
             ! Volume fraction(s)
             if ((model_eqns == 2) .or. (model_eqns == 3)) then
