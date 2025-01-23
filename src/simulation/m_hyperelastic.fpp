@@ -123,12 +123,12 @@ contains
                                                                     alpha_rho_k, Re, j, k, l, G, Gs)
                    rho = max(rho, sgm_eps)
                    G = max(G, sgm_eps)
-                   !if ( G <= verysmall ) G_K = 0_wp
+                   !if ( G <= verysmall ) G_K = 0._wp
 
                    if ( G > verysmall ) then
                       !$acc loop seq
                       do i = 1, tensor_size
-                         tensora(i) = 0_wp
+                         tensora(i) = 0._wp
                       end do
                       ! STEP 1: computing the grad_xi tensor using finite differences
                       ! grad_xi definition / organization
@@ -141,7 +141,7 @@ contains
                            ! STEP 2a: computing the determinant of the grad_xi tensor
                            tensorb(tensor_size) = tensora(1)
                            ! STEP 2b: computing the inverse of the grad_xi tensor
-                           tensorb(1) = 1_wp/(tensora(1)**2)
+                           tensorb(1) = 1._wp/(tensora(1)**2)
          
                            if (tensorb(tensor_size) > verysmall) then
                               ! STEP 2c: computing the inverse of grad_xi tensor = F
@@ -193,12 +193,12 @@ contains
                                                                     alpha_rho_k, Re, j, k, l, G, Gs)
                    rho = max(rho, sgm_eps)
                    G = max(G, sgm_eps)
-                   !if ( G <= verysmall ) G_K = 0_wp
+                   !if ( G <= verysmall ) G_K = 0._wp
 
                    if ( G > verysmall ) then
                       !$acc loop seq
                       do i = 1, tensor_size
-                         tensora(i) = 0_wp
+                         tensora(i) = 0._wp
                       end do
                       ! STEP 1: computing the grad_xi tensor using finite differences
                       ! grad_xi definition / organization
@@ -229,7 +229,7 @@ contains
                            tensora(i) = tensorb(i)/tensorb(tensor_size)
                         end do
                         ! STEP 2d: computing the J = det(F) = 1/det(\grad{\xi})
-                        tensorb(tensor_size) = 1_wp/tensorb(tensor_size)
+                        tensorb(tensor_size) = 1._wp/tensorb(tensor_size)
                         ! STEP 3: override adjoint (tensorb) to be F transpose F
                         tensorb(1) = tensora(1)**2 + tensora(2)**2
                         tensorb(4) = tensora(3)**2 + tensora(4)**2
@@ -281,12 +281,12 @@ contains
                                                                     alpha_rho_k, Re, j, k, l, G, Gs)
                     rho = max(rho, sgm_eps)
                     G = max(G, sgm_eps)
-                    !if ( G <= verysmall ) G_K = 0_wp
+                    !if ( G <= verysmall ) G_K = 0._wp
 
                     if (G > verysmall) then
                         !$acc loop seq
                         do i = 1, tensor_size
-                            tensora(i) = 0_wp
+                            tensora(i) = 0._wp
                         end do
                         ! STEP 1: computing the grad_xi tensor using finite differences
                         ! grad_xi definition / organization
@@ -333,7 +333,7 @@ contains
                             end do
 
                             ! STEP 2d: computing the J = det(F) = 1/det(\grad{\xi})
-                            tensorb(tensor_size) = 1_wp/tensorb(tensor_size)
+                            tensorb(tensor_size) = 1._wp/tensorb(tensor_size)
 
                             ! STEP 3: computing F transpose F
                             tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
