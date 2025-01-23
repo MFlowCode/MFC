@@ -213,7 +213,6 @@ contains
                          tensora(3) = tensora(3) + q_prim_vf(xibeg)%sf(j, k + r, l)*fd_coeff_y(r, k)
                          tensora(4) = tensora(4) + q_prim_vf(xibeg + 1)%sf(j, k + r, l)*fd_coeff_y(r, k)
                       end do
-                      !print *, 'j :: ',j,', tensor1 :: ',tensora(1),', tensor2 :: ',tensora(2),', tensora(3) :: ',tensora(3),', tensora(4) :: ',tensora(4)
                       ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
                       tensorb(1) = tensora(4)
                       tensorb(2) = -tensora(3)
@@ -250,13 +249,10 @@ contains
                         !elseif (hyper_model == 2) then
                         !    call s_Mooney_Rivlin_cauchy_solver_2D(btensor%vf, q_prim_vf, G, j, k, l)        
                         !end if
-                       ! print *, 'before j :: ',j,', k :: ',k,', p :: ',q_prim_vf(E_idx)%sf(j,k,l),', val :: ',q_prim_vf(xiend + 1)%sf(j, k, l)
 
                         ! STEP 5b: updating the pressure field
                         q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
                                                        G*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma
-
-                       ! print *, 'after j :: ',j,', k :: ',k,', p :: ',q_prim_vf(E_idx)%sf(j,k,l),' val :: ',q_prim_vf(xiend + 1)%sf(j, k, l)
 
                         ! STEP 5c: updating the Cauchy stress conservative scalar field
                         !$acc loop seq
