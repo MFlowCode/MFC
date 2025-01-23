@@ -243,7 +243,6 @@ contains
                         ! store the determinant at the last entry of the btensor
                         btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
                         ! STEP 5a: updating the Cauchy stress primitive scalar field
-                        !print *,'hyper model :: ',hyper_model
                         !if (hyper_model == 1) then
                             call s_neoHookean_cauchy_solver_2D(btensor%vf, q_prim_vf, G, j, k, l)
                         !elseif (hyper_model == 2) then
@@ -436,7 +435,6 @@ contains
         do i = 1, b_size - 1
            q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
                G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
-        !   print *,'j :: ',j,', val :: ', G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &
