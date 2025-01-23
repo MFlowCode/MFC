@@ -141,7 +141,7 @@ contains
                            ! STEP 2a: computing the determinant of the grad_xi tensor
                            tensorb(tensor_size) = tensora(1)
                            ! STEP 2b: computing the inverse of the grad_xi tensor
-                           tensorb(1) = 1d0/(tensora(1)**2)
+                           tensorb(1) = 1_wp/(tensora(1)**2)
          
                            if (tensorb(tensor_size) > verysmall) then
                               ! STEP 2c: computing the inverse of grad_xi tensor = F
@@ -229,7 +229,7 @@ contains
                            tensora(i) = tensorb(i)/tensorb(tensor_size)
                         end do
                         ! STEP 2d: computing the J = det(F) = 1/det(\grad{\xi})
-                        tensorb(tensor_size) = 1d0/tensorb(tensor_size)
+                        tensorb(tensor_size) = 1_wp/tensorb(tensor_size)
                         ! STEP 3: override adjoint (tensorb) to be F transpose F
                         tensorb(1) = tensora(1)**2 + tensora(2)**2
                         tensorb(4) = tensora(3)**2 + tensora(4)**2
