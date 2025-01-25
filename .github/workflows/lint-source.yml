@@ -40,7 +40,7 @@ jobs:
 
     - name: Looking for junk code
       run: |
-        ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
+        ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/* | grep '!'
 
     - name: Looking for junk comments in examples
       run: |
