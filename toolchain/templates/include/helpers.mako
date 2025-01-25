@@ -87,6 +87,11 @@ END
 
     t_${target.name}_stop=$(python3 -c 'import time; print(time.time())')
 
+    if [ $code -eq 22 ]; then
+        echo
+        error "$YELLOW CASE FILE ERROR$COLOR_RESET > $YELLOW Case file has prohibited conditions as stated above.$COLOR_RESET"
+    fi
+
     if [ $code -ne 0 ]; then
         echo
         error ":( $MAGENTA${target.get_install_binpath(case)}$COLOR_RESET failed with exit code $MAGENTA$code$COLOR_RESET."

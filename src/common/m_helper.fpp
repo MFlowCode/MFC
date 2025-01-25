@@ -476,16 +476,13 @@ contains
         character(len=*), intent(in) :: condition, message
 
         print *, ""
-        print *, "===================================================================================================="
-        print *, "                                          CASE FILE ERROR                                           "
-        print *, "----------------------------------------------------------------------------------------------------"
-        print *, "Prohibited condition: ", trim(condition)
+        print *, "CASE FILE ERROR"
+        print *, "  - Prohibited condition: ", trim(condition)
         if (len_trim(message) > 0) then
-            print *, "Note: ", trim(message)
+            print *, "  - Note: ", trim(message)
         end if
-        print *, "===================================================================================================="
         print *, ""
-        call s_mpi_abort
+        call s_mpi_abort(code=CASE_FILE_ERROR_CODE)
     end subroutine s_prohibit_abort
 
     !> This function generates the unassociated legendre poynomials

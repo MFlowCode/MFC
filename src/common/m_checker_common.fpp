@@ -339,11 +339,11 @@ contains
                     if (any((/bc_${X}$%${VB2}$, bc_${X}$%${VB3}$/) /= 0._wp)) then
                         call s_mpi_abort("bc_${X}$%beg must be -15 if "// &
                                          "bc_${X}$%${VB2}$ or bc_${X}$%${VB3}$ "// &
-                                         "is set. Exiting.")
+                                         "is set. Exiting.", CASE_FILE_ERROR_CODE)
                     end if
                 elseif (bc_${X}$%beg /= -16) then
                     call s_mpi_abort("bc_${X}$%beg must be -15 or -16 if "// &
-                                     "bc_${X}$%vb[1,2,3] is set. Exiting.")
+                                     "bc_${X}$%vb[1,2,3] is set. Exiting.", CASE_FILE_ERROR_CODE)
                 end if
             end if
         #:endfor
@@ -354,11 +354,11 @@ contains
                     if (any((/bc_${X}$%${VE2}$, bc_${X}$%${VE3}$/) /= 0._wp)) then
                         call s_mpi_abort("bc_${X}$%end must be -15 if "// &
                                          "bc_${X}$%${VE2}$ or bc_${X}$%${VE3}$ "// &
-                                         "is set. Exiting.")
+                                         "is set. Exiting.", CASE_FILE_ERROR_CODE)
                     end if
                 elseif (bc_${X}$%end /= -16) then
                     call s_mpi_abort("bc_${X}$%end must be -15 or -16 if "// &
-                                     "bc_${X}$%ve[1,2,3] is set. Exiting.")
+                                     "bc_${X}$%ve[1,2,3] is set. Exiting.", CASE_FILE_ERROR_CODE)
                 end if
             end if
         #:endfor
