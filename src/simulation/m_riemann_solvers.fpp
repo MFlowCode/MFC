@@ -868,13 +868,13 @@ contains
                                     end do
                                     ! Recalculating the radial momentum geometric source flux
                                     flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
-                                    (s_M*(rho_R*vel_R(dir_idx(1)) &
-                                            *vel_R(dir_idx(1))) &
-                                        - s_P*(rho_L*vel_L(dir_idx(1)) &
-                                            *vel_L(dir_idx(1))) &
-                                        + s_M*s_P*(rho_L*vel_L(dir_idx(1)) &
-                                                - rho_R*vel_R(dir_idx(1)))) &
-                                    /(s_M - s_P)
+                                        (s_M*(rho_R*vel_R(dir_idx(1)) &
+                                              *vel_R(dir_idx(1))) &
+                                         - s_P*(rho_L*vel_L(dir_idx(1)) &
+                                                *vel_L(dir_idx(1))) &
+                                         + s_M*s_P*(rho_L*vel_L(dir_idx(1)) &
+                                                    - rho_R*vel_R(dir_idx(1)))) &
+                                        /(s_M - s_P)
                                     ! Geometrical source of the void fraction(s) is zero
                                     !$acc loop seq
                                     do i = advxb, advxe
