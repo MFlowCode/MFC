@@ -20,7 +20,7 @@ sbatch_cpu_opts="\
 "
 
 sbatch_gpu_opts="\
-#SBATCH -CV100
+#SBATCH -p gpu-v100,gpu-a100,gpu-h100,gpu-h200,gpu-l40s
 #SBATCH --ntasks-per-node=4       # Number of cores per node required
 #SBATCH -G2\
 "
@@ -42,7 +42,7 @@ sbatch <<EOT
 #SBATCH --account=gts-sbryngelson3 # charge account
 #SBATCH -N1                        # Number of nodes required
 $sbatch_device_opts
-#SBATCH -t 02:00:00                # Duration of the job (Ex: 15 mins)
+#SBATCH -t 04:00:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -q embers                  # QOS Name
 #SBATCH -o$job_slug.out            # Combined output and error messages file
 #SBATCH -W                         # Do not exit until the submitted job terminates.
@@ -51,6 +51,22 @@ set -e
 set -x
 
 cd "\$SLURM_SUBMIT_DIR"
+echo "Running PR"
+cd pr
+
+echo "Running in $(pwd):"
+
+job_slug="$job_slug"
+job_device="$2"
+
+. ./mfc.sh load -c p -m $2
+
+$sbatch_script_contents
+
+cd "\$SLURM_SUBMIT_DIR"
+echo "Running Master"
+cd master
+
 echo "Running in $(pwd):"
 
 job_slug="$job_slug"
