@@ -54,7 +54,6 @@ set -x
 
 cd "\$SLURM_SUBMIT_DIR"
 echo "Running PR"
-cd pr
 
 echo "Running in $(pwd):"
 
@@ -67,7 +66,7 @@ $sbatch_script_contents
 
 cd "\$SLURM_SUBMIT_DIR"
 echo "Running Master"
-cd master
+cd ../master
 
 echo "Running in $(pwd):"
 
