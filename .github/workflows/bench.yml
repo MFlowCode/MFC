@@ -47,7 +47,7 @@ jobs:
 
       - name: Bench (Master v. PR)
         run: |
-          bash .github/workflows/phoenix/submit-bench.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}
+          (cd pr && bash .github/workflows/phoenix/submit-bench.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }})
 
       - name: Generate & Post Comment
         run: |
