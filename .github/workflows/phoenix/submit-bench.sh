@@ -20,10 +20,12 @@ sbatch_cpu_opts="\
 "
 
 sbatch_gpu_opts="\
-#SBATCH -p gpu-v100,gpu-a100,gpu-h100,gpu-h200,gpu-l40s
+#SBATCH -p gpu-v100
 #SBATCH --ntasks-per-node=4       # Number of cores per node required
 #SBATCH -G2\
 "
+
+# ,gpu-a100,gpu-h100,gpu-h200,gpu-l40s
 
 if [ "$2" == "cpu" ]; then
     sbatch_device_opts="$sbatch_cpu_opts"
