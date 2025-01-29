@@ -126,8 +126,8 @@ contains
 
                         if (G > verysmall) then
                             !$acc loop seq
-                            do i = 1, tensor_size
-                                tensora(i) = 0._wp
+                            do i = 1, tensor_size - 1
+                                tensora(i) = tensorb(i)/tensorb(tensor_size)
                             end do
 
                             ! STEP 1: computing the grad_xi tensor using finite differences
