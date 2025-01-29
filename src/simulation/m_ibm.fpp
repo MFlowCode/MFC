@@ -56,18 +56,19 @@ contains
             @:ALLOCATE(levelset%sf(-gp_layers:m+gp_layers, &
                 -gp_layers:n+gp_layers, -gp_layers:p+gp_layers, num_ibs))
             @:ALLOCATE(levelset_norm%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, -gp_layers:p+gp_layers, num_ibs, 3))
+                -gp_layers:n+gp_layers, -gp_layers:p+gp_layers, num_ibs, 1:3))
         else
             @:ALLOCATE(ib_markers%sf(-gp_layers:m+gp_layers, &
                 -gp_layers:n+gp_layers, 0:0))
             @:ALLOCATE(levelset%sf(-gp_layers:m+gp_layers, &
                 -gp_layers:n+gp_layers, 0:0, num_ibs))
             @:ALLOCATE(levelset_norm%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, 0:0, num_ibs, 3))
+                -gp_layers:n+gp_layers, 0:0, num_ibs, 1:3))
         end if
 
         @:ACC_SETUP_SFs(ib_markers)
         @:ACC_SETUP_SFs(levelset)
+        @:ACC_SETUP_SFs(levelset_norm)
 
         !$acc enter data copyin(num_gps, num_inner_gps)
 
