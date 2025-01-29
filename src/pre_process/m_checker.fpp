@@ -76,7 +76,7 @@ contains
                         "${DIR}$_domain%${BOUND}$ must not be set when ${VAR}$ > 0 and old_grid = T")
                     @:PROHIBIT(${VAR}$ > 0 .and. (.not. old_grid) .and. f_is_default(${DIR}$_domain%${BOUND}$), &
                         "${DIR}$_domain%${BOUND}$ must be set when ${VAR}$ > 0 and old_grid = F")
-                    @:PROHIBIT(${VAR}$ > 0 .and. ${DIR}$_domain%beg >= ${DIR}$_domain%end, &
+                    @:PROHIBIT(${VAR}$ > 0 .and. (.not. old_grid) .and. ${DIR}$_domain%beg >= ${DIR}$_domain%end, &
                         "${DIR}$_domain%beg must be less than ${DIR}$_domain%end when both are set")
                 #:endfor
             end if

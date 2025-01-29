@@ -474,9 +474,10 @@ contains
 
     !> The subroutine terminates the MPI execution environment.
         !! @param prnt error message to be printed
-    subroutine s_mpi_abort(prnt)
+    subroutine s_mpi_abort(prnt, code)
 
         character(len=*), intent(in), optional :: prnt
+        integer, intent(in), optional :: code
 
         if (present(prnt)) then
             print *, prnt
@@ -485,14 +486,18 @@ contains
         end if
 
 #ifndef MFC_MPI
-
-        stop 1
-
+        if (present(code)) then
+            stop code
+        else
+            stop 1
+        end if
 #else
-
         ! Terminating the MPI environment
-        call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-
+        if (present(code)) then
+            call MPI_ABORT(MPI_COMM_WORLD, code, ierr)
+        else
+            call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+        end if
 #endif
 
     end subroutine s_mpi_abort

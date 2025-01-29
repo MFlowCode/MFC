@@ -251,6 +251,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, "model_eqns=2", {'model_eqns': 2}))
         cases.append(define_case_d(stack, "model_eqns=3", {'model_eqns': 3}))
+        cases.append(define_case_d(stack, "HLL", {'riemann_solver': 1}))
 
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
