@@ -56,14 +56,14 @@ contains
             @:ALLOCATE(levelset%sf(-gp_layers:m+gp_layers, &
                 -gp_layers:n+gp_layers, -gp_layers:p+gp_layers, num_ibs))
             @:ALLOCATE(levelset_norm%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, -gp_layers:p+gp_layers, num_ibs, 1:3))
+                -gp_layers:n+gp_layers, -gp_layers:p+gp_layers, num_ibs, 3))
         else
             @:ALLOCATE(ib_markers%sf(-gp_layers:m+gp_layers, &
                 -gp_layers:n+gp_layers, 0:0))
             @:ALLOCATE(levelset%sf(-gp_layers:m+gp_layers, &
                 -gp_layers:n+gp_layers, 0:0, num_ibs))
             @:ALLOCATE(levelset_norm%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, 0:0, num_ibs, 1:3))
+                -gp_layers:n+gp_layers, 0:0, num_ibs, 3))
         end if
 
         @:ACC_SETUP_SFs(ib_markers)
@@ -208,7 +208,7 @@ contains
 
             ! Calculate velocity of ghost cell
             if (gp%slip) then
-                norm = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, :)
+                norm = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
                 buf = sqrt(sum(norm**2))
                 norm = norm/buf
                 vel_norm_IP = sum(vel_IP*norm)*norm
