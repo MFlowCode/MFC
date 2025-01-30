@@ -81,6 +81,8 @@ contains
         integer :: i, j, k
 
         !$acc update device(ib_markers%sf)
+        !$acc update device(levelset%sf)
+        !$acc update device(levelset_norm%sf)
 
         ! Get neighboring IB variables from other processors
         call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
@@ -208,7 +210,7 @@ contains
 
             ! Calculate velocity of ghost cell
             if (gp%slip) then
-                norm = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
+                norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
                 buf = sqrt(sum(norm**2))
                 norm = norm/buf
                 vel_norm_IP = sum(vel_IP*norm)*norm
