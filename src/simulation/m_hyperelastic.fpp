@@ -164,7 +164,7 @@ contains
                         ! STEP 2a: computing the determinant of the grad_xi tensor
                         tensorb(tensor_size) = tensora(1)
                         ! STEP 2b: computing the inverse of the grad_xi tensor
-                        tensorb(1) = 1._wp/(tensora(1)**2)
+                        tensorb(1) = 1._wp/tensora(1)
                         if (n > 0) then
                             ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
                             tensorb(1) = tensora(4)
@@ -192,18 +192,9 @@ contains
                         end if
 
                         if (tensorb(tensor_size) > verysmall) then
-                            ! STEP 2c: computing the inverse of grad_xi tensor = F
-                            ! tensorb is the adjoint, tensora becomes F
-                            !$acc loop seq
-                            do i = 1, tensor_size - 1
-                                tensora(i) = tensorb(i)/tensorb(tensor_size)
-                            end do
-
-                            ! STEP 2d: computing the J = det(F) = 1/det(\grad{\xi})
-                            tensorb(tensor_size) = 1._wp/tensorb(tensor_size)
                             ! STEP 3: update the btensor, this is consistent with Riemann solvers
                             ! \b_xx
-                            btensor%vf(1)%sf(j, k, l) = tensorb(1)
+                            btensor%vf(1)%sf(j, k, l) = tensorb(1)**2
                             if (n > 0) then
                                 ! STEP 2e: override adjoint (tensorb) to be F transpose F
                                 tensorb(1) = tensora(1)**2 + tensora(2)**2
