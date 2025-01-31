@@ -207,7 +207,7 @@ contains
                                !  STEP 2e: override adjoint (tensorb) to be F transpose F
                                tensorb(1) = tensora(4)**2 + tensora(3)**2
                                tensorb(4) = tensora(2)**2 + tensora(1)**2
-                               tensorb(2) = -tensora(2)*tensora(4) + tensora(1)*-tensora(3)
+                               tensorb(2) = -tensora(2)*tensora(4) + tensora(1)*(-tensora(3))
                                tensorb(3) = tensorb(2)
                                ! STEP 3: update the btensor, this is consistent with Riemann solvers
                                #:for BIJ, TXY in [(1,1),(2,2),(3,4)]
