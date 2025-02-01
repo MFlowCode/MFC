@@ -108,9 +108,10 @@ contains
             call MPI_BCAST(patch_ib(i)%model_spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in [ 'x_centroid', 'y_centroid', 'z_centroid',           &
-                & 'length_x', 'length_y', 'length_z', 'radius', 'c', 'p', 't', 'm', 'theta', 'slip']
+                & 'length_x', 'length_y', 'length_z', 'radius', 'c', 'p', 't', 'm', 'theta']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
+            call MPI_BCAST(patch_ib(i)%slip, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in [ 'model_translate', 'model_scale', 'model_rotate']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
