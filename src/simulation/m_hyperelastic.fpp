@@ -125,11 +125,6 @@ contains
                     !if ( G <= verysmall ) G_K = 0._wp
 
                     if (G > verysmall) then
-                        !$acc loop seq
-                        do i = 1, tensor_size - 1
-                            tensora(i) = tensorb(i)/tensorb(tensor_size)
-                        end do
-
                         ! STEP 1: computing grad_xi (tensora) using finite differences
                         ! tensora(1,2): dxix_x, dxiy_x
                         ! tensora(3,4): dxix_dy, dxiy_dy
@@ -138,17 +133,9 @@ contains
                         ! tensora(7,8,9):  dxix_dz, dxiy_dz, dxiz_dz
                         !$acc loop seq
                         do r = -fd_number, fd_number
-                            ! derivatives in the x-direction
-                            tensora(1) = tensora(1) + q_prim_vf(xibeg)%sf(j + r, k, l)*fd_coeff_x(r, j)
-                            if (n > 0) then
-                                ! derivatives in the x-direction
-                                tensora(2) = tensora(2) + q_prim_vf(xibeg + 1)%sf(j + r, k, l)*fd_coeff_x(r, j)
-                                ! derivatives in the y-direction
-                                tensora(3) = tensora(3) + q_prim_vf(xibeg)%sf(j, k + r, l)*fd_coeff_y(r, k)
-                                tensora(4) = tensora(4) + q_prim_vf(xibeg + 1)%sf(j, k + r, l)*fd_coeff_y(r, k)
-                            end if
                             if (p > 0) then
                                 ! derivatives in the x-direction
+                                tensora(1) = tensora(1) + q_prim_vf(xibeg)%sf(j + r, k, l)*fd_coeff_x(r, j)
                                 tensora(2) = tensora(2) + q_prim_vf(xibeg + 1)%sf(j + r, k, l)*fd_coeff_x(r, j)
                                 tensora(3) = tensora(3) + q_prim_vf(xiend)%sf(j + r, k, l)*fd_coeff_x(r, j)
                                 ! derivatives in the y-direction
@@ -159,22 +146,19 @@ contains
                                 tensora(7) = tensora(7) + q_prim_vf(xibeg)%sf(j, k, l + r)*fd_coeff_z(r, l)
                                 tensora(8) = tensora(8) + q_prim_vf(xibeg + 1)%sf(j, k, l + r)*fd_coeff_z(r, l)
                                 tensora(9) = tensora(9) + q_prim_vf(xiend)%sf(j, k, l + r)*fd_coeff_z(r, l)
+                            elseif (n > 0) then
+                                ! derivatives in the x-direction
+                                tensora(1) = tensora(1) + q_prim_vf(xibeg)%sf(j + r, k, l)*fd_coeff_x(r, j)
+                                tensora(2) = tensora(2) + q_prim_vf(xibeg + 1)%sf(j + r, k, l)*fd_coeff_x(r, j)
+                                ! derivatives in the y-direction
+                                tensora(3) = tensora(3) + q_prim_vf(xibeg)%sf(j, k + r, l)*fd_coeff_y(r, k)
+                                tensora(4) = tensora(4) + q_prim_vf(xibeg + 1)%sf(j, k + r, l)*fd_coeff_y(r, k) 
+                            else
+                                ! derivatives in the x-direction
+                                tensora(1) = tensora(1) + q_prim_vf(xibeg)%sf(j + r, k, l)*fd_coeff_x(r, j)
                             end if
                         end do
 
-                        ! STEP 2a: computing the determinant of the grad_xi tensor
-                        tensorb(tensor_size) = tensora(1)
-                        ! STEP 2b: computing the inverse of the grad_xi tensor
-                        tensorb(1) = 1._wp/tensora(1)
-                        if (n > 0) then
-                            ! STEP 2a: computing the cofactor (tensorb) of the grad_xi tensor for the inverse
-                            tensorb(1) = tensora(4)
-                            tensorb(2) = -tensora(2)
-                            tensorb(3) = -tensora(3)
-                            tensorb(4) = tensora(1)
-                            ! STEP 2b: computing the determinant of the grad_xi tensor
-                            tensora(tensor_size) = tensora(1)*tensora(4) - tensora(3)*tensora(2)
-                        end if
                         if (p > 0) then
                             ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
                             tensorb(1) = tensora(5)*tensora(9) - tensora(6)*tensora(8)
@@ -190,31 +174,23 @@ contains
                             tensora(tensor_size) = tensora(1)*(tensora(5)*tensora(9) - tensora(6)*tensora(8)) &
                                                    - tensora(2)*(tensora(4)*tensora(9) - tensora(6)*tensora(7)) &
                                                    + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
+                        elseif (n > 0) then
+                            ! STEP 2a: computing the cofactor (tensorb) of the grad_xi tensor for the inverse
+                            tensorb(1) = tensora(4)
+                            tensorb(2) = -tensora(2)
+                            tensorb(3) = -tensora(3)
+                            tensorb(4) = tensora(1)
+                            ! STEP 2b: computing the determinant of the grad_xi tensor
+                            tensora(tensor_size) = tensora(1)*tensora(4) - tensora(3)*tensora(2)
+                        else
+                            ! STEP 2a: computing the determinant of the grad_xi tensor
+                            tensorb(tensor_size) = tensora(1)
+                            ! STEP 2b: computing the inverse of the grad_xi tensor
+                            tensorb(1) = 1._wp/tensora(1)
                         end if
 
                         if (tensora(tensor_size) > verysmall) then
-                            ! STEP 3: update the btensor, this is consistent with Riemann solvers
-                            ! \b_xx
-                            btensor%vf(1)%sf(j, k, l) = tensorb(1)**2
-                           if (n > 0) then
-                               ! STEP 2c: computing the inverse of grad_xi tensor = F (tensora)
-                               !$acc loop seq
-                               do i = 1, tensor_size - 1
-                                  tensora(i) = tensorb(i)/tensora(tensor_size)
-                               end do
-                               ! STEP 2d: computing J = det(F) 
-                               tensorb(tensor_size) = 1._wp/tensora(tensor_size)
-                               !  STEP 2e: override adjoint (tensorb) to be F transpose F
-                               tensorb(1) = tensora(4)**2 + tensora(3)**2
-                               tensorb(4) = tensora(2)**2 + tensora(1)**2
-                               tensorb(2) = -tensora(2)*tensora(4) + tensora(1)*(-tensora(3))
-                               tensorb(3) = tensorb(2)
-                               ! STEP 3: update the btensor, this is consistent with Riemann solvers
-                               #:for BIJ, TXY in [(1,1),(2,2),(3,4)]
-                                   btensor%vf(${BIJ}$)%sf(j, k, l) = tensorb(${TXY}$)
-                               #:endfor
-                            end if
-                            if (p > 0) then
+                           if (p > 0) then
                                 ! STEP 2c: computing the inverse of grad_xi tensor = F (tensora)
                                 !$acc loop seq
                                 do i = 1, tensor_size - 1
@@ -233,7 +209,28 @@ contains
                                 #:for BIJ, TXY in [(1,1),(2,2),(3,5),(4,3),(5,6),(6,9)]
                                     btensor%vf(${BIJ}$)%sf(j, k, l) = tensorb(${TXY}$)
                                 #:endfor
-                            end if
+                           elseif (n > 0) then
+                               ! STEP 2c: computing the inverse of grad_xi tensor = F (tensora)
+                               !$acc loop seq
+                               do i = 1, tensor_size - 1
+                                  tensora(i) = tensorb(i)/tensora(tensor_size)
+                               end do
+                               ! STEP 2d: computing J = det(F) 
+                               tensorb(tensor_size) = 1._wp/tensora(tensor_size)
+                               !  STEP 2e: override adjoint (tensorb) to be F transpose F
+                               tensorb(1) = tensora(4)**2 + tensora(3)**2
+                               tensorb(4) = tensora(2)**2 + tensora(1)**2
+                               tensorb(2) = (-tensora(2))*tensora(4) + tensora(1)*(-tensora(3))
+                               tensorb(3) = tensorb(2)
+                               ! STEP 3: update the btensor, this is consistent with Riemann solvers
+                               #:for BIJ, TXY in [(1,1),(2,2),(3,4)]
+                                   btensor%vf(${BIJ}$)%sf(j, k, l) = tensorb(${TXY}$)
+                               #:endfor
+                           else
+                              ! STEP 3: update the btensor, this is consistent with Riemann solvers
+                              ! \b_xx
+                              btensor%vf(1)%sf(j, k, l) = tensorb(1)**2
+                           end if
 
                             !STEP 3b: store the determinant at the last entry of the btensor
                             btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
@@ -281,25 +278,25 @@ contains
 
         real(wp) :: trace
         real(wp), parameter :: f13 = 1._wp/3._wp
-        integer :: i
+        integer :: i 
 
-        ! calculate the deviatoric of the tensor
-        btensor(1)%sf(j, k, l) = 2._wp*btensor(1)%sf(j, k, l)/3._wp
-        if (n > 0) then
-            ! tensor is the symmetric tensor & calculate the trace of the tensor
-            trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l)
-            ! calculate the deviatoric of the tensor
-            btensor(1)%sf(j, k, l) = btensor(1)%sf(j, k, l) - f13*trace
-            btensor(3)%sf(j, k, l) = btensor(3)%sf(j, k, l) - f13*trace
-        end if
-        if (p > 0) then
+       if (p > 0) then
             ! tensor is the symmetric tensor & calculate the trace of the tensor
             trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l) + btensor(6)%sf(j, k, l)
             ! calculate the deviatoric of the tensor
             #:for IJ in [1,3,6]
                 btensor(${IJ}$)%sf(j, k, l) = btensor(${IJ}$)%sf(j, k, l) - f13*trace
             #:endfor
-        end if
+       elseif (n > 0) then
+            ! tensor is the symmetric tensor & calculate the trace of the tensor
+            trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l)
+            ! calculate the deviatoric of the tensor
+            btensor(1)%sf(j, k, l) = btensor(1)%sf(j, k, l) - f13*trace
+            btensor(3)%sf(j, k, l) = btensor(3)%sf(j, k, l) - f13*trace
+       else
+            ! calculate the deviatoric of the tensor
+            btensor(1)%sf(j, k, l) = 2._wp*btensor(1)%sf(j, k, l)/3._wp
+       end if
 
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
@@ -334,21 +331,30 @@ contains
         real(wp), parameter :: f13 = 1._wp/3._wp
         integer :: i
 
-        !TODO Make this 1D and 2D capable
-        ! tensor is the symmetric tensor & calculate the trace of the tensor
-        trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l) + btensor(6)%sf(j, k, l)
-
-        ! calculate the deviatoric of the tensor
-        btensor(1)%sf(j, k, l) = btensor(1)%sf(j, k, l) - f13*trace
-        btensor(3)%sf(j, k, l) = btensor(3)%sf(j, k, l) - f13*trace
-        btensor(6)%sf(j, k, l) = btensor(6)%sf(j, k, l) - f13*trace
+       if (p > 0) then
+            ! tensor is the symmetric tensor & calculate the trace of the tensor
+            trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l) + btensor(6)%sf(j, k, l)
+            ! calculate the deviatoric of the tensor
+            #:for IJ in [1,3,6]
+                btensor(${IJ}$)%sf(j, k, l) = btensor(${IJ}$)%sf(j, k, l) - f13*trace
+            #:endfor
+       elseif (n > 0) then
+            ! tensor is the symmetric tensor & calculate the trace of the tensor
+            trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l)
+            ! calculate the deviatoric of the tensor
+            btensor(1)%sf(j, k, l) = btensor(1)%sf(j, k, l) - f13*trace
+            btensor(3)%sf(j, k, l) = btensor(3)%sf(j, k, l) - f13*trace
+       else
+            ! calculate the deviatoric of the tensor
+            btensor(1)%sf(j, k, l) = 2._wp*btensor(1)%sf(j, k, l)/3._wp
+       end if
 
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
         !$acc loop seq
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
-                G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
+               G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &
