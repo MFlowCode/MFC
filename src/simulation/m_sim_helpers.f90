@@ -75,7 +75,7 @@ contains
 
         pres = q_prim_vf(E_idx)%sf(j, k, l)
 
-        E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_sum + qv
+        E = gamma*pres + pi_inf + 0.5_wp*rho*vel_sum + qv
 
         ! energy adjustments for hyperelastic energy
         if (hyperelasticity) then
@@ -246,7 +246,7 @@ contains
                                      dy(k)/(abs(vel(2)) + c))
 
             if (viscous) then
-                vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
+                vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1._wp/Re_l)/rho)
             end if
 
         else
@@ -254,7 +254,7 @@ contains
             icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
 
             if (viscous) then
-                vcfl_dt = cfl_target*(dx(j)**2._wp)/minval(1/(rho*Re_l))
+                vcfl_dt = cfl_target*(dx(j)**2._wp)/minval(1._wp/(rho*Re_l))
             end if
 
         end if
