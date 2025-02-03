@@ -942,7 +942,7 @@ contains
                         if (model_eqns /= 4) then
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
                                                         /rho_K
-                            dyn_pres_K = dyn_pres_K + 5e-1_wp*qK_cons_vf(i)%sf(j, k, l) &
+                            dyn_pres_K = dyn_pres_K + 0.5_wp*qK_cons_vf(i)%sf(j, k, l) &
                                          *qK_prim_vf(i)%sf(j, k, l)
                         else
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
@@ -1341,7 +1341,7 @@ contains
 
                     ! Computing the energy from the pressure
                     E_K = gamma_K*pres_K + pi_inf_K &
-                          + 5e-1_wp*rho_K*vel_K_sum + qv_K
+                          + 0.5_wp*rho_K*vel_K_sum + qv_K
 
                     ! mass flux, this should be \alpha_i \rho_i u_i
                     !$acc loop seq
@@ -1466,7 +1466,7 @@ contains
                         (rho*(1._wp - adv(num_fluids)))
                 end if
             else
-                c = ((H - 5e-1*vel_sum)/gamma)
+                c = ((H - 0.5_wp*vel_sum)/gamma)
             end if
 
             if (mixture_err .and. c < 0._wp) then
