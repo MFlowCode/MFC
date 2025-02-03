@@ -522,13 +522,13 @@ contains
                                 call get_mixture_energy_mass(T_L, Ys_L, E_L)
                                 call get_mixture_energy_mass(T_R, Ys_R, E_R)
 
-                                E_L = rho_L*E_L + 0.5*rho_L*vel_L_rms
-                                E_R = rho_R*E_R + 0.5*rho_R*vel_R_rms
+                                E_L = rho_L*E_L + 0.5_wp*rho_L*vel_L_rms
+                                E_R = rho_R*E_R + 0.5_wp*rho_R*vel_R_rms
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                             else
-                                E_L = gamma_L*pres_L + pi_inf_L + 0.5*rho_L*vel_L_rms + qv_L
-                                E_R = gamma_R*pres_R + pi_inf_R + 0.5*rho_R*vel_R_rms + qv_R
+                                E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L
+                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                             end if
@@ -2359,14 +2359,13 @@ contains
                                     call get_mixture_energy_mass(T_L, Ys_L, E_L)
                                     call get_mixture_energy_mass(T_R, Ys_R, E_R)
 
-                                    E_L = rho_L*E_L + 0.5*rho_L*vel_L_rms
-                                    E_R = rho_R*E_R + 0.5*rho_R*vel_R_rms
+                                    E_L = rho_L*E_L + 0.5_wp*rho_L*vel_L_rms
+                                    E_R = rho_R*E_R + 0.5_wp*rho_R*vel_R_rms
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
                                 else
-                                    E_L = gamma_L*pres_L + pi_inf_L + 0.5*rho_L*vel_L_rms + qv_L
-
-                                    E_R = gamma_R*pres_R + pi_inf_R + 0.5*rho_R*vel_R_rms + qv_R
+                                    E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L
+                                    E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R
 
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
