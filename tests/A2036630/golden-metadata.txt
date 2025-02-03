@@ -1,12 +1,12 @@
-This file was created on 2024-11-24 15:51:05.907958.
+This file was created on 2025-01-20 18:05:53.740200.
 
 mfc.sh:
 
-    Invocation: test -j 8 -o A2036630 --generate
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        5300f98a341af8086f365b7d5a0125a0264b8e8c on master (dirty)
+    Invocation: test --generate -f C7BE8FEA -t 7F70E665
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
+    Git:        f1582f6d88f0395c83a481ceea694e2ed2263ad9 on Add-slip-test (dirty)
 
-post_process:
+pre_process:
 
     CMake Configuration:
     
@@ -15,41 +15,8 @@ post_process:
         C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/haochey/Documents/Github/MFChaocheyfork/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.30.3 on ipsec-10-2-65-237.vpn.gatech.edu
-    
-        C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -105,7 +72,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+simulation:
 
     CMake Configuration:
     
@@ -114,8 +81,8 @@ pre_process:
         C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -134,6 +101,39 @@ pre_process:
         CC       : 
         CXX      : 
         FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.30.3 on ipsec-10-2-65-237.vpn.gatech.edu
+    
+        C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/haochey/Documents/Github/MFChaocheyfork/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 

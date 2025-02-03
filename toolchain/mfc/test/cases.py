@@ -319,44 +319,53 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         else:
             cases.append(define_case_d(stack, '2 MPI Ranks', {}, ppn=2))
 
+
     def alter_ib(dimInfo, six_eqn_model=False):
-        stack.push(f'IBM', {
-            'ib': 'T', 'num_ibs': 1,
-            'patch_ib(1)%x_centroid': 0.5, 'patch_ib(1)%y_centroid': 0.5,
-            'patch_ib(1)%radius': 0.1, 'patch_icpp(1)%vel(1)': 0.001,
-            'patch_icpp(2)%vel(1)': 0.001, 'patch_icpp(3)%vel(1)': 0.001,
-        })
+        for slip in [True, False]:
+            stack.push(f'IBM', {
+                'ib': 'T', 'num_ibs': 1,
+                'patch_ib(1)%x_centroid': 0.5, 'patch_ib(1)%y_centroid': 0.5,
+                'patch_ib(1)%radius': 0.1, 'patch_icpp(1)%vel(1)': 0.001,
+                'patch_icpp(2)%vel(1)': 0.001, 'patch_icpp(3)%vel(1)': 0.001,
+                'patch_ib(1)%slip': 'T' if slip else 'F',
+            })
 
-        if len(dimInfo[0]) == 3:
-            cases.append(define_case_d(stack, f'Sphere', {
-                'patch_ib(1)%z_centroid': 0.5,
-                'patch_ib(1)%geometry': 8,
-            }))
+            suffix = " -> slip" if slip else ""
 
-            cases.append(define_case_d(stack, f'Cuboid', {
-                'patch_ib(1)%z_centroid': 0.5,
-                'patch_ib(1)%length_x': 0.1,
-                'patch_ib(1)%length_y': 0.1,
-                'patch_ib(1)%length_z': 0.1,
-                'patch_ib(1)%geometry': 9,
-            }))
+            if len(dimInfo[0]) == 3:
+                cases.append(define_case_d(stack, f'Sphere{suffix}', {
+                    'patch_ib(1)%z_centroid': 0.5,
+                    'patch_ib(1)%geometry': 8,
+                }))
 
-            cases.append(define_case_d(stack, f'Cylinder', {
-                'patch_ib(1)%z_centroid': 0.5,
-                'patch_ib(1)%length_x': 0.1,
-                'patch_ib(1)%geometry': 10,
-            }))
+                cases.append(define_case_d(stack, f'Cuboid{suffix}', {
+                    'patch_ib(1)%z_centroid': 0.5,
+                    'patch_ib(1)%length_x': 0.1,
+                    'patch_ib(1)%length_y': 0.1,
+                    'patch_ib(1)%length_z': 0.1,
+                    'patch_ib(1)%geometry': 9,
+                }))
 
-        elif len(dimInfo[0]) == 2:
-            cases.append(define_case_d(stack, f'Rectangle', {
-                'patch_ib(1)%length_x': 0.05,
-                'patch_ib(1)%length_y': 0.05,
-                'patch_ib(1)%geometry': 3 }))
-            cases.append(define_case_d(stack, f'Circle', {'patch_ib(1)%geometry': 2 }))
-            if six_eqn_model:
-                cases.append(define_case_d(stack, f'model_eqns=3', {'patch_ib(1)%geometry': 2, 'model_eqns': 3}))
+                cases.append(define_case_d(stack, f'Cylinder{suffix}', {
+                    'patch_ib(1)%z_centroid': 0.5,
+                    'patch_ib(1)%length_x': 0.1,
+                    'patch_ib(1)%geometry': 10,
+                }))
 
-        stack.pop()
+            elif len(dimInfo[0]) == 2:
+                cases.append(define_case_d(stack, f'Rectangle{suffix}', {
+                    'patch_ib(1)%length_x': 0.05,
+                    'patch_ib(1)%length_y': 0.05,
+                    'patch_ib(1)%geometry': 3,
+                }))
+                cases.append(define_case_d(stack, f'Circle{suffix}', {'patch_ib(1)%geometry': 2 }))
+                if six_eqn_model:
+                    cases.append(define_case_d(stack, f'model_eqns=3{suffix}', {
+                        'patch_ib(1)%geometry': 2,
+                        'model_eqns': 3,
+                    }))
+
+            stack.pop()
 
     def ibm_stl():
         common_mods = {
