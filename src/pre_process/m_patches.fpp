@@ -1614,11 +1614,11 @@ contains
                     end if
 
                     if (present(ib) .and. ((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 &
-                                            + (cart_z - z_centroid)**2 <= radius**2)) then
+                                           + (cart_z - z_centroid)**2 <= radius**2)) then
                         patch_id_fp(i, j, 0) = patch_id
                     else
                         if (((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 &
-                             + (cart_z - z_centroid)**2  <= radius**2 &
+                             + (cart_z - z_centroid)**2 <= radius**2 &
                              .and. &
                              patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                             .or. &
