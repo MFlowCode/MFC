@@ -1606,29 +1606,30 @@ contains
                     end if
 
                     if (.not. present(ib) .and. patch_icpp(patch_id)%smoothen) then
-                        eta = tanh(smooth_coeff/min(dx, dy)* &
+                        eta = tanh(smooth_coeff/min(dx, dy, dz)* &
                                    (sqrt((x_cc(i) - x_centroid)**2 &
                                          + (cart_y - y_centroid)**2 &
                                          + (cart_z - z_centroid)**2) &
                                     - radius))*(-0.5_wp) + 0.5_wp
                     end if
 
-                    if (present(ib) .and. ((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 &
-                                           + (cart_z - z_centroid)**2 <= radius**2)) then
-                        patch_id_fp(i, j, 0) = patch_id
-                    else
-                        if (((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 &
-                             + (cart_z - z_centroid)**2 <= radius**2 &
-                             .and. &
-                             patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
-                            .or. &
-                            (.not. present(ib) .and. patch_id_fp(i, j, k) == smooth_patch_id)) &
-                            then
+                    if ((x_cc(i) - x_centroid)**2 &
+                        + (cart_y - y_centroid)**2 &
+                        + (cart_z - z_centroid)**2 <= radius**2) &
+                        then
 
-                            call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                                    eta, q_prim_vf, patch_id_fp)
+                        if (present(ib)) then
+                            ! Updating the patch identities bookkeeping variable
+                            patch_id_fp(i, j, k) = patch_id
+                        else
+                            if (patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k)) .or. &
+                                patch_id_fp(i, j, k) == smooth_patch_id) then
 
-                            @:analytical()
+                                call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                                        eta, q_prim_vf, patch_id_fp)
+
+                                @:analytical()
+                            end if
                         end if
                     end if
                 end do
@@ -1808,6 +1809,25 @@ contains
                         cart_z = z_cc(k)
                     end if
 
+                    if (.not. present(ib) .and. patch_icpp(patch_id)%smoothen) then
+                        if (.not. f_is_default(length_x)) then
+                            eta = tanh(smooth_coeff/min(dy, dz)* &
+                                       (sqrt((cart_y - y_centroid)**2 &
+                                             + (cart_z - z_centroid)**2) &
+                                        - radius))*(-0.5_wp) + 0.5_wp
+                        elseif (.not. f_is_default(length_y)) then
+                            eta = tanh(smooth_coeff/min(dx, dz)* &
+                                       (sqrt((x_cc(i) - x_centroid)**2 &
+                                             + (cart_z - z_centroid)**2) &
+                                        - radius))*(-0.5_wp) + 0.5_wp
+                        else
+                            eta = tanh(smooth_coeff/min(dx, dy)* &
+                                       (sqrt((x_cc(i) - x_centroid)**2 &
+                                             + (cart_y - y_centroid)**2) &
+                                        - radius))*(-0.5_wp) + 0.5_wp
+                        end if
+                    end if
+
                     if ((.not. f_is_default(length_x) .and. &
                          (cart_y - y_centroid)**2 &
                          + (cart_z - z_centroid)**2 <= radius**2 .and. &
@@ -1840,25 +1860,6 @@ contains
 
                                 ! Updating the patch identities bookkeeping variable
                                 if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
-                            end if
-
-                            if (patch_icpp(patch_id)%smoothen) then
-                                if (.not. f_is_default(length_x)) then
-                                    eta = tanh(smooth_coeff/min(dy, dz)* &
-                                               (sqrt((cart_y - y_centroid)**2 &
-                                                     + (cart_z - z_centroid)**2) &
-                                                - radius))*(-0.5_wp) + 0.5_wp
-                                elseif (.not. f_is_default(length_y)) then
-                                    eta = tanh(smooth_coeff/min(dx, dz)* &
-                                               (sqrt((x_cc(i) - x_centroid)**2 &
-                                                     + (cart_z - z_centroid)**2) &
-                                                - radius))*(-0.5_wp) + 0.5_wp
-                                else
-                                    eta = tanh(smooth_coeff/min(dx, dy)* &
-                                               (sqrt((x_cc(i) - x_centroid)**2 &
-                                                     + (cart_y - y_centroid)**2) &
-                                                - radius))*(-0.5_wp) + 0.5_wp
-                                end if
                             end if
                         end if
                     end if
