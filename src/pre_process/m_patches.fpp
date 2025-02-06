@@ -1613,9 +1613,10 @@ contains
                                     - radius))*(-0.5_wp) + 0.5_wp
                     end if
 
-                    if ((x_cc(i) - x_centroid)**2 &
-                        + (cart_y - y_centroid)**2 &
-                        + (cart_z - z_centroid)**2 <= radius**2) &
+                    if (((x_cc(i) - x_centroid)**2 &
+                         + (cart_y - y_centroid)**2 &
+                         + (cart_z - z_centroid)**2 <= radius**2) .or. &
+                        patch_id_fp(i, j, k) == smooth_patch_id) &
                         then
 
                         if (present(ib)) then
@@ -1828,23 +1829,23 @@ contains
                         end if
                     end if
 
-                    if ((.not. f_is_default(length_x) .and. &
-                         (cart_y - y_centroid)**2 &
-                         + (cart_z - z_centroid)**2 <= radius**2 .and. &
-                         x_boundary%beg <= x_cc(i) .and. &
-                         x_boundary%end >= x_cc(i)) &
-                        .or. &
-                        (.not. f_is_default(length_y) .and. &
-                         (x_cc(i) - x_centroid)**2 &
-                         + (cart_z - z_centroid)**2 <= radius**2 .and. &
-                         y_boundary%beg <= cart_y .and. &
-                         y_boundary%end >= cart_y) &
-                        .or. &
-                        (.not. f_is_default(length_z) .and. &
-                         (x_cc(i) - x_centroid)**2 &
-                         + (cart_y - y_centroid)**2 <= radius**2 .and. &
-                         z_boundary%beg <= cart_z .and. &
-                         z_boundary%end >= cart_z)) then
+                    if (((.not. f_is_default(length_x) .and. &
+                          (cart_y - y_centroid)**2 &
+                          + (cart_z - z_centroid)**2 <= radius**2 .and. &
+                          x_boundary%beg <= x_cc(i) .and. &
+                          x_boundary%end >= x_cc(i)) &
+                         .or. &
+                         (.not. f_is_default(length_y) .and. &
+                          (x_cc(i) - x_centroid)**2 &
+                          + (cart_z - z_centroid)**2 <= radius**2 .and. &
+                          y_boundary%beg <= cart_y .and. &
+                          y_boundary%end >= cart_y) &
+                         .or. &
+                         (.not. f_is_default(length_z) .and. &
+                          (x_cc(i) - x_centroid)**2 &
+                          + (cart_y - y_centroid)**2 <= radius**2 .and. &
+                          z_boundary%beg <= cart_z .and. &
+                          z_boundary%end >= cart_z)) .or. patch_id_fp(i, j, k) == smooth_patch_id) then
 
                         if (present(ib)) then
                             ! Updating the patch identities bookkeeping variable
