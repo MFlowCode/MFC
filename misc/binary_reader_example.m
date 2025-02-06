@@ -1,5 +1,5 @@
 % Example of using binary_reader_wrapper
-% Need to change "format" to 2 for 2D_acoustic_support5 and 3D_acoustic_support7
+% Need to change "format" to 2 when post-processing the example cases
 
 clear; clc; close all;
 
