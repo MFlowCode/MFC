@@ -141,6 +141,7 @@ module m_global_parameters
     logical :: alt_soundspeed !< Alternate mixture sound speed
     logical :: null_weights    !< Null undesired WENO weights
     logical :: mixture_err     !< Mixture properties correction
+    logical :: mhd             !< Magnetohydrodynamics
     logical :: hypoelasticity  !< hypoelasticity modeling
     logical :: hyperelasticity !< hyperelasticity modeling
     integer :: hyper_model     !< hyperelasticity solver algorithm
@@ -170,7 +171,7 @@ module m_global_parameters
         !$acc declare create(num_dims, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, mhd, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -228,6 +229,7 @@ module m_global_parameters
     integer :: alf_idx                                 !< Index of void fraction
     integer :: gamma_idx                               !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                              !< Index of liquid stiffness func. eqn.
+    type(int_bounds_info) :: B_idx                 !< Indexes of first and last magnetic field eqns.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     type(int_bounds_info) :: xi_idx                    !< Indexes of first and last reference map eqns.
     integer :: b_size                                  !< Number of elements in the symmetric b tensor, plus one
@@ -440,7 +442,8 @@ module m_global_parameters
     integer :: strxb, strxe
     integer :: chemxb, chemxe
     integer :: xibeg, xiend
-    !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe, chemxb, chemxe)
+    integer :: Bxb, Bxe
+    !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe, chemxb, chemxe, Bxb, Bxe)
     !$acc declare create(xibeg,xiend)
 
     real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
@@ -891,6 +894,12 @@ contains
                     end if
                 end if
 
+                if (mhd) then ! Assume only 1D for now
+                    B_idx%beg = sys_size + 1 ! Magnetic field By
+                    B_idx%end = sys_size + 2 ! Magnetic field Bz
+                    sys_size = B_idx%end
+                end if
+
                 if (hypoelasticity .or. hyperelasticity) then
                     elasticity = .true.
                     stress_idx%beg = sys_size + 1
@@ -1177,7 +1186,9 @@ contains
         xiend = xi_idx%end
         chemxb = species_idx%beg
         chemxe = species_idx%end
-
+        Bxb = B_idx%beg
+        Bxe = B_idx%end
+        
         !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
         !$acc update device(b_size, xibeg, xiend, tensor_size)
 
@@ -1185,7 +1196,7 @@ contains
         !$acc update device(cfl_target, m, n, p)
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, low_Mach)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, mhd, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, low_Mach)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)

@@ -69,7 +69,7 @@ contains
             weno_order, bc_x, &
             bc_y, bc_z, fluid_pp, format, precision, &
             output_partial_domain, x_output, y_output, z_output, &
-            hypoelasticity, G, &
+            hypoelasticity, G, mhd, &
             chem_wrt_Y, chem_wrt_T, avg_state, &
             alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
             E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
@@ -350,6 +350,19 @@ contains
 
             varname(:) = ' '
 
+        end if
+
+        ! Adding the magnetic field to the formatted database file
+        if (mhd) then
+            q_sf = q_prim_vf(B_idx%beg)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+            write (varname, '(A)') 'By'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+            varname(:) = ' '
+
+            q_sf = q_prim_vf(B_idx%beg+1)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+            write (varname, '(A)') 'Bz'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+            varname(:) = ' '
         end if
 
         ! Adding the elastic shear stresses to the formatted database file

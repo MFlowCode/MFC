@@ -104,6 +104,7 @@ module m_global_parameters
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
+    logical :: mhd             !< Magnetohydrodynamics
     logical :: hypoelasticity  !< Turn hypoelasticity on
     logical :: hyperelasticity !< Turn hyperelasticity on
     logical :: elasticity      !< elasticity modeling, true for hyper or hypo
@@ -126,6 +127,7 @@ module m_global_parameters
     integer :: gamma_idx                           !< Index of specific heat ratio func. eqn.
     integer :: alf_idx                             !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
+    type(int_bounds_info) :: B_idx                 !< Indexes of first and last magnetic field eqns.
     type(int_bounds_info) :: stress_idx            !< Indices of elastic stresses
     type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
     integer :: c_idx                               !< Index of color function
@@ -295,6 +297,7 @@ module m_global_parameters
     integer :: strxb, strxe
     integer :: xibeg, xiend
     integer :: chemxb, chemxe
+    integer :: Bxb, Bxe
     !> @}
 
     !> @name Lagrangian bubbles
@@ -339,6 +342,8 @@ contains
         alt_soundspeed = .false.
         relax = .false.
         relax_model = dflt_int
+
+        mhd = .false.
 
         hypoelasticity = .false.
         hyperelasticity = .false.
@@ -563,6 +568,12 @@ contains
 
             end if
 
+            if (mhd) then ! Assume only 1D for now
+                B_idx%beg = sys_size + 1 ! Magnetic field By
+                B_idx%end = sys_size + 2 ! Magnetic field Bz
+                sys_size = B_idx%end
+            end if
+
             if (hypoelasticity .or. hyperelasticity) then
                 elasticity = .true.
                 stress_idx%beg = sys_size + 1
@@ -717,6 +728,8 @@ contains
         xiend = xi_idx%end
         chemxb = species_idx%beg
         chemxe = species_idx%end
+        Bxb = B_idx%beg
+        Bxe = B_idx%end
 
 #ifdef MFC_MPI
 

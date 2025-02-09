@@ -186,7 +186,7 @@ contains
         #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',     &
             &  'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat', &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
-            & 'parallel_io', 'hypoelasticity', 'bubbles_euler', 'polytropic',    &
+            & 'parallel_io', 'mhd', 'hypoelasticity', 'bubbles_euler', 'polytropic',    &
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
             & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',          &
             & 'adv_n', 'adap_dt', 'ib', 'bodyForces', 'bf_x', 'bf_y', 'bf_z',    &

@@ -13,6 +13,8 @@ QPVF_IDX_VARS = {
     'cf_val': 'c_idx'
 }
 
+# TODO Add analyticl support for Bx, By, Bz
+
 @dataclasses.dataclass(init=False)
 class Case:
     params: dict

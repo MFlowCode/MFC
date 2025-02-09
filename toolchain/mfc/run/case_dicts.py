@@ -22,6 +22,7 @@ class ParamType(Enum):
         return self.STR
 
 COMMON = {
+    'mhd': ParamType.LOG,
     'hypoelasticity': ParamType.LOG,
     'hyperelasticity': ParamType.LOG,
     'cyl_coord': ParamType.LOG,
@@ -147,6 +148,12 @@ for p_id in range(1, 10+1):
         PRE_PROCESS[f"patch_icpp({p_id})%a({real_attr})"] = ParamType.REAL
 
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
+
+    PRE_PROCESS[f"patch_icpp({p_id})%Bx0"] = ParamType.REAL
+
+    PRE_PROCESS[f"patch_icpp({p_id})%Bx"] = ParamType.REAL.analytic()
+    PRE_PROCESS[f"patch_icpp({p_id})%By"] = ParamType.REAL.analytic()
+    PRE_PROCESS[f"patch_icpp({p_id})%Bz"] = ParamType.REAL.analytic()
 
     for i in range(100):
         PRE_PROCESS[f"patch_icpp({p_id})%Y({i})"] = ParamType.REAL.analytic()

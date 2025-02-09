@@ -162,7 +162,7 @@ contains
         #:endfor
 
         #:for VAR in [ 'cyl_coord', 'mpp_lim', 'mixture_err',                  &
-            & 'alt_soundspeed', 'hypoelasticity', 'parallel_io', 'rho_wrt',    &
+            & 'alt_soundspeed', 'hypoelasticity', 'mhd', 'parallel_io', 'rho_wrt',    &
             & 'E_wrt', 'pres_wrt', 'gamma_wrt', 'sim_data',                    &
             & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', &
             & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles_euler', 'qbmm',   &

@@ -145,7 +145,7 @@ contains
             bc_x, bc_y, bc_z, &
             x_a, y_a, z_a, x_b, y_b, z_b, &
             x_domain, y_domain, z_domain, &
-            hypoelasticity, &
+            mhd, hypoelasticity, &
             ib, num_ibs, patch_ib, &
             fluid_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &

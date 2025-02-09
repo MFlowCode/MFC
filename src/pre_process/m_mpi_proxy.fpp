@@ -50,7 +50,7 @@ contains
         #:endfor
 
         #:for VAR in [ 'old_grid','old_ic','stretch_x','stretch_y','stretch_z',&
-            & 'cyl_coord','mpp_lim','hypoelasticity', 'relax', 'parallel_io',  &
+            & 'cyl_coord','mpp_lim','hypoelasticity', 'mhd', 'relax', 'parallel_io',  &
             & 'perturb_flow', 'perturb_sph', 'mixlayer_vel_profile',           &
             & 'mixlayer_perturb', 'bubbles_euler', 'polytropic', 'polydisperse',&
             & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
@@ -84,7 +84,7 @@ contains
                 & 'length_x', 'length_y', 'length_z', 'radius', 'epsilon',     &
                 & 'beta', 'smooth_coeff', 'rho', 'p0', 'm0', 'r0', 'v0',       &
                 & 'pres', 'gamma', 'pi_inf', 'hcid', 'cv', 'qv', 'qvp',        &
-                & 'model_threshold', 'cf_val']
+                & 'model_threshold', 'cf_val', 'Bx0', 'Bx', 'By', 'Bz']
                 call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 

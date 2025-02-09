@@ -345,6 +345,9 @@ contains
             ! Elastic stresses
             if (hypoelasticity) dbvars = dbvars + (num_dims*(num_dims + 1))/2
 
+            ! Magnetic field
+            if (mhd) dbvars = dbvars + 2
+
             ! Volume fraction(s)
             if ((model_eqns == 2) .or. (model_eqns == 3)) then
 

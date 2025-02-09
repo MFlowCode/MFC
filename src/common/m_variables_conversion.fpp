@@ -1007,6 +1007,13 @@ contains
                         end if
                     end if
 
+                    if (mhd) then
+                        !$acc loop seq
+                        do i = Bxb, Bxe
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                        end do
+                    end if
+
                     if (elasticity) then
                         !$acc loop seq
                         do i = strxb, strxe
@@ -1194,6 +1201,12 @@ contains
 
                         do i = bub_idx%beg, bub_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*nbub
+                        end do
+                    end if
+
+                    if (mhd) then
+                        do i = Bxb, Bxe
+                            q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                         end do
                     end if
 
