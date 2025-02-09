@@ -208,6 +208,9 @@ contains
                     call s_sphere(i, ib_markers%sf, q_prim_vf, ib)
                     call s_sphere_levelset(levelset, levelset_norm, i)
                     ! Cylindrical patch
+                elseif (patch_ib(i)%geometry == 9) then
+                    call s_cuboid(i, ib_markers%sf, q_prim_vf, ib)
+                    call s_cuboid_levelset(levelset, levelset_norm, i)
                 elseif (patch_ib(i)%geometry == 10) then
                     call s_cylinder(i, ib_markers%sf, q_prim_vf, ib)
                     call s_cylinder_levelset(levelset, levelset_norm, i)
