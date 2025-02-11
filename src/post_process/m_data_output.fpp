@@ -28,19 +28,21 @@ module m_data_output
  s_open_formatted_database_file, &
  s_open_intf_data_file, &
  s_open_energy_data_file, &
+ s_open_kymo_data_file, &
  s_write_grid_to_formatted_database_file, &
  s_write_variable_to_formatted_database_file, &
  s_write_lag_bubbles_results, &
  s_write_intf_data_file, &
  s_write_energy_data_file, &
+ s_write_kymo_data_file, &
  s_close_formatted_database_file, &
  s_close_intf_data_file, &
  s_close_energy_data_file, &
+ s_close_kymo_data_file, &
  s_finalize_data_output_module
 
     ! Including the Silo Fortran interface library that features the subroutines
     ! and parameters that are required to write in the Silo-HDF5 database format
-    ! INCLUDE 'silo.inc'
     include 'silo_f9x.inc'
 
     ! Generic storage for flow variable(s) that are to be written to formatted
@@ -343,7 +345,7 @@ contains
             if (pres_wrt .or. prim_vars_wrt) dbvars = dbvars + 1
 
             ! Elastic stresses
-            if (hypoelasticity) dbvars = dbvars + (num_dims*(num_dims + 1))/2
+            if (tau_wrt .or. prim_vars_wrt) dbvars = dbvars + (num_dims*(num_dims + 1))/2
 
             ! Volume fraction(s)
             if ((model_eqns == 2) .or. (model_eqns == 3)) then
@@ -603,6 +605,25 @@ contains
               STATUS='unknown')
 
     end subroutine s_open_energy_data_file
+
+    subroutine s_open_kymo_data_file()
+        ! Time-step that is currently being post-processed
+
+        ! Relative path to a file in the case directory
+        character(LEN=path_len + 3*name_len) :: file_path
+
+        ! Kymo information is in binary database format
+        ! Generates relative path to database, opened for current time-step
+        write (file_path, '(A)') '/kymo_data.dat'
+        file_path = trim(case_dir)//trim(file_path)
+
+        ! Opening the simulation data file
+        open (251, FILE=trim(file_path), &
+              FORM='formatted', &
+              POSITION='append', &
+              STATUS='unknown')
+
+    end subroutine s_open_kymo_data_file
 
     subroutine s_write_grid_to_formatted_database_file(t_step)
         ! Description: The general objective of this subroutine is to write the
@@ -1371,6 +1392,42 @@ contains
 
     end subroutine s_write_energy_data_file
 
+    subroutine s_write_kymo_data_file(q_prim_vf)
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        integer :: j, k, l, t !< Generic loop iterators
+        real(wp) :: vonMises_d, vonMises_h1  !< selected planes for kymograph comparison
+        real(wp) :: vonMises_h2, vonMises_h3 !<kymograph plane comparison continued
+        real(wp) :: i !< counting integer
+
+        do t = 0, t_stop
+            do j = 0, m
+                ! for bubliq, sf(j,0,0) for d and sf(0.5*xcen_bub,k,0) for h
+                ! for bubgel, sf(j,0,0) for d, sf(-xcen_bub,k,0) for h_1,
+                !                              sf(-0.5*xcen_bub,k,0) for h_2
+                vonMises_d = q_prim_vf(xiend + 1)%sf(j, 0, 0)
+            end do
+        end do
+
+        i = m/4.0_wp
+        do t = 0, t_stop
+            do k = 0, n
+                !xcen_bub is roughly +/- m/4
+                vonMises_h1 = q_prim_vf(xiend + 1)%sf(0, k, 0)
+                vonMises_h2 = q_prim_vf(xiend + 1)%sf(i, k, 0)
+                vonMises_h3 = q_prim_vf(xiend + 1)%sf(-i, k, 0)
+            end do
+        end do
+
+        if (proc_rank == 0) then
+            write (251, '(10X, 8F24.8)') &
+                vonMises_d, &
+                vonMises_h1, &
+                vonMises_h2, &
+                vonMises_h3
+        end if
+
+    end subroutine s_write_kymo_data_file
+
     subroutine s_close_formatted_database_file()
         ! Description: The purpose of this subroutine is to close any formatted
         !              database file(s) that may be opened at the time-step that
@@ -1409,6 +1466,12 @@ contains
         close (251)
 
     end subroutine s_close_energy_data_file
+
+    subroutine s_close_kymo_data_file()
+
+        close (251)
+
+    end subroutine s_close_kymo_data_file
 
     subroutine s_finalize_data_output_module()
         ! Description: Deallocation procedures for the module
