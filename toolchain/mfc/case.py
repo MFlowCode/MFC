@@ -198,6 +198,12 @@ class Case:
                 weno_num_stencils = weno_order - 3
             else:
                 weno_num_stencils = weno_polyn
+                
+            num_dims = 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
+            if self.params.get("mhd", 'F') == 'T':
+                num_vels = 3
+            else:
+                num_vels = num_dims
 
             # Throw error if wenoz_q is required but not set
             return f"""\
@@ -206,7 +212,8 @@ class Case:
 #:set weno_polyn            = {weno_polyn}
 #:set weno_num_stencils     = {weno_num_stencils}
 #:set nb                    = {int(self.params.get("nb", 1))}
-#:set num_dims              = {1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)}
+#:set num_dims              = {num_dims}
+#:set num_vels              = {num_vels}
 #:set nterms                = {nterms}
 #:set num_fluids            = {int(self.params["num_fluids"])}
 #:set wenojs                = {wenojs}

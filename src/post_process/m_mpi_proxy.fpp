@@ -189,7 +189,7 @@ contains
         end do
 
         #:for VAR in [ 'pref', 'rhoref', 'R0ref', 'poly_sigma', 'Web', 'Ca', &
-            & 'Re_inv', 'sigma', 't_save', 't_stop', &
+            & 'Re_inv', 'Bx0', 'sigma', 't_save', 't_stop', &
             & 'x_output%beg', 'x_output%end', 'y_output%beg', &
             & 'y_output%end', 'z_output%beg', 'z_output%end' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)

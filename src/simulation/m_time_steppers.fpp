@@ -930,7 +930,7 @@ contains
     subroutine s_compute_dt()
 
         real(wp) :: rho        !< Cell-avg. density
-        real(wp), dimension(num_dims) :: vel        !< Cell-avg. velocity
+        real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
         real(wp) :: pres       !< Cell-avg. pressure
         real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction

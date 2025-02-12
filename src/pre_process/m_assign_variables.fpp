@@ -481,9 +481,9 @@ contains
             q_prim_vf(B_idx%beg)%sf(j, k, l) = &
                 eta*patch_icpp(patch_id)%By &
                 + (1._wp - eta)*orig_prim_vf(B_idx%beg)
-            q_prim_vf(B_idx%beg+1)%sf(j, k, l) = &
+            q_prim_vf(B_idx%beg + 1)%sf(j, k, l) = &
                 eta*patch_icpp(patch_id)%Bz &
-                + (1._wp - eta)*orig_prim_vf(B_idx%beg+1)
+                + (1._wp - eta)*orig_prim_vf(B_idx%beg + 1)
         end if
 
         ! Elastic Shear Stress

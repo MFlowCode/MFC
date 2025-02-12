@@ -58,6 +58,7 @@ COMMON = {
     'chemistry': ParamType.LOG,
     'cantera_file': ParamType.STR,
     'rkck_adap_dt': ParamType.LOG, 
+    'Bx0': ParamType.REAL,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -148,8 +149,6 @@ for p_id in range(1, 10+1):
         PRE_PROCESS[f"patch_icpp({p_id})%a({real_attr})"] = ParamType.REAL
 
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
-
-    PRE_PROCESS[f"patch_icpp({p_id})%Bx0"] = ParamType.REAL
 
     PRE_PROCESS[f"patch_icpp({p_id})%Bx"] = ParamType.REAL.analytic()
     PRE_PROCESS[f"patch_icpp({p_id})%By"] = ParamType.REAL.analytic()

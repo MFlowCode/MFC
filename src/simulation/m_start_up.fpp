@@ -171,7 +171,7 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
-            hyperelasticity, R0ref
+            hyperelasticity, R0ref, Bx0
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1165,6 +1165,10 @@ contains
 
         real(wp), dimension(num_species) :: rhoYks
 
+        real(wp) :: pres_mag
+
+        pres_mag = 0._wp
+
         T = dflt_T_guess
 
         do j = 0, m
@@ -1185,9 +1189,10 @@ contains
                         end do
                     end if
 
+                    if (mhd) pres_mag = 0.5_wp*(Bx0**2 + v_vf(Bxb)%sf(j, k, l)**2 + v_vf(Bxb+1)%sf(j, k, l)**2)
 
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._wp, &
-                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T)
+                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag = pres_mag)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
@@ -1620,6 +1625,10 @@ contains
 
         if (ib) then
             !$acc update device(ib_markers%sf)
+        end if
+
+        if (mhd) then
+            !$acc update device(Bx0)
         end if
 
     end subroutine s_initialize_gpu_vars

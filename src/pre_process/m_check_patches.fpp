@@ -512,11 +512,11 @@ contains
 
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%vel(1)), &
             "Patch "//trim(iStr)//": vel(1) must be set")
-        @:PROHIBIT(n == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(2))) .and. patch_icpp(patch_id)%vel(2) /= 0, &
+        @:PROHIBIT(n == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(2))) .and. patch_icpp(patch_id)%vel(2) /= 0 .and. (.not. mhd), &
             "Patch "//trim(iStr)//": vel(2) must not be set when n = 0")
         @:PROHIBIT(n > 0 .and. f_is_default(patch_icpp(patch_id)%vel(2)), &
             "Patch "//trim(iStr)//": vel(2) must be set when n > 0")
-        @:PROHIBIT(p == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(3))) .and. patch_icpp(patch_id)%vel(3) /= 0, &
+        @:PROHIBIT(p == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(3))) .and. patch_icpp(patch_id)%vel(3) /= 0 .and. (.not. mhd), &
             "Patch "//trim(iStr)//": vel(3) must not be set when p = 0")
         @:PROHIBIT(p > 0 .and. f_is_default(patch_icpp(patch_id)%vel(3)), &
             "Patch "//trim(iStr)//": vel(3) must be set when p > 0")

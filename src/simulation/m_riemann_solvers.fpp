@@ -223,7 +223,7 @@ contains
                                              ix, iy, iz)
 
         type(scalar_field), &
-            dimension(num_dims), &
+            dimension(num_vels), &
             intent(IN) :: velL_vf, velR_vf, &
                           dvelL_dx_vf, dvelR_dx_vf, &
                           dvelL_dy_vf, dvelR_dy_vf, &
@@ -298,7 +298,7 @@ contains
 
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
         real(wp) :: rho_L, rho_R
-        real(wp), dimension(num_dims) :: vel_L, vel_R
+        real(wp), dimension(num_vels) :: vel_L, vel_R
         real(wp) :: pres_L, pres_R
         real(wp) :: E_L, E_R
         real(wp) :: H_L, H_R
@@ -335,6 +335,11 @@ contains
         real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
         real(wp) :: Ms_L, Ms_R, pres_SL, pres_SR
         real(wp) :: alpha_L_sum, alpha_R_sum
+
+        real(wp) :: By_L, By_R, Bz_L, Bz_R
+        real(wp) :: c_fast_L, c_fast_R
+
+        real(wp) :: pres_mag_L, pres_mag_R
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
@@ -377,7 +382,7 @@ contains
                             end do
 
                             !$acc loop seq
-                            do i = 1, num_dims
+                            do i = 1, num_vels
                                 vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
                                 vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
                             end do
@@ -385,7 +390,7 @@ contains
                             vel_L_rms = 0._wp; vel_R_rms = 0._wp
 
                             !$acc loop seq
-                            do i = 1, num_dims
+                            do i = 1, num_vels
                                 vel_L_rms = vel_L_rms + vel_L(i)**2._wp
                                 vel_R_rms = vel_R_rms + vel_R(i)**2._wp
                             end do
@@ -399,6 +404,11 @@ contains
                             pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
                             pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
+                            By_L = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
+                            By_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
+                            Bz_L = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
+                            Bz_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)
+
                             rho_L = 0._wp
                             gamma_L = 0._wp
                             pi_inf_L = 0._wp
@@ -411,6 +421,9 @@ contains
 
                             alpha_L_sum = 0._wp
                             alpha_R_sum = 0._wp
+
+                            pres_mag_L = 0._wp
+                            pres_mag_R = 0._wp
 
                             if (mpp_lim) then
                                 !$acc loop seq
@@ -527,6 +540,13 @@ contains
                                 E_R = rho_R*E_R + 5e-1*rho_R*vel_R_rms
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
+                            elseif (mhd) then
+                                pres_mag_L = 0.5_wp*(Bx0**2._wp + By_L**2._wp + Bz_L**2._wp)
+                                pres_mag_R = 0.5_wp*(Bx0**2._wp + By_R**2._wp + Bz_R**2._wp)
+                                E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag_L
+                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag_R ! includes magnetic energy
+                                H_L = (E_L + pres_L - pres_mag_L)/rho_L
+                                H_R = (E_R + pres_R - pres_mag_R)/rho_R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
                             else
                                 E_L = gamma_L*pres_L + pi_inf_L + 5e-1*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5e-1*rho_R*vel_R_rms + qv_R
@@ -561,6 +581,13 @@ contains
                                 end do
                             end if
 
+                            if (mhd) then
+                                By_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb)
+                                By_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb)
+                                Bz_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 1)
+                                Bz_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 1)
+                            end if
+
                             ! elastic energy update
                             !if ( hyperelasticity ) then
                             !    G_L = 0._wp
@@ -593,10 +620,6 @@ contains
                             !    end if
                             !end if
 
-                            ! Enthalpy with elastic energy
-                            H_L = (E_L + pres_L)/rho_L
-                            H_R = (E_R + pres_R)/rho_R
-
                             @:compute_average_state()
 
                             call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
@@ -611,6 +634,11 @@ contains
                             call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
                                                           vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
+                            if (mhd) then
+                                call s_compute_fast_magnetosonic_speed(rho_L, c_L, By_L, Bz_L, c_fast_L)
+                                call s_compute_fast_magnetosonic_speed(rho_R, c_R, By_R, Bz_R, c_fast_R)
+                            end if
+
                             if (viscous) then
                                 !$acc loop seq
                                 do i = 1, 2
@@ -619,7 +647,10 @@ contains
                             end if
 
                             if (wave_speeds == 1) then
-                                if (hypoelasticity) then
+                                if (mhd) then
+                                    s_L = min(vel_L(dir_idx(1)) - c_fast_L, vel_R(dir_idx(1)) - c_fast_R)
+                                    s_R = max(vel_R(dir_idx(1)) + c_fast_R, vel_L(dir_idx(1)) + c_fast_L)
+                                elseif (hypoelasticity) then
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                        (((4._wp*G_L)/3._wp) + &
                                                                         tau_e_L(dir_idx_tau(1)))/rho_L) &
@@ -691,9 +722,28 @@ contains
                             end do
 
                             ! Momentum
-                            if (bubbles_euler) then
+                            if (mhd) then
+                                ! v_x flux = rho * v_x**2 + p_tot - Bx**2
+                                flux_rsx_vf(j, k, l, contxe + 1) = &
+                                    (s_M*(rho_R*vel_R(1)**2 + pres_R + pres_mag_R - Bx0**2) &
+                                     - s_P*(rho_L*vel_L(1)**2 + pres_L + pres_mag_L - Bx0**2) &
+                                     + s_M*s_P*(rho_L*vel_L(1) - rho_R*vel_R(1))) &
+                                    /(s_M - s_P)
+                                ! v_y flux = rho * v_x * v_y - Bx * B_y
+                                flux_rsx_vf(j, k, l, contxe + 2) = &
+                                    (s_M*(rho_R*vel_R(1)*vel_R(2) - Bx0*By_R) &
+                                     - s_P*(rho_L*vel_L(1)*vel_L(2) - Bx0*By_L) &
+                                     + s_M*s_P*(rho_L*vel_L(2) - rho_R*vel_R(2))) &
+                                    /(s_M - s_P)
+                                ! v_z flux = rho * v_x * v_z - Bx * B_z
+                                flux_rsx_vf(j, k, l, contxe + 3) = &
+                                    (s_M*(rho_R*vel_R(1)*vel_R(3) - Bx0*Bz_R) &
+                                     - s_P*(rho_L*vel_L(1)*vel_L(3) - Bx0*Bz_L) &
+                                     + s_M*s_P*(rho_L*vel_L(3) - rho_R*vel_R(3))) &
+                                    /(s_M - s_P)
+                            elseif (bubbles_euler) then
                                 !$acc loop seq
-                                do i = 1, num_dims
+                                do i = 1, num_vels
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
                                               *vel_R(dir_idx(i)) &
@@ -707,7 +757,7 @@ contains
                                 end do
                             else if (hypoelasticity) then
                                 !$acc loop seq
-                                do i = 1, num_dims
+                                do i = 1, num_vels
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
                                               *vel_R(dir_idx(i)) &
@@ -723,7 +773,7 @@ contains
                                 end do
                             else
                                 !$acc loop seq
-                                do i = 1, num_dims
+                                do i = 1, num_vels
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
                                               *vel_R(dir_idx(i)) &
@@ -738,7 +788,15 @@ contains
                             end if
 
                             ! Energy
-                            if (bubbles_euler) then
+
+                            if (mhd) then
+                                ! energy flux = (E + p + p_mag) * v_x - Bx * (v_x*Bx + v_y*B_y + v_z*B_z)
+                                flux_rsx_vf(j, k, l, E_idx) = &
+                                    (s_M*(vel_R(1)*(E_R + pres_R + pres_mag_R) - Bx0*(vel_R(1)*Bx0 + vel_R(2)*By_R + vel_R(3)*Bz_R)) &
+                                     - s_P*(vel_L(1)*(E_L + pres_L + pres_mag_L) - Bx0*(vel_L(1)*Bx0 + vel_L(2)*By_L + vel_L(3)*Bz_L)) &
+                                     + s_M*s_P*(E_L - E_R)) &
+                                    /(s_M - s_P)
+                            else if (bubbles_euler) then
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
@@ -826,7 +884,7 @@ contains
 
                             ! Div(U)?
                             !$acc loop seq
-                            do i = 1, num_dims
+                            do i = 1, num_vels
                                 vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = &
                                     (xi_M*(rho_L*vel_L(dir_idx(i))* &
                                            (s_L - vel_L(dir_idx(1))) - &
@@ -857,6 +915,20 @@ contains
                                                                     /(s_M - s_P)
                                     flux_src_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                 end do
+                            end if
+
+                            if (mhd) then
+                                ! B_y flux = v_x * B_y - v_y * Bx
+                                flux_rsx_vf(j, k, l, B_idx%beg) = &
+                                    (s_M*(vel_R(1)*By_R - vel_R(2)*Bx0) &
+                                     - s_P*(vel_L(1)*By_L - vel_L(2)*Bx0) &
+                                     + s_M*s_P*(By_L - By_R))/(s_M - s_P)
+
+                                ! B_z flux = v_x * B_z - v_z * Bx
+                                flux_rsx_vf(j, k, l, B_idx%beg + 1) = &
+                                    (s_M*(vel_R(1)*Bz_R - vel_R(3)*Bx0) &
+                                     - s_P*(vel_L(1)*Bz_L - vel_L(3)*Bx0) &
+                                     + s_M*s_P*(Bz_L - Bz_R))/(s_M - s_P)
                             end if
 
                             #:if (NORM_DIR == 2)
@@ -2798,7 +2870,7 @@ contains
             is3%beg:is3%end, advxb:sys_size))
         @:ALLOCATE(vel_src_rsx_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:num_dims))
+            is3%beg:is3%end, 1:num_vels))
         if (qbmm) then
             @:ALLOCATE(mom_sp_rsx_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
@@ -2825,7 +2897,7 @@ contains
             is3%beg:is3%end, advxb:sys_size))
         @:ALLOCATE(vel_src_rsy_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:num_dims))
+            is3%beg:is3%end, 1:num_vels))
 
         if (qbmm) then
             @:ALLOCATE(mom_sp_rsy_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
@@ -2853,7 +2925,7 @@ contains
             is3%beg:is3%end, advxb:sys_size))
         @:ALLOCATE(vel_src_rsz_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:num_dims))
+            is3%beg:is3%end, 1:num_vels))
 
         if (qbmm) then
             @:ALLOCATE(mom_sp_rsz_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))

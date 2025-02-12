@@ -213,8 +213,8 @@ module m_derived_types
         !! the partial densities, density, velocity, pressure, volume fractions,
         !! specific heat ratio function and the liquid stiffness function.
 
-        real(wp) :: Bx0 !<
-        real(wp) :: Bx, By, Bz !<s
+        real(wp) :: Bx, By, Bz !<
+        !! Magnetic field components; Bx is not used for 1D
 
         real(wp), dimension(6) :: tau_e !<
         !! Elastic stresses added to primitive variables if hypoelasticity = True

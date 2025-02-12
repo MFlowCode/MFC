@@ -52,6 +52,7 @@ module m_global_parameters
     !> @}
 
     integer :: num_dims !< Number of spatial dimensions
+    integer :: num_vels !< Number of velocity components (different from num_dims for mhd)
 
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
@@ -305,6 +306,8 @@ module m_global_parameters
     logical :: bubbles_lagrange, rkck_adap_dt
     !> @}
 
+    real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
+
 contains
 
     !> Assigns default values to user inputs prior to reading
@@ -441,6 +444,9 @@ contains
         z_output%beg = dflt_real
         z_output%end = dflt_real
 
+        ! MHD
+        Bx0 = dflt_real
+
     end subroutine s_assign_default_values_to_user_inputs
 
     !>  Computation of parameters, allocation procedures, and/or
@@ -464,7 +470,7 @@ contains
             cont_idx%beg = 1
             cont_idx%end = cont_idx%beg
             mom_idx%beg = cont_idx%end + 1
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
             adv_idx%end = adv_idx%beg + 1
@@ -481,7 +487,7 @@ contains
             cont_idx%beg = 1
             cont_idx%end = num_fluids
             mom_idx%beg = cont_idx%end + 1
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
             adv_idx%end = E_idx + num_fluids
@@ -606,7 +612,7 @@ contains
             cont_idx%beg = 1
             cont_idx%end = num_fluids
             mom_idx%beg = cont_idx%end + 1
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
             adv_idx%end = E_idx + num_fluids
@@ -642,7 +648,7 @@ contains
             cont_idx%beg = 1 ! one continuity equation
             cont_idx%end = 1 !num_fluids
             mom_idx%beg = cont_idx%end + 1 ! one momentum equation in each
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1 ! one energy equation
             adv_idx%beg = E_idx + 1
             adv_idx%end = adv_idx%beg !one volume advection equation
@@ -859,6 +865,12 @@ contains
     subroutine s_initialize_parallel_io
 
         num_dims = 1 + min(1, n) + min(1, p)
+
+        if (mhd) then
+            num_vels = 3
+        else
+            num_vels = num_dims
+        end if
 
         allocate (proc_coords(1:num_dims))
 

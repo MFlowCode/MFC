@@ -43,6 +43,7 @@ module m_variables_conversion
               s_compute_pressure, &
 #ifndef MFC_PRE_PROCESS
               s_compute_speed_of_sound, &
+              s_compute_fast_magnetosonic_speed, &
 #endif
               s_finalize_variables_conversion_module
 
@@ -114,7 +115,7 @@ contains
         !! @param pres Pressure to calculate
         !! @param stress Shear Stress
         !! @param mom Momentum
-    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G)
+    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
 
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_pressure
@@ -127,7 +128,7 @@ contains
         real(wp), intent(in) :: pi_inf, gamma, rho, qv
         real(wp), intent(out) :: pres
         real(wp), intent(inout) :: T
-        real(wp), intent(in), optional :: stress, mom, G
+        real(wp), intent(in), optional :: stress, mom, G, pres_mag
 
         ! Chemistry
         real(wp), dimension(1:num_species), intent(in) :: rhoYks
@@ -142,7 +143,9 @@ contains
             ! Depending on model_eqns and bubbles_euler, the appropriate procedure
             ! for computing pressure is targeted by the procedure pointer
 
-            if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
+            if (mhd) then
+                pres = (energy - dyn_p - pi_inf - qv - pres_mag)/gamma
+            elseif ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
                 pres = (energy - dyn_p - pi_inf - qv)/gamma
             else if ((model_eqns /= 4) .and. bubbles_euler) then
                 pres = ((energy - dyn_p)/(1._wp - alf) - pi_inf - qv)/gamma
@@ -854,6 +857,7 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterators
 
         real(wp) :: ntmp, T
+        real(wp) :: pres_mag
 
         #:if MFC_CASE_OPTIMIZATION
 #ifndef MFC_SIMULATION
@@ -959,10 +963,14 @@ contains
                         T = q_T_sf%sf(j, k, l)
                     end if
 
+                    if (mhd) then
+                        pres_mag = 0.5_wp*(Bx0**2 + qK_cons_vf(Bxb)%sf(j, k, l)**2 + qK_cons_vf(Bxb + 1)%sf(j, k, l)**2)
+                    end if
+
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
                                             dyn_pres_K, pi_inf_K, gamma_K, rho_K, &
-                                            qv_K, rhoYks, pres, T)
+                                            qv_K, rhoYks, pres, T, pres_mag=pres_mag)
 
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
 
@@ -1096,6 +1104,9 @@ contains
 
         real(wp), dimension(num_species) :: Ys
         real(wp) :: e_mix, mix_mol_weight, T
+        real(wp) :: pres_mag
+
+        pres_mag = 0._wp
 
         G = 0._wp
 
@@ -1145,7 +1156,12 @@ contains
                             dyn_pres + rho*e_mix
                     else
                         ! Computing the energy from the pressure
-                        if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
+                        if (mhd) then
+                            pres_mag = 0.5_wp*(Bx0**2 + q_prim_vf(Bxb)%sf(j, k, l)**2 + q_prim_vf(Bxb + 1)%sf(j, k, l)**2)
+                            q_cons_vf(E_idx)%sf(j, k, l) = &
+                                gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pres_mag &
+                                + pi_inf + qv
+                        elseif ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
                             ! E = Gamma*P + \rho u u /2 + \pi_inf + (\alpha\rho qv)
                             q_cons_vf(E_idx)%sf(j, k, l) = &
                                 gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf &
@@ -1285,7 +1301,7 @@ contains
         real(wp), dimension(num_fluids) :: alpha_rho_K
         real(wp), dimension(num_fluids) :: alpha_K
         real(wp) :: rho_K
-        real(wp), dimension(num_dims) :: vel_K
+        real(wp), dimension(num_vels) :: vel_K
         real(wp) :: vel_K_sum
         real(wp) :: pres_K
         real(wp) :: E_K
@@ -1321,13 +1337,13 @@ contains
                         alpha_K(i - E_idx) = qK_prim_vf(j, k, l, i)
                     end do
                     !$acc loop seq
-                    do i = 1, num_dims
+                    do i = 1, num_vels
                         vel_K(i) = qK_prim_vf(j, k, l, contxe + i)
                     end do
 
                     vel_K_sum = 0._wp
                     !$acc loop seq
-                    do i = 1, num_dims
+                    do i = 1, num_vels
                         vel_K_sum = vel_K_sum + vel_K(i)**2._wp
                     end do
 
@@ -1355,7 +1371,7 @@ contains
                     end do
 
                     !$acc loop seq
-                    do i = 1, num_dims
+                    do i = 1, num_vels
                         FK_vf(j, k, l, contxe + dir_idx(i)) = &
                             rho_K*vel_K(dir_idx(1)) &
                             *vel_K(dir_idx(i)) &
@@ -1481,6 +1497,28 @@ contains
             end if
         end if
     end subroutine s_compute_speed_of_sound
+#endif
+
+#ifndef MFC_PRE_PROCESS
+    pure subroutine s_compute_fast_magnetosonic_speed(rho, c, By, Bz, c_fast)
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_compute_fast_magnetosonic_speed
+#else
+        !$acc routine seq
+#endif
+
+        real(wp), intent(in) :: rho, c, By, Bz
+        real(wp), intent(out) :: c_fast
+
+        real(wp) :: b2, term, disc
+
+        b2 = (Bx0**2 + By**2 + Bz**2)/rho
+        term = c**2 + b2
+        disc = term**2 - 4*c**2*(Bx0**2/rho)
+        disc = max(disc, 0._wp)
+        c_fast = sqrt(0.5_wp*(term + sqrt(disc)))
+
+    end subroutine s_compute_fast_magnetosonic_speed
 #endif
 
 end module m_variables_conversion

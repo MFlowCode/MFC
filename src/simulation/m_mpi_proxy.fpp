@@ -233,7 +233,7 @@ contains
             & 'bc_x%pres_in','bc_x%pres_out','bc_y%pres_in','bc_y%pres_out', 'bc_z%pres_in','bc_z%pres_out', &
             & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',    &
             & 'z_domain%beg', 'z_domain%end', 'x_a', 'x_b', 'y_a', 'y_b', 'z_a', &
-            & 'z_b', 't_stop', 't_save', 'cfl_target', 'rkck_tolerance']
+            & 'z_b', 't_stop', 't_save', 'cfl_target', 'rkck_tolerance', 'Bx0']
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

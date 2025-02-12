@@ -100,8 +100,10 @@ module m_global_parameters
     integer :: model_eqns     !< Multicomponent flow model
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: num_dims = ${num_dims}$       !< Number of spatial dimensions
+        integer, parameter :: num_vels = ${num_vels}$       !< Number of velocity components (different from num_dims for mhd)
     #:else
         integer :: num_dims       !< Number of spatial dimensions
+        integer :: num_vels       !< Number of velocity components (different from num_dims for mhd)
     #:endif
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
@@ -168,7 +170,7 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q)
+        !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q)
     #:endif
 
     !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, mhd, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress)
@@ -470,6 +472,9 @@ module m_global_parameters
     !$acc declare create(bubbles_lagrange, lag_params, rkck_adap_dt, dt_max, rkck_time_tmp, rkck_tolerance)
     !> @}
 
+    real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
+    !$acc declare create(Bx0)
+
 contains
 
     !> Assigns default values to the user inputs before reading
@@ -725,6 +730,8 @@ contains
         rkck_tolerance = dflt_real
         dt_max = dflt_real
 
+        Bx0 = dflt_real
+
     end subroutine s_assign_default_values_to_user_inputs
 
     !>  The computation of parameters, the allocation of memory,
@@ -746,7 +753,7 @@ contains
             !$acc update device(weno_polyn)
             !$acc update device(weno_num_stencils)
             !$acc update device(nb)
-            !$acc update device(num_dims, num_fluids)
+            !$acc update device(num_dims, num_vels, num_fluids)
         #:endif
 
         ! Initializing the number of fluids for which viscous effects will
@@ -765,7 +772,7 @@ contains
             cont_idx%beg = 1
             cont_idx%end = cont_idx%beg
             mom_idx%beg = cont_idx%end + 1
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
             adv_idx%end = adv_idx%beg + 1
@@ -783,7 +790,7 @@ contains
                 cont_idx%beg = 1
                 cont_idx%end = num_fluids
                 mom_idx%beg = cont_idx%end + 1
-                mom_idx%end = cont_idx%end + num_dims
+                mom_idx%end = cont_idx%end + num_vels
                 E_idx = mom_idx%end + 1
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
@@ -929,7 +936,7 @@ contains
                 cont_idx%beg = 1
                 cont_idx%end = num_fluids
                 mom_idx%beg = cont_idx%end + 1
-                mom_idx%end = cont_idx%end + num_dims
+                mom_idx%end = cont_idx%end + num_vels
                 E_idx = mom_idx%end + 1
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
@@ -966,7 +973,7 @@ contains
                 cont_idx%beg = 1 ! one continuity equation
                 cont_idx%end = 1 !num_fluids
                 mom_idx%beg = cont_idx%end + 1 ! one momentum equation in each direction
-                mom_idx%end = cont_idx%end + num_dims
+                mom_idx%end = cont_idx%end + num_vels
                 E_idx = mom_idx%end + 1 ! one energy equation
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = adv_idx%beg !one volume advection equation
@@ -1188,7 +1195,7 @@ contains
         chemxe = species_idx%end
         Bxb = B_idx%beg
         Bxe = B_idx%end
-        
+
         !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
         !$acc update device(b_size, xibeg, xiend, tensor_size)
 
@@ -1196,7 +1203,7 @@ contains
         !$acc update device(cfl_target, m, n, p)
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, mhd, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, low_Mach)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, mhd, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, low_Mach)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)
@@ -1208,6 +1215,8 @@ contains
         !$acc enter data copyin(dir_idx, dir_flg, dir_idx_tau)
 
         !$acc enter data copyin(relax, relax_model, palpha_eps,ptgalpha_eps)
+
+        !$acc enter data copyin(Bx0)
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
@@ -1231,6 +1240,12 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             num_dims = 1 + min(1, n) + min(1, p)
+
+            if (mhd) then
+                num_vels = 3
+            else
+                num_vels = num_dims
+            end if
         #:endif
 
         allocate (proc_coords(1:num_dims))

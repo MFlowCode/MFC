@@ -1279,7 +1279,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
         real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
         real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H
-        real(wp), dimension(num_dims) :: vel
+        real(wp), dimension(num_vels) :: vel
         real(wp), dimension(num_fluids) :: gammas, pi_infs, adv
         integer :: i, j, k, l, s !looping indices
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
@@ -1309,7 +1309,7 @@ contains
                     pi_inf = 0_wp
                     pres = q_prim_vf(E_idx)%sf(i, j, k)
                     Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
-                    do s = 1, num_dims
+                    do s = 1, num_vels
                         vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
                         Egk = Egk + 0.5_wp*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
                         Elk = Elk + 0.5_wp*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
