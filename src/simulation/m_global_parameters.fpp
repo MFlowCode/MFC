@@ -473,7 +473,8 @@ module m_global_parameters
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
-    !$acc declare create(Bx0)
+    logical :: powell !< Powell‐correction for div B = 0
+    !$acc declare create(Bx0, powell)
 
 contains
 
@@ -731,6 +732,7 @@ contains
         dt_max = dflt_real
 
         Bx0 = dflt_real
+        powell = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -1129,6 +1131,10 @@ contains
             fd_number = max(1, fd_order/2)
             !buff_size = buff_size + fd_number
         end if
+        
+        if (mhd) then ! TODO merge with above
+            fd_number = max(1, fd_order/2)
+        end if
 
         if (probe_wrt) then
             fd_number = max(1, fd_order/2)
@@ -1220,7 +1226,7 @@ contains
 
         !$acc enter data copyin(relax, relax_model, palpha_eps,ptgalpha_eps)
 
-        !$acc enter data copyin(Bx0)
+        !$acc enter data copyin(Bx0, powell)
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))

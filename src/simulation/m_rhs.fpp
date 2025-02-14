@@ -59,6 +59,8 @@ module m_rhs
 
     use m_chemistry
 
+    use m_mhd
+
     implicit none
 
     private; public :: s_initialize_rhs_module, &
@@ -846,6 +848,10 @@ contains
                 call nvtxEndRange
             end if
             ! END: Additional physics and source terms
+
+            call nvtxStartRange("RHS-MHD")
+            if (mhd .and. powell) call s_compute_mhd_powell_rhs(q_prim_qp%vf, rhs_vf)
+            call nvtxEndRange
 
         end do
         ! END: Dimensional Splitting Loop

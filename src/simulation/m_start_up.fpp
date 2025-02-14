@@ -81,6 +81,8 @@ module m_start_up
 
     use m_body_forces
 
+    use m_mhd
+
     implicit none
 
     private; public :: s_read_input_file, &
@@ -171,7 +173,7 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
-            hyperelasticity, R0ref, Bx0
+            hyperelasticity, R0ref, Bx0, powell
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1521,6 +1523,8 @@ contains
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
 
+        if (mhd .and. powell) call s_initialize_mhd_powell_module
+
     end subroutine s_initialize_modules
 
     subroutine s_initialize_mpi_domain
@@ -1634,7 +1638,7 @@ contains
         end if
 
         if (mhd) then
-            !$acc update device(Bx0)
+            !$acc update device(Bx0, powell)
         end if
 
     end subroutine s_initialize_gpu_vars
@@ -1662,6 +1666,7 @@ contains
 
         if (surface_tension)  call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
+        if (mhd .and. powell) call s_finalize_mhd_powell_module
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

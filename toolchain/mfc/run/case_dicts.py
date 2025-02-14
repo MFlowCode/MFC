@@ -252,6 +252,7 @@ SIMULATION.update({
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
     'rkck_tolerance': ParamType.REAL,
+    'powell': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
