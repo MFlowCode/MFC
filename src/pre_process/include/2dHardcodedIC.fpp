@@ -129,6 +129,19 @@
             q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
         end if
 
+    case (250) ! MHD Orszag-Tang vortex
+        ! gamma = 5/3
+        !   rho = 25/(36π)
+        !     p = 5/(12π)
+        !     v = (-sin(2π y), sin(2π x), 0)
+        !     B = (-sin(2π y)/sqrt(4π), sin(4π x)/sqrt(4π), 0)
+
+        q_prim_vf(momxb)%sf(i, j, 0) = -sin(2._wp*pi*y_cc(j))
+        q_prim_vf(momxb + 1)%sf(i, j, 0) = sin(2._wp*pi*x_cc(i))
+
+        q_prim_vf(Bxb)%sf(i, j, 0) = -sin(2._wp*pi*y_cc(j))/sqrt(4._wp*pi)
+        q_prim_vf(Bxb + 1)%sf(i, j, 0) = sin(4._wp*pi*x_cc(i))/sqrt(4._wp*pi)
+
     case default
         if (proc_rank == 0) then
             call s_int_to_str(patch_id, iStr)
