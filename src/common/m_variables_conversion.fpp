@@ -1389,7 +1389,7 @@ contains
                     ! energy flux, u(E+p)
                     FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
 
-                    if (riemann_solver == 1) then
+                    if (riemann_solver == 1 .or. riemann_solver == 4) then
                         !$acc loop seq
                         do i = advxb, advxe
                             FK_vf(j, k, l, i) = 0._wp

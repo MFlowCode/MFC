@@ -17,6 +17,7 @@
 !!                  1) Harten-Lax-van Leer (HLL)
 !!                  2) Harten-Lax-van Leer-Contact (HLLC)
 !!                  3) Exact
+!!                  4) Harten-Lax-van Leer Discontinuities (HLLD) - for MHD only
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
@@ -52,6 +53,7 @@ module m_riemann_solvers
  s_riemann_solver, &
  s_hll_riemann_solver, &
  s_hllc_riemann_solver, &
+ s_hlld_riemann_solver, &
  s_finalize_riemann_solvers_module
 
     !> The cell-boundary values of the fluxes (src - source) that are computed
@@ -117,6 +119,7 @@ contains
         !!                        1) s_hll_riemann_solver
         !!                        2) s_hllc_riemann_solver
         !!                        3) s_exact_riemann_solver
+        !!                        4) s_hlld_riemann_solver
         !!  @param qL_prim_vf The  left WENO-reconstructed cell-boundary values of the
         !!      cell-average primitive variables
         !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
@@ -190,6 +193,19 @@ contains
                                       norm_dir, ix, iy, iz)
         elseif (riemann_solver == 2) then
             call s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
+                                       dqL_prim_dy_vf, &
+                                       dqL_prim_dz_vf, &
+                                       qL_prim_vf, &
+                                       qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+                                       dqR_prim_dy_vf, &
+                                       dqR_prim_dz_vf, &
+                                       qR_prim_vf, &
+                                       q_prim_vf, &
+                                       flux_vf, flux_src_vf, &
+                                       flux_gsrc_vf, &
+                                       norm_dir, ix, iy, iz)
+        elseif (riemann_solver == 4) then
+            call s_hlld_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                        dqL_prim_dy_vf, &
                                        dqL_prim_dz_vf, &
                                        qL_prim_vf, &
@@ -2862,6 +2878,293 @@ contains
 
     end subroutine s_hllc_riemann_solver
 
+    !> HLLD Riemann solver resolves 5 of the 7 waves of MHD equations:
+        !!      1 entropy wave, 2 Alfvén waves, 2 fast magnetosonic waves.
+    subroutine s_hlld_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, &
+                                     dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
+                                     qL_prim_vf, &
+                                     qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
+                                     dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, &
+                                     qR_prim_vf, &
+                                     q_prim_vf, &
+                                     flux_vf, flux_src_vf, flux_gsrc_vf, &
+                                     norm_dir, ix, iy, iz)
+
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, &
+                                                                             qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+
+        type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+                                                                        dqL_prim_dy_vf, dqR_prim_dy_vf, &
+                                                                        dqL_prim_dz_vf, dqR_prim_dz_vf
+        type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
+
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
+
+        real(wp), dimension(num_fluids) :: alpha_L, alpha_R
+        real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
+        real(wp), dimension(num_vels) :: vel_L, vel_R
+        real(wp) :: rho_L, rho_R
+        real(wp) :: pres_L, pres_R
+        real(wp) :: E_L, E_R
+        real(wp) :: H_no_mag_L, H_no_mag_R
+        real(wp) :: gamma_L, gamma_R
+        real(wp) :: pi_inf_L, pi_inf_R
+        real(wp) :: qv_L, qv_R
+
+        real(wp) :: alpha_L_sum, alpha_R_sum
+        real(wp) :: vel_L_rms, vel_R_rms
+
+        real(wp) :: pres_mag_L, pres_mag_R
+        real(wp) :: Bx_L, Bx_R, By_L, By_R, Bz_L, Bz_R
+
+        real(wp) :: c_L, c_R
+        real(wp) :: c_fast_L, c_fast_R
+
+        real(wp) :: s_L, s_R, s_M, s_P, s_S
+
+        integer :: i, j, k, l
+
+        ! Populating the buffers of the left and right Riemann problem
+        ! states variables, based on the choice of boundary conditions
+        call s_populate_riemann_states_variables_buffers( &
+            qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
+            dqL_prim_dy_vf, &
+            dqL_prim_dz_vf, &
+            qL_prim_vf, &
+            qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+            dqR_prim_dy_vf, &
+            dqR_prim_dz_vf, &
+            qR_prim_vf, &
+            norm_dir, ix, iy, iz)
+
+        ! Reshaping inputted data based on dimensional splitting direction
+        call s_initialize_riemann_solver( &
+            q_prim_vf, &
+            flux_vf, flux_src_vf, &
+            flux_gsrc_vf, &
+            norm_dir, ix, iy, iz)
+        #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+
+            if (norm_dir == ${NORM_DIR}$) then
+                !$acc parallel loop collapse(3) gang vector default(present) &
+                !$acc private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            !$acc loop seq
+                            do i = 1, contxe
+                                alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                            end do
+
+                            !$acc loop seq
+                            do i = 1, num_vels
+                                vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
+                                vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
+                            end do
+
+                            vel_L_rms = 0._wp; vel_R_rms = 0._wp
+
+                            !$acc loop seq
+                            do i = 1, num_vels
+                                vel_L_rms = vel_L_rms + vel_L(i)**2._wp
+                                vel_R_rms = vel_R_rms + vel_R(i)**2._wp
+                            end do
+
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
+                                alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
+                            end do
+
+                            pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
+                            pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
+
+                            if (mhd) then
+                                if (n == 0) then ! 1D: constant Bx; By, Bz as variables
+                                    Bx_L = Bx0
+                                    Bx_R = Bx0
+                                    By_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb)
+                                    By_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb)
+                                    Bz_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 1)
+                                    Bz_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 1)
+                                else ! 2D/3D: Bx, By, Bz as variables
+                                    Bx_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb)
+                                    Bx_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb)
+                                    By_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 1)
+                                    By_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 1)
+                                    Bz_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 2)
+                                    Bz_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 2)
+                                end if
+                            end if
+
+                            rho_L = 0._wp
+                            gamma_L = 0._wp
+                            pi_inf_L = 0._wp
+                            qv_L = 0._wp
+
+                            rho_R = 0._wp
+                            gamma_R = 0._wp
+                            pi_inf_R = 0._wp
+                            qv_R = 0._wp
+
+                            pres_mag_L = 0._wp
+                            pres_mag_R = 0._wp
+
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                rho_L = rho_L + alpha_rho_L(i)
+                                gamma_L = gamma_L + alpha_L(i)*gammas(i)
+                                pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
+                                qv_L = qv_L + alpha_rho_L(i)*qvs(i)
+
+                                rho_R = rho_R + alpha_rho_R(i)
+                                gamma_R = gamma_R + alpha_R(i)*gammas(i)
+                                pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                qv_R = qv_R + alpha_rho_R(i)*qvs(i)
+                            end do
+
+                            pres_mag_L = 0.5_wp*(Bx_L**2._wp + By_L**2._wp + Bz_L**2._wp)
+                            pres_mag_R = 0.5_wp*(Bx_R**2._wp + By_R**2._wp + Bz_R**2._wp)
+                            E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag_L
+                            E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag_R ! includes magnetic energy
+                            H_no_mag_L = (E_L + pres_L - pres_mag_L)/rho_L
+                            H_no_mag_R = (E_R + pres_R - pres_mag_R)/rho_R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+
+                            call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_no_mag_L, alpha_L, &
+                                                          vel_L_rms, 0._wp, c_L)
+
+                            call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_no_mag_R, alpha_R, &
+                                                          vel_R_rms, 0._wp, c_R)
+
+                            call s_compute_fast_magnetosonic_speed(rho_L, c_L, Bx_L, By_L, Bz_L, B${XYZ}$_L, c_fast_L)
+                            call s_compute_fast_magnetosonic_speed(rho_R, c_R, Bx_R, By_R, Bz_R, B${XYZ}$_R, c_fast_R)
+
+                            ! TODO in checker: MHD only works with wave_speed == 1 for now (not just HLLD)
+
+                            s_L = min(vel_L(dir_idx(1)) - c_fast_L, vel_R(dir_idx(1)) - c_fast_R)
+                            s_R = max(vel_R(dir_idx(1)) + c_fast_R, vel_L(dir_idx(1)) + c_fast_L)
+
+                            s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
+
+                            ! Mass
+                            !$acc loop seq
+                            do i = 1, contxe
+                                flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                    (s_M*alpha_rho_R(i)*vel_R(dir_idx(1)) &
+                                     - s_P*alpha_rho_L(i)*vel_L(dir_idx(1)) &
+                                     + s_M*s_P*(alpha_rho_L(i) &
+                                                - alpha_rho_R(i))) &
+                                    /(s_M - s_P)
+                            end do
+
+                            ! Momentum
+                            ! Flux of v_x in the ${XYZ}$ direction
+                            ! = rho * v_x * v_${XYZ}$ - B_x * B_${XYZ}$ + delta_(${XYZ}$,x) * p_tot
+                            flux_rs${XYZ}$_vf(j, k, l, contxe + 1) = &
+                                (s_M*(rho_R*vel_R(1)*vel_R(dir_idx(1)) &
+                                      - Bx_R*B${XYZ}$_R &
+                                      + dir_flg(1)*(pres_R + pres_mag_R)) &
+                                 - s_P*(rho_L*vel_L(1)*vel_L(dir_idx(1)) &
+                                        - Bx_L*B${XYZ}$_L &
+                                        + dir_flg(1)*(pres_L + pres_mag_L)) &
+                                 + s_M*s_P*(rho_L*vel_L(1) - rho_R*vel_R(1))) &
+                                /(s_M - s_P)
+                            ! Flux of v_y in the ${XYZ}$ direction
+                            ! = rho * v_y * v_${XYZ}$ - B_y * B_${XYZ}$ + delta_(${XYZ}$,y) * p_tot
+                            flux_rs${XYZ}$_vf(j, k, l, contxe + 2) = &
+                                (s_M*(rho_R*vel_R(2)*vel_R(dir_idx(1)) &
+                                      - By_R*B${XYZ}$_R &
+                                      + dir_flg(2)*(pres_R + pres_mag_R)) &
+                                 - s_P*(rho_L*vel_L(2)*vel_L(dir_idx(1)) &
+                                        - By_L*B${XYZ}$_L &
+                                        + dir_flg(2)*(pres_L + pres_mag_L)) &
+                                 + s_M*s_P*(rho_L*vel_L(2) - rho_R*vel_R(2))) &
+                                /(s_M - s_P)
+                            ! Flux of v_z in the ${XYZ}$ direction
+                            ! = rho * v_z * v_${XYZ}$ - B_z * B_${XYZ}$ + delta_(${XYZ}$,z) * p_tot
+                            flux_rs${XYZ}$_vf(j, k, l, contxe + 3) = &
+                                (s_M*(rho_R*vel_R(3)*vel_R(dir_idx(1)) &
+                                      - Bz_R*B${XYZ}$_R &
+                                      + dir_flg(3)*(pres_R + pres_mag_R)) &
+                                 - s_P*(rho_L*vel_L(3)*vel_L(dir_idx(1)) &
+                                        - Bz_L*B${XYZ}$_L &
+                                        + dir_flg(3)*(pres_L + pres_mag_L)) &
+                                 + s_M*s_P*(rho_L*vel_L(3) - rho_R*vel_R(3))) &
+                                /(s_M - s_P)
+
+                            ! Energy
+                            ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
+                            flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                (s_M*(vel_R(dir_idx(1))*(E_R + pres_R + pres_mag_R) - B${XYZ}$_R*(vel_R(1)*Bx_R + vel_R(2)*By_R + vel_R(3)*Bz_R)) &
+                                 - s_P*(vel_L(dir_idx(1))*(E_L + pres_L + pres_mag_L) - B${XYZ}$_L*(vel_L(1)*Bx_L + vel_L(2)*By_L + vel_L(3)*Bz_L)) &
+                                 + s_M*s_P*(E_L - E_R)) &
+                                /(s_M - s_P)
+
+                            ! Advection
+                            !$acc loop seq
+                            do i = advxb, advxe
+                                flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                    (qL_prim_rs${XYZ}$_vf(j, k, l, i) &
+                                     - qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)) &
+                                    *s_M*s_P/(s_M - s_P)
+                                flux_src_rs${XYZ}$_vf(j, k, l, i) = &
+                                    (s_M*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
+                                     - s_P*qL_prim_rs${XYZ}$_vf(j, k, l, i)) &
+                                    /(s_M - s_P)
+                            end do
+
+                            ! xi (div U?) corrections from HLLC not used
+
+                            if (n == 0) then ! 1D: d/dx flux only & Bx = Bx0 = const.
+                                ! B_y flux = v_x * B_y - v_y * Bx0
+                                flux_rsx_vf(j, k, l, B_idx%beg) = (s_M*(vel_R(1)*By_R - vel_R(2)*Bx0) &
+                                                                   - s_P*(vel_L(1)*By_L - vel_L(2)*Bx0) + s_M*s_P*(By_L - By_R))/(s_M - s_P)
+
+                                ! B_z flux = v_x * B_z - v_z * Bx0
+                                flux_rsx_vf(j, k, l, B_idx%beg + 1) = (s_M*(vel_R(1)*Bz_R - vel_R(3)*Bx0) &
+                                                                       - s_P*(vel_L(1)*Bz_L - vel_L(3)*Bx0) + s_M*s_P*(Bz_L - Bz_R))/(s_M - s_P)
+
+                            else ! 2D/3D: Bx, By, Bz /= const. but zero flux component in the same direction
+                                ! B_x d/d${XYZ}$ flux = (1 - delta(x,${XYZ}$)) * (v_${XYZ}$ * B_x - v_x * B_${XYZ}$)
+                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg) = (1 - dir_flg(1))*( &
+                                                                        s_M*(vel_R(dir_idx(1))*Bx_R - vel_R(1)*B${XYZ}$_R) - &
+                                                                        s_P*(vel_L(dir_idx(1))*Bx_L - vel_L(1)*B${XYZ}$_L) + &
+                                                                        s_M*s_P*(Bx_L - Bx_R))/(s_M - s_P)
+
+                                ! B_y d/d${XYZ}$ flux = (1 - delta(y,${XYZ}$)) * (v_${XYZ}$ * B_y - v_y * B_${XYZ}$)
+                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1) = (1 - dir_flg(2))*( &
+                                                                            s_M*(vel_R(dir_idx(1))*By_R - vel_R(2)*B${XYZ}$_R) - &
+                                                                            s_P*(vel_L(dir_idx(1))*By_L - vel_L(2)*B${XYZ}$_L) + &
+                                                                            s_M*s_P*(By_L - By_R))/(s_M - s_P)
+
+                                ! B_z d/d${XYZ}$ flux = (1 - delta(z,${XYZ}$)) * (v_${XYZ}$ * B_z - v_z * B_${XYZ}$)
+                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 2) = (1 - dir_flg(3))*( &
+                                                                            s_M*(vel_R(dir_idx(1))*Bz_R - vel_R(3)*B${XYZ}$_R) - &
+                                                                            s_P*(vel_L(dir_idx(1))*Bz_L - vel_L(3)*B${XYZ}$_L) + &
+                                                                            s_M*s_P*(Bz_L - Bz_R))/(s_M - s_P)
+
+                            end if
+
+                            ! TODO cylindrical coordinate
+
+                        end do
+                    end do
+                end do
+            end if
+
+        #:endfor
+
+        call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
+                                       flux_gsrc_vf, &
+                                       norm_dir, ix, iy, iz)
+
+    end subroutine s_hlld_riemann_solver
+
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
@@ -4573,7 +4876,7 @@ contains
                 end do
             end do
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == 1 .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
@@ -4626,7 +4929,7 @@ contains
                 end do
             end do
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == 1 .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = advxb + 1, advxe
                     do j = is1%beg, is1%end
@@ -4663,7 +4966,7 @@ contains
                 end do
             end do
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == 1 .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = advxb + 1, advxe
                     do l = is3%beg, is3%end

@@ -63,75 +63,75 @@ contains
 
     end subroutine s_initialize_mhd_powell_module
 
-    !>  Compute the Powell source term to correct the magnetic field divergence. 
+    !>  Compute the Powell source term to correct the magnetic field divergence.
         !!      The Powell source term is:
         !!      S = - (∇·B) [ 0, Bx, By, Bz, (v·B), vx, vy, vz ]^T
         !!  @param q_prim_vf  Primitive variables
         !!  @param rhs_vf     rhs variables
     subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in)  :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-    
+
         integer :: k, l, q, r
         real(wp) :: divB, vx, vy, vz, Bx, By, Bz, vdotB
-    
+
         !$acc parallel loop collapse(3) gang vector default(present)
         do q = 0, p
-           do l = 0, n
-              do k = 0, m
+            do l = 0, n
+                do k = 0, m
 
-                divB = 0._wp
-                !$acc loop seq
-                do r = -fd_number, fd_number
-                    divB = divB + q_prim_vf(Bxb)%sf(k + r, l, q) * fd_coeff_x_h(r, k)
-                end do
-                !$acc loop seq
-                do r = -fd_number, fd_number
-                    divB = divB + q_prim_vf(Bxb+1)%sf(k, l + r, q) * fd_coeff_y_h(r, l)
-                end do
-                if (p > 0) then
+                    divB = 0._wp
                     !$acc loop seq
                     do r = -fd_number, fd_number
-                        divB = divB + q_prim_vf(Bxb+2)%sf(k, l, q + r) * fd_coeff_z_h(r, q)
+                        divB = divB + q_prim_vf(Bxb)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
                     end do
-                end if
+                    !$acc loop seq
+                    do r = -fd_number, fd_number
+                        divB = divB + q_prim_vf(Bxb + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                    end do
+                    if (p > 0) then
+                        !$acc loop seq
+                        do r = -fd_number, fd_number
+                            divB = divB + q_prim_vf(Bxb + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
+                        end do
+                    end if
 
-                vx = q_prim_vf(momxb)%sf(k, l, q)
-                vy = q_prim_vf(momxb+1)%sf(k, l, q)
-                vz = q_prim_vf(momxb+2)%sf(k, l, q)
+                    vx = q_prim_vf(momxb)%sf(k, l, q)
+                    vy = q_prim_vf(momxb + 1)%sf(k, l, q)
+                    vz = q_prim_vf(momxb + 2)%sf(k, l, q)
 
-                Bx = q_prim_vf(Bxb)%sf(k, l, q)
-                By = q_prim_vf(Bxb+1)%sf(k, l, q)
-                Bz = q_prim_vf(Bxb+2)%sf(k, l, q)
+                    Bx = q_prim_vf(Bxb)%sf(k, l, q)
+                    By = q_prim_vf(Bxb + 1)%sf(k, l, q)
+                    Bz = q_prim_vf(Bxb + 2)%sf(k, l, q)
 
-                vdotB = vx*Bx + vy*By + vz*Bz
+                    vdotB = vx*Bx + vy*By + vz*Bz
 
-                ! 1: rho -> unchanged
-                ! 2: vx  -> - (divB) * Bx
-                ! 3: vy  -> - (divB) * By
-                ! 4: vz  -> - (divB) * Bz
-                ! 5: E   -> - (divB) * (v·B)
-                ! 6: Bx  -> - (divB) * vx
-                ! 7: By  -> - (divB) * vy
-                ! 8: Bz  -> - (divB) * vz
+                    ! 1: rho -> unchanged
+                    ! 2: vx  -> - (divB) * Bx
+                    ! 3: vy  -> - (divB) * By
+                    ! 4: vz  -> - (divB) * Bz
+                    ! 5: E   -> - (divB) * (v·B)
+                    ! 6: Bx  -> - (divB) * vx
+                    ! 7: By  -> - (divB) * vy
+                    ! 8: Bz  -> - (divB) * vz
 
-                rhs_vf(momxb)%sf(k, l, q) = rhs_vf(momxb)%sf(k, l, q) - divB * Bx
-                rhs_vf(momxb+1)%sf(k, l, q) = rhs_vf(momxb+1)%sf(k, l, q) - divB * By
-                rhs_vf(momxb+2)%sf(k, l, q) = rhs_vf(momxb+2)%sf(k, l, q) - divB * Bz
+                    rhs_vf(momxb)%sf(k, l, q) = rhs_vf(momxb)%sf(k, l, q) - divB*Bx
+                    rhs_vf(momxb + 1)%sf(k, l, q) = rhs_vf(momxb + 1)%sf(k, l, q) - divB*By
+                    rhs_vf(momxb + 2)%sf(k, l, q) = rhs_vf(momxb + 2)%sf(k, l, q) - divB*Bz
 
-                rhs_vf(E_idx)%sf(k, l, q) = rhs_vf(E_idx)%sf(k, l, q) - divB * vdotB
+                    rhs_vf(E_idx)%sf(k, l, q) = rhs_vf(E_idx)%sf(k, l, q) - divB*vdotB
 
-                rhs_vf(Bxb)%sf(k, l, q) = rhs_vf(Bxb)%sf(k, l, q) - divB * vx
-                rhs_vf(Bxb+1)%sf(k, l, q) = rhs_vf(Bxb+1)%sf(k, l, q) - divB * vy
-                rhs_vf(Bxb+2)%sf(k, l, q) = rhs_vf(Bxb+2)%sf(k, l, q) - divB * vz
+                    rhs_vf(Bxb)%sf(k, l, q) = rhs_vf(Bxb)%sf(k, l, q) - divB*vx
+                    rhs_vf(Bxb + 1)%sf(k, l, q) = rhs_vf(Bxb + 1)%sf(k, l, q) - divB*vy
+                    rhs_vf(Bxb + 2)%sf(k, l, q) = rhs_vf(Bxb + 2)%sf(k, l, q) - divB*vz
 
-              end do
-           end do
+                end do
+            end do
         end do
         !$acc end parallel loop
-    
-    end subroutine s_compute_mhd_powell_rhs    
+
+    end subroutine s_compute_mhd_powell_rhs
 
     subroutine s_finalize_mhd_powell_module
 

@@ -1131,7 +1131,7 @@ contains
             fd_number = max(1, fd_order/2)
             !buff_size = buff_size + fd_number
         end if
-        
+
         if (mhd) then ! TODO merge with above
             fd_number = max(1, fd_order/2)
         end if

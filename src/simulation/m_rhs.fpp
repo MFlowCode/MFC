@@ -512,7 +512,7 @@ contains
                          & idwbuff(2)%beg:idwbuff(2)%end, &
                          & idwbuff(3)%beg:idwbuff(3)%end))
 
-                if (riemann_solver == 1) then
+                if (riemann_solver == 1 .or. riemann_solver == 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -542,7 +542,7 @@ contains
             @:ACC_SETUP_VFs(flux_n(i), flux_src_n(i), flux_gsrc_n(i))
 
             if (i == 1) then
-                if (riemann_solver /= 1) then
+                if (riemann_solver /= 1 .and. riemann_solver /= 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
                         !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
@@ -1003,7 +1003,7 @@ contains
                 end do
             end if
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == 1 .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = advxb, advxe
                     do q = 0, p
@@ -1147,7 +1147,7 @@ contains
                 end do
             end if
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == 1 .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = advxb, advxe
                     do l = 0, p
@@ -1413,7 +1413,7 @@ contains
                     end if
                 end if
             else
-                if (riemann_solver == 1) then
+                if (riemann_solver == 1 .or. riemann_solver == 4) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
                         do k = 0, p
@@ -2225,7 +2225,7 @@ contains
                     end do
                 end if
 
-                if (riemann_solver == 1) then
+                if (riemann_solver == 1 .or. riemann_solver == 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                     end do
