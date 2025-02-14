@@ -198,7 +198,7 @@ class Case:
                 weno_num_stencils = weno_order - 3
             else:
                 weno_num_stencils = weno_polyn
-                
+
             num_dims = 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
             if self.params.get("mhd", 'F') == 'T':
                 num_vels = 3

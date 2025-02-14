@@ -346,7 +346,13 @@ contains
             if (hypoelasticity) dbvars = dbvars + (num_dims*(num_dims + 1))/2
 
             ! Magnetic field
-            if (mhd) dbvars = dbvars + 2
+            if (mhd) then
+                if (n == 0) then
+                    dbvars = dbvars + 2
+                else
+                    dbvars = dbvars + 3
+                end if
+            end if
 
             ! Volume fraction(s)
             if ((model_eqns == 2) .or. (model_eqns == 3)) then
@@ -395,11 +401,11 @@ contains
 
             ! Vorticity
             if (p > 0) then
-                do i = 1, E_idx - mom_idx%beg
+                do i = 1, num_vels
                     if (omega_wrt(i)) dbvars = dbvars + 1
                 end do
             elseif (n > 0) then
-                do i = 1, E_idx - cont_idx%end
+                do i = 1, num_vels
                     if (omega_wrt(i)) dbvars = dbvars + 1
                 end do
             end if

@@ -303,7 +303,14 @@ contains
                         else if (i == stress_idx%beg) then !tau_e
                             write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
                         else if (i == E_idx) then !p
-                            if (mhd) pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(Bxb)%sf(j, k, l)**2 + q_cons_vf(Bxb + 1)%sf(j, k, l)**2)
+                            if (mhd) then
+                                if (n == 0) then
+                                    pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(B_idx%beg)%sf(j, k, l)**2 + q_cons_vf(B_idx%beg + 1)%sf(j, k, l)**2)
+                                else
+                                    pres_mag = 0.5_wp*(q_cons_vf(B_idx%beg)%sf(j, k, l)**2 + q_cons_vf(B_idx%beg + 1)%sf(j, k, l)**2 + q_cons_vf(B_idx%beg + 2)%sf(j, k, l)**2)
+                                end if
+                            end if
+
                             call s_compute_pressure( &
                                 q_cons_vf(E_idx)%sf(j, 0, 0), &
                                 q_cons_vf(alf_idx)%sf(j, 0, 0), &

@@ -353,16 +353,31 @@ contains
         end if
 
         ! Adding the magnetic field to the formatted database file
-        if (mhd) then
-            q_sf = q_prim_vf(B_idx%beg)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
-            write (varname, '(A)') 'By'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-            varname(:) = ' '
+        if (mhd .and. prim_vars_wrt) then
+            do i = B_idx%beg, B_idx%end
+                q_sf = q_prim_vf(i)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
 
-            q_sf = q_prim_vf(B_idx%beg + 1)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
-            write (varname, '(A)') 'Bz'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-            varname(:) = ' '
+                ! 1D: output By, Bz
+                if (n == 0) then
+                    if (i == B_idx%beg) then
+                        write (varname, '(A)') 'By'
+                    else
+                        write (varname, '(A)') 'Bz'
+                    end if
+                    ! 2D/3D: output Bx, By, Bz
+                else
+                    if (i == B_idx%beg) then
+                        write (varname, '(A)') 'Bx'
+                    elseif (i == B_idx%beg + 1) then
+                        write (varname, '(A)') 'By'
+                    else
+                        write (varname, '(A)') 'Bz'
+                    end if
+                end if
+
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+                varname(:) = ' '
+            end do
         end if
 
         ! Adding the elastic shear stresses to the formatted database file
@@ -507,7 +522,7 @@ contains
 
         ! Adding the vorticity to the formatted database file
         if (p > 0) then
-            do i = 1, E_idx - mom_idx%beg
+            do i = 1, num_vels
                 if (omega_wrt(i)) then
 
                     call s_derive_vorticity_component(i, q_prim_vf, q_sf)
@@ -519,7 +534,7 @@ contains
                 end if
             end do
         elseif (n > 0) then
-            do i = 1, E_idx - cont_idx%end
+            do i = 1, num_vels
                 if (omega_wrt(i)) then
 
                     call s_derive_vorticity_component(i, q_prim_vf, q_sf)

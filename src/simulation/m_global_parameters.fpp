@@ -901,9 +901,13 @@ contains
                     end if
                 end if
 
-                if (mhd) then ! Assume only 1D for now
-                    B_idx%beg = sys_size + 1 ! Magnetic field By
-                    B_idx%end = sys_size + 2 ! Magnetic field Bz
+                if (mhd) then
+                    B_idx%beg = sys_size + 1
+                    if (n == 0) then
+                        B_idx%end = sys_size + 2 ! 1D: By, Bz
+                    else
+                        B_idx%end = sys_size + 3 ! 2D/3D: Bx, By, Bz
+                    end if
                     sys_size = B_idx%end
                 end if
 

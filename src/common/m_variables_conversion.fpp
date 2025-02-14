@@ -964,7 +964,11 @@ contains
                     end if
 
                     if (mhd) then
-                        pres_mag = 0.5_wp*(Bx0**2 + qK_cons_vf(Bxb)%sf(j, k, l)**2 + qK_cons_vf(Bxb + 1)%sf(j, k, l)**2)
+                        if (n == 0) then
+                            pres_mag = 0.5_wp*(Bx0**2 + qK_cons_vf(Bxb)%sf(j, k, l)**2 + qK_cons_vf(Bxb + 1)%sf(j, k, l)**2)
+                        else
+                            pres_mag = 0.5_wp*(qK_cons_vf(Bxb)%sf(j, k, l)**2 + qK_cons_vf(Bxb + 1)%sf(j, k, l)**2 + qK_cons_vf(Bxb + 2)%sf(j, k, l)**2)
+                        end if
                     end if
 
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
@@ -1157,7 +1161,11 @@ contains
                     else
                         ! Computing the energy from the pressure
                         if (mhd) then
-                            pres_mag = 0.5_wp*(Bx0**2 + q_prim_vf(Bxb)%sf(j, k, l)**2 + q_prim_vf(Bxb + 1)%sf(j, k, l)**2)
+                            if (n == 0) then
+                                pres_mag = 0.5_wp*(Bx0**2 + q_prim_vf(Bxb)%sf(j, k, l)**2 + q_prim_vf(Bxb + 1)%sf(j, k, l)**2)
+                            else
+                                pres_mag = 0.5_wp*(q_prim_vf(Bxb)%sf(j, k, l)**2 + q_prim_vf(Bxb + 1)%sf(j, k, l)**2 + q_prim_vf(Bxb + 2)%sf(j, k, l)**2)
+                            end if
                             q_cons_vf(E_idx)%sf(j, k, l) = &
                                 gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pres_mag &
                                 + pi_inf + qv
@@ -1433,7 +1441,7 @@ contains
     end subroutine s_finalize_variables_conversion_module
 
 #ifndef MFC_PRE_PROCESS
-    pure subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c)
+    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_speed_of_sound
 #else
@@ -1490,6 +1498,10 @@ contains
                 c = ((H - 5e-1*vel_sum)/gamma)
             end if
 
+            ! if (mhd) then ! DEBUG
+            !     c = (1._wp+1._wp/gamma)*pres/rho
+            ! end if
+
             if (mixture_err .and. c < 0._wp) then
                 c = 100._wp*sgm_eps
             else
@@ -1500,21 +1512,21 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-    pure subroutine s_compute_fast_magnetosonic_speed(rho, c, By, Bz, c_fast)
+    pure subroutine s_compute_fast_magnetosonic_speed(rho, c, Bx, By, Bz, B_normal, c_fast)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_fast_magnetosonic_speed
 #else
         !$acc routine seq
 #endif
 
-        real(wp), intent(in) :: rho, c, By, Bz
+        real(wp), intent(in) :: rho, c, Bx, By, Bz, B_normal
         real(wp), intent(out) :: c_fast
 
         real(wp) :: b2, term, disc
 
-        b2 = (Bx0**2 + By**2 + Bz**2)/rho
+        b2 = (Bx**2 + By**2 + Bz**2)/rho
         term = c**2 + b2
-        disc = term**2 - 4*c**2*(Bx0**2/rho)
+        disc = term**2 - 4*c**2*(B_normal**2/rho)
         disc = max(disc, 0._wp)
         c_fast = sqrt(0.5_wp*(term + sqrt(disc)))
 

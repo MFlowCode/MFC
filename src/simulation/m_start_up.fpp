@@ -1189,7 +1189,13 @@ contains
                         end do
                     end if
 
-                    if (mhd) pres_mag = 0.5_wp*(Bx0**2 + v_vf(Bxb)%sf(j, k, l)**2 + v_vf(Bxb+1)%sf(j, k, l)**2)
+                    if (mhd) then
+                        if (n == 0) then
+                            pres_mag = 0.5_wp*(Bx0**2 + v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg+1)%sf(j, k, l)**2)
+                        else
+                            pres_mag = 0.5_wp*(v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg+1)%sf(j, k, l)**2 + v_vf(B_idx%beg+2)%sf(j, k, l)**2)
+                        end if
+                    end if
 
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._wp, &
                                             dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag = pres_mag)
