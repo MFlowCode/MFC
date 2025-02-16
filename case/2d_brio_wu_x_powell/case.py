@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 
+
 # Configuring case dictionary
 print(
     json.dumps(
@@ -13,8 +14,8 @@ print(
             "x_domain%end": 1.,
             "y_domain%beg": 0,
             "y_domain%end": 1.,
-            "m": 24,
-            "n": 49,
+            "m": 49,
+            "n": 24,
             "p": 0,
             "dt": 0.004,
             "t_step_start": 0,
@@ -29,7 +30,8 @@ print(
             "mpp_lim": "F",
             "mixture_err": "F",
             "time_stepper": 3,
-            "weno_order": 1,
+            "weno_order": 5,
+            "mapped_weno": "T",
             "weno_eps": 1.0e-16,
             "null_weights": "F",
             "mp_weno": "F",
@@ -50,42 +52,44 @@ print(
 
             # MHD
             "mhd": "T",
+            "powell": "T",
+            "fd_order": 4,
 
-            # Patch 1: Bottom state
+            # Patch 1 Left
             "patch_icpp(1)%geometry": 3,
-            "patch_icpp(1)%x_centroid": 0.5,
-            "patch_icpp(1)%y_centroid": 0.25,
-            "patch_icpp(1)%length_x": 1.0,
-            "patch_icpp(1)%length_y": 0.5,
+            "patch_icpp(1)%x_centroid": 0.25,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 0.5,
+            "patch_icpp(1)%length_y": 1.,
             "patch_icpp(1)%vel(1)": 0.0,
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%vel(3)": 0.0,
             "patch_icpp(1)%pres": 1.0,
-            "patch_icpp(1)%Bx": 1.0,
-            "patch_icpp(1)%By": 0.75,
+            "patch_icpp(1)%Bx": 0.75,
+            "patch_icpp(1)%By": 1.0,
             "patch_icpp(1)%Bz": 0.0,
             "patch_icpp(1)%alpha_rho(1)": 1.0,
             "patch_icpp(1)%alpha(1)": 1.0,
 
-            # Patch 2: Top state
+            # Patch 2 Right
             "patch_icpp(2)%geometry": 3,
-            "patch_icpp(2)%x_centroid": 0.5,
-            "patch_icpp(2)%y_centroid": 0.75,
-            "patch_icpp(2)%length_x": 1.0,
-            "patch_icpp(2)%length_y": 0.5,
+            "patch_icpp(2)%x_centroid": 0.75,
+            "patch_icpp(2)%y_centroid": 0.5,
+            "patch_icpp(2)%length_x": 0.5,
+            "patch_icpp(2)%length_y": 1.,
             "patch_icpp(2)%vel(1)": 0.0,
             "patch_icpp(2)%vel(2)": 0.0,
             "patch_icpp(2)%vel(3)": 0.0,
             "patch_icpp(2)%pres": 0.1,
-            "patch_icpp(2)%Bx": -1.0,
-            "patch_icpp(2)%By": 0.75,
+            "patch_icpp(2)%Bx": 0.75,
+            "patch_icpp(2)%By": -1.0,
             "patch_icpp(2)%Bz": 0.0,
             "patch_icpp(2)%alpha_rho(1)": 0.125,
             "patch_icpp(2)%alpha(1)": 1.0,
 
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (2.0e00 - 1.0e00),
-            "fluid_pp(1)%pi_inf": 0.0
+            "fluid_pp(1)%pi_inf": 0.0,
         }
     )
 )

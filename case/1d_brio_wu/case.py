@@ -12,13 +12,13 @@ print(
             # Computational Domain Parameters
             "x_domain%beg": 0,
             "x_domain%end": 1.,
-            "m": 49,
+            "m": 199,
             "n": 0,
             "p": 0,
-            "dt": 0.004,
+            "dt": 0.001,
             "t_step_start": 0,
-            "t_step_stop": 50,
-            "t_step_save": 1,
+            "t_step_stop": 200,
+            "t_step_save": 4,
 
             # Simulation Algorithm Parameters
             "num_patches": 2,
@@ -28,8 +28,8 @@ print(
             "mpp_lim": "F",
             "mixture_err": "F",
             "time_stepper": 3,
-            "weno_order": 5,
-            "mapped_weno": "T",
+            "weno_order": 1,
+            # "mapped_weno": "T",
             "weno_eps": 1.0e-16,
             "null_weights": "F",
             "mp_weno": "F",

@@ -58,6 +58,8 @@ print(
 
             # MHD
             "mhd": "T",
+            "powell": "T",
+            "fd_order": 2,
 
             # Patch 1 - Analytical for v and B
             # gamma = 5/3

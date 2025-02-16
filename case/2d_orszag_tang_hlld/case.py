@@ -41,7 +41,7 @@ print(
             "weno_eps": 1.0e-6,
             "null_weights": "F",
             "mp_weno": "F",
-            "riemann_solver": 1,
+            "riemann_solver": 4,
             "wave_speeds": 1,
             "avg_state": 2,
             "bc_x%beg": -1,
