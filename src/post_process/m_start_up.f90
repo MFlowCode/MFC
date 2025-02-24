@@ -84,7 +84,7 @@ contains
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
             cfl_target, surface_tension, bubbles_lagrange, rkck_adap_dt, &
-            sim_data, hyperelasticity, Bx0
+            sim_data, hyperelasticity, Bx0, relativity
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -272,15 +272,22 @@ contains
         end if
 
         ! Adding the density to the formatted database file
-        if (rho_wrt &
-            .or. &
-            (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
+        if (((rho_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) &
+            .and. (.not. relativity)) .or. (relativity .and. cons_vars_wrt)) then
             q_sf = rho_sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
             write (varname, '(A)') 'rho'
             call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
 
+        elseif (relativity .and. (rho_wrt .or. prim_vars_wrt)) then
+            ! For relativistic flow, conservative and primitive densities are different
+            ! Hard-coded single-component for now
+            q_sf = q_cons_vf(1)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+            write (varname, '(A)') 'rho'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+
+            varname(:) = ' '
         end if
 
         ! Adding the momentum to the formatted database file

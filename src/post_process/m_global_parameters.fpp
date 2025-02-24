@@ -106,6 +106,7 @@ module m_global_parameters
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: mhd             !< Magnetohydrodynamics
+    logical :: relativity      !< Relativity for RMHD
     logical :: hypoelasticity  !< Turn hypoelasticity on
     logical :: hyperelasticity !< Turn hyperelasticity on
     logical :: elasticity      !< elasticity modeling, true for hyper or hypo
@@ -347,6 +348,7 @@ contains
         relax_model = dflt_int
 
         mhd = .false.
+        relativity = .false.
 
         hypoelasticity = .false.
         hyperelasticity = .false.

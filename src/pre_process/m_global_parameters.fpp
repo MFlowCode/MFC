@@ -88,6 +88,7 @@ module m_global_parameters
     logical :: hyperelasticity       !< activate hyperelasticity
     logical :: elasticity            !< elasticity modeling, true for hyper or hypo
     logical :: mhd                   !< Magnetohydrodynamics
+    logical :: relativity            !< Relativity for RMHD
     integer :: b_size                !< Number of components in the b tensor
     integer :: tensor_size           !< Number of components in the nonsymmetric tensor
     logical :: pre_stress            !< activate pre_stressed domain
@@ -321,6 +322,7 @@ contains
         tensor_size = dflt_int
 
         mhd = .false.
+        relativity = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int

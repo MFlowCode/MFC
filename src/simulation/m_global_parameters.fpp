@@ -474,7 +474,8 @@ module m_global_parameters
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
     logical :: powell !< Powell‐correction for div B = 0
-    !$acc declare create(Bx0, powell)
+    logical :: relativity
+    !$acc declare create(Bx0, powell, relativity)
 
 contains
 
@@ -733,6 +734,7 @@ contains
 
         Bx0 = dflt_real
         powell = .false.
+        relativity = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -1226,7 +1228,7 @@ contains
 
         !$acc enter data copyin(relax, relax_model, palpha_eps,ptgalpha_eps)
 
-        !$acc enter data copyin(Bx0, powell)
+        !$acc enter data copyin(Bx0, powell, relativity)
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))

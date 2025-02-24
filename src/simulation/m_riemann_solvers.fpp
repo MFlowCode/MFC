@@ -357,6 +357,11 @@ contains
 
         real(wp) :: pres_mag_L, pres_mag_R
 
+        real(wp) :: Ga_L, Ga_R ! Lorentz factor
+        real(wp) :: vdotB_L, vdotB_R, B2_L, B2_R
+        real(wp) :: b4x_L, b4y_L, b4z_L, b4x_R, b4y_R, b4z_R ! 4-magnetic field components
+        real(wp) :: mx_L, my_L, mz_L, mx_R, my_R, mz_R ! Conservative momentum variables
+
         integer :: i, j, k, l, q !< Generic loop iterators
 
         ! Populating the buffers of the left and right Riemann problem
@@ -569,6 +574,37 @@ contains
                                 E_R = rho_R*E_R + 5e-1*rho_R*vel_R_rms
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
+                            elseif (mhd .and. relativity) then
+                                Ga_L = 1._wp/sqrt(1._wp - vel_L_rms)
+                                Ga_R = 1._wp/sqrt(1._wp - vel_R_rms)
+                                vdotB_L = vel_L(1)*Bx_L + vel_L(2)*By_L + vel_L(3)*Bz_L
+                                vdotB_R = vel_R(1)*Bx_R + vel_R(2)*By_R + vel_R(3)*Bz_R
+
+                                b4x_L = Bx_L/Ga_L + Ga_L*vel_L(1)*vdotB_L
+                                b4y_L = By_L/Ga_L + Ga_L*vel_L(2)*vdotB_L
+                                b4z_L = Bz_L/Ga_L + Ga_L*vel_L(3)*vdotB_L
+                                b4x_R = Bx_R/Ga_R + Ga_R*vel_R(1)*vdotB_R
+                                b4y_R = By_R/Ga_R + Ga_R*vel_R(2)*vdotB_R
+                                b4z_R = Bz_R/Ga_R + Ga_R*vel_R(3)*vdotB_R
+                                B2_L = Bx_L**2._wp + By_L**2._wp + Bz_L**2._wp
+                                B2_R = Bx_R**2._wp + By_R**2._wp + Bz_R**2._wp
+
+                                pres_mag_L = 0.5_wp*(B2_L/Ga_L**2._wp + vdotB_L**2._wp)
+                                pres_mag_R = 0.5_wp*(B2_R/Ga_R**2._wp + vdotB_R**2._wp)
+
+                                ! Hard-coded EOS
+                                H_L = 1._wp + (gamma_L + 1)*pres_L/rho_L
+                                H_R = 1._wp + (gamma_R + 1)*pres_R/rho_R
+
+                                mx_L = (rho_L*H_L*Ga_L**2+B2_L)*vel_L(1) - vdotB_L*Bx_L
+                                my_L = (rho_L*H_L*Ga_L**2+B2_L)*vel_L(2) - vdotB_L*By_L
+                                mz_L = (rho_L*H_L*Ga_L**2+B2_L)*vel_L(3) - vdotB_L*Bz_L
+                                mx_R = (rho_R*H_R*Ga_R**2+B2_R)*vel_R(1) - vdotB_R*Bx_R
+                                my_R = (rho_R*H_R*Ga_R**2+B2_R)*vel_R(2) - vdotB_R*By_R
+                                mz_R = (rho_R*H_R*Ga_R**2+B2_R)*vel_R(3) - vdotB_R*Bz_R
+
+                                E_L = rho_L*h_L*Ga_L**2 - pres_L + 0.5_wp*(B2_L + vel_L_rms*B2_L - vdotB_L**2._wp) - rho_L*Ga_L
+                                E_R = rho_R*h_R*Ga_R**2 - pres_R + 0.5_wp*(B2_R + vel_R_rms*B2_R - vdotB_R**2._wp) - rho_R*Ga_R
                             elseif (mhd) then
                                 pres_mag_L = 0.5_wp*(Bx_L**2._wp + By_L**2._wp + Bz_L**2._wp)
                                 pres_mag_R = 0.5_wp*(Bx_R**2._wp + By_R**2._wp + Bz_R**2._wp)
@@ -656,9 +692,14 @@ contains
                             call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
                                                           vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
+                            if (relativity) then ! TODO merge into speed of sounds
+                                c_L = sqrt((1._wp + 1._wp/gamma_L)*pres_L/rho_L/H_L)
+                                c_R = sqrt((1._wp + 1._wp/gamma_R)*pres_R/rho_R/H_R)
+                            end if
+
                             if (mhd) then
-                                call s_compute_fast_magnetosonic_speed(rho_L, c_L, Bx_L, By_L, Bz_L, B${XYZ}$_L, c_fast_L)
-                                call s_compute_fast_magnetosonic_speed(rho_R, c_R, Bx_R, By_R, Bz_R, B${XYZ}$_R, c_fast_R)
+                                call s_compute_fast_magnetosonic_speed(rho_L, c_L, Bx_L, By_L, Bz_L, B${XYZ}$_L, c_fast_L, H_L)
+                                call s_compute_fast_magnetosonic_speed(rho_R, c_R, Bx_R, By_R, Bz_R, B${XYZ}$_R, c_fast_R, H_R)
                             end if
 
                             if (viscous) then
@@ -733,19 +774,31 @@ contains
                                    *(5e-1_wp + sign(5e-1_wp, s_R))
 
                             ! Mass
-                            !$acc loop seq
-                            do i = 1, contxe
-                                flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                    (s_M*alpha_rho_R(i)*vel_R(dir_idx(1)) &
-                                     - s_P*alpha_rho_L(i)*vel_L(dir_idx(1)) &
-                                     + s_M*s_P*(alpha_rho_L(i) &
-                                                - alpha_rho_R(i))) &
-                                    /(s_M - s_P)
-                            end do
+                            if (.not. relativity) then
+                                !$acc loop seq
+                                do i = 1, contxe
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                        (s_M*alpha_rho_R(i)*vel_R(dir_idx(1)) &
+                                        - s_P*alpha_rho_L(i)*vel_L(dir_idx(1)) &
+                                        + s_M*s_P*(alpha_rho_L(i) &
+                                                    - alpha_rho_R(i))) &
+                                        /(s_M - s_P)
+                                end do
+                            elseif (relativity) then
+                                !$acc loop seq
+                                do i = 1, contxe
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                        (s_M*Ga_R*alpha_rho_R(i)*vel_R(dir_idx(1)) &
+                                        - s_P*Ga_L*alpha_rho_L(i)*vel_L(dir_idx(1)) &
+                                        + s_M*s_P*(Ga_L*alpha_rho_L(i) &
+                                                    - Ga_R*alpha_rho_R(i))) &
+                                        /(s_M - s_P)
+                                end do
+                            end if
 
                             ! Momentum
-                            if (mhd) then
-                                ! Flux of v_x in the ${XYZ}$ direction
+                            if (mhd .and. (.not. relativity)) then
+                                ! Flux of rho*v_x in the ${XYZ}$ direction
                                 ! = rho * v_x * v_${XYZ}$ - B_x * B_${XYZ}$ + delta_(${XYZ}$,x) * p_tot
                                 flux_rs${XYZ}$_vf(j, k, l, contxe + 1) = &
                                     (s_M*(rho_R*vel_R(1)*vel_R(dir_idx(1)) &
@@ -756,7 +809,7 @@ contains
                                             + dir_flg(1)*(pres_L + pres_mag_L)) &
                                      + s_M*s_P*(rho_L*vel_L(1) - rho_R*vel_R(1))) &
                                     /(s_M - s_P)
-                                ! Flux of v_y in the ${XYZ}$ direction
+                                ! Flux of rho*v_y in the ${XYZ}$ direction
                                 ! = rho * v_y * v_${XYZ}$ - B_y * B_${XYZ}$ + delta_(${XYZ}$,y) * p_tot
                                 flux_rs${XYZ}$_vf(j, k, l, contxe + 2) = &
                                     (s_M*(rho_R*vel_R(2)*vel_R(dir_idx(1)) &
@@ -767,7 +820,7 @@ contains
                                             + dir_flg(2)*(pres_L + pres_mag_L)) &
                                      + s_M*s_P*(rho_L*vel_L(2) - rho_R*vel_R(2))) &
                                     /(s_M - s_P)
-                                ! Flux of v_z in the ${XYZ}$ direction
+                                ! Flux of rho*v_z in the ${XYZ}$ direction
                                 ! = rho * v_z * v_${XYZ}$ - B_z * B_${XYZ}$ + delta_(${XYZ}$,z) * p_tot
                                 flux_rs${XYZ}$_vf(j, k, l, contxe + 3) = &
                                     (s_M*(rho_R*vel_R(3)*vel_R(dir_idx(1)) &
@@ -777,6 +830,40 @@ contains
                                             - Bz_L*B${XYZ}$_L &
                                             + dir_flg(3)*(pres_L + pres_mag_L)) &
                                      + s_M*s_P*(rho_L*vel_L(3) - rho_R*vel_R(3))) &
+                                    /(s_M - s_P)
+                            elseif (mhd .and. relativity) then
+                                ! Flux of m_x in the ${XYZ}$ direction
+                                ! = m_x * v_${XYZ}$ - b_x/Gamma * B_${XYZ}$ + delta_(${XYZ}$,x) * p_tot
+                                flux_rs${XYZ}$_vf(j, k, l, contxe + 1) = &
+                                    (s_M*(mx_R*vel_R(dir_idx(1)) &
+                                          - b4x_R/Ga_R*B${XYZ}$_R &
+                                          + dir_flg(1)*(pres_R + pres_mag_R)) &
+                                     - s_P*(mx_L*vel_L(dir_idx(1)) &
+                                            - b4x_L/Ga_L*B${XYZ}$_L &
+                                            + dir_flg(1)*(pres_L + pres_mag_L)) &
+                                     + s_M*s_P*(mx_L - mx_R)) &
+                                    /(s_M - s_P)
+                                ! Flux of m_y in the ${XYZ}$ direction
+                                ! = rho * v_y * v_${XYZ}$ - B_y * B_${XYZ}$ + delta_(${XYZ}$,y) * p_tot
+                                flux_rs${XYZ}$_vf(j, k, l, contxe + 2) = &
+                                    (s_M*(my_R*vel_R(dir_idx(1)) &
+                                          - b4y_R/Ga_R*B${XYZ}$_R &
+                                          + dir_flg(2)*(pres_R + pres_mag_R)) &
+                                     - s_P*(my_L*vel_L(dir_idx(1)) &
+                                            - b4y_L/Ga_L*B${XYZ}$_L &
+                                            + dir_flg(2)*(pres_L + pres_mag_L)) &
+                                     + s_M*s_P*(my_L - my_R)) &
+                                    /(s_M - s_P)
+                                ! Flux of m_z in the ${XYZ}$ direction
+                                ! = rho * v_z * v_${XYZ}$ - B_z * B_${XYZ}$ + delta_(${XYZ}$,z) * p_tot
+                                flux_rs${XYZ}$_vf(j, k, l, contxe + 3) = &
+                                    (s_M*(mz_R*vel_R(dir_idx(1)) &
+                                          - b4z_R/Ga_R*B${XYZ}$_R &
+                                          + dir_flg(3)*(pres_R + pres_mag_R)) &
+                                     - s_P*(mz_L*vel_L(dir_idx(1)) &
+                                            - b4z_L/Ga_L*B${XYZ}$_L &
+                                            + dir_flg(3)*(pres_L + pres_mag_L)) &
+                                     + s_M*s_P*(mz_L - mz_R)) &
                                     /(s_M - s_P)
                             elseif (bubbles_euler) then
                                 !$acc loop seq
@@ -825,12 +912,20 @@ contains
                             end if
 
                             ! Energy
-                            if (mhd) then
+                            if (mhd .and. (.not. relativity)) then
                                 ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     (s_M*(vel_R(dir_idx(1))*(E_R + pres_R + pres_mag_R) - B${XYZ}$_R*(vel_R(1)*Bx_R + vel_R(2)*By_R + vel_R(3)*Bz_R)) &
                                      - s_P*(vel_L(dir_idx(1))*(E_L + pres_L + pres_mag_L) - B${XYZ}$_L*(vel_L(1)*Bx_L + vel_L(2)*By_L + vel_L(3)*Bz_L)) &
                                      + s_M*s_P*(E_L - E_R)) &
+                                    /(s_M - s_P)
+                            elseif (mhd .and. relativity) then
+                                ! energy flux = m_${XYZ}$ - mass flux
+                                ! Hard-coded for single-component for now
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                    (s_M*(m${XYZ}$_R - Ga_R*alpha_rho_R(1)*vel_R(dir_idx(1))) &
+                                        - s_P*(m${XYZ}$_L - Ga_L*alpha_rho_L(1)*vel_L(dir_idx(1))) &
+                                        + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
                             else if (bubbles_euler) then
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
@@ -3026,8 +3121,8 @@ contains
                             ! (2) Compute fast wave speeds
                             call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_no_mag_L, alpha_L, vel_L_rms, 0._wp, c_L)
                             call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_no_mag_R, alpha_R, vel_R_rms, 0._wp, c_R)
-                            call s_compute_fast_magnetosonic_speed(rho_L, c_L, Bx_L, By_L, Bz_L, B${XYZ}$_L, c_fast_L)
-                            call s_compute_fast_magnetosonic_speed(rho_R, c_R, Bx_R, By_R, Bz_R, B${XYZ}$_R, c_fast_R)
+                            call s_compute_fast_magnetosonic_speed(rho_L, c_L, Bx_L, By_L, Bz_L, B${XYZ}$_L, c_fast_L, H_no_mag_L)
+                            call s_compute_fast_magnetosonic_speed(rho_R, c_R, Bx_R, By_R, Bz_R, B${XYZ}$_R, c_fast_R, H_no_mag_R)
 
                             ! (3) Compute contact speed s_M [Miyoshi Equ. (38)]
                             s_L = min(vel_L(1) - c_fast_L, vel_R(1) - c_fast_R)

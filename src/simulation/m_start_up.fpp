@@ -173,7 +173,7 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
-            hyperelasticity, R0ref, Bx0, powell
+            hyperelasticity, R0ref, Bx0, powell, relativity
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1638,7 +1638,7 @@ contains
         end if
 
         if (mhd) then
-            !$acc update device(Bx0, powell)
+            !$acc update device(Bx0, powell, relativity)
         end if
 
     end subroutine s_initialize_gpu_vars

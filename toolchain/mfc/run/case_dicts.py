@@ -59,6 +59,7 @@ COMMON = {
     'cantera_file': ParamType.STR,
     'rkck_adap_dt': ParamType.LOG, 
     'Bx0': ParamType.REAL,
+    'relativity': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()

@@ -859,6 +859,16 @@ contains
         real(wp) :: ntmp, T
         real(wp) :: pres_mag
 
+        real(wp) :: Ga ! Lorentz factor (gamma in relativity)
+        real(wp) :: B2 ! Magnetic field magnitude squared
+        real(wp) :: B(3) ! Magnetic field components
+        real(wp) :: m2 ! Relativistic momentum magnitude squared
+        real(wp) :: S ! Dot product of the magnetic field and the relativistic momentum
+        real(wp) :: W, dW ! W := rho*v*Ga**2; f = f(W) in Newton-Raphson
+        real(wp) :: E, D ! Prim/Cons variables within Newton-Raphson iteration
+        real(wp) :: f, dGa_dW, dp_dW, df_dW ! Functions within Newton-Raphson iteration
+        integer :: iter ! Newton-Raphson iteration counter
+
         #:if MFC_CASE_OPTIMIZATION
 #ifndef MFC_SIMULATION
             if (bubbles_euler) then
@@ -912,6 +922,76 @@ contains
                                                                 rho_K, gamma_K, pi_inf_K, qv_K)
                         end if
 #endif
+                    end if
+
+                    if (relativity) then
+                        if (n == 0) then
+                            B(1) = Bx0
+                            B(2) = qK_cons_vf(Bxb)%sf(j, k, l)
+                            B(3) = qK_cons_vf(Bxb + 1)%sf(j, k, l)
+                        else
+                            B(1) = qK_cons_vf(Bxb)%sf(j, k, l)
+                            B(2) = qK_cons_vf(Bxb + 1)%sf(j, k, l)
+                            B(3) = qK_cons_vf(Bxb + 2)%sf(j, k, l)
+                        end if
+                        B2 = B(1)**2 + B(2)**2 + B(3)**2
+
+                        m2 = 0._wp
+                        !$acc loop seq
+                        do i = momxb, momxe
+                            m2 = m2 + qK_cons_vf(i)%sf(j, k, l)**2
+                        end do
+
+                        S = 0._wp
+                        !$acc loop seq
+                        do i = 1, 3
+                            S = S + qK_cons_vf(momxb + i - 1)%sf(j, k, l)*B(i)
+                        end do
+
+                        E = qK_cons_vf(E_idx)%sf(j, k, l)
+
+                        D = 0._wp
+                        !$acc loop seq
+                        do i = 1, contxe
+                            D = D + qK_cons_vf(i)%sf(j, k, l)
+                        end do
+
+                        ! Newton-Raphson
+                        W = E + D
+                        !$acc loop seq
+                        do iter = 1, 100
+                            Ga = (W+B2)*W/sqrt((W+B2)**2*W**2 - (m2*W**2 + S**2*(2*W+B2)))
+                            pres = (W - D*Ga)/((gamma_K + 1)*Ga**2) ! Thermal pressure from EOS
+                            f = W - pres + (1 - 1/(2*Ga**2))*B2 - S**2/(2*W**2) - E - D
+                            
+                            ! dGa_dW = -Ga**3 * ( S**2*(3*W**2+3*W*B2+B2**2) + m2*W**2 ) / (W**3 * (W+B2)**3) ! Typo in paper corrected (m2*W**2 -> 2*m2*W**2 which cancelled out with 2* on the other terms)
+                            dGa_dW = -Ga**3 * (2*S**2*(3*W**2+3*W*B2+B2**2) + m2*W**2) / (2*W**3*(W+B2)**3)
+                    
+                            dp_dW = (Ga*(1 + D*dGa_dW) - 2*W*dGa_dW)/((gamma_K + 1)*Ga**3)
+                            df_dW = 1 - dp_dW + (B2/Ga**3)*dGa_dW + S**2/W**3
+                            
+                            dW = -f/df_dW
+                            W = W + dW
+                            if (abs(dW) < 1e-12 * W) exit
+                        end do
+
+                        ! Recalculate pressure using converged W
+                        Ga = (W+B2)*W/sqrt((W+B2)**2*W**2 - (m2*W**2 + S**2*(2*W+B2)))
+                        qK_prim_vf(E_idx)%sf(j, k, l) = (W - D*Ga)/((gamma_K + 1)*Ga**2)
+
+                        ! Recover the other primitive variables
+                        !$acc loop seq
+                        do i = 1, 3
+                            qK_prim_vf(momxb + i - 1)%sf(j, k, l) = (qK_cons_vf(momxb + i - 1)%sf(j, k, l) + (S/W)*B(i))/(W+B2)
+                        end do
+                        qK_cons_vf(1)%sf(j, k, l) = D/Ga ! Hard-coded for single-component for now
+                        
+                        !$acc loop seq
+                        do i = Bxb, Bxe
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                        end do
+
+                        cycle ! skip all the non-relativistic conversions below
                     end if
 
                     if (chemistry) then
@@ -1110,6 +1190,13 @@ contains
         real(wp) :: e_mix, mix_mol_weight, T
         real(wp) :: pres_mag
 
+        real(wp) :: Ga ! Lorentz factor (gamma in relativity)
+        real(wp) :: h ! relativistic enthalpy
+        real(wp) :: v2 ! Square of the velocity magnitude
+        real(wp) :: B2 ! Square of the magnetic field magnitude
+        real(wp) :: vdotB ! Dot product of the velocity and magnetic field vectors
+        real(wp) :: B(3) ! Magnetic field components
+
         pres_mag = 0._wp
 
         G = 0._wp
@@ -1125,13 +1212,70 @@ contains
                     call s_convert_to_mixture_variables(q_prim_vf, j, k, l, &
                                                         rho, gamma, pi_inf, qv, Re_K, G, fluid_pp(:)%G)
 
-                    ! Transferring the continuity equation(s) variable(s)
-                    do i = 1, contxe
+                    ! Transferring the advection equation(s) variable(s)
+                    do i = adv_idx%beg, adv_idx%end
                         q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                     end do
 
-                    ! Transferring the advection equation(s) variable(s)
-                    do i = adv_idx%beg, adv_idx%end
+                    if (relativity) then
+
+                        if (n == 0) then
+                            B(1) = Bx0
+                            B(2) = q_prim_vf(Bxb)%sf(j, k, l)
+                            B(3) = q_prim_vf(Bxb + 1)%sf(j, k, l)
+                        else
+                            B(1) = q_prim_vf(Bxb)%sf(j, k, l)
+                            B(2) = q_prim_vf(Bxb + 1)%sf(j, k, l)
+                            B(3) = q_prim_vf(Bxb + 2)%sf(j, k, l)
+                        end if
+
+                        v2 = 0._wp
+                        do i = momxb, momxe
+                            v2 = v2 + q_prim_vf(i)%sf(j, k, l)**2
+                        end do
+                        if (v2 >= 1._wp) call s_mpi_abort('Error: v squared > 1 in s_convert_primitive_to_conservative_variables')
+                        
+                        Ga = 1._wp/sqrt(1._wp - v2)
+
+                        h = 1._wp + (gamma + 1)*q_prim_vf(E_idx)%sf(j, k, l)/rho ! Assume perfect gas for now
+
+                        B2 = 0._wp
+                        do i = Bxb, Bxe
+                            B2 = B2 + q_prim_vf(i)%sf(j, k, l)**2
+                        end do
+                        if (n == 0) B2 = B2 + Bx0**2
+
+                        vdotB = 0._wp
+                        do i = 1, 3
+                            vdotB = vdotB + q_prim_vf(momxb + i - 1)%sf(j, k, l)*B(i)
+                        end do
+
+                        do i = 1, contxe
+                            q_cons_vf(i)%sf(j, k, l) = Ga * q_prim_vf(i)%sf(j, k, l)
+                        end do
+                        
+                        do i = momxb, momxe
+                            q_cons_vf(i)%sf(j, k, l) = (rho*h*Ga**2 + B2)*q_prim_vf(i)%sf(j, k, l) &
+                                - vdotB*B(i - momxb + 1)
+                        end do
+
+                        q_cons_vf(E_idx)%sf(j, k, l) = rho*h*Ga**2 - q_prim_vf(E_idx)%sf(j, k, l) &
+                            + 0.5_wp*(B2 + v2*B2 - vdotB**2)
+                        ! Remove rest energy
+                        do i = 1, contxe
+                            q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) - q_cons_vf(i)%sf(j, k, l)
+                        end do
+
+                        do i = Bxb, Bxe
+                            q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                        end do
+
+                        cycle ! skip all the non-relativistic conversions below
+
+                    end if
+
+                    ! Transferring the continuity equation(s) variable(s)
+                    do i = 1, contxe
                         q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                     end do
 
@@ -1512,7 +1656,7 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-    pure subroutine s_compute_fast_magnetosonic_speed(rho, c, Bx, By, Bz, B_normal, c_fast)
+    pure subroutine s_compute_fast_magnetosonic_speed(rho, c, Bx, By, Bz, B_normal, c_fast, h)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_fast_magnetosonic_speed
 #else
@@ -1520,14 +1664,30 @@ contains
 #endif
 
         real(wp), intent(in) :: rho, c, Bx, By, Bz, B_normal
+        real(wp), intent(in) :: h ! only used for relativity
         real(wp), intent(out) :: c_fast
 
-        real(wp) :: b2, term, disc
+        real(wp) :: B2, term, disc
+        real(wp) :: term2
 
-        b2 = (Bx**2 + By**2 + Bz**2)/rho
-        term = c**2 + b2
-        disc = term**2 - 4*c**2*(B_normal**2/rho)
-        disc = max(disc, 0._wp)
+        B2 = Bx**2 + By**2 + Bz**2
+
+        if (.not. relativity) then
+            term = c**2 + B2/rho
+            disc = term**2 - 4*c**2*(B_normal**2/rho)
+        else
+            ! Note: this is approximation for the non-relatisitic limit; accurate solution requires solving a quartic equation
+            term = (c**2 * (B_normal**2 + rho*h) + B2)/(rho*h+B2)
+            disc = term**2 - 4*c**2*B_normal**2/(rho*h+B2)
+        end if
+
+#ifdef DEBUG
+        if (disc < 0._wp) then
+            print *, 'rho, c, Bx, By, Bz, h, term, disc:', rho, c, Bx, By, Bz, h, term, disc
+            call s_mpi_abort('Error: negative discriminant in s_compute_fast_magnetosonic_speed')
+        end if
+#endif
+
         c_fast = sqrt(0.5_wp*(term + sqrt(disc)))
 
     end subroutine s_compute_fast_magnetosonic_speed
