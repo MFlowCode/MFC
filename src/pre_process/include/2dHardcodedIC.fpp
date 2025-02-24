@@ -145,14 +145,14 @@
 
     case (251) ! RMHD Cylindrical Blast Wave [Mignone, 2006: Section 4.3.1]
 
-        if (x_cc(i)**2 +  y_cc(j)**2 < 0.08_wp**2) then
+        if (x_cc(i)**2 + y_cc(j)**2 < 0.08_wp**2) then
             q_prim_vf(contxb)%sf(i, j, 0) = 0.01
             q_prim_vf(E_idx)%sf(i, j, 0) = 1.0
-        elseif (x_cc(i)**2 +  y_cc(j)**2 <= 1._wp**2) then
+        elseif (x_cc(i)**2 + y_cc(j)**2 <= 1._wp**2) then
             ! Linear interpolation between r=0.08 and r=1.0
             factor = (1.0_wp - sqrt(x_cc(i)**2 + y_cc(j)**2))/(1.0_wp - 0.08_wp)
-            q_prim_vf(contxb)%sf(i, j, 0) = 0.01_wp * factor + 1.e-4_wp * (1.0_wp - factor)
-            q_prim_vf(E_idx)%sf(i, j, 0) = 1.0_wp * factor + 3.e-5_wp * (1.0_wp - factor)
+            q_prim_vf(contxb)%sf(i, j, 0) = 0.01_wp*factor + 1.e-4_wp*(1.0_wp - factor)
+            q_prim_vf(E_idx)%sf(i, j, 0) = 1.0_wp*factor + 3.e-5_wp*(1.0_wp - factor)
         else
             q_prim_vf(contxb)%sf(i, j, 0) = 1.e-4_wp
             q_prim_vf(E_idx)%sf(i, j, 0) = 3.e-5_wp

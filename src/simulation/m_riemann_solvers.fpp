@@ -596,12 +596,12 @@ contains
                                 H_L = 1._wp + (gamma_L + 1)*pres_L/rho_L
                                 H_R = 1._wp + (gamma_R + 1)*pres_R/rho_R
 
-                                mx_L = (rho_L*H_L*Ga_L**2+B2_L)*vel_L(1) - vdotB_L*Bx_L
-                                my_L = (rho_L*H_L*Ga_L**2+B2_L)*vel_L(2) - vdotB_L*By_L
-                                mz_L = (rho_L*H_L*Ga_L**2+B2_L)*vel_L(3) - vdotB_L*Bz_L
-                                mx_R = (rho_R*H_R*Ga_R**2+B2_R)*vel_R(1) - vdotB_R*Bx_R
-                                my_R = (rho_R*H_R*Ga_R**2+B2_R)*vel_R(2) - vdotB_R*By_R
-                                mz_R = (rho_R*H_R*Ga_R**2+B2_R)*vel_R(3) - vdotB_R*Bz_R
+                                mx_L = (rho_L*H_L*Ga_L**2 + B2_L)*vel_L(1) - vdotB_L*Bx_L
+                                my_L = (rho_L*H_L*Ga_L**2 + B2_L)*vel_L(2) - vdotB_L*By_L
+                                mz_L = (rho_L*H_L*Ga_L**2 + B2_L)*vel_L(3) - vdotB_L*Bz_L
+                                mx_R = (rho_R*H_R*Ga_R**2 + B2_R)*vel_R(1) - vdotB_R*Bx_R
+                                my_R = (rho_R*H_R*Ga_R**2 + B2_R)*vel_R(2) - vdotB_R*By_R
+                                mz_R = (rho_R*H_R*Ga_R**2 + B2_R)*vel_R(3) - vdotB_R*Bz_R
 
                                 E_L = rho_L*h_L*Ga_L**2 - pres_L + 0.5_wp*(B2_L + vel_L_rms*B2_L - vdotB_L**2._wp) - rho_L*Ga_L
                                 E_R = rho_R*h_R*Ga_R**2 - pres_R + 0.5_wp*(B2_R + vel_R_rms*B2_R - vdotB_R**2._wp) - rho_R*Ga_R
@@ -779,8 +779,8 @@ contains
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         (s_M*alpha_rho_R(i)*vel_R(dir_idx(1)) &
-                                        - s_P*alpha_rho_L(i)*vel_L(dir_idx(1)) &
-                                        + s_M*s_P*(alpha_rho_L(i) &
+                                         - s_P*alpha_rho_L(i)*vel_L(dir_idx(1)) &
+                                         + s_M*s_P*(alpha_rho_L(i) &
                                                     - alpha_rho_R(i))) &
                                         /(s_M - s_P)
                                 end do
@@ -789,8 +789,8 @@ contains
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         (s_M*Ga_R*alpha_rho_R(i)*vel_R(dir_idx(1)) &
-                                        - s_P*Ga_L*alpha_rho_L(i)*vel_L(dir_idx(1)) &
-                                        + s_M*s_P*(Ga_L*alpha_rho_L(i) &
+                                         - s_P*Ga_L*alpha_rho_L(i)*vel_L(dir_idx(1)) &
+                                         + s_M*s_P*(Ga_L*alpha_rho_L(i) &
                                                     - Ga_R*alpha_rho_R(i))) &
                                         /(s_M - s_P)
                                 end do
@@ -924,8 +924,8 @@ contains
                                 ! Hard-coded for single-component for now
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     (s_M*(m${XYZ}$_R - Ga_R*alpha_rho_R(1)*vel_R(dir_idx(1))) &
-                                        - s_P*(m${XYZ}$_L - Ga_L*alpha_rho_L(1)*vel_L(dir_idx(1))) &
-                                        + s_M*s_P*(E_L - E_R)) &
+                                     - s_P*(m${XYZ}$_L - Ga_L*alpha_rho_L(1)*vel_L(dir_idx(1))) &
+                                     + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
                             else if (bubbles_euler) then
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &

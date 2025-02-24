@@ -960,32 +960,32 @@ contains
                         W = E + D
                         !$acc loop seq
                         do iter = 1, 100
-                            Ga = (W+B2)*W/sqrt((W+B2)**2*W**2 - (m2*W**2 + S**2*(2*W+B2)))
+                            Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
                             pres = (W - D*Ga)/((gamma_K + 1)*Ga**2) ! Thermal pressure from EOS
                             f = W - pres + (1 - 1/(2*Ga**2))*B2 - S**2/(2*W**2) - E - D
-                            
+
                             ! dGa_dW = -Ga**3 * ( S**2*(3*W**2+3*W*B2+B2**2) + m2*W**2 ) / (W**3 * (W+B2)**3) ! Typo in paper corrected (m2*W**2 -> 2*m2*W**2 which cancelled out with 2* on the other terms)
-                            dGa_dW = -Ga**3 * (2*S**2*(3*W**2+3*W*B2+B2**2) + m2*W**2) / (2*W**3*(W+B2)**3)
-                    
+                            dGa_dW = -Ga**3*(2*S**2*(3*W**2 + 3*W*B2 + B2**2) + m2*W**2)/(2*W**3*(W + B2)**3)
+
                             dp_dW = (Ga*(1 + D*dGa_dW) - 2*W*dGa_dW)/((gamma_K + 1)*Ga**3)
                             df_dW = 1 - dp_dW + (B2/Ga**3)*dGa_dW + S**2/W**3
-                            
+
                             dW = -f/df_dW
                             W = W + dW
-                            if (abs(dW) < 1e-12 * W) exit
+                            if (abs(dW) < 1e-12*W) exit
                         end do
 
                         ! Recalculate pressure using converged W
-                        Ga = (W+B2)*W/sqrt((W+B2)**2*W**2 - (m2*W**2 + S**2*(2*W+B2)))
+                        Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
                         qK_prim_vf(E_idx)%sf(j, k, l) = (W - D*Ga)/((gamma_K + 1)*Ga**2)
 
                         ! Recover the other primitive variables
                         !$acc loop seq
                         do i = 1, 3
-                            qK_prim_vf(momxb + i - 1)%sf(j, k, l) = (qK_cons_vf(momxb + i - 1)%sf(j, k, l) + (S/W)*B(i))/(W+B2)
+                            qK_prim_vf(momxb + i - 1)%sf(j, k, l) = (qK_cons_vf(momxb + i - 1)%sf(j, k, l) + (S/W)*B(i))/(W + B2)
                         end do
                         qK_cons_vf(1)%sf(j, k, l) = D/Ga ! Hard-coded for single-component for now
-                        
+
                         !$acc loop seq
                         do i = Bxb, Bxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
@@ -1234,7 +1234,7 @@ contains
                             v2 = v2 + q_prim_vf(i)%sf(j, k, l)**2
                         end do
                         if (v2 >= 1._wp) call s_mpi_abort('Error: v squared > 1 in s_convert_primitive_to_conservative_variables')
-                        
+
                         Ga = 1._wp/sqrt(1._wp - v2)
 
                         h = 1._wp + (gamma + 1)*q_prim_vf(E_idx)%sf(j, k, l)/rho ! Assume perfect gas for now
@@ -1251,16 +1251,16 @@ contains
                         end do
 
                         do i = 1, contxe
-                            q_cons_vf(i)%sf(j, k, l) = Ga * q_prim_vf(i)%sf(j, k, l)
+                            q_cons_vf(i)%sf(j, k, l) = Ga*q_prim_vf(i)%sf(j, k, l)
                         end do
-                        
+
                         do i = momxb, momxe
                             q_cons_vf(i)%sf(j, k, l) = (rho*h*Ga**2 + B2)*q_prim_vf(i)%sf(j, k, l) &
-                                - vdotB*B(i - momxb + 1)
+                                                       - vdotB*B(i - momxb + 1)
                         end do
 
                         q_cons_vf(E_idx)%sf(j, k, l) = rho*h*Ga**2 - q_prim_vf(E_idx)%sf(j, k, l) &
-                            + 0.5_wp*(B2 + v2*B2 - vdotB**2)
+                                                       + 0.5_wp*(B2 + v2*B2 - vdotB**2)
                         ! Remove rest energy
                         do i = 1, contxe
                             q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) - q_cons_vf(i)%sf(j, k, l)
@@ -1677,8 +1677,8 @@ contains
             disc = term**2 - 4*c**2*(B_normal**2/rho)
         else
             ! Note: this is approximation for the non-relatisitic limit; accurate solution requires solving a quartic equation
-            term = (c**2 * (B_normal**2 + rho*h) + B2)/(rho*h+B2)
-            disc = term**2 - 4*c**2*B_normal**2/(rho*h+B2)
+            term = (c**2*(B_normal**2 + rho*h) + B2)/(rho*h + B2)
+            disc = term**2 - 4*c**2*B_normal**2/(rho*h + B2)
         end if
 
 #ifdef DEBUG
