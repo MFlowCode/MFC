@@ -308,7 +308,7 @@ for cmp in ["x", "y", "z"]:
     for prepend in ["domain%beg", "domain%end"]:
         SIMULATION[f"{cmp}_{prepend}"] = ParamType.REAL
 
-for probe_id in range(1,3+1):
+for probe_id in range(1,10+1):
     for cmp in ["x", "y", "z"]:
         SIMULATION[f'probe({probe_id})%{cmp}'] = ParamType.REAL
 
