@@ -13,13 +13,13 @@ module m_mpi_proxy
     use mpi                     !< Message passing interface (MPI) module
 #endif
 
+    use m_helper
+
     use m_derived_types         !< Definitions of the derived types
 
     use m_global_parameters     !< Global parameters for the code
 
     use m_mpi_common
-
-    use m_helper
 
     implicit none
 
@@ -51,7 +51,6 @@ contains
         ! for the sake of simplicity, both variables are provided sufficient
         ! storage to hold the largest buffer in the computational domain.
 
-
         if (n > 0) then
             if (p > 0) then
 
@@ -70,14 +69,13 @@ contains
 
         v_size = sys_size
 
-        allocate(q_prims_buff_send(0:halo_size))
+        allocate (q_prims_buff_send(0:halo_size))
 
-        allocate(q_prims_buff_recv(0:ubound(q_prims_buff_send, 1)))
+        allocate (q_prims_buff_recv(0:ubound(q_prims_buff_send, 1)))
 
 #endif
 
     end subroutine s_initialize_mpi_proxy_module
-
 
     !> Since only processor with rank 0 is in charge of reading
         !!       and checking the consistency of the user provided inputs,
@@ -98,7 +96,7 @@ contains
             & 'loops_x', 'loops_y', 'loops_z', 'model_eqns', 'num_fluids',     &
             & 'weno_order', 'precision', 'perturb_flow_fluid', &
             & 'perturb_sph_fluid', 'num_patches', 'thermal', 'nb', 'dist_type',&
-            & 'R0_type', 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters' ]
+            & 'R0_type', 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters']
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -108,8 +106,8 @@ contains
             & 'mixlayer_perturb', 'bubbles_euler', 'polytropic', 'polydisperse',&
             & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
             & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
-            & 'hyperelasticity', 'pre_stress', 'viscous', 'bubbles_lagrange',  &
-            & 'elliptic_smoothing' ]
+            & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',&
+            & 'bubbles_lagrange' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
@@ -484,7 +482,6 @@ contains
                                                           num_procs_y/), (/.true., &
                                                                            .true./), .false., MPI_COMM_CART, &
                                      ierr)
-
                 ! Finding corresponding Cartesian coordinates of the local
                 ! processor rank in newly declared cartesian communicator
                 call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 2, &
@@ -668,10 +665,10 @@ contains
 #ifdef MFC_MPI
 
         buffer_counts = (/ &
-                buff_size*sys_size*(n + 1)*(p + 1), &
-                buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
-                buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
-                /)
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
+                        buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
+                        /)
 
         buffer_count = buffer_counts(mpi_dir)
         boundary_conditions = (/bc_x, bc_y, bc_z/)
@@ -754,10 +751,10 @@ contains
         p_recv => q_prims_buff_recv(0)
 
         call MPI_SENDRECV( &
-        p_send, buffer_count, mpi_p, dst_proc, send_tag, &
-        p_recv, buffer_count, mpi_p, src_proc, recv_tag, &
-        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-        
+            p_send, buffer_count, mpi_p, dst_proc, send_tag, &
+            p_recv, buffer_count, mpi_p, src_proc, recv_tag, &
+            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
         ! Unpack Received Buffer
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
@@ -769,7 +766,7 @@ contains
                                 do i = 1, sys_size
                                     r = (i - 1) + v_size* &
                                         (j + buff_size*((k + 1) + (n + 1)*l))
-                                        q_prim_vf(i)%sf(j + unpack_offset, k, l) = q_prims_buff_recv(r)
+                                    q_prim_vf(i)%sf(j + unpack_offset, k, l) = q_prims_buff_recv(r)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_prim_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
@@ -781,7 +778,7 @@ contains
                         end do
                     end do
 
-               #:elif mpi_dir == 2
+                #:elif mpi_dir == 2
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, sys_size
                         do l = 0, p
@@ -790,7 +787,7 @@ contains
                                     r = (i - 1) + v_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + buff_size*l))
-                                         q_prim_vf(i)%sf(j, k + unpack_offset, l) = q_prims_buff_recv(r)
+                                    q_prim_vf(i)%sf(j, k + unpack_offset, l) = q_prims_buff_recv(r)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_prim_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
@@ -812,7 +809,7 @@ contains
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)* &
                                           (l + buff_size)))
-                                          q_prim_vf(i)%sf(j, k, l + unpack_offset) = q_prims_buff_recv(r)
+                                    q_prim_vf(i)%sf(j, k, l + unpack_offset) = q_prims_buff_recv(r)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_prim_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
@@ -830,5 +827,14 @@ contains
 #endif
 
     end subroutine s_mpi_sendrecv_variables_buffers
+
+    !> Module deallocation and/or disassociation procedures
+    subroutine s_finalize_mpi_proxy_module
+
+#ifdef MFC_MPI
+        deallocate (q_prims_buff_send, q_prims_buff_recv)
+#endif
+
+    end subroutine s_finalize_mpi_proxy_module
 
 end module m_mpi_proxy

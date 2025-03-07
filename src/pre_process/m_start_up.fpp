@@ -767,6 +767,7 @@ contains
             pb0 = pb0/pref
             pref = 1._wp
         end if
+        call s_initialize_mpi_proxy_module()
         call s_initialize_data_output_module()
         call s_initialize_variables_conversion_module()
         call s_initialize_grid_module()
@@ -917,6 +918,7 @@ contains
         s_write_data_files => null()
 
         ! Deallocation procedures for the modules
+        call s_finalize_mpi_proxy_module()
         call s_finalize_grid_module()
         call s_finalize_variables_conversion_module()
         call s_finalize_data_output_module()

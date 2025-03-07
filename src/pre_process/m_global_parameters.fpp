@@ -260,7 +260,6 @@ module m_global_parameters
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
-
 contains
 
     !>  Assigns default values to user inputs prior to reading
