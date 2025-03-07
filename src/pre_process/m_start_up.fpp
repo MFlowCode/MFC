@@ -140,7 +140,9 @@ contains
             file_per_process, relax, relax_model, &
             palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
             sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
-            n_start_old, surface_tension, hyperelasticity, pre_stress, rkck_adap_dt
+            n_start_old, surface_tension, hyperelasticity, pre_stress, &
+            rkck_adap_dt, elliptic_smoothing, elliptic_smoothing_iters, &
+            viscous, bubbles_lagrange
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -920,6 +922,7 @@ contains
         call s_finalize_data_output_module()
         call s_finalize_global_parameters_module()
         call s_finalize_assign_variables_module()
+        call s_finalize_perturbation_module()
         if (relax) call s_finalize_relaxation_solver_module()
 
         ! Finalization of the MPI environment
