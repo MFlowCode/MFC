@@ -1500,7 +1500,7 @@ contains
             end if
         #:endfor
 
-    end subroutine
+    end subroutine s_any_cbc_boundaries
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_cbc_module

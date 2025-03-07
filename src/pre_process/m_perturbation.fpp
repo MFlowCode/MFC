@@ -618,7 +618,7 @@ contains
 
     subroutine s_elliptic_smoothing(q_prim_vf)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
         integer :: i, j, k, l, q
 
         do q = 1, elliptic_smoothing_iters

@@ -23,4 +23,4 @@ program main
         print '(" - "I3" : "A" | "F0.2" GB | "A"")', i, devvendor, devmem, devname
     end do
 
-end program
+end program main
