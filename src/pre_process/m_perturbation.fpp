@@ -858,7 +858,7 @@ contains
                                 q_prim_temp(j, k, l, i) = (1._wp/8._wp)* &
                                                           (q_prim_vf(i)%sf(j + 1, k, l) + q_prim_vf(i)%sf(j - 1, k, l) + &
                                                            q_prim_vf(i)%sf(j, k + 1, l) + q_prim_vf(i)%sf(j, k - 1, l) + &
-                                                           4._wp * q_prim_vf(i)%sf(j,k,l))
+                                                           4._wp*q_prim_vf(i)%sf(j, k, l))
                             end do
                         end do
                     end do
@@ -872,7 +872,7 @@ contains
                                                           (q_prim_vf(i)%sf(j + 1, k, l) + q_prim_vf(i)%sf(j - 1, k, l) + &
                                                            q_prim_vf(i)%sf(j, k + 1, l) + q_prim_vf(i)%sf(j, k - 1, l) + &
                                                            q_prim_vf(i)%sf(j, k, l + 1) + q_prim_vf(i)%sf(j, k, l - 1) + &
-                                                           6._wp * q_prim_vf(i)%sf(j,k,l))
+                                                           6._wp*q_prim_vf(i)%sf(j, k, l))
                             end do
                         end do
                     end do
