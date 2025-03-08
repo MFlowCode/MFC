@@ -626,7 +626,6 @@ contains
             if (bcxb >= 0) then
                 call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1)
             else if (bcxb == -1) then
-                !$acc parallel loop gang vector collapse(3) default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
@@ -637,7 +636,6 @@ contains
                     end do
                 end do
             else if (bcxb == -2) then
-                !$acc parallel loop gang vector collapse(3) default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
@@ -648,7 +646,6 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop gang vector collapse(3) default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
@@ -663,7 +660,6 @@ contains
             if (bcxe >= 0) then
                 call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, 1)
             else if (bcxe == -1) then
-                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
@@ -674,7 +670,6 @@ contains
                     end do
                 end do
             else if (bcxe == -2) then
-                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
@@ -685,7 +680,6 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
@@ -700,7 +694,6 @@ contains
             if (bcyb >= 0) then
                 call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, -1)
             else if (bcyb == -1) then
-                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 1, buff_size
                         do j = 0, m
@@ -711,7 +704,6 @@ contains
                     end do
                 end do
             else if (bcyb == -2) then
-                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 1, buff_size
                         do j = 0, m
@@ -722,7 +714,6 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 1, buff_size
                         do j = 0, m
@@ -737,7 +728,6 @@ contains
             if (bcye >= 0) then
                 call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, 1)
             else if (bcye == -1) then
-                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 1, buff_size
                         do j = 0, m
@@ -748,7 +738,6 @@ contains
                     end do
                 end do
             else if (bcye == -2) then
-                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 1, buff_size
                         do j = 0, m
@@ -759,7 +748,6 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 1, buff_size
                         do j = 0, m
@@ -769,14 +757,12 @@ contains
                         end do
                     end do
                 end do
-
             end if
 
             if (p > 0) then
                 if (bczb >= 0) then
                     call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, -1)
                 else if (bczb == -1) then
-                    !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 1, buff_size
                         do k = 0, n
                             do j = 0, m
@@ -787,7 +773,6 @@ contains
                         end do
                     end do
                 else if (bczb == -2) then
-                    !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 1, buff_size
                         do k = 0, n
                             do j = 0, m
@@ -798,7 +783,6 @@ contains
                         end do
                     end do
                 else
-                    !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 1, buff_size
                         do k = 0, n
                             do j = 0, m
@@ -808,13 +792,11 @@ contains
                             end do
                         end do
                     end do
-
                 end if
 
                 if (bcze >= 0) then
                     call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1)
                 else if (bcze == -1) then
-                    !$acc parallel loop gang vector collapse(3) default(present)
                     do l = 1, buff_size
                         do k = 0, n
                             do j = 0, m
@@ -825,7 +807,6 @@ contains
                         end do
                     end do
                 else if (bcze == -2) then
-                    !$acc parallel loop gang vector collapse(3) default(present)
                     do l = 1, buff_size
                         do k = 0, n
                             do j = 0, m
@@ -836,7 +817,6 @@ contains
                         end do
                     end do
                 else
-                    !$acc parallel loop gang vector collapse(3) default(present)
                     do l = 1, buff_size
                         do k = 0, n
                             do j = 0, m

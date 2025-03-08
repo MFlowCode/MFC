@@ -14,6 +14,8 @@ module m_start_up
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
+    use m_mpi_common
+
     use m_variables_conversion  !< Subroutines to change the state variables from
                                 !! one form to another
 
@@ -767,7 +769,7 @@ contains
             pb0 = pb0/pref
             pref = 1._wp
         end if
-        call s_initialize_mpi_proxy_module()
+        call s_initialize_mpi_common_module()
         call s_initialize_data_output_module()
         call s_initialize_variables_conversion_module()
         call s_initialize_grid_module()
@@ -918,7 +920,7 @@ contains
         s_write_data_files => null()
 
         ! Deallocation procedures for the modules
-        call s_finalize_mpi_proxy_module()
+        call s_finalize_mpi_common_module()
         call s_finalize_grid_module()
         call s_finalize_variables_conversion_module()
         call s_finalize_data_output_module()
