@@ -23,6 +23,7 @@ module m_mpi_common
     implicit none
 
     integer, private :: err_code, ierr, v_size !<
+    !$acc declare create(v_size)
     !! Generic flags used to identify and report MPI errors
 
     real(wp), private, allocatable, dimension(:), target :: q_prims_buff_send !<
@@ -859,7 +860,7 @@ contains
                     call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
                 #:else
                     call nvtxStartRange("RHS-COMM-DEV2HOST")
-                    !$acc update host(q_prims_buff_send, ib_buff_send)
+                    !$acc update host(q_prims_buff_send)
                     call nvtxEndRange
                     call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
                 #:endif
