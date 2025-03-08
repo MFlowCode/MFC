@@ -629,16 +629,23 @@ contains
             call s_populate_variables_buffers(q_prim_vf)
 
             ! Perform smoothing and store in temp array
-            if (p == 0) then
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do i = 1, sys_size
-                                q_prim_temp(j, k, l, i) = (1._wp/8._wp)* &
-                                                          (q_prim_vf(i)%sf(j + 1, k, l) + q_prim_vf(i)%sf(j - 1, k, l) + &
-                                                           q_prim_vf(i)%sf(j, k + 1, l) + q_prim_vf(i)%sf(j, k - 1, l) + &
-                                                           4._wp*q_prim_vf(i)%sf(j, k, l))
-                            end do
+
+            if (n == 0) then
+                do j = 0, m
+                    do i = 1, sys_size
+                        q_prim_temp(j, 0, 0, i) = (1._wp/4._wp)* &
+                                                  (q_prim_vf(i)%sf(j + 1, 0, 0) + q_prim_vf(i)%sf(j - 1, 0, 0) + &
+                                                   2._wp*q_prim_vf(i)%sf(j, 0, 0))
+                    end do
+                end do
+            else if (p == 0) then
+                do k = 0, n
+                    do j = 0, m
+                        do i = 1, sys_size
+                            q_prim_temp(j, k, 0, i) = (1._wp/8._wp)* &
+                                                      (q_prim_vf(i)%sf(j + 1, k, 0) + q_prim_vf(i)%sf(j - 1, k, 0) + &
+                                                       q_prim_vf(i)%sf(j, k + 1, 0) + q_prim_vf(i)%sf(j, k - 1, 0) + &
+                                                       4._wp*q_prim_vf(i)%sf(j, k, 0))
                         end do
                     end do
                 end do

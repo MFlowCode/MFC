@@ -194,6 +194,15 @@ module m_global_parameters
     type(bounds_info) :: x_output, y_output, z_output !< Portion of domain to output for post-processing
     type(int_bounds_info) :: x_output_idx, y_output_idx, z_output_idx !< Indices of domain to output for post-processing
 
+    !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions.
+    !! The definition of the ghost zone layers is only necessary when using the
+    !! Silo database file format in multidimensions. These zones provide VisIt
+    !! with the subdomain connectivity information that it requires in order to
+    !! produce smooth plots.
+    !> @{
+    type(int_bounds_info) :: offset_x, offset_y, offset_z
+    !> @}
+
     !> @name The list of all possible flow variables that may be written to a database
     !! file. It includes partial densities, density, momentum, velocity, energy,
     !! pressure, volume fraction(s), specific heat ratio function, specific heat
@@ -729,7 +738,35 @@ contains
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
 #endif
 
-        buff_size = 0
+        ! Size of the ghost zone layer is non-zero only when post-processing
+        ! the raw simulation data of a parallel multidimensional computation
+        ! in the Silo-HDF5 format. If this is the case, one must also verify
+        ! whether the raw simulation data is 2D or 3D. In the 2D case, size
+        ! of the z-coordinate direction ghost zone layer must be zeroed out.
+        if (num_procs == 1 .or. format /= 1 .or. n == 0) then
+
+            offset_x%beg = 0
+            offset_x%end = 0
+            offset_y%beg = 0
+            offset_y%end = 0
+            offset_z%beg = 0
+            offset_z%end = 0
+
+        elseif (p == 0) then
+
+            offset_z%beg = 0
+            offset_z%end = 0
+
+        end if
+
+        ! Determining the finite-difference number and the buffer size. Note
+        ! that the size of the buffer is unrelated to the order of the WENO
+        ! scheme. Rather, it is directly dependent on maximum size of ghost
+        ! zone layers and possibly the order of the finite difference scheme
+        ! used for the computation of vorticity and/or numerical Schlieren
+        ! function.
+        buff_size = max(offset_x%beg, offset_x%end, offset_y%beg, &
+                        offset_y%end, offset_z%beg, offset_z%end)
 
         if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt) then
             fd_number = max(1, fd_order/2)
