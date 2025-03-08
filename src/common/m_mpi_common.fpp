@@ -613,7 +613,6 @@ contains
 
     end subroutine s_mpi_finalize
 
-
     !>  The goal of this procedure is to populate the buffers of
         !!      the cell-average conservative variables by communicating
         !!      with the neighboring processors.
@@ -621,16 +620,13 @@ contains
         !!  @param mpi_dir MPI communication coordinate direction
         !!  @param pbc_loc Processor boundary condition (PBC) location
     subroutine s_mpi_sendrecv_variables_buffers(q_cons_vf, &
-#ifdef MFC_SIMULATION
                                                 pb, mv, &
-#endif
                                                 mpi_dir, &
                                                 pbc_loc)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-#ifdef MFC_SIMULATION
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
-#endif
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+
         integer, intent(in) :: mpi_dir, pbc_loc
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
@@ -850,12 +846,13 @@ contains
         #:endfor
         call nvtxEndRange ! Packbuf
 
+        p_send => q_prims_buff_send(0)
+        p_recv => q_prims_buff_recv(0)
+
 #ifdef MFC_SIMULATION
         ! Send/Recv
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
-                p_send => q_prims_buff_send(0)
-                p_recv => q_prims_buff_recv(0)
                 #:if rdma_mpi
                     !$acc data attach(p_send, p_recv)
                     !$acc host_data use_device(p_send, p_recv)

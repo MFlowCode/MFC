@@ -287,9 +287,7 @@ module m_global_parameters
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
-    integer :: startx, starty, startz
-
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
+    !$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
 
     ! END: Simulation Algorithm Parameters
 
@@ -1140,18 +1138,7 @@ contains
                 & idwbuff(3)%beg:idwbuff(3)%end))
         end if
 
-        startx = -buff_size
-        starty = 0
-        startz = 0
-        if (n > 0) then
-            starty = -buff_size
-        end if
-        if (p > 0) then
-            startz = -buff_size
-        end if
-
         !$acc update device(fd_order,fd_number)
-        !$acc update device(startx, starty, startz)
 
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
