@@ -194,15 +194,6 @@ module m_global_parameters
     type(bounds_info) :: x_output, y_output, z_output !< Portion of domain to output for post-processing
     type(int_bounds_info) :: x_output_idx, y_output_idx, z_output_idx !< Indices of domain to output for post-processing
 
-    !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions.
-    !! The definition of the ghost zone layers is only necessary when using the
-    !! Silo database file format in multidimensions. These zones provide VisIt
-    !! with the subdomain connectivity information that it requires in order to
-    !! produce smooth plots.
-    !> @{
-    type(int_bounds_info) :: offset_x, offset_y, offset_z
-    !> @}
-
     !> @name The list of all possible flow variables that may be written to a database
     !! file. It includes partial densities, density, momentum, velocity, energy,
     !! pressure, volume fraction(s), specific heat ratio function, specific heat
@@ -719,7 +710,6 @@ contains
         chemxe = species_idx%end
 
 #ifdef MFC_MPI
-
         if (bubbles_lagrange) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
@@ -739,35 +729,7 @@ contains
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
 #endif
 
-        ! Size of the ghost zone layer is non-zero only when post-processing
-        ! the raw simulation data of a parallel multidimensional computation
-        ! in the Silo-HDF5 format. If this is the case, one must also verify
-        ! whether the raw simulation data is 2D or 3D. In the 2D case, size
-        ! of the z-coordinate direction ghost zone layer must be zeroed out.
-        if (num_procs == 1 .or. format /= 1 .or. n == 0) then
-
-            offset_x%beg = 0
-            offset_x%end = 0
-            offset_y%beg = 0
-            offset_y%end = 0
-            offset_z%beg = 0
-            offset_z%end = 0
-
-        elseif (p == 0) then
-
-            offset_z%beg = 0
-            offset_z%end = 0
-
-        end if
-
-        ! Determining the finite-difference number and the buffer size. Note
-        ! that the size of the buffer is unrelated to the order of the WENO
-        ! scheme. Rather, it is directly dependent on maximum size of ghost
-        ! zone layers and possibly the order of the finite difference scheme
-        ! used for the computation of vorticity and/or numerical Schlieren
-        ! function.
-        buff_size = max(offset_x%beg, offset_x%end, offset_y%beg, &
-                        offset_y%end, offset_z%beg, offset_z%end)
+        buff_size = 0
 
         if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt) then
             fd_number = max(1, fd_order/2)
@@ -788,11 +750,11 @@ contains
 
         ! Allocating single precision grid variables if needed
         if (precision == 1) then
-            allocate (x_cb_s(-1 - offset_x%beg:m + offset_x%end))
+            allocate (x_cb_s(-1:m))
             if (n > 0) then
-                allocate (y_cb_s(-1 - offset_x%beg:n + offset_x%end))
+                allocate (y_cb_s(-1:n))
                 if (p > 0) then
-                    allocate (z_cb_s(-1 - offset_x%beg:m + offset_x%end))
+                    allocate (z_cb_s(-1:m))
                 end if
             end if
         else
@@ -800,19 +762,19 @@ contains
         end if
 
         ! Allocating the grid variables in the x-coordinate direction
-        allocate (x_cb(-1 - offset_x%beg:m + offset_x%end))
+        allocate (x_cb(-1:m))
         allocate (x_cc(-buff_size:m + buff_size))
         allocate (dx(-buff_size:m + buff_size))
 
         ! Allocating grid variables in the y- and z-coordinate directions
         if (n > 0) then
 
-            allocate (y_cb(-1 - offset_y%beg:n + offset_y%end))
+            allocate (y_cb(-1:n))
             allocate (y_cc(-buff_size:n + buff_size))
             allocate (dy(-buff_size:n + buff_size))
 
             if (p > 0) then
-                allocate (z_cb(-1 - offset_z%beg:p + offset_z%end))
+                allocate (z_cb(-1:p))
                 allocate (z_cc(-buff_size:p + buff_size))
                 allocate (dz(-buff_size:p + buff_size))
             end if
