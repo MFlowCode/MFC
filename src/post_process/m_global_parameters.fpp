@@ -787,11 +787,11 @@ contains
 
         ! Allocating single precision grid variables if needed
         if (precision == 1) then
-            allocate (x_cb_s(-1:m))
+            allocate (x_cb_s(-1 - offset_x%beg:m + offset_x%end))
             if (n > 0) then
-                allocate (y_cb_s(-1:n))
+                allocate (y_cb_s(-1 - offset_y%beg:n + offset_y%end))
                 if (p > 0) then
-                    allocate (z_cb_s(-1:m))
+                    allocate (z_cb_s(-1 - offset_z%beg:p + offset_z%end))
                 end if
             end if
         else
@@ -799,19 +799,19 @@ contains
         end if
 
         ! Allocating the grid variables in the x-coordinate direction
-        allocate (x_cb(-1:m))
+        allocate (x_cb(-1 - offset_x%beg:m + offset_x%end))
         allocate (x_cc(-buff_size:m + buff_size))
         allocate (dx(-buff_size:m + buff_size))
 
         ! Allocating grid variables in the y- and z-coordinate directions
         if (n > 0) then
 
-            allocate (y_cb(-1:n))
+            allocate (y_cb(-1 - offset_y%beg:n + offset_y%end))
             allocate (y_cc(-buff_size:n + buff_size))
             allocate (dy(-buff_size:n + buff_size))
 
             if (p > 0) then
-                allocate (z_cb(-1:p))
+                allocate (z_cb(-1 - offset_z%beg:p + offset_z%end))
                 allocate (z_cc(-buff_size:p + buff_size))
                 allocate (dz(-buff_size:p + buff_size))
             end if

@@ -649,6 +649,7 @@ contains
         call nvtxStartRange("RHS-COMM-PACKBUF")
         !$acc update device(v_size)
 
+#ifdef MFC_SIMULATION
         if (qbmm .and. .not. polytropic) then
             buffer_counts = (/ &
                             buff_size*(sys_size + 2*nb*4)*(n + 1)*(p + 1), &
@@ -656,12 +657,15 @@ contains
                             buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
                             /)
         else
+#endif
             buffer_counts = (/ &
                             buff_size*sys_size*(n + 1)*(p + 1), &
                             buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
                             buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
                             /)
+#ifdef MFC_SIMULATION
         end if
+#endif
 
         buffer_count = buffer_counts(mpi_dir)
         boundary_conditions = (/bc_x, bc_y, bc_z/)
@@ -850,8 +854,8 @@ contains
         p_send => q_prims_buff_send(0)
         p_recv => q_prims_buff_recv(0)
 
-#ifdef MFC_SIMULATION
         ! Send/Recv
+#ifdef MFC_SIMULATION
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
                 #:if rdma_mpi
@@ -864,14 +868,13 @@ contains
                     call nvtxEndRange
                     call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
                 #:endif
-#endif MFC_SIMULATION
 
                 call MPI_SENDRECV( &
                     p_send, buffer_count, mpi_p, dst_proc, send_tag, &
                     p_recv, buffer_count, mpi_p, src_proc, recv_tag, &
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#ifdef MFC_SIMULATION
+
                 call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
                 #:if rdma_mpi
@@ -885,7 +888,12 @@ contains
                 #:endif
             end if
         #:endfor
-#endif MFC_SIMULATION
+#else
+        call MPI_SENDRECV( &
+            p_send, buffer_count, mpi_p, dst_proc, send_tag, &
+            p_recv, buffer_count, mpi_p, src_proc, recv_tag, &
+            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+#endif
 
         ! Unpack Received Buffer
         call nvtxStartRange("RHS-COMM-UNPACKBUF")
