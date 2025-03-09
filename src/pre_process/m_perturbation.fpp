@@ -629,7 +629,6 @@ contains
             call s_populate_variables_buffers(q_prim_vf)
 
             ! Perform smoothing and store in temp array
-
             if (n == 0) then
                 do j = 0, m
                     do i = 1, sys_size
@@ -675,7 +674,6 @@ contains
                     end do
                 end do
             end do
-
         end do
 
     end subroutine s_elliptic_smoothing

@@ -647,7 +647,7 @@ contains
 #ifdef MFC_MPI
 
         call nvtxStartRange("RHS-COMM-PACKBUF")
-        !$acc update device(v_size)
+!$acc update device(v_size)
 
 #ifdef MFC_SIMULATION
         if (qbmm .and. .not. polytropic) then
@@ -873,7 +873,6 @@ contains
                     p_send, buffer_count, mpi_p, dst_proc, send_tag, &
                     p_recv, buffer_count, mpi_p, src_proc, recv_tag, &
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
 
                 call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
