@@ -123,7 +123,7 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: q_prim_vf !< Primitive Variables
 
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), optional, intent(INOUT) :: pb, mv
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), optional, intent(INOUT) :: pb, mv
 
         integer :: i, j, k, l, q, r!< Iterator variables
         integer :: patch_id !< Patch ID of ghost point
@@ -730,7 +730,7 @@ contains
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_prim_vf !< Primitive Variables
-        real(wp), optional, dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(INOUT) :: pb, mv
 
         type(ghost_point), intent(IN) :: gp
         real(wp), intent(INOUT) :: pres_IP

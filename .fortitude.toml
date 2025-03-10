@@ -1,5 +1,5 @@
 [check]
 # Ignored Rules and justification:
-ignore = ["E001","S001","S101","M011","F001","S041","T001","S101","S102","T002","T011","T042","M001"]
+ignore = ["E001","S001","S101","C121","S091","MOD011","C001","S101","S102","C002","PORT011","C072","C003","C131","C141","C092"]
 file-extensions = ["f90","fpp","fypp"]
 output-format = "pylint"

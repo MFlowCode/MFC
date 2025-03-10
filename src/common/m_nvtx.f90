@@ -32,7 +32,7 @@ module m_nvtx
         subroutine nvtxRangePushA(name) bind(C, name='nvtxRangePushA')
             use iso_c_binding
 
-            character(kind=c_char, len=*) :: name
+            character(kind=c_char, len=*), intent(IN) :: name
         end subroutine nvtxRangePushA
 
         ! push range with custom label and custom color
@@ -40,7 +40,7 @@ module m_nvtx
             use iso_c_binding
 
             import :: nvtxEventAttributes
-            type(nvtxEventAttributes) :: event
+            type(nvtxEventAttributes), intent(IN) :: event
         end subroutine nvtxRangePushEx
     end interface nvtxRangePush
 
@@ -54,8 +54,8 @@ module m_nvtx
 contains
 
     subroutine nvtxStartRange(name, id)
-        character(kind=c_char, len=*) :: name
-        integer, optional :: id
+        character(kind=c_char, len=*), intent(IN) :: name
+        integer, intent(IN), optional :: id
         type(nvtxEventAttributes) :: event
 
 #if defined(MFC_OpenACC) && defined(__PGI)
