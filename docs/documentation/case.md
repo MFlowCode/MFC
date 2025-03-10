@@ -269,6 +269,11 @@ These physical parameters must be consistent with fluid material's parameters de
 
 - `model_spc` and `model_threshold` are ray-tracing parameters. `model_spc` defines the number of rays per cell to render the model. `model_threshold` defines the ray-tracing threshold at which the cell is marked as the model.
 
+#### Elliptic Smoothing
+
+Initial conditions in which not all patches support the `patch_icpp(j)%smoothen` parameter can still be smoothed by applying iterations of the heat equation to the initial condition.
+This is enabled by adding `'elliptic_smoothing': "T",` and `'elliptic_smoothing_iters': N,` to the case dictionary, where `N` is the number of smoothing iterations to apply.
+
 ### 4. Immersed Boundary Patches
 
 | Parameter            | Type    | Description |
