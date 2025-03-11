@@ -9,8 +9,6 @@ module m_helper
 
     use m_global_parameters    !< Definitions of the global parameters
 
-    use m_mpi_common           !< MPI modules
-
     use ieee_arithmetic        !< For checking NaN
 
     implicit none
@@ -32,7 +30,6 @@ module m_helper
               s_print_2D_array, &
               f_xor, &
               f_logical_to_int, &
-              s_prohibit_abort, &
               unassociated_legendre, &
               associated_legendre, &
               spherical_harmonic_func, &
@@ -471,19 +468,6 @@ contains
             int = 0
         end if
     end function f_logical_to_int
-
-    subroutine s_prohibit_abort(condition, message)
-        character(len=*), intent(in) :: condition, message
-
-        print *, ""
-        print *, "CASE FILE ERROR"
-        print *, "  - Prohibited condition: ", trim(condition)
-        if (len_trim(message) > 0) then
-            print *, "  - Note: ", trim(message)
-        end if
-        print *, ""
-        call s_mpi_abort(code=CASE_FILE_ERROR_CODE)
-    end subroutine s_prohibit_abort
 
     !> This function generates the unassociated legendre poynomials
     !! @param x is the input value
