@@ -25,13 +25,12 @@ contains
     subroutine s_check_inputs
 
         call s_check_inputs_compilers
-
         call s_check_inputs_weno
         call s_check_inputs_riemann_solver
         call s_check_inputs_time_stepping
         call s_check_inputs_model_eqns
         call s_check_inputs_acoustic_src
-        call s_check_inputs_hypoelasticity
+        call s_check_inputs_elasticity
         call s_check_inputs_bubbles_euler
         call s_check_inputs_bubbles_lagrange
         call s_check_inputs_adapt_dt
@@ -122,7 +121,7 @@ contains
         @:PROHIBIT(model_eqns == 3 .and. wave_speeds /= 1, "6-equation model (model_eqns = 3) requires wave_speeds = 1")
     end subroutine s_check_inputs_model_eqns
 
-    !> Checks constraints for GRCBC
+    !> Checks constraints for grCBC
     subroutine s_check_inputs_grcbc
         #:for DIR in ['x', 'y', 'z']
             @:PROHIBIT(bc_${DIR}$%grcbc_in .and. (bc_${DIR}$%beg /= -7 .and. bc_${DIR}$%end /= -7), "Subsonic Inflow requires bc = -7")
@@ -258,9 +257,11 @@ contains
 
     end subroutine s_check_inputs_acoustic_src
 
-    !> Checks constraints on hypoelasticity parameters
-    subroutine s_check_inputs_hypoelasticity
-        @:PROHIBIT(hypoelasticity .and. riemann_solver /= 1, "hypoelasticity requires HLL Riemann solver (riemann_solver = 1)")
+    !> Checks constraints on elasticity parameters
+    subroutine s_check_inputs_elasticity
+        @:PROHIBIT(hyperelasticity .and. hyper_model == dflt_int)
+        @:PROHIBIT((hypoelasticity .or. hyperelasticity) .and. fd_order == dflt_int, &
+            "fd_order must be set for hypoelasticity or hyperelasticity")
     end subroutine
 
     !> Checks constraints on bubble parameters
