@@ -293,8 +293,8 @@ contains
                 end if
 #endif
             end if
-            
-	    !< y-direction
+
+            !< y-direction
         elseif (bc_dir == 2) then !< y-direction
 
             if (bc_loc == -1) then !< bc_y%beg
