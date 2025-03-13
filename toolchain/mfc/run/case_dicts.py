@@ -92,6 +92,8 @@ PRE_PROCESS.update({
     'n_start': ParamType.INT,
     'n_start_old': ParamType.INT,
     'surface_tension': ParamType.LOG,
+    'elliptic_smoothing': ParamType.LOG,
+    'elliptic_smoothing_iters': ParamType.INT,
 })
 
 for ib_id in range(1, 10+1):

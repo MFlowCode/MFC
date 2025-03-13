@@ -585,9 +585,9 @@ contains
         !$acc parallel loop collapse(4) gang vector default(present)
         do id = 1, num_dims
             do i = 1, sys_size
-                do l = startz, p - startz
-                    do k = starty, n - starty
-                        do j = startx, m - startx
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
                             flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0._wp
                         end do
                     end do
@@ -607,8 +607,8 @@ contains
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
 
@@ -1974,8 +1974,8 @@ contains
                                                   norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
@@ -2026,8 +2026,8 @@ contains
                                                               norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
 
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction

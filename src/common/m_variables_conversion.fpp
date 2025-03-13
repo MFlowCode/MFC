@@ -746,14 +746,14 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv
+        real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: mv
 
         integer :: i, j, k, l
         real(wp) :: mu, sig, nbub_sc
 
-        do l = idwbuff(3)%beg, idwbuff(3)%end
-            do k = idwbuff(2)%beg, idwbuff(2)%end
-                do j = idwbuff(1)%beg, idwbuff(1)%end
+        do l = idwint(3)%beg, idwint(3)%end
+            do k = idwint(2)%beg, idwint(2)%end
+                do j = idwint(1)%beg, idwint(1)%end
 
                     nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
 
@@ -778,15 +778,15 @@ contains
     subroutine s_initialize_pb(qK_cons_vf, mv, pb)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(in) :: mv
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb
+        real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
+        real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: pb
 
         integer :: i, j, k, l
         real(wp) :: mu, sig, nbub_sc
 
-        do l = idwbuff(3)%beg, idwbuff(3)%end
-            do k = idwbuff(2)%beg, idwbuff(2)%end
-                do j = idwbuff(1)%beg, idwbuff(1)%end
+        do l = idwint(3)%beg, idwint(3)%end
+            do k = idwint(2)%beg, idwint(2)%end
+                do j = idwint(1)%beg, idwint(1)%end
 
                     nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
 

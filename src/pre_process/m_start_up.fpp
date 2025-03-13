@@ -14,6 +14,8 @@ module m_start_up
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
+    use m_mpi_common
+
     use m_variables_conversion  !< Subroutines to change the state variables from
                                 !! one form to another
 
@@ -141,7 +143,8 @@ contains
             palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
             sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
             n_start_old, surface_tension, hyperelasticity, pre_stress, &
-            rkck_adap_dt
+            rkck_adap_dt, elliptic_smoothing, elliptic_smoothing_iters, &
+            viscous, bubbles_lagrange
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -766,6 +769,7 @@ contains
             pb0 = pb0/pref
             pref = 1._wp
         end if
+        call s_initialize_mpi_common_module()
         call s_initialize_data_output_module()
         call s_initialize_variables_conversion_module()
         call s_initialize_grid_module()
@@ -916,11 +920,13 @@ contains
         s_write_data_files => null()
 
         ! Deallocation procedures for the modules
+        call s_finalize_mpi_common_module()
         call s_finalize_grid_module()
         call s_finalize_variables_conversion_module()
         call s_finalize_data_output_module()
         call s_finalize_global_parameters_module()
         call s_finalize_assign_variables_module()
+        call s_finalize_perturbation_module()
         if (relax) call s_finalize_relaxation_solver_module()
 
         ! Finalization of the MPI environment
