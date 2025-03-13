@@ -237,14 +237,14 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (hyperelasticity) then
                     !$acc parallel loop collapse(4) gang vector default(present), private(bc_sum)
                     do j = 1, buff_size
                         do l = 0, p
                             do k = 0, n
                                 do i = xibeg, xiend
-                                    bc_sum = 0_wp
+                                    bc_sum = 0._wp
                                     !$acc loop seq
                                     do q = 1, j
                                         bc_sum = bc_sum - dx(-q)
@@ -257,7 +257,7 @@ contains
                     end do
                     !$acc end parallel loop
                 end if
-
+#endif
             else !< bc_x%end
 
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -271,14 +271,14 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (hyperelasticity) then
                     !$acc parallel loop collapse(4) gang vector default(present), private(bc_sum)
                     do j = 1, buff_size
                         do l = 0, p
                             do k = 0, n
                                 do i = xibeg, xiend
-                                    bc_sum = 0_wp
+                                    bc_sum = 0._wp
                                     !$acc loop seq
                                     do q = 1, j
                                         bc_sum = bc_sum + dx(m + q)
@@ -291,9 +291,10 @@ contains
                     end do
                     !$acc end parallel loop
                 end if
+#endif
             end if
-
-            !< y-direction
+            
+	    !< y-direction
         elseif (bc_dir == 2) then !< y-direction
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -309,14 +310,14 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (hyperelasticity) then
                     !$acc parallel loop collapse(4) gang vector default(present), private(bc_sum)
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
                             do k = 0, p
                                 do i = xibeg, xiend
-                                    bc_sum = 0_wp
+                                    bc_sum = 0._wp
                                     !$acc loop seq
                                     do q = 1, j
                                         bc_sum = bc_sum - dy(-q)
@@ -329,7 +330,7 @@ contains
                     end do
                     !$acc end parallel loop
                 end if
-
+#endif
             else !< bc_y%end
 
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -343,14 +344,14 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (hyperelasticity) then
                     !$acc parallel loop collapse(4) gang vector default(present), private(bc_sum)
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
                             do k = 0, p
                                 do i = xibeg, xiend
-                                    bc_sum = 0_wp
+                                    bc_sum = 0._wp
                                     !$acc loop seq
                                     do q = 1, j
                                         bc_sum = bc_sum + dy(n + q)
@@ -363,7 +364,7 @@ contains
                     end do
                     !$acc end parallel loop
                 end if
-
+#endif
             end if
 
             !< z-direction
@@ -382,14 +383,14 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (hyperelasticity) then
                     !$acc parallel loop collapse(4) gang vector default(present), private(bc_sum)
                     do j = 1, buff_size
                         do l = -buff_size, n + buff_size
                             do k = -buff_size, m + buff_size
                                 do i = xibeg, xiend
-                                    bc_sum = 0_wp
+                                    bc_sum = 0._wp
                                     !$acc loop seq
                                     do q = 1, j
                                         bc_sum = bc_sum - dx(-q)
@@ -402,8 +403,8 @@ contains
                     end do
                     !$acc end parallel loop
                 end if
+#endif
             else !< bc_z%end
-
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -415,14 +416,14 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (hyperelasticity) then
                     !$acc parallel loop collapse(4) gang vector default(present), private(bc_sum)
                     do j = 1, buff_size
                         do l = -buff_size, n + buff_size
                             do k = -buff_size, m + buff_size
                                 do i = xibeg, xiend
-                                    bc_sum = 0_wp
+                                    bc_sum = 0._wp
                                     !$acc loop seq
                                     do q = 1, j
                                         bc_sum = bc_sum + dz(p + q)
@@ -435,7 +436,7 @@ contains
                     end do
                     !$acc end parallel loop
                 end if
-
+#endif
             end if
 
         end if
@@ -473,12 +474,12 @@ contains
                                 q_prim_vf(i)%sf(-j, k, l) = &
                                     q_prim_vf(i)%sf(j - 1, k, l)
                             end do
-
+#ifdef MFC_SIMULATION
                             if (hyperelasticity) then
                                 q_prim_vf(xibeg)%sf(-j, k, l) = &
                                     -q_prim_vf(xibeg)%sf(j - 1, k, l)
                             end if
-
+#endif
                         end do
                     end do
                 end do
@@ -523,12 +524,12 @@ contains
                                 q_prim_vf(i)%sf(m + j, k, l) = &
                                     q_prim_vf(i)%sf(m - (j - 1), k, l)
                             end do
-
+#ifdef MFC_SIMULATION
                             if (hyperelasticity) then
                                 q_prim_vf(xibeg)%sf(m + j, k, l) = &
                                     -q_prim_vf(xibeg)%sf(m - (j - 1), k, l)
                             end if
-
+#endif
                         end do
                     end do
                 end do
@@ -576,11 +577,12 @@ contains
                                 q_prim_vf(i)%sf(l, -j, k) = &
                                     q_prim_vf(i)%sf(l, j - 1, k)
                             end do
-
+#ifdef MFC_SIMULATION
                             if (hyperelasticity) then
                                 q_prim_vf(xibeg + 1)%sf(l, -j, k) = &
                                     -q_prim_vf(xibeg + 1)%sf(l, j - 1, k)
                             end if
+#endif
                         end do
                     end do
                 end do
@@ -623,11 +625,12 @@ contains
                                 q_prim_vf(i)%sf(l, n + j, k) = &
                                     q_prim_vf(i)%sf(l, n - (j - 1), k)
                             end do
-
+#ifdef MFC_SIMULATION
                             if (hyperelasticity) then
                                 q_prim_vf(xibeg + 1)%sf(l, n + j, k) = &
                                     -q_prim_vf(xibeg + 1)%sf(l, n - (j - 1), k)
                             end if
+#endif
                         end do
                     end do
                 end do
@@ -675,11 +678,12 @@ contains
                                 q_prim_vf(i)%sf(k, l, -j) = &
                                     q_prim_vf(i)%sf(k, l, j - 1)
                             end do
-
+#ifdef MFC_SIMULATION
                             if (hyperelasticity) then
                                 q_prim_vf(xiend)%sf(k, l, -j) = &
                                     -q_prim_vf(xiend)%sf(k, l, j - 1)
                             end if
+#endif
                         end do
                     end do
                 end do
@@ -722,11 +726,12 @@ contains
                                 q_prim_vf(i)%sf(k, l, p + j) = &
                                     q_prim_vf(i)%sf(k, l, p - (j - 1))
                             end do
-
+#ifdef MFC_SIMULATION
                             if (hyperelasticity) then
                                 q_prim_vf(xiend)%sf(k, l, p + j) = &
                                     -q_prim_vf(xiend)%sf(k, l, p - (j - 1))
                             end if
+#endif
                         end do
                     end do
                 end do
