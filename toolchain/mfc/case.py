@@ -204,6 +204,9 @@ class Case:
             else:
                 num_vels = num_dims
 
+            mhd = 1 if self.params.get("mhd", 'F') == 'T' else 0
+            relativity = 1 if self.params.get("relativity", 'F') == 'T' else 0
+
             # Throw error if wenoz_q is required but not set
             return f"""\
 #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
@@ -220,6 +223,8 @@ class Case:
 #:set wenoz                 = {wenoz}
 #:set teno                  = {teno}
 #:set wenoz_q               = {self.params.get("wenoz_q", -1)}
+#:set mhd                   = {mhd}
+#:set relativity            = {relativity}
 """
 
         return """\

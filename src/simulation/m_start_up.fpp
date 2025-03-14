@@ -147,7 +147,7 @@ contains
             bc_x, bc_y, bc_z, &
             x_a, y_a, z_a, x_b, y_b, z_b, &
             x_domain, y_domain, z_domain, &
-            mhd, hypoelasticity, &
+            hypoelasticity, &
             ib, num_ibs, patch_ib, &
             fluid_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
@@ -156,7 +156,7 @@ contains
             rhoref, pref, bubbles_euler, bubble_model, &
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, &
+            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, mhd, relativity, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
@@ -173,7 +173,7 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
-            hyperelasticity, R0ref, Bx0, powell, relativity
+            hyperelasticity, R0ref, Bx0, powell
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1636,11 +1636,6 @@ contains
         if (ib) then
             !$acc update device(ib_markers%sf)
         end if
-
-        if (mhd) then
-            !$acc update device(Bx0, powell, relativity)
-        end if
-
     end subroutine s_initialize_gpu_vars
 
     subroutine s_finalize_modules

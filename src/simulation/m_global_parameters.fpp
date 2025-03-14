@@ -113,12 +113,14 @@ module m_global_parameters
         integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
         integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
         integer, parameter :: weno_num_stencils = ${weno_num_stencils}$ !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
-        integer, parameter :: num_fluids = ${num_fluids}$ !< number of fluids in the simulation
+        integer, parameter :: num_fluids = ${num_fluids}$           !< number of fluids in the simulation
         logical, parameter :: wenojs = (${wenojs}$ /= 0)            !< WENO-JS (default)
         logical, parameter :: mapped_weno = (${mapped_weno}$ /= 0)  !< WENO-M (WENO with mapping of nonlinear weights)
         logical, parameter :: wenoz = (${wenoz}$ /= 0)              !< WENO-Z
         logical, parameter :: teno = (${teno}$ /= 0)                !< TENO (Targeted ENO)
-        real(wp), parameter :: wenoz_q = ${wenoz_q}$         !< Power constant for WENO-Z
+        real(wp), parameter :: wenoz_q = ${wenoz_q}$                !< Power constant for WENO-Z
+        logical, parameter :: mhd = (${mhd}$ /= 0)                  !< Magnetohydrodynamics
+        logical, parameter :: relativity = (${relativity}$ /= 0)    !< Relativity (only for MHD)
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
@@ -128,7 +130,9 @@ module m_global_parameters
         logical :: mapped_weno    !< WENO-M (WENO with mapping of nonlinear weights)
         logical :: wenoz          !< WENO-Z
         logical :: teno           !< TENO (Targeted ENO)
-        real(wp) :: wenoz_q  !< Power constant for WENO-Z
+        real(wp) :: wenoz_q       !< Power constant for WENO-Z
+        logical :: mhd            !< Magnetohydrodynamics
+        logical :: relativity     !< Relativity (only for MHD)
     #:endif
 
     real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
@@ -143,7 +147,6 @@ module m_global_parameters
     logical :: alt_soundspeed !< Alternate mixture sound speed
     logical :: null_weights    !< Null undesired WENO weights
     logical :: mixture_err     !< Mixture properties correction
-    logical :: mhd             !< Magnetohydrodynamics
     logical :: hypoelasticity  !< hypoelasticity modeling
     logical :: hyperelasticity !< hyperelasticity modeling
     integer :: hyper_model     !< hyperelasticity solver algorithm
@@ -170,10 +173,10 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q)
+        !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, mhd, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -474,8 +477,7 @@ module m_global_parameters
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
     logical :: powell !< Powell‐correction for div B = 0
-    logical :: relativity
-    !$acc declare create(Bx0, powell, relativity)
+    !$acc declare create(Bx0, powell)
 
 contains
 
@@ -734,7 +736,11 @@ contains
 
         Bx0 = dflt_real
         powell = .false.
-        relativity = .false.
+
+        #:if not MFC_CASE_OPTIMIZATION
+            mhd = .false.
+            relativity = .false.
+        #:endif
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -1215,11 +1221,12 @@ contains
         !$acc update device(cfl_target, m, n, p)
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, mhd, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, low_Mach)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, low_Mach)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)
             !$acc update device(wenoz_q)
+            !$acc update device(mhd, relativity)
         #:endif
 
         !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
@@ -1228,7 +1235,7 @@ contains
 
         !$acc enter data copyin(relax, relax_model, palpha_eps,ptgalpha_eps)
 
-        !$acc enter data copyin(Bx0, powell, relativity)
+        !$acc enter data copyin(Bx0, powell)
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
