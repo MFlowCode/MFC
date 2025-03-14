@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import json
 
-# An upwind differencing scheme for the equations of ideal magnetohydrodynamics
-# M. Brio and C. C. Wu
+# An HLLC Riemann solver for relativistic flows – II. Magnetohydrodynamics
+# A. Mignone and G. Bodo
+# Problem 1 Figure 3
 
 # Configuring case dictionary
 print(
@@ -13,12 +14,12 @@ print(
             # Computational Domain Parameters
             "x_domain%beg": 0,
             "x_domain%end": 1.0,
-            "m": 800,
+            "m": 1600,
             "n": 0,
             "p": 0,
             "dt": 0.0002,
             "t_step_start": 0,
-            "t_step_stop": 1000,
+            "t_step_stop": 2000,
             "t_step_save": 100,
             # Simulation Algorithm Parameters
             "num_patches": 2,
@@ -36,17 +37,18 @@ print(
             "riemann_solver": 1,
             "wave_speeds": 1,
             "avg_state": 2,
-            "bc_x%beg": -2,
-            "bc_x%end": -2,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
             # Formatted Database Files Structure Parameters
             "format": 2,
             "precision": 2,
             "prim_vars_wrt": "T",
             "rho_wrt": "T",
             "parallel_io": "T",
-            # MHD
+            # RMHD
             "mhd": "T",
-            "Bx0": 0.75,
+            "relativity": "T",
+            "Bx0": 0.5,
             # Patch 1 Left
             "patch_icpp(1)%geometry": 1,
             "patch_icpp(1)%x_centroid": 0.25,

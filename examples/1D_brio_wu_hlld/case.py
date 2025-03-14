@@ -3,6 +3,7 @@ import json
 
 # An upwind differencing scheme for the equations of ideal magnetohydrodynamics
 # M. Brio and C. C. Wu
+# Note: HLLD is not used in the paper
 
 # Configuring case dictionary
 print(
@@ -33,7 +34,7 @@ print(
             "weno_eps": 1.0e-16,
             "null_weights": "F",
             "mp_weno": "F",
-            "riemann_solver": 1,
+            "riemann_solver": 4,
             "wave_speeds": 1,
             "avg_state": 2,
             "bc_x%beg": -2,
