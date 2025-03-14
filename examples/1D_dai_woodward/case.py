@@ -48,7 +48,7 @@ print(
             "bc_x%beg": -3,
             "bc_x%end": -3,
             # Formatted Database Files Structure Parameters
-            "format": 2,
+            "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "rho_wrt": "T",

@@ -827,6 +827,27 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 stack.pop()
 
+    def mhd_cases():
+        params = {
+            '1D': {"m": 200, "dt": 0.001, "t_step_stop": 200, "t_step_save": 200},
+            '2D': {"m": 50, "n": 50, "dt": 0.002, "t_step_stop": 500, "t_step_save": 500},
+            '3D': {"m": 25, "n": 25, "p": 25, "dt": 0.005, "t_step_stop": 200, "t_step_save": 200},
+        }
+
+        case_specs = [
+            ("1D -> MHD -> HLL",    "examples/1D_brio_wu/case.py",              params['1D']),
+            ("1D -> MHD -> HLLD",   "examples/1D_brio_wu_hlld/case.py",         params['1D']),
+            ("1D -> RMHD",          "examples/1D_brio_wu_rmhd/case.py",         params['1D']),
+            ("2D -> MHD -> HLL",    "examples/2D_orszag_tang/case.py",          params['2D']),
+            ("2D -> MHD -> HLLD",   "examples/2D_orszag_tang_hlld/case.py",     params['2D']),
+            ("2D -> MHD -> Powell", "examples/2D_orszag_tang_powell/case.py",   params['2D']),
+            ("2D -> RMHD",          "examples/2D_shock_cloud_rmhd/case.py",     params['2D']),
+            ("3D -> MHD",           "examples/3D_brio_wu/case.py",              params['3D']),
+            ("3D -> RMHD",          "examples/3D_brio_wu/case.py",              {**params['3D'], 'relativity': 'T'}),
+        ]
+
+        for name, path, param in case_specs:
+            cases.append(define_case_f(name, path, mods=param))
 
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
@@ -914,6 +935,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             ))
 
     foreach_dimension()
+
+    mhd_cases()
 
     foreach_example()
 
