@@ -964,8 +964,12 @@ contains
                             pres = (W - D*Ga)/((gamma_K + 1)*Ga**2) ! Thermal pressure from EOS
                             f = W - pres + (1 - 1/(2*Ga**2))*B2 - S**2/(2*W**2) - E - D
 
-                            ! dGa_dW = -Ga**3 * ( S**2*(3*W**2+3*W*B2+B2**2) + m2*W**2 ) / (W**3 * (W+B2)**3) ! Typo in paper corrected (m2*W**2 -> 2*m2*W**2 which cancelled out with 2* on the other terms)
-                            dGa_dW = -Ga**3*(2*S**2*(3*W**2 + 3*W*B2 + B2**2) + m2*W**2)/(2*W**3*(W + B2)**3)
+                            ! The first equation below corrects a typo in (Mignone & Bodo, 2006)
+                            ! m2*W**2 → 2*m2*W**2, which would cancel with the 2* in other terms
+                            ! This corrected version is not used as the second equation empirically converges faster.
+                            ! First equation is kept for further investigation.
+                            ! dGa_dW = -Ga**3 * ( S**2*(3*W**2+3*W*B2+B2**2) + m2*W**2 ) / (W**3 * (W+B2)**3) ! first (corrected)
+                            dGa_dW = -Ga**3*(2*S**2*(3*W**2 + 3*W*B2 + B2**2) + m2*W**2)/(2*W**3*(W + B2)**3) ! second (in paper)
 
                             dp_dW = (Ga*(1 + D*dGa_dW) - 2*W*dGa_dW)/((gamma_K + 1)*Ga**3)
                             df_dW = 1 - dp_dW + (B2/Ga**3)*dGa_dW + S**2/W**3
@@ -1611,6 +1615,9 @@ contains
             else
                 c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
             end if
+        elseif (relativity) then
+            ! Only supports perfect gas for now
+            c = sqrt((1._wp + 1._wp/gamma)*pres/rho/H)
         else
             if (alt_soundspeed) then
                 blkmod1 = ((gammas(1) + 1._wp)*pres + &
@@ -1641,10 +1648,6 @@ contains
             else
                 c = ((H - 5e-1*vel_sum)/gamma)
             end if
-
-            ! if (mhd) then ! DEBUG
-            !     c = (1._wp+1._wp/gamma)*pres/rho
-            ! end if
 
             if (mixture_err .and. c < 0._wp) then
                 c = 100._wp*sgm_eps

@@ -1134,7 +1134,7 @@ contains
             !buff_size = buff_size + fd_number
         end if
 
-        if (mhd) then ! TODO merge with above
+        if (mhd) then ! TODO merge with above; waiting for hyperelasticity PR
             fd_number = max(1, fd_order/2)
         end if
 

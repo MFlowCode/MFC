@@ -272,8 +272,8 @@ contains
         end if
 
         ! Adding the density to the formatted database file
-        if (((rho_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) &
-             .and. (.not. relativity)) .or. (relativity .and. cons_vars_wrt)) then
+        if (((rho_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) .and. (.not. relativity)) &
+            .or. (relativity .and. cons_vars_wrt)) then
             q_sf = rho_sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
             write (varname, '(A)') 'rho'
             call s_write_variable_to_formatted_database_file(varname, t_step)

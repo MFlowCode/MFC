@@ -473,7 +473,6 @@ contains
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND)
 
-                ! TODO no differences between branches
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
                     do i = 1, sys_size

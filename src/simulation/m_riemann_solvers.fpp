@@ -692,11 +692,6 @@ contains
                             call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
                                                           vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
-                            if (relativity) then ! TODO merge into speed of sounds
-                                c_L = sqrt((1._wp + 1._wp/gamma_L)*pres_L/rho_L/H_L)
-                                c_R = sqrt((1._wp + 1._wp/gamma_R)*pres_R/rho_R/H_R)
-                            end if
-
                             if (mhd) then
                                 call s_compute_fast_magnetosonic_speed(rho_L, c_L, Bx_L, By_L, Bz_L, B${XYZ}$_L, c_fast_L, H_L)
                                 call s_compute_fast_magnetosonic_speed(rho_R, c_R, Bx_R, By_R, Bz_R, B${XYZ}$_R, c_fast_R, H_R)

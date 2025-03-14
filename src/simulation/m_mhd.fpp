@@ -37,6 +37,7 @@ contains
 
         integer :: i, k, r
 
+        ! Additional safety check beyond m_checker
         if (n == 0) call s_mpi_abort('Fatal Error: Powell correction is not applicable for 1D')
 
         @:ALLOCATE(du_dx(0:m,0:n,0:p), dv_dx(0:m,0:n,0:p), dw_dx(0:m,0:n,0:p))

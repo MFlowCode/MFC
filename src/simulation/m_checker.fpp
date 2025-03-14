@@ -89,7 +89,7 @@ contains
     !> Checks constraints on Riemann solver parameters
     subroutine s_check_inputs_riemann_solver
         @:PROHIBIT(riemann_solver /= 2 .and. model_eqns == 3, "6-equation model (model_eqns = 3) requires riemann_solver = 2")
-        ! @:PROHIBIT(riemann_solver < 1 .or. riemann_solver > 3, "riemann_solver must be 1, 2, or 3")
+        @:PROHIBIT(riemann_solver < 1 .or. riemann_solver > 4, "riemann_solver must be 1, 2, 3, or 4")
         @:PROHIBIT(all(wave_speeds /= (/dflt_int, 1, 2/)), "wave_speeds must be 1 or 2")
         @:PROHIBIT(riemann_solver == 3 .and. wave_speeds /= dflt_int, "Exact Riemann (riemann_solver = 3) does not support wave_speeds")
         @:PROHIBIT(all(avg_state /= (/dflt_int, 1, 2/)), "Unsupported value of avg_state")
