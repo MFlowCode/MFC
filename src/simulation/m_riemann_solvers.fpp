@@ -605,7 +605,7 @@ contains
 
                                 E_L = rho_L*h_L*Ga_L**2 - pres_L + 0.5_wp*(B2_L + vel_L_rms*B2_L - vdotB_L**2._wp) - rho_L*Ga_L
                                 E_R = rho_R*h_R*Ga_R**2 - pres_R + 0.5_wp*(B2_R + vel_R_rms*B2_R - vdotB_R**2._wp) - rho_R*Ga_R
-                            elseif (mhd) then
+                            elseif (mhd .and. .not. relativity) then
                                 pres_mag_L = 0.5_wp*(Bx_L**2._wp + By_L**2._wp + Bz_L**2._wp)
                                 pres_mag_R = 0.5_wp*(Bx_R**2._wp + By_R**2._wp + Bz_R**2._wp)
                                 E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag_L
@@ -3039,7 +3039,7 @@ contains
             if (norm_dir == ${NORM_DIR}$) then
                 !$acc parallel loop collapse(3) gang vector default(present) &
                 !$acc private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
-                !$acc U_L, U_R, U_starL, U_starR, F_L, F_R, F_starL, F_starR, F_hlld)
+                !$acc U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
