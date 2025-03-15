@@ -288,10 +288,6 @@ contains
 
                     if (top == bottom) then
                         slope = 1._wp
-                        !       ELSEIF((top == 0._wp .AND. bottom /= 0._wp) &
-                        !               .OR.            &
-                        !           (bottom == 0._wp .AND. top /= 0._wp)) THEN
-                        !           slope = 0._wp
                     else
                         slope = (top*bottom)/(bottom**2._wp + 1e-16_wp)
                     end if

@@ -42,10 +42,15 @@ jobs:
       run: |
         ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
 
+    - name: Looking for all caps comments in source
+      run: |
+        ! grep -RE '^\s+[!]\s+[A-Z]{5}' ./src/*
+
     - name: Looking for junk comments in examples
       run: |
         ! grep -R '# ===' ./benchmarks **/*.py
         ! grep -R '# ===' ./examples/**/*.py
         ! grep -R '==='   ./benchmarks/**/*.py
         ! grep -R '==='   ./examples/**/*.py
+
 
