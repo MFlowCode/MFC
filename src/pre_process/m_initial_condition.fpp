@@ -29,13 +29,13 @@ module m_initial_condition
 
     use m_patches
 
-    use m_compute_levelset      ! Subroutines to calculate levelsets for IBs
-
     use m_assign_variables
 
     use m_perturbation          ! Subroutines to perturb initial flow fields
 
     use m_chemistry
+
+    use m_boundary_conditions
 
     implicit none
 
@@ -48,6 +48,8 @@ module m_initial_condition
     type(scalar_field), allocatable, dimension(:) :: q_cons_vf !< conservative variables
 
     type(scalar_field) :: q_T_sf !< Temperature field
+
+    type(integer_field), dimension(:,:), allocatable :: bc_type !< bc_type fields
 
     integer, allocatable, dimension(:, :, :) :: patch_id_fp !<
     !! Bookkepping variable used to track the patch identities (id) associated
@@ -68,7 +70,7 @@ contains
         !!              any other tasks needed to properly setup the module
     subroutine s_initialize_initial_condition_module
 
-        integer :: i !< generic loop iterator
+        integer :: i, j, k, l !< generic loop iterators
 
         ! Allocating the primitive and conservative variables
         allocate (q_prim_vf(1:sys_size))
@@ -113,6 +115,44 @@ contains
             q_prim_vf(i)%sf = dflt_real
         end do
 
+        ! Allocating arrays to store the bc types
+        allocate(bc_type(1:num_dims,-1:1))
+
+        allocate(bc_type(1,-1)%sf(0:0,0:n,0:p))
+        allocate(bc_type(1,1)%sf(0:0,0:n,0:p))
+
+        do l = 0, p
+            do k = 0, n
+                bc_type(1,-1)%sf(0,k,l) = bc_x%beg
+                bc_type(1,1)%sf(0,k,l) = bc_x%end
+            end do
+        end do
+
+        if (n > 0) then
+            allocate(bc_type(2,-1)%sf(-buff_size:m+buff_size,0:0,0:p))
+            allocate(bc_type(2,1)%sf(-buff_size:m+buff_size,0:0,0:p))
+
+            do l = 0, p
+                do j = -buff_size, m + buff_size
+                    bc_type(2,-1)%sf(j,0,l) = bc_y%beg
+                    bc_type(2,1)%sf(j,0,l) = bc_y%end
+                end do
+            end do
+
+            if (p > 0) then
+                allocate(bc_type(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+                allocate(bc_type(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+
+
+                do k = -buff_size, n + buff_size
+                    do j = -buff_size, m + buff_size
+                        bc_type(3,-1)%sf(j,k,0) = bc_z%beg
+                        bc_type(3,1)%sf(j,k,0) = bc_z%end
+                    end do
+                end do
+            end if
+        end if
+
         ! Setting default values for patch identities bookkeeping variable.
         ! This is necessary to avoid any confusion in the assessment of the
         ! extent of application that the overwrite permissions give a patch
@@ -132,8 +172,6 @@ contains
 
         integer :: i  !< Generic loop operator
 
-        character(len=10) :: iStr
-
         ! First, compute the temperature field from the conservative variables.
         if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
@@ -146,195 +184,8 @@ contains
                                                                idwint)
         end if
 
-        !  3D Patch Geometries
-        if (p > 0) then
-
-            do i = 1, num_patches
-
-                if (proc_rank == 0) then
-                    print *, 'Processing patch', i
-                end if
-
-                !> ICPP Patches
-                !> @{
-                ! Spherical patch
-                if (patch_icpp(i)%geometry == 8) then
-                    call s_sphere(i, patch_id_fp, q_prim_vf)
-
-                    ! Cuboidal patch
-                elseif (patch_icpp(i)%geometry == 9) then
-                    call s_cuboid(i, patch_id_fp, q_prim_vf)
-
-                    ! Cylindrical patch
-                elseif (patch_icpp(i)%geometry == 10) then
-                    call s_cylinder(i, patch_id_fp, q_prim_vf)
-
-                    ! Swept plane patch
-                elseif (patch_icpp(i)%geometry == 11) then
-                    call s_sweep_plane(i, patch_id_fp, q_prim_vf)
-
-                    ! Ellipsoidal patch
-                elseif (patch_icpp(i)%geometry == 12) then
-                    call s_ellipsoid(i, patch_id_fp, q_prim_vf)
-
-                    ! Analytical function patch for testing purposes
-                elseif (patch_icpp(i)%geometry == 13) then
-                    call s_3D_analytical(i, patch_id_fp, q_prim_vf)
-
-                    ! Spherical harmonic patch
-                elseif (patch_icpp(i)%geometry == 14) then
-                    call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
-
-                    ! 3D Modified circular patch
-                elseif (patch_icpp(i)%geometry == 19) then
-                    call s_3dvarcircle(i, patch_id_fp, q_prim_vf)
-
-                    ! 3D STL patch
-                elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf)
-
-                end if
-
-            end do
-            !> @}
-
-            !> IB Patches
-            !> @{
-            ! Spherical patch
-            do i = 1, num_ibs
-                if (proc_rank == 0) then
-                    print *, 'Processing 3D ib patch ', i
-                end if
-
-                if (patch_ib(i)%geometry == 8) then
-                    call s_sphere(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_sphere_levelset(levelset, levelset_norm, i)
-                    ! Cylindrical patch
-                elseif (patch_ib(i)%geometry == 9) then
-                    call s_cuboid(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_cuboid_levelset(levelset, levelset_norm, i)
-                elseif (patch_ib(i)%geometry == 10) then
-                    call s_cylinder(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_cylinder_levelset(levelset, levelset_norm, i)
-                elseif (patch_ib(i)%geometry == 11) then
-                    call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_3D_airfoil_levelset(levelset, levelset_norm, i)
-
-                    ! STL+IBM patch
-                elseif (patch_ib(i)%geometry == 12) then
-                    call s_model(i, ib_markers%sf, q_prim_vf, ib, levelset, levelset_norm)
-                end if
-            end do
-            !> @}
-
-            ! 2D Patch Geometries
-        elseif (n > 0) then
-
-            do i = 1, num_patches
-
-                if (proc_rank == 0) then
-                    print *, 'Processing patch', i
-                end if
-
-                !> ICPP Patches
-                !> @{
-                ! Circular patch
-                if (patch_icpp(i)%geometry == 2) then
-                    call s_circle(i, patch_id_fp, q_prim_vf)
-
-                    ! Rectangular patch
-                elseif (patch_icpp(i)%geometry == 3) then
-                    call s_rectangle(i, patch_id_fp, q_prim_vf)
-
-                    ! Swept line patch
-                elseif (patch_icpp(i)%geometry == 4) then
-                    call s_sweep_line(i, patch_id_fp, q_prim_vf)
-
-                    ! Elliptical patch
-                elseif (patch_icpp(i)%geometry == 5) then
-                    call s_ellipse(i, patch_id_fp, q_prim_vf)
-
-                    ! Unimplemented patch (formerly isentropic vortex)
-                elseif (patch_icpp(i)%geometry == 6) then
-                    call s_mpi_abort('This used to be the isentropic vortex patch, '// &
-                                     'which no longer exists. See Examples. Exiting.')
-
-                    ! Analytical function patch for testing purposes
-                elseif (patch_icpp(i)%geometry == 7) then
-                    call s_2D_analytical(i, patch_id_fp, q_prim_vf)
-
-                    ! Spherical Harmonic Patch
-                elseif (patch_icpp(i)%geometry == 14) then
-                    call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
-
-                    ! Spiral patch
-                elseif (patch_icpp(i)%geometry == 17) then
-                    call s_spiral(i, patch_id_fp, q_prim_vf)
-
-                    ! Modified circular patch
-                elseif (patch_icpp(i)%geometry == 18) then
-                    call s_varcircle(i, patch_id_fp, q_prim_vf)
-
-                    ! TaylorGreen vortex patch
-                elseif (patch_icpp(i)%geometry == 20) then
-                    call s_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)
-
-                    ! STL patch
-                elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf)
-
-                end if
-                !> @}
-            end do
-
-            !> IB Patches
-            !> @{
-            do i = 1, num_ibs
-                if (proc_rank == 0) then
-                    print *, 'Processing 2D ib patch ', i
-                end if
-                if (patch_ib(i)%geometry == 2) then
-                    call s_circle(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_circle_levelset(levelset, levelset_norm, i)
-                    ! Rectangular patch
-                elseif (patch_ib(i)%geometry == 3) then
-                    call s_rectangle(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_rectangle_levelset(levelset, levelset_norm, i)
-                elseif (patch_ib(i)%geometry == 4) then
-                    call s_airfoil(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_airfoil_levelset(levelset, levelset_norm, i)
-                    ! STL+IBM patch
-                elseif (patch_ib(i)%geometry == 5) then
-                    call s_model(i, ib_markers%sf, q_prim_vf, ib, levelset, levelset_norm)
-                end if
-            end do
-            !> @}
-
-            ! 1D Patch Geometries
-        else
-
-            do i = 1, num_patches
-
-                if (proc_rank == 0) then
-                    print *, 'Processing patch', i
-                end if
-
-                ! Line segment patch
-                if (patch_icpp(i)%geometry == 1) then
-                    call s_line_segment(i, patch_id_fp, q_prim_vf)
-
-                    ! 1d analytical
-                elseif (patch_icpp(i)%geometry == 15) then
-                    call s_1d_analytical(i, patch_id_fp, q_prim_vf)
-
-                    ! 1d bubble screen with sinusoidal pressure pulse
-                elseif (patch_icpp(i)%geometry == 16) then
-                    call s_1d_bubble_pulse(i, patch_id_fp, q_prim_vf)
-                end if
-
-            end do
-
-        end if
+        call s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers%sf, levelset, levelset_norm)
+        call s_apply_boundary_patches(q_prim_vf, bc_type)
 
         if (perturb_flow) call s_perturb_surrounding_flow(q_prim_vf)
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)

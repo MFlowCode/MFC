@@ -94,9 +94,10 @@ PRE_PROCESS.update({
     'surface_tension': ParamType.LOG,
     'elliptic_smoothing': ParamType.LOG,
     'elliptic_smoothing_iters': ParamType.INT,
+    'num_bc_patches': ParamType.INT,
 })
 
-for ib_id in range(1, 10+1):
+for ib_id in range(1, 25+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
                           ("theta", ParamType.REAL), ("slip", ParamType.LOG),
                           ("c", ParamType.REAL), ("p", ParamType.REAL),
@@ -133,6 +134,21 @@ for f_id in range(1, 10+1):
     for real_attr in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
                       "mu_v", "k_v", "cp_v", "G", "cv", "qv", "qvp" ]:
         PRE_PROCESS[f"fluid_pp({f_id})%{real_attr}"] = ParamType.REAL
+
+for bc_p_id in range(1, 10+1):
+    for attribute in ["geometry","type","dir","loc"]:
+        PRE_PROCESS[f"patch_bc({bc_p_id})%{attribute}"] = ParamType.INT
+
+    for attribute in["alpha_rho", "alpha"]:
+        for f_id in range(1, 10+1):
+            PRE_PROCESS[f"patch_bc({bc_p_id})%{attribute}({f_id})"] = ParamType.REAL
+
+    for attribute in ["centroid","length","vel"]:
+        for d_id in range(1, 3+1):
+            PRE_PROCESS[f"patch_bc({bc_p_id})%{attribute}({d_id})"] = ParamType.REAL
+
+    PRE_PROCESS[f"patch_bc({bc_p_id})%pres"] = ParamType.REAL
+    PRE_PROCESS[f"patch_bc({bc_p_id})%radius"] = ParamType.REAL
 
 for p_id in range(1, 10+1):
     for attribute, ty in [("geometry", ParamType.INT), ("smoothen", ParamType.LOG),
@@ -187,6 +203,29 @@ for p_id in range(1, 10+1):
             PRE_PROCESS[f'patch_icpp({p_id})%alter_patch({alter_id})'] = ParamType.LOG
 
     PRE_PROCESS[f'patch_icpp({p_id})%cf_val'] = ParamType.REAL.analytic()
+
+    for cmp in ["x", "y", "z"]:
+        PRE_PROCESS[f'bc_{cmp}%beg'] = ParamType.INT
+        PRE_PROCESS[f'bc_{cmp}%end'] = ParamType.INT
+        PRE_PROCESS[f'bc_{cmp}%vb1'] = ParamType.REAL
+        PRE_PROCESS[f'bc_{cmp}%vb2'] = ParamType.REAL
+        PRE_PROCESS[f'bc_{cmp}%vb3'] = ParamType.REAL
+        PRE_PROCESS[f'bc_{cmp}%ve1'] = ParamType.REAL
+        PRE_PROCESS[f'bc_{cmp}%ve2'] = ParamType.REAL
+        PRE_PROCESS[f'bc_{cmp}%ve3'] = ParamType.REAL
+        PRE_PROCESS[f'bc_{cmp}%pres_in'] = ParamType.REAL
+        PRE_PROCESS[f'bc_{cmp}%pres_out'] = ParamType.REAL
+        PRE_PROCESS[f'bc_{cmp}%grcbc_in'] = ParamType.LOG
+        PRE_PROCESS[f'bc_{cmp}%grcbc_out'] = ParamType.LOG
+        PRE_PROCESS[f'bc_{cmp}%grcbc_vel_out'] = ParamType.LOG
+
+        for int_id in range(1, 10+1):
+            PRE_PROCESS[f"bc_{cmp}%alpha_rho_in({int_id})"] = ParamType.REAL
+            PRE_PROCESS[f"bc_{cmp}%alpha_in({int_id})"] = ParamType.REAL
+
+        for int_id in range(1, 3+1):
+            PRE_PROCESS[f"bc_{cmp}%vel_in({int_id})"] = ParamType.REAL
+            PRE_PROCESS[f"bc_{cmp}%vel_out({int_id})"] = ParamType.REAL    
 
 # NOTE: Currently unused.
 # for f_id in range(1, 10+1):

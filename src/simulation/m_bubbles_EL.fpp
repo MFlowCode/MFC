@@ -19,7 +19,7 @@ module m_bubbles_EL
 
     use m_compile_specific
 
-    use m_boundary_conditions
+    use m_boundary_conditions_common
 
     use m_sim_helpers
 

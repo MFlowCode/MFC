@@ -52,6 +52,8 @@ module m_start_up
 
     use m_checker
 
+    use m_boundary_conditions
+
     implicit none
 
     private; 
@@ -144,7 +146,8 @@ contains
             sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
             n_start_old, surface_tension, hyperelasticity, pre_stress, &
             rkck_adap_dt, elliptic_smoothing, elliptic_smoothing_iters, &
-            viscous, bubbles_lagrange
+            viscous, bubbles_lagrange, bc_x, bc_y, bc_z, num_bc_patches, &
+            patch_bc
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -770,12 +773,14 @@ contains
             pref = 1._wp
         end if
         call s_initialize_mpi_common_module()
+        call s_initialize_mpi_proxy_module()
         call s_initialize_data_output_module()
         call s_initialize_variables_conversion_module()
         call s_initialize_grid_module()
         call s_initialize_initial_condition_module()
         call s_initialize_perturbation_module()
         call s_initialize_assign_variables_module()
+        call s_initialize_boundary_conditions_module()
         if (relax) call s_initialize_phasechange_module()
 
         ! Create the D directory if it doesn't exit, to store
@@ -847,7 +852,7 @@ contains
             call s_infinite_relaxation_k(q_cons_vf)
         end if
 
-        call s_write_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
+        call s_write_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
 
         call cpu_time(finish)
     end subroutine s_apply_initial_condition
@@ -921,12 +926,14 @@ contains
 
         ! Deallocation procedures for the modules
         call s_finalize_mpi_common_module()
+        call s_finalize_mpi_proxy_module()
         call s_finalize_grid_module()
         call s_finalize_variables_conversion_module()
         call s_finalize_data_output_module()
         call s_finalize_global_parameters_module()
         call s_finalize_assign_variables_module()
         call s_finalize_perturbation_module()
+        call s_finalize_boundary_conditions_module() 
         if (relax) call s_finalize_relaxation_solver_module()
 
         ! Finalization of the MPI environment

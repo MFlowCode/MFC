@@ -1,10 +1,10 @@
 !>
-!! @file m_boundary_conditions.fpp
-!! @brief Contains module m_boundary_conditions
+!! @file m_boundary_conditions_common.fpp
+!! @brief Contains module m_boundary_conditions_common
 
 !> @brief The purpose of the module is to apply noncharacteristic and processor
 !! boundary condiitons
-module m_boundary_conditions
+module m_boundary_conditions_common
 
     use m_derived_types        !< Definitions of the derived types
 
@@ -1663,4 +1663,4 @@ contains
     end subroutine s_populate_capillary_buffers
 #endif
 
-end module m_boundary_conditions
+end module m_boundary_conditions_common

@@ -35,6 +35,8 @@ module m_start_up
 
     use m_cbc                  !< Characteristic boundary conditions (CBC)
 
+    use m_boundary_conditions_common
+
     use m_acoustic_src      !< Acoustic source calculations
 
     use m_rhs                  !< Right-hane-side (RHS) evaluation procedures
@@ -247,7 +249,8 @@ contains
     subroutine s_read_serial_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-
+        
+            
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the starting time-step directory
 
@@ -275,6 +278,8 @@ contains
         if (file_exist .neqv. .true.) then
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
         end if
+
+        ! call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
 
         ! Cell-boundary Locations in x-direction
         file_path = trim(t_step_dir)//'/x_cb.dat'
@@ -930,6 +935,7 @@ contains
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
+        ! call s_read_parallel_boundary_condition_files(bc_type)
 #endif
 
     end subroutine s_read_parallel_data_files

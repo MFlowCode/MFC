@@ -49,6 +49,30 @@ contains
 
 #ifdef MFC_MPI
 
+#ifdef MFC_PRE_PROCESS
+        if (n > 0) then
+            if (p > 0) then
+
+                halo_size = -1 + buff_size*sys_size* &
+                                        & (m + 2*buff_size + 1)* &
+                                        & (n + 2*buff_size + 1)* &
+                                        & (p + 2*buff_size + 1)/ &
+                                        & (min(m, n, p) + 2*buff_size + 1)
+            else
+                halo_size = -1 + buff_size*sys_size* &
+                                        & (max(m, n) + 2*buff_size + 1)
+            end if
+        else
+            halo_size = -1 + buff_size*sys_size
+        end if
+
+        v_size = sys_size
+
+        allocate(q_prims_buff_send(0:halo_size))
+
+        allocate(q_prims_buff_recv(0:ubound(q_prims_buff_send, 1)))
+#endif
+
         ! Allocating q_prims_buff_send/recv and ib_buff_send/recv. Please note that
         ! for the sake of simplicity, both variables are provided sufficient
         ! storage to hold the largest buffer in the computational domain.

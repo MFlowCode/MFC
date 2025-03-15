@@ -16,8 +16,8 @@ module m_surface_tension
 
     use m_helper
 
-    use m_boundary_conditions
-
+    use m_boundary_conditions_common
+    
     implicit none
 
     private; public :: s_initialize_surface_tension_module, &
