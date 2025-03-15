@@ -32,8 +32,7 @@ print(
             "mpp_lim": "F",
             "mixture_err": "F",
             "time_stepper": 3,
-            "weno_order": 3,
-            "mapped_weno": "T",
+            "weno_order": 1,
             "weno_eps": 1.0e-16,
             "null_weights": "F",
             "mp_weno": "F",
@@ -47,7 +46,7 @@ print(
             "bc_z%beg": -3,
             "bc_z%end": -3,
             # Formatted Database Files Structure Parameters
-            "format": 2,
+            "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "rho_wrt": "T",
