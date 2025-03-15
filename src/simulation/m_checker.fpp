@@ -41,6 +41,7 @@ contains
         call s_check_inputs_misc
         call s_check_inputs_grcbc
         call s_check_inputs_geometry_precision
+        call s_check_inputs_mhd
 
     end subroutine s_check_inputs
 
@@ -338,5 +339,11 @@ contains
         @:PROHIBIT(probe_wrt .and. fd_order == dflt_int, "fd_order must be specified for probe_wrt")
         @:PROHIBIT(integral_wrt .and. (.not. bubbles_euler))
     end subroutine s_check_inputs_misc
+
+    subroutine s_check_inputs_mhd
+        @:PROHIBIT(riemann_solver == 4 .and. .not. mhd, "HLLD is only available for MHD simulations")
+        @:PROHIBIT(powell .and. .not. mhd)
+        @:PROHIBIT(powell .and. fd_order == dflt_int, "fd_order must be set if Powell's method is enabled")
+    end subroutine s_check_inputs_mhd
 
 end module m_checker
