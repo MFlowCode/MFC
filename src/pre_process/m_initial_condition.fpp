@@ -190,7 +190,7 @@ contains
         if (perturb_flow) call s_perturb_surrounding_flow(q_prim_vf)
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
         if (mixlayer_perturb) call s_superposition_instability_wave(q_prim_vf)
-        if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf, bc_type)
+        if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf)
 
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
@@ -230,4 +230,3 @@ contains
     end subroutine s_finalize_initial_condition_module
 
 end module m_initial_condition
-if (ell
