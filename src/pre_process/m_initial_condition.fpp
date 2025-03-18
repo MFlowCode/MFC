@@ -77,9 +77,9 @@ contains
         allocate (q_cons_vf(1:sys_size))
 
         do i = 1, sys_size
-            allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                                      idwbuff(2)%beg:idwbuff(2)%end, &
-                                      idwbuff(3)%beg:idwbuff(3)%end))
+            allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &                                       
+                idwbuff(2)%beg:idwbuff(2)%end, &                                       
+                idwbuff(3)%beg:idwbuff(3)%end))
             allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
         end do
 
@@ -173,7 +173,7 @@ contains
         integer :: i  !< Generic loop operator
 
         ! First, compute the temperature field from the conservative variables.
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwbuff)
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
@@ -181,7 +181,7 @@ contains
             call s_convert_conservative_to_primitive_variables(q_cons_vf, &
                                                                q_T_sf, &
                                                                q_prim_vf, &
-                                                               idwint)
+                                                               idwbuff)
         end if
 
         call s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers%sf, levelset, levelset_norm)
@@ -190,7 +190,7 @@ contains
         if (perturb_flow) call s_perturb_surrounding_flow(q_prim_vf)
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
         if (mixlayer_perturb) call s_superposition_instability_wave(q_prim_vf)
-        if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf)
+        if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf, bc_type)
 
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
@@ -230,3 +230,4 @@ contains
     end subroutine s_finalize_initial_condition_module
 
 end module m_initial_condition
+if (ell

@@ -1,6 +1,6 @@
 !>
-!! @file m_perturbation.fpp
-!! @brief Contains module m_perturbation
+!! @file m_boundary_conditions.fpp
+!! @brief Contains module m_boundary_conditions
 
 !> @brief This module contains
 module m_boundary_conditions
