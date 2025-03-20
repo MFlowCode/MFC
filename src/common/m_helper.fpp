@@ -559,7 +559,7 @@ contains
     end function double_factorial
 
     !> The following function calculates the factorial value of an integer
-    !! @paaram n is the input integer
+    !! @param n is the input integer
     !! @return R is the factorial value of n
     recursive function factorial(n) result(R)
 
