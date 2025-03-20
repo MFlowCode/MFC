@@ -39,7 +39,6 @@ contains
         call s_check_inputs_bubbles_euler
         call s_check_inputs_qbmm_and_polydisperse
         call s_check_inputs_adv_n
-        call s_check_inputs_hypoelasticity
         call s_check_inputs_phase_change
         call s_check_inputs_ibm
 #endif
@@ -50,6 +49,7 @@ contains
         call s_check_inputs_weno
         call s_check_inputs_bc
         call s_check_inputs_stiffened_eos
+        call s_check_inputs_elasticity
         call s_check_inputs_surface_tension
         call s_check_inputs_moving_bc
 
@@ -132,25 +132,6 @@ contains
         @:PROHIBIT(adv_n .and. qbmm)
     end subroutine s_check_inputs_adv_n
 
-    !> Checks constraints on the hypoelasticity parameters.
-        !! Called by s_check_inputs_common for pre-processing and simulation
-    subroutine s_check_inputs_hypoelasticity
-        @:PROHIBIT(hypoelasticity .and. model_eqns /= 2)
-#ifdef MFC_SIMULATION
-        @:PROHIBIT(elasticity .and. fd_order /= 4)
-#endif
-    end subroutine s_check_inputs_hypoelasticity
-
-    !> Checks constraints on the hyperelasticity parameters.
-        !! Called by s_check_inputs_common for pre-processing and simulation
-    subroutine s_check_inputs_hyperelasticity
-        @:PROHIBIT(hyperelasticity .and. model_eqns == 1)
-        @:PROHIBIT(hyperelasticity .and. model_eqns > 3)
-#ifdef MFC_SIMULATION
-        @:PROHIBIT(elasticity .and. fd_order /= 4)
-#endif
-    end subroutine s_check_inputs_hyperelasticity
-
     !> Checks constraints on the phase change parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
     subroutine s_check_inputs_phase_change
@@ -176,6 +157,17 @@ contains
     end subroutine s_check_inputs_ibm
 
 #endif
+
+    !> Checks constraints on the elasticity parameters.
+        !! Called by s_check_inputs_common for all three stages
+    subroutine s_check_inputs_elasticity
+        @:PROHIBIT(elasticity .and. .not. (model_eqns == 2 .or. model_eqns == 3))
+        #:for X in ['x', 'y', 'z']
+            #:for BOUND in ['beg', 'end']
+                @:PROHIBIT(hyperelasticity .and. bc_${X}$%${BOUND}$ /= dflt_int .and. (bc_${X}$%${BOUND}$ < -3))
+            #:endfor
+        #:endfor
+    end subroutine s_check_inputs_elasticity
 
     !> Checks constraints on dimensionality and the number of cells for the grid.
         !! Called by s_check_inputs_common for all three stages

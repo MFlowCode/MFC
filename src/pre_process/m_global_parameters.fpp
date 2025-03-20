@@ -653,24 +653,6 @@ contains
                 end if
             end if
 
-            if (hypoelasticity .or. hyperelasticity) then
-                elasticity = .true.
-                stress_idx%beg = sys_size + 1
-                stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
-                ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
-                sys_size = stress_idx%end
-            end if
-
-            if (hyperelasticity) then
-                ! number of entries in the symmetric btensor plus the jacobian
-                b_size = (num_dims*(num_dims + 1))/2 + 1
-                tensor_size = num_dims**2 + 1
-                xi_idx%beg = sys_size + 1
-                xi_idx%end = sys_size + num_dims
-                ! adding three more equations for the \xi field and the elastic energy
-                sys_size = xi_idx%end + 1
-            end if
-
             if (surface_tension) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
@@ -692,24 +674,6 @@ contains
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
-
-            if (hypoelasticity .or. hyperelasticity) then
-                elasticity = .true.
-                stress_idx%beg = sys_size + 1
-                stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
-                ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
-                sys_size = stress_idx%end
-            end if
-
-            if (hyperelasticity) then
-                ! number of entries in the symmetric btensor plus the jacobian
-                b_size = (num_dims*(num_dims + 1))/2 + 1
-                tensor_size = num_dims**2 + 1
-                xi_idx%beg = sys_size + 1
-                xi_idx%end = sys_size + num_dims
-                ! adding three more equations for the \xi field and the elastic energy
-                sys_size = xi_idx%end + 1
-            end if
 
             if (surface_tension) then
                 c_idx = sys_size + 1
@@ -772,6 +736,26 @@ contains
                 end if
 
             end if
+        end if
+
+        elasticity = hypoelasticity .or. hyperelasticity
+
+        if (elasticity) then
+            ! creates stress indices for both hypo and hyperelasticity
+            stress_idx%beg = sys_size + 1
+            stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+            ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
+            sys_size = stress_idx%end
+        end if
+
+        if (hyperelasticity) then
+            ! number of entries in the symmetric btensor plus the jacobian
+            b_size = (num_dims*(num_dims + 1))/2 + 1
+            tensor_size = num_dims**2 + 1
+            xi_idx%beg = sys_size + 1
+            xi_idx%end = sys_size + num_dims
+            ! adding three more equations for the \xi field and the elastic energy
+            sys_size = xi_idx%end + 1
         end if
 
         if (chemistry) then
@@ -867,11 +851,6 @@ contains
         mpiiofs = trim(mpiiofs)
         call MPI_INFO_CREATE(mpi_info_int, ierr)
         call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
-
-        ! Option for UNIX file system (Hooke/Thomson)
-        ! WRITE(mpiiofs, '(A)') '/ufs_'
-        ! mpiiofs = TRIM(mpiiofs)
-        ! mpi_info_int = MPI_INFO_NULL
 
         allocate (start_idx(1:num_dims))
 

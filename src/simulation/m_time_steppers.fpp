@@ -843,11 +843,11 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
         call nvtxStartRange("RHS-ELASTIC")
         if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(1)%vf, q_prim_vf)
         call nvtxEndRange
-
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -1067,7 +1067,7 @@ contains
             start_rkck_step = .false.
             restart_rkck_step = .false.
 
-            ! FIRST TIME-STAGE
+            ! first time-stage
             RKstep = 1
             rkck_time_tmp = mytime + rkck_c1*dt
 !$acc update device (rkck_time_tmp)
@@ -1081,7 +1081,7 @@ contains
             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
-            ! SECOND TIME-STAGE
+            ! second time-stage
             RKstep = 2
             rkck_time_tmp = mytime + rkck_c2*dt
 !$acc update device (rkck_time_tmp)
@@ -1095,7 +1095,7 @@ contains
             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
-            ! THIRD TIME-STAGE
+            ! third time-stage
             RKstep = 3
             rkck_time_tmp = mytime + rkck_c3*dt
 !$acc update device (rkck_time_tmp)
@@ -1109,7 +1109,7 @@ contains
             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
-            ! FOURTH TIME-STAGE
+            ! fourth time-stage
             RKstep = 4
             rkck_time_tmp = mytime + rkck_c4*dt
 !$acc update device (rkck_time_tmp)
@@ -1123,7 +1123,7 @@ contains
             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
-            ! FIFTH TIME-STAGE
+            ! fifth time-stage
             RKstep = 5
             rkck_time_tmp = mytime + rkck_c5*dt
 !$acc update device (rkck_time_tmp)
@@ -1137,7 +1137,7 @@ contains
             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
-            ! SIXTH TIME-STAGE
+            ! sixth time-stage
             RKstep = 6
             rkck_time_tmp = mytime + rkck_c6*dt
 !$acc update device (rkck_time_tmp)
@@ -1154,7 +1154,7 @@ contains
             dt_did = dt
 
             if (rkck_adap_dt) then
-                ! TRUNCATION ERROR
+                ! truncation error
 #ifdef DEBUG
                 if (proc_rank == 0) print *, 'Computing truncation error (4th/5th RKCK)'
 #endif
