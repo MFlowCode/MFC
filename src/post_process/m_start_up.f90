@@ -272,19 +272,27 @@ contains
         end if
 
         ! Adding the density to the formatted database file
-        if (((rho_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) .and. (.not. relativity)) &
-            .or. (relativity .and. cons_vars_wrt)) then
+        if ((rho_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) .and. (.not. relativity)) then
             q_sf = rho_sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
             write (varname, '(A)') 'rho'
             call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
+        end if
 
-        elseif (relativity .and. (rho_wrt .or. prim_vars_wrt)) then
+        if (relativity .and. (rho_wrt .or. prim_vars_wrt)) then
+            q_sf = q_prim_vf(1)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+            write (varname, '(A)') 'rho'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+
+            varname(:) = ' '
+        end if
+
+        if (relativity .and. (rho_wrt .or. cons_vars_wrt)) then
             ! For relativistic flow, conservative and primitive densities are different
             ! Hard-coded single-component for now
             q_sf = q_cons_vf(1)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
-            write (varname, '(A)') 'rho'
+            write (varname, '(A)') 'D'
             call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '

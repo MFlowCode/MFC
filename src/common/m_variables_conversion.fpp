@@ -988,7 +988,7 @@ contains
                         do i = 1, 3
                             qK_prim_vf(momxb + i - 1)%sf(j, k, l) = (qK_cons_vf(momxb + i - 1)%sf(j, k, l) + (S/W)*B(i))/(W + B2)
                         end do
-                        qK_cons_vf(1)%sf(j, k, l) = D/Ga ! Hard-coded for single-component for now
+                        qK_prim_vf(1)%sf(j, k, l) = D/Ga ! Hard-coded for single-component for now
 
                         !$acc loop seq
                         do i = Bxb, Bxe

@@ -205,9 +205,14 @@ contains
         @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 
         do l = 1, cont_idx%end
-            q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
-            !$acc enter data copyin(q_prim_qp%vf(l)%sf)
-            !$acc enter data attach(q_prim_qp%vf(l)%sf)
+            if (relativity) then
+                ! Cons and Prim densities are different for relativity
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            else
+                q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
+                !$acc enter data copyin(q_prim_qp%vf(l)%sf)
+                !$acc enter data attach(q_prim_qp%vf(l)%sf)
+            end if
         end do
 
         do l = adv_idx%beg, adv_idx%end
@@ -2106,8 +2111,14 @@ contains
         integer :: i, j, l
 
         do j = cont_idx%beg, cont_idx%end
-            !$acc exit data detach(q_prim_qp%vf(j)%sf)
-            nullify (q_prim_qp%vf(j)%sf)
+            if (relativity) then
+                ! Cons and Prim densities are different for relativity
+                @:DEALLOCATE(q_cons_qp%vf(j)%sf)
+                @:DEALLOCATE(q_prim_qp%vf(j)%sf)
+            else
+                !$acc exit data detach(q_prim_qp%vf(j)%sf)
+                nullify (q_prim_qp%vf(j)%sf)
+            end if
         end do
 
         do j = adv_idx%beg, adv_idx%end
