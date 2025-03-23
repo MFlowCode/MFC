@@ -75,7 +75,9 @@ contains
         allocate (q_cons_vf(1:sys_size))
 
         do i = 1, sys_size
-            allocate (q_prim_vf(i)%sf(0:m, 0:n, 0:p))
+            allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                      idwbuff(2)%beg:idwbuff(2)%end, &
+                                      idwbuff(3)%beg:idwbuff(3)%end))
             allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
         end do
 
@@ -133,7 +135,7 @@ contains
         character(len=10) :: iStr
 
         ! First, compute the temperature field from the conservative variables.
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwbuff)
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
@@ -141,7 +143,7 @@ contains
             call s_convert_conservative_to_primitive_variables(q_cons_vf, &
                                                                q_T_sf, &
                                                                q_prim_vf, &
-                                                               idwbuff)
+                                                               idwint)
         end if
 
         !  3D Patch Geometries
@@ -208,6 +210,9 @@ contains
                     call s_sphere(i, ib_markers%sf, q_prim_vf, ib)
                     call s_sphere_levelset(levelset, levelset_norm, i)
                     ! Cylindrical patch
+                elseif (patch_ib(i)%geometry == 9) then
+                    call s_cuboid(i, ib_markers%sf, q_prim_vf, ib)
+                    call s_cuboid_levelset(levelset, levelset_norm, i)
                 elseif (patch_ib(i)%geometry == 10) then
                     call s_cylinder(i, ib_markers%sf, q_prim_vf, ib)
                     call s_cylinder_levelset(levelset, levelset_norm, i)
@@ -334,6 +339,7 @@ contains
         if (perturb_flow) call s_perturb_surrounding_flow(q_prim_vf)
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
         if (mixlayer_perturb) call s_superposition_instability_wave(q_prim_vf)
+        if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf)
 
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)

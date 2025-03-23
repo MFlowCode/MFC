@@ -192,6 +192,9 @@ contains
         @:PROHIBIT(mixlayer_perturb .and. num_fluids > 1, "mixlayer_perturb requires num_fluids = 1")
         @:PROHIBIT(mixlayer_perturb .and. any((/bc_y%beg, bc_y%end/) /= -6), &
             "mixlayer_perturb requires both bc_y%beg and bc_y%end to be 6")
+        @:PROHIBIT(elliptic_smoothing .and. elliptic_smoothing_iters < 1, &
+            "elliptic_smoothing_iters must be positive")
+
     end subroutine s_check_inputs_misc
 
 end module m_checker

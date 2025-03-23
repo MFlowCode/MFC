@@ -827,6 +827,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 stack.pop()
 
+    def alter_elliptic_smoothing():
+        # Elliptic Smoothing
+
+        stack.push("Smoothing",{
+                'elliptic_smoothing': 'T', 'elliptic_smoothing_iters': 10
+            })
+
+        cases.append(define_case_d(stack, '', {}))
+
+        stack.pop()
+
     def mhd_cases():
         params = {
             '1D': {"m": 200, "dt": 0.001, "t_step_stop": 200, "t_step_save": 200},
@@ -868,6 +879,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_hypoelasticity(dimInfo)
             alter_phasechange(dimInfo)
             alter_viscosity(dimInfo)
+            alter_elliptic_smoothing()
             alter_body_forces(dimInfo)
             alter_instability_wave(dimInfo)
             stack.pop()

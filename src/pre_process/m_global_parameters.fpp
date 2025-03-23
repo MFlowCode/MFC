@@ -83,6 +83,7 @@ module m_global_parameters
     integer :: num_fluids            !< Number of different fluids present in the flow
     logical :: mpp_lim               !< Alpha limiter
     integer :: sys_size              !< Number of unknowns in the system of equations
+    integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
     integer :: weno_order            !< Order of accuracy for the WENO reconstruction
     logical :: hypoelasticity        !< activate hypoelasticity
     logical :: hyperelasticity       !< activate hyperelasticity
@@ -134,6 +135,9 @@ module m_global_parameters
 
     real(wp) :: pi_fac !< Factor for artificial pi_inf
 
+    logical :: viscous
+    logical :: bubbles_lagrange
+
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
@@ -141,6 +145,9 @@ module m_global_parameters
     logical :: perturb_sph
     integer :: perturb_sph_fluid    !< Fluid to be perturbed with perturb_sph flag
     real(wp), dimension(num_fluids_max) :: fluid_rho
+
+    logical :: elliptic_smoothing
+    integer :: elliptic_smoothing_iters
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
@@ -255,6 +262,11 @@ module m_global_parameters
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
 
+    integer :: buff_size !<
+    !! The number of cells that are necessary to be able to store enough boundary
+    !! conditions data to march the solution in the physical computational domain
+    !! to the next time-step.
+
 contains
 
     !>  Assigns default values to user inputs prior to reading
@@ -338,6 +350,8 @@ contains
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
+        viscous = .false.
+        bubbles_lagrange = .false.
         mixlayer_vel_profile = .false.
         mixlayer_vel_coef = 1._wp
         mixlayer_domain = 1._wp
@@ -348,6 +362,8 @@ contains
         perturb_sph = .false.
         perturb_sph_fluid = dflt_int
         fluid_rho = dflt_real
+        elliptic_smoothing_iters = dflt_int
+        elliptic_smoothing = .false.
 
         ! Initial condition parameters
         num_patches = dflt_int
@@ -511,6 +527,8 @@ contains
     subroutine s_initialize_global_parameters_module
 
         integer :: i, j, fac
+
+        weno_polyn = (weno_order - 1)/2
 
         ! Determining the layout of the state vectors and overall size of
         ! the system of equations, given the dimensionality and choice of
@@ -806,12 +824,10 @@ contains
         Bxb = B_idx%beg
         Bxe = B_idx%end
 
-        ! Configuring Coordinate Direction Indexes
-        idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
-        idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
-
-        ! There is no buffer region in pre_process.
-        idwbuff(1) = idwint(1); idwbuff(2) = idwint(2); idwbuff(3) = idwint(3)
+        call s_configure_coordinate_bounds(weno_polyn, buff_size, &
+                                           idwint, idwbuff, viscous, &
+                                           bubbles_lagrange, m, n, p, &
+                                           num_dims)
 
 #ifdef MFC_MPI
 

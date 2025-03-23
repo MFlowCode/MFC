@@ -681,7 +681,7 @@ contains
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
                                                                F_src_rs${XYZ}$_vf, &
-                                                               is1, is2, is3, starty, startz)
+                                                               is1, is2, is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do i = 1, advxe
@@ -712,7 +712,7 @@ contains
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
                                                                F_src_rs${XYZ}$_vf, &
-                                                               is1, is2, is3, starty, startz)
+                                                               is1, is2, is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do i = 1, advxe
@@ -1500,7 +1500,7 @@ contains
             end if
         #:endfor
 
-    end subroutine
+    end subroutine s_any_cbc_boundaries
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_cbc_module
