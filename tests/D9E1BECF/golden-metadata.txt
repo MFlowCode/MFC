@@ -1,82 +1,16 @@
-This file was created on 2025-03-14 14:22:57.434771.
+This file was created on 2025-03-23 04:00:52.150993.
 
 mfc.sh:
 
-    Invocation: test -o D9E1BECF --generate -j 8
+    Invocation: test -o D9E1BECF -j 8 --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        2ec5ba40255779c9add509389f4005a7171eb59d on mhd (dirty)
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on LAPTOP-OMEN
-    
-        C       : GNU v11.4.0 (/usr/bin/cc)
-        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/chris/source/MFC_MHD/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on LAPTOP-OMEN
-    
-        C       : GNU v11.4.0 (/usr/bin/cc)
-        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/chris/source/MFC_MHD/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        77c7c123a7f3f0b37fb744f2a9d1cab0505e4de0 on mhd (dirty)
 
 syscheck:
 
     CMake Configuration:
     
-        CMake v3.25.2 on LAPTOP-OMEN
+        CMake v3.22.1 on LAPTOP-OMEN
     
         C       : GNU v11.4.0 (/usr/bin/cc)
         Fortran : GNU v11.4.0 (/usr/bin/gfortran)
@@ -91,16 +25,16 @@ syscheck:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /home/chris/source/MFC_MHD/build/venv/bin/fypp
+        Fypp    : /home/chris/source/MFC_MHD_debug/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -109,7 +43,7 @@ post_process:
 
     CMake Configuration:
     
-        CMake v3.25.2 on LAPTOP-OMEN
+        CMake v3.22.1 on LAPTOP-OMEN
     
         C       : GNU v11.4.0 (/usr/bin/cc)
         Fortran : GNU v11.4.0 (/usr/bin/gfortran)
@@ -124,16 +58,82 @@ post_process:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /home/chris/source/MFC_MHD/build/venv/bin/fypp
+        Fypp    : /home/chris/source/MFC_MHD_debug/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.22.1 on LAPTOP-OMEN
+    
+        C       : GNU v11.4.0 (/usr/bin/cc)
+        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/chris/source/MFC_MHD_debug/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.22.1 on LAPTOP-OMEN
+    
+        C       : GNU v11.4.0 (/usr/bin/cc)
+        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/chris/source/MFC_MHD_debug/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -156,7 +156,7 @@ CPU:
     Core(s) per socket:              8
     Socket(s):                       1
     Stepping:                        0
-    BogoMIPS:                        6387.76
+    BogoMIPS:                        6387.74
     Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves clzero xsaveerptr arat umip vaes vpclmulqdq rdpid fsrm
     Hypervisor vendor:               Microsoft
     Virtualization type:             full
