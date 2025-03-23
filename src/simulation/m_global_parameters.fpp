@@ -234,7 +234,7 @@ module m_global_parameters
     integer :: alf_idx                                 !< Index of void fraction
     integer :: gamma_idx                               !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                              !< Index of liquid stiffness func. eqn.
-    type(int_bounds_info) :: B_idx                 !< Indexes of first and last magnetic field eqns.
+    type(int_bounds_info) :: B_idx                     !< Indexes of first and last magnetic field eqns.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     type(int_bounds_info) :: xi_idx                    !< Indexes of first and last reference map eqns.
     integer :: b_size                                  !< Number of elements in the symmetric b tensor, plus one
@@ -296,7 +296,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx, B_idx)
 
     ! END: Simulation Algorithm Parameters
 
@@ -1214,14 +1214,16 @@ contains
         Bxb = B_idx%beg
         Bxe = B_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, Bxb, Bxe)
         !$acc update device(b_size, xibeg, xiend, tensor_size)
 
         !$acc update device(species_idx)
         !$acc update device(cfl_target, m, n, p)
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, low_Mach)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, B_idx, low_Mach)
+
+        !$acc update device(Bx0, powell)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)
@@ -1234,8 +1236,6 @@ contains
         !$acc enter data copyin(dir_idx, dir_flg, dir_idx_tau)
 
         !$acc enter data copyin(relax, relax_model, palpha_eps,ptgalpha_eps)
-
-        !$acc enter data copyin(Bx0, powell)
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))

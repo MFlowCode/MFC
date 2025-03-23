@@ -341,7 +341,10 @@ contains
     end subroutine s_check_inputs_misc
 
     subroutine s_check_inputs_mhd
+        @:PROHIBIT(mhd .and. (riemann_solver /= 1 .and. riemann_solver /= 4), &
+            "MHD simulations require riemann_solver = 1 (HLL) or riemann_solver = 4 (HLLD)")
         @:PROHIBIT(riemann_solver == 4 .and. .not. mhd, "HLLD is only available for MHD simulations")
+        @:PROHIBIT(riemann_solver == 4 .and. relativity, "HLLD is not available for RMHD")
         @:PROHIBIT(powell .and. .not. mhd)
         @:PROHIBIT(powell .and. n == 0, "Powell's method is not supported for 1D simulations")
         @:PROHIBIT(powell .and. fd_order == dflt_int, "fd_order must be set if Powell's method is enabled")

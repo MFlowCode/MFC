@@ -887,7 +887,7 @@ contains
 
         !$acc parallel loop collapse(3) gang vector default(present) &
         !$acc private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, &
-        !$acc pi_inf_K, qv_K, dyn_pres_K, R3tmp, rhoYks)
+        !$acc pi_inf_K, qv_K, dyn_pres_K, R3tmp, rhoYks, B)
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -1053,6 +1053,8 @@ contains
                         else
                             pres_mag = 0.5_wp*(qK_cons_vf(Bxb)%sf(j, k, l)**2 + qK_cons_vf(Bxb + 1)%sf(j, k, l)**2 + qK_cons_vf(Bxb + 2)%sf(j, k, l)**2)
                         end if
+                    else
+                        pres_mag = 0._wp
                     end if
 
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
@@ -1659,7 +1661,7 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-    pure subroutine s_compute_fast_magnetosonic_speed(rho, c, Bx, By, Bz, B_normal, c_fast, h)
+    subroutine s_compute_fast_magnetosonic_speed(rho, c, Bx, By, Bz, B_normal, c_fast, h)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_fast_magnetosonic_speed
 #else

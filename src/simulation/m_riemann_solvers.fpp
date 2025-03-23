@@ -603,8 +603,8 @@ contains
                                 my_R = (rho_R*H_R*Ga_R**2 + B2_R)*vel_R(2) - vdotB_R*By_R
                                 mz_R = (rho_R*H_R*Ga_R**2 + B2_R)*vel_R(3) - vdotB_R*Bz_R
 
-                                E_L = rho_L*h_L*Ga_L**2 - pres_L + 0.5_wp*(B2_L + vel_L_rms*B2_L - vdotB_L**2._wp) - rho_L*Ga_L
-                                E_R = rho_R*h_R*Ga_R**2 - pres_R + 0.5_wp*(B2_R + vel_R_rms*B2_R - vdotB_R**2._wp) - rho_R*Ga_R
+                                E_L = rho_L*H_L*Ga_L**2 - pres_L + 0.5_wp*(B2_L + vel_L_rms*B2_L - vdotB_L**2._wp) - rho_L*Ga_L
+                                E_R = rho_R*H_R*Ga_R**2 - pres_R + 0.5_wp*(B2_R + vel_R_rms*B2_R - vdotB_R**2._wp) - rho_R*Ga_R
                             elseif (mhd .and. .not. relativity) then
                                 pres_mag_L = 0.5_wp*(Bx_L**2._wp + By_L**2._wp + Bz_L**2._wp)
                                 pres_mag_R = 0.5_wp*(Bx_R**2._wp + By_R**2._wp + Bz_R**2._wp)
@@ -4951,6 +4951,9 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
 
+        print *, "flux_rsx_vf(0, 0, 0, 1) finalize", flux_rsx_vf(0, 0, 0, 1)
+        print *, "flux_vf(1)%sf(0, 0, 0) finalize before", flux_vf(1)%sf(0, 0, 0)
+
         ! Reshaping Outputted Data in y-direction
         if (norm_dir == 2) then
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -5093,6 +5096,8 @@ contains
                 end do
             end if
         end if
+
+        print *, "flux_vf(1)%sf(0, 0, 0) finalize after", flux_vf(1)%sf(0, 0, 0)
 
     end subroutine s_finalize_riemann_solver
 

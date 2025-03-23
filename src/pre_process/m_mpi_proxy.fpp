@@ -50,12 +50,12 @@ contains
         #:endfor
 
         #:for VAR in [ 'old_grid','old_ic','stretch_x','stretch_y','stretch_z',&
-            & 'cyl_coord','mpp_lim','hypoelasticity', 'mhd', 'relax', 'parallel_io',  &
+            & 'cyl_coord','mpp_lim','hypoelasticity', 'relax', 'parallel_io',  &
             & 'perturb_flow', 'perturb_sph', 'mixlayer_vel_profile',           &
             & 'mixlayer_perturb', 'bubbles_euler', 'polytropic', 'polydisperse',&
             & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
             & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
-            & 'hyperelasticity', 'pre_stress', 'relativity' ]
+            & 'hyperelasticity', 'pre_stress', 'mhd', 'relativity' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)

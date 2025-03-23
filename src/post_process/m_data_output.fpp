@@ -314,12 +314,13 @@ contains
             end if
 
             ! Density
-            if (rho_wrt &
-                .or. &
-                (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) &
-                then
+            if ((rho_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) &
+                .and. (.not. relativity)) then
                 dbvars = dbvars + 1
             end if
+
+            if (relativity .and. (rho_wrt .or. prim_vars_wrt)) dbvars = dbvars + 1
+            if (relativity .and. (rho_wrt .or. cons_vars_wrt)) dbvars = dbvars + 1
 
             ! Momentum
             do i = 1, E_idx - mom_idx%beg
