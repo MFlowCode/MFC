@@ -4951,9 +4951,6 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
 
-        print *, "flux_rsx_vf(0, 0, 0, 1) finalize", flux_rsx_vf(0, 0, 0, 1)
-        print *, "flux_vf(1)%sf(0, 0, 0) finalize before", flux_vf(1)%sf(0, 0, 0)
-
         ! Reshaping Outputted Data in y-direction
         if (norm_dir == 2) then
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -5096,8 +5093,6 @@ contains
                 end do
             end if
         end if
-
-        print *, "flux_vf(1)%sf(0, 0, 0) finalize after", flux_vf(1)%sf(0, 0, 0)
 
     end subroutine s_finalize_riemann_solver
 

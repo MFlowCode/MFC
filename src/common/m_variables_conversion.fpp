@@ -1158,8 +1158,6 @@ contains
         end do
         !$acc end parallel loop
 
-        !print *, 'I got here AA'
-
     end subroutine s_convert_conservative_to_primitive_variables
 
     !>  The following procedure handles the conversion between
