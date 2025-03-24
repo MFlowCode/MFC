@@ -90,12 +90,10 @@ module m_mpi_proxy
                 #:for VAR in ['geometry', 'type', 'dir', 'loc']
                     call MPI_BCAST(patch_bc(i)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
                 #:endfor
-    
-                #:for VAR in ['pres', 'radius']
-                    call MPI_BCAST(patch_bc(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                #:endfor
-    
-                #:for VAR in ['vel', 'alpha_rho', 'alpha', 'centroid', 'length']
+       
+                call MPI_BCAST(patch_bc(i)%radius, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+
+                #:for VAR in ['centroid', 'length']
                     call MPI_BCAST(patch_bc(i)%${VAR}$, size(patch_bc(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
                 #:endfor
             end do

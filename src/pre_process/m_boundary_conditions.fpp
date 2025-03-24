@@ -51,23 +51,6 @@ contains
                 do j = 0, n
                     if (y_cc(j) > y_boundary%beg .and. y_cc(j) < y_boundary%end) then
                         bc_type(1,${LOC}$)%sf(0,j,0) = patch_bc(patch_id)%type
-                        if (patch_bc(patch_id)%type == -17) then ! Dirichlet BC
-                            do i = 1, buff_size
-                                ! Velocities
-                                do l = 1, num_dims
-                                    q_prim_vf(momxb+l-1)%sf(${X}$,j,0) = patch_bc(patch_id)%vel(l)
-                                end do
-
-                                ! Density and volume fraction
-                                do l = 1, num_fluids
-                                    q_prim_vf(l)%sf(${X}$,j,0) = patch_bc(patch_id)%alpha_rho(l)
-                                    q_prim_vf(advxb+l-1)%sf(${X}$,j,0) = patch_bc(patch_id)%alpha(l)
-                                end do
-
-                                ! Pressure
-                                q_prim_vf(E_idx)%sf(${X}$,j,0) = patch_bc(patch_id)%pres
-                            end do
-                        end if
                     end if
                 end do
             end if
@@ -88,23 +71,6 @@ contains
                 do j = 0, m
                     if (x_cc(j) > x_boundary%beg .and. x_cc(j) < x_boundary%end) then
                         bc_type(2,${LOC}$)%sf(j,0,0) = patch_bc(patch_id)%type
-                        if (patch_bc(patch_id)%type == -17) then ! Dirichlet BC
-                            do i = 1, buff_size
-                                ! Velocities
-                                do l = 1, num_dims
-                                    q_prim_vf(momxb+l-1)%sf(j,${Y}$,0) = patch_bc(patch_id)%vel(l)
-                                end do
-
-                                ! Density and volume fraction
-                                do l = 1, num_fluids
-                                    q_prim_vf(l)%sf(j,${Y}$,0) = patch_bc(patch_id)%alpha_rho(l)
-                                    q_prim_vf(advxb+l-1)%sf(j,${Y}$,0) = patch_bc(patch_id)%alpha(l)
-                                end do
-
-                                ! Pressure
-                                q_prim_vf(E_idx)%sf(j,${Y}$,0) = patch_bc(patch_id)%pres
-                            end do
-                        end if
                     end if
                 end do
             end if
@@ -134,23 +100,6 @@ contains
                         if ((z_cc(k) - z_centroid)**2._wp +  &
                             (y_cc(j) - y_centroid)**2._wp <= radius**2._wp) then
                             bc_type(1,-1)%sf(0,j,k) = patch_bc(patch_id)%type
-                            if (patch_bc(patch_id)%type == -17) then ! Dirichlet BC
-                                do i = 1, buff_size
-                                    ! Velocities
-                                    do l = 1, num_dims
-                                        q_prim_vf(momxb+l-1)%sf(${X}$,j,k) = patch_bc(patch_id)%vel(l)
-                                    end do
-
-                                    ! Density and volume fraction
-                                    do l = 1, num_fluids
-                                        q_prim_vf(l)%sf(${X}$,j,k) = patch_bc(patch_id)%alpha_rho(l)
-                                        q_prim_vf(advxb+l-1)%sf(${X}$,j,k) = patch_bc(patch_id)%alpha(l)
-                                    end do
-
-                                    ! Pressure
-                                    q_prim_vf(E_idx)%sf(${X}$,j,k) = patch_bc(patch_id)%pres
-                                end do
-                            end if
                         end if
                     end do
                 end do
@@ -169,23 +118,6 @@ contains
                         if ((z_cc(k) - z_centroid)**2._wp +  &
                             (x_cc(j) - x_centroid)**2._wp <= radius**2._wp) then
                             bc_type(2,-1)%sf(j,0,k) = patch_bc(patch_id)%type
-                            if (patch_bc(patch_id)%type == -17) then ! Dirichlet BC
-                                do i = 1, buff_size
-                                    ! Velocities
-                                    do l = 1, num_dims
-                                        q_prim_vf(momxb+l-1)%sf(j,${Y}$,k) = patch_bc(patch_id)%vel(l)
-                                    end do
-
-                                    ! Density and volume fraction
-                                    do l = 1, num_fluids
-                                        q_prim_vf(l)%sf(j,${Y}$,k) = patch_bc(patch_id)%alpha_rho(l)
-                                        q_prim_vf(advxb+l-1)%sf(j,${Y}$,k) = patch_bc(patch_id)%alpha(l)
-                                    end do
-
-                                    ! Pressure
-                                    q_prim_vf(E_idx)%sf(j,${Y}$,k) = patch_bc(patch_id)%pres
-                                end do
-                            end if
                         end if
                     end do
                 end do
@@ -203,23 +135,6 @@ contains
                         if ((y_cc(k) - y_centroid)**2._wp +  &
                             (x_cc(j) - x_centroid)**2._wp <= radius**2._wp) then
                             bc_type(3,-1)%sf(j,k,0) = patch_bc(patch_id)%type
-                            if (patch_bc(patch_id)%type == -17) then ! Dirichlet BC
-                                do i = 1, buff_size
-                                    ! Velocities
-                                    do l = 1, num_dims
-                                        q_prim_vf(momxb+l-1)%sf(j,k,${Z}$) = patch_bc(patch_id)%vel(l)
-                                    end do
-
-                                    ! Density and volume fraction
-                                    do l = 1, num_fluids
-                                        q_prim_vf(l)%sf(j,k,${Z}$) = patch_bc(patch_id)%alpha_rho(l)
-                                        q_prim_vf(advxb+l-1)%sf(j,k,${Z}$) = patch_bc(patch_id)%alpha(l)
-                                    end do
-
-                                    ! Pressure
-                                    q_prim_vf(E_idx)%sf(j,k,${Z}$) = patch_bc(patch_id)%pres
-                                end do
-                            end if
                         end if
                     end do
                 end do
@@ -257,23 +172,6 @@ contains
                             z_boundary%beg <= z_cc(k) .and. &
                             z_boundary%end >= z_cc(k)) then
                             bc_type(1,-1)%sf(0,j,k) = patch_bc(patch_id)%type
-                            if (patch_bc(patch_id)%type == -17) then ! Dirichlet BC
-                                do i = 1, buff_size
-                                    ! Velocities
-                                    do l = 1, num_dims
-                                        q_prim_vf(momxb+l-1)%sf(${X}$,j,k) = patch_bc(patch_id)%vel(l)
-                                    end do
-
-                                    ! Density and volume fraction
-                                    do l = 1, num_fluids
-                                        q_prim_vf(l)%sf(${X}$,j,k) = patch_bc(patch_id)%alpha_rho(l)
-                                        q_prim_vf(advxb+l-1)%sf(${X}$,j,k) = patch_bc(patch_id)%alpha(l)
-                                    end do
-
-                                    ! Pressure
-                                    q_prim_vf(E_idx)%sf(${X}$,j,k) = patch_bc(patch_id)%pres
-                                end do
-                            end if
                         end if
                     end do
                 end do
@@ -301,23 +199,6 @@ contains
                             z_boundary%beg <= z_cc(k) .and. &
                             z_boundary%end >= z_cc(k)) then
                             bc_type(2,-1)%sf(j,0,k) = patch_bc(patch_id)%type
-                            if (patch_bc(patch_id)%type == -17) then ! Dirichlet BC
-                                do i = 1, buff_size
-                                    ! Velocities
-                                    do l = 1, num_dims
-                                        q_prim_vf(momxb+l-1)%sf(j,${Y}$,k) = patch_bc(patch_id)%vel(l)
-                                    end do
-
-                                    ! Density and volume fraction
-                                    do l = 1, num_fluids
-                                        q_prim_vf(l)%sf(j,${Y}$,k) = patch_bc(patch_id)%alpha_rho(l)
-                                        q_prim_vf(advxb+l-1)%sf(j,${Y}$,k) = patch_bc(patch_id)%alpha(l)
-                                    end do
-
-                                    ! Pressure
-                                    q_prim_vf(E_idx)%sf(j,${Y}$,k) = patch_bc(patch_id)%pres
-                                end do
-                            end if
                         end if
                     end do
                 end do
@@ -344,23 +225,6 @@ contains
                             y_boundary%beg <= y_cc(k) .and. &
                             y_boundary%end >= y_cc(k)) then
                             bc_type(3,-1)%sf(j,k,0) = patch_bc(patch_id)%type
-                            if (patch_bc(patch_id)%type == -17) then ! Dirichlet BC
-                                do i = 1, buff_size
-                                    ! Velocities
-                                    do l = 1, num_dims
-                                        q_prim_vf(momxb+l-1)%sf(j,k,${Z}$) = patch_bc(patch_id)%vel(l)
-                                    end do
-
-                                    ! Density and volume fraction
-                                    do l = 1, num_fluids
-                                        q_prim_vf(l)%sf(j,k,${Z}$) = patch_bc(patch_id)%alpha_rho(l)
-                                        q_prim_vf(advxb+l-1)%sf(j,k,${Z}$) = patch_bc(patch_id)%alpha(l)
-                                    end do
-
-                                    ! Pressure
-                                    q_prim_vf(E_idx)%sf(j,k,${Z}$) = patch_bc(patch_id)%pres
-                                end do
-                            end if
                         end if
                     end do
                 end do
@@ -515,7 +379,7 @@ contains
             do j = 0, n
                 do i = 1, sys_size
                     bc_buffers(1,-1)%sf(i,j,k) = q_prim_vf(i)%sf(0,j,k)
-                    bc_buffers(1,1)%sf(i,j,k) = q_prim_vf(i)%sf(m+1,j,k)
+                    bc_buffers(1,1)%sf(i,j,k) = q_prim_vf(i)%sf(m,j,k)
                 end do
             end do
         end do
@@ -524,8 +388,8 @@ contains
             do k = 0, p
                 do j = 1, sys_size
                     do i = 0, m
-                        bc_buffers(2,-1)%sf(i,j,k) = q_prim_vf(j)%sf(i,-1,k)
-                        bc_buffers(2,1)%sf(i,j,k) = q_prim_vf(j)%sf(i,n+1,k)
+                        bc_buffers(2,-1)%sf(i,j,k) = q_prim_vf(j)%sf(i,0,k)
+                        bc_buffers(2,1)%sf(i,j,k) = q_prim_vf(j)%sf(i,n,k)
                     end do
                 end do
             end do
@@ -534,8 +398,8 @@ contains
                 do k = 1, sys_size
                     do j = 0, n
                         do i = 0, m
-                            bc_buffers(3,-1)%sf(i,j,k) = q_prim_vf(k)%sf(i,j,-1)
-                            bc_buffers(3,1)%sf(i,j,k) = q_prim_vf(k)%sf(i,j,p+1)
+                            bc_buffers(3,-1)%sf(i,j,k) = q_prim_vf(k)%sf(i,j,0)
+                            bc_buffers(3,1)%sf(i,j,k) = q_prim_vf(k)%sf(i,j,p)
                         end do
                     end do
                 end do

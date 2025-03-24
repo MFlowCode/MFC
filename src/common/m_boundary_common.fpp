@@ -31,15 +31,15 @@ module m_boundary_common
 #endif
 
 #ifdef MFC_SIMULATION
-    private; public :: s_initialize_boundary_common_module, & 
-                s_populate_variables_buffers, & 
+    private; public :: s_initialize_boundary_common_module, &
+                s_populate_variables_buffers, &
                 s_create_mpi_types, &
-                s_populate_capillary_buffers, & 
-                
+                s_populate_capillary_buffers, &
+
                 s_finalize_boundary_common_module
 #else
-    private; public :: s_initialize_boundary_common_module, & 
-                s_populate_variables_buffers, & 
+    private; public :: s_initialize_boundary_common_module, &
+                s_populate_variables_buffers, &
                 s_create_mpi_types, &
                 s_finalize_boundary_common_module
 #endif
@@ -114,7 +114,11 @@ contains
                     elseif (bc_type(1,-1)%sf(0,k,l) == -16) then
                         ${PRIM_NO_SLIP_WALL_BC("x","L")}$
                     elseif (bc_type(1,-1)%sf(0,k,l) == -17) then
+#ifdef MFC_PRE_PROCESS
+                        ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("-j,k,l","0,k,l")}$
+#else
                         ${PRIM_DIRICHLET_BC(1,-1,"-j,k,l","i,k,l")}$
+#endif
                     end if
                 end do
             end do
@@ -137,7 +141,11 @@ contains
                     elseif (bc_type(1,1)%sf(0,k,l) == -16) then
                         ${PRIM_NO_SLIP_WALL_BC("x","R")}$
                     elseif (bc_type(1,1)%sf(0,k,l) == -17) then
+#ifdef MFC_PRE_PROCESS
+                        ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("m+j,k,l","m,k,l")}$
+#else
                         ${PRIM_DIRICHLET_BC(1,1,"m+j,k,l","i,k,l")}$
+#endif
                     end if
                 end do
             end do
@@ -240,7 +248,11 @@ contains
                     elseif (bc_type(2,-1)%sf(k,0,l) == -16) then
                         ${PRIM_NO_SLIP_WALL_BC("y","L")}$
                     elseif (bc_type(2,-1)%sf(k,0,l) == -17) then
+#ifdef MFC_PRE_PROCESS
+                        ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,-j,l","k,0,l")}$
+#else
                         ${PRIM_DIRICHLET_BC(2,-1,"k,-j,l","k,i,l")}$
+#endif
                     end if
                 end do
             end do
@@ -263,7 +275,11 @@ contains
                     elseif (bc_type(2,1)%sf(k,0,l) == -16) then
                         ${PRIM_NO_SLIP_WALL_BC("y","R")}$
                     elseif (bc_type(2,1)%sf(k,0,l) == -17) then
+#ifdef FMC_PRE_PROCESS
+                        ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,n+j,l","k,n,l")}$
+#else
                         ${PRIM_DIRICHLET_BC(2,1,"k,n+j,l","k,i,l")}$
+#endif
                     end if
                 end do
             end do
@@ -321,7 +337,11 @@ contains
                     elseif (bc_type(3,-1)%sf(k,l,0) == -16) then
                         ${PRIM_NO_SLIP_WALL_BC("z","L")}$
                     elseif (bc_type(3,-1)%sf(k,l,0) == -17) then
+#ifdef MFC_PRE_PROCESS
+                        ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,l,-j","k,l,0")}$
+#else
                         ${PRIM_DIRICHLET_BC(3,-1,"k,l,-j","k,l,i")}$
+#endif
                     end if
                 end do
             end do
@@ -344,7 +364,11 @@ contains
                     elseif (bc_type(3,1)%sf(k,l,0) == -16) then
                         ${PRIM_NO_SLIP_WALL_BC("z","R")}$
                     elseif (bc_type(3,1)%sf(k,l,0) == -17) then
+#ifdef MFC_PRE_PROCESS
+                        ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,l,p+j","k,l,p")}$
+#else
                         ${PRIM_DIRICHLET_BC(3,1,"k,l,p+j","k,l,i")}$
+#endif
                     end if
                 end do
             end do
@@ -385,284 +409,120 @@ contains
     end subroutine s_populate_variables_buffers
 
 #ifdef MFC_SIMULATION
-    subroutine s_populate_capillary_buffers(c_divs)
+    subroutine s_populate_capillary_buffers(c_divs, bc_type)
 
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+
         integer :: i, j, k, l
 
-        ! x - direction
-        if (bc_x%beg <= -3) then !< ghost cell extrapolation
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do l = 0, p
-                    do k = 0, n
-                        do j = 1, buff_size
-                            c_divs(i)%sf(-j, k, l) = &
-                                c_divs(i)%sf(0, k, l)
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_x%beg == -2) then !< slip wall or reflective
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do l = 0, p
-                    do k = 0, n
-                        do j = 1, buff_size
-                            if (i == 1) then
-                                c_divs(i)%sf(-j, k, l) = &
-                                    -c_divs(i)%sf(j - 1, k, l)
-                            else
-                                c_divs(i)%sf(-j, k, l) = &
-                                    c_divs(i)%sf(j - 1, k, l)
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_x%beg == -1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do l = 0, p
-                    do k = 0, n
-                        do j = 1, buff_size
-                            c_divs(i)%sf(-j, k, l) = &
-                                c_divs(i)%sf(m - (j - 1), k, l)
-                        end do
-                    end do
-                end do
-            end do
-        else
+        !< x-direction
+        if (bcxb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, -1)
+        else
+            !$acc parallel loop collapse(2) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    if (bc_type(1,-1)%sf(0,k,l) == -1) then
+                        ${COLOR_FUNC_BC("-j,k,l","m - (j-1),k,l")}$
+                    elseif (bc_type(1,-1)%sf(0,k,l) == -2) then
+                        ${COLOR_FUNC_SLIP_WALL_BC(1,"-j,k,l","j-1,k,l")}$
+                    else
+                       ${COLOR_FUNC_BC("-j,k,l","0,k,l")}$
+                    end if
+                end do
+            end do
         end if
 
-        if (bc_x%end <= -3) then !< ghost-cell extrapolation
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do l = 0, p
-                    do k = 0, n
-                        do j = 1, buff_size
-                            c_divs(i)%sf(m + j, k, l) = &
-                                c_divs(i)%sf(m, k, l)
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_x%end == -2) then
-            !$acc parallel loop collapse(4) default(present)
-            do i = 1, num_dims + 1
-                do l = 0, p
-                    do k = 0, n
-                        do j = 1, buff_size
-                            if (i == 1) then
-                                c_divs(i)%sf(m + j, k, l) = &
-                                    -c_divs(i)%sf(m - (j - 1), k, l)
-                            else
-                                c_divs(i)%sf(m + j, k, l) = &
-                                    c_divs(i)%sf(m - (j - 1), k, l)
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-        else if (bc_x%end == -1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do l = 0, p
-                    do k = 0, n
-                        do j = 1, buff_size
-                            c_divs(i)%sf(m + j, k, l) = &
-                                c_divs(i)%sf(j - 1, k, l)
-                        end do
-                    end do
-                end do
-            end do
-        else
+        if (bcxe >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, 1)
+        else
+            !$acc parallel loop collapse(2) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    if (bc_type(1,1)%sf(0,k,l) == -1) then
+                        ${COLOR_FUNC_BC("m+j,k,l","j-1,k,l")}$
+                    elseif (bc_type(1,1)%sf(0,k,l) == -2) then
+                        ${COLOR_FUNC_SLIP_WALL_BC(1,"m+j,k,l","m - (j-1),k,l")}$
+                    else
+                       ${COLOR_FUNC_BC("m+j,k,l","m,k,l")}$
+                    end if
+                end do
+            end do
         end if
 
-        if (n == 0) then
-            return
-        elseif (bc_y%beg <= -3) then !< ghost-cell extrapolation
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            c_divs(i)%sf(l, -j, k) = &
-                                c_divs(i)%sf(l, 0, k)
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_y%beg == -2) then !< slip wall or reflective
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            if (i == 2) then
-                                c_divs(i)%sf(l, -j, k) = &
-                                    -c_divs(i)%sf(l, j - 1, k)
-                            else
-                                c_divs(i)%sf(l, -j, k) = &
-                                    c_divs(i)%sf(l, j - 1, k)
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_y%beg == -1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            c_divs(i)%sf(l, -j, k) = &
-                                c_divs(i)%sf(l, n - (j - 1), k)
-                        end do
-                    end do
-                end do
-            end do
-        else
+        if (n == 0) return
+
+        !< y-direction
+        if (bcyb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, -1)
+        else
+            !$acc parallel loop collapse(2) gang vector default(present)
+            do l = 0, p
+                do k = -buff_size, m + buff_size
+                    if (bc_type(2,-1)%sf(k,0,l) == -1) then
+                        ${COLOR_FUNC_BC("k,-j,l","k,n - (j-1),l")}$
+                    elseif (bc_type(2,-1)%sf(k,0,l) == -2) then
+                        ${COLOR_FUNC_SLIP_WALL_BC(2,"k,-j,l","k,j-1,l")}$
+                    else
+                       ${COLOR_FUNC_BC("k,-j,l","k,0,l")}$
+                    end if
+                end do
+            end do
         end if
 
-        if (bc_y%end <= -3) then !< ghost-cell extrapolation
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            c_divs(i)%sf(l, n + j, k) = &
-                                c_divs(i)%sf(l, n, k)
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_y%end == -2) then !< slip wall or reflective
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            if (i == 2) then
-                                c_divs(i)%sf(l, n + j, k) = &
-                                    -c_divs(i)%sf(l, n - (j - 1), k)
-                            else
-                                c_divs(i)%sf(l, n + j, k) = &
-                                    c_divs(i)%sf(l, n - (j - 1), k)
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_y%end == -1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            c_divs(i)%sf(l, n + j, k) = &
-                                c_divs(i)%sf(l, j - 1, k)
-                        end do
-                    end do
-                end do
-            end do
-        else
+        if (bcye >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, 1)
+        else
+            !$acc parallel loop collapse(2) gang vector default(present)
+            do l = 0, p
+                do k = -buff_size, m + buff_size
+                    if (bc_type(2,1)%sf(k,0,l) == -1) then
+                        ${COLOR_FUNC_BC("k,n+j,l","k,j-1,l")}$
+                    elseif (bc_type(2,1)%sf(k,0,l) == -2) then
+                        ${COLOR_FUNC_SLIP_WALL_BC(2,"k,n+j,l","k,n - (j-1),l")}$
+                    else
+                       ${COLOR_FUNC_BC("k,n+j,l","k,n,l")}$
+                    end if
+                end do
+            end do
         end if
 
-        if (p == 0) then
-            return
-        elseif (bc_z%beg <= -3) then !< ghost-cell extrapolation
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do j = 1, buff_size
-                    do l = -buff_size, n + buff_size
-                        do k = -buff_size, m + buff_size
-                            c_divs(i)%sf(k, l, -j) = &
-                                c_divs(i)%sf(k, l, 0)
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_z%beg == -2) then !< symmetry
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do j = 1, buff_size
-                    do l = -buff_size, n + buff_size
-                        do k = -buff_size, m + buff_size
-                            if (i == 3) then
-                                c_divs(i)%sf(k, l, -j) = &
-                                    -c_divs(i)%sf(k, l, j - 1)
-                            else
-                                c_divs(i)%sf(k, l, -j) = &
-                                    c_divs(i)%sf(k, l, j - 1)
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_z%beg == -1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do j = 1, buff_size
-                    do l = -buff_size, n + buff_size
-                        do k = -buff_size, m + buff_size
-                            c_divs(i)%sf(k, l, -j) = &
-                                c_divs(i)%sf(k, l, p - (j - 1))
-                        end do
-                    end do
-                end do
-            end do
-        else
+        if (p == 0) return
+
+        !< z-direction
+        if (bczb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, -1)
+        else
+            !$acc parallel loop collapse(2) gang vector default(present)
+            do l = -buff_size, n + buff_size
+                do k = -buff_size, m + buff_size
+                    if (bc_type(3,-1)%sf(k,l,0) == -1) then
+                        ${COLOR_FUNC_BC("k,l,-j","k,l,p - (j-1)")}$
+                    elseif (bc_type(3,-1)%sf(k,l,0) == -2) then
+                        ${COLOR_FUNC_SLIP_WALL_BC(3,"k,l,-j","k,l,j-1")}$
+                    else
+                       ${COLOR_FUNC_BC("k,l,-j","k,l,0")}$
+                    end if
+                end do
+            end do
         end if
 
-        if (bc_z%end <= -3) then !< ghost-cell extrapolation
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do j = 1, buff_size
-                    do l = -buff_size, n + buff_size
-                        do k = -buff_size, m + buff_size
-                            c_divs(i)%sf(k, l, p + j) = &
-                                c_divs(i)%sf(k, l, p)
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_z%end == -2) then !< symmetry
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do j = 1, buff_size
-                    do l = -buff_size, n + buff_size
-                        do k = -buff_size, m + buff_size
-                            if (i == 3) then
-                                c_divs(i)%sf(k, l, p + j) = &
-                                    -c_divs(i)%sf(k, l, p - (j - 1))
-                            else
-                                c_divs(i)%sf(k, l, p + j) = &
-                                    c_divs(i)%sf(k, l, p - (j - 1))
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_z%end == -1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do j = 1, buff_size
-                    do l = -buff_size, n + buff_size
-                        do k = -buff_size, m + buff_size
-                            c_divs(i)%sf(k, l, p + j) = &
-                                c_divs(i)%sf(k, l, j - 1)
-                        end do
-                    end do
-                end do
-            end do
-        else
+        if (bcze >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, 1)
+        else
+            !$acc parallel loop collapse(2) gang vector default(present)
+            do l = -buff_size, n + buff_size
+                do k = -buff_size, m + buff_size
+                    if (bc_type(3,1)%sf(k,l,0) == -1) then
+                        ${COLOR_FUNC_BC("k,l,p+j","k,l,j-1")}$
+                    elseif (bc_type(3,1)%sf(k,l,0) == -2) then
+                        ${COLOR_FUNC_SLIP_WALL_BC(3,"k,l,p+j","k,l,p - (j-1)")}$
+                    else
+                       ${COLOR_FUNC_BC("k,l,p+j","k,l,p")}$
+                    end if
+                end do
+            end do
         end if
 
     end subroutine s_populate_capillary_buffers

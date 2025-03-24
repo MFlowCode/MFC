@@ -139,15 +139,10 @@ for bc_p_id in range(1, 10+1):
     for attribute in ["geometry","type","dir","loc"]:
         PRE_PROCESS[f"patch_bc({bc_p_id})%{attribute}"] = ParamType.INT
 
-    for attribute in["alpha_rho", "alpha"]:
-        for f_id in range(1, 10+1):
-            PRE_PROCESS[f"patch_bc({bc_p_id})%{attribute}({f_id})"] = ParamType.REAL
-
-    for attribute in ["centroid","length","vel"]:
+    for attribute in ["centroid","length"]:
         for d_id in range(1, 3+1):
             PRE_PROCESS[f"patch_bc({bc_p_id})%{attribute}({d_id})"] = ParamType.REAL
 
-    PRE_PROCESS[f"patch_bc({bc_p_id})%pres"] = ParamType.REAL
     PRE_PROCESS[f"patch_bc({bc_p_id})%radius"] = ParamType.REAL
 
 for p_id in range(1, 10+1):

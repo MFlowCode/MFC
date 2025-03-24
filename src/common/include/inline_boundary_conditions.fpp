@@ -39,9 +39,8 @@
             do i = 1, sys_size
                 do j = 1, buff_size
                     if (i == momxb) then
-                        !q_prim_vf(i)%sf(-j, k, l) = &
-                            !-q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb1
-                        q_prim_vf(i)%sf(-j, k, l) = 0
+                        q_prim_vf(i)%sf(-j, k, l) = &
+                            -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb1
                     else
                         q_prim_vf(i)%sf(-j, k, l) = &
                             q_prim_vf(i)%sf(0, k, l)
@@ -122,17 +121,14 @@
             do i = 1, sys_size
                 do j = 1, buff_size
                     if (i == momxb) then
-                        !q_prim_vf(i)%sf(-j, k, l) = &
-                            !-q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb1
-                        q_prim_vf(i)%sf(-j, k, l) = 0._wp
+                        q_prim_vf(i)%sf(-j, k, l) = &
+                            -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb1
                     elseif (i == momxb + 1 .and. num_dims > 1) then
-                        !q_prim_vf(i)%sf(-j, k, l) = &
-                            !-q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb2
-                        q_prim_vf(i)%sf(-j, k, l) = 0._wp
+                        q_prim_vf(i)%sf(-j, k, l) = &
+                            -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb2
                     elseif (i == momxb + 2 .and. num_dims > 2) then
-                        !q_prim_vf(i)%sf(-j, k, l) = &
-                            !-q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb3
-                        q_prim_vf(i)%sf(-j, k, l) = 0._wp
+                        q_prim_vf(i)%sf(-j, k, l) = &
+                            -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb3
                     else
                         q_prim_vf(i)%sf(-j, k, l) = &
                             q_prim_vf(i)%sf(0, k, l)
@@ -256,3 +252,22 @@
     end do
 #:enddef
 
+#:def COLOR_FUNC_SLIP_WALL_BC(DIR, DEST, SRC)
+    do i = 1, num_dims + 1
+        do j = 1, buff_size
+            if (i == ${DIR}$) then
+                c_divs(i)%sf(${DEST}$) = -c_divs(i)%sf(${SRC}$)
+            else
+                c_divs(i)%sf(${DEST}$) = c_divs(i)%sf(${SRC}$)
+            end if
+        end do
+    end do
+#:enddef
+
+#:def COLOR_FUNC_BC(DEST, SRC)
+    do i = 1, num_dims + 1
+        do j = 1, buff_size
+            c_divs(i)%sf(${DEST}$) = c_divs(i)%sf(${SRC}$)
+        end do
+    end do
+#:enddef

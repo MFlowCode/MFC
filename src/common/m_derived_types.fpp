@@ -93,10 +93,6 @@ module m_derived_types
         integer :: type
         integer :: dir
         integer :: loc
-        real(wp), dimension(3) :: vel
-        real(wp), dimension(num_fluids_max) :: alpha_rho
-        real(wp), dimension(num_fluids_max) :: alpha
-        real(wp) :: pres
         real(wp), dimension(3) :: centroid
         real(wp), dimension(3) :: length
         real(wp) :: radius
