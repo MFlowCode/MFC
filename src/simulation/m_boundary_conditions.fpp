@@ -34,7 +34,7 @@ contains
         file_path = trim(step_dirpath)//'/bc_type.dat'
         inquire (FILE=trim(file_path), EXIST=file_exist)
         if (.not. file_exist) then
-            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
         end if
 
         open (1, FILE=trim(file_path), FORM='unformatted', STATUS='unknown')
@@ -50,7 +50,7 @@ contains
         file_path = trim(step_dirpath)//'/bc_buffers.dat'
         inquire (FILE=trim(file_path), EXIST=file_exist)
         if (.not. file_exist) then
-            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
         end if
 
         open (1, FILE=trim(file_path), FORM='unformatted', STATUS='unknown')
@@ -85,7 +85,7 @@ contains
         if (proc_rank == 0) then
             call my_inquire(file_loc, dir_check)
             if (dir_check .neqv. .true.) then
-                call s_mpi_abort(trim(file_loc)//' is missing. Exiting ...')
+                call s_mpi_abort(trim(file_loc)//' is missing. Exiting.')
             end if
         end if
 
