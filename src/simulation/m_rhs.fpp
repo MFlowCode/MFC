@@ -49,7 +49,7 @@ module m_rhs
 
     use m_nvtx
 
-    use m_boundary_conditions_common
+    use m_boundary_common
 
     use m_helper
 
@@ -663,7 +663,7 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("RHS-COMMUNICATION")
-        call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
+        call s_populate_variables_buffers(q_prim_qp%vf, pb, mv, bc_type)
         call nvtxEndRange
 
         call nvtxStartRange("RHS-ELASTIC")

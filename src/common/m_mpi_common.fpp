@@ -97,7 +97,6 @@ contains
 
             v_size = sys_size + 2*nb*4
         else
-#endif
             if (n > 0) then
                 if (p > 0) then
                     @:ALLOCATE(q_prims_buff_send(0:-1 + buff_size*sys_size* &
@@ -116,7 +115,6 @@ contains
             @:ALLOCATE(q_prims_buff_recv(0:ubound(q_prims_buff_send, 1)))
 
             v_size = sys_size
-#ifdef MFC_SIMULATION
         end if
 #endif
 

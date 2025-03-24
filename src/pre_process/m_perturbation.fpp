@@ -14,7 +14,7 @@ module m_perturbation
 
     use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
 
-    use m_boundary_conditions_common   ! Boundary conditions module
+    use m_boundary_common   ! Boundary conditions module
     ! complex general matrix
     
     use m_helper
@@ -31,7 +31,7 @@ module m_perturbation
     
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_temp
 
-    real(wp) :: bcxb, bcxe, bcyb, bcye, bczb, bcze
+    ! real(wp) :: bcxb, bcxe, bcyb, bcye, bczb, bcze
 
 contains
 
@@ -620,15 +620,16 @@ contains
 
     end subroutine s_generate_wave
 
-    subroutine s_elliptic_smoothing(q_prim_vf)
+    subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
+        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
         integer :: i, j, k, l, q
 
         do q = 1, elliptic_smoothing_iters
 
             ! Communication of buffer regions and apply boundary conditions
-            call s_populate_variables_buffers(q_prim_vf)
+            call s_populate_variables_buffers(q_prim_vf, pb%sf, mv%sf, bc_type)
 
             ! Perform smoothing and store in temp array
             if (n == 0) then

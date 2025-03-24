@@ -29,6 +29,8 @@ module m_data_output
 
     use m_delay_file_access
 
+    use m_boundary_common
+
     use m_boundary_conditions
 
     use m_thermochem, only: species_names

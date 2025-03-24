@@ -30,7 +30,9 @@ module m_time_steppers
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
-    use m_boundary_conditions_common
+    use m_boundary_common
+
+    use m_boundary_conditions
 
     use m_helper
 

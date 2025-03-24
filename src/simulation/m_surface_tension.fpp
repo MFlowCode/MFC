@@ -16,7 +16,7 @@ module m_surface_tension
 
     use m_helper
 
-    use m_boundary_conditions_common
+    use m_boundary_common
     
     implicit none
 

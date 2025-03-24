@@ -15,6 +15,8 @@ module m_boundary_conditions
 
     use m_compile_specific
 
+    use m_boundary_common
+
     implicit none
 
     real(wp) :: x_centroid, y_centroid, z_centroid
@@ -22,37 +24,11 @@ module m_boundary_conditions
     real(wp) :: radius
     type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
 
-    type(scalar_field), dimension(:,:), allocatable :: bc_buffers
-
-#ifdef MFC_MPI
-    integer, dimension(1:3, -1:1) :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
-#endif
-
-    private; public :: s_initialize_boundary_conditions_module, &
-        s_apply_boundary_patches, &
-        s_write_serial_boundary_condition_files, &
-        s_write_parallel_boundary_condition_files, &
-        s_finalize_boundary_conditions_module
+    private; public :: s_apply_boundary_patches, &
+                    s_write_serial_boundary_condition_files, &
+                    s_write_parallel_boundary_condition_files
 
 contains
-
-    subroutine s_initialize_boundary_conditions_module()
-
-        allocate(bc_buffers(1:num_dims, -1:1))
-
-        allocate(bc_buffers(1, -1)%sf(1:sys_size, 0:n, 0:p))
-        allocate(bc_buffers(1, 1)%sf(1:sys_size, 0:n, 0:p))
-        if (n > 0) then
-            allocate(bc_buffers(2,-1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-            allocate(bc_buffers(2,1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-            if (p > 0) then
-                allocate(bc_buffers(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-                allocate(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-            end if
-        end if
-
-    end subroutine s_initialize_boundary_conditions_module
-
     subroutine s_line_segment_bc(patch_id, q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
@@ -466,10 +442,6 @@ contains
         end do
         close (1)
 
-        do i = 1, n
-            ! print("(I,4F10.2)"), bc_type(1,-1)%sf(0,i,0), bc_buffers(1,-1)%sf(E_idx,i,0)
-        end do
-
     end subroutine s_write_serial_boundary_condition_files
 
     subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
@@ -534,39 +506,6 @@ contains
 
     end subroutine s_write_parallel_boundary_condition_files
 
-    subroutine s_create_mpi_types(bc_type)
-
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
-
-#ifdef MFC_MPI
-        integer :: dir, loc
-        integer, dimension(3) :: sf_start_idx, sf_extents_loc
-        integer :: ifile, ierr, data_size
-
-        do dir = 1, num_dims
-            do loc = -1, 1, 2
-                sf_start_idx = (/0, 0, 0/)
-                sf_extents_loc = shape(bc_type(dir, loc)%sf)
-
-                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sf_extents_loc, sf_extents_loc, sf_start_idx, &
-                                              MPI_ORDER_FORTRAN, MPI_INTEGER, MPI_BC_TYPE_TYPE(dir, loc), ierr)
-                call MPI_TYPE_COMMIT(MPI_BC_TYPE_TYPE(dir, loc), ierr)
-            end do
-        end do
-
-        do dir = 1, num_dims
-            do loc = -1, 1, 2
-                sf_start_idx = (/0, 0, 0/)
-                sf_extents_loc = shape(bc_buffers(dir, loc)%sf)
-
-                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sf_extents_loc, sf_extents_loc, sf_start_idx, &
-                                              MPI_ORDER_FORTRAN, mpi_p, MPI_BC_BUFFER_TYPE(dir, loc), ierr)
-                call MPI_TYPE_COMMIT(MPI_BC_BUFFER_TYPE(dir, loc), ierr)
-            end do
-        end do
-#endif
-    end subroutine s_create_mpi_types
-
     subroutine s_pack_boundary_condition_buffers(q_prim_vf)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
@@ -604,22 +543,5 @@ contains
         end if
 
     end subroutine s_pack_boundary_condition_buffers
-
-    subroutine s_finalize_boundary_conditions_module()
-
-        deallocate(bc_buffers(1, -1)%sf)
-        deallocate(bc_buffers(1, 1)%sf)
-        if (n > 0) then
-            deallocate(bc_buffers(2,-1)%sf)
-            deallocate(bc_buffers(2,1)%sf)
-            if (p > 0) then
-                deallocate(bc_buffers(3,-1)%sf)
-                deallocate(bc_buffers(3,1)%sf)
-            end if
-        end if
-
-        deallocate(bc_buffers)
-
-    end subroutine s_finalize_boundary_conditions_module
 
 end module m_boundary_conditions

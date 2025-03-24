@@ -52,6 +52,8 @@ module m_start_up
 
     use m_checker
 
+    use m_boundary_common
+    
     use m_boundary_conditions
 
     implicit none
@@ -780,7 +782,7 @@ contains
         call s_initialize_initial_condition_module()
         call s_initialize_perturbation_module()
         call s_initialize_assign_variables_module()
-        call s_initialize_boundary_conditions_module()
+        call s_initialize_boundary_common_module()
         if (relax) call s_initialize_phasechange_module()
 
         ! Create the D directory if it doesn't exit, to store
@@ -933,7 +935,7 @@ contains
         call s_finalize_global_parameters_module()
         call s_finalize_assign_variables_module()
         call s_finalize_perturbation_module()
-        call s_finalize_boundary_conditions_module() 
+        call s_finalize_boundary_common_module() 
         if (relax) call s_finalize_relaxation_solver_module()
 
         ! Finalization of the MPI environment

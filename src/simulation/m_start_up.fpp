@@ -35,7 +35,7 @@ module m_start_up
 
     use m_cbc                  !< Characteristic boundary conditions (CBC)
 
-    use m_boundary_conditions_common
+    use m_boundary_common
 
     use m_acoustic_src      !< Acoustic source calculations
 
@@ -279,7 +279,7 @@ contains
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
         end if
 
-        ! call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
+        call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
 
         ! Cell-boundary Locations in x-direction
         file_path = trim(t_step_dir)//'/x_cb.dat'
@@ -935,7 +935,7 @@ contains
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
-        ! call s_read_parallel_boundary_condition_files(bc_type)
+        call s_read_parallel_boundary_condition_files(bc_type)
 #endif
 
     end subroutine s_read_parallel_data_files
@@ -1488,6 +1488,7 @@ contains
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
+        call s_initialize_boundary_common_module()
 
         ! Reading in the user provided initial condition and grid data
         call s_read_data_files(q_cons_ts(1)%vf)
@@ -1650,6 +1651,7 @@ contains
         call s_finalize_mpi_common_module()
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
+        call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (bubbles_lagrange) call s_finalize_lagrangian_solver()
         if (viscous) then
