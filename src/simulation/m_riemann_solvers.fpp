@@ -1073,6 +1073,8 @@ contains
                                                                                 s_M*s_P*(Bz_L - Bz_R))/(s_M - s_P)
 
                                 end if
+
+                                flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
                             end if
 
                             #:if (NORM_DIR == 2)
@@ -3267,6 +3269,8 @@ contains
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf(j, k, l, i) = 0._wp ! TODO multi-component (zero for now)
                             end do
+
+                            flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
                         end do
                     end do
                 end do
