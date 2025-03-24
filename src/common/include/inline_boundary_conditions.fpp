@@ -8,19 +8,19 @@
 
 #:def PRIM_SYMMETRY_BC(DIR,DEST,SRC)
     do j = 1, buff_size
-        do i = 1, momxb+${DIR}$-2
+        do i = 1, momxb + ${DIR}$-2
             q_prim_vf(i)%sf(${DEST}$) = q_prim_vf(i)%sf(${SRC}$)
         end do
 
         q_prim_vf(i)%sf(${DEST}$) = -q_prim_vf(i)%sf(${SRC}$)
 
-        do i = momxb+${DIR}$, sys_size
+        do i = momxb + ${DIR}$, sys_size
             q_prim_vf(i)%sf(${DEST}$) = q_prim_vf(i)%sf(${SRC}$)
         end do
 
         if (hyperelasticity) then
-           q_prim_vf(xibeg + ${DIR}$ - 1)%sf(${DEST}$) = &
-                -q_prim_vf(xibeg + ${DIR}$ - 1)%sf(l, j - 1, k)
+            q_prim_vf(xibeg + ${DIR}$-1)%sf(${DEST}$) = &
+                -q_prim_vf(xibeg + ${DIR}$-1)%sf(l, j - 1, k)
         end if
     end do
 #:enddef
@@ -236,7 +236,7 @@
 #:def PRIM_DIRICHLET_BC(DIR, LOC, DEST, SRC)
     do i = 1, sys_size
         do j = 1, buff_size
-            q_prim_vf(i)%sf(${DEST}$) = bc_buffers(${DIR}$,${LOC}$)%sf(${SRC}$)
+            q_prim_vf(i)%sf(${DEST}$) = bc_buffers(${DIR}$, ${LOC}$)%sf(${SRC}$)
         end do
     end do
 #:enddef

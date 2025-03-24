@@ -16,13 +16,13 @@ module m_boundary_conditions
 
     use m_boundary_common
 
-    contains
+contains
 
     subroutine s_read_serial_boundary_condition_files(step_dirpath, bc_type)
 
         character(LEN=*), intent(in) :: step_dirpath
 
-        type(integer_field), dimension(1:num_dims,-1:1) :: bc_type
+        type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 
         integer :: dir, loc
         logical :: file_exist
@@ -66,7 +66,7 @@ module m_boundary_conditions
 
     subroutine s_read_parallel_boundary_condition_files(bc_type)
 
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
+        type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 
         integer :: dir, loc
         character(len=path_len) :: file_loc, file_path

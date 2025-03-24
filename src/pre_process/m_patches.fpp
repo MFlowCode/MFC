@@ -66,8 +66,8 @@ contains
 
     subroutine s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
 
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        integer, dimension(0:m,0:m,0:m) :: patch_id_fp, ib_markers_sf
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp, ib_markers_sf
         type(levelset_field), intent(inout) :: levelset !< Levelset determined by models
         type(levelset_norm_field), intent(inout) :: levelset_norm !< Levelset_norm determined by models
 
@@ -87,28 +87,28 @@ contains
                 ! Spherical patch
                 if (patch_icpp(i)%geometry == 8) then
                     call s_sphere(i, patch_id_fp, q_prim_vf)
-                ! Cuboidal patch
+                    ! Cuboidal patch
                 elseif (patch_icpp(i)%geometry == 9) then
                     call s_cuboid(i, patch_id_fp, q_prim_vf)
-                ! Cylindrical patch
+                    ! Cylindrical patch
                 elseif (patch_icpp(i)%geometry == 10) then
                     call s_cylinder(i, patch_id_fp, q_prim_vf)
-                ! Swept plane patch
+                    ! Swept plane patch
                 elseif (patch_icpp(i)%geometry == 11) then
                     call s_sweep_plane(i, patch_id_fp, q_prim_vf)
-                ! Ellipsoidal patch
+                    ! Ellipsoidal patch
                 elseif (patch_icpp(i)%geometry == 12) then
                     call s_ellipsoid(i, patch_id_fp, q_prim_vf)
-                ! Analytical function patch for testing purposes
+                    ! Analytical function patch for testing purposes
                 elseif (patch_icpp(i)%geometry == 13) then
                     call s_3D_analytical(i, patch_id_fp, q_prim_vf)
-                ! Spherical harmonic patch
+                    ! Spherical harmonic patch
                 elseif (patch_icpp(i)%geometry == 14) then
                     call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
-                ! 3D Modified circular patch
+                    ! 3D Modified circular patch
                 elseif (patch_icpp(i)%geometry == 19) then
                     call s_3dvarcircle(i, patch_id_fp, q_prim_vf)
-                ! 3D STL patch
+                    ! 3D STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_model(i, patch_id_fp, q_prim_vf)
                 end if
@@ -156,35 +156,35 @@ contains
                 ! Circular patch
                 if (patch_icpp(i)%geometry == 2) then
                     call s_circle(i, patch_id_fp, q_prim_vf)
-                ! Rectangular patch
+                    ! Rectangular patch
                 elseif (patch_icpp(i)%geometry == 3) then
                     call s_rectangle(i, patch_id_fp, q_prim_vf)
-                ! Swept line patch
+                    ! Swept line patch
                 elseif (patch_icpp(i)%geometry == 4) then
                     call s_sweep_line(i, patch_id_fp, q_prim_vf)
-                ! Elliptical patch
+                    ! Elliptical patch
                 elseif (patch_icpp(i)%geometry == 5) then
                     call s_ellipse(i, patch_id_fp, q_prim_vf)
-                ! Unimplemented patch (formerly isentropic vortex)
+                    ! Unimplemented patch (formerly isentropic vortex)
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, '// &
                                      'which no longer exists. See Examples. Exiting.')
-                ! Analytical function patch for testing purposes
+                    ! Analytical function patch for testing purposes
                 elseif (patch_icpp(i)%geometry == 7) then
                     call s_2D_analytical(i, patch_id_fp, q_prim_vf)
-                ! Spherical Harmonic Patch
+                    ! Spherical Harmonic Patch
                 elseif (patch_icpp(i)%geometry == 14) then
                     call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
-                ! Spiral patch
+                    ! Spiral patch
                 elseif (patch_icpp(i)%geometry == 17) then
                     call s_spiral(i, patch_id_fp, q_prim_vf)
-                ! Modified circular patch
+                    ! Modified circular patch
                 elseif (patch_icpp(i)%geometry == 18) then
                     call s_varcircle(i, patch_id_fp, q_prim_vf)
-                ! TaylorGreen vortex patch
+                    ! TaylorGreen vortex patch
                 elseif (patch_icpp(i)%geometry == 20) then
                     call s_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)
-                ! STL patch
+                    ! STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_model(i, patch_id_fp, q_prim_vf)
                 end if
@@ -206,14 +206,14 @@ contains
                 elseif (patch_ib(i)%geometry == 4) then
                     call s_airfoil(i, ib_markers_sf, q_prim_vf, ib)
                     call s_airfoil_levelset(levelset, levelset_norm, i)
-                ! STL+IBM patch
+                    ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 5) then
                     call s_model(i, ib_markers_sf, q_prim_vf, ib, levelset, levelset_norm)
                 end if
             end do
             !> @}
 
-        ! 1D Patch Geometries
+            ! 1D Patch Geometries
         else
 
             do i = 1, num_patches
@@ -225,10 +225,10 @@ contains
                 ! Line segment patch
                 if (patch_icpp(i)%geometry == 1) then
                     call s_line_segment(i, patch_id_fp, q_prim_vf)
-                ! 1d analytical
+                    ! 1d analytical
                 elseif (patch_icpp(i)%geometry == 15) then
                     call s_1d_analytical(i, patch_id_fp, q_prim_vf)
-                ! 1d bubble screen with sinusoidal pressure pulse
+                    ! 1d bubble screen with sinusoidal pressure pulse
                 elseif (patch_icpp(i)%geometry == 16) then
                     call s_1d_bubble_pulse(i, patch_id_fp, q_prim_vf)
                 end if
@@ -237,8 +237,6 @@ contains
         end if
 
     end subroutine s_apply_domain_patches
-
-
 
     !>          The line segment patch is a 1D geometry that may be used,
     !!              for example, in creating a Riemann problem. The geometry

@@ -20,11 +20,10 @@ module m_boundary_common
 
     implicit none
 
-    type(scalar_field), dimension(:,:), allocatable  :: bc_buffers
+    type(scalar_field), dimension(:, :), allocatable :: bc_buffers
     !$acc declare create(bc_buffers)
 
     real(wp) :: bcxb, bcxe, bcyb, bcye, bczb, bcze
-
 
 #ifdef MFC_MPI
     integer, dimension(1:3, -1:1) :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
@@ -32,17 +31,17 @@ module m_boundary_common
 
 #ifdef MFC_SIMULATION
     private; public :: s_initialize_boundary_common_module, &
-                s_populate_variables_buffers, &
-                s_create_mpi_types, &
-                s_populate_capillary_buffers, &
-
-                s_finalize_boundary_common_module
+ s_populate_variables_buffers, &
+ s_create_mpi_types, &
+ s_populate_capillary_buffers, &
+ s_finalize_boundary_common_module
 #else
     private; public :: s_initialize_boundary_common_module, &
-                s_populate_variables_buffers, &
-                s_create_mpi_types, &
-                s_finalize_boundary_common_module
+ s_populate_variables_buffers, &
+ s_create_mpi_types, &
+ s_finalize_boundary_common_module
 #endif
+
     public :: bc_buffers, bcxb, bcxe, bcyb, bcye, bczb, bcze, MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
 
 contains
@@ -50,20 +49,19 @@ contains
     subroutine s_initialize_boundary_common_module()
 
 #ifdef MFC_PRE_PROCESS
-        allocate(bc_buffers(1:num_dims, -1:1))
+        allocate (bc_buffers(1:num_dims, -1:1))
 
-        allocate(bc_buffers(1, -1)%sf(1:sys_size, 0:n, 0:p))
-        allocate(bc_buffers(1, 1)%sf(1:sys_size, 0:n, 0:p))
+        allocate (bc_buffers(1, -1)%sf(1:sys_size, 0:n, 0:p))
+        allocate (bc_buffers(1, 1)%sf(1:sys_size, 0:n, 0:p))
         if (n > 0) then
-            allocate(bc_buffers(2,-1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-            allocate(bc_buffers(2,1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
+            allocate (bc_buffers(2, -1)%sf(-buff_size:m + buff_size, 1:sys_size, 0:p))
+            allocate (bc_buffers(2, 1)%sf(-buff_size:m + buff_size, 1:sys_size, 0:p))
             if (p > 0) then
-                allocate(bc_buffers(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-                allocate(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
+                allocate (bc_buffers(3, -1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 1:sys_size))
+                allocate (bc_buffers(3, 1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 1:sys_size))
             end if
         end if
 #endif
-
 
 #ifdef MFC_SIMULATION
         bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
@@ -87,7 +85,6 @@ contains
 
     end subroutine s_initialize_boundary_common_module
 
-
     subroutine s_populate_variables_buffers(q_prim_vf, pb, mv, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -103,17 +100,17 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = 0, n
-                    if (bc_type(1,-1)%sf(0,k,l) >= -13 .and. bc_type(1,-1)%sf(0,k,l) <= -3) then
+                    if (bc_type(1, -1)%sf(0, k, l) >= -13 .and. bc_type(1, -1)%sf(0, k, l) <= -3) then
                         ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("-j,k,l","0,k,l")}$
-                    elseif (bc_type(1,-1)%sf(0,k,l) == -2) then
+                    elseif (bc_type(1, -1)%sf(0, k, l) == -2) then
                         ${PRIM_SYMMETRY_BC(1,"-j,k,l","j-1,k,l")}$
-                    elseif (bc_type(1,-1)%sf(0,k,l) == -1) then
+                    elseif (bc_type(1, -1)%sf(0, k, l) == -1) then
                         ${PRIM_PERIODIC_BC("-j,k,l","m-(j-1),k,l")}$
-                    elseif (bc_type(1,-1)%sf(0,k,l) == -15) then
+                    elseif (bc_type(1, -1)%sf(0, k, l) == -15) then
                         ${PRIM_SLIP_WALL_BC("x","L")}$
-                    elseif (bc_type(1,-1)%sf(0,k,l) == -16) then
+                    elseif (bc_type(1, -1)%sf(0, k, l) == -16) then
                         ${PRIM_NO_SLIP_WALL_BC("x","L")}$
-                    elseif (bc_type(1,-1)%sf(0,k,l) == -17) then
+                    elseif (bc_type(1, -1)%sf(0, k, l) == -17) then
 #ifdef MFC_PRE_PROCESS
                         ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("-j,k,l","0,k,l")}$
 #else
@@ -130,17 +127,17 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = 0, n
-                    if (bc_type(1,1)%sf(0,k,l) >= -13 .and. bc_type(1,1)%sf(0,k,l) <= -3) then
+                    if (bc_type(1, 1)%sf(0, k, l) >= -13 .and. bc_type(1, 1)%sf(0, k, l) <= -3) then
                         ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("m+j,k,l","m,k,l")}$
-                    elseif (bc_type(1,1)%sf(0,k,l) == -2) then
+                    elseif (bc_type(1, 1)%sf(0, k, l) == -2) then
                         ${PRIM_SYMMETRY_BC(1,"m+j,k,l","m - (j-1),k,l")}$
-                    elseif (bc_type(1,1)%sf(0,k,l) == -1) then
+                    elseif (bc_type(1, 1)%sf(0, k, l) == -1) then
                         ${PRIM_PERIODIC_BC("m+j,k,l","j-1,k,l")}$
-                    elseif (bc_type(1,1)%sf(0,k,l) == -15) then
+                    elseif (bc_type(1, 1)%sf(0, k, l) == -15) then
                         ${PRIM_SLIP_WALL_BC("x","R")}$
-                    elseif (bc_type(1,1)%sf(0,k,l) == -16) then
+                    elseif (bc_type(1, 1)%sf(0, k, l) == -16) then
                         ${PRIM_NO_SLIP_WALL_BC("x","R")}$
-                    elseif (bc_type(1,1)%sf(0,k,l) == -17) then
+                    elseif (bc_type(1, 1)%sf(0, k, l) == -17) then
 #ifdef MFC_PRE_PROCESS
                         ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("m+j,k,l","m,k,l")}$
 #else
@@ -156,11 +153,11 @@ contains
                 !$acc parallel loop collapse(2) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
-                        if (bc_type(1,-1)%sf(0,k,l) >= -13 .and. bc_type(1,-1)%sf(0,k,l) <= -3) then
+                        if (bc_type(1, -1)%sf(0, k, l) >= -13 .and. bc_type(1, -1)%sf(0, k, l) <= -3) then
                             ${QBMM_BC("-j,k,l,q,i","0,k,l,q,i")}$
-                        elseif (bc_type(1,-1)%sf(0,k,l) == -2) then
+                        elseif (bc_type(1, -1)%sf(0, k, l) == -2) then
                             ${QBMM_BC("-j,k,l,q,i","j-1,k,l,q,i")}$
-                        elseif (bc_type(1,-1)%sf(0,k,l) == -1) then
+                        elseif (bc_type(1, -1)%sf(0, k, l) == -1) then
                             ${QBMM_BC("-j,k,l,q,i","m - (j-1),k,l,q,i")}$
                         end if
                     end do
@@ -171,11 +168,11 @@ contains
                 !$acc parallel loop collapse(2) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
-                        if (bc_type(1,1)%sf(0,k,l) >= -13 .and. bc_type(1,1)%sf(0,k,l) <= -3) then
+                        if (bc_type(1, 1)%sf(0, k, l) >= -13 .and. bc_type(1, 1)%sf(0, k, l) <= -3) then
                             ${QBMM_BC("m+j,k,l,q,i","m,k,l,q,i")}$
-                        elseif (bc_type(1,1)%sf(0,k,l) == -2) then
+                        elseif (bc_type(1, 1)%sf(0, k, l) == -2) then
                             ${QBMM_BC("m+j,k,l,q,i","m - (j-1),k,l,q,i")}$
-                        elseif (bc_type(1,1)%sf(0,k,l) == -1) then
+                        elseif (bc_type(1, 1)%sf(0, k, l) == -1) then
                             ${QBMM_BC("m+j,k,l,q,i","j-1,k,l,q,i")}$
                         end if
                     end do
@@ -237,17 +234,17 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = -buff_size, m + buff_size
-                    if (bc_type(2,-1)%sf(k,0,l) >= -13 .and. bc_type(2,-1)%sf(k,0,l) <= -3) then
+                    if (bc_type(2, -1)%sf(k, 0, l) >= -13 .and. bc_type(2, -1)%sf(k, 0, l) <= -3) then
                         ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,-j,l","k,0,l")}$
-                    elseif (bc_type(2,-1)%sf(k,0,l) == -2) then
+                    elseif (bc_type(2, -1)%sf(k, 0, l) == -2) then
                         ${PRIM_SYMMETRY_BC(2,"k,-j,l","k,j-1,l")}$
-                    elseif (bc_type(2,-1)%sf(k,0,l) == -1) then
+                    elseif (bc_type(2, -1)%sf(k, 0, l) == -1) then
                         ${PRIM_PERIODIC_BC("k,-j,l","k,n-(j-1),l")}$
-                    elseif (bc_type(2,-1)%sf(k,0,l) == -15) then
+                    elseif (bc_type(2, -1)%sf(k, 0, l) == -15) then
                         ${PRIM_SLIP_WALL_BC("y","L")}$
-                    elseif (bc_type(2,-1)%sf(k,0,l) == -16) then
+                    elseif (bc_type(2, -1)%sf(k, 0, l) == -16) then
                         ${PRIM_NO_SLIP_WALL_BC("y","L")}$
-                    elseif (bc_type(2,-1)%sf(k,0,l) == -17) then
+                    elseif (bc_type(2, -1)%sf(k, 0, l) == -17) then
 #ifdef MFC_PRE_PROCESS
                         ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,-j,l","k,0,l")}$
 #else
@@ -264,17 +261,17 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = -buff_size, m + buff_size
-                    if (bc_type(2,1)%sf(k,0,l) >= -13 .and. bc_type(2,1)%sf(k,0,l) <= -3) then
+                    if (bc_type(2, 1)%sf(k, 0, l) >= -13 .and. bc_type(2, 1)%sf(k, 0, l) <= -3) then
                         ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,n+j,l","k,n,l")}$
-                    elseif (bc_type(2,1)%sf(k,0,l) == -2) then
+                    elseif (bc_type(2, 1)%sf(k, 0, l) == -2) then
                         ${PRIM_SYMMETRY_BC(2,"k,n+j,l","k,n - (j-1),l")}$
-                    elseif (bc_type(2,1)%sf(k,0,l) == -1) then
+                    elseif (bc_type(2, 1)%sf(k, 0, l) == -1) then
                         ${PRIM_PERIODIC_BC("k,n+j,l","k,j-1,l")}$
-                    elseif (bc_type(2,1)%sf(k,0,l) == -15) then
+                    elseif (bc_type(2, 1)%sf(k, 0, l) == -15) then
                         ${PRIM_SLIP_WALL_BC("y","R")}$
-                    elseif (bc_type(2,1)%sf(k,0,l) == -16) then
+                    elseif (bc_type(2, 1)%sf(k, 0, l) == -16) then
                         ${PRIM_NO_SLIP_WALL_BC("y","R")}$
-                    elseif (bc_type(2,1)%sf(k,0,l) == -17) then
+                    elseif (bc_type(2, 1)%sf(k, 0, l) == -17) then
 #ifdef FMC_PRE_PROCESS
                         ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,n+j,l","k,n,l")}$
 #else
@@ -290,11 +287,11 @@ contains
                 !$acc parallel loop collapse(2) gang vector default(present)
                 do l = 0, p
                     do k = -buff_size, m + buff_size
-                        if (bc_type(2,-1)%sf(k,0,l) >= -13 .and. bc_type(2,-1)%sf(k,0,l) <= -3) then
+                        if (bc_type(2, -1)%sf(k, 0, l) >= -13 .and. bc_type(2, -1)%sf(k, 0, l) <= -3) then
                             ${QBMM_BC("k,-j,l,q,i","k,0,l,q,i")}$
-                        elseif (bc_type(2,-1)%sf(k,0,l) == -2) then
+                        elseif (bc_type(2, -1)%sf(k, 0, l) == -2) then
                             ${QBMM_BC("k,-j,l,q,i","k,j-1,l,q,i")}$
-                        elseif (bc_type(2,-1)%sf(k,0,l) == -1) then
+                        elseif (bc_type(2, -1)%sf(k, 0, l) == -1) then
                             ${QBMM_BC("k,-j,l,q,i","k,n - (j-1),l,q,i")}$
                         end if
                     end do
@@ -305,11 +302,11 @@ contains
                 !$acc parallel loop collapse(2) gang vector default(present)
                 do l = 0, p
                     do k = -buff_size, m + buff_size
-                        if (bc_type(2,1)%sf(k,0,l) >= -13 .and. bc_type(2,1)%sf(k,0,l) <= -3) then
+                        if (bc_type(2, 1)%sf(k, 0, l) >= -13 .and. bc_type(2, 1)%sf(k, 0, l) <= -3) then
                             ${QBMM_BC("k,n+j,l,q,i","k,n,l,q,i")}$
-                        elseif (bc_type(2,1)%sf(k,0,l) == -2) then
+                        elseif (bc_type(2, 1)%sf(k, 0, l) == -2) then
                             ${QBMM_BC("k,n+j,l,q,i","k,n - (j-1),l,q,i")}$
-                        elseif (bc_type(2,1)%sf(k,0,l) == -1) then
+                        elseif (bc_type(2, 1)%sf(k, 0, l) == -1) then
                             ${QBMM_BC("k,n+j,l,q,i","k,j-1,k,q,i")}$
                         end if
                     end do
@@ -326,17 +323,17 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
-                    if (bc_type(3,-1)%sf(k,l,0) >= -13 .and. bc_type(3,-1)%sf(k,l,0) <= -3) then
+                    if (bc_type(3, -1)%sf(k, l, 0) >= -13 .and. bc_type(3, -1)%sf(k, l, 0) <= -3) then
                         ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,l,-j","k,l,0")}$
-                    elseif (bc_type(3,-1)%sf(k,l,0) == -2) then
+                    elseif (bc_type(3, -1)%sf(k, l, 0) == -2) then
                         ${PRIM_SYMMETRY_BC(3,"k,l,-j","k,l,j-1")}$
-                    elseif (bc_type(3,-1)%sf(k,l,0) == -1) then
+                    elseif (bc_type(3, -1)%sf(k, l, 0) == -1) then
                         ${PRIM_PERIODIC_BC("k,l,-j","k,l,p-(j-1)")}$
-                    elseif (bc_type(3,-1)%sf(k,l,0) == -15) then
+                    elseif (bc_type(3, -1)%sf(k, l, 0) == -15) then
                         ${PRIM_SLIP_WALL_BC("z","L")}$
-                    elseif (bc_type(3,-1)%sf(k,l,0) == -16) then
+                    elseif (bc_type(3, -1)%sf(k, l, 0) == -16) then
                         ${PRIM_NO_SLIP_WALL_BC("z","L")}$
-                    elseif (bc_type(3,-1)%sf(k,l,0) == -17) then
+                    elseif (bc_type(3, -1)%sf(k, l, 0) == -17) then
 #ifdef MFC_PRE_PROCESS
                         ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,l,-j","k,l,0")}$
 #else
@@ -353,17 +350,17 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
-                    if (bc_type(3,1)%sf(k,l,0) >= -13 .and. bc_type(3,1)%sf(k,l,0) <= -3) then
+                    if (bc_type(3, 1)%sf(k, l, 0) >= -13 .and. bc_type(3, 1)%sf(k, l, 0) <= -3) then
                         ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,l,p+j","k,l,p")}$
-                    elseif (bc_type(3,1)%sf(k,l,0) == -2) then
+                    elseif (bc_type(3, 1)%sf(k, l, 0) == -2) then
                         ${PRIM_SYMMETRY_BC(3,"k,l,p+j","k,l,p - (j-1)")}$
-                    elseif (bc_type(3,1)%sf(k,l,0) == -1) then
+                    elseif (bc_type(3, 1)%sf(k, l, 0) == -1) then
                         ${PRIM_PERIODIC_BC("k,l,p+j","k,l,j-1")}$
-                    elseif (bc_type(3,1)%sf(k,l,0) == -15) then
+                    elseif (bc_type(3, 1)%sf(k, l, 0) == -15) then
                         ${PRIM_SLIP_WALL_BC("z","R")}$
-                    elseif (bc_type(3,1)%sf(k,l,0) == -16) then
+                    elseif (bc_type(3, 1)%sf(k, l, 0) == -16) then
                         ${PRIM_NO_SLIP_WALL_BC("z","R")}$
-                    elseif (bc_type(3,1)%sf(k,l,0) == -17) then
+                    elseif (bc_type(3, 1)%sf(k, l, 0) == -17) then
 #ifdef MFC_PRE_PROCESS
                         ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,l,p+j","k,l,p")}$
 #else
@@ -379,11 +376,11 @@ contains
                 !$acc parallel loop collapse(2) gang vector default(present)
                 do l = -buff_size, n + buff_size
                     do k = -buff_size, m + buff_size
-                        if (bc_type(3,-1)%sf(k,l,0) >= -13 .and. bc_type(3,-1)%sf(k,l,0) <= -3) then
+                        if (bc_type(3, -1)%sf(k, l, 0) >= -13 .and. bc_type(3, -1)%sf(k, l, 0) <= -3) then
                             ${QBMM_BC("k,l,-j,q,i","k,l,0,q,i")}$
-                        elseif (bc_type(3,-1)%sf(k,l,0) == -2) then
+                        elseif (bc_type(3, -1)%sf(k, l, 0) == -2) then
                             ${QBMM_BC("k,l,-j,q,i","k,l,j-1,q,i")}$
-                        elseif (bc_type(3,-1)%sf(k,l,0) == -1) then
+                        elseif (bc_type(3, -1)%sf(k, l, 0) == -1) then
                             ${QBMM_BC("k,l,-j,q,i","k,l,p - (j-1),q,i")}$
                         end if
                     end do
@@ -394,11 +391,11 @@ contains
                 !$acc parallel loop collapse(2) gang vector default(present)
                 do l = -buff_size, n + buff_size
                     do k = -buff_size, m + buff_size
-                        if (bc_type(3,1)%sf(k,l,0) >= -13 .and. bc_type(3,1)%sf(k,l,0) <= -3) then
+                        if (bc_type(3, 1)%sf(k, l, 0) >= -13 .and. bc_type(3, 1)%sf(k, l, 0) <= -3) then
                             ${QBMM_BC("k,l,p+j,q,i","k,l,p,q,i")}$
-                        elseif (bc_type(3,1)%sf(k,l,0) == -2) then
+                        elseif (bc_type(3, 1)%sf(k, l, 0) == -2) then
                             ${QBMM_BC("k,l,p+j,q,i","k,l,p - (j-1),q,i")}$
-                        elseif (bc_type(3,1)%sf(k,l,0) == -1) then
+                        elseif (bc_type(3, 1)%sf(k, l, 0) == -1) then
                             ${QBMM_BC("k,l,p+j,q,i","k,l,j-1,q,i")}$
                         end if
                     end do
@@ -423,12 +420,12 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = 0, n
-                    if (bc_type(1,-1)%sf(0,k,l) == -1) then
+                    if (bc_type(1, -1)%sf(0, k, l) == -1) then
                         ${COLOR_FUNC_BC("-j,k,l","m - (j-1),k,l")}$
-                    elseif (bc_type(1,-1)%sf(0,k,l) == -2) then
+                    elseif (bc_type(1, -1)%sf(0, k, l) == -2) then
                         ${COLOR_FUNC_SLIP_WALL_BC(1,"-j,k,l","j-1,k,l")}$
                     else
-                       ${COLOR_FUNC_BC("-j,k,l","0,k,l")}$
+                        ${COLOR_FUNC_BC("-j,k,l","0,k,l")}$
                     end if
                 end do
             end do
@@ -440,12 +437,12 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = 0, n
-                    if (bc_type(1,1)%sf(0,k,l) == -1) then
+                    if (bc_type(1, 1)%sf(0, k, l) == -1) then
                         ${COLOR_FUNC_BC("m+j,k,l","j-1,k,l")}$
-                    elseif (bc_type(1,1)%sf(0,k,l) == -2) then
+                    elseif (bc_type(1, 1)%sf(0, k, l) == -2) then
                         ${COLOR_FUNC_SLIP_WALL_BC(1,"m+j,k,l","m - (j-1),k,l")}$
                     else
-                       ${COLOR_FUNC_BC("m+j,k,l","m,k,l")}$
+                        ${COLOR_FUNC_BC("m+j,k,l","m,k,l")}$
                     end if
                 end do
             end do
@@ -460,12 +457,12 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = -buff_size, m + buff_size
-                    if (bc_type(2,-1)%sf(k,0,l) == -1) then
+                    if (bc_type(2, -1)%sf(k, 0, l) == -1) then
                         ${COLOR_FUNC_BC("k,-j,l","k,n - (j-1),l")}$
-                    elseif (bc_type(2,-1)%sf(k,0,l) == -2) then
+                    elseif (bc_type(2, -1)%sf(k, 0, l) == -2) then
                         ${COLOR_FUNC_SLIP_WALL_BC(2,"k,-j,l","k,j-1,l")}$
                     else
-                       ${COLOR_FUNC_BC("k,-j,l","k,0,l")}$
+                        ${COLOR_FUNC_BC("k,-j,l","k,0,l")}$
                     end if
                 end do
             end do
@@ -477,12 +474,12 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = -buff_size, m + buff_size
-                    if (bc_type(2,1)%sf(k,0,l) == -1) then
+                    if (bc_type(2, 1)%sf(k, 0, l) == -1) then
                         ${COLOR_FUNC_BC("k,n+j,l","k,j-1,l")}$
-                    elseif (bc_type(2,1)%sf(k,0,l) == -2) then
+                    elseif (bc_type(2, 1)%sf(k, 0, l) == -2) then
                         ${COLOR_FUNC_SLIP_WALL_BC(2,"k,n+j,l","k,n - (j-1),l")}$
                     else
-                       ${COLOR_FUNC_BC("k,n+j,l","k,n,l")}$
+                        ${COLOR_FUNC_BC("k,n+j,l","k,n,l")}$
                     end if
                 end do
             end do
@@ -497,12 +494,12 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
-                    if (bc_type(3,-1)%sf(k,l,0) == -1) then
+                    if (bc_type(3, -1)%sf(k, l, 0) == -1) then
                         ${COLOR_FUNC_BC("k,l,-j","k,l,p - (j-1)")}$
-                    elseif (bc_type(3,-1)%sf(k,l,0) == -2) then
+                    elseif (bc_type(3, -1)%sf(k, l, 0) == -2) then
                         ${COLOR_FUNC_SLIP_WALL_BC(3,"k,l,-j","k,l,j-1")}$
                     else
-                       ${COLOR_FUNC_BC("k,l,-j","k,l,0")}$
+                        ${COLOR_FUNC_BC("k,l,-j","k,l,0")}$
                     end if
                 end do
             end do
@@ -514,12 +511,12 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
-                    if (bc_type(3,1)%sf(k,l,0) == -1) then
+                    if (bc_type(3, 1)%sf(k, l, 0) == -1) then
                         ${COLOR_FUNC_BC("k,l,p+j","k,l,j-1")}$
-                    elseif (bc_type(3,1)%sf(k,l,0) == -2) then
+                    elseif (bc_type(3, 1)%sf(k, l, 0) == -2) then
                         ${COLOR_FUNC_SLIP_WALL_BC(3,"k,l,p+j","k,l,p - (j-1)")}$
                     else
-                       ${COLOR_FUNC_BC("k,l,p+j","k,l,p")}$
+                        ${COLOR_FUNC_BC("k,l,p+j","k,l,p")}$
                     end if
                 end do
             end do
@@ -543,7 +540,7 @@ contains
                 sf_extents_loc = shape(bc_type(dir, loc)%sf)
 
                 call MPI_TYPE_CREATE_SUBARRAY(num_dims, sf_extents_loc, sf_extents_loc, sf_start_idx, &
-                                            MPI_ORDER_FORTRAN, MPI_INTEGER, MPI_BC_TYPE_TYPE(dir, loc), ierr)
+                                              MPI_ORDER_FORTRAN, MPI_INTEGER, MPI_BC_TYPE_TYPE(dir, loc), ierr)
                 call MPI_TYPE_COMMIT(MPI_BC_TYPE_TYPE(dir, loc), ierr)
             end do
         end do
@@ -554,7 +551,7 @@ contains
                 sf_extents_loc = shape(bc_buffers(dir, loc)%sf)
 
                 call MPI_TYPE_CREATE_SUBARRAY(num_dims, sf_extents_loc, sf_extents_loc, sf_start_idx, &
-                                            MPI_ORDER_FORTRAN, mpi_p, MPI_BC_BUFFER_TYPE(dir, loc), ierr)
+                                              MPI_ORDER_FORTRAN, mpi_p, MPI_BC_BUFFER_TYPE(dir, loc), ierr)
                 call MPI_TYPE_COMMIT(MPI_BC_BUFFER_TYPE(dir, loc), ierr)
             end do
         end do
@@ -563,18 +560,18 @@ contains
 
     subroutine s_finalize_boundary_common_module()
 
-        deallocate(bc_buffers(1, -1)%sf)
-        deallocate(bc_buffers(1, 1)%sf)
+        deallocate (bc_buffers(1, -1)%sf)
+        deallocate (bc_buffers(1, 1)%sf)
         if (n > 0) then
-            deallocate(bc_buffers(2,-1)%sf)
-            deallocate(bc_buffers(2,1)%sf)
+            deallocate (bc_buffers(2, -1)%sf)
+            deallocate (bc_buffers(2, 1)%sf)
             if (p > 0) then
-                deallocate(bc_buffers(3,-1)%sf)
-                deallocate(bc_buffers(3,1)%sf)
+                deallocate (bc_buffers(3, -1)%sf)
+                deallocate (bc_buffers(3, 1)%sf)
             end if
         end if
 
-        deallocate(bc_buffers)
+        deallocate (bc_buffers)
 
     end subroutine s_finalize_boundary_common_module
 

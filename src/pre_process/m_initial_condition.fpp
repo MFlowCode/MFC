@@ -49,7 +49,7 @@ module m_initial_condition
 
     type(scalar_field) :: q_T_sf !< Temperature field
 
-    type(integer_field), dimension(:,:), allocatable :: bc_type !< bc_type fields
+    type(integer_field), dimension(:, :), allocatable :: bc_type !< bc_type fields
 
     integer, allocatable, dimension(:, :, :) :: patch_id_fp !<
     !! Bookkepping variable used to track the patch identities (id) associated
@@ -77,9 +77,9 @@ contains
         allocate (q_cons_vf(1:sys_size))
 
         do i = 1, sys_size
-            allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &                                       
-                idwbuff(2)%beg:idwbuff(2)%end, &                                       
-                idwbuff(3)%beg:idwbuff(3)%end))
+            allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                      idwbuff(2)%beg:idwbuff(2)%end, &
+                                      idwbuff(3)%beg:idwbuff(3)%end))
             allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
         end do
 
@@ -116,38 +116,37 @@ contains
         end do
 
         ! Allocating arrays to store the bc types
-        allocate(bc_type(1:num_dims,-1:1))
+        allocate (bc_type(1:num_dims, -1:1))
 
-        allocate(bc_type(1,-1)%sf(0:0,0:n,0:p))
-        allocate(bc_type(1,1)%sf(0:0,0:n,0:p))
+        allocate (bc_type(1, -1)%sf(0:0, 0:n, 0:p))
+        allocate (bc_type(1, 1)%sf(0:0, 0:n, 0:p))
 
         do l = 0, p
             do k = 0, n
-                bc_type(1,-1)%sf(0,k,l) = bc_x%beg
-                bc_type(1,1)%sf(0,k,l) = bc_x%end
+                bc_type(1, -1)%sf(0, k, l) = bc_x%beg
+                bc_type(1, 1)%sf(0, k, l) = bc_x%end
             end do
         end do
 
         if (n > 0) then
-            allocate(bc_type(2,-1)%sf(-buff_size:m+buff_size,0:0,0:p))
-            allocate(bc_type(2,1)%sf(-buff_size:m+buff_size,0:0,0:p))
+            allocate (bc_type(2, -1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
+            allocate (bc_type(2, 1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
 
             do l = 0, p
                 do j = -buff_size, m + buff_size
-                    bc_type(2,-1)%sf(j,0,l) = bc_y%beg
-                    bc_type(2,1)%sf(j,0,l) = bc_y%end
+                    bc_type(2, -1)%sf(j, 0, l) = bc_y%beg
+                    bc_type(2, 1)%sf(j, 0, l) = bc_y%end
                 end do
             end do
 
             if (p > 0) then
-                allocate(bc_type(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
-                allocate(bc_type(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
-
+                allocate (bc_type(3, -1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
+                allocate (bc_type(3, 1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
 
                 do k = -buff_size, n + buff_size
                     do j = -buff_size, m + buff_size
-                        bc_type(3,-1)%sf(j,k,0) = bc_z%beg
-                        bc_type(3,1)%sf(j,k,0) = bc_z%end
+                        bc_type(3, -1)%sf(j, k, 0) = bc_z%beg
+                        bc_type(3, 1)%sf(j, k, 0) = bc_z%end
                     end do
                 end do
             end if
@@ -173,7 +172,7 @@ contains
         integer :: i  !< Generic loop operator
 
         ! First, compute the temperature field from the conservative variables.
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwbuff)
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
