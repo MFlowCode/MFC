@@ -42,7 +42,11 @@ module m_boundary_common
  s_finalize_boundary_common_module
 #endif
 
-    public :: bc_buffers, bcxb, bcxe, bcyb, bcye, bczb, bcze, MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
+    public :: bc_buffers, bcxb, bcxe, bcyb, bcye, bczb, bcze
+
+#ifdef MFC_MPI
+    public :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
+#endif
 
 contains
 
