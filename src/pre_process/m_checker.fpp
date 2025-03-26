@@ -32,6 +32,7 @@ contains
         call s_check_inputs_perturb_density
         call s_check_inputs_chemistry
         call s_check_inputs_misc
+        call s_check_bc
 
     end subroutine s_check_inputs
 
@@ -196,5 +197,49 @@ contains
             "elliptic_smoothing_iters must be positive")
 
     end subroutine s_check_inputs_misc
+
+    subroutine s_check_bc
+
+        integer :: i
+
+
+        do i = 1, num_bc_patches
+            ! Line Segement BC 
+            if (patch_bc(i)%geometry == 1) then
+                @:PROHIBIT( .not. f_is_default(patch_bc(i)%radius))
+                #:for DIR in [('1', '2')]
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%centroid(${DIR}$)) &
+                        .or. .not. f_is_default(patch_bc(i)%centroid(3)))
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%length(${DIR}$)) &
+                        .or. .not. f_is_default(patch_bc(i)%length(3)))
+                #:endfor
+            end if  
+            ! Circle BC 
+            if (patch_bc(i)%geometry == 2) then
+                @:PROHIBIT(f_is_default(patch_bc(i)%radius))
+                @:PROHIBIT(.not. f_is_default(patch_bc(i)%length(1)) &
+                    .or. .not. f_is_default(patch_bc(i)%length(2)) &
+                    .or. .not. f_is_default(patch_bc(i)%length(3)))
+
+                #:for DIR in [('1'), ('2'), ('3')]
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%centroid(${DIR}$)))
+                #:endfor
+
+            end if 
+            ! Rectangle BC
+            if (patch_bc(i)%geometry == 3) then
+                @:PROHIBIT( .not. f_is_default(patch_bc(i)%radius))
+
+                #:for DIR, VAR in [('1', '2', '3'), ('2', '3', '1'), ('3', '1', '2')]
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%centroid(${DIR}$)))
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%length(${DIR}$)))
+                #:endfor
+
+            end if 
+            
+            
+        end do
+
+    end subroutine
 
 end module m_checker
