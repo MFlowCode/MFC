@@ -175,7 +175,7 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
-            hyperelasticity, R0ref
+            hyperelasticity, R0ref, num_bc_patches
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -279,7 +279,7 @@ contains
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
         end if
 
-        call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
+        if (num_bc_patches > 0) call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
 
         ! Cell-boundary Locations in x-direction
         file_path = trim(t_step_dir)//'/x_cb.dat'
@@ -935,7 +935,7 @@ contains
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
-        call s_read_parallel_boundary_condition_files(bc_type)
+        if (num_bc_patches > 0) call s_read_parallel_boundary_condition_files(bc_type)
 #endif
 
     end subroutine s_read_parallel_data_files

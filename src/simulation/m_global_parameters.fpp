@@ -180,7 +180,8 @@ module m_global_parameters
 !#ifndef _CRAYFTN
 !$acc declare create(relax, relax_model, palpha_eps,ptgalpha_eps)
 !#endif
-
+    
+    integer :: num_bc_patches
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
@@ -546,6 +547,8 @@ contains
         chem_params%diffusion = .false.
         chem_params%reactions = .false.
         chem_params%gamma_method = 1
+
+        num_bc_patches = 0
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int

@@ -202,41 +202,45 @@ contains
 
         integer :: i
 
+        @:PROHIBIT(num_bc_patches > num_bc_patches_max, "num_bc_patches must be <= 10")
+
 
         do i = 1, num_bc_patches
+
             ! Line Segement BC 
             if (patch_bc(i)%geometry == 1) then
-                @:PROHIBIT( .not. f_is_default(patch_bc(i)%radius))
-                #:for DIR in [('1', '2')]
-                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%centroid(${DIR}$)) &
-                        .or. .not. f_is_default(patch_bc(i)%centroid(3)))
-                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%length(${DIR}$)) &
-                        .or. .not. f_is_default(patch_bc(i)%length(3)))
+                @:PROHIBIT( .not. f_is_default(patch_bc(i)%radius), "Line Segment Patch can't have radius defined")
+                #:for DIR in [('1'), ('2')]
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. (.not. f_is_default(patch_bc(i)%centroid(${DIR}$)) .or. .not. f_is_default(patch_bc(i)%centroid(3))), &
+                        "Line Segment Patch of Dir ${DIR}$ can't have a centroid in Dir ${DIR}$ or 3" ) 
+                        @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. (.not. f_is_default(patch_bc(i)%length(${DIR}$)) .or. .not. f_is_default(patch_bc(i)%length(3))), &
+                        "Line Segment Patch of Dir ${DIR}$ can't have a length in Dir ${DIR}$ or 3" ) 
                 #:endfor
             end if  
             ! Circle BC 
             if (patch_bc(i)%geometry == 2) then
-                @:PROHIBIT(f_is_default(patch_bc(i)%radius))
-                @:PROHIBIT(.not. f_is_default(patch_bc(i)%length(1)) &
-                    .or. .not. f_is_default(patch_bc(i)%length(2)) &
-                    .or. .not. f_is_default(patch_bc(i)%length(3)))
+                @:PROHIBIT(f_is_default(patch_bc(i)%radius), "Circle Patch must have radius defined")
+                @:PROHIBIT(.not. f_is_default(patch_bc(i)%length(1)) .or. .not. f_is_default(patch_bc(i)%length(2)) .or. .not. f_is_default(patch_bc(i)%length(3)), & 
+                    "Circle Patch can't have lengths defined")
 
                 #:for DIR in [('1'), ('2'), ('3')]
-                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%centroid(${DIR}$)))
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%centroid(${DIR}$)), &
+                    "Circle Patch of Dir ${DIR}$ can't have a centroid in Dir ${DIR}$")
                 #:endfor
 
             end if 
             ! Rectangle BC
             if (patch_bc(i)%geometry == 3) then
-                @:PROHIBIT( .not. f_is_default(patch_bc(i)%radius))
+                @:PROHIBIT( .not. f_is_default(patch_bc(i)%radius), "Rectangle Patch can't have radius defined")
 
                 #:for DIR, VAR in [('1', '2', '3'), ('2', '3', '1'), ('3', '1', '2')]
-                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%centroid(${DIR}$)))
-                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%length(${DIR}$)))
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%centroid(${DIR}$)), &
+                    "Rectangle Patch of Dir ${DIR}$ can't have a centroid in Dir ${DIR}$")
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%length(${DIR}$)), &
+                    "Rectangle Patch of Dir ${DIR}$ can't have a length in Dir ${DIR}$")
                 #:endfor
 
             end if 
-            
             
         end do
 

@@ -185,7 +185,7 @@ contains
         end if
 
         call s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers%sf, levelset, levelset_norm)
-        call s_apply_boundary_patches(q_prim_vf, bc_type)
+        if (num_bc_patches > 0) call s_apply_boundary_patches(q_prim_vf, bc_type)
 
         if (perturb_flow) call s_perturb_surrounding_flow(q_prim_vf)
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
