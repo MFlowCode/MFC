@@ -68,9 +68,9 @@ contains
 
         v_size = sys_size
 
-        allocate(q_prims_buff_send(0:halo_size))
+        allocate (q_prims_buff_send(0:halo_size))
 
-        allocate(q_prims_buff_recv(0:ubound(q_prims_buff_send, 1)))
+        allocate (q_prims_buff_recv(0:ubound(q_prims_buff_send, 1)))
 #endif
 
         ! Allocating q_prims_buff_send/recv and ib_buff_send/recv. Please note that

@@ -17,7 +17,7 @@ module m_surface_tension
     use m_helper
 
     use m_boundary_common
-    
+
     implicit none
 
     private; public :: s_initialize_surface_tension_module, &
@@ -225,9 +225,10 @@ contains
 
     end subroutine s_compute_capilary_source_flux
 
-    subroutine s_get_capilary(q_prim_vf)
+    subroutine s_get_capilary(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
         type(int_bounds_info) :: isx, isy, isz
 
@@ -287,7 +288,7 @@ contains
             end do
         end do
 
-        call s_populate_capillary_buffers(c_divs)
+        call s_populate_capillary_buffers(c_divs, bc_type)
 
         iv%beg = 1; iv%end = num_dims + 1
 

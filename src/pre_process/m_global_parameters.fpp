@@ -428,10 +428,6 @@ contains
             patch_bc(i)%type = dflt_int
             patch_bc(i)%dir = dflt_int
             patch_bc(i)%loc = dflt_int
-            patch_bc(i)%vel(:) = dflt_real
-            patch_bc(i)%alpha_rho(:) = dflt_real
-            patch_bc(i)%alpha(:) = dflt_real
-            patch_bc(i)%pres = dflt_real
             patch_bc(i)%centroid(:) = dflt_real
             patch_bc(i)%length(:) = dflt_real
             patch_bc(i)%radius = dflt_real

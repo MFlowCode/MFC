@@ -694,7 +694,7 @@ contains
 
         if (surface_tension) then
             call nvtxStartRange("RHS-SURFACE-TENSION")
-            call s_get_capilary(q_prim_qp%vf)
+            call s_get_capilary(q_prim_qp%vf, bc_type)
             call nvtxEndRange
         end if
         ! Dimensional Splitting Loop

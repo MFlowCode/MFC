@@ -16,13 +16,13 @@ module m_boundary_conditions
 
     use m_boundary_common
 
-    contains
+contains
 
     subroutine s_read_serial_boundary_condition_files(step_dirpath, bc_type)
 
         character(LEN=*), intent(in) :: step_dirpath
 
-        type(integer_field), dimension(1:num_dims,-1:1) :: bc_type
+        type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 
         integer :: dir, loc
         logical :: file_exist
@@ -34,7 +34,7 @@ module m_boundary_conditions
         file_path = trim(step_dirpath)//'/bc_type.dat'
         inquire (FILE=trim(file_path), EXIST=file_exist)
         if (.not. file_exist) then
-            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
         end if
 
         open (1, FILE=trim(file_path), FORM='unformatted', STATUS='unknown')
@@ -50,7 +50,7 @@ module m_boundary_conditions
         file_path = trim(step_dirpath)//'/bc_buffers.dat'
         inquire (FILE=trim(file_path), EXIST=file_exist)
         if (.not. file_exist) then
-            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
         end if
 
         open (1, FILE=trim(file_path), FORM='unformatted', STATUS='unknown')
@@ -66,7 +66,7 @@ module m_boundary_conditions
 
     subroutine s_read_parallel_boundary_condition_files(bc_type)
 
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
+        type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 
         integer :: dir, loc
         character(len=path_len) :: file_loc, file_path
@@ -85,7 +85,7 @@ module m_boundary_conditions
         if (proc_rank == 0) then
             call my_inquire(file_loc, dir_check)
             if (dir_check .neqv. .true.) then
-                call s_mpi_abort(trim(file_loc)//' is missing. Exiting ...')
+                call s_mpi_abort(trim(file_loc)//' is missing. Exiting.')
             end if
         end if
 

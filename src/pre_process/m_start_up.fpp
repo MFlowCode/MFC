@@ -53,7 +53,7 @@ module m_start_up
     use m_checker
 
     use m_boundary_common
-    
+
     use m_boundary_conditions
 
     implicit none
@@ -935,7 +935,7 @@ contains
         call s_finalize_global_parameters_module()
         call s_finalize_assign_variables_module()
         call s_finalize_perturbation_module()
-        call s_finalize_boundary_common_module() 
+        call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
 
         ! Finalization of the MPI environment

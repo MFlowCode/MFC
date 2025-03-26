@@ -37,7 +37,7 @@ module m_data_output
 
     implicit none
 
-    private;
+    private; 
     public :: s_write_serial_data_files, &
               s_write_parallel_data_files, &
               s_write_data_files, &

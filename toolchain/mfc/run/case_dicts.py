@@ -56,7 +56,7 @@ COMMON = {
     'cfl_const_dt': ParamType.LOG,
     'chemistry': ParamType.LOG,
     'cantera_file': ParamType.STR,
-    'rkck_adap_dt': ParamType.LOG, 
+    'rkck_adap_dt': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -95,6 +95,8 @@ PRE_PROCESS.update({
     'elliptic_smoothing': ParamType.LOG,
     'elliptic_smoothing_iters': ParamType.INT,
     'num_bc_patches': ParamType.INT,
+    'viscous': ParamType.LOG,
+    'bubbles_lagrange': ParamType.LOG,
 })
 
 for ib_id in range(1, 25+1):
@@ -139,15 +141,10 @@ for bc_p_id in range(1, 10+1):
     for attribute in ["geometry","type","dir","loc"]:
         PRE_PROCESS[f"patch_bc({bc_p_id})%{attribute}"] = ParamType.INT
 
-    for attribute in["alpha_rho", "alpha"]:
-        for f_id in range(1, 10+1):
-            PRE_PROCESS[f"patch_bc({bc_p_id})%{attribute}({f_id})"] = ParamType.REAL
-
-    for attribute in ["centroid","length","vel"]:
+    for attribute in ["centroid","length"]:
         for d_id in range(1, 3+1):
             PRE_PROCESS[f"patch_bc({bc_p_id})%{attribute}({d_id})"] = ParamType.REAL
 
-    PRE_PROCESS[f"patch_bc({bc_p_id})%pres"] = ParamType.REAL
     PRE_PROCESS[f"patch_bc({bc_p_id})%radius"] = ParamType.REAL
 
 for p_id in range(1, 10+1):
@@ -225,7 +222,7 @@ for p_id in range(1, 10+1):
 
         for int_id in range(1, 3+1):
             PRE_PROCESS[f"bc_{cmp}%vel_in({int_id})"] = ParamType.REAL
-            PRE_PROCESS[f"bc_{cmp}%vel_out({int_id})"] = ParamType.REAL    
+            PRE_PROCESS[f"bc_{cmp}%vel_out({int_id})"] = ParamType.REAL
 
 # NOTE: Currently unused.
 # for f_id in range(1, 10+1):

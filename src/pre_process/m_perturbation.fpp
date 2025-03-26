@@ -16,7 +16,7 @@ module m_perturbation
 
     use m_boundary_common   ! Boundary conditions module
     ! complex general matrix
-    
+
     use m_helper
 
     use ieee_arithmetic
@@ -28,7 +28,7 @@ module m_perturbation
     integer :: nbp ! Number of grid cell boundary points in y-direction
     integer :: mixlayer_bc_fd ! Order of finite difference applied at the boundaries of mixing layer
     integer :: n_bc_skip ! Number of points skipped in the linear stability analysis due to the boundary condition
-    
+
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_temp
 
     ! real(wp) :: bcxb, bcxe, bcyb, bcye, bczb, bcze
@@ -622,8 +622,8 @@ contains
 
     subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
         integer :: i, j, k, l, q
 
         do q = 1, elliptic_smoothing_iters
