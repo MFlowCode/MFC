@@ -85,6 +85,8 @@ module m_start_up
 
     use m_body_forces
 
+    use m_sim_helpers
+
     implicit none
 
     private; public :: s_read_input_file, &
@@ -279,7 +281,11 @@ contains
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
         end if
 
-        if (num_bc_patches > 0) call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
+        if (num_bc_patches > 0) then
+            call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
+        else
+            call s_assign_default_bc_type(bc_type)
+        end if
 
         ! Cell-boundary Locations in x-direction
         file_path = trim(t_step_dir)//'/x_cb.dat'
@@ -935,7 +941,12 @@ contains
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
-        if (num_bc_patches > 0) call s_read_parallel_boundary_condition_files(bc_type)
+        if (num_bc_patches > 0) then
+            call s_read_parallel_boundary_condition_files(bc_type)
+        else
+            call s_assign_default_bc_type(bc_type)
+        end if
+
 #endif
 
     end subroutine s_read_parallel_data_files
