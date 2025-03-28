@@ -1,5 +1,6 @@
 #:def Hardcoded1DVariables()
     ! Place any declaration of intermediate variables here
+    ! Test
 
 #:enddef
 
