@@ -20,7 +20,7 @@ sbatch_cpu_opts="\
 "
 
 sbatch_gpu_opts="\
-#SBATCH -CV100
+#SBATCH -CL40S
 #SBATCH --ntasks-per-node=4       # Number of cores per node required
 #SBATCH -G2\
 "
