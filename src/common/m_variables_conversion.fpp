@@ -959,7 +959,7 @@ contains
                         ! Newton-Raphson
                         W = E + D
                         !$acc loop seq
-                        do iter = 1, 100
+                        do iter = 1, relativity_cons_to_prim_max_iter
                             Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
                             pres = (W - D*Ga)/((gamma_K + 1)*Ga**2) ! Thermal pressure from EOS
                             f = W - pres + (1 - 1/(2*Ga**2))*B2 - S**2/(2*W**2) - E - D
