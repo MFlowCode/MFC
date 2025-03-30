@@ -132,10 +132,10 @@
 
     case (250) ! MHD Orszag-Tang vortex
         ! gamma = 5/3
-        !   rho = 25/(36π)
-        !     p = 5/(12π)
-        !     v = (-sin(2π y), sin(2π x), 0)
-        !     B = (-sin(2π y)/sqrt(4π), sin(4π x)/sqrt(4π), 0)
+        !   rho = 25/(36*pi)
+        !     p = 5/(12*pi)
+        !     v = (-sin(2*pi*y), sin(2*pi*x), 0)
+        !     B = (-sin(2*pi*y)/sqrt(4*pi), sin(4*pi*x)/sqrt(4*pi), 0)
 
         q_prim_vf(momxb)%sf(i, j, 0) = -sin(2._wp*pi*y_cc(j))
         q_prim_vf(momxb + 1)%sf(i, j, 0) = sin(2._wp*pi*x_cc(i))

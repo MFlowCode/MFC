@@ -49,10 +49,10 @@ print(
             "mhd": "T",
             # Patch 1 - Analytical for v and B
             # gamma = 5/3
-            #   rho = 25/(36π)
-            #     p = 5/(12π)
-            #     v = (-sin(2π y), sin(2π x), 0)
-            #     B = (-sin(2π y)/sqrt(4π), sin(4π x)/sqrt(4π), 0)
+            #   rho = 25/(36*pi)
+            #     p = 5/(12*pi)
+            #     v = (-sin(2*pi*y), sin(2*pi*x), 0)
+            #     B = (-sin(2*pi*y)/sqrt(4*pi), sin(4*pi*x)/sqrt(4*pi), 0)
             "patch_icpp(1)%hcid": 250,
             "patch_icpp(1)%geometry": 7,
             "patch_icpp(1)%x_centroid": 0.5,

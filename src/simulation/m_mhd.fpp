@@ -112,7 +112,7 @@ contains
                     ! 2: vx  -> - (divB) * Bx
                     ! 3: vy  -> - (divB) * By
                     ! 4: vz  -> - (divB) * Bz
-                    ! 5: E   -> - (divB) * (v·B)
+                    ! 5: E   -> - (divB) * (v dot B)
                     ! 6: Bx  -> - (divB) * vx
                     ! 7: By  -> - (divB) * vy
                     ! 8: Bz  -> - (divB) * vz
