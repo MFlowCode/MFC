@@ -480,20 +480,20 @@ contains
         if (mhd) then
             if (n == 0) then ! 1D: By, Bz
                 q_prim_vf(B_idx%beg)%sf(j, k, l) = &
-                    eta*patch_icpp(patch_id)%B%y &
+                    eta*patch_icpp(patch_id)%By &
                     + (1._wp - eta)*orig_prim_vf(B_idx%beg)
                 q_prim_vf(B_idx%beg + 1)%sf(j, k, l) = &
-                    eta*patch_icpp(patch_id)%B%z &
+                    eta*patch_icpp(patch_id)%Bz &
                     + (1._wp - eta)*orig_prim_vf(B_idx%beg + 1)
             else ! 2D/3D: Bx, By, Bz
                 q_prim_vf(B_idx%beg)%sf(j, k, l) = &
-                    eta*patch_icpp(patch_id)%B%x &
+                    eta*patch_icpp(patch_id)%Bx &
                     + (1._wp - eta)*orig_prim_vf(B_idx%beg)
                 q_prim_vf(B_idx%beg + 1)%sf(j, k, l) = &
-                    eta*patch_icpp(patch_id)%B%y &
+                    eta*patch_icpp(patch_id)%By &
                     + (1._wp - eta)*orig_prim_vf(B_idx%beg + 1)
                 q_prim_vf(B_idx%beg + 2)%sf(j, k, l) = &
-                    eta*patch_icpp(patch_id)%B%z &
+                    eta*patch_icpp(patch_id)%Bz &
                     + (1._wp - eta)*orig_prim_vf(B_idx%beg + 2)
             end if
         end if

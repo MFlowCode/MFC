@@ -535,9 +535,9 @@ contains
         @:PROHIBIT(model_eqns == 2 .and. any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0._wp), &
             "Patch "//trim(iStr)//": alpha_rho(1:num_fluids) must be greater than or equal to zero when model_eqns = 2")
 
-        is_set_B(1) = .not. f_is_default(patch_icpp(patch_id)%B%x)
-        is_set_B(2) = .not. f_is_default(patch_icpp(patch_id)%B%y)
-        is_set_B(3) = .not. f_is_default(patch_icpp(patch_id)%B%z)
+        is_set_B(1) = .not. f_is_default(patch_icpp(patch_id)%Bx)
+        is_set_B(2) = .not. f_is_default(patch_icpp(patch_id)%By)
+        is_set_B(3) = .not. f_is_default(patch_icpp(patch_id)%Bz)
 
         @:PROHIBIT(.not. mhd .and. any(is_set_B), &
             "Bx, By, and Bz must not be set if MHD is not enabled")

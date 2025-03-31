@@ -401,9 +401,9 @@ contains
             patch_icpp(i)%qv = 0._wp
             patch_icpp(i)%qvp = 0._wp
             patch_icpp(i)%tau_e = 0._wp
-            patch_icpp(i)%B%x = dflt_real
-            patch_icpp(i)%B%y = dflt_real
-            patch_icpp(i)%B%z = dflt_real
+            patch_icpp(i)%Bx = dflt_real
+            patch_icpp(i)%By = dflt_real
+            patch_icpp(i)%Bz = dflt_real
             patch_icpp(i)%a(2) = dflt_real
             patch_icpp(i)%a(3) = dflt_real
             patch_icpp(i)%a(4) = dflt_real
