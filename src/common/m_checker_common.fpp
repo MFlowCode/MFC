@@ -235,8 +235,8 @@ contains
                 #:endif
 
                 if (.not. skip_check) then
-                    @:PROHIBIT(bc_${X}$%${BOUND}$ /= dflt_int .and. (bc_${X}$%${BOUND}$ > -1 .or. bc_${X}$%${BOUND}$ < -16), &
-                        "bc_${X}$%${BOUND}$ must be between -1 and -16")
+                    @:PROHIBIT(bc_${X}$%${BOUND}$ /= dflt_int .and. (bc_${X}$%${BOUND}$ > -1 .or. bc_${X}$%${BOUND}$ < -17), &
+                        "bc_${X}$%${BOUND}$ must be between -1 and -17")
 
                     @:PROHIBIT(bc_${X}$%${BOUND}$ /= dflt_int .and. bc_${X}$%${BOUND}$ == -14, &
                         "bc_${X}$%${BOUND}$ must not be -14 for non-cylindrical coordinates")
@@ -252,7 +252,7 @@ contains
         @: PROHIBIT(cyl_coord .and. n == 0, "n must be positive (2D or 3D) for cylindrical coordinates")
         @: PROHIBIT(cyl_coord .and. p == 0 .and. bc_y%beg /= -2, "bc_y%beg must be -2 for 2D cylindrical coordinates (p = 0)")
         @: PROHIBIT(cyl_coord .and. p > 0 .and. bc_y%beg /= -14, "bc_y%beg must be -14 for 3D cylindrical coordinates (p > 0)")
-        @: PROHIBIT(cyl_coord .and. (bc_y%end > -1 .or. bc_y%end < -16), "bc_y%end must be between -1 and -16")
+        @: PROHIBIT(cyl_coord .and. (bc_y%end > -1 .or. bc_y%end < -17), "bc_y%end must be between -1 and -17")
         @: PROHIBIT(cyl_coord .and. bc_y%end == -14, "bc_y%end must not be -14")
 
         ! Check for y and z directions for 3D cylindrical coordinates

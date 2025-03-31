@@ -157,7 +157,12 @@ contains
             status = 'new'
         end if
 
-        if (num_bc_patches > 0) call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir)
+        checkboundary: do i = 1, 3
+            if (any(bc_type(1, -1)%sf == -17) .or. any(bc_type(i, 1)%sf == -17)) then
+                call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir)
+                exit checkboundary
+            end if
+        end do checkboundary
 
         ! x-coordinate direction
         file_loc = trim(t_step_dir)//'/x_cb.dat'
@@ -842,7 +847,12 @@ contains
         end if
 #endif
 
-        if (num_bc_patches > 0) call s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
+        checkboundary: do i = 1, 3
+            if (any(bc_type(1, -1)%sf == -17) .or. any(bc_type(i, 1)%sf == -17)) then
+                call s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
+                exit checkboundary
+            end if
+        end do checkboundary
 
     end subroutine s_write_parallel_data_files
 
