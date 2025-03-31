@@ -9,7 +9,6 @@
 !!              for the post-process.
 module m_mpi_proxy
 
-    ! Dependencies =============================================================
 #ifdef MFC_MPI
     use mpi                     !< Message passing interface (MPI) module
 #endif
@@ -21,7 +20,6 @@ module m_mpi_proxy
     use m_mpi_common
 
     use ieee_arithmetic
-    ! ==========================================================================
 
     implicit none
 
@@ -170,7 +168,7 @@ contains
             & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles_euler', 'qbmm',   &
             & 'polytropic', 'polydisperse', 'file_per_process', 'relax', 'cf_wrt',     &
             & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',          &
-            & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange', 'rkck_adap_dt']
+            & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange', 'rkck_adap_dt', 'output_partial_domain']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -191,7 +189,9 @@ contains
         end do
 
         #:for VAR in [ 'pref', 'rhoref', 'R0ref', 'poly_sigma', 'Web', 'Ca', &
-            & 'Re_inv', 'sigma', 't_save', 't_stop' ]
+            & 'Re_inv', 'sigma', 't_save', 't_stop', &
+            & 'x_output%beg', 'x_output%end', 'y_output%beg', &
+            & 'y_output%end', 'z_output%beg', 'z_output%end' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(schlieren_alpha(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
@@ -241,7 +241,7 @@ contains
         ! equivalent piece of the computational domain. Note that explicit
         ! type-casting is omitted here for code legibility purposes.
 
-        ! Generating 3D Cartesian Processor Topology =======================
+        ! Generating 3D Cartesian Processor Topology
 
         if (n > 0) then
 
@@ -364,7 +364,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     print '(A)', 'Unable to decompose computational '// &
                         'domain for selected number of '// &
-                        'processors. Exiting ...'
+                        'processors. Exiting.'
                     call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                 end if
 
@@ -379,9 +379,9 @@ contains
                 call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, &
                                      proc_coords, ierr)
 
-                ! END: Generating 3D Cartesian Processor Topology ==================
+                ! END: Generating 3D Cartesian Processor Topology
 
-                ! Sub-domain Global Parameters in z-direction ======================
+                ! Sub-domain Global Parameters in z-direction
 
                 ! Number of remaining cells after majority is distributed
                 rem_cells = mod(p + 1, num_procs_z)
@@ -434,9 +434,8 @@ contains
                         start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
                     end if
                 end if
-                ! ==================================================================
 
-                ! Generating 2D Cartesian Processor Topology =======================
+                ! Generating 2D Cartesian Processor Topology
 
             else
 
@@ -485,7 +484,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     print '(A)', 'Unable to decompose computational '// &
                         'domain for selected number of '// &
-                        'processors. Exiting ...'
+                        'processors. Exiting.'
                     call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                 end if
 
@@ -502,9 +501,9 @@ contains
 
             end if
 
-            ! END: Generating 2D Cartesian Processor Topology ==================
+            ! END: Generating 2D Cartesian Processor Topology
 
-            ! Sub-domain Global Parameters in y-direction ======================
+            ! Sub-domain Global Parameters in y-direction
 
             ! Number of remaining cells after majority has been distributed
             rem_cells = mod(n + 1, num_procs_y)
@@ -557,9 +556,8 @@ contains
                     start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
                 end if
             end if
-            ! ==================================================================
 
-            ! Generating 1D Cartesian Processor Topology =======================
+            ! Generating 1D Cartesian Processor Topology
 
         else
 
@@ -583,9 +581,7 @@ contains
 
         end if
 
-        ! ==================================================================
-
-        ! Sub-domain Global Parameters in x-direction ======================
+        ! Sub-domain Global Parameters in x-direction
 
         ! Number of remaining cells after majority has been distributed
         rem_cells = mod(m + 1, num_procs_x)
@@ -636,7 +632,6 @@ contains
                 start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
             end if
         end if
-        ! ==================================================================
 
 #endif
 
@@ -656,7 +651,7 @@ contains
 
 #ifdef MFC_MPI
 
-        ! Communications in the x-direction ================================
+        ! Communications in the x-direction
 
         if (sweep_coord == 'x') then
 
@@ -714,9 +709,9 @@ contains
 
             end if
 
-            ! END: Communications in the x-direction ===========================
+            ! END: Communications in the x-direction
 
-            ! Communications in the y-direction ================================
+            ! Communications in the y-direction
 
         elseif (sweep_coord == 'y') then
 
@@ -774,9 +769,9 @@ contains
 
             end if
 
-            ! END: Communications in the y-direction ===========================
+            ! END: Communications in the y-direction
 
-            ! Communications in the z-direction ================================
+            ! Communications in the z-direction
 
         else
 
@@ -836,7 +831,7 @@ contains
 
         end if
 
-        ! END: Communications in the z-direction ===========================
+        ! END: Communications in the z-direction
 
 #endif
 
@@ -867,7 +862,7 @@ contains
 
         integer :: i, j, k, l, r !< Generic loop iterators
 
-        ! Communications in the x-direction ================================
+        ! Communications in the x-direction
 
         if (sweep_coord == 'x') then
 
@@ -1059,9 +1054,9 @@ contains
 
             end if
 
-            ! END: Communications in the x-direction ===========================
+            ! END: Communications in the x-direction
 
-            ! Communications in the y-direction ================================
+            ! Communications in the y-direction
 
         elseif (sweep_coord == 'y') then
 
@@ -1267,9 +1262,9 @@ contains
 
             end if
 
-            ! END: Communications in the y-direction ===========================
+            ! END: Communications in the y-direction
 
-            ! Communications in the z-direction ================================
+            ! Communications in the z-direction
 
         else
 
@@ -1487,7 +1482,7 @@ contains
 
         end if
 
-        ! END: Communications in the z-direction ===========================
+        ! END: Communications in the z-direction
 
 #endif
 

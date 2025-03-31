@@ -251,6 +251,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, "model_eqns=2", {'model_eqns': 2}))
         cases.append(define_case_d(stack, "model_eqns=3", {'model_eqns': 3}))
+        cases.append(define_case_d(stack, "HLL", {'riemann_solver': 1}))
 
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
@@ -318,44 +319,53 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         else:
             cases.append(define_case_d(stack, '2 MPI Ranks', {}, ppn=2))
 
+
     def alter_ib(dimInfo, six_eqn_model=False):
-        stack.push(f'IBM', {
-            'ib': 'T', 'num_ibs': 1,
-            'patch_ib(1)%x_centroid': 0.5, 'patch_ib(1)%y_centroid': 0.5,
-            'patch_ib(1)%radius': 0.1, 'patch_icpp(1)%vel(1)': 0.001,
-            'patch_icpp(2)%vel(1)': 0.001, 'patch_icpp(3)%vel(1)': 0.001,
-        })
+        for slip in [True, False]:
+            stack.push(f'IBM', {
+                'ib': 'T', 'num_ibs': 1,
+                'patch_ib(1)%x_centroid': 0.5, 'patch_ib(1)%y_centroid': 0.5,
+                'patch_ib(1)%radius': 0.1, 'patch_icpp(1)%vel(1)': 0.001,
+                'patch_icpp(2)%vel(1)': 0.001, 'patch_icpp(3)%vel(1)': 0.001,
+                'patch_ib(1)%slip': 'T' if slip else 'F',
+            })
 
-        if len(dimInfo[0]) == 3:
-            cases.append(define_case_d(stack, f'Sphere', {
-                'patch_ib(1)%z_centroid': 0.5,
-                'patch_ib(1)%geometry': 8,
-            }))
+            suffix = " -> slip" if slip else ""
 
-            cases.append(define_case_d(stack, f'Cuboid', {
-                'patch_ib(1)%z_centroid': 0.5,
-                'patch_ib(1)%length_x': 0.1,
-                'patch_ib(1)%length_y': 0.1,
-                'patch_ib(1)%length_z': 0.1,
-                'patch_ib(1)%geometry': 9,
-            }))
+            if len(dimInfo[0]) == 3:
+                cases.append(define_case_d(stack, f'Sphere{suffix}', {
+                    'patch_ib(1)%z_centroid': 0.5,
+                    'patch_ib(1)%geometry': 8,
+                }))
 
-            cases.append(define_case_d(stack, f'Cylinder', {
-                'patch_ib(1)%z_centroid': 0.5,
-                'patch_ib(1)%length_x': 0.1,
-                'patch_ib(1)%geometry': 10,
-            }))
+                cases.append(define_case_d(stack, f'Cuboid{suffix}', {
+                    'patch_ib(1)%z_centroid': 0.5,
+                    'patch_ib(1)%length_x': 0.1,
+                    'patch_ib(1)%length_y': 0.1,
+                    'patch_ib(1)%length_z': 0.1,
+                    'patch_ib(1)%geometry': 9,
+                }))
 
-        elif len(dimInfo[0]) == 2:
-            cases.append(define_case_d(stack, f'Rectangle', {
-                'patch_ib(1)%length_x': 0.05,
-                'patch_ib(1)%length_y': 0.05,
-                'patch_ib(1)%geometry': 3 }))
-            cases.append(define_case_d(stack, f'Circle', {'patch_ib(1)%geometry': 2 }))
-            if six_eqn_model:
-                cases.append(define_case_d(stack, f'model_eqns=3', {'patch_ib(1)%geometry': 2, 'model_eqns': 3}))
+                cases.append(define_case_d(stack, f'Cylinder{suffix}', {
+                    'patch_ib(1)%z_centroid': 0.5,
+                    'patch_ib(1)%length_x': 0.1,
+                    'patch_ib(1)%geometry': 10,
+                }))
 
-        stack.pop()
+            elif len(dimInfo[0]) == 2:
+                cases.append(define_case_d(stack, f'Rectangle{suffix}', {
+                    'patch_ib(1)%length_x': 0.05,
+                    'patch_ib(1)%length_y': 0.05,
+                    'patch_ib(1)%geometry': 3,
+                }))
+                cases.append(define_case_d(stack, f'Circle{suffix}', {'patch_ib(1)%geometry': 2 }))
+                if six_eqn_model:
+                    cases.append(define_case_d(stack, f'model_eqns=3{suffix}', {
+                        'patch_ib(1)%geometry': 2,
+                        'model_eqns': 3,
+                    }))
+
+            stack.pop()
 
     def ibm_stl():
         common_mods = {
@@ -817,6 +827,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 stack.pop()
 
+    def alter_elliptic_smoothing():
+        # Elliptic Smoothing
+
+        stack.push("Smoothing",{
+                'elliptic_smoothing': 'T', 'elliptic_smoothing_iters': 10
+            })
+
+        cases.append(define_case_d(stack, '', {}))
+
+        stack.pop()
 
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
@@ -837,6 +857,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_hypoelasticity(dimInfo)
             alter_phasechange(dimInfo)
             alter_viscosity(dimInfo)
+            alter_elliptic_smoothing()
             alter_body_forces(dimInfo)
             alter_instability_wave(dimInfo)
             stack.pop()
@@ -848,7 +869,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 continue
 
             # # List of currently broken examples -> currently attempting to fix!
-            brokenCases = ["2D_ibm_cfl_dt", "1D_sodHypo", "2D_viscous", "2D_laplace_pressure_jump", "2D_bubbly_steady_shock", "2D_advection", "2D_hardcodied_ic", "2D_ibm_multiphase", "2D_acoustic_broadband", "1D_inert_shocktube", "1D_reactive_shocktube", "2D_ibm_steady_shock", "3D_performance_test", "3D_ibm_stl_ellipsoid", "3D_sphbubcollapse", "2D_ibm_stl_wedge", "3D_ibm_stl_pyramid", "3D_ibm_bowshock", "3D_turb_mixing", "2D_mixing_artificial_Ma"]
+            brokenCases = ["2D_ibm_cfl_dt", "1D_sodHypo", "2D_viscous", "2D_laplace_pressure_jump", "2D_bubbly_steady_shock", "2D_advection", "2D_hardcodied_ic", "2D_ibm_multiphase", "2D_acoustic_broadband", "1D_inert_shocktube", "1D_reactive_shocktube", "2D_ibm_steady_shock", "3D_performance_test", "3D_ibm_stl_ellipsoid", "3D_sphbubcollapse", "2D_ibm_stl_wedge", "3D_ibm_stl_pyramid", "3D_ibm_bowshock", "3D_turb_mixing", "2D_mixing_artificial_Ma", "3D_lagrange_bubblescreen", "2D_triple_point"]
             if path in brokenCases:
                 continue
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"

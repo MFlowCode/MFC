@@ -10,7 +10,6 @@ dependencies = [
     "rich",
     "wheel",
     "typos",
-    "typing",
     "PyYAML",
     "argparse",
     "dataclasses",
@@ -26,6 +25,9 @@ dependencies = [
     "typos",
     "pylint",
     "fprettify",
+    "black",
+    "fortitude-lint",
+    "ansi2txt",
 
     # Profiling
     "numpy",

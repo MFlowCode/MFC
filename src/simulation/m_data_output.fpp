@@ -13,7 +13,6 @@
 !!              and cell Reynolds (Rc) numbers.
 module m_data_output
 
-    !  Dependencies ============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -31,7 +30,6 @@ module m_data_output
     use m_delay_file_access
 
     use m_ibm
-    ! ==========================================================================
 
     implicit none
 
@@ -112,7 +110,7 @@ contains
         !!      time-step.
     subroutine s_open_run_time_information_file
 
-        character(LEN=name_len) :: file_name = 'run_time.inf' !<
+        character(LEN=name_len), parameter :: file_name = 'run_time.inf' !<
             !! Name of the run-time information file
 
         character(LEN=path_len + name_len) :: file_path !<
@@ -151,19 +149,19 @@ contains
         ! Generating table header for the stability criteria to be outputted
         if (cfl_dt) then
             if (viscous) then
-                write (1, '(A)') '==== Time-steps ====== dt ===== Time ======= ICFL '// &
-                    'Max ==== VCFL Max ====== Rc Min ======='
+                write (1, '(A)') '     Time-steps        dt     = Time         ICFL '// &
+                    'Max      VCFL Max        Rc Min       ='
             else
-                write (1, '(A)') '=========== Time-steps ============== dt ===== Time '// &
-                    '============== ICFL Max ============='
+                write (1, '(A)') '            Time-steps                dt       Time '// &
+                    '               ICFL Max              '
             end if
         else
             if (viscous) then
-                write (1, '(A)') '==== Time-steps ====== Time ======= ICFL '// &
-                    'Max ==== VCFL Max ====== Rc Min ======='
+                write (1, '(A)') '     Time-steps        Time         ICFL '// &
+                    'Max      VCFL Max        Rc Min        '
             else
-                write (1, '(A)') '=========== Time-steps ============== Time '// &
-                    '============== ICFL Max ============='
+                write (1, '(A)') '            Time-steps                Time '// &
+                    '               ICFL Max              '
             end if
         end if
 
@@ -171,10 +169,12 @@ contains
 
     !>  This opens a formatted data file where the root processor
         !!      can write out the CoM information
-    subroutine s_open_com_files() ! ----------------------------------------
+    subroutine s_open_com_files()
+
         character(len=path_len + 3*name_len) :: file_path !<
             !! Relative path to the CoM file in the case directory
         integer :: i !< Generic loop iterator
+
         do i = 1, num_fluids
             ! Generating the relative path to the CoM data file
             write (file_path, '(A,I0,A)') '/fluid', i, '_com.dat'
@@ -186,26 +186,26 @@ contains
                   position='append', &
                   status='unknown')
             if (n == 0) then
-                write (i + 120, '(A)') '=== Non-Dimensional Time '// &
-                    '=== Total Mass '// &
-                    '=== x-loc '// &
-                    '=== Total Volume ==='
+                write (i + 120, '(A)') '    Non-Dimensional Time '// &
+                    '    Total Mass '// &
+                    '    x-loc '// &
+                    '    Total Volume    '
             elseif (p == 0) then
-                write (i + 120, '(A)') '=== Non-Dimensional Time '// &
-                    '=== Total Mass '// &
-                    '=== x-loc '// &
-                    '=== y-loc '// &
-                    '=== Total Volume ==='
+                write (i + 120, '(A)') '    Non-Dimensional Time '// &
+                    '    Total Mass '// &
+                    '    x-loc '// &
+                    '    y-loc '// &
+                    '    Total Volume    '
             else
-                write (i + 120, '(A)') '=== Non-Dimensional Time '// &
-                    '=== Total Mass '// &
-                    '=== x-loc '// &
-                    '=== y-loc '// &
-                    '=== z-loc '// &
-                    '=== Total Volume ==='
+                write (i + 120, '(A)') '    Non-Dimensional Time '// &
+                    '    Total Mass '// &
+                    '    x-loc '// &
+                    '    y-loc '// &
+                    '    z-loc '// &
+                    '    Total Volume    '
             end if
         end do
-    end subroutine s_open_com_files ! --------------------------------------
+    end subroutine s_open_com_files
 
     !>  This opens a formatted data file where the root processor
         !!      can write out flow probe information
@@ -276,7 +276,7 @@ contains
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         integer :: j, k, l
 
-        ! Computing Stability Criteria at Current Time-step ================
+        ! Computing Stability Criteria at Current Time-step
         !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
         do l = 0, p
             do k = 0, n
@@ -296,7 +296,7 @@ contains
         end do
         !$acc end parallel loop
 
-        ! end: Computing Stability Criteria at Current Time-step ===========
+        ! end: Computing Stability Criteria at Current Time-step
 
         ! Determining local stability criteria extrema at current time-step
 
@@ -363,18 +363,18 @@ contains
             end if
 
             if (icfl_max_glb /= icfl_max_glb) then
-                call s_mpi_abort('ICFL is NaN. Exiting ...')
+                call s_mpi_abort('ICFL is NaN. Exiting.')
             elseif (icfl_max_glb > 1._wp) then
                 print *, 'icfl', icfl_max_glb
-                call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
+                call s_mpi_abort('ICFL is greater than 1.0. Exiting.')
             end if
 
             if (viscous) then
                 if (vcfl_max_glb /= vcfl_max_glb) then
-                    call s_mpi_abort('VCFL is NaN. Exiting ...')
+                    call s_mpi_abort('VCFL is NaN. Exiting.')
                 elseif (vcfl_max_glb > 1._wp) then
                     print *, 'vcfl', vcfl_max_glb
-                    call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')
+                    call s_mpi_abort('VCFL is greater than 1.0. Exiting.')
                 end if
             end if
         end if
@@ -990,7 +990,7 @@ contains
     !!  @param t_step Current time-step
     !!  @param q_com Center of mass information
     !!  @param moments Higher moment information
-    subroutine s_write_com_files(t_step, c_mass) ! -------------------
+    subroutine s_write_com_files(t_step, c_mass)
 
         integer, intent(in) :: t_step
         real(wp), dimension(num_fluids, 5), intent(in) :: c_mass
@@ -1035,7 +1035,7 @@ contains
             end if
         end if
 
-    end subroutine s_write_com_files ! -------------------------------------
+    end subroutine s_write_com_files
 
     !>  This writes a formatted data file for the flow probe information
         !!  @param t_step Current time-step
@@ -1689,9 +1689,9 @@ contains
     subroutine s_close_run_time_information_file
 
         real(wp) :: run_time !< Run-time of the simulation
+
         ! Writing the footer of and closing the run-time information file
-        write (3, '(A)') '----------------------------------------'// &
-            '----------------------------------------'
+        write (3, '(A)') '    '
         write (3, '(A)') ''
 
         write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
@@ -1702,21 +1702,20 @@ contains
 
         write (3, '(A)') ''
         write (3, '(A,I0,A)') 'Run-time: ', int(anint(run_time)), 's'
-        write (3, '(A)') '========================================'// &
-            '========================================'
+        write (3, '(A)') '    '
         close (3)
 
     end subroutine s_close_run_time_information_file
 
     !> Closes communication files
-    subroutine s_close_com_files() ! ---------------------------------------
+    subroutine s_close_com_files()
 
         integer :: i !< Generic loop iterator
         do i = 1, num_fluids
             close (i + 120)
         end do
 
-    end subroutine s_close_com_files ! -------------------------------------
+    end subroutine s_close_com_files
 
     !> Closes probe files
     subroutine s_close_probe_files

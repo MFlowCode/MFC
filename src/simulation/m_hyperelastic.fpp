@@ -9,8 +9,6 @@
 
 module m_hyperelastic
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -18,8 +16,6 @@ module m_hyperelastic
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_finite_differences
-
-    ! ==========================================================================
 
     implicit none
 
@@ -231,7 +227,7 @@ contains
         integer, intent(in) :: j, k, l
 
         real(wp) :: trace
-        real(wp) :: f13 = 1_wp/3_wp
+        real(wp), parameter :: f13 = 1._wp/3._wp
         integer :: i !< Generic loop iterators
 
         ! tensor is the symmetric tensor & calculate the trace of the tensor
@@ -270,7 +266,7 @@ contains
         integer, intent(in) :: j, k, l
 
         real(wp) :: trace
-        real(wp) :: f13 = 1_wp/3_wp
+        real(wp), parameter :: f13 = 1._wp/3._wp
         integer :: i !< Generic loop iterators
 
         !TODO Make this 1D and 2D capable

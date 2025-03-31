@@ -7,7 +7,6 @@
 !!             variables and fill out their buffer regions.
 module m_data_input
 
-    ! Dependencies =============================================================
 #ifdef MFC_MPI
     use mpi                     !< Message passing interface (MPI) module
 #endif
@@ -21,7 +20,6 @@ module m_data_input
     use m_compile_specific
 
     use m_helper
-    ! ==========================================================================
 
     implicit none
 
@@ -33,17 +31,19 @@ module m_data_input
  s_populate_conservative_variables_buffer_regions, &
  s_finalize_data_input_module
 
-    abstract interface ! ===================================================
+    abstract interface
 
         !> Subroutine for reading data files
         !!  @param t_step Current time-step to input
         subroutine s_read_abstract_data_files(t_step)
 
+            implicit none
+
             integer, intent(in) :: t_step
 
         end subroutine s_read_abstract_data_files
 
-    end interface ! ========================================================
+    end interface
 
     type(scalar_field), allocatable, dimension(:), public :: q_cons_vf !<
     !! Conservative variables
@@ -114,7 +114,7 @@ contains
         ! If the time-step directory is missing, the post-process exits.
         if (dir_check .neqv. .true.) then
             call s_mpi_abort('Time-step folder '//trim(t_step_dir)// &
-                             ' is missing. Exiting ...')
+                             ' is missing. Exiting.')
         end if
 
         call my_inquire(file_loc_ib, dir_check)
@@ -122,10 +122,10 @@ contains
         ! If the time-step directory is missing, the post-process exits.
         if (dir_check .neqv. .true.) then
             call s_mpi_abort('Time-step folder '//trim(t_step_ib_dir)// &
-                             ' is missing. Exiting ...')
+                             ' is missing. Exiting.')
         end if
 
-        ! Reading the Grid Data File for the x-direction ===================
+        ! Reading the Grid Data File for the x-direction
 
         ! Checking whether x_cb.dat exists
         file_loc = trim(t_step_dir)//'/x_cb.dat'
@@ -139,7 +139,7 @@ contains
             close (1)
         else
             call s_mpi_abort('File x_cb.dat is missing in '// &
-                             trim(t_step_dir)//'. Exiting ...')
+                             trim(t_step_dir)//'. Exiting.')
         end if
 
         ! Computing the cell-width distribution
@@ -148,10 +148,7 @@ contains
         ! Computing the cell-center locations
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
-        ! ==================================================================
-
-        ! Reading the Grid Data File for the y-direction ===================
-
+        ! Reading the Grid Data File for the y-direction
         if (n > 0) then
 
             ! Checking whether y_cb.dat exists
@@ -166,7 +163,7 @@ contains
                 close (1)
             else
                 call s_mpi_abort('File y_cb.dat is missing in '// &
-                                 trim(t_step_dir)//'. Exiting ...')
+                                 trim(t_step_dir)//'. Exiting.')
             end if
 
             ! Computing the cell-width distribution
@@ -175,10 +172,7 @@ contains
             ! Computing the cell-center locations
             y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
-            ! ==================================================================
-
-            ! Reading the Grid Data File for the z-direction ===================
-
+            ! Reading the Grid Data File for the z-direction
             if (p > 0) then
 
                 ! Checking whether z_cb.dat exists
@@ -193,7 +187,7 @@ contains
                     close (1)
                 else
                     call s_mpi_abort('File z_cb.dat is missing in '// &
-                                     trim(t_step_dir)//'. Exiting ...')
+                                     trim(t_step_dir)//'. Exiting.')
                 end if
 
                 ! Computing the cell-width distribution
@@ -206,9 +200,7 @@ contains
 
         end if
 
-        ! ==================================================================
-
-        ! Reading the Conservative Variables Data Files ====================
+        ! Reading the Conservative Variables Data Files
         do i = 1, sys_size
 
             ! Checking whether the data file associated with the variable
@@ -227,7 +219,7 @@ contains
             else
                 call s_mpi_abort('File q_cons_vf'//trim(file_num)// &
                                  '.dat is missing in '//trim(t_step_dir)// &
-                                 '. Exiting ...')
+                                 '. Exiting.')
             end if
 
         end do
@@ -242,7 +234,7 @@ contains
                       ACTION='read', &
                       STATUS='old')
             else
-                call s_mpi_abort('File '//trim(file_loc_ib)//' is missing. Exiting ...')
+                call s_mpi_abort('File '//trim(file_loc_ib)//' is missing. Exiting.')
             end if
         end if
 
@@ -264,12 +256,10 @@ contains
             else
                 print '(A)', 'File q_cons_vf'//trim(file_num)// &
                     '.dat is missing in '//trim(t_step_dir)// &
-                    '. Exiting ...'
+                    '. Exiting.'
                 call s_mpi_abort()
             end if
         end if
-
-        ! ==================================================================
 
     end subroutine s_read_serial_data_files
 
@@ -324,7 +314,7 @@ contains
             call MPI_FILE_READ(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
-            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
         end if
 
         ! Assigning local cell boundary locations
@@ -345,7 +335,7 @@ contains
                 call MPI_FILE_READ(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             else
-                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
 
             ! Assigning local cell boundary locations
@@ -366,7 +356,7 @@ contains
                     call MPI_FILE_READ(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
-                    call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
                 end if
 
                 ! Assigning local cell boundary locations
@@ -446,12 +436,12 @@ contains
                                            MPI_INTEGER, status, ierr)
 
                     else
-                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
                     end if
 
                 end if
             else
-                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
         else
             ! Open the file to read conservative variables
@@ -544,11 +534,11 @@ contains
                                            MPI_INTEGER, status, ierr)
 
                     else
-                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
                     end if
                 end if
             else
-                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
         end if
 
@@ -570,7 +560,7 @@ contains
 
         integer :: i !< Generic loop iterator
 
-        ! Populating Buffer Regions in the x-direction =====================
+        ! Populating Buffer Regions in the x-direction
 
         ! Ghost-cell extrapolation BC at the beginning
         if (bc_x%beg <= -3) then
@@ -644,9 +634,9 @@ contains
             x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
         end do
 
-        ! END: Populating Buffer Regions in the x-direction ================
+        ! END: Populating Buffer Regions in the x-direction
 
-        ! Populating Buffer Regions in the y-direction =====================
+        ! Populating Buffer Regions in the y-direction
 
         if (n > 0) then
 
@@ -722,9 +712,9 @@ contains
                 y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
             end do
 
-            ! END: Populating Buffer Regions in the y-direction ================
+            ! END: Populating Buffer Regions in the y-direction
 
-            ! Populating Buffer Regions in the z-direction =====================
+            ! Populating Buffer Regions in the z-direction
 
             if (p > 0) then
 
@@ -804,7 +794,7 @@ contains
 
         end if
 
-        ! END: Populating Buffer Regions in the z-direction ================
+        ! END: Populating Buffer Regions in the z-direction
 
     end subroutine s_populate_grid_variables_buffer_regions
 
@@ -817,7 +807,7 @@ contains
 
         integer :: i, j, k !< Generic loop iterators
 
-        ! Populating Buffer Regions in the x-direction =====================
+        ! Populating Buffer Regions in the x-direction
 
         ! Ghost-cell extrapolation BC at the beginning
         if (bc_x%beg <= -3) then
@@ -962,9 +952,9 @@ contains
 
         end if
 
-        ! END: Populating Buffer Regions in the x-direction ================
+        ! END: Populating Buffer Regions in the x-direction
 
-        ! Populating Buffer Regions in the y-direction =====================
+        ! Populating Buffer Regions in the y-direction
 
         if (n > 0) then
 
@@ -1158,9 +1148,9 @@ contains
 
             end if
 
-            ! END: Populating Buffer Regions in the y-direction ================
+            ! END: Populating Buffer Regions in the y-direction
 
-            ! Populating Buffer Regions in the z-direction =====================
+            ! Populating Buffer Regions in the z-direction
 
             if (p > 0) then
 
@@ -1308,7 +1298,7 @@ contains
 
         end if
 
-        ! END: Populating Buffer Regions in the z-direction ================
+        ! END: Populating Buffer Regions in the z-direction
 
     end subroutine s_populate_conservative_variables_buffer_regions
 

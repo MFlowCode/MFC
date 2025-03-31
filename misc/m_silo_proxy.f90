@@ -44,7 +44,7 @@ contains
 
     !> @brief  Refer to page 28 of Silo's user guide (10/2007, v4.6) for
                 !!                           information about this subroutine
-    function DBCREATE(pathname, lpathname, mode, target, & !! ----------
+    function DBCREATE(pathname, lpathname, mode, target, &
                       fileinfo, lfileinfo, filetype, status)
 
         integer                                                   :: DBCREATE
@@ -59,55 +59,55 @@ contains
 
         print '(A)', 'Creation of Silo-HDF5 database file is '// &
             'inconsistent with use of Silo proxy module. '// &
-            'Exiting ...'
+            'Exiting.'
         stop
 
-    end function DBCREATE !! ------------------------------------------------
+    end function DBCREATE
 
     !> @brief  Refer to page 235 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBGET2DSTRLEN() !! ---------------------------------------------
+    function DBGET2DSTRLEN()
 
         integer :: DBGET2DSTRLEN
 
         print '(A)', 'Attempt to query 2D string length is '// &
             'inconsistent with use of Silo proxy module. '// &
-            'Exiting ...'
+            'Exiting.'
         stop
 
-    end function DBGET2DSTRLEN !! -------------------------------------------
+    end function DBGET2DSTRLEN
 
     !> @brief  Refer to page 234 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBSET2DSTRLEN(len) !! ------------------------------------------
+    function DBSET2DSTRLEN(len)
 
         integer                                :: DBSET2DSTRLEN
         integer, intent(IN) :: len
 
         print '(A)', 'Attempt to set 2D string length is '// &
             'inconsistent with use of Silo proxy module. '// &
-            'Exiting ...'
+            'Exiting.'
         stop
 
-    end function DBSET2DSTRLEN !! -------------------------------------------
+    end function DBSET2DSTRLEN
 
     !> @brief  Refer to page 185 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBMKOPTLIST(maxopts, optlist_id) !! ----------------------------
+    function DBMKOPTLIST(maxopts, optlist_id)
 
         integer                                :: DBMKOPTLIST
         integer, intent(IN) :: maxopts
         integer, intent(IN) :: optlist_id
 
         print '(A)', 'Allocation of an options list is inconsistent '// &
-            'with use of Silo proxy module. Exiting ...'
+            'with use of Silo proxy module. Exiting.'
         stop
 
-    end function DBMKOPTLIST !! ---------------------------------------------
+    end function DBMKOPTLIST
 
     !> @brief  Refer to page 186 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBADDIOPT(optlist_id, option, ivalue) !! -----------------------
+    function DBADDIOPT(optlist_id, option, ivalue)
 
         integer                                :: DBADDIOPT
         integer, intent(IN) :: optlist_id
@@ -116,14 +116,14 @@ contains
 
         print '(A)', 'Adding an option to an options list is '// &
             'inconsistent with use of Silo proxy module. '// &
-            'Exiting ...'
+            'Exiting.'
         stop
 
-    end function DBADDIOPT !! -----------------------------------------------
+    end function DBADDIOPT
 
     !> @brief  Refer to page 186 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBADDDOPT(optlist_id, option, dvalue) !! -----------------------
+    function DBADDDOPT(optlist_id, option, dvalue)
 
         integer                                                                :: DBADDDOPT
         integer, intent(IN) :: optlist_id
@@ -132,14 +132,14 @@ contains
 
         print '(A)', 'Adding an option to an options list is '// &
             'inconsistent with use of Silo proxy module. '// &
-            'Exiting ...'
+            'Exiting.'
         stop
 
-    end function DBADDDOPT !! -----------------------------------------------
+    end function DBADDDOPT
 
     !> @brief  Refer to page 121 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBPUTMMESH(dbid, name, lname, nmesh, meshnames, & !! -----
+    function DBPUTMMESH(dbid, name, lname, nmesh, meshnames, &
                         lmeshnames, meshtypes, optlist_id, status)
 
         integer                                                                                 :: DBPUTMMESH
@@ -155,27 +155,27 @@ contains
 
         print '(A)', 'Writing of multi-block mesh object into '// &
             'Silo-HDF5 database file is inconsistent with '// &
-            'use of Silo proxy module. Exiting ...'
+            'use of Silo proxy module. Exiting.'
         stop
 
-    end function DBPUTMMESH !! ----------------------------------------------
+    end function DBPUTMMESH
 
     !> @brief  Refer to page 189 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBFREEOPTLIST(optlist_id) !! -----------------------------------
+    function DBFREEOPTLIST(optlist_id)
 
         integer                                :: DBFREEOPTLIST
         integer, intent(IN) :: optlist_id
 
         print '(A)', 'Deallocation of an options list is inconsistent '// &
-            'with use of Silo proxy module. Exiting ...'
+            'with use of Silo proxy module. Exiting.'
         stop
 
-    end function DBFREEOPTLIST !! -------------------------------------------
+    end function DBFREEOPTLIST
 
     !> @brief  Refer to page 57 of Silo's user guide (10/2007, v4.6) for
                 !!                           information about this subroutine
-    function DBPUTQM(dbid, name, lname, xname, lxname, yname, lyname, & !! -
+    function DBPUTQM(dbid, name, lname, xname, lxname, yname, lyname, &
                      zname, lzname, x, y, z, dims, ndims, datatype, &
                      coordtype, optlist_id, status)
 
@@ -201,14 +201,14 @@ contains
 
         print '(A)', 'Writing of quad mesh object into Silo-HDF5 '// &
             'database file is inconsistent with use of Silo '// &
-            'proxy module. Exiting ...'
+            'proxy module. Exiting.'
         stop
 
-    end function DBPUTQM !! -------------------------------------------------
+    end function DBPUTQM
 
     !> @brief  Refer to page 46 of Silo's user guide (10/2007, v4.6) for
                 !!                           information about this subroutine
-    function DBPUTCURVE(dbid, curvename, lcurvename, xvals, yvals, & !! ----
+    function DBPUTCURVE(dbid, curvename, lcurvename, xvals, yvals, &
                         datatype, npoints, optlist_id, status)
 
         integer                                                                                 :: DBPUTCURVE
@@ -224,14 +224,14 @@ contains
 
         print '(A)', 'Writing of curve object into Silo-HDF5 database '// &
             'file is inconsistent with use of Silo proxy '// &
-            'module. Exiting ...'
+            'module. Exiting.'
         stop
 
-    end function DBPUTCURVE !! ----------------------------------------------
+    end function DBPUTCURVE
 
     !> @brief  Refer to page 130 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBPUTMVAR(dbid, name, lname, nvar, varnames, lvarnames, & !! --
+    function DBPUTMVAR(dbid, name, lname, nvar, varnames, lvarnames, &
                        vartypes, optlist_id, status)
 
         integer                                                                                 :: DBPUTMVAR
@@ -247,14 +247,14 @@ contains
 
         print '(A)', 'Writing of multi-block variable into Silo-HDF5 '// &
             'database file is inconsistent with use of Silo '// &
-            'proxy module. Exiting ...'
+            'proxy module. Exiting.'
         stop
 
-    end function DBPUTMVAR !! -----------------------------------------------
+    end function DBPUTMVAR
 
     !> @brief  Refer to page 64 of Silo's user guide (10/2007, v4.6) for
                 !!                           information about this subroutine
-    function DBPUTQV1(dbid, name, lname, meshname, lmeshname, var, & !! ----
+    function DBPUTQV1(dbid, name, lname, meshname, lmeshname, var, &
                       dims, ndims, mixvar, mixlen, datatype, &
                       centering, optlist_id, status)
 
@@ -276,23 +276,23 @@ contains
 
         print '(A)', 'Writing a scalar quad variable into a Silo-HDF5 '// &
             'database file is inconsistent with use of Silo '// &
-            'proxy module. Exiting ...'
+            'proxy module. Exiting.'
         stop
 
-    end function DBPUTQV1 !! ------------------------------------------------
+    end function DBPUTQV1
 
     !> @brief  Refer to page 31 of Silo's user guide (10/2007, v4.6) for
                 !!                           information about this subroutine
-    function DBCLOSE(dbid) !! -----------------------------------------------
+    function DBCLOSE(dbid)
 
         integer                                :: DBCLOSE
         integer, intent(IN) :: dbid
 
         print '(A)', 'Attempt to close Silo-HDF5 database file is '// &
             'inconsistent with use of Silo proxy module. '// &
-            'Exiting ...'
+            'Exiting.'
         stop
 
-    end function DBCLOSE !! -------------------------------------------------
+    end function DBCLOSE
 
 end module m_silo_proxy

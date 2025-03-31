@@ -16,7 +16,6 @@
 !!             reading in the relevant data files.
 module m_initial_condition
 
-    ! Dependencies =============================================================
     use m_derived_types         ! Definitions of the derived types
 
     use m_global_parameters     ! Global parameters for the code
@@ -37,9 +36,6 @@ module m_initial_condition
     use m_perturbation          ! Subroutines to perturb initial flow fields
 
     use m_chemistry
-
-    ! ==========================================================================
-    ! ==========================================================================
 
     implicit none
 
@@ -79,7 +75,9 @@ contains
         allocate (q_cons_vf(1:sys_size))
 
         do i = 1, sys_size
-            allocate (q_prim_vf(i)%sf(0:m, 0:n, 0:p))
+            allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                      idwbuff(2)%beg:idwbuff(2)%end, &
+                                      idwbuff(3)%beg:idwbuff(3)%end))
             allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
         end do
 
@@ -137,7 +135,7 @@ contains
         character(len=10) :: iStr
 
         ! First, compute the temperature field from the conservative variables.
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwbuff)
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
@@ -145,10 +143,10 @@ contains
             call s_convert_conservative_to_primitive_variables(q_cons_vf, &
                                                                q_T_sf, &
                                                                q_prim_vf, &
-                                                               idwbuff)
+                                                               idwint)
         end if
 
-        !  3D Patch Geometries =============================================
+        !  3D Patch Geometries
         if (p > 0) then
 
             do i = 1, num_patches
@@ -212,6 +210,9 @@ contains
                     call s_sphere(i, ib_markers%sf, q_prim_vf, ib)
                     call s_sphere_levelset(levelset, levelset_norm, i)
                     ! Cylindrical patch
+                elseif (patch_ib(i)%geometry == 9) then
+                    call s_cuboid(i, ib_markers%sf, q_prim_vf, ib)
+                    call s_cuboid_levelset(levelset, levelset_norm, i)
                 elseif (patch_ib(i)%geometry == 10) then
                     call s_cylinder(i, ib_markers%sf, q_prim_vf, ib)
                     call s_cylinder_levelset(levelset, levelset_norm, i)
@@ -226,9 +227,7 @@ contains
             end do
             !> @}
 
-            ! ==================================================================
-
-            ! 2D Patch Geometries ==============================================
+            ! 2D Patch Geometries
         elseif (n > 0) then
 
             do i = 1, num_patches
@@ -258,7 +257,7 @@ contains
                     ! Unimplemented patch (formerly isentropic vortex)
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, '// &
-                                     'which no longer exists. See Examples. Exiting ...')
+                                     'which no longer exists. See Examples. Exiting.')
 
                     ! Analytical function patch for testing purposes
                 elseif (patch_icpp(i)%geometry == 7) then
@@ -311,9 +310,7 @@ contains
             end do
             !> @}
 
-            ! ==================================================================
-
-            ! 1D Patch Geometries ==============================================
+            ! 1D Patch Geometries
         else
 
             do i = 1, num_patches
@@ -338,11 +335,11 @@ contains
             end do
 
         end if
-        ! ==================================================================
 
         if (perturb_flow) call s_perturb_surrounding_flow(q_prim_vf)
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
         if (mixlayer_perturb) call s_superposition_instability_wave(q_prim_vf)
+        if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf)
 
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)

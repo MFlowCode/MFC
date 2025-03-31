@@ -17,7 +17,7 @@
 !!              WENO-Z but is less robust, is implemented according to the work
 !!              of Fu et al. (2016).
 module m_weno
-    ! Dependencies =============================================================
+
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -29,9 +29,6 @@ module m_weno
 #endif
 
     use m_mpi_proxy
-    ! ==========================================================================
-
-    !implicit none
 
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
@@ -43,11 +40,10 @@ module m_weno
     !! of the characteristic decomposition are stored in custom-constructed WENO-
     !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
-
     real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
     !> @}
 
-    ! WENO Coefficients ========================================================
+    ! WENO Coefficients
 
     !> @name Polynomial coefficients at the left and right cell-boundaries (CB) and at
     !! the left and right quadrature points (QP), in the x-, y- and z-directions.
@@ -55,17 +51,12 @@ module m_weno
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the cell-location in the relevant coordinate direction.
     !> @{
-
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_z
-
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_x
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
-
-    !    real(wp), pointer, dimension(:, :, :) :: poly_coef_L => null()
-    !    real(wp), pointer, dimension(:, :, :) :: poly_coef_R => null()
     !> @}
 
     !> @name The ideal weights at the left and the right cell-boundaries and at the
@@ -73,7 +64,6 @@ module m_weno
     !! that the first dimension of the array identifies the weight, while the
     !! last denotes the cell-location in the relevant coordinate direction.
     !> @{
-
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_x
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_y
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_z
@@ -81,8 +71,6 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_x
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_y
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_z
-!    real(wp), pointer, dimension(:, :) :: d_L => null()
-!    real(wp), pointer, dimension(:, :) :: d_R => null()
     !> @}
 
     !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
@@ -90,17 +78,14 @@ module m_weno
     !! second identifies the position of its coefficients and the last denotes
     !! the cell-location in the relevant coordinate direction.
     !> @{
-
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_x
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_y
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_z
-!    real(wp), pointer, dimension(:, :, :) :: beta_coef => null()
     !> @}
 
-    ! END: WENO Coefficients ===================================================
+    ! END: WENO Coefficients
 
     integer :: v_size !< Number of WENO-reconstructed cell-average variables
-
     !$acc declare create(v_size)
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
@@ -128,7 +113,7 @@ contains
 
         if (weno_order == 1) return
 
-        ! Allocating/Computing WENO Coefficients in x-direction ============
+        ! Allocating/Computing WENO Coefficients in x-direction
         is1_weno%beg = -buff_size; is1_weno%end = m - is1_weno%beg
         if (n == 0) then
             is2_weno%beg = 0
@@ -164,9 +149,7 @@ contains
         @:ALLOCATE(v_rs_ws_x(is1_weno%beg:is1_weno%end, &
             is2_weno%beg:is2_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
 
-        ! ==================================================================
-
-        ! Allocating/Computing WENO Coefficients in y-direction ============
+        ! Allocating/Computing WENO Coefficients in y-direction
         if (n == 0) return
 
         is2_weno%beg = -buff_size; is2_weno%end = n - is2_weno%beg
@@ -196,9 +179,7 @@ contains
         @:ALLOCATE(v_rs_ws_y(is2_weno%beg:is2_weno%end, &
             is1_weno%beg:is1_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
 
-        ! ==================================================================
-
-        ! Allocating/Computing WENO Coefficients in z-direction ============
+        ! Allocating/Computing WENO Coefficients in z-direction
         if (p == 0) return
 
         is2_weno%beg = -buff_size; is2_weno%end = n - is2_weno%beg
@@ -220,8 +201,6 @@ contains
 
         @:ALLOCATE(v_rs_ws_z(is3_weno%beg:is3_weno%end, &
             is2_weno%beg:is2_weno%end, is1_weno%beg:is1_weno%end, 1:sys_size))
-
-        ! ==================================================================
 
     end subroutine s_initialize_weno_module
 
@@ -260,7 +239,7 @@ contains
         end if
 
         #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            ! Computing WENO3 Coefficients =====================================
+            ! Computing WENO3 Coefficients
             if (weno_dir == ${WENO_DIR}$) then
                 if (weno_order == 3) then
                     do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
@@ -303,9 +282,9 @@ contains
                             d_cbL_${XYZ}$ (0, s) = 0._wp; d_cbL_${XYZ}$ (1, s) = 1._wp
                         end if
                     end if
-                    ! END: Computing WENO3 Coefficients ================================
+                    ! END: Computing WENO3 Coefficients
 
-                    ! Computing WENO5 Coefficients =====================================
+                    ! Computing WENO5 Coefficients
                 elseif (weno_order == 5) then
 
                     do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
@@ -645,7 +624,6 @@ contains
             end if
         #:endfor
 
-! END: Computing WENO Coefficients ================================
         if (weno_dir == 1) then
             !$acc update device(poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x)
         elseif (weno_dir == 2) then
@@ -665,8 +643,8 @@ contains
                       is1_weno_d, is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
         integer, intent(in) :: norm_dir
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
@@ -875,9 +853,10 @@ contains
                                         ! Fu, et al. (2016)
                                         ! Fu''s code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
                                         tau = abs(beta(2) - beta(0))
-                                        alpha = (1._wp + tau/beta)**6._wp           ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                        alpha = 1._wp + tau/beta                    ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                        alpha = (alpha*alpha*alpha)**2._wp          ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
                                         omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
-                                        delta = merge(0._wp, 1._wp, omega < teno_CT)    ! Equation 26
+                                        delta = merge(0._wp, 1._wp, omega < teno_CT)! Equation 26
                                         alpha = delta*d_cbL_${XYZ}$ (:, j)          ! Equation 27
 
                                     end if
@@ -1058,7 +1037,8 @@ contains
 
                                     elseif (teno) then
                                         tau = abs(beta(4) - beta(3)) ! Note the reordering of stencils
-                                        alpha = (1._wp + tau/beta)**6._wp
+                                        alpha = 1._wp + tau/beta
+                                        alpha = (alpha*alpha*alpha)**2._wp ! some CPU compilers cannot optimize x**6.0
                                         omega = alpha/sum(alpha)
                                         delta = merge(0._wp, 1._wp, omega < teno_CT)
                                         alpha = delta*d_cbL_${XYZ}$ (:, j)
@@ -1170,9 +1150,8 @@ contains
             end do
             !$acc end parallel loop
         end if
-        ! ==================================================================
 
-        ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
+        ! Reshaping/Projecting onto Characteristic Fields in y-direction
         if (n == 0) return
 
         if (weno_dir == 2) then
@@ -1213,9 +1192,7 @@ contains
 #endif
         end if
 
-        ! ==================================================================
-
-        ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
+        ! Reshaping/Projecting onto Characteristic Fields in z-direction
         if (p == 0) return
         if (weno_dir == 3) then
 #if MFC_cuTENSOR
@@ -1245,8 +1222,6 @@ contains
 #endif
         end if
 
-        ! ==================================================================
-
     end subroutine s_initialize_weno
 
     !>  The goal of this subroutine is to ensure that the WENO
@@ -1262,8 +1237,8 @@ contains
         !!  @param l Thire-coordinate cell index
     subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(IN) :: v_rs_ws
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(IN) :: v_rs_ws
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
 
         integer :: i, j, k, l
 
@@ -1355,9 +1330,9 @@ contains
                                                   + sign(5e-1_wp, vL_max - vL_rs_vf(j, k, l, i))) &
                                                *min(abs(vL_min - vL_rs_vf(j, k, l, i)), &
                                                     abs(vL_max - vL_rs_vf(j, k, l, i)))
-                        ! END: Left Monotonicity Preserving Bound ==========================
+                        ! END: Left Monotonicity Preserving Bound
 
-                        ! Right Monotonicity Preserving Bound ==============================
+                        ! Right Monotonicity Preserving Bound
                         d(-1) = v_rs_ws(j, k, l, i) &
                                 + v_rs_ws(j - 2, k, l, i) &
                                 - v_rs_ws(j - 1, k, l, i) &
@@ -1414,7 +1389,7 @@ contains
                                                   + sign(5e-1_wp, vR_max - vR_rs_vf(j, k, l, i))) &
                                                *min(abs(vR_min - vR_rs_vf(j, k, l, i)), &
                                                     abs(vR_max - vR_rs_vf(j, k, l, i)))
-                        ! END: Right Monotonicity Preserving Bound =========================
+                        ! END: Right Monotonicity Preserving Bound
                     end do
                 end do
             end do
@@ -1433,13 +1408,12 @@ contains
         !deallocate(vL_rs_vf_x, vR_rs_vf_x)
         @:DEALLOCATE(v_rs_ws_x)
 
-        ! Deallocating WENO coefficients in x-direction ====================
+        ! Deallocating WENO coefficients in x-direction
         @:DEALLOCATE(poly_coef_cbL_x, poly_coef_cbR_x)
         @:DEALLOCATE(d_cbL_x, d_cbR_x)
         @:DEALLOCATE(beta_coef_x)
-        ! ==================================================================
 
-        ! Deallocating WENO coefficients in y-direction ====================
+        ! Deallocating WENO coefficients in y-direction
         if (n == 0) return
 
         !deallocate(vL_rs_vf_y, vR_rs_vf_y)
@@ -1448,9 +1422,8 @@ contains
         @:DEALLOCATE(poly_coef_cbL_y, poly_coef_cbR_y)
         @:DEALLOCATE(d_cbL_y, d_cbR_y)
         @:DEALLOCATE(beta_coef_y)
-        ! ==================================================================
 
-        ! Deallocating WENO coefficients in z-direction ====================
+        ! Deallocating WENO coefficients in z-direction
         if (p == 0) return
 
         !deallocate(vL_rs_vf_z, vR_rs_vf_z)
@@ -1459,7 +1432,6 @@ contains
         @:DEALLOCATE(poly_coef_cbL_z, poly_coef_cbR_z)
         @:DEALLOCATE(d_cbL_z, d_cbR_z)
         @:DEALLOCATE(beta_coef_z)
-        ! ==================================================================
 
     end subroutine s_finalize_weno_module
 

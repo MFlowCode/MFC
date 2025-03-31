@@ -44,8 +44,8 @@
         end if
 
     case (301) ! (3D lung geometry in X direction, |sin(*)+sin(*)|)
-        h = 0.0
-        lam = 1.0
+        h = 0.0_wp
+        lam = 1.0_wp
         amp = patch_icpp(patch_id)%a(2)
         intH = amp*abs((sin(2*pi*y_cc(j)/lam - pi/2) + sin(2*pi*z_cc(k)/lam - pi/2)) + h)
         if (x_cc(i) > intH) then

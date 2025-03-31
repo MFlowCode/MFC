@@ -26,6 +26,7 @@ contains
     subroutine s_check_inputs
 
         call s_check_inputs_output_format
+        call s_check_inputs_partial_domain
         call s_check_inputs_partial_density
         call s_check_inputs_velocity
         call s_check_inputs_flux_limiter
@@ -42,6 +43,21 @@ contains
         @:PROHIBIT(format /= 1 .and. format /= 2)
         @:PROHIBIT(precision /= 1 .and. precision /= 2)
     end subroutine s_check_inputs_output_format
+
+    !> Checks constraints on partial domain parameters
+    subroutine s_check_inputs_partial_domain
+        @:PROHIBIT(output_partial_domain .and. format == 1)
+        @:PROHIBIT(output_partial_domain .and. precision == 1)
+        @:PROHIBIT(output_partial_domain .and. any([flux_wrt, heat_ratio_wrt, pres_inf_wrt, c_wrt, schlieren_wrt, qm_wrt, ib, any(omega_wrt)]))
+
+        @:PROHIBIT(output_partial_domain .and. (f_is_default(x_output%beg) .or. f_is_default(x_output%end)))
+        @:PROHIBIT(output_partial_domain .and. n /= 0 .and. (f_is_default(y_output%beg) .or. f_is_default(y_output%end)))
+        @:PROHIBIT(output_partial_domain .and. p /= 0 .and. (f_is_default(z_output%beg) .or. f_is_default(z_output%end)))
+
+        #:for X in ['x', 'y', 'z']
+            @:PROHIBIT(${X}$_output%beg > ${X}$_output%end)
+        #:endfor
+    end subroutine s_check_inputs_partial_domain
 
     !> Checks constraints on partial density parameters
     subroutine s_check_inputs_partial_density
@@ -125,7 +141,7 @@ contains
             (/rho_wrt, E_wrt, pres_wrt, gamma_wrt, heat_ratio_wrt, pi_inf_wrt, &
               pres_inf_wrt, cons_vars_wrt, prim_vars_wrt, c_wrt, schlieren_wrt/), &
             alpha_rho_wrt, mom_wrt, vel_wrt, flux_wrt, alpha_wrt, omega_wrt]), &
-            "None of the flow variables have been selected for post-process. Exiting ...")
+            "None of the flow variables have been selected for post-process. Exiting.")
     end subroutine s_check_inputs_no_flow_variables
 
 end module m_checker

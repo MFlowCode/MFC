@@ -7,7 +7,7 @@
 
 module m_check_patches
 
-    ! Dependencies =============================================================
+    ! Dependencies
     use m_derived_types          !< Definitions of the derived types
 
     use m_global_parameters      !< Global parameters for the code
@@ -26,7 +26,6 @@ module m_check_patches
     use m_helper_basic           !< Functions to compare floating point numbers
 
     use m_helper
-    ! ==========================================================================
 
     implicit none
 
@@ -61,7 +60,7 @@ contains
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('geometry 6 (formerly "Vortex")'// &
                                      'is no longer supported for patch '//trim(iStr)// &
-                                     '. Exiting ...')
+                                     '. Exiting.')
                 elseif (patch_icpp(i)%geometry == 7) then
                     call s_check_2D_analytical_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 8) then
@@ -546,7 +545,7 @@ contains
             !@:ASSERT(any(patch_icpp(patch_id)%Y(1:num_species) >  verysmall), "Patch " // trim(iStr) // ".")
         end if
 
-    end subroutine s_check_active_patch_primitive_variables ! --------------
+    end subroutine s_check_active_patch_primitive_variables
 
     !>  This subroutine verifies that the primitive variables
         !!      associated with the given inactive patch remain unaltered

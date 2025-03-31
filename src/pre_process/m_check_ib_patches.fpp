@@ -5,7 +5,6 @@
 
 module m_check_ib_patches
 
-    ! Dependencies =============================================================
     use m_derived_types          !< Definitions of the derived types
 
     use m_global_parameters      !< Global parameters
@@ -24,7 +23,6 @@ module m_check_ib_patches
     use m_helper_basic           !< Functions to compare floating point numbers
 
     use m_helper
-    ! ==========================================================================
 
     implicit none
 

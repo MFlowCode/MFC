@@ -7,7 +7,6 @@
 !> @brief The module contains the subroutines for the FFT routines
 module m_fftw
 
-    ! Dependencies =============================================================
     use, intrinsic :: iso_c_binding
 
     use m_derived_types        !< Definitions of the derived types
@@ -23,8 +22,6 @@ module m_fftw
     use hipfort_check
     use hipfort_hipfft
 #endif
-
-    ! ==========================================================================
 
     implicit none
 
@@ -297,7 +294,7 @@ contains
         end do
 #endif
 !$acc end data
-    end subroutine s_apply_fourier_filter ! --------------------------------
+    end subroutine s_apply_fourier_filter
 
     !>  The purpose of this subroutine is to destroy the fftw plan
         !!      that will be used in the forward and backward DFTs when
@@ -325,4 +322,4 @@ contains
 
     end subroutine s_finalize_fftw_module
 
-end module
+end module m_fftw

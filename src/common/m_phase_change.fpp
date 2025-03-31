@@ -7,8 +7,6 @@ module m_phase_change
 
 #ifndef MFC_POST_PROCESS
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -18,8 +16,6 @@ module m_phase_change
     use m_variables_conversion !< State variables type conversion procedures
 
     use ieee_arithmetic
-
-    ! ==========================================================================
 
     implicit none
 
@@ -122,7 +118,7 @@ contains
                     ! throughout the phase-change process.
                     rM = q_cons_vf(lp + contxb - 1)%sf(j, k, l) + q_cons_vf(vp + contxb - 1)%sf(j, k, l)
 
-                    ! correcting negative (recating) mass fraction values in case they happen
+                    ! correcting negative (reacting) mass fraction values in case they happen
                     call s_correct_partial_densities(MCT, q_cons_vf, rM, j, k, l)
 
                     ! fixing m1 and m2 AFTER correcting the partial densities. Note that these values must be stored for the phase
@@ -798,7 +794,7 @@ contains
 
     !>  This subroutine finalizes the phase change module
     subroutine s_finalize_relaxation_solver_module
-    end subroutine
+    end subroutine s_finalize_relaxation_solver_module
 
 #endif
 

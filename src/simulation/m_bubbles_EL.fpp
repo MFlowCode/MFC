@@ -7,8 +7,6 @@
 !> @brief This module is used to to compute the volume-averaged bubble model
 module m_bubbles_EL
 
-    ! Dependencies =============================================================
-
     use m_global_parameters             !< Definitions of the global parameters
 
     use m_mpi_proxy                     !< Message passing interface (MPI) module proxy
@@ -26,8 +24,6 @@ module m_bubbles_EL
     use m_sim_helpers
 
     use m_helper
-
-    ! ==========================================================================
 
     implicit none
 
@@ -405,7 +401,7 @@ contains
         !! @param save_count File identifier
     subroutine s_restart_bubbles(bub_id, save_count)
 
-        integer :: bub_id, save_count
+        integer, intent(inout) :: bub_id, save_count
 
         character(LEN=path_len + 2*name_len) :: file_loc
 
@@ -434,7 +430,7 @@ contains
                 print *, 'Reading lag_bubbles_mpi_io: ', tot_data, mytime, dt
             end if
         else
-            print '(a)', trim(file_loc)//' is missing. exiting ...'
+            print '(a)', trim(file_loc)//' is missing. exiting.'
             call s_mpi_abort
         end if
 
@@ -993,7 +989,7 @@ contains
             dc = (3._wp*abs(vol)/(4._wp*pi))**(1._wp/3._wp)
         else
 
-            stop "Check cluterflag. Exiting ..."
+            stop "Check cluterflag. Exiting."
 
         end if
 
@@ -1166,7 +1162,8 @@ contains
 
         lag_largestep = 0._wp
         remove_id = 0
-        !$acc parallel loop gang vector default(present) reduction(+: lag_largestep) reduction(MAX: remove_id) private(k) copyin(RKstep)
+        !$acc parallel loop gang vector default(present) reduction(+:lag_largestep) &
+        !$acc reduction(MAX: remove_id) copyin(RKstep) copy(lag_largestep, remove_id)
         do k = 1, nBubs
 
             radiusOld = intfc_rad(k, 2)
@@ -1238,7 +1235,7 @@ contains
         integer :: i, j, k
 
         rkck_errmax = 0._wp
-        !$acc parallel loop gang vector default(present) reduction(MAX: rkck_errmax) private(k)
+        !$acc parallel loop gang vector default(present) reduction(MAX: rkck_errmax) copy(rkck_errmax)
         do k = 1, nBubs
             errb = 0._wp
 
@@ -1463,7 +1460,7 @@ contains
     function particle_in_domain(pos_part)
 
         logical :: particle_in_domain
-        real(wp), dimension(3) :: pos_part
+        real(wp), dimension(3), intent(in) :: pos_part
 
         ! 2D
         if (p == 0 .and. cyl_coord .neqv. .true.) then
@@ -1516,7 +1513,7 @@ contains
     function particle_in_domain_physical(pos_part)
 
         logical :: particle_in_domain_physical
-        real(wp), dimension(3) :: pos_part
+        real(wp), dimension(3), intent(in) :: pos_part
 
         particle_in_domain_physical = ((pos_part(1) < x_cb(m)) .and. (pos_part(1) >= x_cb(-1)) .and. &
                                        (pos_part(2) < y_cb(n)) .and. (pos_part(2) >= y_cb(-1)))
@@ -1592,7 +1589,7 @@ contains
         !!  @param q_time Current time
     subroutine s_write_lag_particles(qtime)
 
-        real(wp) :: qtime
+        real(wp), intent(in) :: qtime
         integer :: k
 
         character(LEN=path_len + 2*name_len) :: file_loc
@@ -1634,7 +1631,8 @@ contains
             !!  @param q_time Current time
     subroutine s_write_void_evol(qtime)
 
-        real(wp) :: qtime, volcell, voltot
+        real(wp), intent(in) :: qtime
+        real(wp) :: volcell, voltot
         real(wp) :: lag_void_max, lag_void_avg, lag_vol
         real(wp) :: void_max_glb, void_avg_glb, vol_glb
 
@@ -1662,15 +1660,12 @@ contains
         lag_void_avg = 0._wp
         lag_vol = 0._wp
         !$acc parallel loop collapse(3) gang vector default(present) reduction(+:lag_vol,lag_void_avg) &
-        !$acc reduction(MAX:lag_void_max) private(cell)
-        do i = 0, m
+        !$acc reduction(MAX:lag_void_max) copy(lag_vol, lag_void_avg, lag_void_max)
+        do k = 0, p
             do j = 0, n
-                do k = 0, p
+                do i = 0, m
                     lag_void_max = max(lag_void_max, 1._wp - q_beta%vf(1)%sf(i, j, k))
-                    cell(1) = i
-                    cell(2) = j
-                    cell(3) = k
-                    call s_get_char_vol(cell(1), cell(2), cell(3), volcell)
+                    call s_get_char_vol(i, j, k, volcell)
                     if ((1._wp - q_beta%vf(1)%sf(i, j, k)) > 5.0d-11) then
                         lag_void_avg = lag_void_avg + (1._wp - q_beta%vf(1)%sf(i, j, k))*volcell
                         lag_vol = lag_vol + volcell
@@ -1710,11 +1705,12 @@ contains
     subroutine s_write_restart_lag_bubbles(t_step)
 
         ! Generic string used to store the address of a particular file
+        integer, intent(in) :: t_step
+
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
-
-        integer :: i, k, t_step
         integer :: bub_id, tot_part, tot_part_wrtn, npart_wrtn
+        integer :: i, k
 
 #ifdef MFC_MPI
         ! For Parallel I/O
@@ -1848,7 +1844,8 @@ contains
 
         integer :: k
 
-        !$acc parallel loop gang vector default(present) reduction(MAX: Rmax_glb) reduction(MIN: Rmin_glb) private(k)
+        !$acc parallel loop gang vector default(present) reduction(MAX:Rmax_glb) &
+        !$acc reduction(MIN: Rmin_glb) copy(Rmax_glb, Rmin_glb)
         do k = 1, nBubs
             Rmax_glb = max(Rmax_glb, intfc_rad(k, 1)/bub_R0(k))
             Rmin_glb = min(Rmin_glb, intfc_rad(k, 1)/bub_R0(k))

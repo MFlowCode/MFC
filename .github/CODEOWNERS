@@ -2,16 +2,14 @@
 # default owner of all files in the repository.
 *                  @sbryngelson
 
-# Henry Le Berre (henryleberre)
-docs/              @sbryngelson @henryleberre
-toolchain/         @sbryngelson @henryleberre
-tests/             @sbryngelson @henryleberre
-mfc.sh             @sbryngelson @henryleberre
-mfc.bat            @sbryngelson @henryleberre
-CMakeLists.txt     @sbryngelson @henryleberre
-.gitlab-ci.yml     @sbryngelson @henryleberre
-.vscode/           @sbryngelson @henryleberre
-.github/workflows/ @sbryngelson @henryleberre
+# @core-devs
+src/               @MFlowCode/core-devs
+docs/              @MFlowCode/core-devs
+toolchain/         @MFlowCode/core-devs
+tests/             @MFlowCode/core-devs
+benchmarks/        @MFlowCode/core-devs
+mfc.sh             @MFlowCode/core-devs
+CMakeLists.txt     @MFlowCode/core-devs
 
-# Spencer H. Bryngelson & Ben Wilfong
-.typos.toml        @sbryngelson @wilfonba
+# @physics-devs
+src/               @MFlowCode/physics-devs

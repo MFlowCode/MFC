@@ -13,7 +13,6 @@
 !!              numbers and the Weber numbers.
 module m_global_parameters
 
-    ! Dependencies =============================================================
 #ifdef MFC_MPI
     use mpi                    !< Message passing interface (MPI) module
 #endif
@@ -26,20 +25,17 @@ module m_global_parameters
     use openacc
 #endif
 
-    ! ==========================================================================
-
     implicit none
 
     real(wp) :: time = 0
 
-    ! Logistics ================================================================
+    ! Logistics
     integer :: num_procs             !< Number of processors
     character(LEN=path_len) :: case_dir              !< Case folder location
     logical :: run_time_info         !< Run-time output flag
     integer :: t_step_old            !< Existing IC/grid folder
-    ! ==========================================================================
 
-    ! Computational Domain Parameters ==========================================
+    ! Computational Domain Parameters
     integer :: proc_rank !< Rank of the local processor
 
     !> @name Number of cells in the x-, y- and z-directions, respectively
@@ -100,9 +96,7 @@ module m_global_parameters
 
     integer :: t_step_print !< Number of time-steps between printouts
 
-    ! ==========================================================================
-
-    ! Simulation Algorithm Parameters ==========================================
+    ! Simulation Algorithm Parameters
     integer :: model_eqns     !< Multicomponent flow model
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: num_dims = ${num_dims}$       !< Number of spatial dimensions
@@ -293,13 +287,11 @@ module m_global_parameters
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
-    integer :: startx, starty, startz
+    !$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
+    ! END: Simulation Algorithm Parameters
 
-    ! END: Simulation Algorithm Parameters =====================================
-
-    ! Fluids Physical Parameters ===============================================
+    ! Fluids Physical Parameters
 
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
     !! Database of the physical parameters of each of the fluids that is present
@@ -309,8 +301,6 @@ module m_global_parameters
     !$acc declare create(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
     !$acc declare create(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
     !$acc declare create(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
-
-    ! ==========================================================================
 
     integer :: fd_order !<
     !! The order of the finite-difference (fd) approximations of the first-order
@@ -348,7 +338,6 @@ module m_global_parameters
     !! patches employed in the configuration of the initial condition. Note that
     !! the maximum allowable number of patches, num_patches_max, may be changed
     !! in the module m_derived_types.f90.
-    ! ==========================================================================
 
     !$acc declare create(ib, num_ibs, patch_ib)
     !> @}
@@ -475,7 +464,6 @@ module m_global_parameters
     real(wp) :: dt_max                           !< Maximum time step size
     !$acc declare create(bubbles_lagrange, lag_params, rkck_adap_dt, dt_max, rkck_time_tmp, rkck_tolerance)
     !> @}
-    ! ======================================================================
 
 contains
 
@@ -763,7 +751,7 @@ contains
         ! interfaces will be computed
         Re_size = 0
 
-        ! Gamma/Pi_inf Model ===============================================
+        ! Gamma/Pi_inf Model
         if (model_eqns == 1) then
 
             ! Annotating structure of the state and flux vectors belonging
@@ -780,9 +768,7 @@ contains
             pi_inf_idx = adv_idx%end
             sys_size = adv_idx%end
 
-            ! ==================================================================
-
-            ! Volume Fraction Model ============================================
+            ! Volume Fraction Model
         else
 
             ! Annotating structure of the state and flux vectors belonging
@@ -1055,7 +1041,7 @@ contains
             end if
 
         end if
-        ! END: Volume Fraction Model =======================================
+        ! END: Volume Fraction Model
 
         if (chemistry) then
             species_idx%beg = sys_size + 1
@@ -1107,45 +1093,22 @@ contains
         Np = 0
 
         !$acc update device(Re_size)
-        ! Determining the number of cells that are needed in order to store
-        ! sufficient boundary conditions data as to iterate the solution in
-        ! the physical computational domain from one time-step iteration to
-        ! the next one
-        if (viscous) then
-            buff_size = 2*weno_polyn + 2
-        else
-            buff_size = weno_polyn + 2
-        end if
 
         if (elasticity) then
             fd_number = max(1, fd_order/2)
-            !buff_size = buff_size + fd_number
         end if
 
         if (probe_wrt) then
             fd_number = max(1, fd_order/2)
         end if
 
-        ! Correction for smearing function in the lagrangian subgrid bubble model
-        if (bubbles_lagrange) then
-            buff_size = max(buff_size, 6)
-        end if
-
-        ! Configuring Coordinate Direction Indexes =========================
-        idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
-        idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
-
-        idwbuff(1)%beg = -buff_size
-        if (num_dims > 1) then; idwbuff(2)%beg = -buff_size; else; idwbuff(2)%beg = 0; end if
-        if (num_dims > 2) then; idwbuff(3)%beg = -buff_size; else; idwbuff(3)%beg = 0; end if
-
-        idwbuff(1)%end = idwint(1)%end - idwbuff(1)%beg
-        idwbuff(2)%end = idwint(2)%end - idwbuff(2)%beg
-        idwbuff(3)%end = idwint(3)%end - idwbuff(3)%beg
+        call s_configure_coordinate_bounds(weno_polyn, buff_size, &
+                                           idwint, idwbuff, viscous, &
+                                           bubbles_lagrange, m, n, p, &
+                                           num_dims)
         !$acc update device(idwint, idwbuff)
-        ! ==================================================================
 
-        ! Configuring Coordinate Direction Indexes =========================
+        ! Configuring Coordinate Direction Indexes
         if (bubbles_euler) then
             @:ALLOCATE(ptil(&
                 & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -1153,18 +1116,7 @@ contains
                 & idwbuff(3)%beg:idwbuff(3)%end))
         end if
 
-        startx = -buff_size
-        starty = 0
-        startz = 0
-        if (n > 0) then
-            starty = -buff_size
-        end if
-        if (p > 0) then
-            startz = -buff_size
-        end if
-
         !$acc update device(fd_order,fd_number)
-        !$acc update device(startx, starty, startz)
 
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1

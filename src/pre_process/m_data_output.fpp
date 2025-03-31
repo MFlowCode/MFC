@@ -9,7 +9,6 @@
 !!              file pre_process.inp.
 module m_data_output
 
-    ! Dependencies =============================================================
     use m_derived_types         !< Definitions of the derived types
 
     use m_global_parameters     !< Global parameters for the code
@@ -32,8 +31,6 @@ module m_data_output
 
     use m_thermochem, only: species_names
 
-    ! ==========================================================================
-
     implicit none
 
     private; 
@@ -43,7 +40,7 @@ module m_data_output
               s_initialize_data_output_module, &
               s_finalize_data_output_module
 
-    abstract interface ! ===================================================
+    abstract interface
 
         !>  Interface for the conservative data
         !! @param q_cons_vf Conservative variables
@@ -73,7 +70,7 @@ module m_data_output
                 intent(IN) :: levelset_norm
 
         end subroutine s_write_abstract_data_files
-    end interface ! ========================================================
+    end interface
 
     character(LEN=path_len + 2*name_len), private :: t_step_dir !<
     !! Time-step folder into which grid and initial condition data will be placed
@@ -139,7 +136,7 @@ contains
 
         t_step = 0
 
-        ! Outputting the Locations of the Cell-boundaries ==================
+        ! Outputting the Locations of the Cell-boundaries
 
         if (old_grid) then
             status = 'old'
@@ -172,9 +169,7 @@ contains
             end if
         end if
 
-        ! ==================================================================
-
-        ! Outputting IB Markers ================================
+        ! Outputting IB Markers
         file_loc = trim(t_step_dir)//'/ib.dat'
 
         open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
@@ -199,9 +194,8 @@ contains
                 end if
             end do
         end if
-        ! ==================================================================
 
-        ! Outtputting Levelset Info ============================
+        ! Outtputting Levelset Info
         file_loc = trim(t_step_dir)//'/levelset.dat'
 
         open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
@@ -214,7 +208,7 @@ contains
         write (1) levelset_norm%sf
         close (1)
 
-        ! Outputting Conservative Variables ================================
+        ! Outputting Conservative Variables
         do i = 1, sys_size
             write (file_num, '(I0)') i
             file_loc = trim(t_step_dir)//'/q_cons_vf'//trim(file_num) &
@@ -251,7 +245,6 @@ contains
                 end do
             end do
         end if
-        ! ==================================================================
 
         gamma = fluid_pp(1)%gamma
         lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
@@ -838,7 +831,7 @@ contains
         ! Generic string used to store the address of a particular file
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
         character(len=15) :: temp
-        character(LEN=1), dimension(3) :: coord = (/'x', 'y', 'z'/)
+        character(LEN=1), dimension(3), parameter :: coord = (/'x', 'y', 'z'/)
 
         ! Generic logical used to check the existence of directories
         logical :: dir_check
@@ -892,7 +885,7 @@ contains
         write (1, '(A)') "This file may contain errors and not support all features."
 
         write (1, '(A3,A20,A20)') "#", "Conservative", "Primitive"
-        write (1, '(A)') "-------------------------------------------"
+        write (1, '(A)') "    "
         do i = contxb, contxe
             write (temp, '(I0)') i - contxb + 1
             write (1, '(I3,A20,A20)') i, "\alpha_{"//trim(temp)//"} \rho_{"//trim(temp)//"}", "\alpha_{"//trim(temp)//"} \rho"

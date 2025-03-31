@@ -76,7 +76,7 @@ contains
                         "${DIR}$_domain%${BOUND}$ must not be set when ${VAR}$ > 0 and old_grid = T")
                     @:PROHIBIT(${VAR}$ > 0 .and. (.not. old_grid) .and. f_is_default(${DIR}$_domain%${BOUND}$), &
                         "${DIR}$_domain%${BOUND}$ must be set when ${VAR}$ > 0 and old_grid = F")
-                    @:PROHIBIT(${VAR}$ > 0 .and. ${DIR}$_domain%beg >= ${DIR}$_domain%end, &
+                    @:PROHIBIT(${VAR}$ > 0 .and. (.not. old_grid) .and. ${DIR}$_domain%beg >= ${DIR}$_domain%end, &
                         "${DIR}$_domain%beg must be less than ${DIR}$_domain%end when both are set")
                 #:endfor
             end if
@@ -192,6 +192,9 @@ contains
         @:PROHIBIT(mixlayer_perturb .and. num_fluids > 1, "mixlayer_perturb requires num_fluids = 1")
         @:PROHIBIT(mixlayer_perturb .and. any((/bc_y%beg, bc_y%end/) /= -6), &
             "mixlayer_perturb requires both bc_y%beg and bc_y%end to be 6")
+        @:PROHIBIT(elliptic_smoothing .and. elliptic_smoothing_iters < 1, &
+            "elliptic_smoothing_iters must be positive")
+
     end subroutine s_check_inputs_misc
 
 end module m_checker

@@ -6,7 +6,6 @@
 !! boundary condiitons
 module m_boundary_conditions
 
-    ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -14,13 +13,14 @@ module m_boundary_conditions
     use m_mpi_proxy
 
     use m_constants
-    ! ==========================================================================
 
     implicit none
 
-    private; 
-    public :: s_populate_variables_buffers, &
-              s_populate_capillary_buffers
+#ifdef MFC_SIMULATION
+    private; public :: s_populate_variables_buffers, s_populate_capillary_buffers
+#else
+    private; public :: s_populate_variables_buffers
+#endif
 
 contains
 
@@ -30,11 +30,12 @@ contains
     subroutine s_populate_variables_buffers(q_prim_vf, pb, mv)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
 
         integer :: bc_loc, bc_dir
 
-        ! Population of Buffers in x-direction =============================
+        ! Population of Buffers in x-direction
 
         select case (bc_x%beg)
         case (-13:-3) ! Ghost-cell extrap. BC at beginning
@@ -68,6 +69,7 @@ contains
                 q_prim_vf, pb, mv, 1, 1)
         end select
 
+#ifdef MFC_SIMULATION
         if (qbmm .and. .not. polytropic) then
             select case (bc_x%beg)
             case (-13:-3) ! Ghost-cell extrap. BC at beginning
@@ -87,10 +89,9 @@ contains
                 call s_qbmm_extrapolation(pb, mv, 1, 1)
             end select
         end if
+#endif
 
-        ! END: Population of Buffers in x-direction ========================
-
-        ! Population of Buffers in y-direction =============================
+        ! Population of Buffers in y-direction
 
         if (n == 0) return
 
@@ -128,8 +129,8 @@ contains
                 q_prim_vf, pb, mv, 2, 1)
         end select
 
+#ifdef MFC_SIMULATION
         if (qbmm .and. .not. polytropic) then
-
             select case (bc_y%beg)
             case (-13:-3) ! Ghost-cell extrap. BC at beginning
                 call s_qbmm_extrapolation(pb, mv, 2, -1)
@@ -147,12 +148,10 @@ contains
             case (-16)    ! No-slip wall BC at end
                 call s_qbmm_extrapolation(pb, mv, 2, 1)
             end select
-
         end if
+#endif
 
-        ! END: Population of Buffers in y-direction ========================
-
-        ! Population of Buffers in z-direction =============================
+        ! Population of Buffers in z-direction
 
         if (p == 0) return
 
@@ -188,8 +187,8 @@ contains
                 q_prim_vf, pb, mv, 3, 1)
         end select
 
+#ifdef MFC_SIMULATION
         if (qbmm .and. .not. polytropic) then
-
             select case (bc_z%beg)
             case (-13:-3) ! Ghost-cell extrap. BC at beginning
                 call s_qbmm_extrapolation(pb, mv, 3, -1)
@@ -207,21 +206,20 @@ contains
             case (-16)    ! No-slip wall BC at end
                 call s_qbmm_extrapolation(pb, mv, 3, 1)
             end select
-
         end if
-
-        ! END: Population of Buffers in z-direction ========================
+#endif
+        ! END: Population of Buffers in z-direction
 
     end subroutine s_populate_variables_buffers
 
     subroutine s_ghost_cell_extrapolation(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer :: j, k, l, q, i
 
-        !< x-direction =========================================================
+        !< x-direction
         if (bc_dir == 1) then !< x-direction
 
             if (bc_loc == -1) then !bc_x%beg
@@ -254,7 +252,7 @@ contains
 
             end if
 
-            !< y-direction =========================================================
+            !< y-direction
         elseif (bc_dir == 2) then !< y-direction
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -287,7 +285,7 @@ contains
 
             end if
 
-            !< z-direction =========================================================
+            !< z-direction
         elseif (bc_dir == 3) then !< z-direction
 
             if (bc_loc == -1) then !< bc_z%beg
@@ -321,19 +319,18 @@ contains
             end if
 
         end if
-        !< =====================================================================
 
     end subroutine s_ghost_cell_extrapolation
 
     subroutine s_symmetry(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
 
         integer :: j, k, l, q, i
 
-        !< x-direction =========================================================
+        !< x-direction
         if (bc_dir == 1) then
 
             if (bc_loc == -1) then !< bc_x%beg
@@ -365,7 +362,7 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
@@ -383,6 +380,7 @@ contains
                         end do
                     end do
                 end if
+#endif
 
             else !< bc_x%end
 
@@ -414,7 +412,7 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
@@ -432,10 +430,10 @@ contains
                         end do
                     end do
                 end if
-
+#endif
             end if
 
-            !< y-direction =========================================================
+            !< y-direction
         elseif (bc_dir == 2) then
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -466,7 +464,7 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
@@ -484,7 +482,7 @@ contains
                         end do
                     end do
                 end if
-
+#endif
             else !< bc_y%end
 
                 !$acc parallel loop collapse(3) gang vector default(present)
@@ -513,7 +511,7 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
@@ -531,10 +529,10 @@ contains
                         end do
                     end do
                 end if
-
+#endif
             end if
 
-            !< z-direction =========================================================
+            !< z-direction
         elseif (bc_dir == 3) then
 
             if (bc_loc == -1) then !< bc_z%beg
@@ -565,7 +563,7 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
@@ -583,7 +581,7 @@ contains
                         end do
                     end do
                 end if
-
+#endif
             else !< bc_z%end
 
                 !$acc parallel loop collapse(3) gang vector default(present)
@@ -612,7 +610,7 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
@@ -630,23 +628,22 @@ contains
                         end do
                     end do
                 end if
-
+#endif
             end if
 
         end if
-        !< =====================================================================
 
     end subroutine s_symmetry
 
     subroutine s_periodic(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
 
         integer :: j, k, l, q, i
 
-        !< x-direction =========================================================
+        !< x-direction
         if (bc_dir == 1) then
 
             if (bc_loc == -1) then !< bc_x%beg
@@ -662,7 +659,7 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
@@ -680,7 +677,7 @@ contains
                         end do
                     end do
                 end if
-
+#endif
             else !< bc_x%end
 
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -694,7 +691,7 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
@@ -712,10 +709,10 @@ contains
                         end do
                     end do
                 end if
-
+#endif
             end if
 
-            !< y-direction =========================================================
+            !< y-direction
         elseif (bc_dir == 2) then
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -731,7 +728,7 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do i = 1, nb
@@ -749,7 +746,7 @@ contains
                         end do
                     end do
                 end if
-
+#endif
             else !< bc_y%end
 
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -763,7 +760,7 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
@@ -781,10 +778,10 @@ contains
                         end do
                     end do
                 end if
-
+#endif
             end if
 
-            !< z-direction =========================================================
+            !< z-direction
         elseif (bc_dir == 3) then
 
             if (bc_loc == -1) then !< bc_z%beg
@@ -800,7 +797,7 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
@@ -818,7 +815,7 @@ contains
                         end do
                     end do
                 end if
-
+#endif
             else !< bc_z%end
 
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -832,7 +829,7 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
@@ -850,18 +847,17 @@ contains
                         end do
                     end do
                 end if
-
+#endif
             end if
 
         end if
-        !< =====================================================================
 
     end subroutine s_periodic
 
     subroutine s_axis(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
 
         integer :: j, k, l, q, i
@@ -910,7 +906,7 @@ contains
                 end do
             end do
         end do
-
+#ifdef MFC_SIMULATION
         if (qbmm .and. .not. polytropic) then
             !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
@@ -928,18 +924,18 @@ contains
                 end do
             end do
         end if
-
+#endif
     end subroutine s_axis
 
     subroutine s_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
 
         integer :: j, k, l, q, i
 
-        !< x-direction =========================================================
+        !< x-direction
         if (bc_dir == 1) then
 
             if (bc_loc == -1) then !< bc_x%beg
@@ -982,7 +978,7 @@ contains
 
             end if
 
-            !< y-direction =========================================================
+            !< y-direction
         elseif (bc_dir == 2) then
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -1025,7 +1021,7 @@ contains
 
             end if
 
-            !< z-direction =========================================================
+            !< z-direction
         elseif (bc_dir == 3) then
 
             if (bc_loc == -1) then !< bc_z%beg
@@ -1069,19 +1065,18 @@ contains
             end if
 
         end if
-        !< =====================================================================
 
     end subroutine s_slip_wall
 
     subroutine s_no_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
 
         integer :: j, k, l, q, i
 
-        !< x-direction =========================================================
+        !< x-direction
         if (bc_dir == 1) then
 
             if (bc_loc == -1) then !< bc_x%beg
@@ -1136,7 +1131,7 @@ contains
 
             end if
 
-            !< y-direction =========================================================
+            !< y-direction
         elseif (bc_dir == 2) then
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -1191,7 +1186,7 @@ contains
 
             end if
 
-            !< z-direction =========================================================
+            !< z-direction
         elseif (bc_dir == 3) then
 
             if (bc_loc == -1) then !< bc_z%beg
@@ -1247,18 +1242,17 @@ contains
             end if
 
         end if
-        !< =====================================================================
 
     end subroutine s_no_slip_wall
 
     subroutine s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc)
 
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
 
         integer :: j, k, l, q, i
 
-        !< x-direction =========================================================
+        !< x-direction
         if (bc_dir == 1) then
 
             if (bc_loc == -1) then !< bc_x%beg
@@ -1299,7 +1293,7 @@ contains
 
             end if
 
-            !< y-direction =========================================================
+            !< y-direction
         elseif (bc_dir == 2) then
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -1340,7 +1334,7 @@ contains
 
             end if
 
-            !< z-direction =========================================================
+            !< z-direction
         elseif (bc_dir == 3) then
 
             if (bc_loc == -1) then !< bc_z%beg
@@ -1383,8 +1377,9 @@ contains
 
         end if
 
-    end subroutine
+    end subroutine s_qbmm_extrapolation
 
+#ifdef MFC_SIMULATION
     subroutine s_populate_capillary_buffers(c_divs)
 
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
@@ -1666,5 +1661,6 @@ contains
         end if
 
     end subroutine s_populate_capillary_buffers
+#endif
 
 end module m_boundary_conditions

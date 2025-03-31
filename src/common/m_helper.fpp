@@ -5,17 +5,11 @@
 
 module m_helper
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
 
-    use m_mpi_common           !< MPI modules
-
     use ieee_arithmetic        !< For checking NaN
-
-    ! ==========================================================================
 
     implicit none
 
@@ -36,7 +30,6 @@ module m_helper
               s_print_2D_array, &
               f_xor, &
               f_logical_to_int, &
-              s_prohibit_abort, &
               unassociated_legendre, &
               associated_legendre, &
               spherical_harmonic_func, &
@@ -105,7 +98,7 @@ contains
         end do
         write (*, fmt="(A1)") " "
 
-    end subroutine
+    end subroutine s_print_2D_array
 
     !> Initializes non-polydisperse bubble modeling
     subroutine s_initialize_nonpoly
@@ -248,11 +241,11 @@ contains
     subroutine s_int_to_str(i, res)
 
         integer, intent(in) :: i
-        character(len=*), intent(out) :: res
+        character(len=*), intent(inout) :: res
 
         write (res, '(I0)') i
         res = trim(res)
-    end subroutine
+    end subroutine s_int_to_str
 
     !> Computes the Simpson weights for quadrature
     subroutine s_simpson
@@ -319,10 +312,11 @@ contains
     !> This procedure creates a transformation matrix.
     !! @param  p Parameters for the transformation.
     !! @return Transformation matrix.
-    function f_create_transform_matrix(p) result(out_matrix)
+    function f_create_transform_matrix(p, center) result(out_matrix)
 
         type(ic_model_parameters), intent(in) :: p
-        t_mat4x4 :: sc, rz, rx, ry, tr, out_matrix
+        t_vec3, optional, intent(in) :: center
+        t_mat4x4 :: sc, rz, rx, ry, tr, t_back, t_to_origin, out_matrix
 
         sc = transpose(reshape([ &
                                p%scale(1), 0._wp, 0._wp, 0._wp, &
@@ -354,7 +348,25 @@ contains
                                0._wp, 0._wp, 1._wp, p%translate(3), &
                                0._wp, 0._wp, 0._wp, 1._wp], shape(tr)))
 
-        out_matrix = matmul(tr, matmul(ry, matmul(rx, matmul(rz, sc))))
+        if (present(center)) then
+            ! Translation matrix to move center to the origin
+            t_to_origin = transpose(reshape([ &
+                                            1._wp, 0._wp, 0._wp, -center(1), &
+                                            0._wp, 1._wp, 0._wp, -center(2), &
+                                            0._wp, 0._wp, 1._wp, -center(3), &
+                                            0._wp, 0._wp, 0._wp, 1._wp], shape(tr)))
+
+            ! Translation matrix to move center back to original position
+            t_back = transpose(reshape([ &
+                                       1._wp, 0._wp, 0._wp, center(1), &
+                                       0._wp, 1._wp, 0._wp, center(2), &
+                                       0._wp, 0._wp, 1._wp, center(3), &
+                                       0._wp, 0._wp, 0._wp, 1._wp], shape(tr)))
+
+            out_matrix = matmul(tr, matmul(t_back, matmul(ry, matmul(rx, matmul(rz, matmul(sc, t_to_origin))))))
+        else
+            out_matrix = matmul(ry, matmul(rx, rz))
+        end if
 
     end function f_create_transform_matrix
 
@@ -376,10 +388,10 @@ contains
     !> This procedure transforms a triangle by a matrix, one vertex at a time.
     !! @param triangle Triangle to transform.
     !! @param matrix   Transformation matrix.
-    subroutine s_transform_triangle(triangle, matrix)
+    subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
         type(t_triangle), intent(inout) :: triangle
-        t_mat4x4, intent(in) :: matrix
+        t_mat4x4, intent(in) :: matrix, matrix_n
 
         integer :: i
 
@@ -389,20 +401,22 @@ contains
             call s_transform_vec(triangle%v(i, :), matrix)
         end do
 
+        call s_transform_vec(triangle%n(1:3), matrix_n)
+
     end subroutine s_transform_triangle
 
     !> This procedure transforms a model by a matrix, one triangle at a time.
     !! @param model  Model to transform.
     !! @param matrix Transformation matrix.
-    subroutine s_transform_model(model, matrix)
+    subroutine s_transform_model(model, matrix, matrix_n)
 
         type(t_model), intent(inout) :: model
-        t_mat4x4, intent(in) :: matrix
+        t_mat4x4, intent(in) :: matrix, matrix_n
 
         integer :: i
 
         do i = 1, size(model%trs)
-            call s_transform_triangle(model%trs(i), matrix)
+            call s_transform_triangle(model%trs(i), matrix, matrix_n)
         end do
 
     end subroutine s_transform_model
@@ -454,22 +468,6 @@ contains
             int = 0
         end if
     end function f_logical_to_int
-
-    subroutine s_prohibit_abort(condition, message)
-        character(len=*), intent(in) :: condition, message
-
-        print *, ""
-        print *, "===================================================================================================="
-        print *, "                                          CASE FILE ERROR                                           "
-        print *, "----------------------------------------------------------------------------------------------------"
-        print *, "Prohibited condition: ", trim(condition)
-        if (len_trim(message) > 0) then
-            print *, "Note: ", trim(message)
-        end if
-        print *, "===================================================================================================="
-        print *, ""
-        call s_mpi_abort
-    end subroutine s_prohibit_abort
 
     !> This function generates the unassociated legendre poynomials
     !! @param x is the input value
@@ -561,7 +559,7 @@ contains
     end function double_factorial
 
     !> The following function calculates the factorial value of an integer
-    !! @paaram n is the input integer
+    !! @param n is the input integer
     !! @return R is the factorial value of n
     recursive function factorial(n) result(R)
 

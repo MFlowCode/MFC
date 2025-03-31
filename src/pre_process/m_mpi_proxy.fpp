@@ -9,22 +9,21 @@
 !!              communication goals.
 module m_mpi_proxy
 
-    ! Dependencies =============================================================
 #ifdef MFC_MPI
     use mpi                     !< Message passing interface (MPI) module
 #endif
+
+    use m_helper
 
     use m_derived_types         !< Definitions of the derived types
 
     use m_global_parameters     !< Global parameters for the code
 
     use m_mpi_common
-    ! ==========================================================================
 
     implicit none
 
-    integer, private :: err_code, ierr !<
-    !! Generic flags used to identify and report MPI errors
+    integer, private :: ierr
 
 contains
 
@@ -47,7 +46,7 @@ contains
             & 'loops_x', 'loops_y', 'loops_z', 'model_eqns', 'num_fluids',     &
             & 'weno_order', 'precision', 'perturb_flow_fluid', &
             & 'perturb_sph_fluid', 'num_patches', 'thermal', 'nb', 'dist_type',&
-            & 'R0_type', 'relax_model', 'num_ibs', 'n_start' ]
+            & 'R0_type', 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters']
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -57,7 +56,8 @@ contains
             & 'mixlayer_perturb', 'bubbles_euler', 'polytropic', 'polydisperse',&
             & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
             & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
-            & 'hyperelasticity', 'pre_stress' ]
+            & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',&
+            & 'bubbles_lagrange' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
@@ -110,9 +110,10 @@ contains
             call MPI_BCAST(patch_ib(i)%model_spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in [ 'x_centroid', 'y_centroid', 'z_centroid',           &
-                & 'length_x', 'length_y', 'length_z', 'radius', 'c', 'p', 't', 'm', 'theta', 'slip']
+                & 'length_x', 'length_y', 'length_z', 'radius', 'c', 'p', 't', 'm', 'theta']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
+            call MPI_BCAST(patch_ib(i)%slip, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in [ 'model_translate', 'model_scale', 'model_rotate']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
@@ -172,7 +173,7 @@ contains
         ! equivalent piece of the computational domain. Note that explicit
         ! type-casting is omitted here for code legibility purposes.
 
-        ! Generating 3D Cartesian Processor Topology =======================
+        ! Generating 3D Cartesian Processor Topology
 
         if (n > 0) then
 
@@ -295,7 +296,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     print '(A)', 'Unable to decompose computational '// &
                         'domain for selected number of '// &
-                        'processors. Exiting ...'
+                        'processors. Exiting.'
                     call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                 end if
 
@@ -310,9 +311,9 @@ contains
                 call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, &
                                      proc_coords, ierr)
 
-                ! END: Generating 3D Cartesian Processor Topology ==================
+                ! END: Generating 3D Cartesian Processor Topology
 
-                ! Sub-domain Global Parameters in z-direction ======================
+                ! Sub-domain Global Parameters in z-direction
 
                 ! Number of remaining cells after majority is distributed
                 rem_cells = mod(p + 1, num_procs_z)
@@ -332,6 +333,22 @@ contains
                         exit
                     end if
                 end do
+
+                ! Boundary condition at the beginning
+                if (proc_coords(3) > 0 .or. (bc_z%beg == -1 .and. num_procs_z > 1)) then
+                    proc_coords(3) = proc_coords(3) - 1
+                    call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
+                                       bc_z%beg, ierr)
+                    proc_coords(3) = proc_coords(3) + 1
+                end if
+
+                ! Boundary condition at the end
+                if (proc_coords(3) < num_procs_z - 1 .or. (bc_z%end == -1 .and. num_procs_z > 1)) then
+                    proc_coords(3) = proc_coords(3) + 1
+                    call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
+                                       bc_z%end, ierr)
+                    proc_coords(3) = proc_coords(3) - 1
+                end if
 
                 ! Beginning and end sub-domain boundary locations
                 if (parallel_io .neqv. .true.) then
@@ -357,9 +374,7 @@ contains
                     end if
                 end if
 
-                ! ==================================================================
-
-                ! Generating 2D Cartesian Processor Topology =======================
+                ! Generating 2D Cartesian Processor Topology
 
             else
 
@@ -408,7 +423,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     print '(A)', 'Unable to decompose computational '// &
                         'domain for selected number of '// &
-                        'processors. Exiting ...'
+                        'processors. Exiting.'
                     call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                 end if
 
@@ -417,7 +432,6 @@ contains
                                                           num_procs_y/), (/.true., &
                                                                            .true./), .false., MPI_COMM_CART, &
                                      ierr)
-
                 ! Finding corresponding Cartesian coordinates of the local
                 ! processor rank in newly declared cartesian communicator
                 call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 2, &
@@ -425,9 +439,9 @@ contains
 
             end if
 
-            ! END: Generating 2D Cartesian Processor Topology ==================
+            ! END: Generating 2D Cartesian Processor Topology
 
-            ! Sub-domain Global Parameters in y-direction ======================
+            ! Sub-domain Global Parameters in y-direction
 
             ! Number of remaining cells after majority has been distributed
             rem_cells = mod(n + 1, num_procs_y)
@@ -447,6 +461,22 @@ contains
                     exit
                 end if
             end do
+
+            ! Boundary condition at the beginning
+            if (proc_coords(2) > 0 .or. (bc_y%beg == -1 .and. num_procs_y > 1)) then
+                proc_coords(2) = proc_coords(2) - 1
+                call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
+                                   bc_y%beg, ierr)
+                proc_coords(2) = proc_coords(2) + 1
+            end if
+
+            ! Boundary condition at the end
+            if (proc_coords(2) < num_procs_y - 1 .or. (bc_y%end == -1 .and. num_procs_y > 1)) then
+                proc_coords(2) = proc_coords(2) + 1
+                call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
+                                   bc_y%end, ierr)
+                proc_coords(2) = proc_coords(2) - 1
+            end if
 
             ! Beginning and end sub-domain boundary locations
             if (parallel_io .neqv. .true.) then
@@ -472,9 +502,7 @@ contains
                 end if
             end if
 
-            ! ==================================================================
-
-            ! Generating 1D Cartesian Processor Topology =======================
+            ! Generating 1D Cartesian Processor Topology
 
         else
 
@@ -494,9 +522,7 @@ contains
 
         end if
 
-        ! ==================================================================
-
-        ! Sub-domain Global Parameters in x-direction ======================
+        ! Sub-domain Global Parameters in x-direction
 
         ! Number of remaining cells after majority has been distributed
         rem_cells = mod(m + 1, num_procs_x)
@@ -516,6 +542,20 @@ contains
                 exit
             end if
         end do
+
+        ! Boundary condition at the beginning
+        if (proc_coords(1) > 0 .or. (bc_x%beg == -1 .and. num_procs_x > 1)) then
+            proc_coords(1) = proc_coords(1) - 1
+            call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
+            proc_coords(1) = proc_coords(1) + 1
+        end if
+
+        ! Boundary condition at the end
+        if (proc_coords(1) < num_procs_x - 1 .or. (bc_x%end == -1 .and. num_procs_x > 1)) then
+            proc_coords(1) = proc_coords(1) + 1
+            call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
+            proc_coords(1) = proc_coords(1) - 1
+        end if
 
         ! Beginning and end sub-domain boundary locations
         if (parallel_io .neqv. .true.) then
@@ -540,8 +580,6 @@ contains
                 start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
             end if
         end if
-
-        ! ==================================================================
 
 #endif
 

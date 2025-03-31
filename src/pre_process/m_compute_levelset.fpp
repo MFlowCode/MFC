@@ -8,15 +8,11 @@
 !!              boundary methods (IBMs)
 module m_compute_levelset
 
-    ! Dependencies =============================================================
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-
-    ! ==========================================================================
 
     implicit none
 
@@ -265,7 +261,7 @@ contains
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
 
-        integer :: ib_patch_id
+        integer, intent(in) :: ib_patch_id
         real(wp) :: top_right(2), bottom_left(2)
         real(wp) :: x, y, min_dist
         real(wp) :: side_dists(4)

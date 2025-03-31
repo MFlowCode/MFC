@@ -11,7 +11,6 @@
 !!              the mixture variables and the subroutines used to compute pressure.
 module m_variables_conversion
 
-    ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -25,8 +24,6 @@ module m_variables_conversion
     use m_thermochem, only: &
         num_species, get_temperature, get_pressure, gas_constant, &
         get_mixture_molecular_weight, get_mixture_energy_mass
-
-    ! ==========================================================================
 
     implicit none
 
@@ -749,14 +746,14 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv
+        real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: mv
 
         integer :: i, j, k, l
         real(wp) :: mu, sig, nbub_sc
 
-        do l = idwbuff(3)%beg, idwbuff(3)%end
-            do k = idwbuff(2)%beg, idwbuff(2)%end
-                do j = idwbuff(1)%beg, idwbuff(1)%end
+        do l = idwint(3)%beg, idwint(3)%end
+            do k = idwint(2)%beg, idwint(2)%end
+                do j = idwint(1)%beg, idwint(1)%end
 
                     nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
 
@@ -781,15 +778,15 @@ contains
     subroutine s_initialize_pb(qK_cons_vf, mv, pb)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(in) :: mv
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb
+        real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
+        real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: pb
 
         integer :: i, j, k, l
         real(wp) :: mu, sig, nbub_sc
 
-        do l = idwbuff(3)%beg, idwbuff(3)%end
-            do k = idwbuff(2)%beg, idwbuff(2)%end
-                do j = idwbuff(1)%beg, idwbuff(1)%end
+        do l = idwint(3)%beg, idwint(3)%end
+            do k = idwint(2)%beg, idwint(2)%end
+                do j = idwint(1)%beg, idwint(1)%end
 
                     nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
 
@@ -1058,7 +1055,7 @@ contains
 
         !print *, 'I got here AA'
 
-    end subroutine s_convert_conservative_to_primitive_variables ! ---------
+    end subroutine s_convert_conservative_to_primitive_variables
 
     !>  The following procedure handles the conversion between
         !!      the primitive variables and the conservative variables.
@@ -1084,7 +1081,7 @@ contains
         real(wp) :: dyn_pres
         real(wp) :: nbub, R3, vftmp, R3tmp
         real(wp), dimension(nb) :: Rtmp
-        real(wp) :: G = 0._wp
+        real(wp) :: G
         real(wp), dimension(2) :: Re_K
 
         integer :: i, j, k, l, q !< Generic loop iterators
@@ -1092,6 +1089,8 @@ contains
 
         real(wp), dimension(num_species) :: Ys
         real(wp) :: e_mix, mix_mol_weight, T
+
+        G = 0._wp
 
 #ifndef MFC_SIMULATION
         ! Converting the primitive variables to the conservative variables
@@ -1242,7 +1241,7 @@ contains
         if (proc_rank == 0) then
             call s_mpi_abort('Conversion from primitive to '// &
                              'conservative variables not '// &
-                             'implemented. Exiting ...')
+                             'implemented. Exiting.')
         end if
 #endif
     end subroutine s_convert_primitive_to_conservative_variables
@@ -1380,7 +1379,7 @@ contains
 #endif
     end subroutine s_convert_primitive_to_flux_variables
 
-    subroutine s_finalize_variables_conversion_module() ! ------------------
+    subroutine s_finalize_variables_conversion_module()
 
         integer :: i !< Generic loop iterators
 

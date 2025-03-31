@@ -14,7 +14,6 @@
 !!              for the cell-centers and cell-boundaries locations.
 module m_grid
 
-    ! Dependencies =============================================================
     use m_derived_types         ! Definitions of the derived types
 
     use m_global_parameters     ! Global parameters for the code
@@ -24,7 +23,6 @@ module m_grid
 #ifdef MFC_MPI
     use mpi                     ! Message passing interface (MPI) module
 #endif
-    ! ==========================================================================
 
     implicit none
 
@@ -35,15 +33,13 @@ module m_grid
               s_generate_parallel_grid, &
               s_finalize_grid_module
 
-    abstract interface ! ===================================================
+    abstract interface
 
         subroutine s_generate_abstract_grid
 
-            ! integer, intent(IN), optional :: dummy
-
         end subroutine s_generate_abstract_grid
 
-    end interface ! ========================================================
+    end interface
 
     procedure(s_generate_abstract_grid), pointer :: s_generate_grid => null()
 
@@ -60,7 +56,7 @@ contains
         integer :: i, j             !< generic loop operators
         real(wp) :: length   !< domain lengths
 
-        ! Grid Generation in the x-direction ===============================
+        ! Grid Generation in the x-direction
         dx = (x_domain%end - x_domain%beg)/real(m + 1, wp)
 
         do i = 0, m
@@ -94,9 +90,8 @@ contains
             if (num_procs > 1) call s_mpi_reduce_min(dx)
 
         end if
-        ! ==================================================================
 
-        ! Grid Generation in the y-direction ===============================
+        ! Grid Generation in the y-direction
         if (n == 0) return
 
         if (grid_geometry == 2 .and. y_domain%beg == 0.0_wp) then
@@ -149,9 +144,8 @@ contains
             if (num_procs > 1) call s_mpi_reduce_min(dy)
 
         end if
-        ! ==================================================================
 
-        ! Grid Generation in the z-direction ===============================
+        ! Grid Generation in the z-direction
         if (p == 0) return
 
         dz = (z_domain%end - z_domain%beg)/real(p + 1, wp)
@@ -187,7 +181,6 @@ contains
             if (num_procs > 1) call s_mpi_reduce_min(dz)
 
         end if
-        ! ==================================================================
 
     end subroutine s_generate_serial_grid
 
