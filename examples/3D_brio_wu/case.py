@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
 
-# 1D Brio-Wu Problem in z; Zero B%x
+# 1D Brio-Wu Problem in z; Zero Bx
 # Case is for validation and test suites
 
 # Configuring case dictionary
@@ -65,9 +65,9 @@ print(
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%vel(3)": 0.0,
             "patch_icpp(1)%pres": 1.0,
-            "patch_icpp(1)%B%x": 0.0,
-            "patch_icpp(1)%B%y": 1.0,
-            "patch_icpp(1)%B%z": 0.75,
+            "patch_icpp(1)%Bx": 0.0,
+            "patch_icpp(1)%By": 1.0,
+            "patch_icpp(1)%Bz": 0.75,
             "patch_icpp(1)%alpha_rho(1)": 1.0,
             "patch_icpp(1)%alpha(1)": 1.0,
             # Patch 2 Top
@@ -82,9 +82,9 @@ print(
             "patch_icpp(2)%vel(2)": 0.0,
             "patch_icpp(2)%vel(3)": 0.0,
             "patch_icpp(2)%pres": 0.1,
-            "patch_icpp(2)%B%x": 0.0,
-            "patch_icpp(2)%B%y": -1.0,
-            "patch_icpp(2)%B%z": 0.75,
+            "patch_icpp(2)%Bx": 0.0,
+            "patch_icpp(2)%By": -1.0,
+            "patch_icpp(2)%Bz": 0.75,
             "patch_icpp(2)%alpha_rho(1)": 0.125,
             "patch_icpp(2)%alpha(1)": 1.0,
             # Fluids Physical Parameters

@@ -209,7 +209,7 @@ module m_global_parameters
 
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
 
-    type(vec3), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
+    type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
     !! Database of the immersed boundary patch parameters for each of the
     !! patches employed in the configuration of the initial condition. Note that
     !! the maximum allowable number of patches, num_patches_max, may be changed

@@ -71,11 +71,12 @@ module m_derived_types
     end type vector_field
 
     !> Generic 3-component vector (e.g., spatial coordinates or field components)
-    type vec3
+    !! Named _dt (derived types: x,y,z) to differentiate from t_vec3 (3-component vector)
+    type vec3_dt ! dt for derived types
         real(wp) :: x
         real(wp) :: y
         real(wp) :: z
-    end type vec3
+    end type vec3_dt
 
     !> Left and right Riemann states
     type riemann_states
@@ -232,7 +233,7 @@ module m_derived_types
         !! the partial densities, density, velocity, pressure, volume fractions,
         !! specific heat ratio function and the liquid stiffness function.
 
-        type(vec3) :: B !<
+        type(vec3_dt) :: B !<
         !! Magnetic field components; B%x is not used for 1D
 
         real(wp), dimension(6) :: tau_e !<
@@ -331,7 +332,7 @@ module m_derived_types
 
     type mpi_io_airfoil_ib_var
         integer, dimension(2) :: view
-        type(vec3), allocatable, dimension(:) :: var
+        type(vec3_dt), allocatable, dimension(:) :: var
     end type mpi_io_airfoil_ib_var
 
     !> Derived type annexing integral regions

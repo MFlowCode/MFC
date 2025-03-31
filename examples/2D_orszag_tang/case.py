@@ -63,9 +63,9 @@ print(
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%vel(3)": 0.0,
             "patch_icpp(1)%pres": 5.0 / (12 * math.pi),
-            "patch_icpp(1)%B%x": 0.0,
-            "patch_icpp(1)%B%y": 0.0,
-            "patch_icpp(1)%B%z": 0.0,
+            "patch_icpp(1)%Bx": 0.0,
+            "patch_icpp(1)%By": 0.0,
+            "patch_icpp(1)%Bz": 0.0,
             "patch_icpp(1)%alpha_rho(1)": 25.0 / (36.0 * math.pi),
             "patch_icpp(1)%alpha(1)": 1.0,
             # Fluids Physical Parameters

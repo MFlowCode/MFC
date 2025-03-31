@@ -10,7 +10,7 @@ from .run   import case_dicts
 QPVF_IDX_VARS = {
     'alpha_rho': 'contxb', 'vel'  : 'momxb',         'pres': 'E_idx', 
     'alpha':     'advxb',  'tau_e': 'stress_idx%beg', 'Y':   'chemxb',
-    'cf_val': 'c_idx', 'B%x': 'B_idx%beg', 'B%y': 'B_idx%end-1', 'B%z': 'B_idx%end',
+    'cf_val': 'c_idx', 'Bx': 'B_idx%beg', 'By': 'B_idx%end-1', 'Bz': 'B_idx%end',
 }
 # "B_idx%end - 1" not "B_idx%beg + 1" must be used because 1D does not have Bx
 
