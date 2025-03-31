@@ -251,7 +251,7 @@ contains
                 end do
                 close (94)
             else
-                stop "if you include lagrange bubbles, you have to initialize them in input/lag_bubbles.dat"
+                stop "Lagrange bubbles: you have to initialize them in input/lag_bubbles.dat"
             end if
         else
             if (proc_rank == 0) print *, 'Restarting lagrange bubbles at save_count: ', save_count
@@ -338,6 +338,16 @@ contains
         cell = -buff_size
         call s_locate_cell(mtn_pos(bub_id, 1:3, 1), cell, mtn_s(bub_id, 1:3, 1))
 
+        ! Check if the bubble is located in the ghost cell of a symmetric boundary
+        if (bc_x%beg == -2 .and. cell(1) < 0) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_x%beg)."
+        if (bc_x%end == -2 .and. cell(1) > m) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_x%end)."
+        if (bc_y%beg == -2 .and. cell(2) < 0) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_y%beg)."
+        if (bc_y%end == -2 .and. cell(2) > n) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_y%end)."
+        if (p > 0) then
+            if (bc_z%beg == -2 .and. cell(3) < 0) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_z%beg)."
+            if (bc_z%end == -2 .and. cell(3) > p) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_z%end)."
+        end if
+
         ! If particle is in the ghost cells, find the closest non-ghost cell
         cell(1) = min(max(cell(1), 0), m)
         cell(2) = min(max(cell(2), 0), n)
@@ -366,7 +376,7 @@ contains
         gas_mv(bub_id, 1) = pv*volparticle*(1._wp/(R_v*Tw))*(massflag) ! vapermass
         gas_mg(bub_id) = (gas_p(bub_id, 1) - pv*(massflag))*volparticle*(1._wp/(R_n*Tw)) ! gasmass
         if (gas_mg(bub_id) <= 0._wp) then
-            stop 'the initial mass of gas inside the bubble is negative. Check your initial conditions'
+            stop "The initial mass of gas inside the bubble is negative. Check your initial conditions."
         end if
         totalmass = gas_mg(bub_id) + gas_mv(bub_id, 1) ! totalmass
 
@@ -374,9 +384,8 @@ contains
         concvap = gas_mv(bub_id, 1)/(gas_mv(bub_id, 1) + gas_mg(bub_id))
         omegaN = (3._wp*(gas_p(bub_id, 1) - pv*(massflag)) + 4._wp*(1._wp/Web)/bub_R0(bub_id))/rhol
         if (pv*(massflag) > gas_p(bub_id, 1)) then
-            print *, 'Not allowed: bubble initially located in a region with pressure below the vapor pressure'
             print *, 'location:', mtn_pos(bub_id, 1:3, 1)
-            stop
+            stop "Lagrange bubble initially located in a region with pressure below the vapor pressure."
         end if
         omegaN = sqrt(omegaN/bub_R0(bub_id)**2._wp)
 
@@ -906,11 +915,7 @@ contains
             ! Bubble dynamic closure from Maeda and Colonius (2018)
 
             ! Range of cells included in Omega
-            if (lag_params%smooth_type == 1) then
-                mapCells_pinf = mapCells
-            else
-                stop "lag_params%cluster_type: 2 requires lag_params%smooth_type: 1."
-            end if
+            mapCells_pinf = mapCells
 
             ! Include the cell that contains the bubble (mapCells+1+mapCells)
             smearGrid = mapCells_pinf - (-mapCells_pinf) + 1
@@ -987,9 +992,6 @@ contains
             f_pinfl = charpres2/charvol2
             vol = charvol
             dc = (3._wp*abs(vol)/(4._wp*pi))**(1._wp/3._wp)
-        else
-
-            stop "Check cluterflag. Exiting."
 
         end if
 
@@ -1038,7 +1040,6 @@ contains
                 mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                 gas_p(k, 1) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                 gas_mv(k, 1) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
-                if (intfc_rad(k, 1) <= 0._wp) stop "Negative bubble radius encountered, please reduce dt"
             end do
 
             call s_transfer_data_to_tmp()
@@ -1061,7 +1062,6 @@ contains
                     mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                     gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
-                    if (intfc_rad(k, 2) <= 0._wp) stop "Negative bubble radius encountered, please reduce dt"
                 end do
 
             elseif (stage == 2) then
@@ -1074,7 +1074,6 @@ contains
                     mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/2._wp
                     gas_p(k, 1) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/2._wp
                     gas_mv(k, 1) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2._wp
-                    if (intfc_rad(k, 1) <= 0._wp) stop "Negative bubble radius encountered, please reduce dt"
                 end do
 
                 call s_transfer_data_to_tmp()
@@ -1099,7 +1098,6 @@ contains
                     mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                     gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
-                    if (intfc_rad(k, 2) <= 0._wp) stop "Negative bubble radius encountered, please reduce dt"
                 end do
 
             elseif (stage == 2) then
@@ -1112,7 +1110,6 @@ contains
                     mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/4._wp
                     gas_p(k, 2) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/4._wp
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4._wp
-                    if (intfc_rad(k, 2) <= 0._wp) stop "Negative bubble radius encountered, please reduce dt"
                 end do
             elseif (stage == 3) then
                 !$acc parallel loop gang vector default(present) private(k)
@@ -1124,7 +1121,6 @@ contains
                     mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + (2._wp/3._wp)*dt*(mtn_dveldt(k, 1:3, 1)/4._wp + mtn_dveldt(k, 1:3, 2)/4._wp + mtn_dveldt(k, 1:3, 3))
                     gas_p(k, 1) = gas_p(k, 1) + (2._wp/3._wp)*dt*(gas_dpdt(k, 1)/4._wp + gas_dpdt(k, 2)/4._wp + gas_dpdt(k, 3))
                     gas_mv(k, 1) = gas_mv(k, 1) + (2._wp/3._wp)*dt*(gas_dmvdt(k, 1)/4._wp + gas_dmvdt(k, 2)/4._wp + gas_dmvdt(k, 3))
-                    if (intfc_rad(k, 1) <= 0._wp) stop "Negative bubble radius encountered, please reduce dt"
                 end do
 
                 call s_transfer_data_to_tmp()
