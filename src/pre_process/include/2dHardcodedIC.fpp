@@ -140,8 +140,8 @@
         q_prim_vf(momxb)%sf(i, j, 0) = -sin(2._wp*pi*y_cc(j))
         q_prim_vf(momxb + 1)%sf(i, j, 0) = sin(2._wp*pi*x_cc(i))
 
-        q_prim_vf(Bxb)%sf(i, j, 0) = -sin(2._wp*pi*y_cc(j))/sqrt(4._wp*pi)
-        q_prim_vf(Bxb + 1)%sf(i, j, 0) = sin(4._wp*pi*x_cc(i))/sqrt(4._wp*pi)
+        q_prim_vf(B_idx%beg)%sf(i, j, 0) = -sin(2._wp*pi*y_cc(j))/sqrt(4._wp*pi)
+        q_prim_vf(B_idx%beg + 1)%sf(i, j, 0) = sin(4._wp*pi*x_cc(i))/sqrt(4._wp*pi)
 
     case (251) ! RMHD Cylindrical Blast Wave [Mignone, 2006: Section 4.3.1]
 

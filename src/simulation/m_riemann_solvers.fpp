@@ -428,17 +428,17 @@ contains
                                 if (n == 0) then ! 1D: constant Bx; By, Bz as variables
                                     B%L(1) = Bx0
                                     B%R(1) = Bx0
-                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb)
-                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb)
-                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 1)
-                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 1)
+                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
+                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
+                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
+                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)
                                 else ! 2D/3D: Bx, By, Bz as variables
-                                    B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb)
-                                    B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb)
-                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 1)
-                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 1)
-                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 2)
-                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 2)
+                                    B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
+                                    B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
+                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
+                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)
+                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 2)
+                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 2)
                                 end if
                             end if
 
@@ -3076,17 +3076,17 @@ contains
                                 if (n == 0) then ! 1D: constant Bx; By, Bz as variables; only in x so not permutated
                                     B%L(1) = Bx0
                                     B%R(1) = Bx0
-                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb)
-                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb)
-                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 1)
-                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 1)
+                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
+                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
+                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
+                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)
                                 else ! 2D/3D: Bx, By, Bz as variables
-                                    B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + dir_idx(1) - 1)
-                                    B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + dir_idx(1) - 1)
-                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + dir_idx(2) - 1)
-                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + dir_idx(2) - 1)
-                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + dir_idx(3) - 1)
-                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + dir_idx(3) - 1)
+                                    B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(1) - 1)
+                                    B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(1) - 1)
+                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(2) - 1)
+                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(2) - 1)
+                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(3) - 1)
+                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(3) - 1)
                                 end if
                             end if
 
@@ -3254,11 +3254,11 @@ contains
                             flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(3)) = F_hlld(4)
                             ! Magnetic field
                             if (n == 0) then
-                                flux_rs${XYZ}$_vf(j, k, l, Bxb) = F_hlld(5)
-                                flux_rs${XYZ}$_vf(j, k, l, Bxb + 1) = F_hlld(6)
+                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg) = F_hlld(5)
+                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1) = F_hlld(6)
                             else
-                                flux_rs${XYZ}$_vf(j, k, l, Bxb + dir_idx(2) - 1) = F_hlld(5)
-                                flux_rs${XYZ}$_vf(j, k, l, Bxb + dir_idx(3) - 1) = F_hlld(6)
+                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(2) - 1) = F_hlld(5)
+                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(3) - 1) = F_hlld(6)
                             end if
                             ! Energy
                             flux_rs${XYZ}$_vf(j, k, l, E_idx) = F_hlld(7)

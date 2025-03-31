@@ -445,8 +445,7 @@ module m_global_parameters
     integer :: strxb, strxe
     integer :: chemxb, chemxe
     integer :: xibeg, xiend
-    integer :: Bxb, Bxe
-    !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe, chemxb, chemxe, Bxb, Bxe)
+    !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe, chemxb, chemxe)
     !$acc declare create(xibeg,xiend)
 
     real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
@@ -1176,10 +1175,8 @@ contains
         xiend = xi_idx%end
         chemxb = species_idx%beg
         chemxe = species_idx%end
-        Bxb = B_idx%beg
-        Bxe = B_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, Bxb, Bxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
         !$acc update device(b_size, xibeg, xiend, tensor_size)
 
         !$acc update device(species_idx)

@@ -10,9 +10,9 @@ from .run   import case_dicts
 QPVF_IDX_VARS = {
     'alpha_rho': 'contxb', 'vel'  : 'momxb',         'pres': 'E_idx', 
     'alpha':     'advxb',  'tau_e': 'stress_idx%beg', 'Y':   'chemxb',
-    'cf_val': 'c_idx', 'B%x': 'Bxb', 'B%y': 'Bxe-1', 'B%z': 'Bxe',
+    'cf_val': 'c_idx', 'B%x': 'B_idx%beg', 'B%y': 'B_idx%end-1', 'B%z': 'B_idx%end',
 }
-# Bxe must be used because 1D doesn't have Bx
+# "B_idx%end - 1" not "B_idx%beg + 1" must be used because 1D does not have Bx
 
 @dataclasses.dataclass(init=False)
 class Case:

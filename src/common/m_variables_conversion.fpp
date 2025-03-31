@@ -927,12 +927,12 @@ contains
                     if (relativity) then
                         if (n == 0) then
                             B(1) = Bx0
-                            B(2) = qK_cons_vf(Bxb)%sf(j, k, l)
-                            B(3) = qK_cons_vf(Bxb + 1)%sf(j, k, l)
+                            B(2) = qK_cons_vf(B_idx%beg)%sf(j, k, l)
+                            B(3) = qK_cons_vf(B_idx%beg + 1)%sf(j, k, l)
                         else
-                            B(1) = qK_cons_vf(Bxb)%sf(j, k, l)
-                            B(2) = qK_cons_vf(Bxb + 1)%sf(j, k, l)
-                            B(3) = qK_cons_vf(Bxb + 2)%sf(j, k, l)
+                            B(1) = qK_cons_vf(B_idx%beg)%sf(j, k, l)
+                            B(2) = qK_cons_vf(B_idx%beg + 1)%sf(j, k, l)
+                            B(3) = qK_cons_vf(B_idx%beg + 2)%sf(j, k, l)
                         end if
                         B2 = B(1)**2 + B(2)**2 + B(3)**2
 
@@ -991,7 +991,7 @@ contains
                         qK_prim_vf(1)%sf(j, k, l) = D/Ga ! Hard-coded for single-component for now
 
                         !$acc loop seq
-                        do i = Bxb, Bxe
+                        do i = B_idx%beg, B_idx%end
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                         end do
 
@@ -1049,9 +1049,9 @@ contains
 
                     if (mhd) then
                         if (n == 0) then
-                            pres_mag = 0.5_wp*(Bx0**2 + qK_cons_vf(Bxb)%sf(j, k, l)**2 + qK_cons_vf(Bxb + 1)%sf(j, k, l)**2)
+                            pres_mag = 0.5_wp*(Bx0**2 + qK_cons_vf(B_idx%beg)%sf(j, k, l)**2 + qK_cons_vf(B_idx%beg + 1)%sf(j, k, l)**2)
                         else
-                            pres_mag = 0.5_wp*(qK_cons_vf(Bxb)%sf(j, k, l)**2 + qK_cons_vf(Bxb + 1)%sf(j, k, l)**2 + qK_cons_vf(Bxb + 2)%sf(j, k, l)**2)
+                            pres_mag = 0.5_wp*(qK_cons_vf(B_idx%beg)%sf(j, k, l)**2 + qK_cons_vf(B_idx%beg + 1)%sf(j, k, l)**2 + qK_cons_vf(B_idx%beg + 2)%sf(j, k, l)**2)
                         end if
                     else
                         pres_mag = 0._wp
@@ -1107,7 +1107,7 @@ contains
 
                     if (mhd) then
                         !$acc loop seq
-                        do i = Bxb, Bxe
+                        do i = B_idx%beg, B_idx%end
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                         end do
                     end if
@@ -1225,12 +1225,12 @@ contains
 
                         if (n == 0) then
                             B(1) = Bx0
-                            B(2) = q_prim_vf(Bxb)%sf(j, k, l)
-                            B(3) = q_prim_vf(Bxb + 1)%sf(j, k, l)
+                            B(2) = q_prim_vf(B_idx%beg)%sf(j, k, l)
+                            B(3) = q_prim_vf(B_idx%beg + 1)%sf(j, k, l)
                         else
-                            B(1) = q_prim_vf(Bxb)%sf(j, k, l)
-                            B(2) = q_prim_vf(Bxb + 1)%sf(j, k, l)
-                            B(3) = q_prim_vf(Bxb + 2)%sf(j, k, l)
+                            B(1) = q_prim_vf(B_idx%beg)%sf(j, k, l)
+                            B(2) = q_prim_vf(B_idx%beg + 1)%sf(j, k, l)
+                            B(3) = q_prim_vf(B_idx%beg + 2)%sf(j, k, l)
                         end if
 
                         v2 = 0._wp
@@ -1244,7 +1244,7 @@ contains
                         h = 1._wp + (gamma + 1)*q_prim_vf(E_idx)%sf(j, k, l)/rho ! Assume perfect gas for now
 
                         B2 = 0._wp
-                        do i = Bxb, Bxe
+                        do i = B_idx%beg, B_idx%end
                             B2 = B2 + q_prim_vf(i)%sf(j, k, l)**2
                         end do
                         if (n == 0) B2 = B2 + Bx0**2
@@ -1270,7 +1270,7 @@ contains
                             q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) - q_cons_vf(i)%sf(j, k, l)
                         end do
 
-                        do i = Bxb, Bxe
+                        do i = B_idx%beg, B_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                         end do
 
@@ -1310,9 +1310,9 @@ contains
                         ! Computing the energy from the pressure
                         if (mhd) then
                             if (n == 0) then
-                                pres_mag = 0.5_wp*(Bx0**2 + q_prim_vf(Bxb)%sf(j, k, l)**2 + q_prim_vf(Bxb + 1)%sf(j, k, l)**2)
+                                pres_mag = 0.5_wp*(Bx0**2 + q_prim_vf(B_idx%beg)%sf(j, k, l)**2 + q_prim_vf(B_idx%beg + 1)%sf(j, k, l)**2)
                             else
-                                pres_mag = 0.5_wp*(q_prim_vf(Bxb)%sf(j, k, l)**2 + q_prim_vf(Bxb + 1)%sf(j, k, l)**2 + q_prim_vf(Bxb + 2)%sf(j, k, l)**2)
+                                pres_mag = 0.5_wp*(q_prim_vf(B_idx%beg)%sf(j, k, l)**2 + q_prim_vf(B_idx%beg + 1)%sf(j, k, l)**2 + q_prim_vf(B_idx%beg + 2)%sf(j, k, l)**2)
                             end if
                             q_cons_vf(E_idx)%sf(j, k, l) = &
                                 gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pres_mag &
@@ -1377,7 +1377,7 @@ contains
                     end if
 
                     if (mhd) then
-                        do i = Bxb, Bxe
+                        do i = B_idx%beg, B_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                         end do
                     end if
@@ -1669,7 +1669,7 @@ contains
         real(wp), intent(in) :: B(3), rho, c
         real(wp), intent(in) :: h ! only used for relativity
         real(wp), intent(out) :: c_fast
-        integer :: norm
+        integer, intent(in) :: norm
 
         real(wp) :: B2, term, disc
         real(wp) :: term2

@@ -299,7 +299,6 @@ module m_global_parameters
     integer :: strxb, strxe
     integer :: xibeg, xiend
     integer :: chemxb, chemxe
-    integer :: Bxb, Bxe
     !> @}
 
     !> @name Lagrangian bubbles
@@ -740,8 +739,6 @@ contains
         xiend = xi_idx%end
         chemxb = species_idx%beg
         chemxe = species_idx%end
-        Bxb = B_idx%beg
-        Bxe = B_idx%end
 
 #ifdef MFC_MPI
         if (bubbles_lagrange) then

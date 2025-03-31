@@ -248,7 +248,6 @@ module m_global_parameters
     integer :: strxb, strxe
     integer :: xibeg, xiend
     integer :: chemxb, chemxe
-    integer :: Bxb, Bxe
     !> @}
 
     !> @ lagrangian solver parameters
@@ -821,8 +820,6 @@ contains
         xiend = xi_idx%end
         chemxb = species_idx%beg
         chemxe = species_idx%end
-        Bxb = B_idx%beg
-        Bxe = B_idx%end
 
         call s_configure_coordinate_bounds(weno_polyn, buff_size, &
                                            idwint, idwbuff, viscous, &
