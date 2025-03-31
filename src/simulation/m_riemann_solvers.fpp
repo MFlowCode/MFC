@@ -2997,11 +2997,10 @@ contains
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! Local variables:
-        type(riemann_states), dimension(num_fluids) :: alpha, alpha_rho
+        real(wp), dimension(num_fluids) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
         type(riemann_states), dimension(num_vels) :: vel
         type(riemann_states) :: rho, pres, E, H_no_mag
         type(riemann_states) :: gamma, pi_inf, qv
-
         type(riemann_states) :: vel_rms
 
         type(riemann_states_vec3) :: B
@@ -3034,10 +3033,10 @@ contains
         call s_initialize_riemann_solver( &
             q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
-        #:for DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (norm_dir == ${DIR}$) then
+        #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (norm_dir == ${NORM_DIR}$) then
                 !$acc parallel loop collapse(3) gang vector default(present) &
-                !$acc private(alpha_rho, vel, alpha, &
+                !$acc private(alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, &
                 !$acc rho, pres, E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, &
                 !$acc U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld)
                 do l = is3%beg, is3%end
@@ -3046,11 +3045,11 @@ contains
 
                             ! (1) Extract the left/right primitive states
                             do i = 1, contxe
-                                alpha_rho(i)%L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
-                                alpha_rho(i)%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                             end do
 
-                            ! NOTE: unlike HLL & HLLC, vel%L here is permutated by dir_idx for simpler logic
+                            ! NOTE: unlike HLL & HLLC, vel_L here is permutated by dir_idx for simpler logic
                             do i = 1, num_vels
                                 vel(i)%L = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i))
                                 vel(i)%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + dir_idx(i))
@@ -3064,8 +3063,8 @@ contains
                             end do
 
                             do i = 1, num_fluids
-                                alpha(i)%L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
-                                alpha(i)%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
+                                alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
+                                alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                             end do
 
                             pres%L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
@@ -3095,15 +3094,15 @@ contains
                             rho%R = 0._wp; gamma%R = 0._wp; pi_inf%R = 0._wp; qv%R = 0._wp
                             !$acc loop seq
                             do i = 1, num_fluids
-                                rho%L = rho%L + alpha_rho(i)%L
-                                gamma%L = gamma%L + alpha(i)%L*gammas(i)
-                                pi_inf%L = pi_inf%L + alpha(i)%L*pi_infs(i)
-                                qv%L = qv%L + alpha_rho(i)%L*qvs(i)
+                                rho%L = rho%L + alpha_rho_L(i)
+                                gamma%L = gamma%L + alpha_L(i)*gammas(i)
+                                pi_inf%L = pi_inf%L + alpha_L(i)*pi_infs(i)
+                                qv%L = qv%L + alpha_rho_L(i)*qvs(i)
 
-                                rho%R = rho%R + alpha_rho(i)%R
-                                gamma%R = gamma%R + alpha(i)%R*gammas(i)
-                                pi_inf%R = pi_inf%R + alpha(i)%R*pi_infs(i)
-                                qv%R = qv%R + alpha_rho(i)%R*qvs(i)
+                                rho%R = rho%R + alpha_rho_R(i)
+                                gamma%R = gamma%R + alpha_R(i)*gammas(i)
+                                pi_inf%R = pi_inf%R + alpha_R(i)*pi_infs(i)
+                                qv%R = qv%R + alpha_rho_R(i)*qvs(i)
                             end do
 
                             pres_mag%L = 0.5_wp*sum(B%L**2._wp)
@@ -3114,8 +3113,8 @@ contains
                             H_no_mag%R = (E%R + pres%R - pres_mag%R)/rho%R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
 
                             ! (2) Compute fast wave speeds
-                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H_no_mag%L, alpha%L, vel_rms%L, 0._wp, c%L)
-                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H_no_mag%R, alpha%R, vel_rms%R, 0._wp, c%R)
+                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H_no_mag%L, alpha_L, vel_rms%L, 0._wp, c%L)
+                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H_no_mag%R, alpha_R, vel_rms%R, 0._wp, c%R)
                             call s_compute_fast_magnetosonic_speed(rho%L, c%L, B%L, norm_dir, c_fast%L, H_no_mag%L)
                             call s_compute_fast_magnetosonic_speed(rho%R, c%R, B%R, norm_dir, c_fast%R, H_no_mag%R)
 
