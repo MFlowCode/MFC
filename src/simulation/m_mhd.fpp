@@ -75,10 +75,11 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         integer :: k, l, q, r
-        type(vec3) :: v, B
+        real(wp), dimension(3) :: v, B
         real(wp) :: divB, vdotB
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        !$acc parallel loop collapse(3) gang vector default(present) &
+        !$acc private(v, B)
         do q = 0, p
             do l = 0, n
                 do k = 0, m
@@ -99,15 +100,15 @@ contains
                         end do
                     end if
 
-                    v%x = q_prim_vf(momxb)%sf(k, l, q)
-                    v%y = q_prim_vf(momxb + 1)%sf(k, l, q)
-                    v%z = q_prim_vf(momxb + 2)%sf(k, l, q)
+                    v(1) = q_prim_vf(momxb)%sf(k, l, q)
+                    v(2) = q_prim_vf(momxb + 1)%sf(k, l, q)
+                    v(3) = q_prim_vf(momxb + 2)%sf(k, l, q)
 
-                    B%x = q_prim_vf(Bxb)%sf(k, l, q)
-                    B%y = q_prim_vf(Bxb + 1)%sf(k, l, q)
-                    B%z = q_prim_vf(Bxb + 2)%sf(k, l, q)
+                    B(1) = q_prim_vf(Bxb)%sf(k, l, q)
+                    B(2) = q_prim_vf(Bxb + 1)%sf(k, l, q)
+                    B(3) = q_prim_vf(Bxb + 2)%sf(k, l, q)
 
-                    vdotB = v%x*B%x + v%y*B%y + v%z*B%z
+                    vdotB = sum(v*B)
 
                     ! 1: rho -> unchanged
                     ! 2: vx  -> - (divB) * Bx
@@ -118,15 +119,15 @@ contains
                     ! 7: By  -> - (divB) * vy
                     ! 8: Bz  -> - (divB) * vz
 
-                    rhs_vf(momxb)%sf(k, l, q) = rhs_vf(momxb)%sf(k, l, q) - divB*B%x
-                    rhs_vf(momxb + 1)%sf(k, l, q) = rhs_vf(momxb + 1)%sf(k, l, q) - divB*B%y
-                    rhs_vf(momxb + 2)%sf(k, l, q) = rhs_vf(momxb + 2)%sf(k, l, q) - divB*B%z
+                    rhs_vf(momxb)%sf(k, l, q) = rhs_vf(momxb)%sf(k, l, q) - divB*B(1)
+                    rhs_vf(momxb + 1)%sf(k, l, q) = rhs_vf(momxb + 1)%sf(k, l, q) - divB*B(2)
+                    rhs_vf(momxb + 2)%sf(k, l, q) = rhs_vf(momxb + 2)%sf(k, l, q) - divB*B(3)
 
                     rhs_vf(E_idx)%sf(k, l, q) = rhs_vf(E_idx)%sf(k, l, q) - divB*vdotB
 
-                    rhs_vf(Bxb)%sf(k, l, q) = rhs_vf(Bxb)%sf(k, l, q) - divB*v%x
-                    rhs_vf(Bxb + 1)%sf(k, l, q) = rhs_vf(Bxb + 1)%sf(k, l, q) - divB*v%y
-                    rhs_vf(Bxb + 2)%sf(k, l, q) = rhs_vf(Bxb + 2)%sf(k, l, q) - divB*v%z
+                    rhs_vf(Bxb)%sf(k, l, q) = rhs_vf(Bxb)%sf(k, l, q) - divB*v(1)
+                    rhs_vf(Bxb + 1)%sf(k, l, q) = rhs_vf(Bxb + 1)%sf(k, l, q) - divB*v(2)
+                    rhs_vf(Bxb + 2)%sf(k, l, q) = rhs_vf(Bxb + 2)%sf(k, l, q) - divB*v(3)
 
                 end do
             end do
