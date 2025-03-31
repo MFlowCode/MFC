@@ -324,7 +324,7 @@ module m_global_parameters
     logical :: integral_wrt
     integer :: num_probes
     integer :: num_integrals
-    type(probe_parameters), dimension(num_probes_max) :: probe
+    type(vec3), dimension(num_probes_max) :: probe
     type(integral_parameters), dimension(num_probes_max) :: integral
 
     !> @name Reference density and pressure for Tait EOS
@@ -339,7 +339,7 @@ module m_global_parameters
     integer :: num_ibs
 
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
-    type(probe_parameters), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
+    type(vec3), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
     integer :: Np
     !! Database of the immersed boundary patch parameters for each of the
     !! patches employed in the configuration of the initial condition. Note that

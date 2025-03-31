@@ -125,7 +125,7 @@ dx = (xe - xb) / Nx
 
 # I calculating tend twice; first is an estimate, second is
 # the actual value used. This is because I am getting errors in the
-# post process part every time I approximate the actual Nt by an integer
+# post process part every time I approximate the actual Nt B%y an integer
 # number (think of a smarter way).
 
 # dimensionless time
@@ -145,7 +145,7 @@ dt = cfl * dx / ss
 # Save Frequency. Note that the number of autosaves will be SF + 1, as th IC (0.dat) is also saved
 SF = 400
 
-## making Nt divisible by SF
+## making Nt divisible B%y SF
 # 1 - ensure NtA goes slightly beyond tendA
 NtA = int(tendA // dt + 1)
 

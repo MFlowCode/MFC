@@ -57,8 +57,8 @@ print(
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%vel(3)": 0.0,
             "patch_icpp(1)%pres": 1.0,
-            "patch_icpp(1)%By": 1.0,
-            "patch_icpp(1)%Bz": 0.0,
+            "patch_icpp(1)%B%y": 1.0,
+            "patch_icpp(1)%B%z": 0.0,
             "patch_icpp(1)%alpha_rho(1)": 1.0,
             "patch_icpp(1)%alpha(1)": 1.0,
             # Patch 2 Right
@@ -69,8 +69,8 @@ print(
             "patch_icpp(2)%vel(2)": 0.0,
             "patch_icpp(2)%vel(3)": 0.0,
             "patch_icpp(2)%pres": 0.1,
-            "patch_icpp(2)%By": -1.0,
-            "patch_icpp(2)%Bz": 0.0,
+            "patch_icpp(2)%B%y": -1.0,
+            "patch_icpp(2)%B%z": 0.0,
             "patch_icpp(2)%alpha_rho(1)": 0.125,
             "patch_icpp(2)%alpha(1)": 1.0,
             # Fluids Physical Parameters

@@ -1659,34 +1659,35 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-    subroutine s_compute_fast_magnetosonic_speed(rho, c, Bx, By, Bz, B_normal, c_fast, h)
+    subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_fast_magnetosonic_speed
 #else
         !$acc routine seq
 #endif
 
-        real(wp), intent(in) :: rho, c, Bx, By, Bz, B_normal
+        real(wp), intent(in) :: B(3), rho, c
         real(wp), intent(in) :: h ! only used for relativity
         real(wp), intent(out) :: c_fast
+        integer :: norm
 
         real(wp) :: B2, term, disc
         real(wp) :: term2
 
-        B2 = Bx**2 + By**2 + Bz**2
+        B2 = sum(B**2)
 
         if (.not. relativity) then
             term = c**2 + B2/rho
-            disc = term**2 - 4*c**2*(B_normal**2/rho)
+            disc = term**2 - 4*c**2*(B(norm)**2/rho)
         else
             ! Note: this is approximation for the non-relatisitic limit; accurate solution requires solving a quartic equation
-            term = (c**2*(B_normal**2 + rho*h) + B2)/(rho*h + B2)
-            disc = term**2 - 4*c**2*B_normal**2/(rho*h + B2)
+            term = (c**2*(B(norm)**2 + rho*h) + B2)/(rho*h + B2)
+            disc = term**2 - 4*c**2*B(norm)**2/(rho*h + B2)
         end if
 
 #ifdef DEBUG
         if (disc < 0._wp) then
-            print *, 'rho, c, Bx, By, Bz, h, term, disc:', rho, c, Bx, By, Bz, h, term, disc
+            print *, 'rho, c, Bx, By, Bz, h, term, disc:', rho, c, B(1), B(2), B(3), h, term, disc
             call s_mpi_abort('Error: negative discriminant in s_compute_fast_magnetosonic_speed')
         end if
 #endif

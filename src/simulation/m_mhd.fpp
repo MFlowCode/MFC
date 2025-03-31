@@ -66,7 +66,7 @@ contains
 
     !>  Compute the Powell source term to correct the magnetic field divergence.
         !!      The Powell source term is:
-        !!      S = - (∇·B) [ 0, Bx, By, Bz, (v·B), vx, vy, vz ]^T
+        !!      S = - (divB) [ 0, Bx, By, Bz, vdotB, vx, vy, vz ]^T
         !!  @param q_prim_vf  Primitive variables
         !!  @param rhs_vf     rhs variables
     subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)
@@ -75,7 +75,8 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         integer :: k, l, q, r
-        real(wp) :: divB, vx, vy, vz, Bx, By, Bz, vdotB
+        type(vec3) :: v, B
+        real(wp) :: divB, vdotB
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do q = 0, p
@@ -98,34 +99,34 @@ contains
                         end do
                     end if
 
-                    vx = q_prim_vf(momxb)%sf(k, l, q)
-                    vy = q_prim_vf(momxb + 1)%sf(k, l, q)
-                    vz = q_prim_vf(momxb + 2)%sf(k, l, q)
+                    v%x = q_prim_vf(momxb)%sf(k, l, q)
+                    v%y = q_prim_vf(momxb + 1)%sf(k, l, q)
+                    v%z = q_prim_vf(momxb + 2)%sf(k, l, q)
 
-                    Bx = q_prim_vf(Bxb)%sf(k, l, q)
-                    By = q_prim_vf(Bxb + 1)%sf(k, l, q)
-                    Bz = q_prim_vf(Bxb + 2)%sf(k, l, q)
+                    B%x = q_prim_vf(Bxb)%sf(k, l, q)
+                    B%y = q_prim_vf(Bxb + 1)%sf(k, l, q)
+                    B%z = q_prim_vf(Bxb + 2)%sf(k, l, q)
 
-                    vdotB = vx*Bx + vy*By + vz*Bz
+                    vdotB = v%x*B%x + v%y*B%y + v%z*B%z
 
                     ! 1: rho -> unchanged
                     ! 2: vx  -> - (divB) * Bx
                     ! 3: vy  -> - (divB) * By
                     ! 4: vz  -> - (divB) * Bz
-                    ! 5: E   -> - (divB) * (v dot B)
+                    ! 5: E   -> - (divB) * (vdotB)
                     ! 6: Bx  -> - (divB) * vx
                     ! 7: By  -> - (divB) * vy
                     ! 8: Bz  -> - (divB) * vz
 
-                    rhs_vf(momxb)%sf(k, l, q) = rhs_vf(momxb)%sf(k, l, q) - divB*Bx
-                    rhs_vf(momxb + 1)%sf(k, l, q) = rhs_vf(momxb + 1)%sf(k, l, q) - divB*By
-                    rhs_vf(momxb + 2)%sf(k, l, q) = rhs_vf(momxb + 2)%sf(k, l, q) - divB*Bz
+                    rhs_vf(momxb)%sf(k, l, q) = rhs_vf(momxb)%sf(k, l, q) - divB*B%x
+                    rhs_vf(momxb + 1)%sf(k, l, q) = rhs_vf(momxb + 1)%sf(k, l, q) - divB*B%y
+                    rhs_vf(momxb + 2)%sf(k, l, q) = rhs_vf(momxb + 2)%sf(k, l, q) - divB*B%z
 
                     rhs_vf(E_idx)%sf(k, l, q) = rhs_vf(E_idx)%sf(k, l, q) - divB*vdotB
 
-                    rhs_vf(Bxb)%sf(k, l, q) = rhs_vf(Bxb)%sf(k, l, q) - divB*vx
-                    rhs_vf(Bxb + 1)%sf(k, l, q) = rhs_vf(Bxb + 1)%sf(k, l, q) - divB*vy
-                    rhs_vf(Bxb + 2)%sf(k, l, q) = rhs_vf(Bxb + 2)%sf(k, l, q) - divB*vz
+                    rhs_vf(Bxb)%sf(k, l, q) = rhs_vf(Bxb)%sf(k, l, q) - divB*v%x
+                    rhs_vf(Bxb + 1)%sf(k, l, q) = rhs_vf(Bxb + 1)%sf(k, l, q) - divB*v%y
+                    rhs_vf(Bxb + 2)%sf(k, l, q) = rhs_vf(Bxb + 2)%sf(k, l, q) - divB*v%z
 
                 end do
             end do

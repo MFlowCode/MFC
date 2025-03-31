@@ -508,7 +508,7 @@ contains
 
         integer, intent(in) :: patch_id
 
-        logical :: is_set_Bx, is_set_By, is_set_Bz
+        logical, dimension(3) :: is_set_B
 
         call s_int_to_str(patch_id, iStr)
 
@@ -535,14 +535,15 @@ contains
         @:PROHIBIT(model_eqns == 2 .and. any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0._wp), &
             "Patch "//trim(iStr)//": alpha_rho(1:num_fluids) must be greater than or equal to zero when model_eqns = 2")
 
-        #:for B in ['Bx', 'By', 'Bz']
-            is_set_${B}$ = .not. f_is_default(patch_icpp(patch_id)%${B}$)
-        #:endfor
-        @:PROHIBIT(.not. mhd .and. (is_set_Bx .or. is_set_By .or. is_set_Bz), &
+        is_set_B(1) = .not. f_is_default(patch_icpp(patch_id)%B%x)
+        is_set_B(2) = .not. f_is_default(patch_icpp(patch_id)%B%y)
+        is_set_B(3) = .not. f_is_default(patch_icpp(patch_id)%B%z)
+
+        @:PROHIBIT(.not. mhd .and. any(is_set_B), &
             "Bx, By, and Bz must not be set if MHD is not enabled")
-        @:PROHIBIT(mhd .and. n == 0 .and. is_set_Bx, "Bx must not be set in 1D MHD simulations")
-        @:PROHIBIT(mhd .and. n > 0 .and. .not. is_set_Bx, "Bx must be set in 2D/3D MHD simulations")
-        @:PROHIBIT(mhd .and. .not. (is_set_By .and. is_set_Bz), "By and Bz must be set in all MHD simulations")
+        @:PROHIBIT(mhd .and. n == 0 .and. is_set_B(1), "Bx must not be set in 1D MHD simulations")
+        @:PROHIBIT(mhd .and. n > 0 .and. .not. is_set_B(1), "Bx must be set in 2D/3D MHD simulations")
+        @:PROHIBIT(mhd .and. .not. (is_set_B(2) .and. is_set_B(3)), "By and Bz must be set in all MHD simulations")
 
         if (model_eqns == 2 .and. num_fluids < num_fluids_max) then
             @:PROHIBIT(.not. f_all_default(patch_icpp(patch_id)%alpha_rho(num_fluids + 1:)), &

@@ -150,7 +150,7 @@ SF = 200
 # Critical time-step
 tc = 0.915 * R0 * math.sqrt(rho0wl1 / p01)
 
-# making Nt divisible by SF
+# making Nt divisible B%y SF
 # tendA = 1.5 * tc
 tend = 1.2 * tc
 

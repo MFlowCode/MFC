@@ -153,9 +153,9 @@ for p_id in range(1, 10+1):
 
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
 
-    PRE_PROCESS[f"patch_icpp({p_id})%Bx"] = ParamType.REAL.analytic()
-    PRE_PROCESS[f"patch_icpp({p_id})%By"] = ParamType.REAL.analytic()
-    PRE_PROCESS[f"patch_icpp({p_id})%Bz"] = ParamType.REAL.analytic()
+    PRE_PROCESS[f"patch_icpp({p_id})%B%x"] = ParamType.REAL.analytic()
+    PRE_PROCESS[f"patch_icpp({p_id})%B%y"] = ParamType.REAL.analytic()
+    PRE_PROCESS[f"patch_icpp({p_id})%B%z"] = ParamType.REAL.analytic()
 
     for i in range(100):
         PRE_PROCESS[f"patch_icpp({p_id})%Y({i})"] = ParamType.REAL.analytic()

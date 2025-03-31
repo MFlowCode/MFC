@@ -352,15 +352,13 @@ contains
         real(wp) :: Ms_L, Ms_R, pres_SL, pres_SR
         real(wp) :: alpha_L_sum, alpha_R_sum
 
-        real(wp) :: Bx_L, Bx_R, By_L, By_R, Bz_L, Bz_R
-        real(wp) :: c_fast_L, c_fast_R
+        type(riemann_states) :: c_fast, pres_mag
+        type(riemann_states_vec3) :: B
 
-        real(wp) :: pres_mag_L, pres_mag_R
-
-        real(wp) :: Ga_L, Ga_R ! Lorentz factor
-        real(wp) :: vdotB_L, vdotB_R, B2_L, B2_R
-        real(wp) :: b4x_L, b4y_L, b4z_L, b4x_R, b4y_R, b4z_R ! 4-magnetic field components
-        real(wp) :: mx_L, my_L, mz_L, mx_R, my_R, mz_R ! Conservative momentum variables
+        type(riemann_states) :: Ga ! Gamma (Lorentz factor)
+        type(riemann_states) :: vdotB, B2
+        type(riemann_states_vec3) :: b4 ! 4-magnetic field components (spatial: b4x, b4y, b4z)
+        type(riemann_states_vec3) :: cm ! Conservative momentum variables
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
@@ -392,7 +390,8 @@ contains
                 !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R,     &
                 !$acc xi_field_L, xi_field_R,                                   &
                 !$acc Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR,             &
-                !$acc Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2)
+                !$acc Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2,                     &
+                !$acc c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -427,19 +426,19 @@ contains
 
                             if (mhd) then
                                 if (n == 0) then ! 1D: constant Bx; By, Bz as variables
-                                    Bx_L = Bx0
-                                    Bx_R = Bx0
-                                    By_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb)
-                                    By_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb)
-                                    Bz_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 1)
-                                    Bz_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 1)
+                                    B%L(1) = Bx0
+                                    B%R(1) = Bx0
+                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb)
+                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb)
+                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 1)
+                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 1)
                                 else ! 2D/3D: Bx, By, Bz as variables
-                                    Bx_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb)
-                                    Bx_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb)
-                                    By_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 1)
-                                    By_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 1)
-                                    Bz_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 2)
-                                    Bz_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 2)
+                                    B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb)
+                                    B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb)
+                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 1)
+                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 1)
+                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 2)
+                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 2)
                                 end if
                             end if
 
@@ -456,8 +455,8 @@ contains
                             alpha_L_sum = 0._wp
                             alpha_R_sum = 0._wp
 
-                            pres_mag_L = 0._wp
-                            pres_mag_R = 0._wp
+                            pres_mag%L = 0._wp
+                            pres_mag%R = 0._wp
 
                             if (mpp_lim) then
                                 !$acc loop seq
@@ -575,43 +574,43 @@ contains
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                             elseif (mhd .and. relativity) then
-                                Ga_L = 1._wp/sqrt(1._wp - vel_L_rms)
-                                Ga_R = 1._wp/sqrt(1._wp - vel_R_rms)
-                                vdotB_L = vel_L(1)*Bx_L + vel_L(2)*By_L + vel_L(3)*Bz_L
-                                vdotB_R = vel_R(1)*Bx_R + vel_R(2)*By_R + vel_R(3)*Bz_R
+                                Ga%L = 1._wp/sqrt(1._wp - vel_L_rms)
+                                Ga%R = 1._wp/sqrt(1._wp - vel_R_rms)
+                                vdotB%L = vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3)
+                                vdotB%R = vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3)
 
-                                b4x_L = Bx_L/Ga_L + Ga_L*vel_L(1)*vdotB_L
-                                b4y_L = By_L/Ga_L + Ga_L*vel_L(2)*vdotB_L
-                                b4z_L = Bz_L/Ga_L + Ga_L*vel_L(3)*vdotB_L
-                                b4x_R = Bx_R/Ga_R + Ga_R*vel_R(1)*vdotB_R
-                                b4y_R = By_R/Ga_R + Ga_R*vel_R(2)*vdotB_R
-                                b4z_R = Bz_R/Ga_R + Ga_R*vel_R(3)*vdotB_R
-                                B2_L = Bx_L**2._wp + By_L**2._wp + Bz_L**2._wp
-                                B2_R = Bx_R**2._wp + By_R**2._wp + Bz_R**2._wp
+                                b4%L(1) = B%L(1)/Ga%L + Ga%L*vel_L(1)*vdotB%L
+                                b4%L(2) = B%L(2)/Ga%L + Ga%L*vel_L(2)*vdotB%L
+                                b4%L(3) = B%L(3)/Ga%L + Ga%L*vel_L(3)*vdotB%L
+                                b4%R(1) = B%R(1)/Ga%R + Ga%R*vel_R(1)*vdotB%R
+                                b4%R(2) = B%R(2)/Ga%R + Ga%R*vel_R(2)*vdotB%R
+                                b4%R(3) = B%R(3)/Ga%R + Ga%R*vel_R(3)*vdotB%R
+                                B2%L = B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp
+                                B2%R = B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp
 
-                                pres_mag_L = 0.5_wp*(B2_L/Ga_L**2._wp + vdotB_L**2._wp)
-                                pres_mag_R = 0.5_wp*(B2_R/Ga_R**2._wp + vdotB_R**2._wp)
+                                pres_mag%L = 0.5_wp*(B2%L/Ga%L**2._wp + vdotB%L**2._wp)
+                                pres_mag%R = 0.5_wp*(B2%R/Ga%R**2._wp + vdotB%R**2._wp)
 
                                 ! Hard-coded EOS
                                 H_L = 1._wp + (gamma_L + 1)*pres_L/rho_L
                                 H_R = 1._wp + (gamma_R + 1)*pres_R/rho_R
 
-                                mx_L = (rho_L*H_L*Ga_L**2 + B2_L)*vel_L(1) - vdotB_L*Bx_L
-                                my_L = (rho_L*H_L*Ga_L**2 + B2_L)*vel_L(2) - vdotB_L*By_L
-                                mz_L = (rho_L*H_L*Ga_L**2 + B2_L)*vel_L(3) - vdotB_L*Bz_L
-                                mx_R = (rho_R*H_R*Ga_R**2 + B2_R)*vel_R(1) - vdotB_R*Bx_R
-                                my_R = (rho_R*H_R*Ga_R**2 + B2_R)*vel_R(2) - vdotB_R*By_R
-                                mz_R = (rho_R*H_R*Ga_R**2 + B2_R)*vel_R(3) - vdotB_R*Bz_R
+                                cm%L(1) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(1) - vdotB%L*B%L(1)
+                                cm%L(2) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(2) - vdotB%L*B%L(2)
+                                cm%L(3) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(3) - vdotB%L*B%L(3)
+                                cm%R(1) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(1) - vdotB%R*B%R(1)
+                                cm%R(2) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(2) - vdotB%R*B%R(2)
+                                cm%R(3) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(3) - vdotB%R*B%R(3)
 
-                                E_L = rho_L*H_L*Ga_L**2 - pres_L + 0.5_wp*(B2_L + vel_L_rms*B2_L - vdotB_L**2._wp) - rho_L*Ga_L
-                                E_R = rho_R*H_R*Ga_R**2 - pres_R + 0.5_wp*(B2_R + vel_R_rms*B2_R - vdotB_R**2._wp) - rho_R*Ga_R
+                                E_L = rho_L*H_L*Ga%L**2 - pres_L + 0.5_wp*(B2%L + vel_L_rms*B2%L - vdotB%L**2._wp) - rho_L*Ga%L
+                                E_R = rho_R*H_R*Ga%R**2 - pres_R + 0.5_wp*(B2%R + vel_R_rms*B2%R - vdotB%R**2._wp) - rho_R*Ga%R
                             elseif (mhd .and. .not. relativity) then
-                                pres_mag_L = 0.5_wp*(Bx_L**2._wp + By_L**2._wp + Bz_L**2._wp)
-                                pres_mag_R = 0.5_wp*(Bx_R**2._wp + By_R**2._wp + Bz_R**2._wp)
-                                E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag_L
-                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag_R ! includes magnetic energy
-                                H_L = (E_L + pres_L - pres_mag_L)/rho_L
-                                H_R = (E_R + pres_R - pres_mag_R)/rho_R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                pres_mag%L = 0.5_wp*(B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp)
+                                pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
+                                E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag%L
+                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag%R ! includes magnetic energy
+                                H_L = (E_L + pres_L - pres_mag%L)/rho_L
+                                H_R = (E_R + pres_R - pres_mag%R)/rho_R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
                             else
                                 E_L = gamma_L*pres_L + pi_inf_L + 5e-1*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5e-1*rho_R*vel_R_rms + qv_R
@@ -693,8 +692,8 @@ contains
                                                           vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
                             if (mhd) then
-                                call s_compute_fast_magnetosonic_speed(rho_L, c_L, Bx_L, By_L, Bz_L, B${XYZ}$_L, c_fast_L, H_L)
-                                call s_compute_fast_magnetosonic_speed(rho_R, c_R, Bx_R, By_R, Bz_R, B${XYZ}$_R, c_fast_R, H_R)
+                                call s_compute_fast_magnetosonic_speed(rho_L, c_L, B%L, norm_dir, c_fast%L, H_L)
+                                call s_compute_fast_magnetosonic_speed(rho_R, c_R, B%R, norm_dir, c_fast%R, H_R)
                             end if
 
                             if (viscous) then
@@ -706,8 +705,8 @@ contains
 
                             if (wave_speeds == 1) then
                                 if (mhd) then
-                                    s_L = min(vel_L(dir_idx(1)) - c_fast_L, vel_R(dir_idx(1)) - c_fast_R)
-                                    s_R = max(vel_R(dir_idx(1)) + c_fast_R, vel_L(dir_idx(1)) + c_fast_L)
+                                    s_L = min(vel_L(dir_idx(1)) - c_fast%L, vel_R(dir_idx(1)) - c_fast%R)
+                                    s_R = max(vel_R(dir_idx(1)) + c_fast%R, vel_L(dir_idx(1)) + c_fast%L)
                                 elseif (hypoelasticity) then
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                        (((4._wp*G_L)/3._wp) + &
@@ -773,8 +772,8 @@ contains
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                        (s_M*alpha_rho_R(i)*vel_R(dir_idx(1)) &
-                                         - s_P*alpha_rho_L(i)*vel_L(dir_idx(1)) &
+                                        (s_M*alpha_rho_R(i)*vel_R(norm_dir) &
+                                         - s_P*alpha_rho_L(i)*vel_L(norm_dir) &
                                          + s_M*s_P*(alpha_rho_L(i) &
                                                     - alpha_rho_R(i))) &
                                         /(s_M - s_P)
@@ -783,10 +782,10 @@ contains
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                        (s_M*Ga_R*alpha_rho_R(i)*vel_R(dir_idx(1)) &
-                                         - s_P*Ga_L*alpha_rho_L(i)*vel_L(dir_idx(1)) &
-                                         + s_M*s_P*(Ga_L*alpha_rho_L(i) &
-                                                    - Ga_R*alpha_rho_R(i))) &
+                                        (s_M*Ga%R*alpha_rho_R(i)*vel_R(norm_dir) &
+                                         - s_P*Ga%L*alpha_rho_L(i)*vel_L(norm_dir) &
+                                         + s_M*s_P*(Ga%L*alpha_rho_L(i) &
+                                                    - Ga%R*alpha_rho_R(i))) &
                                         /(s_M - s_P)
                                 end do
                             end if
@@ -796,69 +795,69 @@ contains
                                 ! Flux of rho*v_x in the ${XYZ}$ direction
                                 ! = rho * v_x * v_${XYZ}$ - B_x * B_${XYZ}$ + delta_(${XYZ}$,x) * p_tot
                                 flux_rs${XYZ}$_vf(j, k, l, contxe + 1) = &
-                                    (s_M*(rho_R*vel_R(1)*vel_R(dir_idx(1)) &
-                                          - Bx_R*B${XYZ}$_R &
-                                          + dir_flg(1)*(pres_R + pres_mag_R)) &
-                                     - s_P*(rho_L*vel_L(1)*vel_L(dir_idx(1)) &
-                                            - Bx_L*B${XYZ}$_L &
-                                            + dir_flg(1)*(pres_L + pres_mag_L)) &
+                                    (s_M*(rho_R*vel_R(1)*vel_R(norm_dir) &
+                                          - B%R(1)*B%R(norm_dir) &
+                                          + dir_flg(1)*(pres_R + pres_mag%R)) &
+                                     - s_P*(rho_L*vel_L(1)*vel_L(norm_dir) &
+                                            - B%L(1)*B%L(norm_dir) &
+                                            + dir_flg(1)*(pres_L + pres_mag%L)) &
                                      + s_M*s_P*(rho_L*vel_L(1) - rho_R*vel_R(1))) &
                                     /(s_M - s_P)
                                 ! Flux of rho*v_y in the ${XYZ}$ direction
                                 ! = rho * v_y * v_${XYZ}$ - B_y * B_${XYZ}$ + delta_(${XYZ}$,y) * p_tot
                                 flux_rs${XYZ}$_vf(j, k, l, contxe + 2) = &
-                                    (s_M*(rho_R*vel_R(2)*vel_R(dir_idx(1)) &
-                                          - By_R*B${XYZ}$_R &
-                                          + dir_flg(2)*(pres_R + pres_mag_R)) &
-                                     - s_P*(rho_L*vel_L(2)*vel_L(dir_idx(1)) &
-                                            - By_L*B${XYZ}$_L &
-                                            + dir_flg(2)*(pres_L + pres_mag_L)) &
+                                    (s_M*(rho_R*vel_R(2)*vel_R(norm_dir) &
+                                          - B%R(2)*B%R(norm_dir) &
+                                          + dir_flg(2)*(pres_R + pres_mag%R)) &
+                                     - s_P*(rho_L*vel_L(2)*vel_L(norm_dir) &
+                                            - B%L(2)*B%L(norm_dir) &
+                                            + dir_flg(2)*(pres_L + pres_mag%L)) &
                                      + s_M*s_P*(rho_L*vel_L(2) - rho_R*vel_R(2))) &
                                     /(s_M - s_P)
                                 ! Flux of rho*v_z in the ${XYZ}$ direction
                                 ! = rho * v_z * v_${XYZ}$ - B_z * B_${XYZ}$ + delta_(${XYZ}$,z) * p_tot
                                 flux_rs${XYZ}$_vf(j, k, l, contxe + 3) = &
-                                    (s_M*(rho_R*vel_R(3)*vel_R(dir_idx(1)) &
-                                          - Bz_R*B${XYZ}$_R &
-                                          + dir_flg(3)*(pres_R + pres_mag_R)) &
-                                     - s_P*(rho_L*vel_L(3)*vel_L(dir_idx(1)) &
-                                            - Bz_L*B${XYZ}$_L &
-                                            + dir_flg(3)*(pres_L + pres_mag_L)) &
+                                    (s_M*(rho_R*vel_R(3)*vel_R(norm_dir) &
+                                          - B%R(3)*B%R(norm_dir) &
+                                          + dir_flg(3)*(pres_R + pres_mag%R)) &
+                                     - s_P*(rho_L*vel_L(3)*vel_L(norm_dir) &
+                                            - B%L(3)*B%L(norm_dir) &
+                                            + dir_flg(3)*(pres_L + pres_mag%L)) &
                                      + s_M*s_P*(rho_L*vel_L(3) - rho_R*vel_R(3))) &
                                     /(s_M - s_P)
                             elseif (mhd .and. relativity) then
                                 ! Flux of m_x in the ${XYZ}$ direction
                                 ! = m_x * v_${XYZ}$ - b_x/Gamma * B_${XYZ}$ + delta_(${XYZ}$,x) * p_tot
                                 flux_rs${XYZ}$_vf(j, k, l, contxe + 1) = &
-                                    (s_M*(mx_R*vel_R(dir_idx(1)) &
-                                          - b4x_R/Ga_R*B${XYZ}$_R &
-                                          + dir_flg(1)*(pres_R + pres_mag_R)) &
-                                     - s_P*(mx_L*vel_L(dir_idx(1)) &
-                                            - b4x_L/Ga_L*B${XYZ}$_L &
-                                            + dir_flg(1)*(pres_L + pres_mag_L)) &
-                                     + s_M*s_P*(mx_L - mx_R)) &
+                                    (s_M*(cm%R(1)*vel_R(norm_dir) &
+                                          - b4%R(1)/Ga%R*B%R(norm_dir) &
+                                          + dir_flg(1)*(pres_R + pres_mag%R)) &
+                                     - s_P*(cm%L(1)*vel_L(norm_dir) &
+                                            - b4%L(1)/Ga%L*B%L(norm_dir) &
+                                            + dir_flg(1)*(pres_L + pres_mag%L)) &
+                                     + s_M*s_P*(cm%L(1) - cm%R(1))) &
                                     /(s_M - s_P)
                                 ! Flux of m_y in the ${XYZ}$ direction
                                 ! = rho * v_y * v_${XYZ}$ - B_y * B_${XYZ}$ + delta_(${XYZ}$,y) * p_tot
                                 flux_rs${XYZ}$_vf(j, k, l, contxe + 2) = &
-                                    (s_M*(my_R*vel_R(dir_idx(1)) &
-                                          - b4y_R/Ga_R*B${XYZ}$_R &
-                                          + dir_flg(2)*(pres_R + pres_mag_R)) &
-                                     - s_P*(my_L*vel_L(dir_idx(1)) &
-                                            - b4y_L/Ga_L*B${XYZ}$_L &
-                                            + dir_flg(2)*(pres_L + pres_mag_L)) &
-                                     + s_M*s_P*(my_L - my_R)) &
+                                    (s_M*(cm%R(2)*vel_R(norm_dir) &
+                                          - b4%R(2)/Ga%R*B%R(norm_dir) &
+                                          + dir_flg(2)*(pres_R + pres_mag%R)) &
+                                     - s_P*(cm%L(2)*vel_L(norm_dir) &
+                                            - b4%L(2)/Ga%L*B%L(norm_dir) &
+                                            + dir_flg(2)*(pres_L + pres_mag%L)) &
+                                     + s_M*s_P*(cm%L(2) - cm%R(2))) &
                                     /(s_M - s_P)
                                 ! Flux of m_z in the ${XYZ}$ direction
                                 ! = rho * v_z * v_${XYZ}$ - B_z * B_${XYZ}$ + delta_(${XYZ}$,z) * p_tot
                                 flux_rs${XYZ}$_vf(j, k, l, contxe + 3) = &
-                                    (s_M*(mz_R*vel_R(dir_idx(1)) &
-                                          - b4z_R/Ga_R*B${XYZ}$_R &
-                                          + dir_flg(3)*(pres_R + pres_mag_R)) &
-                                     - s_P*(mz_L*vel_L(dir_idx(1)) &
-                                            - b4z_L/Ga_L*B${XYZ}$_L &
-                                            + dir_flg(3)*(pres_L + pres_mag_L)) &
-                                     + s_M*s_P*(mz_L - mz_R)) &
+                                    (s_M*(cm%R(3)*vel_R(norm_dir) &
+                                          - b4%R(3)/Ga%R*B%R(norm_dir) &
+                                          + dir_flg(3)*(pres_R + pres_mag%R)) &
+                                     - s_P*(cm%L(3)*vel_L(norm_dir) &
+                                            - b4%L(3)/Ga%L*B%L(norm_dir) &
+                                            + dir_flg(3)*(pres_L + pres_mag%L)) &
+                                     + s_M*s_P*(cm%L(3) - cm%R(3))) &
                                     /(s_M - s_P)
                             elseif (bubbles_euler) then
                                 !$acc loop seq
@@ -910,16 +909,16 @@ contains
                             if (mhd .and. (.not. relativity)) then
                                 ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                    (s_M*(vel_R(dir_idx(1))*(E_R + pres_R + pres_mag_R) - B${XYZ}$_R*(vel_R(1)*Bx_R + vel_R(2)*By_R + vel_R(3)*Bz_R)) &
-                                     - s_P*(vel_L(dir_idx(1))*(E_L + pres_L + pres_mag_L) - B${XYZ}$_L*(vel_L(1)*Bx_L + vel_L(2)*By_L + vel_L(3)*Bz_L)) &
+                                    (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) - B%R(norm_dir)*(vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3))) &
+                                     - s_P*(vel_L(norm_dir)*(E_L + pres_L + pres_mag%L) - B%L(norm_dir)*(vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3))) &
                                      + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
                             elseif (mhd .and. relativity) then
                                 ! energy flux = m_${XYZ}$ - mass flux
                                 ! Hard-coded for single-component for now
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                    (s_M*(m${XYZ}$_R - Ga_R*alpha_rho_R(1)*vel_R(dir_idx(1))) &
-                                     - s_P*(m${XYZ}$_L - Ga_L*alpha_rho_L(1)*vel_L(dir_idx(1))) &
+                                    (s_M*(cm%R(norm_dir) - Ga%R*alpha_rho_R(1)*vel_R(norm_dir)) &
+                                     - s_P*(cm%L(norm_dir) - Ga%L*alpha_rho_L(1)*vel_L(norm_dir)) &
                                      + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
                             else if (bubbles_euler) then
@@ -1046,31 +1045,31 @@ contains
                             if (mhd) then
                                 if (n == 0) then ! 1D: d/dx flux only & Bx = Bx0 = const.
                                     ! B_y flux = v_x * B_y - v_y * Bx0
-                                    flux_rsx_vf(j, k, l, B_idx%beg) = (s_M*(vel_R(1)*By_R - vel_R(2)*Bx0) &
-                                                                       - s_P*(vel_L(1)*By_L - vel_L(2)*Bx0) + s_M*s_P*(By_L - By_R))/(s_M - s_P)
+                                    flux_rsx_vf(j, k, l, B_idx%beg) = (s_M*(vel_R(1)*B%R(2) - vel_R(2)*Bx0) &
+                                                                       - s_P*(vel_L(1)*B%L(2) - vel_L(2)*Bx0) + s_M*s_P*(B%L(2) - B%R(2)))/(s_M - s_P)
 
                                     ! B_z flux = v_x * B_z - v_z * Bx0
-                                    flux_rsx_vf(j, k, l, B_idx%beg + 1) = (s_M*(vel_R(1)*Bz_R - vel_R(3)*Bx0) &
-                                                                           - s_P*(vel_L(1)*Bz_L - vel_L(3)*Bx0) + s_M*s_P*(Bz_L - Bz_R))/(s_M - s_P)
+                                    flux_rsx_vf(j, k, l, B_idx%beg + 1) = (s_M*(vel_R(1)*B%R(3) - vel_R(3)*Bx0) &
+                                                                           - s_P*(vel_L(1)*B%L(3) - vel_L(3)*Bx0) + s_M*s_P*(B%L(3) - B%R(3)))/(s_M - s_P)
 
                                 else ! 2D/3D: Bx, By, Bz /= const. but zero flux component in the same direction
                                     ! B_x d/d${XYZ}$ flux = (1 - delta(x,${XYZ}$)) * (v_${XYZ}$ * B_x - v_x * B_${XYZ}$)
                                     flux_rs${XYZ}$_vf(j, k, l, B_idx%beg) = (1 - dir_flg(1))*( &
-                                                                            s_M*(vel_R(dir_idx(1))*Bx_R - vel_R(1)*B${XYZ}$_R) - &
-                                                                            s_P*(vel_L(dir_idx(1))*Bx_L - vel_L(1)*B${XYZ}$_L) + &
-                                                                            s_M*s_P*(Bx_L - Bx_R))/(s_M - s_P)
+                                                                            s_M*(vel_R(dir_idx(1))*B%R(1) - vel_R(1)*B%R(norm_dir)) - &
+                                                                            s_P*(vel_L(dir_idx(1))*B%L(1) - vel_L(1)*B%L(norm_dir)) + &
+                                                                            s_M*s_P*(B%L(1) - B%R(1)))/(s_M - s_P)
 
                                     ! B_y d/d${XYZ}$ flux = (1 - delta(y,${XYZ}$)) * (v_${XYZ}$ * B_y - v_y * B_${XYZ}$)
                                     flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1) = (1 - dir_flg(2))*( &
-                                                                                s_M*(vel_R(dir_idx(1))*By_R - vel_R(2)*B${XYZ}$_R) - &
-                                                                                s_P*(vel_L(dir_idx(1))*By_L - vel_L(2)*B${XYZ}$_L) + &
-                                                                                s_M*s_P*(By_L - By_R))/(s_M - s_P)
+                                                                                s_M*(vel_R(dir_idx(1))*B%R(2) - vel_R(2)*B%R(norm_dir)) - &
+                                                                                s_P*(vel_L(dir_idx(1))*B%L(2) - vel_L(2)*B%L(norm_dir)) + &
+                                                                                s_M*s_P*(B%L(2) - B%R(2)))/(s_M - s_P)
 
                                     ! B_z d/d${XYZ}$ flux = (1 - delta(z,${XYZ}$)) * (v_${XYZ}$ * B_z - v_z * B_${XYZ}$)
                                     flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 2) = (1 - dir_flg(3))*( &
-                                                                                s_M*(vel_R(dir_idx(1))*Bz_R - vel_R(3)*B${XYZ}$_R) - &
-                                                                                s_P*(vel_L(dir_idx(1))*Bz_L - vel_L(3)*B${XYZ}$_L) + &
-                                                                                s_M*s_P*(Bz_L - Bz_R))/(s_M - s_P)
+                                                                                s_M*(vel_R(dir_idx(1))*B%R(3) - vel_R(3)*B%R(norm_dir)) - &
+                                                                                s_P*(vel_L(dir_idx(1))*B%L(3) - vel_L(3)*B%L(norm_dir)) + &
+                                                                                s_M*s_P*(B%L(3) - B%R(3)))/(s_M - s_P)
 
                                 end if
 
@@ -2998,17 +2997,15 @@ contains
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! Local variables:
-        real(wp), dimension(num_fluids) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
-        real(wp), dimension(num_vels) :: vel_L, vel_R
-        real(wp) :: rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_no_mag_L, H_no_mag_R
-        real(wp) :: gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R
+        type(riemann_states), dimension(num_fluids) :: alpha, alpha_rho
+        type(riemann_states), dimension(num_vels) :: vel
+        type(riemann_states) :: rho, pres, E, H_no_mag
+        type(riemann_states) :: gamma, pi_inf, qv
 
-        real(wp) :: alpha_L_sum, alpha_R_sum, vel_L_rms, vel_R_rms
+        type(riemann_states) :: vel_rms
 
-        real(wp) :: pres_mag_L, pres_mag_R
-        real(wp) :: Bx_L, Bx_R, By_L, By_R, Bz_L, Bz_R
-
-        real(wp) :: c_L, c_R, c_fast_L, c_fast_R
+        type(riemann_states_vec3) :: B
+        type(riemann_states) :: c, c_fast, pres_mag
 
         ! HLLD speeds and intermediate state variables:
         real(wp) :: s_L, s_R, s_M, s_starL, s_starR
@@ -3037,10 +3034,11 @@ contains
         call s_initialize_riemann_solver( &
             q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
-        #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (norm_dir == ${NORM_DIR}$) then
+        #:for DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (norm_dir == ${DIR}$) then
                 !$acc parallel loop collapse(3) gang vector default(present) &
-                !$acc private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
+                !$acc private(alpha_rho, vel, alpha, &
+                !$acc rho, pres, E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, &
                 !$acc U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -3048,172 +3046,172 @@ contains
 
                             ! (1) Extract the left/right primitive states
                             do i = 1, contxe
-                                alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
-                                alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                alpha_rho(i)%L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                alpha_rho(i)%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                             end do
 
-                            ! NOTE: unlike HLL & HLLC, vel_L here is permutated by dir_idx for simpler logic
+                            ! NOTE: unlike HLL & HLLC, vel%L here is permutated by dir_idx for simpler logic
                             do i = 1, num_vels
-                                vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i))
-                                vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + dir_idx(i))
+                                vel(i)%L = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i))
+                                vel(i)%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + dir_idx(i))
                             end do
 
-                            vel_L_rms = 0._wp; vel_R_rms = 0._wp
+                            vel_rms%L = 0._wp; vel_rms%R = 0._wp
 
                             do i = 1, num_vels
-                                vel_L_rms = vel_L_rms + vel_L(i)**2._wp
-                                vel_R_rms = vel_R_rms + vel_R(i)**2._wp
+                                vel_rms%L = vel_rms%L + vel(i)%L**2._wp
+                                vel_rms%R = vel_rms%R + vel(i)%R**2._wp
                             end do
 
                             do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
-                                alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
+                                alpha(i)%L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
+                                alpha(i)%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                             end do
 
-                            pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
-                            pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
+                            pres%L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
+                            pres%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
                             ! NOTE: unlike HLL, Bx, By, Bz are permutated by dir_idx for simpler logic
                             if (mhd) then
                                 if (n == 0) then ! 1D: constant Bx; By, Bz as variables; only in x so not permutated
-                                    Bx_L = Bx0
-                                    Bx_R = Bx0
-                                    By_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb)
-                                    By_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb)
-                                    Bz_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 1)
-                                    Bz_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 1)
+                                    B%L(1) = Bx0
+                                    B%R(1) = Bx0
+                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb)
+                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb)
+                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + 1)
+                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + 1)
                                 else ! 2D/3D: Bx, By, Bz as variables
-                                    Bx_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + dir_idx(1) - 1)
-                                    Bx_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + dir_idx(1) - 1)
-                                    By_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + dir_idx(2) - 1)
-                                    By_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + dir_idx(2) - 1)
-                                    Bz_L = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + dir_idx(3) - 1)
-                                    Bz_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + dir_idx(3) - 1)
+                                    B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + dir_idx(1) - 1)
+                                    B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + dir_idx(1) - 1)
+                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + dir_idx(2) - 1)
+                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + dir_idx(2) - 1)
+                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, Bxb + dir_idx(3) - 1)
+                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, Bxb + dir_idx(3) - 1)
                                 end if
                             end if
 
                             ! Sum properties of all fluid components
-                            rho_L = 0._wp; gamma_L = 0._wp; pi_inf_L = 0._wp; qv_L = 0._wp
-                            rho_R = 0._wp; gamma_R = 0._wp; pi_inf_R = 0._wp; qv_R = 0._wp
+                            rho%L = 0._wp; gamma%L = 0._wp; pi_inf%L = 0._wp; qv%L = 0._wp
+                            rho%R = 0._wp; gamma%R = 0._wp; pi_inf%R = 0._wp; qv%R = 0._wp
                             !$acc loop seq
                             do i = 1, num_fluids
-                                rho_L = rho_L + alpha_rho_L(i)
-                                gamma_L = gamma_L + alpha_L(i)*gammas(i)
-                                pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
-                                qv_L = qv_L + alpha_rho_L(i)*qvs(i)
+                                rho%L = rho%L + alpha_rho(i)%L
+                                gamma%L = gamma%L + alpha(i)%L*gammas(i)
+                                pi_inf%L = pi_inf%L + alpha(i)%L*pi_infs(i)
+                                qv%L = qv%L + alpha_rho(i)%L*qvs(i)
 
-                                rho_R = rho_R + alpha_rho_R(i)
-                                gamma_R = gamma_R + alpha_R(i)*gammas(i)
-                                pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
-                                qv_R = qv_R + alpha_rho_R(i)*qvs(i)
+                                rho%R = rho%R + alpha_rho(i)%R
+                                gamma%R = gamma%R + alpha(i)%R*gammas(i)
+                                pi_inf%R = pi_inf%R + alpha(i)%R*pi_infs(i)
+                                qv%R = qv%R + alpha_rho(i)%R*qvs(i)
                             end do
 
-                            pres_mag_L = 0.5_wp*(Bx_L**2._wp + By_L**2._wp + Bz_L**2._wp)
-                            pres_mag_R = 0.5_wp*(Bx_R**2._wp + By_R**2._wp + Bz_R**2._wp)
-                            E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag_L
-                            E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag_R ! includes magnetic energy
-                            H_no_mag_L = (E_L + pres_L - pres_mag_L)/rho_L
-                            H_no_mag_R = (E_R + pres_R - pres_mag_R)/rho_R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                            pres_mag%L = 0.5_wp*sum(B%L**2._wp)
+                            pres_mag%R = 0.5_wp*sum(B%R**2._wp)
+                            E%L = gamma%L*pres%L + pi_inf%L + 0.5_wp*rho%L*vel_rms%L + qv%L + pres_mag%L
+                            E%R = gamma%R*pres%R + pi_inf%R + 0.5_wp*rho%R*vel_rms%R + qv%R + pres_mag%R ! includes magnetic energy
+                            H_no_mag%L = (E%L + pres%L - pres_mag%L)/rho%L
+                            H_no_mag%R = (E%R + pres%R - pres_mag%R)/rho%R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
 
                             ! (2) Compute fast wave speeds
-                            call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_no_mag_L, alpha_L, vel_L_rms, 0._wp, c_L)
-                            call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_no_mag_R, alpha_R, vel_R_rms, 0._wp, c_R)
-                            call s_compute_fast_magnetosonic_speed(rho_L, c_L, Bx_L, By_L, Bz_L, B${XYZ}$_L, c_fast_L, H_no_mag_L)
-                            call s_compute_fast_magnetosonic_speed(rho_R, c_R, Bx_R, By_R, Bz_R, B${XYZ}$_R, c_fast_R, H_no_mag_R)
+                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H_no_mag%L, alpha%L, vel_rms%L, 0._wp, c%L)
+                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H_no_mag%R, alpha%R, vel_rms%R, 0._wp, c%R)
+                            call s_compute_fast_magnetosonic_speed(rho%L, c%L, B%L, norm_dir, c_fast%L, H_no_mag%L)
+                            call s_compute_fast_magnetosonic_speed(rho%R, c%R, B%R, norm_dir, c_fast%R, H_no_mag%R)
 
                             ! (3) Compute contact speed s_M [Miyoshi Equ. (38)]
-                            s_L = min(vel_L(1) - c_fast_L, vel_R(1) - c_fast_R)
-                            s_R = max(vel_R(1) + c_fast_R, vel_L(1) + c_fast_L)
+                            s_L = min(vel(1)%L - c_fast%L, vel(1)%R - c_fast%R)
+                            s_R = max(vel(1)%R + c_fast%R, vel(1)%L + c_fast%L)
 
-                            pTot_L = pres_L + pres_mag_L
-                            pTot_R = pres_R + pres_mag_R
+                            pTot_L = pres%L + pres_mag%L
+                            pTot_R = pres%R + pres_mag%R
 
-                            s_M = (((s_R - vel_R(1))*rho_R*vel_R(1) - &
-                                    (s_L - vel_L(1))*rho_L*vel_L(1) - pTot_R + pTot_L)/ &
-                                   ((s_R - vel_R(1))*rho_R - (s_L - vel_L(1))*rho_L))
+                            s_M = (((s_R - vel(1)%R)*rho%R*vel(1)%R - &
+                                    (s_L - vel(1)%L)*rho%L*vel(1)%L - pTot_R + pTot_L)/ &
+                                   ((s_R - vel(1)%R)*rho%R - (s_L - vel(1)%L)*rho%L))
 
                             ! (4) Compute star state variables
-                            rhoL_star = rho_L*(s_L - vel_L(1))/(s_L - s_M)
-                            rhoR_star = rho_R*(s_R - vel_R(1))/(s_R - s_M)
-                            p_star = pTot_L + rho_L*(s_L - vel_L(1))*(s_M - vel_L(1))/(s_L - s_M)
-                            E_starL = ((s_L - vel_L(1))*E_L - pTot_L*vel_L(1) + p_star*s_M)/(s_L - s_M)
-                            E_starR = ((s_R - vel_R(1))*E_R - pTot_R*vel_R(1) + p_star*s_M)/(s_R - s_M)
+                            rhoL_star = rho%L*(s_L - vel(1)%L)/(s_L - s_M)
+                            rhoR_star = rho%R*(s_R - vel(1)%R)/(s_R - s_M)
+                            p_star = pTot_L + rho%L*(s_L - vel(1)%L)*(s_M - vel(1)%L)/(s_L - s_M)
+                            E_starL = ((s_L - vel(1)%L)*E%L - pTot_L*vel(1)%L + p_star*s_M)/(s_L - s_M)
+                            E_starR = ((s_R - vel(1)%R)*E%R - pTot_R*vel(1)%R + p_star*s_M)/(s_R - s_M)
 
                             ! (5) Compute the left/right conserved state vectors
-                            U_L(1) = rho_L
-                            U_L(2) = rho_L*vel_L(1)
-                            U_L(3) = rho_L*vel_L(2)
-                            U_L(4) = rho_L*vel_L(3)
-                            U_L(5) = By_L
-                            U_L(6) = Bz_L
-                            U_L(7) = E_L
+                            U_L(1) = rho%L
+                            U_L(2) = rho%L*vel(1)%L
+                            U_L(3) = rho%L*vel(2)%L
+                            U_L(4) = rho%L*vel(3)%L
+                            U_L(5) = B%L(2)
+                            U_L(6) = B%L(3)
+                            U_L(7) = E%L
 
-                            U_R(1) = rho_R
-                            U_R(2) = rho_R*vel_R(1)
-                            U_R(3) = rho_R*vel_R(2)
-                            U_R(4) = rho_R*vel_R(3)
-                            U_R(5) = By_R
-                            U_R(6) = Bz_R
-                            U_R(7) = E_R
+                            U_R(1) = rho%R
+                            U_R(2) = rho%R*vel(1)%R
+                            U_R(3) = rho%R*vel(2)%R
+                            U_R(4) = rho%R*vel(3)%R
+                            U_R(5) = B%R(2)
+                            U_R(6) = B%R(3)
+                            U_R(7) = E%R
 
                             ! (6) Compute the left/right star state vectors
                             U_starL(1) = rhoL_star
                             U_starL(2) = rhoL_star*s_M
-                            U_starL(3) = rhoL_star*vel_L(2)
-                            U_starL(4) = rhoL_star*vel_L(3)
-                            U_starL(5) = By_L
-                            U_starL(6) = Bz_L
+                            U_starL(3) = rhoL_star*vel(2)%L
+                            U_starL(4) = rhoL_star*vel(3)%L
+                            U_starL(5) = B%L(2)
+                            U_starL(6) = B%L(3)
                             U_starL(7) = E_starL
 
                             U_starR(1) = rhoR_star
                             U_starR(2) = rhoR_star*s_M
-                            U_starR(3) = rhoR_star*vel_R(2)
-                            U_starR(4) = rhoR_star*vel_R(3)
-                            U_starR(5) = By_R
-                            U_starR(6) = Bz_R
+                            U_starR(3) = rhoR_star*vel(2)%R
+                            U_starR(4) = rhoR_star*vel(3)%R
+                            U_starR(5) = B%R(2)
+                            U_starR(6) = B%R(3)
                             U_starR(7) = E_starR
 
                             ! (7) Compute the left/right fluxes
-                            F_L(1) = rho_L*vel_L(1)
-                            F_L(2) = rho_L*vel_L(1)*vel_L(1) - Bx_L*Bx_L + pTot_L
-                            F_L(3) = rho_L*vel_L(1)*vel_L(2) - Bx_L*By_L
-                            F_L(4) = rho_L*vel_L(1)*vel_L(3) - Bx_L*Bz_L
-                            F_L(5) = vel_L(1)*By_L - vel_L(2)*Bx_L
-                            F_L(6) = vel_L(1)*Bz_L - vel_L(3)*Bx_L
-                            F_L(7) = (E_L + pTot_L)*vel_L(1) - Bx_L*(vel_L(1)*Bx_L + vel_L(2)*By_L + vel_L(3)*Bz_L)
+                            F_L(1) = rho%L*vel(1)%L
+                            F_L(2) = rho%L*vel(1)%L*vel(1)%L - B%L(1)*B%L(1) + pTot_L
+                            F_L(3) = rho%L*vel(1)%L*vel(2)%L - B%L(1)*B%L(2)
+                            F_L(4) = rho%L*vel(1)%L*vel(3)%L - B%L(1)*B%L(3)
+                            F_L(5) = vel(1)%L*B%L(2) - vel(2)%L*B%L(1)
+                            F_L(6) = vel(1)%L*B%L(3) - vel(3)%L*B%L(1)
+                            F_L(7) = (E%L + pTot_L)*vel(1)%L - B%L(1)*(vel(1)%L*B%L(1) + vel(2)%L*B%L(2) + vel(3)%L*B%L(3))
 
-                            F_R(1) = rho_R*vel_R(1)
-                            F_R(2) = rho_R*vel_R(1)*vel_R(1) - Bx_R*Bx_R + pTot_R
-                            F_R(3) = rho_R*vel_R(1)*vel_R(2) - Bx_R*By_R
-                            F_R(4) = rho_R*vel_R(1)*vel_R(3) - Bx_R*Bz_R
-                            F_R(5) = vel_R(1)*By_R - vel_R(2)*Bx_R
-                            F_R(6) = vel_R(1)*Bz_R - vel_R(3)*Bx_R
-                            F_R(7) = (E_R + pTot_R)*vel_R(1) - Bx_R*(vel_R(1)*Bx_R + vel_R(2)*By_R + vel_R(3)*Bz_R)
+                            F_R(1) = rho%R*vel(1)%R
+                            F_R(2) = rho%R*vel(1)%R*vel(1)%R - B%R(1)*B%R(1) + pTot_R
+                            F_R(3) = rho%R*vel(1)%R*vel(2)%R - B%R(1)*B%R(2)
+                            F_R(4) = rho%R*vel(1)%R*vel(3)%R - B%R(1)*B%R(3)
+                            F_R(5) = vel(1)%R*B%R(2) - vel(2)%R*B%R(1)
+                            F_R(6) = vel(1)%R*B%R(3) - vel(3)%R*B%R(1)
+                            F_R(7) = (E%R + pTot_R)*vel(1)%R - B%R(1)*(vel(1)%R*B%R(1) + vel(2)%R*B%R(2) + vel(3)%R*B%R(3))
 
                             ! (8) Compute the left/right star fluxes (note array operations)
                             F_starL = F_L + s_L*(U_starL - U_L)
                             F_starR = F_R + s_R*(U_starR - U_R)
 
                             ! (9) Compute the rotational (Alfvén) speeds
-                            s_starL = s_M - abs(Bx_L)/sqrt(rhoL_star)
-                            s_starR = s_M + abs(Bx_L)/sqrt(rhoR_star)
+                            s_starL = s_M - abs(B%L(1))/sqrt(rhoL_star)
+                            s_starR = s_M + abs(B%L(1))/sqrt(rhoR_star)
 
                             ! (10) Compute the double–star states [Miyoshi Eqns. (59)-(62)]
                             sqrt_rhoL_star = sqrt(rhoL_star)
                             sqrt_rhoR_star = sqrt(rhoR_star)
                             denom_ds = sqrt_rhoL_star + sqrt_rhoR_star
-                            sign_Bx = sign(1._wp, Bx_L)
-                            vL_star = vel_L(2)
-                            wL_star = vel_L(3)
-                            vR_star = vel_R(2)
-                            wR_star = vel_R(3)
-                            v_double = (sqrt_rhoL_star*vL_star + sqrt_rhoR_star*vR_star + (By_R - By_L)*sign_Bx)/denom_ds
-                            w_double = (sqrt_rhoL_star*wL_star + sqrt_rhoR_star*wR_star + (Bz_R - Bz_L)*sign_Bx)/denom_ds
-                            By_double = (sqrt_rhoL_star*By_R + sqrt_rhoR_star*By_L + sqrt_rhoL_star*sqrt_rhoR_star*(vR_star - vL_star)*sign_Bx)/denom_ds
-                            Bz_double = (sqrt_rhoL_star*Bz_R + sqrt_rhoR_star*Bz_L + sqrt_rhoL_star*sqrt_rhoR_star*(wR_star - wL_star)*sign_Bx)/denom_ds
+                            sign_Bx = sign(1._wp, B%L(1))
+                            vL_star = vel(2)%L
+                            wL_star = vel(3)%L
+                            vR_star = vel(2)%R
+                            wR_star = vel(3)%R
+                            v_double = (sqrt_rhoL_star*vL_star + sqrt_rhoR_star*vR_star + (B%R(2) - B%L(2))*sign_Bx)/denom_ds
+                            w_double = (sqrt_rhoL_star*wL_star + sqrt_rhoR_star*wR_star + (B%R(3) - B%L(3))*sign_Bx)/denom_ds
+                            By_double = (sqrt_rhoL_star*B%R(2) + sqrt_rhoR_star*B%L(2) + sqrt_rhoL_star*sqrt_rhoR_star*(vR_star - vL_star)*sign_Bx)/denom_ds
+                            Bz_double = (sqrt_rhoL_star*B%R(3) + sqrt_rhoR_star*B%L(3) + sqrt_rhoL_star*sqrt_rhoR_star*(wR_star - wL_star)*sign_Bx)/denom_ds
 
-                            E_doubleL = E_starL - sqrt_rhoL_star*((vL_star*By_L + wL_star*Bz_L) - (v_double*By_double + w_double*Bz_double))*sign_Bx
-                            E_doubleR = E_starR + sqrt_rhoR_star*((vR_star*By_R + wR_star*Bz_R) - (v_double*By_double + w_double*Bz_double))*sign_Bx
+                            E_doubleL = E_starL - sqrt_rhoL_star*((vL_star*B%L(2) + wL_star*B%L(3)) - (v_double*By_double + w_double*Bz_double))*sign_Bx
+                            E_doubleR = E_starR + sqrt_rhoR_star*((vR_star*B%R(2) + wR_star*B%R(3)) - (v_double*By_double + w_double*Bz_double))*sign_Bx
                             E_double = 0.5_wp*(E_doubleL + E_doubleR)
 
                             U_doubleL(1) = rhoL_star

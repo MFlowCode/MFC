@@ -209,7 +209,7 @@ module m_global_parameters
 
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
 
-    type(probe_parameters), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
+    type(vec3), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
     !! Database of the immersed boundary patch parameters for each of the
     !! patches employed in the configuration of the initial condition. Note that
     !! the maximum allowable number of patches, num_patches_max, may be changed
@@ -402,9 +402,9 @@ contains
             patch_icpp(i)%qv = 0._wp
             patch_icpp(i)%qvp = 0._wp
             patch_icpp(i)%tau_e = 0._wp
-            patch_icpp(i)%Bx = dflt_real
-            patch_icpp(i)%By = dflt_real
-            patch_icpp(i)%Bz = dflt_real
+            patch_icpp(i)%B%x = dflt_real
+            patch_icpp(i)%B%y = dflt_real
+            patch_icpp(i)%B%z = dflt_real
             patch_icpp(i)%a(2) = dflt_real
             patch_icpp(i)%a(3) = dflt_real
             patch_icpp(i)%a(4) = dflt_real
