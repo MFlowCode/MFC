@@ -289,6 +289,17 @@ module m_global_parameters
 
     !$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
 
+    integer :: shear_num !! Number of shear stress components
+    integer, dimension(3) :: shear_indices !<
+    !! Indices of the stress components that represent shear stress
+    integer :: shear_BC_flip_num !<
+    !! Number of shear stress components to reflect for boundary conditions
+    integer, dimension(3, 2) :: shear_BC_flip_indices !<
+    !! Indices of shear stress components to reflect for boundary conditions.
+    !! Size: (1:3, 1:shear_BC_flip_num) for (x/y/z, [indices])
+
+    !$acc declare create(shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices)
+
     ! END: Simulation Algorithm Parameters
 
     ! Fluids Physical Parameters
@@ -895,6 +906,30 @@ contains
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                     ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
                     sys_size = stress_idx%end
+
+                    ! shear stress index is 2 for 2D and 2,4,5 for 3D
+                    print *, 'DEBUG DEBUG'
+                    if (num_dims == 1) then
+                        shear_num = 0
+                    else if (num_dims == 2) then
+                        print *, 'HERE'
+                        shear_num = 1
+                        shear_indices(1) = stress_idx%beg - 1 + 2
+                        shear_BC_flip_num = 1
+                        shear_BC_flip_indices(1:2, 1) = shear_indices(1)
+                        ! Both x-dir and y-dir: flip tau_xy only
+                    else if (num_dims == 3) then
+                        shear_num = 3
+                        shear_indices(1:3) = stress_idx%beg - 1 + (/2, 4, 5/)
+                        shear_BC_flip_num = 2
+                        shear_BC_flip_indices(1, 1:2) = shear_indices((/1, 2/))
+                        shear_BC_flip_indices(2, 1:2) = shear_indices((/1, 3/))
+                        shear_BC_flip_indices(3, 1:2) = shear_indices((/2, 3/))
+                        ! x-dir: flip tau_xy and tau_xz
+                        ! y-dir: flip tau_xy and tau_yz
+                        ! z-dir: flip tau_xz and tau_yz
+                    end if
+                    !$acc update device(shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices)
                 end if
 
                 if (hyperelasticity) then
@@ -933,6 +968,30 @@ contains
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                     ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
                     sys_size = stress_idx%end
+
+                    ! shear stress index is 2 for 2D and 2,4,5 for 3D
+                    print *, 'DEBUG DEBUG'
+                    if (num_dims == 1) then
+                        shear_num = 0
+                    else if (num_dims == 2) then
+                        print *, 'HERE'
+                        shear_num = 1
+                        shear_indices(1) = stress_idx%beg - 1 + 2
+                        shear_BC_flip_num = 1
+                        shear_BC_flip_indices(1:2, 1) = shear_indices(1)
+                        ! Both x-dir and y-dir: flip tau_xy only
+                    else if (num_dims == 3) then
+                        shear_num = 3
+                        shear_indices(1:3) = stress_idx%beg - 1 + (/2, 4, 5/)
+                        shear_BC_flip_num = 2
+                        shear_BC_flip_indices(1, 1:2) = shear_indices((/1, 2/))
+                        shear_BC_flip_indices(2, 1:2) = shear_indices((/1, 3/))
+                        shear_BC_flip_indices(3, 1:2) = shear_indices((/2, 3/))
+                        ! x-dir: flip tau_xy and tau_xz
+                        ! y-dir: flip tau_xy and tau_yz
+                        ! z-dir: flip tau_xz and tau_yz
+                    end if
+                    !$acc update device(shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices)
                 end if
 
                 if (hyperelasticity) then
