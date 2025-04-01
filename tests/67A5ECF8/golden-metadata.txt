@@ -1,0 +1,176 @@
+This file was created on 2025-03-31 23:31:26.339303.
+
+mfc.sh:
+
+    Invocation: test --generate -o 67A5ECF8 -j 8
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
+    Git:        50d75cdf95a4fe610bd10a4ea6e75611febc0cb9 on fix_stress_BC (dirty)
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on LAPTOP-OMEN
+    
+        C       : GNU v11.4.0 (/usr/bin/cc)
+        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/chris/source/MFC_PR/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on LAPTOP-OMEN
+    
+        C       : GNU v11.4.0 (/usr/bin/cc)
+        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/chris/source/MFC_PR/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on LAPTOP-OMEN
+    
+        C       : GNU v11.4.0 (/usr/bin/cc)
+        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/chris/source/MFC_PR/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on LAPTOP-OMEN
+    
+        C       : GNU v11.4.0 (/usr/bin/cc)
+        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/chris/source/MFC_PR/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+CPU:
+
+    CPU Info:
+    From lscpu
+    Architecture:                    x86_64
+    CPU op-mode(s):                  32-bit, 64-bit
+    Address sizes:                   48 bits physical, 48 bits virtual
+    Byte Order:                      Little Endian
+    CPU(s):                          16
+    On-line CPU(s) list:             0-15
+    Vendor ID:                       AuthenticAMD
+    Model name:                      AMD Ryzen 7 5800H with Radeon Graphics
+    CPU family:                      25
+    Model:                           80
+    Thread(s) per core:              2
+    Core(s) per socket:              8
+    Socket(s):                       1
+    Stepping:                        0
+    BogoMIPS:                        6388.00
+    Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves clzero xsaveerptr arat umip vaes vpclmulqdq rdpid fsrm
+    Hypervisor vendor:               Microsoft
+    Virtualization type:             full
+    L1d cache:                       256 KiB (8 instances)
+    L1i cache:                       256 KiB (8 instances)
+    L2 cache:                        4 MiB (8 instances)
+    L3 cache:                        16 MiB (1 instance)
+    Vulnerability Itlb multihit:     Not affected
+    Vulnerability L1tf:              Not affected
+    Vulnerability Mds:               Not affected
+    Vulnerability Meltdown:          Not affected
+    Vulnerability Spec store bypass: Vulnerable
+    Vulnerability Spectre v1:        Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+    Vulnerability Spectre v2:        Mitigation; Full AMD retpoline, IBPB conditional, IBRS_FW, STIBP conditional, RSB filling
+    Vulnerability Srbds:             Not affected
+    Vulnerability Tsx async abort:   Not affected
+
