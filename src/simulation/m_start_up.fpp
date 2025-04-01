@@ -1395,9 +1395,17 @@ contains
         end if
 
         if (bubbles_lagrange) then
+            !$acc update host(intfc_rad)
+            do i = 1, nBubs
+                if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
+                    print *, "Bubble radius is negative or NaN", proc_rank, t_step, i, intfc_rad(i, 1)
+                    error stop "Bubble radius is negative or NaN, please reduce dt"
+                end if
+            end do
+
             !$acc update host(q_beta%vf(1)%sf)
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, q_beta%vf(1))
-            !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_rad, intfc_vel)
+            !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_vel)
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
