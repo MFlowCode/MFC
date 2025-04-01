@@ -83,6 +83,8 @@ module m_start_up
 
     use m_body_forces
 
+    use m_mhd
+
     implicit none
 
     private; public :: s_read_input_file, &
@@ -156,7 +158,7 @@ contains
             rhoref, pref, bubbles_euler, bubble_model, &
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, &
+            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, mhd, relativity, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
@@ -173,7 +175,7 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
-            hyperelasticity, R0ref
+            hyperelasticity, R0ref, Bx0, powell
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1167,6 +1169,10 @@ contains
 
         real(wp), dimension(num_species) :: rhoYks
 
+        real(wp) :: pres_mag
+
+        pres_mag = 0._wp
+
         T = dflt_T_guess
 
         do j = 0, m
@@ -1187,9 +1193,16 @@ contains
                         end do
                     end if
 
+                    if (mhd) then
+                        if (n == 0) then
+                            pres_mag = 0.5_wp*(Bx0**2 + v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg+1)%sf(j, k, l)**2)
+                        else
+                            pres_mag = 0.5_wp*(v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg+1)%sf(j, k, l)**2 + v_vf(B_idx%beg+2)%sf(j, k, l)**2)
+                        end if
+                    end if
 
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._wp, &
-                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T)
+                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag = pres_mag)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
@@ -1514,6 +1527,8 @@ contains
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
 
+        if (mhd .and. powell) call s_initialize_mhd_powell_module
+
     end subroutine s_initialize_modules
 
     subroutine s_initialize_mpi_domain
@@ -1625,7 +1640,6 @@ contains
         if (ib) then
             !$acc update device(ib_markers%sf)
         end if
-
     end subroutine s_initialize_gpu_vars
 
     subroutine s_finalize_modules
@@ -1652,6 +1666,7 @@ contains
 
         if (surface_tension)  call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
+        if (mhd .and. powell) call s_finalize_mhd_powell_module
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()
