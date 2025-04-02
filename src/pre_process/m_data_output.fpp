@@ -157,15 +157,10 @@ contains
             status = 'new'
         end if
 
-        checkboundary1: do i = 1, num_bc_patches
-            if (bc_x%beg == -17 .or. bc_x%beg == -17 &
-                .or. bc_y%beg == -17 .or. bc_y%end == -17 &
-                .or. bc_z%beg == -17 .or. bc_z%end == -17 &
-                .or. patch_bc(i)%type == -17) then
-                    call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir)
-                    exit checkboundary1
-            end if
-        end do checkboundary1
+        if (save_bc) then
+            call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir)
+        end if
+
         ! x-coordinate direction
         file_loc = trim(t_step_dir)//'/x_cb.dat'
         open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
@@ -849,15 +844,9 @@ contains
         end if
 #endif
 
-    checkboundary2: do i = 1, num_bc_patches
-        if (bc_x%beg == -17 .or. bc_x%beg == -17 &
-            .or. bc_y%beg == -17 .or. bc_y%end == -17 &
-            .or. bc_z%beg == -17 .or. bc_z%end == -17 &
-            .or. patch_bc(i)%type == -17) then
-                call s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
-                exit checkboundary2
+        if (save_bc) then
+            call s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
         end if
-    end do checkboundary2
 
     end subroutine s_write_parallel_data_files
 

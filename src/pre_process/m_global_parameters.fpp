@@ -177,6 +177,7 @@ module m_global_parameters
     !! in the module m_derived_types.f90.
 
     integer :: num_bc_patches  !< Number of boundary condition patches
+    logical :: save_bc !< whether or not to save BC data
     type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc
     !! Database of the boundary condition patch parameters for each of the patches
     !! employed in the configuration of the boundary conditions
@@ -422,6 +423,7 @@ contains
         end do
 
         num_bc_patches = 0
+        save_bc = .false.
 
         do i = 1, num_bc_patches_max
             patch_bc(i)%geometry = dflt_int

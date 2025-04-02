@@ -211,6 +211,11 @@ contains
 
             if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
 
+            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. &
+                num_bc_patches /= dflt_int) then
+                read_bc = .true.
+            endif
+
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
         end if
@@ -281,7 +286,7 @@ contains
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
         end if
 
-        if (num_bc_patches > 0) then
+        if (read_bc) then
             call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
         else
             call s_assign_default_bc_type(bc_type)
@@ -941,7 +946,7 @@ contains
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
-        if (num_bc_patches > 0) then
+        if (read_bc) then
             call s_read_parallel_boundary_condition_files(bc_type)
         else
             call s_assign_default_bc_type(bc_type)
