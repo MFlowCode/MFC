@@ -767,7 +767,8 @@ contains
                 elasticity = .true.
                 stress_idx%beg = sys_size + 1
                 stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
-                ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
+                if (cyl_coord) stress_idx%end = stress_idx%end + 1
+                ! number of stresses is 1 in 1D, 3 in 2D, 4 in 2D-Axisym, 6 in 3D
                 sys_size = stress_idx%end
 
                 ! shear stress index is 2 for 2D and 2,4,5 for 3D
