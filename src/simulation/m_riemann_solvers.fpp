@@ -636,7 +636,7 @@ contains
                                     if ((G_L > 1000) .and. (G_R > 1000)) then
                                         E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                         E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                        ! Additional terms in 2D and 3D
+                                        ! Double for shear stresses
                                         if (any(strxb - 1 + i == shear_indices)) then
                                             E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                             E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)

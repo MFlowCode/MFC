@@ -331,7 +331,7 @@ contains
             end do
         end if
 
-        if (cyl_coord) then
+        if (cyl_coord .and. idir == 2) then
 
             !$acc parallel loop collapse(3) gang vector default(present)
             do q = 0, p
