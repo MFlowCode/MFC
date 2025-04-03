@@ -344,7 +344,7 @@ contains
             if (pres_wrt .or. prim_vars_wrt) dbvars = dbvars + 1
 
             ! Elastic stresses
-            if (hypoelasticity) dbvars = dbvars + (num_dims*(num_dims + 1))/2
+            if (elasticity .and. (tau_wrt .or. prim_vars_wrt)) dbvars = dbvars + (num_dims*(num_dims + 1))/2
 
             ! Magnetic field
             if (mhd) then

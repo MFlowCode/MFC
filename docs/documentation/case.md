@@ -164,6 +164,7 @@ MPI topology is automatically optimized to maximize the parallel efficiency for 
 | `alpha_rho(i)` *     | Real    | Supported             | Partial density of fluid $i$.                                |
 | `pres` *             | Real    | Supported             | Pressure.                                                    |
 | `vel(i)` *           | Real    | Supported             | Velocity in direction $i$.                                   |
+| `tau_e(i)` *         | Real    | Supported             | Elastic stresses.                                            |
 | `hcid` *             | Integer | N/A                   | Hard coded patch id                                          |
 | `cf_val` *           | Real    | Supported             | Surface tension color function value                         |
 | `model_filepath`     | String  | Not Supported         | Path to an STL or OBJ file (not all OBJs are supported).     |
@@ -179,6 +180,8 @@ The Table lists the patch parameters.
 The parameters define the geometries and physical parameters of fluid components (patch) in the domain at initial condition.
 Note that the domain must be fully filled with patche(s).
 The code outputs error messages when an empty region is left in the domain.
+
+- `tau_e(i)` is the `i`-th component of the elastic stress tensor, ordered as `tau_xx`, `tau_xy`, `tau_yy`, `tau_xz`, `tau_yz`, and `tau_zz`. 1D simulation requires `tau(1)`, 2D `tau(1:3)`, and 3D `tau(1:6)`.
 
 #### Analytical Definition of Primitive Variables
 
@@ -330,6 +333,7 @@ Additional details on this specification can be found in [The Naca Airfoil Serie
 | `qv`   ** | Real   | Stiffened-gas parameter $q$ of fluid.          |
 | `qvp`  ** | Real   | Stiffened-gas parameter $q'$ of fluid.         |
 | `sigma`   | Real   | Surface tension coefficient                    |
+| `G`       | Real   | Shear modulus of solid.                        |
 
 Fluid material's parameters. All parameters except for sigma should be prepended with `fluid_pp(i)` where $i$ is the fluid index.
 
@@ -348,6 +352,8 @@ When these parameters are undefined, fluids are treated as inviscid.
 Details of implementation of viscosity in MFC can be found in [Coralic (2015)](references.md#Coralic15).
 
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
+
+- `fluid_pp(i)%%G` is required for `hypoelasticity`.
 
 ### 6. Simulation Algorithm
 
@@ -391,6 +397,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `t_stop`               | Real    | Simulation stop time |
 | `surface_tension`      | Logical | Activate surface tension |
 | `viscous`              | Logical | Activate viscosity |
+| `hypoelasticity`       | Logical | Activate hypoelasticity* |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.
@@ -470,6 +477,8 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 
 - `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
 
+- `hypoelasticity` activates elastic stress calculations for fluid-solid interactions. Requires `G` to be set in the fluid material's parameters.
+
 #### Constant Time-Stepping
 
 - `dt` specifies the constant time step size used in the simulation.
@@ -523,6 +532,7 @@ To restart the simulation from $k$-th time step, see [Restarting Cases](running.
 | `omega_wrt(i)`       | Logical | Add the $i$-direction vorticity to the database	 |
 | `schlieren_wrt`      | Logical | Add the numerical schlieren to the database|
 | `qm_wrt`             | Logical | Add the Q-criterion to the database|
+| `tau_wrt`            | Logical | Add the elastic stress components to the database|
 | `fd_order`           | Integer | Order of finite differences for computing the vorticity and the numerical Schlieren function [1,2,4] |
 | `schlieren_alpha(i)` | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |
 | `probe_wrt`          | Logical | Write the flow chosen probes data files for each time step	|
