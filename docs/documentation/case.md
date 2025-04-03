@@ -886,7 +886,20 @@ Note: In 1D/2D/3D simulations, all three velocity components are treated as stat
 
 Note: For relativistic flow, the conservative and primitive densities are different. `rho_wrt` outputs the primitive (rest mass) density.
 
-### 15. Cylindrical Coordinates
+### 15. Elasticity
+
+| Parameter         | Type    | Description                                         |
+| ---:              | :---:   | :---                                                |
+| `hypoelasticity`  | Logical | Enable hypoelasticity simulation                    |
+| `hyperelasticity` | Logical | Enable hyperelasticity simulation                   |
+| `cont_damage`     | Logical | Enable continuum damage model                       |
+| `tau_star`        | Real    | Threshold stress for continuum damage model         |
+| `cont_damage_s`   | Real    | Power `s` for continuum damage model                |
+| `alpha_bar`       | Real    | Damage factor (rate) for continuum damage model     |
+
+- `cont_damage` activates continuum damage model for solid materials. Requires `tau_star`, `cont_damage_s`, and `alpha_bar` to be set (empirically determined) ([Cao et al., 2019](references.md#cao19)).
+
+### 16. Cylindrical Coordinates
 
 When ``cyl_coord = 'T'`` is set in 3D the following constraints must be met:
 
