@@ -1,43 +1,10 @@
-This file was created on 2025-04-02 22:50:04.335880.
+This file was created on 2025-04-03 00:30:20.481466.
 
 mfc.sh:
 
     Invocation: test --generate -o 9C9B2CBC
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        c39c0f54401599628e1d54d8895dcae6f1dbacab on axisym_hypo_merged (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on LAPTOP-OMEN
-    
-        C       : GNU v11.4.0 (/usr/bin/cc)
-        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/chris/source/MFC_fix_hll_axisym/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        3ab0d92265986522feba30a75aaf2bc0074bb90a on axisym_hypo_merged (dirty)
 
 post_process:
 
@@ -72,7 +39,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+simulation:
 
     CMake Configuration:
     
@@ -81,8 +48,8 @@ pre_process:
         C       : GNU v11.4.0 (/usr/bin/cc)
         Fortran : GNU v11.4.0 (/usr/bin/gfortran)
     
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -118,6 +85,39 @@ syscheck:
         SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/chris/source/MFC_fix_hll_axisym/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on LAPTOP-OMEN
+    
+        C       : GNU v11.4.0 (/usr/bin/cc)
+        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
