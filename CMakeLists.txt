@@ -8,6 +8,8 @@
 
 cmake_minimum_required(VERSION 3.20)
 
+# Set minimum policy version to 3.5 to fix FFTW compilation with CMake 4.0+
+set(CMAKE_POLICY_VERSION_MINIMUM "3.5" CACHE STRING "Minimum CMake policy version")
 
 # We include C as a language because - for some reason -
 # FIND_LIBRARY_USE_LIB64_PATHS is otherwise ignored.
