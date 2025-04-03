@@ -914,7 +914,11 @@ contains
             ! Bubble dynamic closure from Maeda and Colonius (2018)
 
             ! Range of cells included in Omega
-            mapCells_pinf = mapCells
+            if (lag_params%smooth_type == 1) then
+                mapCells_pinf = mapCells
+            else
+                stop "lag_params%cluster_type: 2 requires lag_params%smooth_type: 1."
+            end if
 
             ! Include the cell that contains the bubble (mapCells+1+mapCells)
             smearGrid = mapCells_pinf - (-mapCells_pinf) + 1
@@ -991,6 +995,10 @@ contains
             f_pinfl = charpres2/charvol2
             vol = charvol
             dc = (3._wp*abs(vol)/(4._wp*pi))**(1._wp/3._wp)
+
+        else
+
+            stop "Check cluterflag. Exiting."
 
         end if
 
