@@ -60,6 +60,7 @@ COMMON = {
     'rkck_adap_dt': ParamType.LOG, 
     'Bx0': ParamType.REAL,
     'relativity': ParamType.LOG,
+    'cont_damage': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -256,6 +257,9 @@ SIMULATION.update({
     'bubbles_lagrange': ParamType.LOG,
     'rkck_tolerance': ParamType.REAL,
     'powell': ParamType.LOG,
+    'tau_star': ParamType.REAL,
+    'cont_damage_s': ParamType.REAL,
+    'alpha_bar': ParamType.REAL,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
