@@ -36,6 +36,7 @@ if (MFC_FFTW)
                 URL        "http://www.fftw.org/fftw-3.3.10.tar.gz"
                 CMAKE_ARGS -DBUILD_TESTS=OFF
                            -DBUILD_SHARED_LIBS=OFF
+                           -DCMAKE_POLICY_VERSION_MINIMUM=3.5
                            "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
             )
         else()
