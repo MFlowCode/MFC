@@ -154,6 +154,15 @@ contains
             end if
         end if
 
+        if (mhd) then
+            do i = B_idx%beg, B_idx%end
+                @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    idwbuff(2)%beg:idwbuff(2)%end, &
+                    idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+        end if
+
         if (elasticity) then
             do i = stress_idx%beg, stress_idx%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -921,7 +930,7 @@ contains
     subroutine s_compute_dt()
 
         real(wp) :: rho        !< Cell-avg. density
-        real(wp), dimension(num_dims) :: vel        !< Cell-avg. velocity
+        real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
         real(wp) :: pres       !< Cell-avg. pressure
         real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
@@ -1216,6 +1225,12 @@ contains
         do i = 1, adv_idx%end
             @:DEALLOCATE(q_prim_vf(i)%sf)
         end do
+
+        if (mhd) then
+            do i = B_idx%beg, B_idx%end
+                @:DEALLOCATE(q_prim_vf(i)%sf)
+            end do
+        end if
 
         if (elasticity) then
             do i = stress_idx%beg, stress_idx%end
