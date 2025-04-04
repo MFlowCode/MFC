@@ -426,9 +426,9 @@ contains
                         tau_xx = q_cons_vf(stress_idx%beg)%sf(k, l, q)
                         tau_xy = q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)
                         tau_yy = q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)
-                        tau_zz = q_cons_vf(stress_idx%beg + 3)%sf(k, l, q)
+                        tau_xz = q_cons_vf(stress_idx%beg + 3)%sf(k, l, q)
                         tau_yz = q_cons_vf(stress_idx%beg + 4)%sf(k, l, q)
-                        tau_xz = q_cons_vf(stress_idx%beg + 5)%sf(k, l, q)
+                        tau_zz = q_cons_vf(stress_idx%beg + 5)%sf(k, l, q)
 
                         ! Invariants of the stress tensor
                         I1 = tau_xx + tau_yy + tau_zz
