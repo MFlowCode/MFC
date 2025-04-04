@@ -154,6 +154,15 @@ contains
             end if
         end if
 
+        if (mhd) then
+            do i = B_idx%beg, B_idx%end
+                @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    idwbuff(2)%beg:idwbuff(2)%end, &
+                    idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+        end if
+
         if (elasticity) then
             do i = stress_idx%beg, stress_idx%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -170,6 +179,13 @@ contains
                     idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
+        end if
+
+        if (cont_damage) then
+            @:ALLOCATE(q_prim_vf(damage_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(q_prim_vf(damage_idx))
         end if
 
         if (model_eqns == 3) then
@@ -921,7 +937,7 @@ contains
     subroutine s_compute_dt()
 
         real(wp) :: rho        !< Cell-avg. density
-        real(wp), dimension(num_dims) :: vel        !< Cell-avg. velocity
+        real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
         real(wp) :: pres       !< Cell-avg. pressure
         real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
@@ -1217,6 +1233,12 @@ contains
             @:DEALLOCATE(q_prim_vf(i)%sf)
         end do
 
+        if (mhd) then
+            do i = B_idx%beg, B_idx%end
+                @:DEALLOCATE(q_prim_vf(i)%sf)
+            end do
+        end if
+
         if (elasticity) then
             do i = stress_idx%beg, stress_idx%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
@@ -1227,6 +1249,10 @@ contains
             do i = xibeg, xiend + 1
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
+        end if
+
+        if (cont_damage) then
+            @:DEALLOCATE(q_prim_vf(damage_idx)%sf)
         end if
 
         if (bubbles_euler) then

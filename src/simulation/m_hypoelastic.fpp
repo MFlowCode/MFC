@@ -16,7 +16,8 @@ module m_hypoelastic
 
     private; public :: s_initialize_hypoelastic_module, &
  s_finalize_hypoelastic_module, &
- s_compute_hypoelastic_rhs
+ s_compute_hypoelastic_rhs, &
+ s_compute_damage_state
 
     real(wp), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
@@ -204,6 +205,9 @@ contains
                             rho_K = rho_K + q_prim_vf(i)%sf(k, l, q) !alpha_rho_K(1)
                             G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs(i)  !alpha_K(1) * Gs(1)
                         end do
+
+                        if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(damage_idx)%sf(k, l, q)), 0._wp)
+
                         rho_K_field(k, l, q) = rho_K
                         G_K_field(k, l, q) = G_K
 
@@ -331,6 +335,39 @@ contains
             end do
         end if
 
+        if (cyl_coord .and. idir == 2) then
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        ! S_xx -= rho * v/r * (tau_xx + 2/3*G)
+                        rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) - &
+                                                    rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
+                                                    (q_prim_vf(strxb)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_xx + 2/3*G
+
+                        ! S_xr -= rho * v/r * tau_xr
+                        rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) - &
+                                                        rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
+                                                        q_prim_vf(strxb + 1)%sf(k, l, q) ! tau_xx
+
+                        ! S_rr -= rho * v/r * (tau_rr + 2/3*G)
+                        rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) - &
+                                                        rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
+                                                        (q_prim_vf(strxb + 2)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_rr + 2/3*G
+
+                        ! S_thetatheta += rho * ( -(tau_thetatheta + 2/3*G)*(du/dx + dv/dr + v/r) + 2*(tau_thetatheta + G)*v/r )
+                        rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + &
+                                                        rho_K_field(k, l, q)*( &
+                                                        -(q_prim_vf(strxb + 3)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q))* &
+                                                        (du_dx(k, l, q) + dv_dy(k, l, q) + q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)) &
+                                                        + 2._wp*(q_prim_vf(strxb + 3)%sf(k, l, q) + G_K_field(k, l, q))*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l))
+                    end do
+                end do
+            end do
+
+        end if
+
     end subroutine s_compute_hypoelastic_rhs
 
     subroutine s_finalize_hypoelastic_module()
@@ -349,5 +386,78 @@ contains
         end if
 
     end subroutine s_finalize_hypoelastic_module
+
+    subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+
+        real(wp) :: tau_p ! principal stress
+        real(wp) :: tau_xx, tau_xy, tau_yy, tau_zz, tau_yz, tau_xz
+        real(wp) :: I1, I2, I3, argument, phi, sqrt_term_1, sqrt_term_2, temp
+        integer :: q, l, k
+
+        if (n == 0) then
+            l = 0; q = 0
+            !$acc parallel loop collapse(1) gang vector default(present)
+            do k = 0, m
+                rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_star, 0._wp))**cont_damage_s
+            end do
+        elseif (p == 0) then
+            q = 0
+            !$acc parallel loop collapse(2) gang vector default(present)
+            do l = 0, n
+                do k = 0, m
+                    ! Maximum principal stress
+                    tau_p = 0.5_wp*(q_cons_vf(stress_idx%beg)%sf(k, l, q) + &
+                                    q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)) + &
+                            sqrt((q_cons_vf(stress_idx%beg)%sf(k, l, q) - &
+                                  q_cons_vf(stress_idx%beg + 2)%sf(k, l, q))**2.0_wp + &
+                                 4._wp*q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)**2.0_wp)/2._wp
+
+                    rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
+                end do
+            end do
+        else
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        tau_xx = q_cons_vf(stress_idx%beg)%sf(k, l, q)
+                        tau_xy = q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)
+                        tau_yy = q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)
+                        tau_xz = q_cons_vf(stress_idx%beg + 3)%sf(k, l, q)
+                        tau_yz = q_cons_vf(stress_idx%beg + 4)%sf(k, l, q)
+                        tau_zz = q_cons_vf(stress_idx%beg + 5)%sf(k, l, q)
+
+                        ! Invariants of the stress tensor
+                        I1 = tau_xx + tau_yy + tau_zz
+                        I2 = tau_xx*tau_yy + tau_xx*tau_zz + tau_yy*tau_zz - &
+                             (tau_xy**2.0_wp + tau_xz**2.0_wp + tau_yz**2.0_wp)
+                        I3 = tau_xx*tau_yy*tau_zz + 2.0_wp*tau_xy*tau_xz*tau_yz - &
+                             tau_xx*tau_yz**2.0_wp - tau_yy*tau_xz**2.0_wp - tau_zz*tau_xy**2.0_wp
+
+                        ! Maximum principal stress
+                        temp = I1**2.0_wp - 3.0_wp*I2
+                        sqrt_term_1 = sqrt(max(temp, 0.0_wp))
+                        if (sqrt_term_1 > verysmall) then ! Avoid 0/0
+                            argument = (2.0_wp*I1*I1*I1 - 9.0_wp*I1*I2 + 27.0_wp*I3)/ &
+                            (2.0_wp*sqrt_term_1*sqrt_term_1*sqrt_term_1)
+                            if (argument > 1.0_wp) argument = 1.0_wp
+                            if (argument < -1.0_wp) argument = -1.0_wp
+                            phi = acos(argument)
+                            sqrt_term_2 = sqrt(max(I1**2.0_wp - 3.0_wp*I2, 0.0_wp))
+                            tau_p = I1/3.0_wp + 2.0_wp/sqrt(3.0_wp)*sqrt_term_2*cos(phi/3.0_wp)
+                        else
+                            tau_p = I1/3.0_wp
+                        end if
+
+                        rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
+                    end do
+                end do
+            end do
+        end if
+
+    end subroutine s_compute_damage_state
 
 end module m_hypoelastic

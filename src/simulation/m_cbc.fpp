@@ -636,7 +636,7 @@ contains
         real(wp) :: dqv_dt
         real(wp), dimension(contxe) :: alpha_rho, dalpha_rho_ds, mf
         real(wp), dimension(2) :: Re_cbc
-        real(wp), dimension(num_dims) :: vel, dvel_ds
+        real(wp), dimension(num_vels) :: vel, dvel_ds
         real(wp), dimension(num_fluids) :: adv, dadv_ds
         real(wp), dimension(sys_size) :: L
         real(wp), dimension(3) :: lambda
