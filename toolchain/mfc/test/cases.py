@@ -576,8 +576,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if len(dimInfo[0]) == 3:
                 reflective_params.update({'bc_z%beg': -2, 'bc_z%end': -2})
 
+            tau_star_val = 10.0 if len(dimInfo[0]) == 3 else 0.0
+
             if num_fluids == 1:
-                cases.append(define_case_d(stack, 'cont_damage', {'cont_damage': 'T', 'tau_star': 0.0, 'cont_damage_s': 2.0, 'alpha_bar': 1e-6}))
+                cases.append(define_case_d(stack, 'cont_damage', {'cont_damage': 'T', 'tau_star': tau_star_val, 'cont_damage_s': 2.0, 'alpha_bar': 1e-6}))
                 if len(dimInfo[0]) >= 2:
                     cases.append(define_case_d(stack, 'bc=-2', reflective_params))
                 if len(dimInfo[0]) == 2:
