@@ -7,11 +7,10 @@ print(
         {
             # Logistics
             "run_time_info": "T",
-
             # Computational Domain Parameters
-            "x_domain%beg": 0.,
+            "x_domain%beg": 0.0,
             "x_domain%end": 0.001,
-            "y_domain%beg": 0.,
+            "y_domain%beg": 0.0,
             "y_domain%end": 0.0005,
             "m": 50,
             "n": 25,
@@ -20,7 +19,6 @@ print(
             "t_step_start": 0,
             "t_step_stop": 400,
             "t_step_save": 20,
-
             # Simulation Algorithm Parameters
             "num_patches": 2,
             "model_eqns": 2,
@@ -42,7 +40,6 @@ print(
             "bc_x%end": -6,
             "bc_y%beg": -2,
             "bc_y%end": -6,
-
             # Hypoelasticity
             "hypoelasticity": "T",
             "fd_order": 4,
@@ -50,13 +47,11 @@ print(
             "tau_star": 0.0,
             "cont_damage_s": 2.0,
             "alpha_bar": 1e-4,
-
             # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-
             # Patch 1 Liquid
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.0005,
@@ -66,11 +61,10 @@ print(
             "patch_icpp(1)%vel(1)": 0.0,
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%pres": 1e05,
-            "patch_icpp(1)%alpha_rho(1)": 1100*(1.0-1e-6),
-            "patch_icpp(1)%alpha(1)": 1.0-1e-6,
-            "patch_icpp(1)%alpha_rho(2)": 1100*1e-6,
+            "patch_icpp(1)%alpha_rho(1)": 1100 * (1.0 - 1e-6),
+            "patch_icpp(1)%alpha(1)": 1.0 - 1e-6,
+            "patch_icpp(1)%alpha_rho(2)": 1100 * 1e-6,
             "patch_icpp(1)%alpha(2)": 1e-6,
-
             # Patch 2 Solid
             "patch_icpp(2)%alter_patch(1)": "T",
             "patch_icpp(2)%geometry": 3,
@@ -81,11 +75,10 @@ print(
             "patch_icpp(2)%vel(1)": 0.0,
             "patch_icpp(2)%vel(2)": 0.0,
             "patch_icpp(2)%pres": 1e05,
-            "patch_icpp(2)%alpha_rho(1)": 1100*1e-6,
+            "patch_icpp(2)%alpha_rho(1)": 1100 * 1e-6,
             "patch_icpp(2)%alpha(1)": 1e-6,
-            "patch_icpp(2)%alpha_rho(2)": 1100*(1.0-1e-6),
-            "patch_icpp(2)%alpha(2)": 1.0-1e-6,
-
+            "patch_icpp(2)%alpha_rho(2)": 1100 * (1.0 - 1e-6),
+            "patch_icpp(2)%alpha(2)": 1.0 - 1e-6,
             # Acoustic source
             "acoustic_source": "T",
             "num_source": 1,
@@ -99,7 +92,6 @@ print(
             "acoustic(1)%foc_length": 0.00045,
             "acoustic(1)%aperture": 0.0008,
             "acoustic(1)%delay": 0.0,
-
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
             "fluid_pp(1)%pi_inf": 4.4e00 * 5.57e08 / (4.4e00 - 1.0e00),

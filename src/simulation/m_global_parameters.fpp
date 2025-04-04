@@ -1223,6 +1223,8 @@ contains
 
         !$acc update device(Bx0, powell)
 
+        !$acc update device(cont_damage, tau_star, cont_damage_s, alpha_bar)
+
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)
             !$acc update device(wenoz_q)

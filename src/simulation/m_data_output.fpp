@@ -1284,7 +1284,7 @@ contains
                                 damage_state = q_cons_vf(damage_idx)%sf(j - 2, k - 2, l)
                                 G = G*max((1._wp - damage_state), 0._wp)
                             end if
-    
+
                             call s_compute_pressure( &
                                 q_cons_vf(1)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
