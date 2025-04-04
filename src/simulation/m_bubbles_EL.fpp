@@ -910,12 +910,14 @@ contains
             !R_Omega
             dc = (3._wp*vol/(4._wp*pi))**(1._wp/3._wp)
 
-        else
+        else if (lag_params%cluster_type >= 2) then
             ! Bubble dynamic closure from Maeda and Colonius (2018)
 
             ! Range of cells included in Omega
             if (lag_params%smooth_type == 1) then
                 mapCells_pinf = mapCells
+            else
+                print *, "lag_params%cluster_type: 2 requires lag_params%smooth_type: 1."
             end if
 
             ! Include the cell that contains the bubble (mapCells+1+mapCells)
@@ -993,6 +995,9 @@ contains
             f_pinfl = charpres2/charvol2
             vol = charvol
             dc = (3._wp*abs(vol)/(4._wp*pi))**(1._wp/3._wp)
+        else
+
+            print *, "Check cluterflag. Exiting."
 
         end if
 
