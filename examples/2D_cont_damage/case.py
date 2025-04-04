@@ -15,10 +15,10 @@ print(
             "m": 50,
             "n": 25,
             "p": 0,
-            "dt": 2e-9,
+            "dt": 2e-12,
             "t_step_start": 0,
-            "t_step_stop": 400,
-            "t_step_save": 20,
+            "t_step_stop": 40000,
+            "t_step_save": 2000,
             # Simulation Algorithm Parameters
             "num_patches": 2,
             "model_eqns": 2,
