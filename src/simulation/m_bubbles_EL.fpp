@@ -914,7 +914,9 @@ contains
             ! Bubble dynamic closure from Maeda and Colonius (2018)
 
             ! Range of cells included in Omega
-            mapCells_pinf = mapCells
+            if (lag_params%smooth_type == 1) then
+                mapCells_pinf = mapCells
+            end if
 
             ! Include the cell that contains the bubble (mapCells+1+mapCells)
             smearGrid = mapCells_pinf - (-mapCells_pinf) + 1
