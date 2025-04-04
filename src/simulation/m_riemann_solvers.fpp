@@ -2998,7 +2998,7 @@ contains
 
         ! Local variables:
         real(wp), dimension(num_fluids) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
-        type(riemann_states), dimension(num_vels) :: vel
+        type(riemann_states_vec3) :: vel
         type(riemann_states) :: rho, pres, E, H_no_mag
         type(riemann_states) :: gamma, pi_inf, qv
         type(riemann_states) :: vel_rms
@@ -3051,16 +3051,12 @@ contains
 
                             ! NOTE: unlike HLL & HLLC, vel_L here is permutated by dir_idx for simpler logic
                             do i = 1, num_vels
-                                vel(i)%L = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i))
-                                vel(i)%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + dir_idx(i))
+                                vel%L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i))
+                                vel%R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + dir_idx(i))
                             end do
 
-                            vel_rms%L = 0._wp; vel_rms%R = 0._wp
-
-                            do i = 1, num_vels
-                                vel_rms%L = vel_rms%L + vel(i)%L**2._wp
-                                vel_rms%R = vel_rms%R + vel(i)%R**2._wp
-                            end do
+                            vel_rms%L = sum(vel%L**2._wp)
+                            vel_rms%R = sum(vel%R**2._wp)
 
                             do i = 1, num_fluids
                                 alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
@@ -3119,36 +3115,36 @@ contains
                             call s_compute_fast_magnetosonic_speed(rho%R, c%R, B%R, norm_dir, c_fast%R, H_no_mag%R)
 
                             ! (3) Compute contact speed s_M [Miyoshi Equ. (38)]
-                            s_L = min(vel(1)%L - c_fast%L, vel(1)%R - c_fast%R)
-                            s_R = max(vel(1)%R + c_fast%R, vel(1)%L + c_fast%L)
+                            s_L = min(vel%L(1) - c_fast%L, vel%R(1) - c_fast%R)
+                            s_R = max(vel%R(1) + c_fast%R, vel%L(1) + c_fast%L)
 
                             pTot_L = pres%L + pres_mag%L
                             pTot_R = pres%R + pres_mag%R
 
-                            s_M = (((s_R - vel(1)%R)*rho%R*vel(1)%R - &
-                                    (s_L - vel(1)%L)*rho%L*vel(1)%L - pTot_R + pTot_L)/ &
-                                   ((s_R - vel(1)%R)*rho%R - (s_L - vel(1)%L)*rho%L))
+                            s_M = (((s_R - vel%R(1))*rho%R*vel%R(1) - &
+                                    (s_L - vel%L(1))*rho%L*vel%L(1) - pTot_R + pTot_L)/ &
+                                   ((s_R - vel%R(1))*rho%R - (s_L - vel%L(1))*rho%L))
 
                             ! (4) Compute star state variables
-                            rhoL_star = rho%L*(s_L - vel(1)%L)/(s_L - s_M)
-                            rhoR_star = rho%R*(s_R - vel(1)%R)/(s_R - s_M)
-                            p_star = pTot_L + rho%L*(s_L - vel(1)%L)*(s_M - vel(1)%L)/(s_L - s_M)
-                            E_starL = ((s_L - vel(1)%L)*E%L - pTot_L*vel(1)%L + p_star*s_M)/(s_L - s_M)
-                            E_starR = ((s_R - vel(1)%R)*E%R - pTot_R*vel(1)%R + p_star*s_M)/(s_R - s_M)
+                            rhoL_star = rho%L*(s_L - vel%L(1))/(s_L - s_M)
+                            rhoR_star = rho%R*(s_R - vel%R(1))/(s_R - s_M)
+                            p_star = pTot_L + rho%L*(s_L - vel%L(1))*(s_M - vel%L(1))/(s_L - s_M)
+                            E_starL = ((s_L - vel%L(1))*E%L - pTot_L*vel%L(1) + p_star*s_M)/(s_L - s_M)
+                            E_starR = ((s_R - vel%R(1))*E%R - pTot_R*vel%R(1) + p_star*s_M)/(s_R - s_M)
 
                             ! (5) Compute the left/right conserved state vectors
                             U_L(1) = rho%L
-                            U_L(2) = rho%L*vel(1)%L
-                            U_L(3) = rho%L*vel(2)%L
-                            U_L(4) = rho%L*vel(3)%L
+                            U_L(2) = rho%L*vel%L(1)
+                            U_L(3) = rho%L*vel%L(2)
+                            U_L(4) = rho%L*vel%L(3)
                             U_L(5) = B%L(2)
                             U_L(6) = B%L(3)
                             U_L(7) = E%L
 
                             U_R(1) = rho%R
-                            U_R(2) = rho%R*vel(1)%R
-                            U_R(3) = rho%R*vel(2)%R
-                            U_R(4) = rho%R*vel(3)%R
+                            U_R(2) = rho%R*vel%R(1)
+                            U_R(3) = rho%R*vel%R(2)
+                            U_R(4) = rho%R*vel%R(3)
                             U_R(5) = B%R(2)
                             U_R(6) = B%R(3)
                             U_R(7) = E%R
@@ -3156,36 +3152,36 @@ contains
                             ! (6) Compute the left/right star state vectors
                             U_starL(1) = rhoL_star
                             U_starL(2) = rhoL_star*s_M
-                            U_starL(3) = rhoL_star*vel(2)%L
-                            U_starL(4) = rhoL_star*vel(3)%L
+                            U_starL(3) = rhoL_star*vel%L(2)
+                            U_starL(4) = rhoL_star*vel%L(3)
                             U_starL(5) = B%L(2)
                             U_starL(6) = B%L(3)
                             U_starL(7) = E_starL
 
                             U_starR(1) = rhoR_star
                             U_starR(2) = rhoR_star*s_M
-                            U_starR(3) = rhoR_star*vel(2)%R
-                            U_starR(4) = rhoR_star*vel(3)%R
+                            U_starR(3) = rhoR_star*vel%R(2)
+                            U_starR(4) = rhoR_star*vel%R(3)
                             U_starR(5) = B%R(2)
                             U_starR(6) = B%R(3)
                             U_starR(7) = E_starR
 
                             ! (7) Compute the left/right fluxes
-                            F_L(1) = rho%L*vel(1)%L
-                            F_L(2) = rho%L*vel(1)%L*vel(1)%L - B%L(1)*B%L(1) + pTot_L
-                            F_L(3) = rho%L*vel(1)%L*vel(2)%L - B%L(1)*B%L(2)
-                            F_L(4) = rho%L*vel(1)%L*vel(3)%L - B%L(1)*B%L(3)
-                            F_L(5) = vel(1)%L*B%L(2) - vel(2)%L*B%L(1)
-                            F_L(6) = vel(1)%L*B%L(3) - vel(3)%L*B%L(1)
-                            F_L(7) = (E%L + pTot_L)*vel(1)%L - B%L(1)*(vel(1)%L*B%L(1) + vel(2)%L*B%L(2) + vel(3)%L*B%L(3))
+                            F_L(1) = rho%L*vel%L(1)
+                            F_L(2) = rho%L*vel%L(1)*vel%L(1) - B%L(1)*B%L(1) + pTot_L
+                            F_L(3) = rho%L*vel%L(1)*vel%L(2) - B%L(1)*B%L(2)
+                            F_L(4) = rho%L*vel%L(1)*vel%L(3) - B%L(1)*B%L(3)
+                            F_L(5) = vel%L(1)*B%L(2) - vel%L(2)*B%L(1)
+                            F_L(6) = vel%L(1)*B%L(3) - vel%L(3)*B%L(1)
+                            F_L(7) = (E%L + pTot_L)*vel%L(1) - B%L(1)*(vel%L(1)*B%L(1) + vel%L(2)*B%L(2) + vel%L(3)*B%L(3))
 
-                            F_R(1) = rho%R*vel(1)%R
-                            F_R(2) = rho%R*vel(1)%R*vel(1)%R - B%R(1)*B%R(1) + pTot_R
-                            F_R(3) = rho%R*vel(1)%R*vel(2)%R - B%R(1)*B%R(2)
-                            F_R(4) = rho%R*vel(1)%R*vel(3)%R - B%R(1)*B%R(3)
-                            F_R(5) = vel(1)%R*B%R(2) - vel(2)%R*B%R(1)
-                            F_R(6) = vel(1)%R*B%R(3) - vel(3)%R*B%R(1)
-                            F_R(7) = (E%R + pTot_R)*vel(1)%R - B%R(1)*(vel(1)%R*B%R(1) + vel(2)%R*B%R(2) + vel(3)%R*B%R(3))
+                            F_R(1) = rho%R*vel%R(1)
+                            F_R(2) = rho%R*vel%R(1)*vel%R(1) - B%R(1)*B%R(1) + pTot_R
+                            F_R(3) = rho%R*vel%R(1)*vel%R(2) - B%R(1)*B%R(2)
+                            F_R(4) = rho%R*vel%R(1)*vel%R(3) - B%R(1)*B%R(3)
+                            F_R(5) = vel%R(1)*B%R(2) - vel%R(2)*B%R(1)
+                            F_R(6) = vel%R(1)*B%R(3) - vel%R(3)*B%R(1)
+                            F_R(7) = (E%R + pTot_R)*vel%R(1) - B%R(1)*(vel%R(1)*B%R(1) + vel%R(2)*B%R(2) + vel%R(3)*B%R(3))
 
                             ! (8) Compute the left/right star fluxes (note array operations)
                             F_starL = F_L + s_L*(U_starL - U_L)
@@ -3200,10 +3196,10 @@ contains
                             sqrt_rhoR_star = sqrt(rhoR_star)
                             denom_ds = sqrt_rhoL_star + sqrt_rhoR_star
                             sign_Bx = sign(1._wp, B%L(1))
-                            vL_star = vel(2)%L
-                            wL_star = vel(3)%L
-                            vR_star = vel(2)%R
-                            wR_star = vel(3)%R
+                            vL_star = vel%L(2)
+                            wL_star = vel%L(3)
+                            vR_star = vel%R(2)
+                            wR_star = vel%R(3)
                             v_double = (sqrt_rhoL_star*vL_star + sqrt_rhoR_star*vR_star + (B%R(2) - B%L(2))*sign_Bx)/denom_ds
                             w_double = (sqrt_rhoL_star*wL_star + sqrt_rhoR_star*wR_star + (B%R(3) - B%L(3))*sign_Bx)/denom_ds
                             By_double = (sqrt_rhoL_star*B%R(2) + sqrt_rhoR_star*B%L(2) + sqrt_rhoL_star*sqrt_rhoR_star*(vR_star - vL_star)*sign_Bx)/denom_ds
