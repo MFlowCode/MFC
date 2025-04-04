@@ -30,7 +30,7 @@ print(
             "time_stepper": 3,
             "weno_order": 5,
             "weno_eps": 1.0e-16,
-            "mapped_weno": 'T',
+            "mapped_weno": "T",
             "null_weights": "F",
             "mp_weno": "F",
             "riemann_solver": 1,
