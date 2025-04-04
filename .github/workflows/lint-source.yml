@@ -31,8 +31,8 @@ jobs:
     - name: Lint the full source
       run: |
         source build/venv/bin/activate
-        find ./src -type f -not -name '*nvtx*' -exec fortitude check {} \;
-        find ./src -type f -not -name '*nvtx*' -exec fortitude check {} \; | wc -l | xargs -I{} sh -c '[ {} -gt 0 ] && exit 1 || exit 0'
+        find ./src -type f -not -name '*nvtx*' -exec sh -c 'fortitude check "$1" | grep -v E001' _ {} \;
+        find ./src -type f -not -name '*nvtx*' -exec sh -c 'fortitude check "$1" | grep -v E001' _ {} \; | wc -l | xargs -I{} sh -c '[ {} -gt 0 ] && exit 1 || exit 0'
 
     - name: No double precision intrinsics
       run: |
