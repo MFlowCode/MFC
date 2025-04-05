@@ -915,7 +915,7 @@ contains
             if (lag_params%smooth_type == 1) then
                 mapCells_pinf = mapCells
             else
-                stop "lag_params%cluster_type: 2 requires lag_params%smooth_type: 1."
+                mapCells_pinf = 0
             end if
 
             ! Include the cell that contains the bubble (mapCells+1+mapCells)
