@@ -138,7 +138,7 @@ dt = cfl * dx / ss
 # save frequency = SF + 1 (because the initial state, 0.dat, is also saved)
 SF = 40
 
-# making Nt divisible By SF
+# making Nt divisible by SF
 tendA = (xe - xb) / ss * 5 / 24
 
 # 1 - ensure NtA is sufficient to go a little beyond tendA

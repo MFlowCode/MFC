@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # This case file demonstrates the Laplace pressure jump of a water droplet in air. The laplace pressure jump
-# in 2D is given By delta = sigma / r where delta is the pressure jump, sigma is the surface tension coefficient,
+# in 2D is given by delta = sigma / r where delta is the pressure jump, sigma is the surface tension coefficient,
 # and r is the radius of the droplet. The results of this simulation agree with theory to well within 1%
 # relative error.
 

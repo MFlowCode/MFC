@@ -178,46 +178,22 @@ contains
 
         type(int_bounds_info), intent(IN) :: ix, iy, iz
 
-        if (riemann_solver == 1) then
-            call s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-                                      dqL_prim_dy_vf, &
-                                      dqL_prim_dz_vf, &
-                                      qL_prim_vf, &
-                                      qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
-                                      dqR_prim_dy_vf, &
-                                      dqR_prim_dz_vf, &
-                                      qR_prim_vf, &
-                                      q_prim_vf, &
-                                      flux_vf, flux_src_vf, &
-                                      flux_gsrc_vf, &
-                                      norm_dir, ix, iy, iz)
-        elseif (riemann_solver == 2) then
-            call s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-                                       dqL_prim_dy_vf, &
-                                       dqL_prim_dz_vf, &
-                                       qL_prim_vf, &
-                                       qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
-                                       dqR_prim_dy_vf, &
-                                       dqR_prim_dz_vf, &
-                                       qR_prim_vf, &
-                                       q_prim_vf, &
-                                       flux_vf, flux_src_vf, &
-                                       flux_gsrc_vf, &
-                                       norm_dir, ix, iy, iz)
-        elseif (riemann_solver == 4) then
-            call s_hlld_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-                                       dqL_prim_dy_vf, &
-                                       dqL_prim_dz_vf, &
-                                       qL_prim_vf, &
-                                       qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
-                                       dqR_prim_dy_vf, &
-                                       dqR_prim_dz_vf, &
-                                       qR_prim_vf, &
-                                       q_prim_vf, &
-                                       flux_vf, flux_src_vf, &
-                                       flux_gsrc_vf, &
-                                       norm_dir, ix, iy, iz)
-        end if
+        #:for NAME, NUM in [('hll', 1), ('hllc', 2), ('hlld', 4)]
+            if (riemann_solver == ${NUM}$) then
+                call s_${NAME}$_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
+                                               dqL_prim_dy_vf, &
+                                               dqL_prim_dz_vf, &
+                                               qL_prim_vf, &
+                                               qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+                                               dqR_prim_dy_vf, &
+                                               dqR_prim_dz_vf, &
+                                               qR_prim_vf, &
+                                               q_prim_vf, &
+                                               flux_vf, flux_src_vf, &
+                                               flux_gsrc_vf, &
+                                               norm_dir, ix, iy, iz)
+            end if
+        #:endfor
 
     end subroutine s_riemann_solver
 
