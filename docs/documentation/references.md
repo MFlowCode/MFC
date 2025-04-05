@@ -57,3 +57,7 @@
 - <a id="Tiwari13">Tiwari, A., Freund, J. B., and Pantano, C. (2013). A diffuse interface model with immiscibility preservation. Journal of computational physics, 252:290–309.</a>
 
 - <a id="Toro13">Toro, E. F. (2013). Riemann solvers and numerical methods for fluid dynamics: a practical introduction. Springer Science & Business Media.</a>
+
+- <a id="Miyoshi05">Miyoishi, T., and Kusano, K. (2005). A multi-state HLL approximate Riemann solver for ideal magnetohydrodynamics. Journal of Computational Physics, 208(1), 315-344.</a>
+
+- <a id="Powell94">Powell, K. G. (1994). An approximate Riemann solver for magnetohydrodynamics: (That works in more than one dimension). In Upwind and high-resolution schemes (pp. 570-583). Springer.</a>

@@ -60,7 +60,7 @@ def __filter(cases_) -> typing.List[TestCase]:
     for case in cases[:]:
         if ARG("single"):
             skip = ['low_Mach', 'Hypoelasticity', 'teno', 'Chemistry', 'Phase Change model 6'
-            ,'Axisymmetric', 'Transducer', 'Transducer Array', 'Cylindrical', 'Example']
+            ,'Axisymmetric', 'Transducer', 'Transducer Array', 'Cylindrical', 'HLLD', 'Example']
             if any(label in case.trace for label in skip):
                 cases.remove(case)
 

@@ -41,6 +41,7 @@ contains
         call s_check_inputs_misc
         call s_check_inputs_grcbc
         call s_check_inputs_geometry_precision
+        call s_check_inputs_mhd
 
     end subroutine s_check_inputs
 
@@ -89,7 +90,7 @@ contains
     !> Checks constraints on Riemann solver parameters
     subroutine s_check_inputs_riemann_solver
         @:PROHIBIT(riemann_solver /= 2 .and. model_eqns == 3, "6-equation model (model_eqns = 3) requires riemann_solver = 2")
-        @:PROHIBIT(riemann_solver < 1 .or. riemann_solver > 3, "riemann_solver must be 1, 2, or 3")
+        @:PROHIBIT(riemann_solver < 1 .or. riemann_solver > 4, "riemann_solver must be 1, 2, 3, or 4")
         @:PROHIBIT(all(wave_speeds /= (/dflt_int, 1, 2/)), "wave_speeds must be 1 or 2")
         @:PROHIBIT(riemann_solver == 3 .and. wave_speeds /= dflt_int, "Exact Riemann (riemann_solver = 3) does not support wave_speeds")
         @:PROHIBIT(all(avg_state /= (/dflt_int, 1, 2/)), "Unsupported value of avg_state")
@@ -338,5 +339,15 @@ contains
         @:PROHIBIT(probe_wrt .and. fd_order == dflt_int, "fd_order must be specified for probe_wrt")
         @:PROHIBIT(integral_wrt .and. (.not. bubbles_euler))
     end subroutine s_check_inputs_misc
+
+    subroutine s_check_inputs_mhd
+        @:PROHIBIT(mhd .and. (riemann_solver /= 1 .and. riemann_solver /= 4), &
+            "MHD simulations require riemann_solver = 1 (HLL) or riemann_solver = 4 (HLLD)")
+        @:PROHIBIT(riemann_solver == 4 .and. .not. mhd, "HLLD is only available for MHD simulations")
+        @:PROHIBIT(riemann_solver == 4 .and. relativity, "HLLD is not available for RMHD")
+        @:PROHIBIT(powell .and. .not. mhd)
+        @:PROHIBIT(powell .and. n == 0, "Powell's method is not supported for 1D simulations")
+        @:PROHIBIT(powell .and. fd_order == dflt_int, "fd_order must be set if Powell's method is enabled")
+    end subroutine s_check_inputs_mhd
 
 end module m_checker

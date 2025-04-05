@@ -45,6 +45,7 @@ module m_global_parameters
     integer :: m_glb, n_glb, p_glb !< Global number of cells in each direction
 
     integer :: num_dims !< Number of spatial dimensions
+    integer :: num_vels !< Number of velocity components (different from num_dims for mhd)
 
     logical :: cyl_coord
     integer :: grid_geometry !< Cylindrical coordinates (either axisymmetric or full 3D)
@@ -87,6 +88,8 @@ module m_global_parameters
     logical :: hypoelasticity        !< activate hypoelasticity
     logical :: hyperelasticity       !< activate hyperelasticity
     logical :: elasticity            !< elasticity modeling, true for hyper or hypo
+    logical :: mhd                   !< Magnetohydrodynamics
+    logical :: relativity            !< Relativity for RMHD
     integer :: b_size                !< Number of components in the b tensor
     integer :: tensor_size           !< Number of components in the nonsymmetric tensor
     logical :: pre_stress            !< activate pre_stressed domain
@@ -103,6 +106,7 @@ module m_global_parameters
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
     integer :: gamma_idx                           !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
+    type(int_bounds_info) :: B_idx                 !< Indexes of first and last magnetic field eqns.
     type(int_bounds_info) :: stress_idx            !< Indexes of elastic shear stress eqns.
     type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
     integer :: c_idx                               !< Index of the color function
@@ -205,7 +209,7 @@ module m_global_parameters
 
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
 
-    type(probe_parameters), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
+    type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
     !! Database of the immersed boundary patch parameters for each of the
     !! patches employed in the configuration of the initial condition. Note that
     !! the maximum allowable number of patches, num_patches_max, may be changed
@@ -254,6 +258,8 @@ module m_global_parameters
 
     type(pres_field) :: pb
     type(pres_field) :: mv
+
+    real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
 
     integer :: buff_size !<
     !! The number of cells that are necessary to be able to store enough boundary
@@ -326,6 +332,9 @@ contains
         b_size = dflt_int
         tensor_size = dflt_int
 
+        mhd = .false.
+        relativity = .false.
+
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
@@ -392,6 +401,9 @@ contains
             patch_icpp(i)%qv = 0._wp
             patch_icpp(i)%qvp = 0._wp
             patch_icpp(i)%tau_e = 0._wp
+            patch_icpp(i)%Bx = dflt_real
+            patch_icpp(i)%By = dflt_real
+            patch_icpp(i)%Bz = dflt_real
             patch_icpp(i)%a(2) = dflt_real
             patch_icpp(i)%a(3) = dflt_real
             patch_icpp(i)%a(4) = dflt_real
@@ -505,6 +517,8 @@ contains
         ! Lagrangian solver
         rkck_adap_dt = .false.
 
+        Bx0 = dflt_real
+
     end subroutine s_assign_default_values_to_user_inputs
 
     !> Computation of parameters, allocation procedures, and/or
@@ -531,7 +545,7 @@ contains
             cont_idx%beg = 1
             cont_idx%end = cont_idx%beg
             mom_idx%beg = cont_idx%end + 1
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
             adv_idx%end = adv_idx%beg + 1
@@ -548,7 +562,7 @@ contains
             cont_idx%beg = 1
             cont_idx%end = num_fluids
             mom_idx%beg = cont_idx%end + 1
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
             adv_idx%end = E_idx + num_fluids
@@ -653,6 +667,16 @@ contains
                 end if
             end if
 
+            if (mhd) then
+                B_idx%beg = sys_size + 1
+                if (n == 0) then
+                    B_idx%end = sys_size + 2 ! 1D: By, Bz
+                else
+                    B_idx%end = sys_size + 3 ! 2D/3D: Bx, By, Bz
+                end if
+                sys_size = B_idx%end
+            end if
+
             if (hypoelasticity .or. hyperelasticity) then
                 elasticity = .true.
                 stress_idx%beg = sys_size + 1
@@ -685,7 +709,7 @@ contains
             cont_idx%beg = 1
             cont_idx%end = num_fluids
             mom_idx%beg = cont_idx%end + 1
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
             adv_idx%end = E_idx + num_fluids
@@ -721,7 +745,7 @@ contains
             cont_idx%beg = 1 ! one continuity equation
             cont_idx%end = 1 ! num_fluids
             mom_idx%beg = cont_idx%end + 1 ! one momentum equation in each direction
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1 ! one energy equation
             adv_idx%beg = E_idx + 1
             adv_idx%end = adv_idx%beg !one volume advection equation
@@ -855,6 +879,12 @@ contains
     subroutine s_initialize_parallel_io
 
         num_dims = 1 + min(1, n) + min(1, p)
+
+        if (mhd) then
+            num_vels = 3
+        else
+            num_vels = num_dims
+        end if
 
         allocate (proc_coords(1:num_dims))
 
