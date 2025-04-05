@@ -825,7 +825,7 @@ contains
         real(wp) :: charvol, charpres, charvol2, charpres2
         integer, dimension(3) :: cellaux
         integer :: i, j, k
-        integer :: mapCells_pinf, smearGrid, smearGridz
+        integer :: smearGrid, smearGrid_zDir
         logical :: celloutside
 
         scoord = mtn_s(bub_id, 1:3, 2)
@@ -912,16 +912,10 @@ contains
 
         else if (lag_params%cluster_type >= 2) then
             ! Bubble dynamic closure from Maeda and Colonius (2018)
-            if (lag_params%smooth_type == 1) then
-                mapCells_pinf = mapCells
-            else
-                mapCells_pinf = 0
-            end if
-
             ! Include the cell that contains the bubble (mapCells+1+mapCells)
-            smearGrid = mapCells_pinf - (-mapCells_pinf) + 1
-            smearGridz = smearGrid
-            if (p == 0) smearGridz = 1
+            smearGrid = 2*mapCells + 1
+            smearGrid_zDir = smearGrid
+            if (p == 0) smearGrid_zDir = 1
 
             charvol = 0._wp
             charpres = 0._wp
@@ -934,7 +928,7 @@ contains
                 !$acc loop seq
                 do j = 1, smearGrid
                     !$acc loop seq
-                    do k = 1, smearGridz
+                    do k = 1, smearGrid_zDir
                         cellaux(1) = cell(1) + i - (mapCells + 1)
                         cellaux(2) = cell(2) + j - (mapCells + 1)
                         cellaux(3) = cell(3) + k - (mapCells + 1)
