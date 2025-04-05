@@ -132,6 +132,8 @@ They are organized below.
 * Ideal and stiffened gas equations of state
 * Body forces
 * Acoustic wave generation (one- and two-way sound sources)
+* Magnetohydrodynamics (MHD)
+* Relativistic Magnetohydrodynamics (RMHD)
 </details>
 
 ### Numerics
@@ -142,7 +144,7 @@ They are organized below.
   	* WENO variants: WENO-JS, WENO-M, WENO-Z, TENO
    	* Monotonicity-preserving reconstructions
 	* Reliable handling of large density ratios
-* Exact and approximate (e.g., HLL, HLLC) Riemann solvers
+* Exact and approximate (e.g., HLL, HLLC, HLLD) Riemann solvers
 * Boundary conditions
 	* Periodic, reflective, extrapolation/Neumann
 	* Slip and no-slip

@@ -10,8 +10,9 @@ from .run   import case_dicts
 QPVF_IDX_VARS = {
     'alpha_rho': 'contxb', 'vel'  : 'momxb',         'pres': 'E_idx', 
     'alpha':     'advxb',  'tau_e': 'stress_idx%beg', 'Y':   'chemxb',
-    'cf_val': 'c_idx'
+    'cf_val': 'c_idx', 'Bx': 'B_idx%beg', 'By': 'B_idx%end-1', 'Bz': 'B_idx%end',
 }
+# "B_idx%end - 1" not "B_idx%beg + 1" must be used because 1D does not have Bx
 
 @dataclasses.dataclass(init=False)
 class Case:
@@ -197,6 +198,15 @@ class Case:
             else:
                 weno_num_stencils = weno_polyn
 
+            num_dims = 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
+            if self.params.get("mhd", 'F') == 'T':
+                num_vels = 3
+            else:
+                num_vels = num_dims
+
+            mhd = 1 if self.params.get("mhd", 'F') == 'T' else 0
+            relativity = 1 if self.params.get("relativity", 'F') == 'T' else 0
+
             # Throw error if wenoz_q is required but not set
             return f"""\
 #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
@@ -204,7 +214,8 @@ class Case:
 #:set weno_polyn            = {weno_polyn}
 #:set weno_num_stencils     = {weno_num_stencils}
 #:set nb                    = {int(self.params.get("nb", 1))}
-#:set num_dims              = {1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)}
+#:set num_dims              = {num_dims}
+#:set num_vels              = {num_vels}
 #:set nterms                = {nterms}
 #:set num_fluids            = {int(self.params["num_fluids"])}
 #:set wenojs                = {wenojs}
@@ -212,6 +223,8 @@ class Case:
 #:set wenoz                 = {wenoz}
 #:set teno                  = {teno}
 #:set wenoz_q               = {self.params.get("wenoz_q", -1)}
+#:set mhd                   = {mhd}
+#:set relativity            = {relativity}
 """
 
         return """\
