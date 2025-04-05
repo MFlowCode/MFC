@@ -394,7 +394,7 @@ contains
 
         real(wp) :: tau_p ! principal stress
         real(wp) :: tau_xx, tau_xy, tau_yy, tau_zz, tau_yz, tau_xz
-        real(wp) :: I1, I2, I3, argument, phi, sqrt_term
+        real(wp) :: I1, I2, I3, argument, phi, sqrt_term_1, sqrt_term_2, temp
         integer :: q, l, k
 
         if (n == 0) then
@@ -412,8 +412,8 @@ contains
                     tau_p = 0.5_wp*(q_cons_vf(stress_idx%beg)%sf(k, l, q) + &
                                     q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)) + &
                             sqrt((q_cons_vf(stress_idx%beg)%sf(k, l, q) - &
-                                  q_cons_vf(stress_idx%beg + 2)%sf(k, l, q))**2 + &
-                                 4._wp*q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)**2)/2._wp
+                                  q_cons_vf(stress_idx%beg + 2)%sf(k, l, q))**2.0_wp + &
+                                 4._wp*q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)**2.0_wp)/2._wp
 
                     rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
                 end do
@@ -433,18 +433,24 @@ contains
                         ! Invariants of the stress tensor
                         I1 = tau_xx + tau_yy + tau_zz
                         I2 = tau_xx*tau_yy + tau_xx*tau_zz + tau_yy*tau_zz - &
-                             (tau_xy**2 + tau_xz**2 + tau_yz**2)
+                             (tau_xy**2.0_wp + tau_xz**2.0_wp + tau_yz**2.0_wp)
                         I3 = tau_xx*tau_yy*tau_zz + 2.0_wp*tau_xy*tau_xz*tau_yz - &
-                             tau_xx*tau_yz**2 - tau_yy*tau_xz**2 - tau_zz*tau_xy**2
+                             tau_xx*tau_yz**2.0_wp - tau_yy*tau_xz**2.0_wp - tau_zz*tau_xy**2.0_wp
 
                         ! Maximum principal stress
-                        argument = (2.0_wp*I1**3 - 9.0_wp*I1*I2 + 27.0_wp*I3)/ &
-                                   (2.0_wp*sqrt(max((I1**2 - 3.0_wp*I2)**3, 0.0_wp)))
-                        if (argument > 1.0_wp) argument = 1.0_wp
-                        if (argument < -1.0_wp) argument = -1.0_wp
-                        phi = acos(argument)
-                        sqrt_term = sqrt(max(I1**2 - 3.0_wp*I2, 0.0_wp))
-                        tau_p = I1/3.0_wp + 2.0_wp/sqrt(3.0_wp)*sqrt_term*cos(phi/3.0_wp)
+                        temp = I1**2.0_wp - 3.0_wp*I2
+                        sqrt_term_1 = sqrt(max(temp, 0.0_wp))
+                        if (sqrt_term_1 > verysmall) then ! Avoid 0/0
+                            argument = (2.0_wp*I1*I1*I1 - 9.0_wp*I1*I2 + 27.0_wp*I3)/ &
+                            (2.0_wp*sqrt_term_1*sqrt_term_1*sqrt_term_1)
+                            if (argument > 1.0_wp) argument = 1.0_wp
+                            if (argument < -1.0_wp) argument = -1.0_wp
+                            phi = acos(argument)
+                            sqrt_term_2 = sqrt(max(I1**2.0_wp - 3.0_wp*I2, 0.0_wp))
+                            tau_p = I1/3.0_wp + 2.0_wp/sqrt(3.0_wp)*sqrt_term_2*cos(phi/3.0_wp)
+                        else
+                            tau_p = I1/3.0_wp
+                        end if
 
                         rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
                     end do
