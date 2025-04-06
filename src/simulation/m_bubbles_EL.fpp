@@ -518,10 +518,10 @@ contains
         integer, intent(in) :: stage
 
         real(wp) :: vaporflux, pliqint
-        real(wp) :: preterm1, term2, paux, pint, Romega, term1_fac, Rb
+        real(wp) :: preterm1, term2, pint, Romega, term1_fac, Rb
         real(wp) :: conc_v, R_m, gamma_m, fpb, fmass_n, fmass_v
         real(wp) :: fR, fV, fbeta_c, fbeta_t, fR0, fpbdt
-        real(wp) :: pinf, aux1, aux2, velint, cson, rhol
+        real(wp) :: pinf, velint, cson, rhol
         real(wp) :: gamma, pi_inf, qv
         real(wp), dimension(contxe) :: myalpha_rho, myalpha
         real(wp), dimension(2) :: Re
@@ -538,7 +538,7 @@ contains
             ! Calculate velocity potentials (valid for one bubble per cell)
             !$acc parallel loop gang vector default(present) private(k, cell)
             do k = 1, nBubs
-                call s_get_pinf(k, q_prim_vf, 2, paux, cell, preterm1, term2, Romega)
+                pinf = f_pinf(k, q_prim_vf, 2, cell, preterm1, term2, Romega)
                 fR0 = bub_R0(k)
                 fR = intfc_rad(k, 2)
                 fV = intfc_vel(k, 2)
@@ -546,11 +546,10 @@ contains
                 pint = f_cpbw_KM(fR0, fR, fV, fpb)
                 pint = pint + 0.5_wp*fV**2._wp
                 if (lag_params%cluster_type == 2) then
-                    bub_dphidt(k) = (paux - pint) + term2
+                    bub_dphidt(k) = (pinf - pint) + term2
                     ! Accounting for the potential induced by the bubble averaged over the control volume
                     ! Note that this is based on the incompressible flow assumption near the bubble.
-                    Rb = intfc_rad(k, 2)
-                    term1_fac = 3._wp/2._wp*(Rb*(Romega**2._wp - Rb**2._wp))/(Romega**3._wp - Rb**3._wp)
+                    term1_fac = 3._wp/2._wp*(fR*(Romega**2._wp - fR**2._wp))/(Romega**3._wp - fR**3._wp)
                     bub_dphidt(k) = bub_dphidt(k)/(1._wp - term1_fac)
                 end if
             end do
@@ -587,7 +586,7 @@ contains
                 pliqint = f_cpbw_KM(fR0, fR, fV, fpb)
 
                 ! Obtaining driving pressure
-                call s_get_pinf(k, q_prim_vf, 1, pinf, cell, aux1, aux2)
+                pinf = f_pinf(k, q_prim_vf, 1, cell, preterm1, term2, Romega)
 
                 ! Obtain liquid density and computing speed of sound from pinf
                 !$acc loop seq
@@ -804,20 +803,16 @@ contains
         !! @param bub_id Particle identifier
         !! @param q_prim_vf  Primitive variables
         !! @param ptype 1: p at infinity, 2: averaged P at the bubble location
-        !! @param f_pinfl Driving pressure
         !! @param cell Bubble cell
         !! @param Romega Control volume radius
-    subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_get_pinf
-#else
+    function f_pinf(bub_id, q_prim_vf, ptype, cell, preterm1, term2, Romega)
         !$acc routine seq
-#endif
         integer, intent(in) :: bub_id, ptype
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        real(wp), intent(out) :: f_pinfl
         integer, dimension(3), intent(out) :: cell
-        real(wp), intent(out), optional :: preterm1, term2, Romega
+        real(wp), intent(out) :: preterm1, term2, Romega
+
+        real(wp) :: f_pinf
 
         real(wp), dimension(3) :: scoord, psi
         real(wp) :: dc, vol, aux
@@ -825,11 +820,11 @@ contains
         real(wp) :: charvol, charpres, charvol2, charpres2
         integer, dimension(3) :: cellaux
         integer :: i, j, k
-        integer :: smearGrid, smearGrid_zDir
+        integer :: smearGrid, smearGridz
         logical :: celloutside
 
         scoord = mtn_s(bub_id, 1:3, 2)
-        f_pinfl = 0._wp
+        f_pinf = 0._wp
 
         !< Find current bubble cell
         cell(:) = int(scoord(:))
@@ -892,19 +887,19 @@ contains
 
             !< Perform bilinear interpolation
             if (p == 0) then  !2D
-                f_pinfl = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)
+                f_pinf = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))
+                f_pinf = f_pinf + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))
+                f_pinf = f_pinf + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)
+                f_pinf = f_pinf + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)
             else              !3D
-                f_pinfl = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1)*(1._wp - psi(1))*(1._wp - psi(2))*psi(3)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3) + 1)*psi(1)*(1._wp - psi(2))*psi(3)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3) + 1)*psi(1)*psi(2)*psi(3)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3) + 1)*(1._wp - psi(1))*psi(2)*psi(3)
+                f_pinf = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))*(1._wp - psi(3))
+                f_pinf = f_pinf + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))*(1._wp - psi(3))
+                f_pinf = f_pinf + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)*(1._wp - psi(3))
+                f_pinf = f_pinf + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)*(1._wp - psi(3))
+                f_pinf = f_pinf + q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1)*(1._wp - psi(1))*(1._wp - psi(2))*psi(3)
+                f_pinf = f_pinf + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3) + 1)*psi(1)*(1._wp - psi(2))*psi(3)
+                f_pinf = f_pinf + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3) + 1)*psi(1)*psi(2)*psi(3)
+                f_pinf = f_pinf + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3) + 1)*(1._wp - psi(1))*psi(2)*psi(3)
             end if
 
             !R_Omega
@@ -914,8 +909,8 @@ contains
             ! Bubble dynamic closure from Maeda and Colonius (2018)
             ! Include the cell that contains the bubble (mapCells+1+mapCells)
             smearGrid = 2*mapCells + 1
-            smearGrid_zDir = smearGrid
-            if (p == 0) smearGrid_zDir = 1
+            smearGridz = smearGrid
+            if (p == 0) smearGridz = 1
 
             charvol = 0._wp
             charpres = 0._wp
@@ -928,7 +923,7 @@ contains
                 !$acc loop seq
                 do j = 1, smearGrid
                     !$acc loop seq
-                    do k = 1, smearGrid_zDir
+                    do k = 1, smearGridz
                         cellaux(1) = cell(1) + i - (mapCells + 1)
                         cellaux(2) = cell(2) + j - (mapCells + 1)
                         cellaux(3) = cell(3) + k - (mapCells + 1)
@@ -984,7 +979,7 @@ contains
                 end do
             end do
 
-            f_pinfl = charpres2/charvol2
+            f_pinf = charpres2/charvol2
             vol = charvol
             dc = (3._wp*abs(vol)/(4._wp*pi))**(1._wp/3._wp)
 
@@ -1009,12 +1004,12 @@ contains
 
             ! Getting p_inf
             if (ptype == 1) then
-                f_pinfl = f_pinfl + preterm1*term1 + term2
+                f_pinf = f_pinf + preterm1*term1 + term2
             end if
 
         end if
 
-    end subroutine s_get_pinf
+    end function f_pinf
 
     !>  This subroutine updates the Lagrange variables using the tvd RK time steppers.
         !!      The time derivative of the bubble variables must be stored at every stage to avoid precision errors.
