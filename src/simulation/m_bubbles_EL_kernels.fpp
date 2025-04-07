@@ -116,55 +116,55 @@ contains
         logical :: celloutside
         integer :: smearGrid, smearGridz
 
-        smearGrid = mapCells - (-mapCells) + 1 ! Include the cell that contains the bubble (3+1+3)
+        smearGrid = mapCells - (-mapCells) ! Include the cell that contains the bubble (3+1+3)
         smearGridz = smearGrid
-        if (p == 0) smearGridz = 1
+        if (p == 0) smearGridz = 0
 
         print *, 's_gaussian'
 
-        !$acc parallel loop gang vector default(present) private(nodecoord, l, s_coord, cell, center) copyin(smearGrid, smearGridz)
+        !$acc parallel loop collapse(4) gang vector default(present) private(l, s_coord, cell, center, cellaux, nodecoord) &
+        !$acc copyin(smearGrid, smearGridz)
         do l = 1, nBubs
-            nodecoord(1:3) = 0
-            center(1:3) = 0._wp
-            volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
-            s_coord(1:3) = lbk_s(l, 1:3, 2)
-            center(1:2) = lbk_pos(l, 1:2, 2)
-            if (p > 0) center(3) = lbk_pos(l, 3, 2)
-            print *, 'reading initial state'
-            call s_get_cell(s_coord, cell)
-            call s_compute_stddsv(cell, volpart, stddsv)
-            print *, 's_compute_stddsv'
-            strength_vol = volpart
-            strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
+            do i = 0, smearGrid
+                do j = 0, smearGrid
+                    do k = 0, smearGridz
 
-            !$acc loop collapse(3) private(cellaux, nodecoord)
-            do i = 1, smearGrid
-                do j = 1, smearGrid
-                    do k = 1, smearGridz
-                        cellaux(1) = cell(1) + i - (mapCells + 1)
-                        cellaux(2) = cell(2) + j - (mapCells + 1)
-                        cellaux(3) = cell(3) + k - (mapCells + 1)
+                        nodecoord(1:3) = 0
+                        center(1:3) = 0._wp
+                        volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
+                        s_coord(1:3) = lbk_s(l, 1:3, 2)
+                        center(1:2) = lbk_pos(l, 1:2, 2)
+                        print *, 'reading initial state'
+                        if (p > 0) center(3) = lbk_pos(l, 3, 2)
+                        call s_get_cell(s_coord, cell)
+                        call s_compute_stddsv(cell, volpart, stddsv)
+                        strength_vol = volpart
+                        strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
+                        print *, 's_compute_stddsv'
+
+                        cellaux(1) = cell(1) + i - mapCells
+                        cellaux(2) = cell(2) + j - mapCells
+                        cellaux(3) = cell(3) + k - mapCells
                         if (p == 0) cellaux(3) = 0
 
                         !Check if the cells intended to smear the bubbles in are in the computational domain
                         !and redefine the cells for symmetric boundary
-                        print *, 's_check_celloutside'
                         call s_check_celloutside(cellaux, celloutside)
+                        print *, 's_check_celloutside'
 
                         if (.not. celloutside) then
 
                             nodecoord(1) = x_cc(cellaux(1))
                             nodecoord(2) = y_cc(cellaux(2))
                             if (p > 0) nodecoord(3) = z_cc(cellaux(3))
-                            print *, 's_applygaussian'
                             call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
-                            if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
+                            if (p == 0) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
+                            print *, 's_applygaussian'
 
                             ! Relocate cells for bubbles intersecting symmetric boundaries
                             if (bc_x%beg == -2 .or. bc_x%end == -2 .or. bc_y%beg == -2 .or. bc_y%end == -2 &
                                 .or. bc_z%beg == -2 .or. bc_z%end == -2) then
                                 call s_shift_cell_symmetric_bc(cellaux, cell)
-                                print *, 's_shift_cell_symmetric_bc'
                             end if
                         else
                             func = 0._wp
@@ -175,7 +175,6 @@ contains
                             if (p == 0) cellaux(3) = 0
                         end if
 
-                        print *, 'Update 1'
                         !Update void fraction field
                         addFun1 = func*strength_vol
                         !$acc atomic update
@@ -183,7 +182,6 @@ contains
                             updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                             + addFun1
 
-                        print *, 'Update 2'
                         !Update time derivative of void fraction
                         addFun2 = func*strength_vel
                         !$acc atomic update
@@ -193,14 +191,16 @@ contains
 
                         !Product of two smeared functions
                         !Update void fraction * time derivative of void fraction
-                        if (lag_params%cluster_type >= 4) then
+                        if (p == 0) then
                             addFun3 = func2*strength_vol*strength_vel
                             !$acc atomic update
                             updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                                 updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                                 + addFun3
                         end if
-                        print *, 'Update 3'
+
+                        print *, 'Update 1-2-3'
+
                     end do
                 end do
             end do
