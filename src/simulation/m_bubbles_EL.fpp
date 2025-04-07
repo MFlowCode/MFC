@@ -685,6 +685,7 @@ contains
 
         call nvtxStartRange("BUBBLES-LAGRANGE-KERNELS")
 
+        print *, 'Zeroing vars'
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, q_beta_idx
             do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -696,9 +697,11 @@ contains
             end do
         end do
 
+        print *, 's_smoothfunction'
         call s_smoothfunction(nBubs, intfc_rad, intfc_vel, &
                               mtn_s, mtn_pos, q_beta)
 
+        print *, '1-beta'
         !Store 1-beta
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = idwbuff(3)%beg, idwbuff(3)%end

@@ -120,6 +120,8 @@ contains
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
+        print *, 's_gaussian'
+
         !$acc parallel loop gang vector default(present) private(nodecoord, l, s_coord, cell, center) copyin(smearGrid, smearGridz)
         do l = 1, nBubs
             nodecoord(1:3) = 0
@@ -128,9 +130,10 @@ contains
             s_coord(1:3) = lbk_s(l, 1:3, 2)
             center(1:2) = lbk_pos(l, 1:2, 2)
             if (p > 0) center(3) = lbk_pos(l, 3, 2)
+            print *, 'reading initial state'
             call s_get_cell(s_coord, cell)
             call s_compute_stddsv(cell, volpart, stddsv)
-
+            print *, 's_compute_stddsv'
             strength_vol = volpart
             strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
 
@@ -145,6 +148,7 @@ contains
 
                         !Check if the cells intended to smear the bubbles in are in the computational domain
                         !and redefine the cells for symmetric boundary
+                        print *, 's_check_celloutside'
                         call s_check_celloutside(cellaux, celloutside)
 
                         if (.not. celloutside) then
@@ -152,6 +156,7 @@ contains
                             nodecoord(1) = x_cc(cellaux(1))
                             nodecoord(2) = y_cc(cellaux(2))
                             if (p > 0) nodecoord(3) = z_cc(cellaux(3))
+                            print *, 's_applygaussian'
                             call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
                             if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
 
@@ -159,6 +164,7 @@ contains
                             if (bc_x%beg == -2 .or. bc_x%end == -2 .or. bc_y%beg == -2 .or. bc_y%end == -2 &
                                 .or. bc_z%beg == -2 .or. bc_z%end == -2) then
                                 call s_shift_cell_symmetric_bc(cellaux, cell)
+                                print *, 's_shift_cell_symmetric_bc'
                             end if
                         else
                             func = 0._wp
@@ -169,6 +175,7 @@ contains
                             if (p == 0) cellaux(3) = 0
                         end if
 
+                        print *, 'Update 1'
                         !Update void fraction field
                         addFun1 = func*strength_vol
                         !$acc atomic update
@@ -176,6 +183,7 @@ contains
                             updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                             + addFun1
 
+                        print *, 'Update 2'
                         !Update time derivative of void fraction
                         addFun2 = func*strength_vel
                         !$acc atomic update
@@ -192,6 +200,7 @@ contains
                                 updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                                 + addFun3
                         end if
+                        print *, 'Update 3'
                     end do
                 end do
             end do
