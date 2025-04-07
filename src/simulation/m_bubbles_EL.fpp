@@ -533,12 +533,14 @@ contains
 
         !< BUBBLE DYNAMICS
 
+        print *, 'bub_dphidt kernel loop'
         ! Subgrid p_inf model based on Maeda and Colonius (2018).
         if (lag_params%pressure_corrector) then
             ! Calculate velocity potentials (valid for one bubble per cell)
             !$acc parallel loop gang vector default(present) private(k, cell)
             do k = 1, nBubs
                 pinf = f_pinf(k, q_prim_vf, 2, cell, preterm1, term2, Romega)
+                print *, 'f_pinf'
                 fR0 = bub_R0(k)
                 fR = intfc_rad(k, 2)
                 fV = intfc_vel(k, 2)
@@ -555,6 +557,7 @@ contains
             end do
         end if
 
+        print *, 'bub dynamics kernel loop'
         ! Radial motion model
         if (bubble_model == 2) then
             !$acc parallel loop gang vector default(present) private(k, myalpha_rho, myalpha, Re, cell) copyin(stage)
@@ -580,14 +583,15 @@ contains
                 ! Vapor and heat fluxes
                 vaporflux = f_vflux(fR, fV, fmass_v, k, fmass_n, fbeta_c, conc_v)
                 fpbdt = f_bpres_dot(vaporflux, fR, fV, fpb, fmass_v, k, fbeta_t, R_m, gamma_m, conc_v)
+                print *, 'f_vflux and f_bpres_dot'
                 gas_dmvdt(k, stage) = 4._wp*pi*fR**2._wp*vaporflux
-
+                print *, 'updated gas_dmvdt', stage
                 ! Pressure at the bubble wall
                 pliqint = f_cpbw_KM(fR0, fR, fV, fpb)
-
+                print *, 'f_cpbw_KM'
                 ! Obtaining driving pressure
                 pinf = f_pinf(k, q_prim_vf, 1, cell, preterm1, term2, Romega)
-
+                print *, 'f_pinf'
                 ! Obtain liquid density and computing speed of sound from pinf
                 !$acc loop seq
                 do i = 1, contxe
@@ -598,14 +602,15 @@ contains
                 call s_convert_species_to_mixture_variables_acc(rhol, gamma, pi_inf, qv, myalpha, &
                                                                 myalpha_rho, Re, cell(1), cell(2), cell(3))
                 call s_compute_cson_from_pinf(k, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
-
+                print *, 'cson and rhol'
                 ! Velocity correction due to massflux
                 velint = fV - gas_dmvdt(k, stage)/(4._wp*pi*fR**2._wp*rhol)
-
+                print *, 'velint'
                 ! Interphase acceleration and update vars
                 intfc_dveldt(k, stage) = f_rddot_KM(fpbdt, pinf, pliqint, rhol, fR, velint, fR0, cson)
                 gas_dpdt(k, stage) = fpbdt
                 intfc_draddt(k, stage) = fV
+                print *, 'update intfc_dveldt, gas_dpdt, intfc_draddt'
 
             end do
         else
@@ -618,6 +623,7 @@ contains
             end do
         end if
 
+        print *, 'bub position kernel loop'
         ! Bubbles remain in a fixed position
         !$acc parallel loop collapse(2) gang vector default(present) private(k) copyin(stage)
         do k = 1, nBubs
@@ -630,7 +636,9 @@ contains
         call nvtxEndRange
 
         !< EULER-LAGRANGE COUPLING
+        print *, 's_smear_voidfraction'
         call s_smear_voidfraction()
+        print *, 's_add_rhs_sources'
         if (lag_params%solver_approach == 2) call s_add_rhs_sources(q_cons_vf, q_prim_vf, rhs_vf)
 
     end subroutine s_compute_EL_coupled_solver
@@ -1000,7 +1008,7 @@ contains
             preterm1 = 3._wp/2._wp*Rbeq*(dc**2._wp - Rbeq**2._wp)/(aux*denom)
 
             !Control volume radius
-            if (ptype == 2) Romega = dc
+            Romega = dc
 
             ! Getting p_inf
             if (ptype == 1) then
