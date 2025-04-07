@@ -159,13 +159,12 @@ contains
                             if (p > 0) nodecoord(3) = z_cc(cellaux(3))
                             call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
                             if (p == 0) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
-                            print *, 's_applygaussian'
 
                             ! Relocate cells for bubbles intersecting symmetric boundaries
-                            if (bc_x%beg == -2 .or. bc_x%end == -2 .or. bc_y%beg == -2 .or. bc_y%end == -2 &
-                                .or. bc_z%beg == -2 .or. bc_z%end == -2) then
-                                call s_shift_cell_symmetric_bc(cellaux, cell)
-                            end if
+                            ! if (bc_x%beg == -2 .or. bc_x%end == -2 .or. bc_y%beg == -2 .or. bc_y%end == -2 &
+                            !     .or. bc_z%beg == -2 .or. bc_z%end == -2) then
+                            !     call s_shift_cell_symmetric_bc(cellaux, cell)
+                            ! end if
                         else
                             func = 0._wp
                             func2 = 0._wp
