@@ -572,6 +572,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             cases.append(define_case_d(stack, '', {}))
 
+            reflective_params = {'bc_x%beg': -2, 'bc_x%end': -2, 'bc_y%beg': -2, 'bc_y%end': -2}
+            if len(dimInfo[0]) == 3:
+                reflective_params.update({'bc_z%beg': -2, 'bc_z%end': -2})
+            if num_fluids == 1 and len(dimInfo[0]) >= 2:
+                cases.append(define_case_d(stack, 'bc=-2', reflective_params))
+
             stack.pop()
 
             if num_fluids == 2:
