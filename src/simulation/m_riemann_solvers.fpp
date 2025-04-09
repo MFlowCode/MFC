@@ -612,8 +612,8 @@ contains
                                     if ((G_L > 1000) .and. (G_R > 1000)) then
                                         E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                         E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                        ! Additional terms in 2D and 3D
-                                        if ((i == 2) .or. (i == 4) .or. (i == 5)) then
+                                        ! Double for shear stresses
+                                        if (any(strxb - 1 + i == shear_indices)) then
                                             E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                             E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                         end if
@@ -1060,17 +1060,26 @@ contains
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
                                     ! Recalculating the radial momentum geometric source flux
-                                    flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
-                                        (s_M*(rho_R*vel_R(dir_idx(1)) &
-                                              *vel_R(dir_idx(1))) &
-                                         - s_P*(rho_L*vel_L(dir_idx(1)) &
-                                                *vel_L(dir_idx(1))) &
-                                         + s_M*s_P*(rho_L*vel_L(dir_idx(1)) &
-                                                    - rho_R*vel_R(dir_idx(1)))) &
-                                        /(s_M - s_P)
+                                    flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + 2) = &
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + 2) &
+                                        - (s_M*pres_R - s_P*pres_L)/(s_M - s_P)
                                     ! Geometrical source of the void fraction(s) is zero
                                     !$acc loop seq
                                     do i = advxb, advxe
+                                        ! flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                    end do
+                                end if
+
+                                if (cyl_coord .and. hypoelasticity) then
+                                    ! += tau_sigmasigma using HLL
+                                    flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + 2) = &
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + 2) + &
+                                        (s_M*tau_e_R(4) - s_P*tau_e_L(4)) &
+                                        /(s_M - s_P)
+
+                                    !$acc loop seq
+                                    do i = strxb, strxe
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
                                 end if
