@@ -207,7 +207,7 @@ contains
 
         do i = 1, num_bc_patches
 
-            ! Line Segement BC 
+            ! Line Segment BC 
             if (patch_bc(i)%geometry == 1) then
                 @:PROHIBIT( .not. f_is_default(patch_bc(i)%radius), "Line Segment Patch can't have radius defined")
                 #:for DIR in [('1'), ('2')]
