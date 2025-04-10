@@ -164,9 +164,9 @@ contains
                 "Only acoustic("//trim(jStr)//")%support = 1 is allowed for 1D simulations")
             @:PROHIBIT(dim == 1 .and. acoustic(j)%support == 1 .and. f_is_default(acoustic(j)%loc(1)), &
                 "acoustic("//trim(jStr)//")%loc(1) must be specified for acoustic("//trim(jStr)//")%support = 1")
-            @:PROHIBIT(dim == 2 .and. (.not. any(acoustic(j)%support == (/2, 5, 6, 9, 10/))), &
+            @:PROHIBIT((dim == 2  .and. .not. cyl_coord) .and. (.not. any(acoustic(j)%support == (/2, 5, 9/))), &
                 "Only acoustic("//trim(jStr)//")%support = 2, 5, 6, 9, or 10 is allowed for 2D simulations")
-            @:PROHIBIT(dim == 2 .and. (.not. any(acoustic(j)%support == (/6, 10/))) .and. cyl_coord, &
+            @:PROHIBIT((dim == 2  .and. cyl_coord) .and. (.not. any(acoustic(j)%support == (/2, 6, 10/))), &
                 "Only acoustic("//trim(jStr)//")%support = 6 or 10 is allowed for 2D axisymmetric simulations")
             @:PROHIBIT(dim == 2 .and. any(acoustic(j)%support == (/2, 5, 6, 9, 10/)) .and. &
                 (f_is_default(acoustic(j)%loc(1)) .or. f_is_default(acoustic(j)%loc(2))), &
