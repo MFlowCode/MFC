@@ -131,6 +131,7 @@ contains
 
                         nodecoord(1:3) = 0
                         center(1:3) = 0._wp
+                        print *, 'Starting loop'
                         volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
                         s_coord(1:3) = lbk_s(l, 1:3, 2)
                         center(1:2) = lbk_pos(l, 1:2, 2)
