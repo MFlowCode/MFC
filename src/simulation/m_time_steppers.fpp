@@ -1075,16 +1075,11 @@ contains
 #ifdef DEBUG
             if (proc_rank == 0) print *, 'RKCK 1st time-stage at', rkck_time_tmp
 #endif
-            print *, 's_compute_rhs', RKstep
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_ts_rkck(1)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            print *, 's_compute_EL_coupled_solver', RKstep
             call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_ts_rkck(1)%vf, RKstep)
-            print *, 's_update_tmp_rkck', RKstep
             call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            print *, 's_compute_rkck_dt', RKstep, lag_largestep
             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
-            print *, 'done with stage 1'
 
             ! SECOND TIME-STAGE
             RKstep = 2
@@ -1094,16 +1089,11 @@ contains
 #ifdef DEBUG
             if (proc_rank == 0) print *, 'RKCK 2nd time-stage at', rkck_time_tmp
 #endif
-            print *, 's_compute_rhs', RKstep
             call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_ts_rkck(2)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            print *, 's_compute_EL_coupled_solver', RKstep
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(2)%vf, RKstep)
-            print *, 's_update_tmp_rkck', RKstep
             call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            print *, 's_compute_rkck_dt', RKstep, lag_largestep
             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
-            print *, 'done with stage 2'
 
             ! THIRD TIME-STAGE
             RKstep = 3
@@ -1118,7 +1108,6 @@ contains
             call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
-            print *, 'done with stage 3'
 
             ! FOURTH TIME-STAGE
             RKstep = 4
@@ -1133,7 +1122,6 @@ contains
             call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
-            print *, 'done with stage 4'
 
             ! FIFTH TIME-STAGE
             RKstep = 5
@@ -1148,7 +1136,6 @@ contains
             call s_update_tmp_rkck(5, q_cons_ts, rhs_ts_rkck, lag_largestep)
             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
-            print *, 'done with stage 5'
 
             ! SIXTH TIME-STAGE
             RKstep = 6
@@ -1163,7 +1150,6 @@ contains
             call s_update_tmp_rkck(6, q_cons_ts, rhs_ts_rkck, lag_largestep)
             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
-            print *, 'done with stage 6'
 
             dt_did = dt
 
@@ -1172,12 +1158,9 @@ contains
 #ifdef DEBUG
                 if (proc_rank == 0) print *, 'Computing truncation error (4th/5th RKCK)'
 #endif
-                print *, 's_calculate_rkck_truncation_error'
                 call s_calculate_rkck_truncation_error(rkck_errmax)
-                print *, 's_compute_rkck_dt'
                 call s_compute_rkck_dt(lag_largestep, restart_rkck_step, rkck_errmax)
                 if (restart_rkck_step) cycle
-                print *, 'done with truncation error', dt
             end if
 
         end do
@@ -1185,7 +1168,6 @@ contains
         !> Update values
         mytime = mytime + dt_did
         call s_update_rkck(q_cons_ts)
-        print *, 'done with s_update_rkck'
 
         call s_write_void_evol(mytime)
         if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
@@ -1199,7 +1181,6 @@ contains
             call s_write_run_time_information(q_prim_vf, t_step)
         end if
 
-        print *, 'done with s_4th_5th_order_rkck'
     end subroutine s_4th_5th_order_rkck
 
     !> Module deallocation and/or disassociation procedures

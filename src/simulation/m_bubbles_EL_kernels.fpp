@@ -116,42 +116,36 @@ contains
         logical :: celloutside
         integer :: smearGrid, smearGridz
 
-        smearGrid = mapCells - (-mapCells) ! Include the cell that contains the bubble (3+1+3)
+        smearGrid = mapCells - (-mapCells) + 1 ! Include the cell that contains the bubble (3+1+3)
         smearGridz = smearGrid
-        if (p == 0) smearGridz = 0
+        if (p == 0) smearGridz = 1
 
-        print *, 's_gaussian'
-
-        !$acc parallel loop collapse(4) gang vector default(present) private(l, s_coord, cell, center, cellaux, nodecoord) &
-        !$acc copyin(smearGrid, smearGridz)
+        !$acc parallel loop gang vector default(present) private(nodecoord, l, s_coord, cell, center) copyin(smearGrid, smearGridz)
         do l = 1, nBubs
-            do i = 0, smearGrid
-                do j = 0, smearGrid
-                    do k = 0, smearGridz
+            nodecoord(1:3) = 0
+            center(1:3) = 0._wp
+            volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
+            s_coord(1:3) = lbk_s(l, 1:3, 2)
+            center(1:2) = lbk_pos(l, 1:2, 2)
+            if (p > 0) center(3) = lbk_pos(l, 3, 2)
+            call s_get_cell(s_coord, cell)
+            call s_compute_stddsv(cell, volpart, stddsv)
 
-                        nodecoord(1:3) = 0
-                        center(1:3) = 0._wp
-                        print *, 'Starting loop'
-                        volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
-                        s_coord(1:3) = lbk_s(l, 1:3, 2)
-                        center(1:2) = lbk_pos(l, 1:2, 2)
-                        print *, 'reading initial state'
-                        if (p > 0) center(3) = lbk_pos(l, 3, 2)
-                        call s_get_cell(s_coord, cell)
-                        call s_compute_stddsv(cell, volpart, stddsv)
-                        strength_vol = volpart
-                        strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
-                        print *, 's_compute_stddsv'
+            strength_vol = volpart
+            strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
 
-                        cellaux(1) = cell(1) + i - mapCells
-                        cellaux(2) = cell(2) + j - mapCells
-                        cellaux(3) = cell(3) + k - mapCells
+            !$acc loop collapse(3) private(cellaux, nodecoord)
+            do i = 1, smearGrid
+                do j = 1, smearGrid
+                    do k = 1, smearGridz
+                        cellaux(1) = cell(1) + i - (mapCells + 1)
+                        cellaux(2) = cell(2) + j - (mapCells + 1)
+                        cellaux(3) = cell(3) + k - (mapCells + 1)
                         if (p == 0) cellaux(3) = 0
 
                         !Check if the cells intended to smear the bubbles in are in the computational domain
                         !and redefine the cells for symmetric boundary
                         call s_check_celloutside(cellaux, celloutside)
-                        print *, 's_check_celloutside'
 
                         if (.not. celloutside) then
 
@@ -159,13 +153,13 @@ contains
                             nodecoord(2) = y_cc(cellaux(2))
                             if (p > 0) nodecoord(3) = z_cc(cellaux(3))
                             call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
-                            if (p == 0) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
+                            if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
 
                             ! Relocate cells for bubbles intersecting symmetric boundaries
-                            ! if (bc_x%beg == -2 .or. bc_x%end == -2 .or. bc_y%beg == -2 .or. bc_y%end == -2 &
-                            !     .or. bc_z%beg == -2 .or. bc_z%end == -2) then
-                            !     call s_shift_cell_symmetric_bc(cellaux, cell)
-                            ! end if
+                            if (bc_x%beg == -2 .or. bc_x%end == -2 .or. bc_y%beg == -2 .or. bc_y%end == -2 &
+                                .or. bc_z%beg == -2 .or. bc_z%end == -2) then
+                                call s_shift_cell_symmetric_bc(cellaux, cell)
+                            end if
                         else
                             func = 0._wp
                             func2 = 0._wp
@@ -191,16 +185,13 @@ contains
 
                         !Product of two smeared functions
                         !Update void fraction * time derivative of void fraction
-                        if (p == 0) then
+                        if (lag_params%cluster_type >= 4) then
                             addFun3 = func2*strength_vol*strength_vel
                             !$acc atomic update
                             updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                                 updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                                 + addFun3
                         end if
-
-                        print *, 'Update 1-2-3'
-
                     end do
                 end do
             end do
@@ -326,27 +317,39 @@ contains
 
         ! x-dir
         if (bc_x%beg == -2 .and. (cell(1) <= mapCells - 1)) then
-            cellaux(1) = abs(cellaux(1)) - 1
+            if (cell(1) >= 0) then
+                cellaux(1) = abs(cellaux(1)) - 1
+            end if
         end if
         if (bc_x%end == -2 .and. (cell(1) >= m + 1 - mapCells)) then
-            cellaux(1) = cellaux(1) - (2*(cellaux(1) - m) - 1)
+            if (cell(1) <= m) then
+                cellaux(1) = cellaux(1) - (2*(cellaux(1) - m) - 1)
+            end if
         end if
 
         !y-dir
         if (bc_y%beg == -2 .and. (cell(2) <= mapCells - 1)) then
-            cellaux(2) = abs(cellaux(2)) - 1
+            if (cell(2) >= 0) then
+                cellaux(2) = abs(cellaux(2)) - 1
+            end if
         end if
         if (bc_y%end == -2 .and. (cell(2) >= n + 1 - mapCells)) then
-            cellaux(2) = cellaux(2) - (2*(cellaux(2) - n) - 1)
+            if (cell(2) <= n) then
+                cellaux(2) = cellaux(2) - (2*(cellaux(2) - n) - 1)
+            end if
         end if
 
         if (p > 0) then
             !z-dir
             if (bc_z%beg == -2 .and. (cell(3) <= mapCells - 1)) then
-                cellaux(3) = abs(cellaux(3)) - 1
+                if (cell(3) >= 0) then
+                    cellaux(3) = abs(cellaux(3)) - 1
+                end if
             end if
             if (bc_z%end == -2 .and. (cell(3) >= p + 1 - mapCells)) then
-                cellaux(3) = cellaux(3) - (2*(cellaux(3) - p) - 1)
+                if (cell(3) <= p) then
+                    cellaux(3) = cellaux(3) - (2*(cellaux(3) - p) - 1)
+                end if
             end if
         end if
 
