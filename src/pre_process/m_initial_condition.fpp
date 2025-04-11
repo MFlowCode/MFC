@@ -113,6 +113,12 @@ contains
             q_prim_vf(i)%sf = dflt_real
         end do
 
+        ! Initial damage state is always zero
+        if (cont_damage) then
+            q_cons_vf(damage_idx)%sf = 0._wp
+            q_prim_vf(damage_idx)%sf = 0._wp
+        end if
+
         ! Setting default values for patch identities bookkeeping variable.
         ! This is necessary to avoid any confusion in the assessment of the
         ! extent of application that the overwrite permissions give a patch

@@ -42,6 +42,7 @@ contains
         call s_check_inputs_grcbc
         call s_check_inputs_geometry_precision
         call s_check_inputs_mhd
+        call s_check_inputs_continuum_damage
 
     end subroutine s_check_inputs
 
@@ -332,6 +333,13 @@ contains
         @:PROHIBIT(bubbles_lagrange .and. n==0, "bubbles_lagrange accepts 2D and 3D simulations only")
         @:PROHIBIT(bubbles_lagrange .and. model_eqns==3, "The 6-equation flow model does not support bubbles_lagrange")
     end subroutine s_check_inputs_bubbles_lagrange
+
+    !> Checks constraints on continuum damage model parameters
+    subroutine s_check_inputs_continuum_damage
+        @:PROHIBIT(cont_damage .and. f_is_default(tau_star))
+        @:PROHIBIT(cont_damage .and. f_is_default(cont_damage_s))
+        @:PROHIBIT(cont_damage .and. f_is_default(alpha_bar))
+    end subroutine s_check_inputs_continuum_damage
 
     !> Checks miscellaneous constraints,
         !! including constraints on probe_wrt and integral_wrt
