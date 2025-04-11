@@ -319,15 +319,11 @@ contains
         if (bc_x%beg == -2 .and. (cell(1) <= mapCells - 1)) then
             if (cell(1) >= 0) then
                 cellaux(1) = abs(cellaux(1)) - 1
-            else
-                stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_x%beg)."
             end if
         end if
         if (bc_x%end == -2 .and. (cell(1) >= m + 1 - mapCells)) then
             if (cell(1) <= m) then
                 cellaux(1) = cellaux(1) - (2*(cellaux(1) - m) - 1)
-            else
-                stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_x%end)."
             end if
         end if
 
@@ -335,15 +331,11 @@ contains
         if (bc_y%beg == -2 .and. (cell(2) <= mapCells - 1)) then
             if (cell(2) >= 0) then
                 cellaux(2) = abs(cellaux(2)) - 1
-            else
-                stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_y%beg)."
             end if
         end if
         if (bc_y%end == -2 .and. (cell(2) >= n + 1 - mapCells)) then
             if (cell(2) <= n) then
                 cellaux(2) = cellaux(2) - (2*(cellaux(2) - n) - 1)
-            else
-                stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_y%end)."
             end if
         end if
 
@@ -352,15 +344,11 @@ contains
             if (bc_z%beg == -2 .and. (cell(3) <= mapCells - 1)) then
                 if (cell(3) >= 0) then
                     cellaux(3) = abs(cellaux(3)) - 1
-                else
-                    stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_z%beg)."
                 end if
             end if
             if (bc_z%end == -2 .and. (cell(3) >= p + 1 - mapCells)) then
                 if (cell(3) <= p) then
                     cellaux(3) = cellaux(3) - (2*(cellaux(3) - p) - 1)
-                else
-                    stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_z%end)."
                 end if
             end if
         end if
