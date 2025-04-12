@@ -171,8 +171,9 @@ contains
             pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z, n_start, t_save, t_stop, &
-            cfl_adap_dt, cfl_const_dt, cfl_target, &
-            viscous, surface_tension, &
+            cfl_adap_dt, cfl_const_dt, cfl_target,  &
+            viscous, surface_tension,               & 
+            hyperelasticity, hyper_model, R0ref, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
             hyperelasticity, R0ref, Bx0, powell

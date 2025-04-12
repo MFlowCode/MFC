@@ -162,6 +162,7 @@ module m_global_parameters
     logical :: parallel_io    !< Format of the data files
     logical :: sim_data
     logical :: file_per_process !< output format
+    logical :: kymograph
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
@@ -231,6 +232,7 @@ module m_global_parameters
     logical, dimension(3) :: flux_wrt
     logical :: E_wrt
     logical :: pres_wrt
+    logical :: tau_wrt
     logical, dimension(num_fluids_max) :: alpha_wrt
     logical :: gamma_wrt
     logical :: heat_ratio_wrt
@@ -402,6 +404,7 @@ contains
         file_per_process = .false.
         E_wrt = .false.
         pres_wrt = .false.
+        tau_wrt = .false.
         alpha_wrt = .false.
         gamma_wrt = .false.
         heat_ratio_wrt = .false.
@@ -414,6 +417,7 @@ contains
         qm_wrt = .false.
         schlieren_wrt = .false.
         sim_data = .false.
+        kymograph = .false.
         cf_wrt = .false.
         ib = .false.
 
@@ -898,13 +902,7 @@ contains
         call MPI_INFO_CREATE(mpi_info_int, ierr)
         call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
 
-        ! Option for UNIX file system (Hooke/Thomson)
-        ! WRITE(mpiiofs, '(A)') '/ufs_'
-        ! mpiiofs = TRIM(mpiiofs)
-        ! mpi_info_int = MPI_INFO_NULL
-
         allocate (start_idx(1:num_dims))
-
 #endif
 
     end subroutine s_initialize_parallel_io

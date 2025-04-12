@@ -27,6 +27,7 @@ contains
     !>  The purpose of this procedure is to populate the buffers
     !!      of the primitive variables, depending on the selected
     !!      boundary conditions.
+    !! @param q_prim_vf Primitive variable
     subroutine s_populate_variables_buffers(q_prim_vf, pb, mv)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -218,6 +219,7 @@ contains
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer :: j, k, l, q, i
+        real(wp) :: bc_sum
 
         !< x-direction
         if (bc_dir == 1) then !< x-direction
@@ -235,7 +237,27 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
+                if (hyperelasticity) then
+                    !$acc parallel loop collapse(4) gang vector default(present), private(bc_sum)
+                    do j = 1, buff_size
+                        do l = 0, p
+                            do k = 0, n
+                                do i = xibeg, xiend
+                                    bc_sum = 0._wp
+                                    !$acc loop seq
+                                    do q = 1, j
+                                        bc_sum = bc_sum - dx(-q)
+                                    end do
+                                    q_prim_vf(i)%sf(-j, k, l) = &
+                                        q_prim_vf(i)%sf(0, k, l) - bc_sum
+                                end do
+                            end do
+                        end do
+                    end do
+                    !$acc end parallel loop
+                end if
+#endif
             else !< bc_x%end
 
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -249,7 +271,27 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
+                if (hyperelasticity) then
+                    !$acc parallel loop collapse(4) gang vector default(present), private(bc_sum)
+                    do j = 1, buff_size
+                        do l = 0, p
+                            do k = 0, n
+                                do i = xibeg, xiend
+                                    bc_sum = 0._wp
+                                    !$acc loop seq
+                                    do q = 1, j
+                                        bc_sum = bc_sum + dx(m + q)
+                                    end do
+                                    q_prim_vf(i)%sf(m + j, k, l) = &
+                                        q_prim_vf(i)%sf(m, k, l) + bc_sum
+                                end do
+                            end do
+                        end do
+                    end do
+                    !$acc end parallel loop
+                end if
+#endif
             end if
 
             !< y-direction
@@ -268,7 +310,27 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
+                if (hyperelasticity) then
+                    !$acc parallel loop collapse(4) gang vector default(present), private(bc_sum)
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            do k = 0, p
+                                do i = xibeg, xiend
+                                    bc_sum = 0._wp
+                                    !$acc loop seq
+                                    do q = 1, j
+                                        bc_sum = bc_sum - dy(-q)
+                                    end do
+                                    q_prim_vf(i)%sf(l, -j, k) = &
+                                        q_prim_vf(i)%sf(l, 0, k) - bc_sum
+                                end do
+                            end do
+                        end do
+                    end do
+                    !$acc end parallel loop
+                end if
+#endif
             else !< bc_y%end
 
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -282,7 +344,27 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
+                if (hyperelasticity) then
+                    !$acc parallel loop collapse(4) gang vector default(present), private(bc_sum)
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            do k = 0, p
+                                do i = xibeg, xiend
+                                    bc_sum = 0._wp
+                                    !$acc loop seq
+                                    do q = 1, j
+                                        bc_sum = bc_sum + dy(n + q)
+                                    end do
+                                    q_prim_vf(i)%sf(l, n + j, k) = &
+                                        q_prim_vf(i)%sf(l, n, k) + bc_sum
+                                end do
+                            end do
+                        end do
+                    end do
+                    !$acc end parallel loop
+                end if
+#endif
             end if
 
             !< z-direction
@@ -301,9 +383,28 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
+                if (hyperelasticity) then
+                    !$acc parallel loop collapse(4) gang vector default(present), private(bc_sum)
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do i = xibeg, xiend
+                                    bc_sum = 0._wp
+                                    !$acc loop seq
+                                    do q = 1, j
+                                        bc_sum = bc_sum - dx(-q)
+                                    end do
+                                    q_prim_vf(i)%sf(k, l, -j) = &
+                                        q_prim_vf(i)%sf(k, l, 0) - bc_sum
+                                end do
+                            end do
+                        end do
+                    end do
+                    !$acc end parallel loop
+                end if
+#endif
             else !< bc_z%end
-
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -315,7 +416,27 @@ contains
                         end do
                     end do
                 end do
-
+#ifdef MFC_SIMULATION
+                if (hyperelasticity) then
+                    !$acc parallel loop collapse(4) gang vector default(present), private(bc_sum)
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do i = xibeg, xiend
+                                    bc_sum = 0._wp
+                                    !$acc loop seq
+                                    do q = 1, j
+                                        bc_sum = bc_sum + dz(p + q)
+                                    end do
+                                    q_prim_vf(i)%sf(k, l, p + j) = &
+                                        q_prim_vf(i)%sf(k, l, p) + bc_sum
+                                end do
+                            end do
+                        end do
+                    end do
+                    !$acc end parallel loop
+                end if
+#endif
             end if
 
         end if
@@ -359,11 +480,6 @@ contains
                                     q_prim_vf(shear_BC_flip_indices(1, i))%sf(-j, k, l) = &
                                         -q_prim_vf(shear_BC_flip_indices(1, i))%sf(j - 1, k, l)
                                 end do
-                            end if
-
-                            if (hyperelasticity) then
-                                q_prim_vf(xibeg)%sf(-j, k, l) = &
-                                    -q_prim_vf(xibeg)%sf(j - 1, k, l)
                             end if
 
                         end do
@@ -416,11 +532,6 @@ contains
                                     q_prim_vf(shear_BC_flip_indices(1, i))%sf(m + j, k, l) = &
                                         -q_prim_vf(shear_BC_flip_indices(1, i))%sf(m - (j - 1), k, l)
                                 end do
-                            end if
-
-                            if (hyperelasticity) then
-                                q_prim_vf(xibeg)%sf(m + j, k, l) = &
-                                    -q_prim_vf(xibeg)%sf(m - (j - 1), k, l)
                             end if
 
                         end do
@@ -478,10 +589,6 @@ contains
                                 end do
                             end if
 
-                            if (hyperelasticity) then
-                                q_prim_vf(xibeg + 1)%sf(l, -j, k) = &
-                                    -q_prim_vf(xibeg + 1)%sf(l, j - 1, k)
-                            end if
                         end do
                     end do
                 end do
@@ -532,10 +639,6 @@ contains
                                 end do
                             end if
 
-                            if (hyperelasticity) then
-                                q_prim_vf(xibeg + 1)%sf(l, n + j, k) = &
-                                    -q_prim_vf(xibeg + 1)%sf(l, n - (j - 1), k)
-                            end if
                         end do
                     end do
                 end do
@@ -591,10 +694,6 @@ contains
                                 end do
                             end if
 
-                            if (hyperelasticity) then
-                                q_prim_vf(xiend)%sf(k, l, -j) = &
-                                    -q_prim_vf(xiend)%sf(k, l, j - 1)
-                            end if
                         end do
                     end do
                 end do
@@ -645,10 +744,6 @@ contains
                                 end do
                             end if
 
-                            if (hyperelasticity) then
-                                q_prim_vf(xiend)%sf(k, l, p + j) = &
-                                    -q_prim_vf(xiend)%sf(k, l, p - (j - 1))
-                            end if
                         end do
                     end do
                 end do

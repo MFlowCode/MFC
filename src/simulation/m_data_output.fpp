@@ -1084,7 +1084,7 @@ contains
         real(wp) :: nondim_time !< Non-dimensional time
 
         real(wp) :: tmp !<
-            !! Temporary variable to store quantity for mpi_allreduce
+        !! Temporary variable to store quantity for mpi_allreduce
 
         integer :: npts !< Number of included integral points
         real(wp) :: rad, thickness !< For integral quantities
