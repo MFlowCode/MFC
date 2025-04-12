@@ -129,7 +129,7 @@ contains
             a_z, x_a, y_a, z_a, x_b, y_b, z_b, &
             model_eqns, num_fluids, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
-            hypoelasticity, patch_icpp, fluid_pp, precision, parallel_io, &
+            hypoelasticity, mhd, patch_icpp, fluid_pp, precision, parallel_io, &
             mixlayer_vel_profile, mixlayer_vel_coef, mixlayer_domain, &
             mixlayer_perturb, &
             pi_fac, perturb_flow, perturb_flow_fluid, perturb_flow_mag, &
@@ -144,7 +144,7 @@ contains
             sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
             n_start_old, surface_tension, hyperelasticity, pre_stress, &
             rkck_adap_dt, elliptic_smoothing, elliptic_smoothing_iters, &
-            viscous, bubbles_lagrange
+            viscous, bubbles_lagrange, Bx0, relativity
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'

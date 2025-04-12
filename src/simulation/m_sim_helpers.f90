@@ -37,7 +37,7 @@ contains
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         real(wp), intent(inout), dimension(num_fluids) :: alpha
-        real(wp), intent(inout), dimension(num_dims) :: vel
+        real(wp), intent(inout), dimension(num_vels) :: vel
         real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres
         integer, intent(in) :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
@@ -63,13 +63,13 @@ contains
         end if
 
         !$acc loop seq
-        do i = 1, num_dims
+        do i = 1, num_vels
             vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
         end do
 
         vel_sum = 0._wp
         !$acc loop seq
-        do i = 1, num_dims
+        do i = 1, num_vels
             vel_sum = vel_sum + vel(i)**2._wp
         end do
 
@@ -98,7 +98,7 @@ contains
         !! @param Rc_sf (optional) cell centered Rc
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         !$acc routine seq
-        real(wp), intent(in), dimension(num_dims) :: vel
+        real(wp), intent(in), dimension(num_vels) :: vel
         real(wp), intent(in) :: c, rho
         real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: icfl_sf
         real(wp), dimension(0:m, 0:n, 0:p), intent(inout), optional :: vcfl_sf, Rc_sf
@@ -195,7 +195,7 @@ contains
         !! @param l z coordinate
     subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
         !$acc routine seq
-        real(wp), dimension(num_dims), intent(in) :: vel
+        real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in) :: c, rho
         real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: max_dt
         real(wp), dimension(2), intent(in) :: Re_l

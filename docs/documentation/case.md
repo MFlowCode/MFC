@@ -164,6 +164,7 @@ MPI topology is automatically optimized to maximize the parallel efficiency for 
 | `alpha_rho(i)` *     | Real    | Supported             | Partial density of fluid $i$.                                |
 | `pres` *             | Real    | Supported             | Pressure.                                                    |
 | `vel(i)` *           | Real    | Supported             | Velocity in direction $i$.                                   |
+| `tau_e(i)` *         | Real    | Supported             | Elastic stresses.                                            |
 | `hcid` *             | Integer | N/A                   | Hard coded patch id                                          |
 | `cf_val` *           | Real    | Supported             | Surface tension color function value                         |
 | `model_filepath`     | String  | Not Supported         | Path to an STL or OBJ file (not all OBJs are supported).     |
@@ -179,6 +180,8 @@ The Table lists the patch parameters.
 The parameters define the geometries and physical parameters of fluid components (patch) in the domain at initial condition.
 Note that the domain must be fully filled with patche(s).
 The code outputs error messages when an empty region is left in the domain.
+
+- `tau_e(i)` is the `i`-th component of the elastic stress tensor, ordered as `tau_xx`, `tau_xy`, `tau_yy`, `tau_xz`, `tau_yz`, and `tau_zz`. 1D simulation requires `tau(1)`, 2D `tau(1:3)`, and 3D `tau(1:6)`.
 
 #### Analytical Definition of Primitive Variables
 
@@ -330,6 +333,7 @@ Additional details on this specification can be found in [The Naca Airfoil Serie
 | `qv`   ** | Real   | Stiffened-gas parameter $q$ of fluid.          |
 | `qvp`  ** | Real   | Stiffened-gas parameter $q'$ of fluid.         |
 | `sigma`   | Real   | Surface tension coefficient                    |
+| `G`       | Real   | Shear modulus of solid.                        |
 
 Fluid material's parameters. All parameters except for sigma should be prepended with `fluid_pp(i)` where $i$ is the fluid index.
 
@@ -348,6 +352,8 @@ When these parameters are undefined, fluids are treated as inviscid.
 Details of implementation of viscosity in MFC can be found in [Coralic (2015)](references.md#Coralic15).
 
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
+
+- `fluid_pp(i)%%G` is required for `hypoelasticity`.
 
 ### 6. Simulation Algorithm
 
@@ -372,7 +378,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `teno_CT`              | Real    | TENO threshold for smoothness detection |
 | `null_weights`         | Logical | Null WENO weights at boundaries |
 | `mp_weno`              | Logical | Monotonicity preserving WENO |
-| `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*	 |
+| `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD	(only for MHD) |
 | `low_Mach`             | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (Chen et al. 2022); [2] Velocity (Thornber et al. 2008)	 |
 | `avg_state`	         | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
 | `wave_speeds`          | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
@@ -391,6 +397,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `t_stop`               | Real    | Simulation stop time |
 | `surface_tension`      | Logical | Activate surface tension |
 | `viscous`              | Logical | Activate viscosity |
+| `hypoelasticity`       | Logical | Activate hypoelasticity* |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.
@@ -450,6 +457,7 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 
 - `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 3.
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively ([Toro, 2013](references.md#Toro13)).
+`riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations ([Miyoshi and Kusano, 2005](references.md#Miyoshi05)).
 
 - `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method ([Chen et al., 2022](references.md#Chen22)) and the improved velocity reconstruction method ([Thornber et al., 2008](references.md#Thornber08)). This feature requires `riemann_solver = 2` and `model_eqns = 2`.
 
@@ -468,6 +476,8 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 - `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set and `num_fluids`. The color function in each patch should be assigned such that `patch_icpp(i)%cf_val = 1` in patches where `patch_icpp(i)%alpha = 1 - eps` and `patch_icpp(i)%cf_val = 0` in patches where `patch_icpp(i)%alpha = eps`.
 
 - `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
+
+- `hypoelasticity` activates elastic stress calculations for fluid-solid interactions. Requires `G` to be set in the fluid material's parameters.
 
 #### Constant Time-Stepping
 
@@ -523,6 +533,7 @@ To restart the simulation from $k$-th time step, see [Restarting Cases](running.
 | `omega_wrt(i)`       | Logical | Add the $i$-direction vorticity to the database	 |
 | `schlieren_wrt`      | Logical | Add the numerical schlieren to the database|
 | `qm_wrt`             | Logical | Add the Q-criterion to the database|
+| `tau_wrt`            | Logical | Add the elastic stress components to the database|
 | `fd_order`           | Integer | Order of finite differences for computing the vorticity and the numerical Schlieren function [1,2,4] |
 | `schlieren_alpha(i)` | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |
 | `probe_wrt`          | Logical | Write the flow chosen probes data files for each time step	|
@@ -849,7 +860,34 @@ $$ a_{x[y,z]} = g_{x[y,z]} + k_{x[y,z]}\sin\left(w_{x[y,z]}t + p_{x[y,z]}\right)
 
 By convention, positive accelerations in the `x[y,z]` direction are in the positive `x[y,z]` direction.
 
-### 14. Cylindrical Coordinates
+### 14. Magnetohydrodynamics (MHD)
+
+| Parameter         | Type    | Description                                         |
+| ---:              | :---:   | :---                                                |
+| `mhd`             | Logical | Enable ideal MHD simulation                         |
+| `relativity`      | Logical | Enable relativistic MHD simulation                  |
+| `powell`          | Logical | Enable Powell's method for solenoidal constraint    |
+| `fd_order`        | Integer | Finite difference order for Powell's method         |
+| `Bx[y,z]`         | Real    | Initial magnetic field in the x[y,z] direction      |
+| `Bx0`             | Real    | Constant magnetic field in the x direction (1D only)|
+
+- `mhd` is currently only available for single-component flows and 5-equation model. Its compatibility with most other features is work in progress.
+
+- `relativity` only works for `mhd` enabled and activates relativistic MHD (RMHD) simulation.
+
+- `powell` activates Powell's eight-wave method to impose the solenoidal constraint in the MHD simulation [Powell (1994)](references.md#Powell94). It should not be used in conjunction with HLLD (`riemann_solver = 4`).
+
+- `fd_order` specifies the finite difference order for computing the RHS of the Powell's method. `fd_order = 1`, `2`, and `4` are allowed.
+
+- `Bx0` is only used in 1D simulations to specify the constant magnetic field in the x direction. It must be specified in 1D simulations. `Bx` must not be used in 1D simulations.
+
+- `Bx`, `By`, and `Bz` are used to specify the initial magnetic field in the x, y, and z directions, respectively. They must be specified in all 1D/2D/3D MHD simulations, with the exception of `Bx` in 1D simulations.
+
+Note: In 1D/2D/3D simulations, all three velocity components are treated as state variables and must be specified in the case file.
+
+Note: For relativistic flow, the conservative and primitive densities are different. `rho_wrt` outputs the primitive (rest mass) density.
+
+### 15. Cylindrical Coordinates
 
 When ``cyl_coord = 'T'`` is set in 3D the following constraints must be met:
 

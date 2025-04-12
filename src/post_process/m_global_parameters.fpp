@@ -52,6 +52,7 @@ module m_global_parameters
     !> @}
 
     integer :: num_dims !< Number of spatial dimensions
+    integer :: num_vels !< Number of velocity components (different from num_dims for mhd)
 
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
@@ -104,6 +105,8 @@ module m_global_parameters
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
+    logical :: mhd             !< Magnetohydrodynamics
+    logical :: relativity      !< Relativity for RMHD
     logical :: hypoelasticity  !< Turn hypoelasticity on
     logical :: hyperelasticity !< Turn hyperelasticity on
     logical :: elasticity      !< elasticity modeling, true for hyper or hypo
@@ -126,6 +129,7 @@ module m_global_parameters
     integer :: gamma_idx                           !< Index of specific heat ratio func. eqn.
     integer :: alf_idx                             !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
+    type(int_bounds_info) :: B_idx                 !< Indexes of first and last magnetic field eqns.
     type(int_bounds_info) :: stress_idx            !< Indices of elastic stresses
     type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
     integer :: c_idx                               !< Index of color function
@@ -145,6 +149,15 @@ module m_global_parameters
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
+
+    integer :: shear_num !! Number of shear stress components
+    integer, dimension(3) :: shear_indices !<
+    !! Indices of the stress components that represent shear stress
+    integer :: shear_BC_flip_num !<
+    !! Number of shear stress components to reflect for boundary conditions
+    integer, dimension(3, 2) :: shear_BC_flip_indices !<
+    !! Indices of shear stress components to reflect for boundary conditions.
+    !! Size: (1:3, 1:shear_BC_flip_num) for (x/y/z, [indices])
 
     logical :: parallel_io    !< Format of the data files
     logical :: sim_data
@@ -304,6 +317,8 @@ module m_global_parameters
     logical :: bubbles_lagrange, rkck_adap_dt
     !> @}
 
+    real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
+
 contains
 
     !> Assigns default values to user inputs prior to reading
@@ -341,6 +356,9 @@ contains
         alt_soundspeed = .false.
         relax = .false.
         relax_model = dflt_int
+
+        mhd = .false.
+        relativity = .false.
 
         hypoelasticity = .false.
         hyperelasticity = .false.
@@ -440,6 +458,9 @@ contains
         z_output%beg = dflt_real
         z_output%end = dflt_real
 
+        ! MHD
+        Bx0 = dflt_real
+
     end subroutine s_assign_default_values_to_user_inputs
 
     !>  Computation of parameters, allocation procedures, and/or
@@ -463,7 +484,7 @@ contains
             cont_idx%beg = 1
             cont_idx%end = cont_idx%beg
             mom_idx%beg = cont_idx%end + 1
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
             adv_idx%end = adv_idx%beg + 1
@@ -480,7 +501,7 @@ contains
             cont_idx%beg = 1
             cont_idx%end = num_fluids
             mom_idx%beg = cont_idx%end + 1
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
             adv_idx%end = E_idx + num_fluids
@@ -567,9 +588,14 @@ contains
 
             end if
 
-            if (surface_tension) then
-                c_idx = sys_size + 1
-                sys_size = c_idx
+            if (mhd) then
+                B_idx%beg = sys_size + 1
+                if (n == 0) then
+                    B_idx%end = sys_size + 2 ! 1D: By, Bz
+                else
+                    B_idx%end = sys_size + 3 ! 2D/3D: Bx, By, Bz
+                end if
+                sys_size = B_idx%end
             end if
 
             ! Volume Fraction Model (6-equation model)
@@ -581,7 +607,7 @@ contains
             cont_idx%beg = 1
             cont_idx%end = num_fluids
             mom_idx%beg = cont_idx%end + 1
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
             adv_idx%end = E_idx + num_fluids
@@ -590,16 +616,11 @@ contains
             sys_size = internalEnergies_idx%end
             alf_idx = 1 ! dummy, cannot actually have a void fraction
 
-            if (surface_tension) then
-                c_idx = sys_size + 1
-                sys_size = c_idx
-            end if
-
         else if (model_eqns == 4) then
             cont_idx%beg = 1 ! one continuity equation
             cont_idx%end = 1 !num_fluids
             mom_idx%beg = cont_idx%end + 1 ! one momentum equation in each
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1 ! one energy equation
             adv_idx%beg = E_idx + 1
             adv_idx%end = adv_idx%beg !one volume advection equation
@@ -651,23 +672,53 @@ contains
             end if
         end if
 
-        elasticity = hypoelasticity .or. hyperelasticity
+        if (model_eqns == 2 .or. model_eqns == 3) then
 
-        if (elasticity) then
-            stress_idx%beg = sys_size + 1
-            stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
-            ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
-            sys_size = stress_idx%end
-        end if
+            if (hypoelasticity .or. hyperelasticity) then
+                elasticity = .true.
+                stress_idx%beg = sys_size + 1
+                stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+                if (cyl_coord) stress_idx%end = stress_idx%end + 1
+                ! number of stresses is 1 in 1D, 3 in 2D, 4 in 2D-Axisym, 6 in 3D
+                sys_size = stress_idx%end
 
-        if (hyperelasticity) then
-            xi_idx%beg = sys_size + 1
-            xi_idx%end = sys_size + num_dims
-            ! adding three more equations for the \xi field and the elastic energy
-            sys_size = xi_idx%end + 1
-            ! number of entries in the symmetric btensor plus the jacobian
-            b_size = (num_dims*(num_dims + 1))/2 + 1
-            tensor_size = num_dims**2 + 1
+                ! shear stress index is 2 for 2D and 2,4,5 for 3D
+                if (num_dims == 1) then
+                    shear_num = 0
+                else if (num_dims == 2) then
+                    shear_num = 1
+                    shear_indices(1) = stress_idx%beg - 1 + 2
+                    shear_BC_flip_num = 1
+                    shear_BC_flip_indices(1:2, 1) = shear_indices(1)
+                    ! Both x-dir and y-dir: flip tau_xy only
+                else if (num_dims == 3) then
+                    shear_num = 3
+                    shear_indices(1:3) = stress_idx%beg - 1 + (/2, 4, 5/)
+                    shear_BC_flip_num = 2
+                    shear_BC_flip_indices(1, 1:2) = shear_indices((/1, 2/))
+                    shear_BC_flip_indices(2, 1:2) = shear_indices((/1, 3/))
+                    shear_BC_flip_indices(3, 1:2) = shear_indices((/2, 3/))
+                    ! x-dir: flip tau_xy and tau_xz
+                    ! y-dir: flip tau_xy and tau_yz
+                    ! z-dir: flip tau_xz and tau_yz
+                end if
+            end if
+
+            if (hyperelasticity) then
+                xi_idx%beg = sys_size + 1
+                xi_idx%end = sys_size + num_dims
+                ! adding three more equations for the \xi field and the elastic energy
+                sys_size = xi_idx%end + 1
+                ! number of entries in the symmetric btensor plus the jacobian
+                b_size = (num_dims*(num_dims + 1))/2 + 1
+                tensor_size = num_dims**2 + 1
+            end if
+
+            if (surface_tension) then
+                c_idx = sys_size + 1
+                sys_size = c_idx
+            end if
+
         end if
 
         if (chemistry) then
@@ -832,6 +883,12 @@ contains
     subroutine s_initialize_parallel_io
 
         num_dims = 1 + min(1, n) + min(1, p)
+
+        if (mhd) then
+            num_vels = 3
+        else
+            num_vels = num_dims
+        end if
 
         allocate (proc_coords(1:num_dims))
 

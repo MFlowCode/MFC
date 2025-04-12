@@ -474,12 +474,14 @@ contains
                                 q_prim_vf(i)%sf(-j, k, l) = &
                                     q_prim_vf(i)%sf(j - 1, k, l)
                             end do
-#ifdef MFC_SIMULATION
-                            if (hyperelasticity) then
-                                q_prim_vf(xibeg)%sf(-j, k, l) = &
-                                    -q_prim_vf(xibeg)%sf(j - 1, k, l)
+
+                            if (elasticity) then
+                                do i = 1, shear_BC_flip_num
+                                    q_prim_vf(shear_BC_flip_indices(1, i))%sf(-j, k, l) = &
+                                        -q_prim_vf(shear_BC_flip_indices(1, i))%sf(j - 1, k, l)
+                                end do
                             end if
-#endif
+
                         end do
                     end do
                 end do
@@ -524,12 +526,14 @@ contains
                                 q_prim_vf(i)%sf(m + j, k, l) = &
                                     q_prim_vf(i)%sf(m - (j - 1), k, l)
                             end do
-#ifdef MFC_SIMULATION
-                            if (hyperelasticity) then
-                                q_prim_vf(xibeg)%sf(m + j, k, l) = &
-                                    -q_prim_vf(xibeg)%sf(m - (j - 1), k, l)
+
+                            if (elasticity) then
+                                do i = 1, shear_BC_flip_num
+                                    q_prim_vf(shear_BC_flip_indices(1, i))%sf(m + j, k, l) = &
+                                        -q_prim_vf(shear_BC_flip_indices(1, i))%sf(m - (j - 1), k, l)
+                                end do
                             end if
-#endif
+
                         end do
                     end do
                 end do
@@ -577,12 +581,14 @@ contains
                                 q_prim_vf(i)%sf(l, -j, k) = &
                                     q_prim_vf(i)%sf(l, j - 1, k)
                             end do
-#ifdef MFC_SIMULATION
-                            if (hyperelasticity) then
-                                q_prim_vf(xibeg + 1)%sf(l, -j, k) = &
-                                    -q_prim_vf(xibeg + 1)%sf(l, j - 1, k)
+
+                            if (elasticity) then
+                                do i = 1, shear_BC_flip_num
+                                    q_prim_vf(shear_BC_flip_indices(2, i))%sf(l, -j, k) = &
+                                        -q_prim_vf(shear_BC_flip_indices(2, i))%sf(l, j - 1, k)
+                                end do
                             end if
-#endif
+
                         end do
                     end do
                 end do
@@ -625,12 +631,14 @@ contains
                                 q_prim_vf(i)%sf(l, n + j, k) = &
                                     q_prim_vf(i)%sf(l, n - (j - 1), k)
                             end do
-#ifdef MFC_SIMULATION
-                            if (hyperelasticity) then
-                                q_prim_vf(xibeg + 1)%sf(l, n + j, k) = &
-                                    -q_prim_vf(xibeg + 1)%sf(l, n - (j - 1), k)
+
+                            if (elasticity) then
+                                do i = 1, shear_BC_flip_num
+                                    q_prim_vf(shear_BC_flip_indices(2, i))%sf(l, n + j, k) = &
+                                        -q_prim_vf(shear_BC_flip_indices(2, i))%sf(l, n - (j - 1), k)
+                                end do
                             end if
-#endif
+
                         end do
                     end do
                 end do
@@ -678,12 +686,14 @@ contains
                                 q_prim_vf(i)%sf(k, l, -j) = &
                                     q_prim_vf(i)%sf(k, l, j - 1)
                             end do
-#ifdef MFC_SIMULATION
-                            if (hyperelasticity) then
-                                q_prim_vf(xiend)%sf(k, l, -j) = &
-                                    -q_prim_vf(xiend)%sf(k, l, j - 1)
+
+                            if (elasticity) then
+                                do i = 1, shear_BC_flip_num
+                                    q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, -j) = &
+                                        -q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, j - 1)
+                                end do
                             end if
-#endif
+
                         end do
                     end do
                 end do
@@ -726,12 +736,14 @@ contains
                                 q_prim_vf(i)%sf(k, l, p + j) = &
                                     q_prim_vf(i)%sf(k, l, p - (j - 1))
                             end do
-#ifdef MFC_SIMULATION
-                            if (hyperelasticity) then
-                                q_prim_vf(xiend)%sf(k, l, p + j) = &
-                                    -q_prim_vf(xiend)%sf(k, l, p - (j - 1))
+
+                            if (elasticity) then
+                                do i = 1, shear_BC_flip_num
+                                    q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, p + j) = &
+                                        -q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, p - (j - 1))
+                                end do
                             end if
-#endif
+
                         end do
                     end do
                 end do

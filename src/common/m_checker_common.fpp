@@ -52,6 +52,7 @@ contains
         call s_check_inputs_elasticity
         call s_check_inputs_surface_tension
         call s_check_inputs_moving_bc
+        call s_check_inputs_mhd
 
     end subroutine s_check_inputs_common
 
@@ -355,5 +356,16 @@ contains
             end if
         #:endfor
     end subroutine s_check_inputs_moving_bc
+
+    subroutine s_check_inputs_mhd
+        @:PROHIBIT(mhd .and. num_fluids /= 1, "MHD is only available for single-component flows")
+        @:PROHIBIT(mhd .and. model_eqns /= 2, "MHD is only available for the 5-equation model")
+
+        @:PROHIBIT(relativity .and. .not. mhd)
+
+        @:PROHIBIT(.not. mhd .and. (.not. f_is_default(Bx0)), "Bx0 must not be set if MHD is not enabled")
+        @:PROHIBIT(mhd .and. n == 0 .and. f_is_default(Bx0), "Bx0 must be set in 1D MHD simulations")
+        @:PROHIBIT(mhd .and. n > 0 .and. (.not. f_is_default(Bx0)), "Bx0 must not be set in 2D/3D MHD simulations")
+    end subroutine s_check_inputs_mhd
 
 end module m_checker_common

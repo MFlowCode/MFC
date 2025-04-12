@@ -100,8 +100,10 @@ module m_global_parameters
     integer :: model_eqns     !< Multicomponent flow model
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: num_dims = ${num_dims}$       !< Number of spatial dimensions
+        integer, parameter :: num_vels = ${num_vels}$       !< Number of velocity components (different from num_dims for mhd)
     #:else
         integer :: num_dims       !< Number of spatial dimensions
+        integer :: num_vels       !< Number of velocity components (different from num_dims for mhd)
     #:endif
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
@@ -111,12 +113,14 @@ module m_global_parameters
         integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
         integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
         integer, parameter :: weno_num_stencils = ${weno_num_stencils}$ !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
-        integer, parameter :: num_fluids = ${num_fluids}$ !< number of fluids in the simulation
+        integer, parameter :: num_fluids = ${num_fluids}$           !< number of fluids in the simulation
         logical, parameter :: wenojs = (${wenojs}$ /= 0)            !< WENO-JS (default)
         logical, parameter :: mapped_weno = (${mapped_weno}$ /= 0)  !< WENO-M (WENO with mapping of nonlinear weights)
         logical, parameter :: wenoz = (${wenoz}$ /= 0)              !< WENO-Z
         logical, parameter :: teno = (${teno}$ /= 0)                !< TENO (Targeted ENO)
-        real(wp), parameter :: wenoz_q = ${wenoz_q}$         !< Power constant for WENO-Z
+        real(wp), parameter :: wenoz_q = ${wenoz_q}$                !< Power constant for WENO-Z
+        logical, parameter :: mhd = (${mhd}$ /= 0)                  !< Magnetohydrodynamics
+        logical, parameter :: relativity = (${relativity}$ /= 0)    !< Relativity (only for MHD)
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
@@ -126,7 +130,9 @@ module m_global_parameters
         logical :: mapped_weno    !< WENO-M (WENO with mapping of nonlinear weights)
         logical :: wenoz          !< WENO-Z
         logical :: teno           !< TENO (Targeted ENO)
-        real(wp) :: wenoz_q  !< Power constant for WENO-Z
+        real(wp) :: wenoz_q       !< Power constant for WENO-Z
+        logical :: mhd            !< Magnetohydrodynamics
+        logical :: relativity     !< Relativity (only for MHD)
     #:endif
 
     real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
@@ -167,7 +173,7 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q)
+        !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity)
     #:endif
 
     !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress)
@@ -228,6 +234,7 @@ module m_global_parameters
     integer :: alf_idx                                 !< Index of void fraction
     integer :: gamma_idx                               !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                              !< Index of liquid stiffness func. eqn.
+    type(int_bounds_info) :: B_idx                     !< Indexes of first and last magnetic field eqns.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     type(int_bounds_info) :: xi_idx                    !< Indexes of first and last reference map eqns.
     integer :: b_size                                  !< Number of elements in the symmetric b tensor, plus one
@@ -287,7 +294,18 @@ module m_global_parameters
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
-    !$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
+    !$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx, B_idx)
+
+    integer :: shear_num !! Number of shear stress components
+    integer, dimension(3) :: shear_indices !<
+    !! Indices of the stress components that represent shear stress
+    integer :: shear_BC_flip_num !<
+    !! Number of shear stress components to reflect for boundary conditions
+    integer, dimension(3, 2) :: shear_BC_flip_indices !<
+    !! Indices of shear stress components to reflect for boundary conditions.
+    !! Size: (1:3, 1:shear_BC_flip_num) for (x/y/z, [indices])
+
+    !$acc declare create(shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices)
 
     ! END: Simulation Algorithm Parameters
 
@@ -317,7 +335,7 @@ module m_global_parameters
     logical :: integral_wrt
     integer :: num_probes
     integer :: num_integrals
-    type(probe_parameters), dimension(num_probes_max) :: probe
+    type(vec3_dt), dimension(num_probes_max) :: probe
     type(integral_parameters), dimension(num_probes_max) :: integral
 
     !> @name Reference density and pressure for Tait EOS
@@ -332,7 +350,7 @@ module m_global_parameters
     integer :: num_ibs
 
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
-    type(probe_parameters), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
+    type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
     integer :: Np
     !! Database of the immersed boundary patch parameters for each of the
     !! patches employed in the configuration of the initial condition. Note that
@@ -464,6 +482,10 @@ module m_global_parameters
     real(wp) :: dt_max                           !< Maximum time step size
     !$acc declare create(bubbles_lagrange, lag_params, rkck_adap_dt, dt_max, rkck_time_tmp, rkck_tolerance)
     !> @}
+
+    real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
+    logical :: powell !< Powell‐correction for div B = 0
+    !$acc declare create(Bx0, powell)
 
 contains
 
@@ -720,6 +742,14 @@ contains
         rkck_tolerance = dflt_real
         dt_max = dflt_real
 
+        Bx0 = dflt_real
+        powell = .false.
+
+        #:if not MFC_CASE_OPTIMIZATION
+            mhd = .false.
+            relativity = .false.
+        #:endif
+
     end subroutine s_assign_default_values_to_user_inputs
 
     !>  The computation of parameters, the allocation of memory,
@@ -741,7 +771,7 @@ contains
             !$acc update device(weno_polyn)
             !$acc update device(weno_num_stencils)
             !$acc update device(nb)
-            !$acc update device(num_dims, num_fluids)
+            !$acc update device(num_dims, num_vels, num_fluids)
         #:endif
 
         ! Initializing the number of fluids for which viscous effects will
@@ -760,7 +790,7 @@ contains
             cont_idx%beg = 1
             cont_idx%end = cont_idx%beg
             mom_idx%beg = cont_idx%end + 1
-            mom_idx%end = cont_idx%end + num_dims
+            mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
             adv_idx%end = adv_idx%beg + 1
@@ -778,7 +808,7 @@ contains
                 cont_idx%beg = 1
                 cont_idx%end = num_fluids
                 mom_idx%beg = cont_idx%end + 1
-                mom_idx%end = cont_idx%end + num_dims
+                mom_idx%end = cont_idx%end + num_vels
                 E_idx = mom_idx%end + 1
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
@@ -889,16 +919,21 @@ contains
                     end if
                 end if
 
-                if (surface_tension) then
-                    c_idx = sys_size + 1
-                    sys_size = c_idx
+                if (mhd) then
+                    B_idx%beg = sys_size + 1
+                    if (n == 0) then
+                        B_idx%end = sys_size + 2 ! 1D: By, Bz
+                    else
+                        B_idx%end = sys_size + 3 ! 2D/3D: Bx, By, Bz
+                    end if
+                    sys_size = B_idx%end
                 end if
 
             else if (model_eqns == 3) then
                 cont_idx%beg = 1
                 cont_idx%end = num_fluids
                 mom_idx%beg = cont_idx%end + 1
-                mom_idx%end = cont_idx%end + num_dims
+                mom_idx%end = cont_idx%end + num_vels
                 E_idx = mom_idx%end + 1
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
@@ -907,16 +942,11 @@ contains
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
 
-                if (surface_tension) then
-                    c_idx = sys_size + 1
-                    sys_size = c_idx
-                end if
-
             else if (model_eqns == 4) then
                 cont_idx%beg = 1 ! one continuity equation
                 cont_idx%end = 1 !num_fluids
                 mom_idx%beg = cont_idx%end + 1 ! one momentum equation in each direction
-                mom_idx%end = cont_idx%end + num_dims
+                mom_idx%end = cont_idx%end + num_vels
                 E_idx = mom_idx%end + 1 ! one energy equation
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = adv_idx%beg !one volume advection equation
@@ -1002,6 +1032,58 @@ contains
             end if
 
         end if
+
+        if (model_eqns == 2 .or. model_eqns == 3) then
+
+            if (hypoelasticity .or. hyperelasticity) then
+                elasticity = .true.
+                stress_idx%beg = sys_size + 1
+                stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+                if (cyl_coord) stress_idx%end = stress_idx%end + 1
+                ! number of stresses is 1 in 1D, 3 in 2D, 4 in 2D-Axisym, 6 in 3D
+                sys_size = stress_idx%end
+
+                ! shear stress index is 2 for 2D and 2,4,5 for 3D
+                if (num_dims == 1) then
+                    shear_num = 0
+                else if (num_dims == 2) then
+                    shear_num = 1
+                    shear_indices(1) = stress_idx%beg - 1 + 2
+                    shear_BC_flip_num = 1
+                    shear_BC_flip_indices(1:2, 1) = shear_indices(1)
+                    ! Both x-dir and y-dir: flip tau_xy only
+                else if (num_dims == 3) then
+                    shear_num = 3
+                    shear_indices(1:3) = stress_idx%beg - 1 + (/2, 4, 5/)
+                    shear_BC_flip_num = 2
+                    shear_BC_flip_indices(1, 1:2) = shear_indices((/1, 2/))
+                    shear_BC_flip_indices(2, 1:2) = shear_indices((/1, 3/))
+                    shear_BC_flip_indices(3, 1:2) = shear_indices((/2, 3/))
+                    ! x-dir: flip tau_xy and tau_xz
+                    ! y-dir: flip tau_xy and tau_yz
+                    ! z-dir: flip tau_xz and tau_yz
+                end if
+                !$acc update device(shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices)
+            end if
+
+            if (hyperelasticity) then
+                ! number of entries in the symmetric btensor plus the jacobian
+                b_size = (num_dims*(num_dims + 1))/2 + 1
+                ! storing the jacobian in the last entry
+                tensor_size = num_dims**2 + 1
+                xi_idx%beg = sys_size + 1
+                xi_idx%end = sys_size + num_dims
+                ! adding three more equations for the \xi field and the elastic energy
+                sys_size = xi_idx%end + 1
+            end if
+
+            if (surface_tension) then
+                c_idx = sys_size + 1
+                sys_size = c_idx
+            end if
+
+        end if
+
         ! END: Volume Fraction Model
 
         elasticity = hypoelasticity .or. hyperelasticity
@@ -1080,6 +1162,10 @@ contains
             fd_number = max(1, fd_order/2)
         end if
 
+        if (mhd) then ! TODO merge with above; waiting for hyperelasticity PR
+            fd_number = max(1, fd_order/2)
+        end if
+
         if (probe_wrt) then
             fd_number = max(1, fd_order/2)
         end if
@@ -1132,11 +1218,14 @@ contains
         !$acc update device(cfl_target, m, n, p)
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, low_Mach)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, B_idx, low_Mach)
+
+        !$acc update device(Bx0, powell)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)
             !$acc update device(wenoz_q)
+            !$acc update device(mhd, relativity)
         #:endif
 
         !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
@@ -1167,6 +1256,12 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             num_dims = 1 + min(1, n) + min(1, p)
+
+            if (mhd) then
+                num_vels = 3
+            else
+                num_vels = num_dims
+            end if
         #:endif
 
         allocate (proc_coords(1:num_dims))
