@@ -18,9 +18,16 @@
             q_prim_vf(i)%sf(${DEST}$) = q_prim_vf(i)%sf(${SRC}$)
         end do
 
+        if (elasticity) then
+            do i = 1, shear_BC_flip_num
+                q_prim_vf(shear_BC_flip_indices(${DIR}$, i))%sf(${DEST}$) = &
+                    -q_prim_vf(shear_BC_flip_indices(${DIR}$, i))%sf(${SRC}$)
+            end do
+        end if
+
         if (hyperelasticity) then
             q_prim_vf(xibeg + ${DIR}$-1)%sf(${DEST}$) = &
-                -q_prim_vf(xibeg + ${DIR}$-1)%sf(l, j - 1, k)
+                -q_prim_vf(xibeg + ${DIR}$-1)%sf(${SRC}$)
         end if
     end do
 #:enddef
