@@ -346,6 +346,9 @@ contains
             ! Elastic stresses
             if (hypoelasticity) dbvars = dbvars + (num_dims*(num_dims + 1))/2
 
+            ! Damage state variable
+            if (cont_damage) dbvars = dbvars + 1
+
             ! Magnetic field
             if (mhd) then
                 if (n == 0) then

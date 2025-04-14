@@ -341,6 +341,8 @@ contains
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
                         else if (i == n_idx .and. adv_n .and. bubbles_euler) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                        else if (i == damage_idx) then
+                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         end if
                     end do
                     close (2)
