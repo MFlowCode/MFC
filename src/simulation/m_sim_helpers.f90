@@ -272,18 +272,18 @@ contains
 
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
 
-        bc_type(1,-1)%sf(:,:,:) = bc_x%beg
-        bc_type(1,1)%sf(:,:,:) = bc_x%end
+        bc_type(1, -1)%sf(:, :, :) = bc_x%beg
+        bc_type(1, 1)%sf(:, :, :) = bc_x%end
         !$acc update device(bc_type(1,-1)%sf, bc_type(1,1)%sf)
 
         if (n > 0) then
-            bc_type(2,-1)%sf(:,:,:) = bc_y%beg
-            bc_type(2,1)%sf(:,:,:) = bc_y%end
+            bc_type(2, -1)%sf(:, :, :) = bc_y%beg
+            bc_type(2, 1)%sf(:, :, :) = bc_y%end
             !$acc update device(bc_type(2,-1)%sf, bc_type(2,1)%sf)
 
             if (p > 0) then
-                bc_type(3,-1)%sf(:,:,:) = bc_z%beg
-                bc_type(3,1)%sf(:,:,:) = bc_z%end
+                bc_type(3, -1)%sf(:, :, :) = bc_z%beg
+                bc_type(3, 1)%sf(:, :, :) = bc_z%end
                 !$acc update device(bc_type(3,-1)%sf, bc_type(3,1)%sf)
             end if
         end if

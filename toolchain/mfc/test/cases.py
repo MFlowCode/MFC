@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 import os, typing, itertools
 
 from mfc   import common
