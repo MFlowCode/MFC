@@ -1078,6 +1078,7 @@ contains
         real(wp), dimension(6) :: tau_e
         real(wp) :: G
         real(wp) :: dyn_p, T
+        real(wp) :: damage_state
 
         integer :: i, j, k, l, s, d !< Generic loop iterator
 
@@ -1131,6 +1132,7 @@ contains
             do s = 1, (num_dims*(num_dims + 1))/2
                 tau_e(s) = 0._wp
             end do
+            damage_state = 0._wp
 
             ! Find probe location in terms of indices on a
             ! specific processor
@@ -1167,6 +1169,10 @@ contains
                     dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                     if (elasticity) then
+                        if (cont_damage) then
+                            damage_state = q_cons_vf(damage_idx)%sf(j - 2, k, l)
+                            G = G*max((1._wp - damage_state), 0._wp)
+                        end if
 
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
@@ -1274,6 +1280,11 @@ contains
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                         if (elasticity) then
+                            if (cont_damage) then
+                                damage_state = q_cons_vf(damage_idx)%sf(j - 2, k - 2, l)
+                                G = G*max((1._wp - damage_state), 0._wp)
+                            end if
+
                             call s_compute_pressure( &
                                 q_cons_vf(1)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
@@ -1365,6 +1376,11 @@ contains
                             end if
 
                             if (elasticity) then
+                                if (cont_damage) then
+                                    damage_state = q_cons_vf(damage_idx)%sf(j - 2, k - 2, l - 2)
+                                    G = G*max((1._wp - damage_state), 0._wp)
+                                end if
+
                                 call s_compute_pressure( &
                                     q_cons_vf(1)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
@@ -1418,6 +1434,11 @@ contains
                         tmp = tau_e(s)
                         call s_mpi_allreduce_sum(tmp, tau_e(s))
                     end do
+                end if
+
+                if (cont_damage) then
+                    tmp = damage_state
+                    call s_mpi_allreduce_sum(tmp, damage_state)
                 end if
             end if
             if (proc_rank == 0) then

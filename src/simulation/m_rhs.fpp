@@ -174,6 +174,8 @@ contains
 
         integer :: i, j, k, l, id !< Generic loop iterators
 
+        integer :: num_eqns_after_adv
+
         !$acc enter data copyin(idwbuff, idwbuff)
         !$acc update device(idwbuff, idwbuff)
 
@@ -188,19 +190,11 @@ contains
             @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
-        if (surface_tension) then
-            ! This assumes that the color function advection equation is
-            ! the last equation. If this changes then this logic will
-            ! need updated
-            do l = adv_idx%end + 1, sys_size - 1
-                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
-            end do
-        else
-            do l = adv_idx%end + 1, sys_size
-                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
-            end do
+        num_eqns_after_adv = count((/surface_tension, cont_damage/))
 
-        end if
+        do l = adv_idx%end + 1, sys_size - num_eqns_after_adv
+            @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        end do
 
         @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 
@@ -226,6 +220,13 @@ contains
                 q_cons_qp%vf(c_idx)%sf
             !$acc enter data copyin(q_prim_qp%vf(c_idx)%sf)
             !$acc enter data attach(q_prim_qp%vf(c_idx)%sf)
+        end if
+
+        if (cont_damage) then
+            q_prim_qp%vf(damage_idx)%sf => &
+                q_cons_qp%vf(damage_idx)%sf
+            !$acc enter data copyin(q_prim_qp%vf(damage_idx)%sf)
+            !$acc enter data attach(q_prim_qp%vf(damage_idx)%sf)
         end if
 
         if (viscous) then
@@ -877,7 +878,7 @@ contains
             end do
         end if
 
-        ! Additional Physics and Source Temrs
+        ! Additional Physics and Source Terms
         ! Additions for acoustic_source
         if (acoustic_source) then
             call nvtxStartRange("RHS-ACOUSTIC-SRC")
@@ -888,7 +889,7 @@ contains
             call nvtxEndRange
         end if
 
-        ! Add bubles source term
+        ! Add bubbles source term
         if (bubbles_euler .and. (.not. adap_dt) .and. (.not. qbmm)) then
             call nvtxStartRange("RHS-BUBBLES-SRC")
             call s_compute_bubble_EE_source( &
@@ -905,7 +906,9 @@ contains
             call nvtxEndRange
         end if
 
-        ! END: Additional pphysics and source terms
+        if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, rhs_vf)
+
+        ! END: Additional physics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
             !$acc parallel loop collapse(4) gang vector default(present)

@@ -93,6 +93,7 @@ module m_global_parameters
     integer :: b_size                !< Number of components in the b tensor
     integer :: tensor_size           !< Number of components in the nonsymmetric tensor
     logical :: pre_stress            !< activate pre_stressed domain
+    logical :: cont_damage           !< continuum damage modeling
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
@@ -111,6 +112,7 @@ module m_global_parameters
     type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
     integer :: c_idx                               !< Index of the color function
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
+    integer :: damage_idx                          !< Index of damage state variable (D) for continuum damage model
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
     ! Stands for "InDices With BUFFer".
@@ -346,6 +348,7 @@ contains
         pre_stress = .false.
         b_size = dflt_int
         tensor_size = dflt_int
+        cont_damage = .false.
 
         mhd = .false.
         relativity = .false.
@@ -825,6 +828,11 @@ contains
             if (surface_tension) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
+            end if
+
+            if (cont_damage) then
+                damage_idx = sys_size + 1
+                sys_size = damage_idx
             end if
 
         end if

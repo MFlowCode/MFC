@@ -1,7 +1,7 @@
 # Flow visualization
 
 A post-processed database in Silo-HDF5 format can be visualized and analyzed using Paraview and VisIt.
-After the post-processing of simulation data (see section [Running](running.md#running-1)), a directory named `silo_hdf5` contains a silo-HDF5 database.
+After the post-processing of simulation data (see section [Running](running.md)), a directory named `silo_hdf5` contains a silo-HDF5 database.
 Here, `silo_hdf5/` includes a directory named `root/` that contains index files for flow field data at each saved time step.
 
 ### Visualizing with Paraview
@@ -38,7 +38,7 @@ For many cases, this step will require resizing the render view window.
 VisIt is an alternative open-source interactive parallel visualization and graphical analysis tool for viewing scientific data.
 Versions of VisIt after 2.6.0 have been confirmed to work with the MFC databases for some parallel environments.
 Nevertheless, installation and configuration of VisIt can be environment-dependent and are left to the user.
-Further remarks on parallel flow visualization, analysis, and processing of the MFC database using VisIt can also be found in [Coralic (2015)](references.md#Coralic15) and [Meng (2016)](references.md#Meng16).
+Further remarks on parallel flow visualization, analysis, and processing of the MFC database using VisIt can also be found in [Coralic (2015)](references.md) and [Meng (2016)](references.md).
 
 The user can launch VisIt and open the index files under `/silo_hdf5/root`.
 Once the database is loaded, flow field variables contained in the database can be added to the plot.
