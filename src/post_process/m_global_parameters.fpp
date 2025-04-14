@@ -112,6 +112,7 @@ module m_global_parameters
     logical :: elasticity      !< elasticity modeling, true for hyper or hypo
     integer :: b_size          !< Number of components in the b tensor
     integer :: tensor_size     !< Number of components in the nonsymmetric tensor
+    logical :: cont_damage     !< Continuum damage modeling
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     !> @}
 
@@ -134,6 +135,7 @@ module m_global_parameters
     type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
     integer :: c_idx                               !< Index of color function
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
+    integer :: damage_idx                          !< Index of damage state variable (D) for continuum damage model
     !> @}
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
@@ -363,6 +365,7 @@ contains
         elasticity = .false.
         b_size = dflt_int
         tensor_size = dflt_int
+        cont_damage = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -713,6 +716,13 @@ contains
             if (surface_tension) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
+            end if
+
+            if (cont_damage) then
+                damage_idx = sys_size + 1
+                sys_size = damage_idx
+            else
+                damage_idx = dflt_int
             end if
 
         end if

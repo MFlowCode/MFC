@@ -156,6 +156,7 @@ module m_global_parameters
     logical :: viscous       !< Viscous effects
     logical :: shear_stress  !< Shear stresses
     logical :: bulk_stress   !< Bulk stresses
+    logical :: cont_damage   !< Continuum damage modeling
 
     !$acc declare create(chemistry)
 
@@ -176,7 +177,7 @@ module m_global_parameters
         !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -241,6 +242,7 @@ module m_global_parameters
     integer :: tensor_size                             !< Number of elements in the full tensor plus one
     type(int_bounds_info) :: species_idx               !< Indexes of first & last concentration eqns.
     integer :: c_idx                                   !< Index of color function
+    integer :: damage_idx                              !< Index of damage state variable (D) for continuum damage model
     !> @}
 
     !$acc declare create(bub_idx)
@@ -487,6 +489,14 @@ module m_global_parameters
     logical :: powell !< Powell‐correction for div B = 0
     !$acc declare create(Bx0, powell)
 
+    !> @name Continuum damage model parameters
+    !> @{!
+    real(wp) :: tau_star        !< Stress threshold for continuum damage modeling
+    real(wp) :: cont_damage_s   !< Exponent s for continuum damage modeling
+    real(wp) :: alpha_bar       !< Damage rate factor for continuum damage modeling
+    !$acc declare create(tau_star, cont_damage_s, alpha_bar)
+    !> @}
+
 contains
 
     !> Assigns default values to the user inputs before reading
@@ -557,6 +567,7 @@ contains
         viscous = .false.
         shear_stress = .false.
         bulk_stress = .false.
+        cont_damage = .false.
 
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.
@@ -742,6 +753,12 @@ contains
         rkck_tolerance = dflt_real
         dt_max = dflt_real
 
+        ! Continuum damage model
+        tau_star = dflt_real
+        cont_damage_s = dflt_real
+        alpha_bar = dflt_real
+
+        ! MHD
         Bx0 = dflt_real
         powell = .false.
 
@@ -1082,6 +1099,11 @@ contains
                 sys_size = c_idx
             end if
 
+            if (cont_damage) then
+                damage_idx = sys_size + 1
+                sys_size = damage_idx
+            end if
+
         end if
 
         ! END: Volume Fraction Model
@@ -1200,6 +1222,8 @@ contains
         !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, B_idx, low_Mach)
 
         !$acc update device(Bx0, powell)
+
+        !$acc update device(cont_damage, tau_star, cont_damage_s, alpha_bar)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)
