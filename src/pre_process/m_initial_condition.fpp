@@ -150,8 +150,8 @@ contains
                     end do
                 end do
             end if
-        end if 
-        
+        end if
+
         ! Initial damage state is always zero
         if (cont_damage) then
             q_cons_vf(damage_idx)%sf = 0._wp

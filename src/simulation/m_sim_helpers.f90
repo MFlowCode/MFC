@@ -270,7 +270,7 @@ contains
 
     subroutine s_assign_default_bc_type(bc_type)
 
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
         bc_type(1, -1)%sf(:, :, :) = bc_x%beg
         bc_type(1, 1)%sf(:, :, :) = bc_x%end
