@@ -70,6 +70,26 @@ module m_derived_types
         type(scalar_field), allocatable, dimension(:) :: vf !< Vector field
     end type vector_field
 
+    !> Generic 3-component vector (e.g., spatial coordinates or field components)
+    !! Named _dt (derived types: x,y,z) to differentiate from t_vec3 (3-component vector)
+    type vec3_dt ! dt for derived types
+        real(wp) :: x
+        real(wp) :: y
+        real(wp) :: z
+    end type vec3_dt
+
+    !> Left and right Riemann states
+    type riemann_states
+        real(wp) :: L
+        real(wp) :: R
+    end type riemann_states
+
+    !> Left and right Riemann states for 3-component vectors
+    type riemann_states_vec3
+        real(wp) :: L(3)
+        real(wp) :: R(3)
+    end type riemann_states_vec3
+
     !> Integer bounds for variables
     type int_bounds_info
         integer :: beg
@@ -223,6 +243,9 @@ module m_derived_types
         !! the partial densities, density, velocity, pressure, volume fractions,
         !! specific heat ratio function and the liquid stiffness function.
 
+        real(wp) :: Bx, By, Bz !<
+        !! Magnetic field components; B%x is not used for 1D
+
         real(wp), dimension(6) :: tau_e !<
         !! Elastic stresses added to primitive variables if hypoelasticity = True
 
@@ -317,16 +340,9 @@ module m_derived_types
         real(wp) :: G
     end type physical_parameters
 
-    !> Derived type annexing the flow probe location
-    type probe_parameters
-        real(wp) :: x !< First coordinate location
-        real(wp) :: y !< Second coordinate location
-        real(wp) :: z !< Third coordinate location
-    end type probe_parameters
-
     type mpi_io_airfoil_ib_var
         integer, dimension(2) :: view
-        type(probe_parameters), allocatable, dimension(:) :: var
+        type(vec3_dt), allocatable, dimension(:) :: var
     end type mpi_io_airfoil_ib_var
 
     !> Derived type annexing integral regions

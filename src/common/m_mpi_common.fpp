@@ -18,6 +18,8 @@ module m_mpi_common
 
     use m_helper
 
+    use ieee_arithmetic
+
     use m_nvtx
 
     implicit none

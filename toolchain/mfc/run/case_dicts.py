@@ -22,6 +22,7 @@ class ParamType(Enum):
         return self.STR
 
 COMMON = {
+    'mhd': ParamType.LOG,
     'hypoelasticity': ParamType.LOG,
     'hyperelasticity': ParamType.LOG,
     'cyl_coord': ParamType.LOG,
@@ -56,7 +57,9 @@ COMMON = {
     'cfl_const_dt': ParamType.LOG,
     'chemistry': ParamType.LOG,
     'cantera_file': ParamType.STR,
-    'rkck_adap_dt': ParamType.LOG,
+    'rkck_adap_dt': ParamType.LOG, 
+    'Bx0': ParamType.REAL,
+    'relativity': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -162,6 +165,10 @@ for p_id in range(1, 10+1):
         PRE_PROCESS[f"patch_icpp({p_id})%a({real_attr})"] = ParamType.REAL
 
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
+
+    PRE_PROCESS[f"patch_icpp({p_id})%Bx"] = ParamType.REAL.analytic()
+    PRE_PROCESS[f"patch_icpp({p_id})%By"] = ParamType.REAL.analytic()
+    PRE_PROCESS[f"patch_icpp({p_id})%Bz"] = ParamType.REAL.analytic()
 
     for i in range(100):
         PRE_PROCESS[f"patch_icpp({p_id})%Y({i})"] = ParamType.REAL.analytic()
@@ -285,6 +292,7 @@ SIMULATION.update({
     'bubbles_lagrange': ParamType.LOG,
     'rkck_tolerance': ParamType.REAL,
     'num_bc_patches': ParamType.INT,
+    'powell': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
@@ -459,7 +467,7 @@ ALL.update(PRE_PROCESS)
 ALL.update(SIMULATION)
 ALL.update(POST_PROCESS)
 
-CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order", "num_fluids" ]
+CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order", "num_fluids", "mhd", "relativity" ]
 
 _properties = { k: v.value for k, v in ALL.items() }
 

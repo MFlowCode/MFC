@@ -145,6 +145,10 @@ contains
 
         real(wp) :: rhoYks(1:num_species) !< Temporary species mass fractions
 
+        real(wp) :: pres_mag
+
+        pres_mag = 0._wp
+
         T = dflt_T_guess
 
         t_step = 0
@@ -316,12 +320,26 @@ contains
                         else if (i == stress_idx%beg) then !tau_e
                             write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
                         else if (i == E_idx) then !p
+                            if (mhd) then
+                                pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(B_idx%beg)%sf(j, 0, 0)**2 + q_cons_vf(B_idx%beg + 1)%sf(j, 0, 0)**2)
+                            end if
+
                             call s_compute_pressure( &
                                 q_cons_vf(E_idx)%sf(j, 0, 0), &
                                 q_cons_vf(alf_idx)%sf(j, 0, 0), &
                                 0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2._wp)/rho, &
-                                pi_inf, gamma, rho, qv, rhoYks, pres, T)
+                                pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
                             write (2, FMT) x_cb(j), pres
+                        else if (mhd) then
+                            if (i == mom_idx%beg + 1) then ! v
+                                write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg + 1)%sf(j, 0, 0)/rho
+                            else if (i == mom_idx%beg + 2) then ! w
+                                write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg + 2)%sf(j, 0, 0)/rho
+                            else if (i == B_idx%beg) then ! By
+                                write (2, FMT) x_cb(j), q_cons_vf(B_idx%beg)%sf(j, 0, 0)/rho
+                            else if (i == B_idx%beg + 1) then ! Bz
+                                write (2, FMT) x_cb(j), q_cons_vf(B_idx%beg + 1)%sf(j, 0, 0)/rho
+                            end if
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles_euler) then
 
                             if (qbmm) then

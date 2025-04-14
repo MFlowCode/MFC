@@ -59,6 +59,8 @@ module m_rhs
 
     use m_chemistry
 
+    use m_mhd
+
     implicit none
 
     private; public :: s_initialize_rhs_module, &
@@ -203,9 +205,14 @@ contains
         @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 
         do l = 1, cont_idx%end
-            q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
-            !$acc enter data copyin(q_prim_qp%vf(l)%sf)
-            !$acc enter data attach(q_prim_qp%vf(l)%sf)
+            if (relativity) then
+                ! Cons and Prim densities are different for relativity
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            else
+                q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
+                !$acc enter data copyin(q_prim_qp%vf(l)%sf)
+                !$acc enter data attach(q_prim_qp%vf(l)%sf)
+            end if
         end do
 
         do l = adv_idx%beg, adv_idx%end
@@ -510,7 +517,7 @@ contains
                          & idwbuff(2)%beg:idwbuff(2)%end, &
                          & idwbuff(3)%beg:idwbuff(3)%end))
 
-                if (riemann_solver == 1) then
+                if (riemann_solver == 1 .or. riemann_solver == 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -540,7 +547,7 @@ contains
             @:ACC_SETUP_VFs(flux_n(i), flux_src_n(i), flux_gsrc_n(i))
 
             if (i == 1) then
-                if (riemann_solver /= 1) then
+                if (riemann_solver /= 1 .and. riemann_solver /= 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
                         !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
@@ -848,6 +855,10 @@ contains
             end if
             ! END: Additional physics and source terms
 
+            call nvtxStartRange("RHS-MHD")
+            if (mhd .and. powell) call s_compute_mhd_powell_rhs(q_prim_qp%vf, rhs_vf)
+            call nvtxEndRange
+
         end do
         ! END: Dimensional Splitting Loop
 
@@ -998,7 +1009,7 @@ contains
                 end do
             end if
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == 1 .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = advxb, advxe
                     do q = 0, p
@@ -1142,7 +1153,7 @@ contains
                 end do
             end if
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == 1 .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = advxb, advxe
                     do l = 0, p
@@ -1408,7 +1419,7 @@ contains
                     end if
                 end if
             else
-                if (riemann_solver == 1) then
+                if (riemann_solver == 1 .or. riemann_solver == 4) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
                         do k = 0, p
@@ -2101,8 +2112,14 @@ contains
         integer :: i, j, l
 
         do j = cont_idx%beg, cont_idx%end
-            !$acc exit data detach(q_prim_qp%vf(j)%sf)
-            nullify (q_prim_qp%vf(j)%sf)
+            if (relativity) then
+                ! Cons and Prim densities are different for relativity
+                @:DEALLOCATE(q_cons_qp%vf(j)%sf)
+                @:DEALLOCATE(q_prim_qp%vf(j)%sf)
+            else
+                !$acc exit data detach(q_prim_qp%vf(j)%sf)
+                nullify (q_prim_qp%vf(j)%sf)
+            end if
         end do
 
         do j = adv_idx%beg, adv_idx%end
@@ -2220,7 +2237,7 @@ contains
                     end do
                 end if
 
-                if (riemann_solver == 1) then
+                if (riemann_solver == 1 .or. riemann_solver == 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                     end do

@@ -80,6 +80,9 @@ module m_constants
     real(wp), parameter :: ERRCON = 1.89e-4_wp !< Limit to slightly increase dt when truncation error is between ERRCON and 1
     real(wp), parameter :: PGROW = -0.2_wp !< Factor to increase dt when truncation error is between ERRCON and 1
 
+    ! Relativity
+    integer, parameter :: relativity_cons_to_prim_max_iter = 100
+
     ! System constants
     integer, parameter :: CASE_FILE_ERROR_CODE = 22
 
