@@ -2,6 +2,8 @@
 
 n_ranks=12
 
+export TMPDIR=/storage/home/hcoda1/6/sbryngelson3/scratch/runner-tmp
+
 if [ "$job_device" == "gpu" ]; then
     n_ranks=$(nvidia-smi -L | wc -l)        # number of GPUs on node
     gpu_ids=$(seq -s ' ' 0 $(($n_ranks-1))) # 0,1,2,...,gpu_count-1
