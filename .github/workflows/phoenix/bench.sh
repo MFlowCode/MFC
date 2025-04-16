@@ -2,7 +2,14 @@
 
 n_ranks=12
 
-export TMPDIR=/storage/home/hcoda1/6/sbryngelson3/scratch/runner-tmp
+rand=""
+for i in {1..10}; do
+  rand="${rand}$((RANDOM % 10))"
+done
+TMPDIR=/tmp/$rand
+mkdir $TMPDIR
+chmod 777 $TMPDIR
+export TMPDIR=$TMPDIR
 
 if [ "$job_device" == "gpu" ]; then
     n_ranks=$(nvidia-smi -L | wc -l)        # number of GPUs on node
