@@ -21,11 +21,10 @@ module m_constants
     integer, parameter :: fourier_rings = 5                       !< Fourier filter ring limit
     integer, parameter :: num_fluids_max = 10                     !< Maximum number of fluids in the simulation
     integer, parameter :: num_probes_max = 10                     !< Maximum number of flow probes in the simulation
-    integer, parameter :: num_patches_max = 25
+    integer, parameter :: num_patches_max = 10
     integer, parameter :: num_bc_patches_max = 10
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
-    real(wp), parameter :: dflt_alf_factor = 10._wp
     integer, parameter :: gp_layers = 3 !< Number of ghost point layers for IBM
     real(wp), parameter :: capillary_cutoff = 1e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
     real(wp), parameter :: acoustic_spatial_support_width = 2.5_wp !< Spatial support width of acoustic source, used in s_source_spatial

@@ -15,9 +15,6 @@ module m_perturbation
     use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
 
     use m_boundary_common   ! Boundary conditions module
-    ! complex general matrix
-
-    use m_helper
 
     use ieee_arithmetic
 
@@ -30,8 +27,6 @@ module m_perturbation
     integer :: n_bc_skip ! Number of points skipped in the linear stability analysis due to the boundary condition
 
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_temp
-
-    ! real(wp) :: bcxb, bcxe, bcyb, bcye, bczb, bcze
 
 contains
 

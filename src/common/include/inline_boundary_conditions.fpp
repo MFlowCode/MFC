@@ -271,7 +271,7 @@
     end do
 #:enddef
 
-#:def COLOR_FUNC_BC(DEST, SRC)
+#:def COLOR_FUNC_EXTRAPOLATION(DEST, SRC)
     do i = 1, num_dims + 1
         do j = 1, buff_size
             c_divs(i)%sf(${DEST}$) = c_divs(i)%sf(${SRC}$)

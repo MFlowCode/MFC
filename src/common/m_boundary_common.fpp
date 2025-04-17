@@ -52,37 +52,29 @@ contains
 
     subroutine s_initialize_boundary_common_module()
 
-#ifdef MFC_PRE_PROCESS
-        allocate (bc_buffers(1:num_dims, -1:1))
-
-        allocate (bc_buffers(1, -1)%sf(1:sys_size, 0:n, 0:p))
-        allocate (bc_buffers(1, 1)%sf(1:sys_size, 0:n, 0:p))
-        if (n > 0) then
-            allocate (bc_buffers(2, -1)%sf(-buff_size:m + buff_size, 1:sys_size, 0:p))
-            allocate (bc_buffers(2, 1)%sf(-buff_size:m + buff_size, 1:sys_size, 0:p))
-            if (p > 0) then
-                allocate (bc_buffers(3, -1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 1:sys_size))
-                allocate (bc_buffers(3, 1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 1:sys_size))
-            end if
-        end if
-#endif
-
-#ifdef MFC_SIMULATION
         bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
 
         @:ALLOCATE(bc_buffers(1:num_dims, -1:1))
 
-        @:ALLOCATE(bc_buffers(1, -1)%sf(1:sys_size, 0:n, 0:p))
-        @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size, 0:n, 0:p))
-        @:ACC_SETUP_SFs(bc_buffers(1,-1), bc_buffers(1,1))
-        if (n > 0) then
-            @:ALLOCATE(bc_buffers(2,-1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-            @:ALLOCATE(bc_buffers(2,1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-            @:ACC_SETUP_SFs(bc_buffers(2,-1), bc_buffers(2,1))
-            if (p > 0) then
-                @:ALLOCATE(bc_buffers(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-                @:ALLOCATE(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-                @:ACC_SETUP_SFs(bc_buffers(3,-1), bc_buffers(3,1))
+#ifndef MFC_POST_PROCESS
+
+#ifdef MFC_PRE_PROCESS
+        if (save_bc) then
+#elif MFC_SIMULATION
+        if (read_bc) then
+#endif
+            @:ALLOCATE(bc_buffers(1, -1)%sf(1:sys_size, 0:n, 0:p))
+            @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size, 0:n, 0:p))
+            @:ACC_SETUP_SFs(bc_buffers(1,-1), bc_buffers(1,1))
+            if (n > 0) then
+                @:ALLOCATE(bc_buffers(2,-1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
+                @:ALLOCATE(bc_buffers(2,1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
+                @:ACC_SETUP_SFs(bc_buffers(2,-1), bc_buffers(2,1))
+                if (p > 0) then
+                    @:ALLOCATE(bc_buffers(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
+                    @:ALLOCATE(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
+                    @:ACC_SETUP_SFs(bc_buffers(3,-1), bc_buffers(3,1))
+                end if
             end if
         end if
 #endif
@@ -425,11 +417,11 @@ contains
             do l = 0, p
                 do k = 0, n
                     if (bc_type(1, -1)%sf(0, k, l) == -1) then
-                        ${COLOR_FUNC_BC("-j,k,l","m - (j-1),k,l")}$
+                        ${COLOR_FUNC_EXTRAPOLATION("-j,k,l","m - (j-1),k,l")}$
                     elseif (bc_type(1, -1)%sf(0, k, l) == -2) then
                         ${COLOR_FUNC_SLIP_WALL_BC(1,"-j,k,l","j-1,k,l")}$
                     else
-                        ${COLOR_FUNC_BC("-j,k,l","0,k,l")}$
+                        ${COLOR_FUNC_EXTRAPOLATION("-j,k,l","0,k,l")}$
                     end if
                 end do
             end do
@@ -442,11 +434,11 @@ contains
             do l = 0, p
                 do k = 0, n
                     if (bc_type(1, 1)%sf(0, k, l) == -1) then
-                        ${COLOR_FUNC_BC("m+j,k,l","j-1,k,l")}$
+                        ${COLOR_FUNC_EXTRAPOLATION("m+j,k,l","j-1,k,l")}$
                     elseif (bc_type(1, 1)%sf(0, k, l) == -2) then
                         ${COLOR_FUNC_SLIP_WALL_BC(1,"m+j,k,l","m - (j-1),k,l")}$
                     else
-                        ${COLOR_FUNC_BC("m+j,k,l","m,k,l")}$
+                        ${COLOR_FUNC_EXTRAPOLATION("m+j,k,l","m,k,l")}$
                     end if
                 end do
             end do
@@ -462,11 +454,11 @@ contains
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     if (bc_type(2, -1)%sf(k, 0, l) == -1) then
-                        ${COLOR_FUNC_BC("k,-j,l","k,n - (j-1),l")}$
+                        ${COLOR_FUNC_EXTRAPOLATION("k,-j,l","k,n - (j-1),l")}$
                     elseif (bc_type(2, -1)%sf(k, 0, l) == -2) then
                         ${COLOR_FUNC_SLIP_WALL_BC(2,"k,-j,l","k,j-1,l")}$
                     else
-                        ${COLOR_FUNC_BC("k,-j,l","k,0,l")}$
+                        ${COLOR_FUNC_EXTRAPOLATION("k,-j,l","k,0,l")}$
                     end if
                 end do
             end do
@@ -479,11 +471,11 @@ contains
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     if (bc_type(2, 1)%sf(k, 0, l) == -1) then
-                        ${COLOR_FUNC_BC("k,n+j,l","k,j-1,l")}$
+                        ${COLOR_FUNC_EXTRAPOLATION("k,n+j,l","k,j-1,l")}$
                     elseif (bc_type(2, 1)%sf(k, 0, l) == -2) then
                         ${COLOR_FUNC_SLIP_WALL_BC(2,"k,n+j,l","k,n - (j-1),l")}$
                     else
-                        ${COLOR_FUNC_BC("k,n+j,l","k,n,l")}$
+                        ${COLOR_FUNC_EXTRAPOLATION("k,n+j,l","k,n,l")}$
                     end if
                 end do
             end do
@@ -499,11 +491,11 @@ contains
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     if (bc_type(3, -1)%sf(k, l, 0) == -1) then
-                        ${COLOR_FUNC_BC("k,l,-j","k,l,p - (j-1)")}$
+                        ${COLOR_FUNC_EXTRAPOLATION("k,l,-j","k,l,p - (j-1)")}$
                     elseif (bc_type(3, -1)%sf(k, l, 0) == -2) then
                         ${COLOR_FUNC_SLIP_WALL_BC(3,"k,l,-j","k,l,j-1")}$
                     else
-                        ${COLOR_FUNC_BC("k,l,-j","k,l,0")}$
+                        ${COLOR_FUNC_EXTRAPOLATION("k,l,-j","k,l,0")}$
                     end if
                 end do
             end do
@@ -516,11 +508,11 @@ contains
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     if (bc_type(3, 1)%sf(k, l, 0) == -1) then
-                        ${COLOR_FUNC_BC("k,l,p+j","k,l,j-1")}$
+                        ${COLOR_FUNC_EXTRAPOLATION("k,l,p+j","k,l,j-1")}$
                     elseif (bc_type(3, 1)%sf(k, l, 0) == -2) then
                         ${COLOR_FUNC_SLIP_WALL_BC(3,"k,l,p+j","k,l,p - (j-1)")}$
                     else
-                        ${COLOR_FUNC_BC("k,l,p+j","k,l,p")}$
+                        ${COLOR_FUNC_EXTRAPOLATION("k,l,p+j","k,l,p")}$
                     end if
                 end do
             end do
@@ -564,18 +556,27 @@ contains
 
     subroutine s_finalize_boundary_common_module()
 
-        deallocate (bc_buffers(1, -1)%sf)
-        deallocate (bc_buffers(1, 1)%sf)
-        if (n > 0) then
-            deallocate (bc_buffers(2, -1)%sf)
-            deallocate (bc_buffers(2, 1)%sf)
-            if (p > 0) then
-                deallocate (bc_buffers(3, -1)%sf)
-                deallocate (bc_buffers(3, 1)%sf)
+#ifndef MFC_POST_PROCESS
+
+#ifdef MFC_PRE_PROCESS
+        if (save_bc) then
+#elif MFC_SIMULATION
+        if (read_bc) then
+#endif
+            deallocate (bc_buffers(1, -1)%sf)
+            deallocate (bc_buffers(1, 1)%sf)
+            if (n > 0) then
+                deallocate (bc_buffers(2, -1)%sf)
+                deallocate (bc_buffers(2, 1)%sf)
+                if (p > 0) then
+                    deallocate (bc_buffers(3, -1)%sf)
+                    deallocate (bc_buffers(3, 1)%sf)
+                end if
             end if
         end if
 
         deallocate (bc_buffers)
+#endif
 
     end subroutine s_finalize_boundary_common_module
 

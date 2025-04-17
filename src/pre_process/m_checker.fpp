@@ -201,8 +201,10 @@ contains
     subroutine s_check_bc
 
         integer :: i
+        character(len=5) :: iStr !< for int to string conversion
 
-        @:PROHIBIT(num_bc_patches > num_bc_patches_max, "num_bc_patches must be <= 10")
+        call s_int_to_str(i, iStr)
+        @:PROHIBIT(num_bc_patches > num_bc_patches_max, "num_bc_patches must be <= "//trim(iStr))
 
         do i = 1, num_bc_patches
 

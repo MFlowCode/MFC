@@ -50,22 +50,39 @@ contains
     subroutine s_initialize_mpi_common_module
 
 #ifdef MFC_MPI
-
-#ifdef MFC_PRE_PROCESS
-        if (n > 0) then
-            if (p > 0) then
-
-                halo_size = -1 + buff_size*sys_size* &
-                                        & (m + 2*buff_size + 1)* &
-                                        & (n + 2*buff_size + 1)* &
-                                        & (p + 2*buff_size + 1)/ &
-                                        & (min(m, n, p) + 2*buff_size + 1)
+        ! Allocating q_prims_buff_send/recv and ib_buff_send/recv. Please note that
+        ! for the sake of simplicity, both variables are provided sufficient
+        ! storage to hold the largest buffer in the computational domain.
+        if (qbmm .and. .not. polytropic) then
+            if (n > 0) then
+                if (p > 0) then
+                    halo_size = -1 + buff_size*(sys_size + 2*nb*4)* &
+                                             & (m + 2*buff_size + 1)* &
+                                             & (n + 2*buff_size + 1)* &
+                                             & (p + 2*buff_size + 1)/ &
+                                             & (min(m, n, p) + 2*buff_size + 1)
+                else
+                    halo_size = -1 + buff_size*(sys_size + 2*nb*4)* &
+                                             & (max(m, n) + 2*buff_size + 1)
+                end if
             else
-                halo_size = -1 + buff_size*sys_size* &
-                                        & (max(m, n) + 2*buff_size + 1)
+                halo_size = -1 + buff_size*(sys_size + 2*nb*4)
             end if
         else
-            halo_size = -1 + buff_size*sys_size
+            if (n > 0) then
+                if (p > 0) then
+                    halo_size = -1 + buff_size*sys_size* &
+                                            & (m + 2*buff_size + 1)* &
+                                            & (n + 2*buff_size + 1)* &
+                                            & (p + 2*buff_size + 1)/ &
+                                            & (min(m, n, p) + 2*buff_size + 1)
+                else
+                    halo_size = -1 + buff_size*sys_size* &
+                                            & (max(m, n) + 2*buff_size + 1)
+                end if
+            else
+                halo_size = -1 + buff_size*sys_size
+            end if
         end if
 
         v_size = sys_size
@@ -73,53 +90,6 @@ contains
         allocate (q_prims_buff_send(0:halo_size))
 
         allocate (q_prims_buff_recv(0:ubound(q_prims_buff_send, 1)))
-#endif
-
-        ! Allocating q_prims_buff_send/recv and ib_buff_send/recv. Please note that
-        ! for the sake of simplicity, both variables are provided sufficient
-        ! storage to hold the largest buffer in the computational domain.
-#ifdef MFC_SIMULATION
-        if (qbmm .and. .not. polytropic) then
-            if (n > 0) then
-                if (p > 0) then
-                    @:ALLOCATE(q_prims_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)* &
-                                             & (m + 2*buff_size + 1)* &
-                                             & (n + 2*buff_size + 1)* &
-                                             & (p + 2*buff_size + 1)/ &
-                                             & (min(m, n, p) + 2*buff_size + 1)))
-                else
-                    @:ALLOCATE(q_prims_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)* &
-                                             & (max(m, n) + 2*buff_size + 1)))
-                end if
-            else
-                @:ALLOCATE(q_prims_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)))
-            end if
-
-            @:ALLOCATE(q_prims_buff_recv(0:ubound(q_prims_buff_send, 1)))
-
-            v_size = sys_size + 2*nb*4
-        else
-            if (n > 0) then
-                if (p > 0) then
-                    @:ALLOCATE(q_prims_buff_send(0:-1 + buff_size*sys_size* &
-                                             & (m + 2*buff_size + 1)* &
-                                             & (n + 2*buff_size + 1)* &
-                                             & (p + 2*buff_size + 1)/ &
-                                             & (min(m, n, p) + 2*buff_size + 1)))
-                else
-                    @:ALLOCATE(q_prims_buff_send(0:-1 + buff_size*sys_size* &
-                                             & (max(m, n) + 2*buff_size + 1)))
-                end if
-            else
-                @:ALLOCATE(q_prims_buff_send(0:-1 + buff_size*sys_size))
-            end if
-
-            @:ALLOCATE(q_prims_buff_recv(0:ubound(q_prims_buff_send, 1)))
-
-            v_size = sys_size
-        end if
-#endif
-
 #endif
 
     end subroutine s_initialize_mpi_common_module
