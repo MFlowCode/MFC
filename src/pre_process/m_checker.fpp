@@ -203,7 +203,7 @@ contains
         integer :: i
         character(len=5) :: iStr !< for int to string conversion
 
-        call s_int_to_str(i, iStr)
+        call s_int_to_str(num_bc_patches_max, iStr)
         @:PROHIBIT(num_bc_patches > num_bc_patches_max, "num_bc_patches must be <= "//trim(iStr))
 
         do i = 1, num_bc_patches
