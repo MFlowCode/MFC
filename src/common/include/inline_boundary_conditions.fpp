@@ -12,7 +12,8 @@
             q_prim_vf(i)%sf(${DEST}$) = q_prim_vf(i)%sf(${SRC}$)
         end do
 
-        q_prim_vf(i)%sf(${DEST}$) = -q_prim_vf(i)%sf(${SRC}$)
+        q_prim_vf(momxb + ${DIR}$-1)%sf(${DEST}$) = &
+            -q_prim_vf(momxb + ${DIR}$-1)%sf(${SRC}$)
 
         do i = momxb + ${DIR}$, sys_size
             q_prim_vf(i)%sf(${DEST}$) = q_prim_vf(i)%sf(${SRC}$)
