@@ -196,7 +196,7 @@ contains
             end do
 
             if (surface_tension) then
-                q_prim_vf(c_idx)%sf(j,k,l) = c_IP
+                q_prim_vf(c_idx)%sf(j, k, l) = c_IP
             end if
 
             if (model_eqns /= 4) then
@@ -241,7 +241,7 @@ contains
 
             ! Set color function
             if (surface_tension) then
-                q_cons_vf(c_idx)%sf(j,k,l) = c_IP
+                q_cons_vf(c_idx)%sf(j, k, l) = c_IP
             end if
 
             ! Set Energy
@@ -320,7 +320,7 @@ contains
             end do
 
             if (surface_tension) then
-                q_prim_vf(c_idx)%sf(j,k,l) = c_IP
+                q_prim_vf(c_idx)%sf(j, k, l) = c_IP
             end if
 
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
@@ -820,7 +820,7 @@ contains
                     end do
 
                     if (surface_tension) then
-                        c_IP = c_IP + coeff * q_prim_vf(c_idx)%sf(i,j,k)
+                        c_IP = c_IP + coeff*q_prim_vf(c_idx)%sf(i, j, k)
                     end if
 
                     if (bubbles_euler .and. .not. qbmm) then
