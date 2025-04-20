@@ -88,7 +88,6 @@ contains
                 real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
 
                 integer :: i, j, k, l, q
-
                 !< x-direction
                 if (bcxb >= 0) then
                     call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 1, -1)
@@ -96,19 +95,20 @@ contains
                     !$acc parallel loop collapse(2) gang vector default(present)
                     do l = 0, p
                         do k = 0, n
+                            print *, bc_type(1, -1)%sf(0, k, l)
                             if (bc_type(1, -1)%sf(0, k, l) >= -13 .and. bc_type(1, -1)%sf(0, k, l) <= -3) then
-                                ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("-j,k,l","0,k,l")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/-j, k, l/), (/0,k,l/))
                             elseif (bc_type(1, -1)%sf(0, k, l) == -2) then
-                                ${PRIM_SYMMETRY_BC(1,"-j,k,l","j-1,k,l")}$
+                                call s_symmetry(q_prim_vf, 1, (/-j,k,l/), (/j-1,k,l/))
                             elseif (bc_type(1, -1)%sf(0, k, l) == -1) then
-                                ${PRIM_PERIODIC_BC("-j,k,l","m-(j-1),k,l")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/-j, k, l/), (/m - (j - 1), k, l/))
                             elseif (bc_type(1, -1)%sf(0, k, l) == -15) then
                                 ${PRIM_SLIP_WALL_BC("x","L")}$
                             elseif (bc_type(1, -1)%sf(0, k, l) == -16) then
                                 ${PRIM_NO_SLIP_WALL_BC("x","L")}$
                             elseif (bc_type(1, -1)%sf(0, k, l) == -17) then
 #ifdef MFC_PRE_PROCESS
-                                ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("-j,k,l","0,k,l")}$
+                                 call s_ghost_cell_periodic(q_prim_vf, (/-j, k, l/), (/0,k,l/))
 #else
                                 ${PRIM_DIRICHLET_BC(1,-1,"-j,k,l","i,k,l")}$
 #endif
@@ -124,18 +124,18 @@ contains
                     do l = 0, p
                         do k = 0, n
                             if (bc_type(1, 1)%sf(0, k, l) >= -13 .and. bc_type(1, 1)%sf(0, k, l) <= -3) then
-                                ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("m+j,k,l","m,k,l")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/m+j, k, l/), (/m,k,l/))
                             elseif (bc_type(1, 1)%sf(0, k, l) == -2) then
-                                ${PRIM_SYMMETRY_BC(1,"m+j,k,l","m - (j-1),k,l")}$
+                                call s_symmetry(q_prim_vf, 1, (/m+j,k,l/), (/m - (j-1),k,l/))
                             elseif (bc_type(1, 1)%sf(0, k, l) == -1) then
-                                ${PRIM_PERIODIC_BC("m+j,k,l","j-1,k,l")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/m+j, k, l/), (/j - 1, k, l/))
                             elseif (bc_type(1, 1)%sf(0, k, l) == -15) then
                                 ${PRIM_SLIP_WALL_BC("x","R")}$
                             elseif (bc_type(1, 1)%sf(0, k, l) == -16) then
                                 ${PRIM_NO_SLIP_WALL_BC("x","R")}$
                             elseif (bc_type(1, 1)%sf(0, k, l) == -17) then
 #ifdef MFC_PRE_PROCESS
-                                ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("m+j,k,l","m,k,l")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/m+j, k, l/), (/m,k,l/))
 #else
                                 ${PRIM_DIRICHLET_BC(1,1,"m+j,k,l","i,k,l")}$
 #endif
@@ -231,18 +231,18 @@ contains
                     do l = 0, p
                         do k = -buff_size, m + buff_size
                             if (bc_type(2, -1)%sf(k, 0, l) >= -13 .and. bc_type(2, -1)%sf(k, 0, l) <= -3) then
-                                ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,-j,l","k,0,l")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/k, -j, l/), (/k,0,l/))
                             elseif (bc_type(2, -1)%sf(k, 0, l) == -2) then
-                                ${PRIM_SYMMETRY_BC(2,"k,-j,l","k,j-1,l")}$
+                                call s_symmetry(q_prim_vf, 2, (/k,-j,l/), (/k,j-1,l/))
                             elseif (bc_type(2, -1)%sf(k, 0, l) == -1) then
-                                ${PRIM_PERIODIC_BC("k,-j,l","k,n-(j-1),l")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/k, -j, l/), (/k, n - (j - 1), l/))
                             elseif (bc_type(2, -1)%sf(k, 0, l) == -15) then
                                 ${PRIM_SLIP_WALL_BC("y","L")}$
                             elseif (bc_type(2, -1)%sf(k, 0, l) == -16) then
                                 ${PRIM_NO_SLIP_WALL_BC("y","L")}$
                             elseif (bc_type(2, -1)%sf(k, 0, l) == -17) then
 #ifdef MFC_PRE_PROCESS
-                                ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,-j,l","k,0,l")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/k, -j, l/), (/k,0,l/))
 #else
                                 ${PRIM_DIRICHLET_BC(2,-1,"k,-j,l","k,i,l")}$
 #endif
@@ -258,18 +258,18 @@ contains
                     do l = 0, p
                         do k = -buff_size, m + buff_size
                             if (bc_type(2, 1)%sf(k, 0, l) >= -13 .and. bc_type(2, 1)%sf(k, 0, l) <= -3) then
-                                ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,n+j,l","k,n,l")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/k, n+j, l/), (/k,n,l/))
                             elseif (bc_type(2, 1)%sf(k, 0, l) == -2) then
-                                ${PRIM_SYMMETRY_BC(2,"k,n+j,l","k,n - (j-1),l")}$
+                                call s_symmetry(q_prim_vf, 2, (/k,n+j,l/), (/k,n - (j-1),l/))
                             elseif (bc_type(2, 1)%sf(k, 0, l) == -1) then
-                                ${PRIM_PERIODIC_BC("k,n+j,l","k,j-1,l")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/k, n+j, l/), (/k, j - 1, l/))
                             elseif (bc_type(2, 1)%sf(k, 0, l) == -15) then
                                 ${PRIM_SLIP_WALL_BC("y","R")}$
                             elseif (bc_type(2, 1)%sf(k, 0, l) == -16) then
                                 ${PRIM_NO_SLIP_WALL_BC("y","R")}$
                             elseif (bc_type(2, 1)%sf(k, 0, l) == -17) then
 #ifdef FMC_PRE_PROCESS
-                                ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,n+j,l","k,n,l")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/k, n+j, l/), (/k,n,l/))
 #else
                                 ${PRIM_DIRICHLET_BC(2,1,"k,n+j,l","k,i,l")}$
 #endif
@@ -320,18 +320,18 @@ contains
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
                             if (bc_type(3, -1)%sf(k, l, 0) >= -13 .and. bc_type(3, -1)%sf(k, l, 0) <= -3) then
-                                ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,l,-j","k,l,0")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/k, l, -j/), (/k,l,0/))
                             elseif (bc_type(3, -1)%sf(k, l, 0) == -2) then
-                                ${PRIM_SYMMETRY_BC(3,"k,l,-j","k,l,j-1")}$
+                                call s_symmetry(q_prim_vf, 3, (/k,l,-j/), (/k,l,j-1/))
                             elseif (bc_type(3, -1)%sf(k, l, 0) == -1) then
-                                ${PRIM_PERIODIC_BC("k,l,-j","k,l,p-(j-1)")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/k, l, -j/), (/k, l, p-(j-1)/))
                             elseif (bc_type(3, -1)%sf(k, l, 0) == -15) then
                                 ${PRIM_SLIP_WALL_BC("z","L")}$
                             elseif (bc_type(3, -1)%sf(k, l, 0) == -16) then
                                 ${PRIM_NO_SLIP_WALL_BC("z","L")}$
                             elseif (bc_type(3, -1)%sf(k, l, 0) == -17) then
 #ifdef MFC_PRE_PROCESS
-                                ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,l,-j","k,l,0")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/k, l, -j/), (/k,l,0/))
 #else
                                 ${PRIM_DIRICHLET_BC(3,-1,"k,l,-j","k,l,i")}$
 #endif
@@ -347,18 +347,18 @@ contains
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
                             if (bc_type(3, 1)%sf(k, l, 0) >= -13 .and. bc_type(3, 1)%sf(k, l, 0) <= -3) then
-                                ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,l,p+j","k,l,p")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/k, l, p+j/), (/k,l,p/))
                             elseif (bc_type(3, 1)%sf(k, l, 0) == -2) then
-                                ${PRIM_SYMMETRY_BC(3,"k,l,p+j","k,l,p - (j-1)")}$
+                                call s_symmetry(q_prim_vf, 3, (/k,l,p+j/), (/k,l,p - (j-1)/))
                             elseif (bc_type(3, 1)%sf(k, l, 0) == -1) then
-                                ${PRIM_PERIODIC_BC("k,l,p+j","k,l,j-1")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/k, l, p+j/), (/k, l, j-1/))
                             elseif (bc_type(3, 1)%sf(k, l, 0) == -15) then
                                 ${PRIM_SLIP_WALL_BC("z","R")}$
                             elseif (bc_type(3, 1)%sf(k, l, 0) == -16) then
                                 ${PRIM_NO_SLIP_WALL_BC("z","R")}$
                             elseif (bc_type(3, 1)%sf(k, l, 0) == -17) then
 #ifdef MFC_PRE_PROCESS
-                                ${PRIM_GHOST_CELL_EXTRAPOLATION_BC("k,l,p+j","k,l,p")}$
+                                call s_ghost_cell_periodic(q_prim_vf, (/k, l, p+j/), (/k,l,p/))
 #else
                                 ${PRIM_DIRICHLET_BC(3,1,"k,l,p+j","k,l,i")}$
 #endif
@@ -401,6 +401,56 @@ contains
 
             end subroutine s_populate_variables_buffers
 
+            subroutine s_ghost_cell_periodic(q_prim_vf, dest, src)
+                type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+                integer, dimension(3), intent(in) :: dest, src
+            
+                integer :: i, j
+            
+                do i = 1, sys_size
+                    do j = 1, buff_size
+                        q_prim_vf(i)%sf(dest(1), dest(2), dest(3)) = q_prim_vf(i)%sf(src(1), src(2), src(3))
+                    end do
+                end do
+            end subroutine s_ghost_cell_periodic
+
+            subroutine s_symmetry(q_prim_vf, dir, dest, src)
+                type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+                integer, intent(in) :: dir
+                integer, dimension(3), intent(in) :: dest, src
+
+                integer :: i, j
+
+                do j = 1, buff_size
+                    do i = 1, momxb + dir-2
+                        q_prim_vf(i)%sf(dest(1), dest(2), dest(3)) = q_prim_vf(i)%sf(src(1), src(2), src(3))
+                    end do
+            
+                    q_prim_vf(momxb + dir-1)%sf(dest(1), dest(2), dest(3)) = &
+                        -q_prim_vf(momxb + dir-1)%sf(src(1), src(2), src(3))
+            
+                    do i = momxb + dir, sys_size
+                        q_prim_vf(i)%sf(dest(1), dest(2), dest(3)) = q_prim_vf(i)%sf(src(1), src(2), src(3))
+                    end do
+            
+                    if (elasticity) then
+                        do i = 1, shear_BC_flip_num
+                            q_prim_vf(shear_BC_flip_indices(dir, i))%sf(dest(1), dest(2), dest(3)) = &
+                                -q_prim_vf(shear_BC_flip_indices(dir, i))%sf(src(1), src(2), src(3))
+                        end do
+                    end if
+            
+                    if (hyperelasticity) then
+                        q_prim_vf(xibeg + dir-1)%sf(dest(1), dest(2), dest(3)) = &
+                            -q_prim_vf(xibeg + dir-1)%sf(src(1), src(2), src(3))
+                    end if
+                end do
+
+            end subroutine s_symmetry
+            
+
+
+            
 #ifdef MFC_SIMULATION
             subroutine s_populate_capillary_buffers(c_divs, bc_type)
 
