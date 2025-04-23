@@ -18,8 +18,7 @@
 #SBATCH --qos=${quality_of_service}
 % endif
 % if gpu:
-#SBATCH --gres=gpu:V100:${tasks_per_node}
-#SBATCH --mem-per-gpu=16G\
+#SBATCH -G${tasks_per_node}
 % endif
 % if email:
 #SBATCH --mail-user=${email}
