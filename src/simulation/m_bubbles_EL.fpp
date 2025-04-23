@@ -258,6 +258,8 @@ contains
             call s_restart_bubbles(bub_id, save_count)
         end if
 
+        if (bub_id == 0) call s_mpi_abort('No bubbles in the domain. Check input/lag_bubbles.dat')
+
         print *, " Lagrange bubbles running, in proc", proc_rank, "number:", bub_id, "/", id
 
         !$acc update device(bubbles_lagrange, lag_params)
@@ -552,6 +554,8 @@ contains
         if (bubble_model == 2) then
             !$acc parallel loop gang vector default(present) private(k, myalpha_rho, myalpha, Re, cell) copyin(stage)
             do k = 1, nBubs
+                cell = -buff_size
+                call s_locate_cell(mtn_pos(k, 1:3, 1), cell, mtn_s(k, 1:3, 1))
                 ! Keller-Miksis model
 
                 ! Current bubble state
@@ -600,25 +604,41 @@ contains
                 gas_dpdt(k, stage) = fpbdt
                 intfc_draddt(k, stage) = fV
 
+                !$acc loop seq
+                do l = 1, num_dims
+                    mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,1:3,1), cell, l, q_prim_vf)
+                    mtn_dveldt(k, l, stage) = 0._wp
+                end do
             end do
         else
-            if (proc_rank == 0) print *, 'WARNING: Lagrange bubbles work with Keller Miksis model!', &
-                ' Deactivating radial motion.'
+            !if (proc_rank == 0) print *, 'WARNING: Lagrange bubbles work with Keller Miksis model!', &
+                !' Deactivating radial motion.'
             !$acc parallel loop gang vector default(present) private(k) copyin(stage)
             do k = 1, nBubs
+                cell = -buff_size
+                call s_locate_cell(mtn_pos(k, 1:3, 1), cell, mtn_s(k, 1:3, 1))
+
                 intfc_dveldt(k, stage) = 0._wp
                 intfc_draddt(k, stage) = 0._wp
+
+                !$acc loop seq
+                do l = 1, num_dims
+                    mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,1:3,1),cell, l, q_prim_vf)
+                    mtn_dveldt(k, l, stage) = 0._wp
+                end do
             end do
         end if
 
         ! Bubbles remain in a fixed position
+#if 0
         !$acc parallel loop collapse(2) gang vector default(present) private(k) copyin(stage)
         do k = 1, nBubs
             do l = 1, 3
-                mtn_dposdt(k, l, stage) = 0._wp
+                mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_ps(k,:,1), l, q_prim_vf)
                 mtn_dveldt(k, l, stage) = 0._wp
             end do
         end do
+#endif
 
         call nvtxEndRange
 
