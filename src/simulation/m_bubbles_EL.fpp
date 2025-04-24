@@ -613,7 +613,7 @@ contains
         else
             !if (proc_rank == 0) print *, 'WARNING: Lagrange bubbles work with Keller Miksis model!', &
                 !' Deactivating radial motion.'
-            !$acc parallel loop gang vector default(present) private(k) copyin(stage)
+            !$acc parallel loop gang vector default(present) private(k, cell) copyin(stage)
             do k = 1, nBubs
                 cell = -buff_size
                 call s_locate_cell(mtn_pos(k, 1:3, 1), cell, mtn_s(k, 1:3, 1))

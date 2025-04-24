@@ -1181,6 +1181,8 @@ contains
 
         end do
 
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(6)%vf, dt)
+
         !> Update values
         mytime = mytime + dt_did
         call s_update_rkck(q_cons_ts)
