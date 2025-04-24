@@ -144,7 +144,7 @@ contains
             sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
             n_start_old, surface_tension, hyperelasticity, pre_stress, &
             rkck_adap_dt, elliptic_smoothing, elliptic_smoothing_iters, &
-            viscous, bubbles_lagrange, Bx0, relativity, cont_damage
+            viscous, bubbles_lagrange, Bx0, relativity, cont_damage, hyper_cleaning
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'

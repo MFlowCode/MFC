@@ -1440,6 +1440,11 @@ contains
                     tmp = damage_state
                     call s_mpi_allreduce_sum(tmp, damage_state)
                 end if
+
+                ! if (hyper_cleaning) then
+                !     tmp = 0._wp
+                !     call s_mpi_allreduce_sum(tmp, tmp) ! TODO
+                ! end if
             end if
             if (proc_rank == 0) then
                 if (n == 0) then

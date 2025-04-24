@@ -157,6 +157,7 @@ module m_global_parameters
     logical :: shear_stress  !< Shear stresses
     logical :: bulk_stress   !< Bulk stresses
     logical :: cont_damage   !< Continuum damage modeling
+    logical :: hyper_cleaning !< Hyperbolic cleaning for MHD for divB=0
 
     !$acc declare create(chemistry)
 
@@ -177,7 +178,7 @@ module m_global_parameters
         !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage, hyper_cleaning)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -243,6 +244,7 @@ module m_global_parameters
     type(int_bounds_info) :: species_idx               !< Indexes of first & last concentration eqns.
     integer :: c_idx                                   !< Index of color function
     integer :: damage_idx                              !< Index of damage state variable (D) for continuum damage model
+    integer :: psi_idx                                 !< Index of hyperbolic cleaning state variable for MHD
     !> @}
 
     !$acc declare create(bub_idx)
@@ -497,6 +499,13 @@ module m_global_parameters
     !$acc declare create(tau_star, cont_damage_s, alpha_bar)
     !> @}
 
+    !> @name MHD Hyperbolic cleaning parameters
+    !> @{!
+    real(wp) :: hyper_cleaning_speed    !< Hyperbolic cleaning wave speed (c_h)
+    real(wp) :: hyper_cleaning_tau      !< Hyperbolic cleaning tau
+    !$acc declare create(hyper_cleaning_speed, hyper_cleaning_tau)
+    !> @}
+
 contains
 
     !> Assigns default values to the user inputs before reading
@@ -568,6 +577,7 @@ contains
         shear_stress = .false.
         bulk_stress = .false.
         cont_damage = .false.
+        hyper_cleaning = .false.
 
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.
@@ -761,6 +771,8 @@ contains
         ! MHD
         Bx0 = dflt_real
         powell = .false.
+        hyper_cleaning_speed = dflt_real
+        hyper_cleaning_tau = dflt_real
 
         #:if not MFC_CASE_OPTIMIZATION
             mhd = .false.
@@ -1104,6 +1116,11 @@ contains
                 sys_size = damage_idx
             end if
 
+            if (hyper_cleaning) then
+                psi_idx = sys_size + 1
+                sys_size = psi_idx
+            end if
+
         end if
 
         ! END: Volume Fraction Model
@@ -1224,6 +1241,8 @@ contains
         !$acc update device(Bx0, powell)
 
         !$acc update device(cont_damage, tau_star, cont_damage_s, alpha_bar)
+
+        !$acc update device(hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)

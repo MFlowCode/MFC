@@ -17,9 +17,10 @@ module m_mhd
 
     implicit none
 
-    private; public :: s_initialize_mhd_powell_module, &
- s_finalize_mhd_powell_module, &
- s_compute_mhd_powell_rhs
+    private; public :: s_initialize_mhd_clean_module, &
+ s_finalize_mhd_clean_module, &
+ s_compute_mhd_powell_rhs, &
+ s_compute_mhd_hyper_cleaning_rhs
 
     real(wp), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
     real(wp), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
@@ -33,7 +34,7 @@ module m_mhd
 
 contains
 
-    subroutine s_initialize_mhd_powell_module
+    subroutine s_initialize_mhd_clean_module
 
         integer :: i, k, r
 
@@ -62,7 +63,7 @@ contains
             !$acc update device(fd_coeff_z_h)
         end if
 
-    end subroutine s_initialize_mhd_powell_module
+    end subroutine s_initialize_mhd_clean_module
 
     !>  Compute the Powell source term to correct the magnetic field divergence.
         !!      The Powell source term is:
@@ -136,7 +137,79 @@ contains
 
     end subroutine s_compute_mhd_powell_rhs
 
-    subroutine s_finalize_mhd_powell_module
+    subroutine s_compute_mhd_hyper_cleaning_rhs(q_prim_vf, rhs_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+
+        integer :: k, l, q, r
+        real(wp) :: divB
+        real(wp) :: dpsi_dx, dpsi_dy, dpsi_dz
+
+        !$acc parallel loop collapse(3) gang vector default(present)    &
+        !$acc private(divB,dpsi_dx,dpsi_dy,dpsi_dz)
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+
+                    !— compute ∇·B —
+                    divB = 0._wp
+                    !$acc loop seq
+                    do r = -fd_number, fd_number
+                        divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                    end do
+                    !$acc loop seq
+                    do r = -fd_number, fd_number
+                        divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                    end do
+                    if (p > 0) then
+                        !$acc loop seq
+                        do r = -fd_number, fd_number
+                            divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
+                        end do
+                    end if
+
+                    !— compute ∂xψ, ∂yψ, (and ∂zψ if 3D) —
+                    dpsi_dx = 0._wp
+                    !$acc loop seq
+                    do r = -fd_number, fd_number
+                        dpsi_dx = dpsi_dx + q_prim_vf(psi_idx)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                    end do
+
+                    dpsi_dy = 0._wp
+                    !$acc loop seq
+                    do r = -fd_number, fd_number
+                        dpsi_dy = dpsi_dy + q_prim_vf(psi_idx)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                    end do
+
+                    dpsi_dz = 0._wp
+                    if (p > 0) then
+                        !$acc loop seq
+                        do r = -fd_number, fd_number
+                            dpsi_dz = dpsi_dz + q_prim_vf(psi_idx)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
+                        end do
+                    end if
+
+                    !— inject into B-components: –∇ψ —
+                    rhs_vf(B_idx%beg)%sf(k, l, q) = rhs_vf(B_idx%beg)%sf(k, l, q) - dpsi_dx
+                    rhs_vf(B_idx%beg + 1)%sf(k, l, q) = rhs_vf(B_idx%beg + 1)%sf(k, l, q) - dpsi_dy
+                    if (p > 0) then
+                        rhs_vf(B_idx%beg + 2)%sf(k, l, q) = rhs_vf(B_idx%beg + 2)%sf(k, l, q) - dpsi_dz
+                    end if
+
+                    !— ψ-equation: –c_h^2 ∇·B  and  –ψ/τ —
+                    rhs_vf(psi_idx)%sf(k, l, q) = rhs_vf(psi_idx)%sf(k, l, q) &
+                                                  - hyper_cleaning_speed**2*divB &
+                                                  - q_prim_vf(psi_idx)%sf(k, l, q)/hyper_cleaning_tau
+
+                end do
+            end do
+        end do
+        !$acc end parallel loop
+
+    end subroutine s_compute_mhd_hyper_cleaning_rhs
+
+    subroutine s_finalize_mhd_clean_module
 
         @:DEALLOCATE(du_dx, dv_dx, dw_dx)
         @:DEALLOCATE(fd_coeff_x_h)
@@ -147,6 +220,6 @@ contains
             @:DEALLOCATE(fd_coeff_z_h)
         end if
 
-    end subroutine s_finalize_mhd_powell_module
+    end subroutine s_finalize_mhd_clean_module
 
 end module m_mhd

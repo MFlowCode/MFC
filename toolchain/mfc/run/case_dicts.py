@@ -61,6 +61,7 @@ COMMON = {
     'Bx0': ParamType.REAL,
     'relativity': ParamType.LOG,
     'cont_damage': ParamType.LOG,
+    'hyper_cleaning': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -260,6 +261,8 @@ SIMULATION.update({
     'tau_star': ParamType.REAL,
     'cont_damage_s': ParamType.REAL,
     'alpha_bar': ParamType.REAL,
+    'hyper_cleaning_speed': ParamType.REAL,
+    'hyper_cleaning_tau': ParamType.REAL,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',

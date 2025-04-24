@@ -190,7 +190,7 @@ contains
             @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
-        num_eqns_after_adv = count((/surface_tension, cont_damage/))
+        num_eqns_after_adv = count((/surface_tension, cont_damage, hyper_cleaning/))
 
         do l = adv_idx%end + 1, sys_size - num_eqns_after_adv
             @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
@@ -227,6 +227,13 @@ contains
                 q_cons_qp%vf(damage_idx)%sf
             !$acc enter data copyin(q_prim_qp%vf(damage_idx)%sf)
             !$acc enter data attach(q_prim_qp%vf(damage_idx)%sf)
+        end if
+
+        if (hyper_cleaning) then
+            q_prim_qp%vf(psi_idx)%sf => &
+                q_cons_qp%vf(psi_idx)%sf
+            !$acc enter data copyin(q_prim_qp%vf(psi_idx)%sf)
+            !$acc enter data attach(q_prim_qp%vf(psi_idx)%sf)
         end if
 
         if (viscous) then
@@ -856,7 +863,8 @@ contains
             ! END: Additional physics and source terms
 
             call nvtxStartRange("RHS-MHD")
-            if (mhd .and. powell) call s_compute_mhd_powell_rhs(q_prim_qp%vf, rhs_vf)
+            if (powell) call s_compute_mhd_powell_rhs(q_prim_qp%vf, rhs_vf)
+            if (hyper_cleaning) call s_compute_mhd_hyper_cleaning_rhs(q_prim_qp%vf, rhs_vf)
             call nvtxEndRange
 
         end do

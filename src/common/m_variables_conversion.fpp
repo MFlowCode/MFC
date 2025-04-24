@@ -1152,6 +1152,8 @@ contains
 
                     if (cont_damage) qK_prim_vf(damage_idx)%sf(j, k, l) = qK_cons_vf(damage_idx)%sf(j, k, l)
 
+                    if (hyper_cleaning) qK_prim_vf(psi_idx)%sf(j, k, l) = qK_cons_vf(psi_idx)%sf(j, k, l)
+
                 end do
             end do
         end do
@@ -1419,6 +1421,8 @@ contains
                     end if
 
                     if (cont_damage) q_cons_vf(damage_idx)%sf(j, k, l) = q_prim_vf(damage_idx)%sf(j, k, l)
+
+                    if (hyper_cleaning) q_cons_vf(psi_idx)%sf(j, k, l) = q_prim_vf(psi_idx)%sf(j, k, l)
 
                 end do
             end do

@@ -188,6 +188,13 @@ contains
             @:ACC_SETUP_SFs(q_prim_vf(damage_idx))
         end if
 
+        if (hyper_cleaning) then
+            @:ALLOCATE(q_prim_vf(psi_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(q_prim_vf(psi_idx))
+        end if
+
         if (model_eqns == 3) then
             do i = internalEnergies_idx%beg, internalEnergies_idx%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -1253,6 +1260,10 @@ contains
 
         if (cont_damage) then
             @:DEALLOCATE(q_prim_vf(damage_idx)%sf)
+        end if
+
+        if (hyper_cleaning) then
+            @:DEALLOCATE(q_prim_vf(psi_idx)%sf)
         end if
 
         if (bubbles_euler) then
