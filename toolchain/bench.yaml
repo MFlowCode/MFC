@@ -35,6 +35,3 @@
   path: benchmarks/hypo_hll/case.py
   args: []
 
-- slug: ibm
-  path: benchmarks/ibm/case.py
-  args: []
