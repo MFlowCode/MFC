@@ -6,7 +6,6 @@
 !! boundary condiitons
 
 #:include 'macros.fpp'
-#:include 'inline_boundary_conditions.fpp'
 
 module m_boundary_common
 
@@ -91,31 +90,31 @@ contains
                 real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
 
                 integer :: bc_loc, bc_dir
-                integer :: l, k
+                integer :: k, l
 
                 ! Population of Buffers in x-direction
-                !$acc parallel loop collapse(2) gang vector default(present)
                 if (bcxb >= 0) then
                     call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 1, -1)
                 else
+                    !$acc parallel loop collapse(2) gang vector default(present)
                     do l = 0, p
                         do k = 0, n
                             select case (int(bc_type(1, -1)%sf(0, k, l)))
                             case (-13:-3) ! Ghost-cell extrap. BC at beginning
-                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, -1, l, k)
+                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, -1, k, l)
                             case (-2)     ! Symmetry BC at beginning
-                                call s_symmetry(q_prim_vf, pb, mv, 1, -1, l, k)
+                                call s_symmetry(q_prim_vf, pb, mv, 1, -1, k, l)
                             case (-1)     ! Periodic BC at beginning
-                                call s_periodic(q_prim_vf, pb, mv, 1, -1, l, k)
+                                call s_periodic(q_prim_vf, pb, mv, 1, -1, k, l)
                             case (-15)    ! Slip wall BC at beginning
-                                call s_slip_wall(q_prim_vf, pb, mv, 1, -1, l, k)
+                                call s_slip_wall(q_prim_vf, pb, mv, 1, -1, k, l)
                             case (-16)    ! No-slip wall BC at beginning
-                                call s_no_slip_wall(q_prim_vf, pb, mv, 1, -1, l, k)
+                                call s_no_slip_wall(q_prim_vf, pb, mv, 1, -1, k, l)
                             case (-17)
 #ifdef MFC_PRE_PROCESS
-                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, -1, l, k)
+                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, -1, k, l)
 #else
-                                call s_dirichlet(q_prim_vf, pb, mv, 1, -1, l, k)
+                                call s_dirichlet(q_prim_vf, pb, mv, 1, -1, k, l)
 #endif
                             end select
                         end do
@@ -130,27 +129,60 @@ contains
                         do k = 0, n
                             select case (int(bc_type(1, 1)%sf(0, k, l)))
                             case (-13:-3) ! Ghost-cell extrap. BC at beginning
-                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, 1, l, k)
+                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, 1, k, l)
                             case (-2)     ! Symmetry BC at beginning
-                                call s_symmetry(q_prim_vf, pb, mv, 1, 1, l, k)
+                                call s_symmetry(q_prim_vf, pb, mv, 1, 1, k, l)
                             case (-1)     ! Periodic BC at beginning
-                                call s_periodic(q_prim_vf, pb, mv, 1, 1, l, k)
+                                call s_periodic(q_prim_vf, pb, mv, 1, 1, k, l)
                             case (-15)    ! Slip wall BC at beginning
-                                call s_slip_wall(q_prim_vf, pb, mv, 1, 1, l, k)
+                                call s_slip_wall(q_prim_vf, pb, mv, 1, 1, k, l)
                             case (-16)    ! No-slip wall BC at beginning
-                                call s_no_slip_wall(q_prim_vf, pb, mv, 1, 1, l, k)
+                                call s_no_slip_wall(q_prim_vf, pb, mv, 1, 1, k, l)
                             case (-17)
-                                print *, "here1"
 #ifdef MFC_PRE_PROCESS
-                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, 1, l, k)
+                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, 1, k, l)
 #else
-                                call s_dirichlet(q_prim_vf, pb, mv, 1, 1, l, k)
+                                call s_dirichlet(q_prim_vf, pb, mv, 1, 1, k, l)
 #endif
-                                print *, "here"
                             end select
                         end do
                     end do
                 end if
+
+#ifdef MFC_SIMULATION
+                if (qbmm .and. (.not. polytropic)) then
+                    if (bcxb < 0) then
+                        !$acc parallel loop collapse(2) gang vector default(present)
+                        do l = 0, p
+                            do k = 0, n
+                                select case (int(bc_type(1, -1)%sf(0, k, l)))
+                                case (-13:-3) ! Ghost-cell extrap. BC at beginning
+                                    call s_qbmm_extrapolation(pb, mv, 1, -1, k, l)
+                                case (-15)    ! Slip wall BC at beginning
+                                    call s_qbmm_extrapolation(pb, mv, 1, -1, k, l)
+                                case (-16)    ! No-slip wall BC at beginning
+                                    call s_qbmm_extrapolation(pb, mv, 1, -1, k, l)
+                                end select
+                            end do
+                        end do
+
+                    else if (bcxe < 0) then
+                        !$acc parallel loop collapse(2) gang vector default(present)
+                        do l = 0, p
+                            do k = 0, n
+                                select case (int(bc_type(1, 1)%sf(0, k, l)))
+                                case (-13:-3) ! Ghost-cell extrap. BC at end
+                                    call s_qbmm_extrapolation(pb, mv, 1, 1, k, l)
+                                case (-15)    ! Slip wall BC at end
+                                    call s_qbmm_extrapolation(pb, mv, 1, 1, k, l)
+                                case (-16)    ! No-slip wall bc at end
+                                    call s_qbmm_extrapolation(pb, mv, 1, 1, k, l)
+                                end select
+                            end do
+                        end do
+                    end if
+                end if
+#endif
 
                 ! Population of Buffers in y-direction
 
@@ -164,23 +196,21 @@ contains
                         do k = -buff_size, m + buff_size
                             select case (int(bc_type(2, -1)%sf(k, 0, l)))
                             case (-13:-3) ! Ghost-cell extrap. BC at beginning
-                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, -1, l, k)
+                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, -1, k, l)
                             case (-2)     ! Symmetry BC at beginning
-                                call s_axis(q_prim_vf, pb, mv, 2, -1, l, k)
+                                call s_axis(q_prim_vf, pb, mv, 2, -1, k, l)
                             case (-1)     ! Periodic BC at beginning
-                                call s_periodic(q_prim_vf, pb, mv, 2, -1, l, k)
+                                call s_periodic(q_prim_vf, pb, mv, 2, -1, k, l)
                             case (-15)    ! Slip wall BC at beginning
-                                call s_slip_wall(q_prim_vf, pb, mv, 2, -1, l, k)
+                                call s_slip_wall(q_prim_vf, pb, mv, 2, -1, k, l)
                             case (-16)    ! No-slip wall BC at beginning
-                                call s_no_slip_wall(q_prim_vf, pb, mv, 2, -1, l, k)
+                                call s_no_slip_wall(q_prim_vf, pb, mv, 2, -1, k, l)
                             case (-17)
 #ifdef MFC_PRE_PROCESS
-                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, -1, l, k)
+                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, -1, k, l)
 #else
-                                call s_dirichlet(q_prim_vf, pb, mv, 2, -1, l, k)
+                                call s_dirichlet(q_prim_vf, pb, mv, 2, -1, k, l)
 #endif
-                            case default ! Processor BC at beginning
-                                call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 2, -1)
                             end select
                         end do
                     end do
@@ -194,25 +224,60 @@ contains
                         do k = -buff_size, m + buff_size
                             select case (int(bc_type(2, 1)%sf(k, 0, l)))
                             case (-13:-3) ! Ghost-cell extrap. BC at beginning
-                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, 1, l, k)
+                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, 1, k, l)
                             case (-2)     ! Symmetry BC at beginning
-                                call s_symmetry(q_prim_vf, pb, mv, 2, 1, l, k)
+                                call s_symmetry(q_prim_vf, pb, mv, 2, 1, k, l)
                             case (-1)     ! Periodic BC at beginning
-                                call s_periodic(q_prim_vf, pb, mv, 2, 1, l, k)
+                                call s_periodic(q_prim_vf, pb, mv, 2, 1, k, l)
                             case (-15)    ! Slip wall BC at beginning
-                                call s_slip_wall(q_prim_vf, pb, mv, 2, 1, l, k)
+                                call s_slip_wall(q_prim_vf, pb, mv, 2, 1, k, l)
                             case (-16)    ! No-slip wall BC at beginning
-                                call s_no_slip_wall(q_prim_vf, pb, mv, 2, 1, l, k)
+                                call s_no_slip_wall(q_prim_vf, pb, mv, 2, 1, k, l)
                             case (-17)
 #ifdef MFC_PRE_PROCESS
-                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, 1, l, k)
+                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, 1, k, l)
 #else
-                                call s_dirichlet(q_prim_vf, pb, mv, 2, 1, l, k)
+                                call s_dirichlet(q_prim_vf, pb, mv, 2, 1, k, l)
 #endif
                             end select
                         end do
                     end do
                 end if
+
+#ifdef MFC_SIMULATION
+                if (qbmm .and. (.not. polytropic)) then
+                    if (bcyb < 0) then
+                        !$acc parallel loop collapse(2) gang vector default(present)
+                        do l = 0, p
+                            do k = -buff_size, m + buff_size
+                                select case (int(bc_type(2, -1)%sf(k, 0, l)))
+                                case (-13:-3) ! Ghost-cell extrap. BC at beginning
+                                    call s_qbmm_extrapolation(pb, mv, 2, -1, k, l)
+                                case (-15)    ! Slip wall BC at beginning
+                                    call s_qbmm_extrapolation(pb, mv, 2, -1, k, l)
+                                case (-16)    ! No-slip wall BC at beginning
+                                    call s_qbmm_extrapolation(pb, mv, 2, -1, k, l)
+                                end select
+                            end do
+                        end do
+
+                    else if (bcye < 0) then
+                        !$acc parallel loop collapse(2) gang vector default(present)
+                        do l = 0, p
+                            do k = -buff_size, m + buff_size
+                                select case (int(bc_type(2, 1)%sf(k, 0, l)))
+                                case (-13:-3) ! Ghost-cell extrap. BC at end
+                                    call s_qbmm_extrapolation(pb, mv, 2, 1, k, l)
+                                case (-15)    ! Slip wall BC at end
+                                    call s_qbmm_extrapolation(pb, mv, 2, 1, k, l)
+                                case (-16)    ! No-slip wall bc at end
+                                    call s_qbmm_extrapolation(pb, mv, 2, 1, k, l)
+                                end select
+                            end do
+                        end do
+                    end if
+                end if
+#endif
 
                 ! Population of Buffers in z-direction
 
@@ -225,20 +290,20 @@ contains
                         do k = -buff_size, m + buff_size
                             select case (int(bc_type(3, -1)%sf(k, l, 0)))
                             case (-13:-3) ! Ghost-cell extrap. BC at beginning
-                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, -1, l, k)
+                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, -1, k, l)
                             case (-2)     ! Symmetry BC at beginning
-                                call s_symmetry(q_prim_vf, pb, mv, 3, -1, l, k)
+                                call s_symmetry(q_prim_vf, pb, mv, 3, -1, k, l)
                             case (-1)     ! Periodic BC at beginning
-                                call s_periodic(q_prim_vf, pb, mv, 3, -1, l, k)
+                                call s_periodic(q_prim_vf, pb, mv, 3, -1, k, l)
                             case (-15)    ! Slip wall BC at beginning
-                                call s_slip_wall(q_prim_vf, pb, mv, 3, -1, l, k)
+                                call s_slip_wall(q_prim_vf, pb, mv, 3, -1, k, l)
                             case (-16)    ! No-slip wall BC at beginning
-                                call s_no_slip_wall(q_prim_vf, pb, mv, 3, -1, l, k)
+                                call s_no_slip_wall(q_prim_vf, pb, mv, 3, -1, k, l)
                             case (-17)
 #ifdef MFC_PRE_PROCESS
-                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, -1, l, k)
+                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, -1, k, l)
 #else
-                                call s_dirichlet(q_prim_vf, pb, mv, 3, -1, l, k)
+                                call s_dirichlet(q_prim_vf, pb, mv, 3, -1, k, l)
 #endif
                             end select
                         end do
@@ -253,35 +318,70 @@ contains
                         do k = -buff_size, m + buff_size
                             select case (int(bc_type(3, 1)%sf(k, l, 0)))
                             case (-13:-3) ! Ghost-cell extrap. BC at beginning
-                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, 1, l, k)
+                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, 1, k, l)
                             case (-2)     ! Symmetry BC at beginning
-                                call s_symmetry(q_prim_vf, pb, mv, 3, 1, l, k)
+                                call s_symmetry(q_prim_vf, pb, mv, 3, 1, k, l)
                             case (-1)     ! Periodic BC at beginning
-                                call s_periodic(q_prim_vf, pb, mv, 3, 1, l, k)
+                                call s_periodic(q_prim_vf, pb, mv, 3, 1, k, l)
                             case (-15)    ! Slip wall BC at beginning
-                                call s_slip_wall(q_prim_vf, pb, mv, 3, 1, l, k)
+                                call s_slip_wall(q_prim_vf, pb, mv, 3, 1, k, l)
                             case (-16)    ! No-slip wall BC at beginning
-                                call s_no_slip_wall(q_prim_vf, pb, mv, 3, 1, l, k)
+                                call s_no_slip_wall(q_prim_vf, pb, mv, 3, 1, k, l)
                             case (-17)
 #ifdef MFC_PRE_PROCESS
-                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, 1, l, k)
+                                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, 1, k, l)
 #else
-                                call s_dirichlet(q_prim_vf, pb, mv, 3, 1, l, k)
+                                call s_dirichlet(q_prim_vf, pb, mv, 3, 1, k, l)
 #endif
                             end select
                         end do
                     end do
                 end if
+
+#ifdef MFC_SIMULATION
+                if (qbmm .and. (.not. polytropic)) then
+                    if (bczb < 0) then
+                        !$acc parallel loop collapse(2) gang vector default(present)
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                select case (int(bc_type(3, -1)%sf(k, l, 0)))
+                                case (-13:-3) ! Ghost-cell extrap. BC at beginning
+                                    call s_qbmm_extrapolation(pb, mv, 3, -1, k, l)
+                                case (-15)    ! Slip wall BC at beginning
+                                    call s_qbmm_extrapolation(pb, mv, 3, -1, k, l)
+                                case (-16)    ! No-slip wall BC at beginning
+                                    call s_qbmm_extrapolation(pb, mv, 3, -1, k, l)
+                                end select
+                            end do
+                        end do
+
+                    else if (bcze < 0) then
+                        !$acc parallel loop collapse(2) gang vector default(present)
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                select case (int(bc_type(3, 1)%sf(k, l, 0)))
+                                case (-13:-3) ! Ghost-cell extrap. BC at end
+                                    call s_qbmm_extrapolation(pb, mv, 3, 1, k, l)
+                                case (-15)    ! Slip wall BC at end
+                                    call s_qbmm_extrapolation(pb, mv, 3, 1, k, l)
+                                case (-16)    ! No-slip wall bc at end
+                                    call s_qbmm_extrapolation(pb, mv, 3, 1, k, l)
+                                end select
+                            end do
+                        end do
+                    end if
+                end if
+#endif
                 ! END: Population of Buffers in z-direction
 
             end subroutine s_populate_variables_buffers
 
-            subroutine s_ghost_cell_extrapolation(q_prim_vf, pb, mv, bc_dir, bc_loc, l, k)
+            subroutine s_ghost_cell_extrapolation(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
 
                 type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
                 real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
                 integer, intent(in) :: bc_dir, bc_loc
-                integer, intent(in) :: l, k
+                integer, intent(in) :: k, l
 
                 integer :: j, q, i
 
@@ -289,8 +389,6 @@ contains
                 if (bc_dir == 1) then !< x-direction
 
                     if (bc_loc == -1) then !bc_x%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(-j, k, l) = &
@@ -299,8 +397,6 @@ contains
                         end do
 
                     else !< bc_x%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(m + j, k, l) = &
@@ -314,8 +410,6 @@ contains
                 elseif (bc_dir == 2) then !< y-direction
 
                     if (bc_loc == -1) then !< bc_y%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(k, -j, l) = &
@@ -324,8 +418,6 @@ contains
                         end do
 
                     else !< bc_y%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(k, n + j, l) = &
@@ -339,8 +431,6 @@ contains
                 elseif (bc_dir == 3) then !< z-direction
 
                     if (bc_loc == -1) then !< bc_z%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(k, l, -j) = &
@@ -349,8 +439,6 @@ contains
                         end do
 
                     else !< bc_z%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(k, l, p + j) = &
@@ -364,12 +452,12 @@ contains
 
             end subroutine s_ghost_cell_extrapolation
 
-            subroutine s_symmetry(q_prim_vf, pb, mv, bc_dir, bc_loc, l, k)
+            subroutine s_symmetry(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
 
                 type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
                 real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
                 integer, intent(in) :: bc_dir, bc_loc
-                integer, intent(in) :: l, k
+                integer, intent(in) :: k, l
 
                 integer :: j, q, i
 
@@ -377,8 +465,6 @@ contains
                 if (bc_dir == 1) then
 
                     if (bc_loc == -1) then !< bc_x%beg
-
-                        !$acc parallel loop gang vector default(present)
                         do j = 1, buff_size
                             !$acc loop seq
                             do i = 1, contxe
@@ -410,7 +496,6 @@ contains
                         end do
 #ifdef MFC_SIMULATION
                         if (qbmm .and. .not. polytropic) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = 1, nb
                                 do q = 1, nnode
                                     do j = 1, buff_size
@@ -425,8 +510,6 @@ contains
 #endif
 
                     else !< bc_x%end
-
-                        !$acc parallel loop default(present)
                         do j = 1, buff_size
                             !$acc loop seq
                             do i = 1, contxe
@@ -458,7 +541,6 @@ contains
                         end do
 #ifdef MFC_SIMULATION
                         if (qbmm .and. .not. polytropic) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = 1, nb
                                 do q = 1, nnode
                                     do j = 1, buff_size
@@ -477,8 +559,6 @@ contains
                 elseif (bc_dir == 2) then
 
                     if (bc_loc == -1) then !< bc_y%beg
-
-                        !$acc parallel loop gang vector default(present)
                         do j = 1, buff_size
                             !$acc loop seq
                             do i = 1, momxb
@@ -509,7 +589,6 @@ contains
                         end do
 #ifdef MFC_SIMULATION
                         if (qbmm .and. .not. polytropic) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = 1, nb
                                 do q = 1, nnode
                                     do j = 1, buff_size
@@ -523,8 +602,6 @@ contains
                         end if
 #endif
                     else !< bc_y%end
-
-                        !$acc parallel loop gang vector default(present)
                         do j = 1, buff_size
                             !$acc loop seq
                             do i = 1, momxb
@@ -555,7 +632,6 @@ contains
                         end do
 #ifdef MFC_SIMULATION
                         if (qbmm .and. .not. polytropic) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = 1, nb
                                 do q = 1, nnode
                                     do j = 1, buff_size
@@ -574,8 +650,6 @@ contains
                 elseif (bc_dir == 3) then
 
                     if (bc_loc == -1) then !< bc_z%beg
-
-                        !$acc parallel loop gang vector default(present)
                         do j = 1, buff_size
                             !$acc loop seq
                             do i = 1, momxb + 1
@@ -606,7 +680,6 @@ contains
                         end do
 #ifdef MFC_SIMULATION
                         if (qbmm .and. .not. polytropic) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = 1, nb
                                 do q = 1, nnode
                                     do j = 1, buff_size
@@ -620,8 +693,6 @@ contains
                         end if
 #endif
                     else !< bc_z%end
-
-                        !$acc parallel loop gang vector default(present)
                         do j = 1, buff_size
                             !$acc loop seq
                             do i = 1, momxb + 1
@@ -652,7 +723,6 @@ contains
                         end do
 #ifdef MFC_SIMULATION
                         if (qbmm .and. .not. polytropic) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = 1, nb
                                 do q = 1, nnode
                                     do j = 1, buff_size
@@ -671,12 +741,12 @@ contains
 
             end subroutine s_symmetry
 
-            subroutine s_periodic(q_prim_vf, pb, mv, bc_dir, bc_loc, l, k)
+            subroutine s_periodic(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
 
                 type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
                 real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
                 integer, intent(in) :: bc_dir, bc_loc
-                integer, intent(in) :: l, k
+                integer, intent(in) :: k, l
 
                 integer :: j, q, i
 
@@ -684,8 +754,6 @@ contains
                 if (bc_dir == 1) then
 
                     if (bc_loc == -1) then !< bc_x%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(-j, k, l) = &
@@ -694,7 +762,6 @@ contains
                         end do
 #ifdef MFC_SIMULATION
                         if (qbmm .and. .not. polytropic) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = 1, nb
                                 do q = 1, nnode
                                     do j = 1, buff_size
@@ -708,8 +775,6 @@ contains
                         end if
 #endif
                     else !< bc_x%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(m + j, k, l) = &
@@ -718,7 +783,6 @@ contains
                         end do
 #ifdef MFC_SIMULATION
                         if (qbmm .and. .not. polytropic) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = 1, nb
                                 do q = 1, nnode
                                     do j = 1, buff_size
@@ -737,8 +801,6 @@ contains
                 elseif (bc_dir == 2) then
 
                     if (bc_loc == -1) then !< bc_y%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(l, -j, k) = &
@@ -747,7 +809,6 @@ contains
                         end do
 #ifdef MFC_SIMULATION
                         if (qbmm .and. .not. polytropic) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = 1, nb
                                 do q = 1, nnode
                                     do j = 1, buff_size
@@ -761,8 +822,6 @@ contains
                         end if
 #endif
                     else !< bc_y%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(l, n + j, k) = &
@@ -771,7 +830,6 @@ contains
                         end do
 #ifdef MFC_SIMULATION
                         if (qbmm .and. .not. polytropic) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = 1, nb
                                 do q = 1, nnode
                                     do j = 1, buff_size
@@ -790,8 +848,6 @@ contains
                 elseif (bc_dir == 3) then
 
                     if (bc_loc == -1) then !< bc_z%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(k, l, -j) = &
@@ -800,7 +856,6 @@ contains
                         end do
 #ifdef MFC_SIMULATION
                         if (qbmm .and. .not. polytropic) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = 1, nb
                                 do q = 1, nnode
                                     do j = 1, buff_size
@@ -814,8 +869,6 @@ contains
                         end if
 #endif
                     else !< bc_z%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(k, l, p + j) = &
@@ -824,7 +877,6 @@ contains
                         end do
 #ifdef MFC_SIMULATION
                         if (qbmm .and. .not. polytropic) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = 1, nb
                                 do q = 1, nnode
                                     do j = 1, buff_size
@@ -843,16 +895,15 @@ contains
 
             end subroutine s_periodic
 
-            subroutine s_axis(q_prim_vf, pb, mv, bc_dir, bc_loc, l, k)
+            subroutine s_axis(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
 
                 type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
                 real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
                 integer, intent(in) :: bc_dir, bc_loc
-                integer, intent(in) :: l, k
+                integer, intent(in) :: k, l
 
                 integer :: j, q, i
 
-                !$acc parallel loop gang vector default(present)
                 do j = 1, buff_size
                     if (z_cc(k) < pi) then
                         !$acc loop seq
@@ -894,7 +945,6 @@ contains
                 end do
 #ifdef MFC_SIMULATION
                 if (qbmm .and. .not. polytropic) then
-                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -909,12 +959,12 @@ contains
 #endif
             end subroutine s_axis
 
-            subroutine s_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc, l, k)
+            subroutine s_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
 
                 type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
                 real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
                 integer, intent(in) :: bc_dir, bc_loc
-                integer, intent(in) :: l, k
+                integer, intent(in) :: k, l
 
                 integer :: j, q, i
 
@@ -922,8 +972,6 @@ contains
                 if (bc_dir == 1) then
 
                     if (bc_loc == -1) then !< bc_x%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 if (i == momxb) then
@@ -937,8 +985,6 @@ contains
                         end do
 
                     else !< bc_x%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 if (i == momxb) then
@@ -957,8 +1003,6 @@ contains
                 elseif (bc_dir == 2) then
 
                     if (bc_loc == -1) then !< bc_y%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 if (i == momxb + 1) then
@@ -972,8 +1016,6 @@ contains
                         end do
 
                     else !< bc_y%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 if (i == momxb + 1) then
@@ -992,8 +1034,6 @@ contains
                 elseif (bc_dir == 3) then
 
                     if (bc_loc == -1) then !< bc_z%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 if (i == momxe) then
@@ -1007,8 +1047,6 @@ contains
                         end do
 
                     else !< bc_z%end
-
-                        !$acc parallel loop collapse(4) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 if (i == momxe) then
@@ -1027,12 +1065,12 @@ contains
 
             end subroutine s_slip_wall
 
-            subroutine s_no_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc, l, k)
+            subroutine s_no_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
 
                 type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
                 real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
                 integer, intent(in) :: bc_dir, bc_loc
-                integer, intent(in) :: l, k
+                integer, intent(in) :: k, l
 
                 integer :: j, q, i
 
@@ -1040,8 +1078,6 @@ contains
                 if (bc_dir == 1) then
 
                     if (bc_loc == -1) then !< bc_x%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 if (i == momxb) then
@@ -1061,8 +1097,6 @@ contains
                         end do
 
                     else !< bc_x%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 if (i == momxb) then
@@ -1087,8 +1121,6 @@ contains
                 elseif (bc_dir == 2) then
 
                     if (bc_loc == -1) then !< bc_y%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 if (i == momxb) then
@@ -1108,8 +1140,6 @@ contains
                         end do
 
                     else !< bc_y%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 if (i == momxb) then
@@ -1134,8 +1164,6 @@ contains
                 elseif (bc_dir == 3) then
 
                     if (bc_loc == -1) then !< bc_z%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 if (i == momxb) then
@@ -1155,8 +1183,6 @@ contains
                         end do
 
                     else !< bc_z%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 if (i == momxb) then
@@ -1181,11 +1207,11 @@ contains
 
             end subroutine s_no_slip_wall
 
-            subroutine s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc, l, k)
+            subroutine s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc, k, l)
 
                 real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
                 integer, intent(in) :: bc_dir, bc_loc
-                integer, intent(in) :: l, k
+                integer, intent(in) :: k, l
 
                 integer :: j, q, i
 
@@ -1193,8 +1219,6 @@ contains
                 if (bc_dir == 1) then
 
                     if (bc_loc == -1) then !< bc_x%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, nb
                             do q = 1, nnode
                                 do j = 1, buff_size
@@ -1207,8 +1231,6 @@ contains
                         end do
 
                     else !< bc_x%end
-
-                        !$acc parallel loop collapse(3) gang vector default(present)
                         do i = 1, nb
                             do q = 1, nnode
                                 do j = 1, buff_size
@@ -1226,8 +1248,6 @@ contains
                 elseif (bc_dir == 2) then
 
                     if (bc_loc == -1) then !< bc_y%beg
-
-                        !$acc parallel loop collapse(3) gang vector default(present)
                         do i = 1, nb
                             do q = 1, nnode
                                 do j = 1, buff_size
@@ -1240,8 +1260,6 @@ contains
                         end do
 
                     else !< bc_y%end
-
-                        !$acc parallel loop collapse(3) gang vector default(present)
                         do i = 1, nb
                             do q = 1, nnode
                                 do j = 1, buff_size
@@ -1259,8 +1277,6 @@ contains
                 elseif (bc_dir == 3) then
 
                     if (bc_loc == -1) then !< bc_z%beg
-
-                        !$acc parallel loop collapse(3) gang vector default(present)
                         do i = 1, nb
                             do q = 1, nnode
                                 do j = 1, buff_size
@@ -1273,8 +1289,6 @@ contains
                         end do
 
                     else !< bc_z%end
-
-                        !$acc parallel loop collapse(5) gang vector default(present)
                         do i = 1, nb
                             do q = 1, nnode
                                 do j = 1, buff_size
@@ -1292,12 +1306,12 @@ contains
 
             end subroutine s_qbmm_extrapolation
 
-            subroutine s_dirichlet(q_prim_vf, pb, mv, bc_dir, bc_loc, l, k)
+            subroutine s_dirichlet(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
 
                 type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
                 real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
                 integer, intent(in) :: bc_dir, bc_loc
-                integer, intent(in) :: l, k
+                integer, intent(in) :: k, l
 
                 integer :: j, i, q
 
@@ -1305,8 +1319,6 @@ contains
                 if (bc_dir == 1) then !< x-direction
 
                     if (bc_loc == -1) then !bc_x%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(-j, k, l) = &
@@ -1315,8 +1327,6 @@ contains
                         end do
 
                     else !< bc_x%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(m + j, k, l) = &
@@ -1330,8 +1340,6 @@ contains
                 elseif (bc_dir == 2) then !< y-direction
 
                     if (bc_loc == -1) then !< bc_y%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(k, -j, l) = &
@@ -1340,8 +1348,6 @@ contains
                         end do
 
                     else !< bc_y%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(k, n + j, l) = &
@@ -1355,8 +1361,6 @@ contains
                 elseif (bc_dir == 3) then !< z-direction
 
                     if (bc_loc == -1) then !< bc_z%beg
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(k, l, -j) = &
@@ -1365,8 +1369,6 @@ contains
                         end do
 
                     else !< bc_z%end
-
-                        !$acc parallel loop collapse(2) gang vector default(present)
                         do i = 1, sys_size
                             do j = 1, buff_size
                                 q_prim_vf(i)%sf(k, l, p + j) = &
@@ -1384,286 +1386,373 @@ contains
 
                 type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
                 type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+
                 integer :: i, j, k, l
 
-                ! x - direction
-                if (bc_x%beg <= -3) then !< ghost cell extrapolation
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    c_divs(i)%sf(-j, k, l) = &
-                                        c_divs(i)%sf(0, k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (bc_x%beg == -2) then !< slip wall or reflective
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    if (i == 1) then
-                                        c_divs(i)%sf(-j, k, l) = &
-                                            -c_divs(i)%sf(j - 1, k, l)
-                                    else
-                                        c_divs(i)%sf(-j, k, l) = &
-                                            c_divs(i)%sf(j - 1, k, l)
-                                    end if
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (bc_x%beg == -1) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    c_divs(i)%sf(-j, k, l) = &
-                                        c_divs(i)%sf(m - (j - 1), k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                else
+                !< x-direction
+                if (bcxb >= 0) then
                     call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, -1)
+                else
+                    !$acc parallel loop collapse(2) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            if (bc_type(1, -1)%sf(0, k, l) == -1) then
+                                call s_color_periodic(c_divs, 1, -1, k, l)
+                            elseif (bc_type(1, -1)%sf(0, k, l) == -2) then
+                                call s_color_reflective(c_divs, 1, -1, k, l)
+                            else
+                                call s_color_ghost_cell_extrapolation(c_divs, 1, -1, k, l)
+                            end if
+                        end do
+                    end do
                 end if
 
-                if (bc_x%end <= -3) then !< ghost-cell extrapolation
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    c_divs(i)%sf(m + j, k, l) = &
-                                        c_divs(i)%sf(m, k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (bc_x%end == -2) then
-                    !$acc parallel loop collapse(4) default(present)
-                    do i = 1, num_dims + 1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    if (i == 1) then
-                                        c_divs(i)%sf(m + j, k, l) = &
-                                            -c_divs(i)%sf(m - (j - 1), k, l)
-                                    else
-                                        c_divs(i)%sf(m + j, k, l) = &
-                                            c_divs(i)%sf(m - (j - 1), k, l)
-                                    end if
-                                end do
-                            end do
-                        end do
-                    end do
-                else if (bc_x%end == -1) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    c_divs(i)%sf(m + j, k, l) = &
-                                        c_divs(i)%sf(j - 1, k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                else
+                if (bcxe >= 0) then
                     call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, 1)
+                else
+                    !$acc parallel loop collapse(2) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            if (bc_type(1, 1)%sf(0, k, l) == -1) then
+                                call s_color_periodic(c_divs, 1, 1, k, l)
+                            elseif (bc_type(1, 1)%sf(0, k, l) == -2) then
+                                call s_color_reflective(c_divs, 1, 1, k, l)
+                            else
+                                call s_color_ghost_cell_extrapolation(c_divs, 1, 1, k, l)
+                            end if
+                        end do
+                    end do
                 end if
 
-                if (n == 0) then
-                    return
-                elseif (bc_y%beg <= -3) then !< ghost-cell extrapolation
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    c_divs(i)%sf(l, -j, k) = &
-                                        c_divs(i)%sf(l, 0, k)
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (bc_y%beg == -2) then !< slip wall or reflective
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    if (i == 2) then
-                                        c_divs(i)%sf(l, -j, k) = &
-                                            -c_divs(i)%sf(l, j - 1, k)
-                                    else
-                                        c_divs(i)%sf(l, -j, k) = &
-                                            c_divs(i)%sf(l, j - 1, k)
-                                    end if
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (bc_y%beg == -1) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    c_divs(i)%sf(l, -j, k) = &
-                                        c_divs(i)%sf(l, n - (j - 1), k)
-                                end do
-                            end do
-                        end do
-                    end do
-                else
+                if (n == 0) return
+
+                !< y-direction
+                if (bcyb >= 0) then
                     call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, -1)
+                else
+                    !$acc parallel loop collapse(2) gang vector default(present)
+                    do l = 0, p
+                        do k = -buff_size, m + buff_size
+                            if (bc_type(2, -1)%sf(k, 0, l) == -1) then
+                                call s_color_periodic(c_divs, 2, -1, k, l)
+                            elseif (bc_type(2, -1)%sf(k, 0, l) == -2) then
+                                call s_color_reflective(c_divs, 2, -1, k, l)
+                            else
+                                call s_color_ghost_cell_extrapolation(c_divs, 2, -1, k, l)
+                            end if
+                        end do
+                    end do
                 end if
 
-                if (bc_y%end <= -3) then !< ghost-cell extrapolation
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    c_divs(i)%sf(l, n + j, k) = &
-                                        c_divs(i)%sf(l, n, k)
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (bc_y%end == -2) then !< slip wall or reflective
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    if (i == 2) then
-                                        c_divs(i)%sf(l, n + j, k) = &
-                                            -c_divs(i)%sf(l, n - (j - 1), k)
-                                    else
-                                        c_divs(i)%sf(l, n + j, k) = &
-                                            c_divs(i)%sf(l, n - (j - 1), k)
-                                    end if
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (bc_y%end == -1) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    c_divs(i)%sf(l, n + j, k) = &
-                                        c_divs(i)%sf(l, j - 1, k)
-                                end do
-                            end do
-                        end do
-                    end do
-                else
+                if (bcye >= 0) then
                     call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, 1)
+                else
+                    !$acc parallel loop collapse(2) gang vector default(present)
+                    do l = 0, p
+                        do k = -buff_size, m + buff_size
+                            if (bc_type(2, 1)%sf(k, 0, l) == -1) then
+                                call s_color_periodic(c_divs, 2, 1, k, l)
+                            elseif (bc_type(2, 1)%sf(k, 0, l) == -2) then
+                                call s_color_reflective(c_divs, 2, 1, k, l)
+                            else
+                                call s_color_ghost_cell_extrapolation(c_divs, 2, 1, k, l)
+                            end if
+                        end do
+                    end do
                 end if
 
-                if (p == 0) then
-                    return
-                elseif (bc_z%beg <= -3) then !< ghost-cell extrapolation
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    c_divs(i)%sf(k, l, -j) = &
-                                        c_divs(i)%sf(k, l, 0)
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (bc_z%beg == -2) then !< symmetry
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    if (i == 3) then
-                                        c_divs(i)%sf(k, l, -j) = &
-                                            -c_divs(i)%sf(k, l, j - 1)
-                                    else
-                                        c_divs(i)%sf(k, l, -j) = &
-                                            c_divs(i)%sf(k, l, j - 1)
-                                    end if
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (bc_z%beg == -1) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    c_divs(i)%sf(k, l, -j) = &
-                                        c_divs(i)%sf(k, l, p - (j - 1))
-                                end do
-                            end do
-                        end do
-                    end do
-                else
+                if (p == 0) return
+
+                !< z-direction
+                if (bczb >= 0) then
                     call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, -1)
-                end if
-
-                if (bc_z%end <= -3) then !< ghost-cell extrapolation
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    c_divs(i)%sf(k, l, p + j) = &
-                                        c_divs(i)%sf(k, l, p)
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (bc_z%end == -2) then !< symmetry
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    if (i == 3) then
-                                        c_divs(i)%sf(k, l, p + j) = &
-                                            -c_divs(i)%sf(k, l, p - (j - 1))
-                                    else
-                                        c_divs(i)%sf(k, l, p + j) = &
-                                            c_divs(i)%sf(k, l, p - (j - 1))
-                                    end if
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (bc_z%end == -1) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, num_dims + 1
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    c_divs(i)%sf(k, l, p + j) = &
-                                        c_divs(i)%sf(k, l, j - 1)
-                                end do
-                            end do
-                        end do
-                    end do
                 else
-                    call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, 1)
+                    !$acc parallel loop collapse(2) gang vector default(present)
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            if (bc_type(3, -1)%sf(k, l, 0) == -1) then
+                                call s_color_periodic(c_divs, 3, -1, k, l)
+                            elseif (bc_type(3, -1)%sf(k, l, 0) == -2) then
+                                call s_color_reflective(c_divs, 3, -1, k, l)
+                            else
+                                call s_color_ghost_cell_extrapolation(c_divs, 3, -1, k, l)
+                            end if
+                        end do
+                    end do
                 end if
 
+                if (bcze >= 0) then
+                    call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, 1)
+                else
+                    !$acc parallel loop collapse(2) gang vector default(present)
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            if (bc_type(3, 1)%sf(k, l, 0) == -1) then
+                                call s_color_periodic(c_divs, 3, 1, k, l)
+                            elseif (bc_type(3, 1)%sf(k, l, 0) == -2) then
+                                call s_color_reflective(c_divs, 3, 1, k, l)
+                            else
+                                call s_color_ghost_cell_extrapolation(c_divs, 3, 1, k, l)
+                            end if
+                        end do
+                    end do
+                end if
             end subroutine s_populate_capillary_buffers
-#endif
 
+            subroutine s_color_periodic(c_divs, bc_dir, bc_loc, k, l)
+                type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
+                integer, intent(in) :: bc_dir, bc_loc
+                integer, intent(in) :: k, l
+
+                integer :: j, i, q
+
+                ! < x-direction
+                if (bc_dir == 1) then !< x-direction
+
+                    if (bc_loc == -1) then !bc_x%beg
+
+                        !$a cc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                c_divs(i)%sf(-j, k, l) = c_divs(i)%sf(m - (j - 1), k, l)
+                            end do
+                        end do
+
+                    else !< bc_x%end
+
+                        ! $acc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                c_divs(i)%sf(m + j, k, l) = c_divs(i)%sf(j - 1, k, l)
+                            end do
+                        end do
+
+                    end if
+
+                    !< y-direction
+                elseif (bc_dir == 2) then !< y-direction
+
+                    if (bc_loc == -1) then !< bc_y%beg
+
+                        ! $acc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, n - (j - 1), l)
+                            end do
+                        end do
+
+                    else !< bc_y%end
+                        !$ acc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                c_divs(i)%sf(k, n + j, l) = c_divs(i)%sf(k, j - 1, l)
+                            end do
+                        end do
+
+                    end if
+
+                    !< z-direction
+                elseif (bc_dir == 3) then !< z-direction
+
+                    if (bc_loc == -1) then !< bc_z%beg
+                        !$ acc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                c_divs(i)%sf(k, l, -j) = c_divs(i)%sf(k, l, p - (j - 1))
+                            end do
+                        end do
+
+                    else !< bc_z%end
+                        !$ acc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                c_divs(i)%sf(k, l, p + j) = c_divs(i)%sf(k, l, j - 1)
+                            end do
+                        end do
+
+                    end if
+
+                end if
+
+            end subroutine s_color_periodic
+
+            subroutine s_color_reflective(c_divs, bc_dir, bc_loc, k, l)
+                type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
+                integer, intent(in) :: bc_dir, bc_loc
+                integer, intent(in) :: k, l
+
+                integer :: j, i, q
+
+                !< x-direction
+                if (bc_dir == 1) then !< x-direction
+
+                    if (bc_loc == -1) then !bc_x%beg
+
+                        !$a cc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                if (i == bc_dir) then
+                                    c_divs(i)%sf(j, k, l) = -c_divs(i)%sf(j - 1, k, l)
+                                else
+                                    c_divs(i)%sf(j, k, l) = c_divs(i)%sf(j - 1, k, l)
+                                end if
+                            end do
+                        end do
+
+                    else !< bc_x%end
+
+                        !$ac c parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                if (i == bc_dir) then
+                                    c_divs(i)%sf(m + j, k, l) = -c_divs(i)%sf(m - (j - 1), k, l)
+                                else
+                                    c_divs(i)%sf(m + j, k, l) = c_divs(i)%sf(m - (j - 1), k, l)
+                                end if
+                            end do
+                        end do
+
+                    end if
+
+                    !< y-direction
+                elseif (bc_dir == 2) then !< y-direction
+
+                    if (bc_loc == -1) then !< bc_y%beg
+
+                        !$a cc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                if (i == bc_dir) then
+                                    c_divs(i)%sf(k, -j, l) = -c_divs(i)%sf(k, j - 1, l)
+                                else
+                                    c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, j - 1, l)
+                                end if
+                            end do
+                        end do
+
+                    else !< bc_y%end
+                        !$a cc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                if (i == bc_dir) then
+                                    c_divs(i)%sf(k, n + j, l) = -c_divs(i)%sf(k, n - (j - 1), l)
+                                else
+                                    c_divs(i)%sf(k, n + j, l) = c_divs(i)%sf(k, n - (j - 1), l)
+                                end if
+                            end do
+                        end do
+
+                    end if
+
+                    !< z-direction
+                elseif (bc_dir == 3) then !< z-direction
+
+                    if (bc_loc == -1) then !< bc_z%beg
+                        !$a cc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                if (i == bc_dir) then
+                                    c_divs(i)%sf(k, l, -j) = -c_divs(i)%sf(k, l, j - 1)
+                                else
+                                    c_divs(i)%sf(k, l, -j) = c_divs(i)%sf(k, l, j - 1)
+                                end if
+                            end do
+                        end do
+
+                    else !< bc_z%end
+                        !$ acc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                if (i == bc_dir) then
+                                    c_divs(i)%sf(k, l, p + j) = -c_divs(i)%sf(k, l, p - (j - 1))
+                                else
+                                    c_divs(i)%sf(k, l, p + j) = c_divs(i)%sf(k, l, p - (j - 1))
+                                end if
+                            end do
+                        end do
+
+                    end if
+
+                end if
+
+            end subroutine s_color_reflective
+
+            subroutine s_color_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
+                type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
+                integer, intent(in) :: bc_dir, bc_loc
+                integer, intent(in) :: k, l
+
+                integer :: j, i, q
+
+                !< x-direction
+                if (bc_dir == 1) then !< x-direction
+
+                    if (bc_loc == -1) then !bc_x%beg
+
+                        !$a cc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                c_divs(i)%sf(-j, k, l) = c_divs(i)%sf(0, k, l)
+                            end do
+                        end do
+
+                    else !< bc_x%end
+
+                        !$a cc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                c_divs(i)%sf(m + j, k, l) = c_divs(i)%sf(m, k, l)
+                            end do
+                        end do
+
+                    end if
+
+                    !< y-direction
+                elseif (bc_dir == 2) then !< y-direction
+
+                    if (bc_loc == -1) then !< bc_y%beg
+
+                        !$ac c parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, 0, l)
+                            end do
+                        end do
+
+                    else !< bc_y%end
+                        !$a cc parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                c_divs(i)%sf(k, n + j, l) = c_divs(i)%sf(k, n, l)
+                            end do
+                        end do
+
+                    end if
+
+                    !< z-direction
+                elseif (bc_dir == 3) then !< z-direction
+
+                    if (bc_loc == -1) then !< bc_z%beg
+                        !$ac c parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                c_divs(i)%sf(k, l, -j) = c_divs(i)%sf(k, l, 0)
+                            end do
+                        end do
+
+                    else !< bc_z%end
+                        !$ac c parallel loop collapse(2) gang vector default(present)
+                        do i = 1, num_dims + 1
+                            do j = 1, buff_size
+                                c_divs(i)%sf(k, l, p + j) = c_divs(i)%sf(k, l, p)
+                            end do
+                        end do
+
+                    end if
+
+                end if
+            end subroutine s_color_ghost_cell_extrapolation
+#endif
             subroutine s_create_mpi_types(bc_type)
 
                 type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
