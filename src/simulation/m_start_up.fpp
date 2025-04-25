@@ -1411,7 +1411,7 @@ contains
         if (bubbles_lagrange) then
             !$acc update host(q_beta%vf(1)%sf)
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, q_beta%vf(1))
-            !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_rad, intfc_vel)
+            !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_vel)
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else

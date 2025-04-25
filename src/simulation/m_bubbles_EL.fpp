@@ -605,8 +605,8 @@ contains
                 intfc_draddt(k, stage) = fV
 
                 !$acc loop seq
-                do l = 1, num_dims
-                    mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,1:3,1), cell, l, q_prim_vf)
+                do l = 1, 3
+                    mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1), cell, l, q_prim_vf)
                     mtn_dveldt(k, l, stage) = 0._wp
                 end do
             end do
@@ -622,8 +622,8 @@ contains
                 intfc_draddt(k, stage) = 0._wp
 
                 !$acc loop seq
-                do l = 1, num_dims
-                    mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,1:3,1),cell, l, q_prim_vf)
+                do l = 1, 3
+                    mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1),cell, l, q_prim_vf)
                     mtn_dveldt(k, l, stage) = 0._wp
                 end do
             end do
