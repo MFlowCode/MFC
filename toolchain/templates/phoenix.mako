@@ -18,7 +18,8 @@
 #SBATCH --qos=${quality_of_service}
 % endif
 % if gpu:
-#SBATCH -G${tasks_per_node}
+#SBATCH --gres=gpu:V100:${tasks_per_node}
+#SBATCH --mem-per-gpu=16G\
 % endif
 % if email:
 #SBATCH --mail-user=${email}
@@ -40,15 +41,10 @@ echo
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
-         (set -x; srun \
-            % if engine == 'interactive':
-                --nodes ${nodes} --ntasks-per-node ${tasks_per_node} \
-                --cpus-per-task 1                                    \
-                % if gpu:
-                    --gpus-per-task 1 --gpu-bind closest                 \
-                % endif
-            % endif
-            ${profiler} "${target.get_install_binpath(case)}")
+        (set -x; ${profiler}    \
+            mpirun -np ${nodes*tasks_per_node}            \
+                   --bind-to none                         \
+                   "${target.get_install_binpath(case)}")
     % endif
 
     ${helpers.run_epilogue(target)}
