@@ -40,15 +40,15 @@ echo
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
-         (set -x; srun \
-            % if engine == 'interactive':
-                --nodes ${nodes} --ntasks-per-node ${tasks_per_node} \
-                --cpus-per-task 1                                    \
-                % if gpu:
-                    --gpus-per-task 1 --gpu-bind closest                 \
-                % endif
+        (set -x; srun \
+        % if engine == 'interactive':
+            --nodes ${nodes} --ntasks-per-node ${tasks_per_node} \
+            --cpus-per-task 1                                    \
+            % if gpu:
+                --gpus-per-task 1 --gpu-bind closest             \
             % endif
-            ${profiler} "${target.get_install_binpath(case)}")
+        % endif
+         ${profiler} "${target.get_install_binpath(case)}")
     % endif
 
     ${helpers.run_epilogue(target)}

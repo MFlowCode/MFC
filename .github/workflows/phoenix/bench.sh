@@ -13,3 +13,5 @@ if ["$job_device" == "gpu"]; then
 else
     ./mfc.sh bench --mem 1 -j $(nproc) -o "$job_slug.yaml" -- -c phoenix $device_opts -n $n_ranks
 fi
+
+sleep 10
