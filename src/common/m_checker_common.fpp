@@ -316,8 +316,8 @@ contains
         @:PROHIBIT(.not. f_is_default(sigma) .and. .not. surface_tension, &
             "sigma is set but surface_tension is not enabled")
 
-        @:PROHIBIT(surface_tension .and. model_eqns /= 3, &
-            "The surface tension model requires model_eqns=3")
+        @:PROHIBIT(surface_tension .and. (model_eqns /= 3 .and. model_eqns /=2), &
+            "The surface tension model requires model_eqns=3 or model_eqns=2")
 
         @:PROHIBIT(surface_tension .and. num_fluids /= 2, &
             "The surface tension model requires num_fluids=2")
