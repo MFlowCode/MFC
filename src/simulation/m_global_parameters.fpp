@@ -296,7 +296,7 @@ module m_global_parameters
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
-    !$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx, B_idx)
+    !$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx, B_idx, c_idx)
 
     integer :: shear_num !! Number of shear stress components
     integer, dimension(3) :: shear_indices !<
@@ -1212,7 +1212,7 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, c_idx)
         !$acc update device(b_size, xibeg, xiend, tensor_size)
 
         !$acc update device(species_idx)
