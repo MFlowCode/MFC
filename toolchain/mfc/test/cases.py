@@ -803,7 +803,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Lagrangian bubbles
         for adap_dt in ['F']:
             for couplingMethod in [1, 2]:
-                stack.push("Lagrange bubbles", {"bubbles_lagrange": 'T',
+                stack.push("Lagrange Bubbles", {"bubbles_lagrange": 'T',
                     'dt': 1e-06, 'lag_params%pressure_corrector': 'T', 'bubble_model': 2,
                     'num_fluids': 2, 'lag_params%heatTransfer_model': 'T', 'lag_params%massTransfer_model': 'T', 
                     'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'fluid_pp(2)%gamma': 2.5,
@@ -821,9 +821,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'acoustic(1)%mag': 2e+04, 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50
                 })
                 if couplingMethod==1:
-                    stack.push('One-way coupling',{'lag_params%solver_approach': 1})
+                    stack.push('One-way Coupling',{'lag_params%solver_approach': 1})
                 else:
-                    stack.push('Two-way coupling',{'lag_params%solver_approach': 2})
+                    stack.push('Two-way Coupling',{'lag_params%solver_approach': 2})
 
                 if adap_dt=='F':
                     stack.push('',{})

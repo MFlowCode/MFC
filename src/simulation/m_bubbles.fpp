@@ -247,17 +247,15 @@ contains
             cdot_star = fpbdot
         end if
 
-        if (.not. bubbles_lagrange) then
-            if (.not. f_is_default(Web)) cdot_star = cdot_star + (2._wp/Web)*fV/(fR**2._wp)
-            if (.not. f_is_default(Re_inv)) cdot_star = cdot_star + 4._wp*Re_inv*((fV/fR)**2._wp)
-        end if
+        if (.not. f_is_default(Web)) cdot_star = cdot_star + (2._wp/Web)*fV/(fR**2._wp)
+        if (.not. f_is_default(Re_inv)) cdot_star = cdot_star + 4._wp*Re_inv*((fV/fR)**2._wp)
 
         tmp1 = fV/fC
         tmp2 = 1.5_wp*(fV**2._wp)*(tmp1/3._wp - 1._wp) + &
                (1._wp + tmp1)*(fCpbw - fCp)/fRho + &
                cdot_star*fR/(fRho*fC)
 
-        if (bubbles_lagrange .or. f_is_default(Re_inv)) then
+        if (f_is_default(Re_inv)) then
             f_rddot_KM = tmp2/(fR*(1._wp - tmp1))
         else
             f_rddot_KM = tmp2/(fR*(1._wp - tmp1) + 4._wp*Re_inv/(fRho*fC))
