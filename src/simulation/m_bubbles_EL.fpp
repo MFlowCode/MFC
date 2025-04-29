@@ -606,8 +606,16 @@ contains
 
                 !$acc loop seq
                 do l = 1, 3
-                    mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1), cell, l, q_prim_vf)
-                    mtn_dveldt(k, l, stage) = 0._wp
+                    if (lag_params%vel_model == 1) then
+                        mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1),cell, l, q_prim_vf)
+                        mtn_dveldt(k, l, stage) = 0._wp
+                    elseif (lag_params%vel_model == 2) then
+                        mtn_dposdt(k, l, stage) = mtn_vel(k,l,1)
+                        mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,1),intfc_rad(k,1),mtn_vel(k,l,1),cell,l,q_prim_vf)
+                    else
+                        mtn_dposdt(k, l, stage) = 0._wp
+                        mtn_dveldt(k, l, stage) = 0._wp
+                    end if
                 end do
             end do
         else
@@ -623,22 +631,19 @@ contains
 
                 !$acc loop seq
                 do l = 1, 3
-                    mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1),cell, l, q_prim_vf)
-                    mtn_dveldt(k, l, stage) = 0._wp
+                    if (lag_params%vel_model == 1) then
+                        mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1),cell, l, q_prim_vf)
+                        mtn_dveldt(k, l, stage) = 0._wp
+                    elseif (lag_params%vel_model == 2) then
+                        mtn_dposdt(k, l, stage) = mtn_vel(k,l,1)
+                        mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,1),intfc_rad(k,1),mtn_vel(k,l,1),cell,l,q_prim_vf)
+                    else
+                        mtn_dposdt(k, l, stage) = 0._wp
+                        mtn_dveldt(k, l, stage) = 0._wp
+                    end if
                 end do
             end do
         end if
-
-        ! Bubbles remain in a fixed position
-#if 0
-        !$acc parallel loop collapse(2) gang vector default(present) private(k) copyin(stage)
-        do k = 1, nBubs
-            do l = 1, 3
-                mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_ps(k,:,1), l, q_prim_vf)
-                mtn_dveldt(k, l, stage) = 0._wp
-            end do
-        end do
-#endif
 
         call nvtxEndRange
 

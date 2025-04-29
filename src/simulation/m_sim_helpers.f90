@@ -10,8 +10,7 @@ module m_sim_helpers
 
     private; public :: s_compute_enthalpy, &
  s_compute_stability_from_dt, &
- s_compute_dt_from_cfl, &
- f_interpolate_velocity
+ s_compute_dt_from_cfl
 
 contains
 
@@ -267,57 +266,5 @@ contains
         end if
 
     end subroutine s_compute_dt_from_cfl
-
-    function f_interpolate_velocity(pos, cell, i, q_prim_vf) result(v)
-!$acc routine seq
-        integer, dimension(3) :: cell
-        integer :: i
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(wp) :: v
-        real(wp) :: L1, L2, L3
-        real(wp) :: pos, x1, x2, x3
-        real(wp) :: y1, y2, y3
-
-        if (i == 1) then
-            x1 = x_cc(cell(1) - 1)
-            y1 = q_prim_vf(momxb)%sf(cell(1) - 1, cell(2), cell(3))
-            x2 = x_cc(cell(1))
-            y2 = q_prim_vf(momxb)%sf(cell(1)    , cell(2), cell(3))
-            x3 = x_cc(cell(1) + 1)
-            y3 = q_prim_vf(momxb)%sf(cell(1) + 1, cell(2), cell(3))
-        elseif (i == 2) then
-            x1 = y_cc(cell(2) - 1)
-            y1 = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 1, cell(3))
-            x2 = y_cc(cell(2))
-            y2 = q_prim_vf(momxb + 1)%sf(cell(1), cell(2)    , cell(3))
-            x3 = y_cc(cell(2) + 1)
-            y3 = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 1, cell(3))
-        elseif (i == 3 .and. p > 0) then
-            x1 = z_cc(cell(3) - 1)
-            y1 = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 1)
-            x2 = z_cc(cell(3))
-            y1 = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3)    )
-            x3 = z_cc(cell(3) + 1)
-            y1 = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 1)
-        else
-            x1 = 0._wp; x2 = 0._wp; x3 = 0._wp
-            y1 = 0._wp; y2 = 0._wp; y3 = 0._wp
-        endif
-
-        L1 = ((pos - x2)*(pos - x3)) / ((x1 - x2)*(x1 - x3))
-        L2 = ((pos - x1)*(pos - x3)) / ((x2 - x1)*(x2 - x3))
-        L3 = ((pos - x1)*(pos - x2)) / ((x3 - x1)*(x3 - x2))
-
-        v = L1*y1 + L2*y2 + L3*y3
-
-        !if (i == 1) then
-            !V = q_prim_vf(momxb)%sf(cell(1),cell(2),cell(3))
-        !elseif (i == 2) then
-            !V = q_prim_vf(momxb+1)%sf(cell(1),cell(2),cell(3))
-        !else
-            !V = q_prim_vf(momxe)%sf(cell(1),cell(2),cell(3))
-        !end if
-
-    end function f_interpolate_velocity
 
 end module m_sim_helpers
