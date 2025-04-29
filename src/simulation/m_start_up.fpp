@@ -174,7 +174,6 @@ contains
             cfl_adap_dt, cfl_const_dt, cfl_target, &
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
-            rkck_adap_dt, rkck_tolerance, &
             hyperelasticity, R0ref, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar
 
@@ -208,7 +207,7 @@ contains
             n_glb = n
             p_glb = p
 
-            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
@@ -1231,13 +1230,13 @@ contains
         integer :: i
 
         if (cfl_dt) then
-            if (cfl_const_dt .and. t_step == 0 .and. .not. rkck_adap_dt) call s_compute_dt()
+            if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
 
-            if (cfl_adap_dt .and. .not. rkck_adap_dt) call s_compute_dt()
+            if (cfl_adap_dt) call s_compute_dt()
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0 .and. .not. rkck_adap_dt) then
+            if (dt < 1e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
                 print*, "Delta t = ", dt
                 call s_mpi_abort("Delta t has become too small")
             end if
@@ -1297,9 +1296,6 @@ contains
             call s_3rd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
-        elseif (time_stepper == 4) then
-            ! (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepper (Cash J. and Karp A., 1990)
-            call s_4th_5th_order_rkck(t_step, time_avg)
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)

@@ -479,10 +479,7 @@ module m_global_parameters
     !> @{!
     logical :: bubbles_lagrange                         !< Lagrangian subgrid bubble model switch
     type(bubbles_lagrange_parameters) :: lag_params     !< Lagrange bubbles' parameters
-    logical :: rkck_adap_dt                             !< Activates the adaptive rkck time stepping algorithm
-    real(wp) :: rkck_time_tmp, rkck_tolerance    !Temp time (in rkck stepper) and tolerance error
-    real(wp) :: dt_max                           !< Maximum time step size
-    !$acc declare create(bubbles_lagrange, lag_params, rkck_adap_dt, dt_max, rkck_time_tmp, rkck_tolerance)
+    !$acc declare create(bubbles_lagrange, lag_params)
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
@@ -748,10 +745,6 @@ contains
         lag_params%Thost = dflt_real
         lag_params%x0 = dflt_real
         lag_params%diffcoefvap = dflt_real
-        rkck_adap_dt = .false.
-        rkck_time_tmp = dflt_real
-        rkck_tolerance = dflt_real
-        dt_max = dflt_real
 
         ! Continuum damage model
         tau_star = dflt_real

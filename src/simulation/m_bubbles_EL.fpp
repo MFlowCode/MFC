@@ -58,10 +58,9 @@ module m_bubbles_EL
     !$acc gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
     !$acc gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt)
 
-    real(wp), allocatable, dimension(:, :) :: lag_RKCKcoef   !< RKCK 4th-5th time stepper coefficients
     integer, private :: lag_num_ts                                  !<  Number of time stages in the time-stepping scheme
-
-    !$acc declare create(lag_RKCKcoef, lag_num_ts)
+    
+    !$acc declare create(lag_num_ts)
 
     integer :: nBubs                            !< Number of bubbles in the local domain
     real(wp) :: Rmax_glb, Rmin_glb       !< Maximum and minimum bubbe size in the local domain
@@ -82,7 +81,6 @@ contains
 
         ! Setting number of time-stages for selected time-stepping scheme
         lag_num_ts = time_stepper
-        if (time_stepper == 4) lag_num_ts = num_ts_rkck
 
         ! Allocate space for the Eulerian fields needed to map the effect of the bubbles
         if (lag_params%solver_approach == 1) then
@@ -136,21 +134,6 @@ contains
         @:ALLOCATE(gas_dmvdt(1:nBubs_glb, 1:lag_num_ts))
         @:ALLOCATE(mtn_dposdt(1:nBubs_glb, 1:3, 1:lag_num_ts))
         @:ALLOCATE(mtn_dveldt(1:nBubs_glb, 1:3, 1:lag_num_ts))
-
-        if (time_stepper == 4) then
-            !< Allocate space for the RKCK 4th/5th time stepper coefficients
-            @:ALLOCATE(lag_RKCKcoef(1:lag_num_ts+1, 1:lag_num_ts))
-            do i = 1, lag_num_ts
-                ! Populate RKCK coefficients (from constants)
-                lag_RKCKcoef(1, i) = rkck_coef1(i)
-                lag_RKCKcoef(2, i) = rkck_coef2(i)
-                lag_RKCKcoef(3, i) = rkck_coef3(i)
-                lag_RKCKcoef(4, i) = rkck_coef4(i)
-                lag_RKCKcoef(5, i) = rkck_coef5(i)
-                lag_RKCKcoef(6, i) = rkck_coef6(i)
-                lag_RKCKcoef(7, i) = rkck_coefE(i)
-            end do
-        end if
 
         ! Starting bubbles
         call s_start_lagrange_inputs()
@@ -269,12 +252,6 @@ contains
         Rmax_glb = min(dflt_real, -dflt_real)
         Rmin_glb = max(dflt_real, -dflt_real)
         !$acc update device(Rmax_glb, Rmin_glb)
-
-        if (time_stepper == 4) then
-            !Initial and largest dt - rkck stepper
-            dt_max = dt
-            !$acc update device(lag_RKCKcoef)
-        end if
 
         !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
 
@@ -1142,244 +1119,6 @@ contains
 
     end subroutine s_update_lagrange_tdv_rk
 
-    !>  This subroutine updates the Euler-Lagrange temporal variables before entering to the next time-stage in the RKCK stepper.
-        !! @param RKstep Current time step in the RKCK adaptive stepper
-        !! @param q_cons_ts Conservative variables
-        !! @param rhs_ts Time derivatives of the conservative variables
-        !! @param lag_largestep Negative radius flag
-    subroutine s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts, lag_largestep)
-
-        integer, intent(in) :: RKstep
-        type(vector_field), dimension(:), intent(inout) :: q_cons_ts
-        type(vector_field), dimension(:), intent(inout) :: rhs_ts
-        real(wp), intent(out) :: lag_largestep
-
-        integer :: i, j, k, l, q
-        real(wp) :: radiusOld, velOld, aux_glb
-        integer :: remove_id
-
-        call s_transfer_data_to_tmp()
-
-        lag_largestep = 0._wp
-        remove_id = 0
-        !$acc parallel loop gang vector default(present) reduction(+:lag_largestep) &
-        !$acc reduction(MAX: remove_id) copyin(RKstep) copy(lag_largestep, remove_id)
-        do k = 1, nBubs
-
-            radiusOld = intfc_rad(k, 2)
-            velOld = intfc_vel(k, 2)
-
-            !$acc loop seq
-            do i = 1, RKstep
-                intfc_rad(k, 2) = intfc_rad(k, 2) + dt*lag_RKCKcoef(RKstep, i)*intfc_draddt(k, i)
-                intfc_vel(k, 2) = intfc_vel(k, 2) + dt*lag_RKCKcoef(RKstep, i)*intfc_dveldt(k, i)
-                mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 2) + dt*lag_RKCKcoef(RKstep, i)*mtn_dposdt(k, 1:3, i)
-                mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 2) + dt*lag_RKCKcoef(RKstep, i)*mtn_dveldt(k, 1:3, i)
-                gas_p(k, 2) = gas_p(k, 2) + dt*lag_RKCKcoef(RKstep, i)*gas_dpdt(k, i)
-                gas_mv(k, 2) = gas_mv(k, 2) + dt*lag_RKCKcoef(RKstep, i)*gas_dmvdt(k, i)
-            end do
-
-            if ((intfc_rad(k, 2) <= 0._wp) .or. &                       ! no negative radius
-                (mtn_pos(k, 1, 2) /= mtn_pos(k, 1, 2))) then  ! finite bubble location
-                print *, 'Negative bubble radius encountered'
-                lag_largestep = lag_largestep + 1._wp
-                if (dt < 2._wp*verysmall_dt) then
-                    remove_id = max(remove_id, k)
-                end if
-            end if
-
-        end do
-
-        if (remove_id /= 0) call s_remove_lag_bubble(remove_id)
-
-#ifdef MFC_MPI
-        if (num_procs > 1) then
-            call s_mpi_allreduce_sum(lag_largestep, aux_glb)
-            lag_largestep = aux_glb
-        end if
-#endif
-
-        if (lag_largestep > 0._wp) return
-
-        ! Update background fluid variables
-        !$acc parallel loop collapse(4) gang vector default(present) copyin(RKstep)
-        do l = 1, sys_size
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        q_cons_ts(2)%vf(l)%sf(i, j, k) = &
-                            q_cons_ts(1)%vf(l)%sf(i, j, k)
-                        !$acc loop seq
-                        do q = 1, RKstep
-                            q_cons_ts(2)%vf(l)%sf(i, j, k) = &
-                                q_cons_ts(2)%vf(l)%sf(i, j, k) + &
-                                dt*lag_RKCKcoef(RKstep, q)*rhs_ts(q)%vf(l)%sf(i, j, k)
-                        end do
-                    end do
-                end do
-            end do
-        end do
-
-    end subroutine s_update_tmp_rkck
-
-    !>  This subroutine calculates the maximum error between the 4th and 5th order Runge-Kutta-Cash-Karp solutions
-        !!      for the same time step size. If the errors are smaller than a tolerance, then the algorithm employs
-        !!      the 5th order solution, while if not, both eulerian/lagrangian variables are re-calculated with a
-        !!      smaller time step size.
-        !! @param rkck_errmax Truncation error
-    subroutine s_calculate_rkck_truncation_error(rkck_errmax)
-
-        real(wp), intent(out) :: rkck_errmax
-
-        real(wp) :: erraux, errb
-        integer :: i, j, k
-
-        rkck_errmax = 0._wp
-        !$acc parallel loop gang vector default(present) reduction(MAX: rkck_errmax) copy(rkck_errmax)
-        do k = 1, nBubs
-            errb = 0._wp
-
-            !Bubble radius error
-            erraux = 0._wp
-            !$acc loop seq
-            do i = 1, lag_num_ts
-                erraux = erraux + lag_RKCKcoef(7, i)*intfc_draddt(k, i)
-            end do
-            errb = max(errb, abs(erraux)*dt/bub_R0(k))
-
-            !Interface velocity error
-            erraux = 0._wp
-            !$acc loop seq
-            do i = 1, lag_num_ts
-                erraux = erraux + lag_RKCKcoef(7, i)*intfc_dveldt(k, i)
-            end do
-            errb = max(errb, abs(erraux)*dt)
-
-            !Bubble velocity error
-            !$acc loop seq
-            do j = 1, 3
-                erraux = 0._wp
-                !$acc loop seq
-                do i = 1, lag_num_ts
-                    erraux = erraux + lag_RKCKcoef(7, i)*mtn_dposdt(k, j, i)
-                end do
-                errb = max(errb, abs(erraux)*dt/(abs(mtn_vel(k, j, 2)) + 1.0d-4))
-            end do
-            rkck_errmax = max(rkck_errmax, errb)
-        end do
-
-    end subroutine s_calculate_rkck_truncation_error
-
-    !>  This subroutine updates the conservative fields and the lagrangian variables after accepting the performed time step.
-        !! @param q_cons_ts Conservative variables
-    subroutine s_update_rkck(q_cons_ts)
-
-        type(vector_field), dimension(:), intent(inout) :: q_cons_ts
-
-        integer :: i, j, k, l
-
-        !$acc parallel loop gang vector default(present) private(k)
-        do k = 1, nBubs
-            !Accept time step (actual vars = temporal vars)
-            mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 2)
-            mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 2)
-            intfc_rad(k, 1) = intfc_rad(k, 2)
-            intfc_vel(k, 1) = intfc_vel(k, 2)
-            gas_p(k, 1) = gas_p(k, 2)
-            gas_mv(k, 1) = gas_mv(k, 2)
-        end do
-
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 0, m
-            do j = 0, n
-                do k = 0, p
-                    do l = 1, sys_size
-                        q_cons_ts(1)%vf(l)%sf(i, j, k) = q_cons_ts(2)%vf(l)%sf(i, j, k)
-                    end do
-                end do
-            end do
-        end do
-
-    end subroutine s_update_rkck
-
-    !>  This subroutine computes the next time step in the adaptive RKCK stepper in the CPU.
-        !! @param lag_largestep Negative radius flag
-        !! @param restart_rkck_step Restart the current time step
-        !! @param rkck_errmax Truncation error
-    subroutine s_compute_rkck_dt(lag_largestep, restart_rkck_step, rkck_errmax)
-
-        real(wp), intent(in) :: lag_largestep
-        logical, intent(out) :: restart_rkck_step
-        real(wp), intent(inout), optional :: rkck_errmax
-
-        real(wp) :: htemp, aux_glb
-
-        restart_rkck_step = .false.
-
-        if (lag_largestep > 0._wp) then ! Encountered negative radius, so reduce dt and restart time step
-
-            if (rkck_adap_dt) then
-                if (dt > verysmall_dt) then
-                    restart_rkck_step = .true.
-                    dt = SHRNKDT*dt
-                    if (num_procs > 1) then
-                        call s_mpi_allreduce_min(dt, aux_glb)
-                        dt = aux_glb
-                    end if
-                    !$acc update device(dt)
-                    if (proc_rank == 0) print *, '>>>>> WARNING: Reducing dt and restarting time step, now dt: ', dt
-                else
-                    call s_mpi_abort('Time step smaller than 1e-14')
-                end if
-            else
-                call s_mpi_abort('Time step too large, please reduce dt or enable rkck_adap_dt')
-            end if
-
-            return
-
-        end if
-
-        if (rkck_adap_dt) then ! Checking truncation error
-
-            rkck_errmax = min(rkck_errmax, 1._wp)
-            if (num_procs > 1) then
-                call s_mpi_allreduce_max(rkck_errmax, aux_glb)
-                rkck_errmax = aux_glb
-            end if
-            rkck_errmax = rkck_errmax/rkck_tolerance ! Scale relative to user required tolerance.
-
-            if ((rkck_errmax > 1._wp)) then   ! Truncation error too large, reduce dt and restart time step
-                restart_rkck_step = .true.
-                htemp = SAFETY*dt*(rkck_errmax**PSHRNK)
-                dt = sign(max(abs(htemp), (1._wp - SAFETY)*abs(dt)), dt)  ! No more than a factor of 10.
-            else                            ! Step succeeded. Compute size of next step.
-                if (rkck_errmax > ERRCON) then
-                    dt = SAFETY*dt*(rkck_errmax**PGROW) ! No more than a factor of 5 increase.
-                else
-                    dt = (1._wp/SHRNKDT)*dt ! Truncation error too small (< 1.89e-4), increase time step
-                end if
-            end if
-
-            !dt precision accuracy is 16 digits
-            dt = (ceiling(dt*RNDDEC)*RNDDEC + ceiling(dt*(RNDDEC**2._wp) - ceiling(dt*RNDDEC)*RNDDEC))/(RNDDEC**2._wp)
-            dt = min(dt, dt_max)
-
-            if (dt < 0._wp) call s_mpi_abort('dt must not be negative')
-            if (num_procs > 1) then
-                call s_mpi_allreduce_min(dt, aux_glb)
-                dt = aux_glb
-            end if
-            !$acc update device(dt)
-
-            if (restart_rkck_step) then
-                if (proc_rank == 0) print '("WARNING: Truncation error found. Restaring time step, and now dt = "ES8.6"")', &
-                    dt
-            end if
-
-        end if
-
-    end subroutine s_compute_rkck_dt
-
     !> This subroutine returns the computational coordinate of the cell for the given position.
           !! @param pos Input coordinates
           !! @param cell Computational coordinate of the cell
@@ -1932,9 +1671,6 @@ contains
         @:DEALLOCATE(q_beta%vf)
 
         !Deallocating space
-        if (time_stepper == 4) then
-            @:DEALLOCATE(lag_RKCKcoef)
-        end if
         @:DEALLOCATE(lag_id)
         @:DEALLOCATE(bub_R0)
         @:DEALLOCATE(Rmax_stats)
