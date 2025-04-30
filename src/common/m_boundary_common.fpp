@@ -1202,7 +1202,7 @@ contains
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
-                            pb(m+j, k, l, q, i) = pb(0, k, l, q, i)
+                            pb(m + j, k, l, q, i) = pb(0, k, l, q, i)
                             mv(m, k, l, q, i) = mv(0, k, l, q, i)
                         end do
                     end do
@@ -1262,7 +1262,7 @@ contains
 
         end if
 
-    end subroutine s_qbmm_extrapolation 
+    end subroutine s_qbmm_extrapolation
 
     subroutine s_populate_capillary_buffers(c_divs, bc_type)
 

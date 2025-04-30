@@ -42,9 +42,6 @@ module m_mpi_proxy
     !! immersed boundary markers, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
-    !$acc declare create( ib_buff_send, ib_buff_recv)
-    !$acc declare create(c_divs_buff_send, c_divs_buff_recv)
-
     !> @name Generic flags used to identify and report MPI errors
     !> @{
     integer, private :: err_code, ierr, v_size
