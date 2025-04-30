@@ -80,6 +80,7 @@ print(
             "n": Ny,
             "p": Nz,
             "dt": round(dt * c0 / x0, 6),
+            "adap_dt": "T",
             "n_start": 0,
             "t_save": saveTime * (c0 / x0),
             "t_stop": stopTime * (c0 / x0),
@@ -89,7 +90,7 @@ print(
             "num_patches": 1,
             "mpp_lim": "F",
             "viscous": "T",
-            "time_stepper": 4,  # 4th/5th RKCK
+            "time_stepper": 3,
             "weno_order": 5,
             "weno_eps": 1.0e-16,
             "mapped_weno": "T",
@@ -141,8 +142,6 @@ print(
             # Lagrangian Bubbles
             "bubbles_lagrange": "T",
             "bubble_model": 2,  # Keller-Miksis model
-            "rkck_adap_dt": "T",  # Activate adaptive time stepper
-            "rkck_tolerance": 1.0e-05,
             "lag_params%nBubs_glb": 1,
             "lag_params%solver_approach": 2,  # Two-way coupled
             "lag_params%cluster_type": 2,

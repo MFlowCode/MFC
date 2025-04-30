@@ -278,8 +278,8 @@ contains
     subroutine s_check_inputs_adapt_dt
         @:PROHIBIT(adap_dt .and. time_stepper /= 3, "adapt_dt requires Runge-Kutta 3 (time_stepper = 3)")
         @:PROHIBIT(adap_dt .and. qbmm)
-        @:PROHIBIT(adap_dt .and. (.not. polytropic))
-        @:PROHIBIT(adap_dt .and. (.not. adv_n))
+        @:PROHIBIT(adap_dt .and. (.not. polytropic) .and. (.not. bubbles_lagrange))
+        @:PROHIBIT(adap_dt .and. (.not. adv_n) .and. (.not. bubbles_lagrange))
     end subroutine s_check_inputs_adapt_dt
 
     !> Checks constraints on alternative sound speed parameters (alt_soundspeed)

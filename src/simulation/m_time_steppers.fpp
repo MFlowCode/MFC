@@ -310,7 +310,7 @@ contains
         ! Stage 1 of 1
         call nvtxStartRange("TIMESTEP")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
 
 #ifdef DEBUG
         print *, 'got rhs'
@@ -334,10 +334,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
-            call s_update_lagrange_tdv_rk(stage=1)
-        end if
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -423,7 +420,7 @@ contains
 
         call nvtxStartRange("TIMESTEP")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -439,10 +436,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
-            call s_update_lagrange_tdv_rk(stage=1)
-        end if
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -512,12 +506,9 @@ contains
 
         ! Stage 2 of 2
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
-            call s_update_lagrange_tdv_rk(stage=2)
-        end if
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -611,7 +602,7 @@ contains
             call nvtxStartRange("TIMESTEP")
         end if
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -627,10 +618,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
-            call s_update_lagrange_tdv_rk(stage=1)
-        end if
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -700,12 +688,9 @@ contains
 
         ! Stage 2 of 3
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
-            call s_update_lagrange_tdv_rk(stage=2)
-        end if
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -776,12 +761,9 @@ contains
         end if
 
         ! Stage 3 of 3
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=3)
-            call s_update_lagrange_tdv_rk(stage=3)
-        end if
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -879,13 +861,13 @@ contains
         call nvtxStartRange("TIMESTEP")
 
         ! Stage 1 of 3
-        call s_adaptive_dt_bubble(t_step)
+        call s_adaptive_dt_bubble(t_step, 1)
 
         ! Stage 2 of 3
         call s_3rd_order_tvd_rk(t_step, time_avg)
 
         ! Stage 3 of 3
-        call s_adaptive_dt_bubble(t_step)
+        call s_adaptive_dt_bubble(t_step, 3)
 
         call nvtxEndRange
 
@@ -897,9 +879,9 @@ contains
 
     !> Bubble source part in Strang operator splitting scheme
         !! @param t_step Current time-step
-    subroutine s_adaptive_dt_bubble(t_step)
+    subroutine s_adaptive_dt_bubble(t_step, stage)
 
-        integer, intent(in) :: t_step
+        integer, intent(in) :: t_step, stage
 
         type(vector_field) :: gm_alpha_qp
 
@@ -910,9 +892,27 @@ contains
             idwint, &
             gm_alpha_qp%vf)
 
-        call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+        if (bubbles_euler) then
 
-        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+            call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+            call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
+        elseif (bubbles_lagrange) then
+
+            call s_populate_variables_buffers(q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+            call s_compute_bubble_EL_dynamics(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf, stage)
+            call s_transfer_data_to_tmp()
+            call s_smear_voidfraction()
+            if (stage == 3) then
+                if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
+                if (lag_params%write_bubbles) then
+                    !$acc update host(gas_p, gas_mv, intfc_rad, intfc_vel)
+                    call s_write_lag_particles(mytime)
+                end if
+                call s_write_void_evol(mytime)
+            end if
+
+        end if
 
     end subroutine s_adaptive_dt_bubble
 

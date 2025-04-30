@@ -89,7 +89,7 @@ contains
         elseif (lag_params%solver_approach == 2) then
             ! Two-way coupling
             q_beta_idx = 4
-            if (lag_params%cluster_type >= 4) then
+            if (p == 0) then
                 !Subgrid noise model for 2D approximation
                 q_beta_idx = 6
             end if
@@ -482,33 +482,32 @@ contains
 
     end subroutine s_restart_bubbles
 
-    !>  Contains the two-way and one-way Euler-Lagrange coupled algorithm, including the bubble dynamics subroutines.
+    !>  Contains the bubble dynamics subroutines.
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param rhs_vf Calculated change of conservative variables
         !! @param stage Current stage in the time-stepper algorithm
-    subroutine s_compute_EL_coupled_solver(q_cons_vf, q_prim_vf, rhs_vf, stage)
+    subroutine s_compute_bubble_EL_dynamics(q_cons_vf, q_prim_vf, t_step, rhs_vf, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        integer, intent(in) :: stage
+        integer, intent(in) :: t_step, stage
 
-        real(wp) :: vaporflux, pliqint
-        real(wp) :: preterm1, term2, paux, pint, Romega, term1_fac, Rb
-        real(wp) :: conc_v, R_m, gamma_m, fpb, fmass_n, fmass_v
-        real(wp) :: fR, fV, fbeta_c, fbeta_t, fR0, fpbdt
-        real(wp) :: pinf, aux1, aux2, velint, cson, rhol
+        real(wp) :: myVapFlux
+        real(wp) :: preterm1, term2, paux, pint, Romega, term1_fac
+        real(wp) :: myR_m, mygamma_m, myPb, myMass_n, myMass_v
+        real(wp) :: myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot
+        real(wp) :: myPinf, aux1, aux2, myCson, myRho
         real(wp) :: gamma, pi_inf, qv
         real(wp), dimension(contxe) :: myalpha_rho, myalpha
         real(wp), dimension(2) :: Re
         integer, dimension(3) :: cell
+        real(wp) :: dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu !< Dummy variables for unified subgrid bubble subroutines
 
         integer :: i, k, l
 
         call nvtxStartRange("LAGRANGE-BUBBLE-DYNAMICS")
-
-        !< BUBBLE DYNAMICS
 
         ! Subgrid p_inf model based on Maeda and Colonius (2018).
         if (lag_params%pressure_corrector) then
@@ -516,85 +515,83 @@ contains
             !$acc parallel loop gang vector default(present) private(k, cell)
             do k = 1, nBubs
                 call s_get_pinf(k, q_prim_vf, 2, paux, cell, preterm1, term2, Romega)
-                fR0 = bub_R0(k)
-                fR = intfc_rad(k, 2)
-                fV = intfc_vel(k, 2)
-                fpb = gas_p(k, 2)
-                pint = f_cpbw_KM(fR0, fR, fV, fpb)
-                pint = pint + 0.5_wp*fV**2._wp
+                myR0 = bub_R0(k)
+                myR = intfc_rad(k, 2)
+                myV = intfc_vel(k, 2)
+                myPb = gas_p(k, 2)
+                pint = f_cpbw_KM(myR0, myR, myV, myPb)
+                pint = pint + 0.5_wp*myV**2._wp
                 if (lag_params%cluster_type == 2) then
                     bub_dphidt(k) = (paux - pint) + term2
                     ! Accounting for the potential induced by the bubble averaged over the control volume
                     ! Note that this is based on the incompressible flow assumption near the bubble.
-                    Rb = intfc_rad(k, 2)
-                    term1_fac = 3._wp/2._wp*(Rb*(Romega**2._wp - Rb**2._wp))/(Romega**3._wp - Rb**3._wp)
+                    term1_fac = 3._wp/2._wp*(myR*(Romega**2._wp - myR**2._wp))/(Romega**3._wp - myR**3._wp)
                     bub_dphidt(k) = bub_dphidt(k)/(1._wp - term1_fac)
                 end if
             end do
         end if
 
         ! Radial motion model
-        if (bubble_model == 2) then
-            !$acc parallel loop gang vector default(present) private(k, myalpha_rho, myalpha, Re, cell) copyin(stage)
-            do k = 1, nBubs
-                ! Keller-Miksis model
+        !$acc parallel loop gang vector default(present) private(k, myalpha_rho, myalpha, Re, cell) copyin(stage)
+        do k = 1, nBubs
+            ! Keller-Miksis model
 
-                ! Current bubble state
-                fpb = gas_p(k, 2)
-                fmass_n = gas_mg(k)
-                fmass_v = gas_mv(k, 2)
-                fR = intfc_rad(k, 2)
-                fV = intfc_vel(k, 2)
-                fbeta_c = gas_betaC(k)
-                fbeta_t = gas_betaT(k)
-                fR0 = bub_R0(k)
+            ! Current bubble state
+            myPb = gas_p(k, 2)
+            myMass_n = gas_mg(k)
+            myMass_v = gas_mv(k, 2)
+            myR = intfc_rad(k, 2)
+            myV = intfc_vel(k, 2)
+            myBeta_c = gas_betaC(k)
+            myBeta_t = gas_betaT(k)
+            myR0 = bub_R0(k)
 
-                ! Mixture properties in the bubble
-                conc_v = 0._wp
-                if (lag_params%massTransfer_model) conc_v = 1._wp/(1._wp + (R_v/R_n)*(fpb/pv - 1._wp))
-                R_m = (fmass_n*R_n + fmass_v*R_v)
-                gamma_m = conc_v*gamma_v + (1._wp - conc_v)*gamma_n
+            ! Vapor and heat fluxes
+            myVapFlux = f_vflux(myR, myV, myPb, myMass_v, k, myMass_n, myBeta_c, myR_m, mygamma_m)
+            myPbdot = f_bpres_dot(myVapFlux, myR, myV, myPb, myMass_v, k, myBeta_t, myR_m, mygamma_m)
+            myMvdot = 4._wp*pi*myR**2._wp*myVapFlux
 
-                ! Vapor and heat fluxes
-                vaporflux = f_vflux(fR, fV, fmass_v, k, fmass_n, fbeta_c, conc_v)
-                fpbdt = f_bpres_dot(vaporflux, fR, fV, fpb, fmass_v, k, fbeta_t, R_m, gamma_m, conc_v)
-                gas_dmvdt(k, stage) = 4._wp*pi*fR**2._wp*vaporflux
+            ! Obtaining driving pressure
+            call s_get_pinf(k, q_prim_vf, 1, myPinf, cell, aux1, aux2)
 
-                ! Pressure at the bubble wall
-                pliqint = f_cpbw_KM(fR0, fR, fV, fpb)
-
-                ! Obtaining driving pressure
-                call s_get_pinf(k, q_prim_vf, 1, pinf, cell, aux1, aux2)
-
-                ! Obtain liquid density and computing speed of sound from pinf
-                !$acc loop seq
-                do i = 1, contxe
-                    myalpha_rho(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))* &
-                                     q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
-                    myalpha(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))
-                end do
-                call s_convert_species_to_mixture_variables_acc(rhol, gamma, pi_inf, qv, myalpha, &
-                                                                myalpha_rho, Re, cell(1), cell(2), cell(3))
-                call s_compute_cson_from_pinf(k, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
-
-                ! Velocity correction due to massflux
-                velint = fV - gas_dmvdt(k, stage)/(4._wp*pi*fR**2._wp*rhol)
-
-                ! Interphase acceleration and update vars
-                intfc_dveldt(k, stage) = f_rddot_KM(fpbdt, pinf, pliqint, rhol, fR, velint, fR0, cson)
-                gas_dpdt(k, stage) = fpbdt
-                intfc_draddt(k, stage) = fV
-
+            ! Obtain liquid density and computing speed of sound from pinf
+            !$acc loop seq
+            do i = 1, num_fluids
+                myalpha_rho(i) = q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
+                myalpha(i) = q_prim_vf(E_idx + i)%sf(cell(1), cell(2), cell(3))
             end do
-        else
-            if (proc_rank == 0) print *, 'WARNING: Lagrange bubbles work with Keller Miksis model!', &
-                ' Deactivating radial motion.'
-            !$acc parallel loop gang vector default(present) private(k) copyin(stage)
-            do k = 1, nBubs
-                intfc_dveldt(k, stage) = 0._wp
-                intfc_draddt(k, stage) = 0._wp
-            end do
-        end if
+            call s_convert_species_to_mixture_variables_acc(myRho, gamma, pi_inf, qv, myalpha, &
+                                                            myalpha_rho, Re, cell(1), cell(2), cell(3))
+            call s_compute_cson_from_pinf(k, q_prim_vf, myPinf, cell, myRho, gamma, pi_inf, myCson)
+
+            ! Adaptive time stepping
+            if (adap_dt) then
+
+                call s_advance_step(myRho, myPinf, myR, myV, myR0, myPb, myPbdot, dmalf, &
+                                    dmntait, dmBtait, dm_bub_adv_src, dm_divu, &
+                                    k, myMass_v, myMass_n, myBeta_c, &
+                                    myBeta_t, myCson)
+
+                ! Update bubble state
+                intfc_rad(k, 1) = myR
+                intfc_vel(k, 1) = myV
+                gas_p(k, 1) = myPb
+                gas_mv(k, 1) = myMass_v
+
+            else
+
+                ! Radial acceleration from bubble models                   
+                intfc_dveldt(k, stage) = f_rddot(myRho, myPinf, myR, myV, myR0, &
+                                                myPb, myPbdot, dmalf, dmntait, dmBtait, &
+                                                dm_bub_adv_src, dm_divu, &
+                                                myCson)
+                intfc_draddt(k, stage) = myV
+                gas_dmvdt(k, stage) = myMvdot
+                gas_dpdt(k, stage) = myPbdot
+
+            end if
+
+        end do
 
         ! Bubbles remain in a fixed position
         !$acc parallel loop collapse(2) gang vector default(present) private(k) copyin(stage)
@@ -607,11 +604,105 @@ contains
 
         call nvtxEndRange
 
-        !< EULER-LAGRANGE COUPLING
-        call s_smear_voidfraction()
-        if (lag_params%solver_approach == 2) call s_add_rhs_sources(q_cons_vf, q_prim_vf, rhs_vf)
+    end subroutine s_compute_bubble_EL_dynamics
 
-    end subroutine s_compute_EL_coupled_solver
+    !>  The purpose of this subroutine is to obtain the bubble source terms based on Maeda and Colonius (2018)
+        !!      and add them to the RHS scalar field.
+        !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf Conservative variables
+        !! @param rhs_vf Time derivative of the conservative variables
+    subroutine s_compute_bubbles_EL_source(q_cons_vf, q_prim_vf, rhs_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+
+        integer :: i, j, k, l
+
+        if (.not. adap_dt) call s_smear_voidfraction()
+
+        if (lag_params%solver_approach == 2) then
+
+            if (p == 0) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do k = 0, p
+                    do j = 0, n
+                        do i = 0, m
+                            do l = 1, E_idx
+                                if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                    rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
+                                                            q_cons_vf(l)%sf(i, j, k)*(q_beta%vf(2)%sf(i, j, k) + &
+                                                                                      q_beta%vf(5)%sf(i, j, k))
+
+                                end if
+                            end do
+                        end do
+                    end do
+                end do
+            else
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do k = 0, p
+                    do j = 0, n
+                        do i = 0, m
+                            do l = 1, E_idx
+                                if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                    rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
+                                                            q_cons_vf(l)%sf(i, j, k)/q_beta%vf(1)%sf(i, j, k)* &
+                                                            q_beta%vf(2)%sf(i, j, k)
+                                end if
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            do l = 1, num_dims
+
+                call s_gradient_dir(q_prim_vf(E_idx), q_beta%vf(3), l)
+
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do k = 0, p
+                    do j = 0, n
+                        do i = 0, m
+                            if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                rhs_vf(contxe + l)%sf(i, j, k) = rhs_vf(contxe + l)%sf(i, j, k) - &
+                                                                 (1._wp - q_beta%vf(1)%sf(i, j, k))/ &
+                                                                 q_beta%vf(1)%sf(i, j, k)* &
+                                                                 q_beta%vf(3)%sf(i, j, k)
+                            end if
+                        end do
+                    end do
+                end do
+
+                !source in energy
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do k = idwbuff(3)%beg, idwbuff(3)%end
+                    do j = idwbuff(2)%beg, idwbuff(2)%end
+                        do i = idwbuff(1)%beg, idwbuff(1)%end
+                            q_beta%vf(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
+                        end do
+                    end do
+                end do
+
+                call s_gradient_dir(q_beta%vf(3), q_beta%vf(4), l)
+
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do k = 0, p
+                    do j = 0, n
+                        do i = 0, m
+                            if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) - &
+                                                            q_beta%vf(4)%sf(i, j, k)*(1._wp - q_beta%vf(1)%sf(i, j, k))/ &
+                                                            q_beta%vf(1)%sf(i, j, k)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+        end if
+
+    end subroutine s_compute_bubbles_EL_source
 
     !>  This procedure computes the speed of sound from a given driving pressure
         !! @param bub_id Bubble id
@@ -685,97 +776,6 @@ contains
         call nvtxEndRange
 
     end subroutine s_smear_voidfraction
-
-    !>  The purpose of this subroutine is to obtain the bubble source terms based on Maeda and Colonius (2018)
-        !!      and add them to the RHS scalar field.
-        !! @param q_cons_vf Conservative variables
-        !! @param q_prim_vf Conservative variables
-        !! @param rhs_vf Time derivative of the conservative variables
-    subroutine s_add_rhs_sources(q_cons_vf, q_prim_vf, rhs_vf)
-
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-
-        integer :: i, j, k, l
-
-        if (lag_params%cluster_type >= 4) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        do l = 1, E_idx
-                            if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
-                                                        q_cons_vf(l)%sf(i, j, k)*(q_beta%vf(2)%sf(i, j, k) + &
-                                                                                  q_beta%vf(5)%sf(i, j, k))
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-        else
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        do l = 1, E_idx
-                            if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
-                                                        q_cons_vf(l)%sf(i, j, k)/q_beta%vf(1)%sf(i, j, k)* &
-                                                        q_beta%vf(2)%sf(i, j, k)
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        do l = 1, num_dims
-
-            call s_gradient_dir(q_prim_vf(E_idx), q_beta%vf(3), l)
-
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                            rhs_vf(contxe + l)%sf(i, j, k) = rhs_vf(contxe + l)%sf(i, j, k) - &
-                                                             (1._wp - q_beta%vf(1)%sf(i, j, k))/ &
-                                                             q_beta%vf(1)%sf(i, j, k)* &
-                                                             q_beta%vf(3)%sf(i, j, k)
-                        end if
-                    end do
-                end do
-            end do
-
-            !source in energy
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do k = idwbuff(3)%beg, idwbuff(3)%end
-                do j = idwbuff(2)%beg, idwbuff(2)%end
-                    do i = idwbuff(1)%beg, idwbuff(1)%end
-                        q_beta%vf(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
-                    end do
-                end do
-            end do
-
-            call s_gradient_dir(q_beta%vf(3), q_beta%vf(4), l)
-
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                            rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) - &
-                                                        q_beta%vf(4)%sf(i, j, k)*(1._wp - q_beta%vf(1)%sf(i, j, k))/ &
-                                                        q_beta%vf(1)%sf(i, j, k)
-                        end if
-                    end do
-                end do
-            end do
-        end do
-
-    end subroutine s_add_rhs_sources
 
     !> The purpose of this procedure is obtain the bubble driving pressure p_inf
         !! @param bub_id Particle identifier
@@ -1324,11 +1324,13 @@ contains
         integer :: k
 
         character(LEN=path_len + 2*name_len) :: file_loc
+        logical :: file_exist
 
         write (file_loc, '(A,I0,A)') 'lag_bubble_evol_', proc_rank, '.dat'
         file_loc = trim(case_dir)//'/D/'//trim(file_loc)
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-        if (qtime == 0._wp) then
+        if (.not. file_exist) then
             open (11, FILE=trim(file_loc), FORM='formatted', position='rewind')
             write (11, *) 'currentTime, particleID, x, y, z, ', &
                 'coreVaporMass, coreVaporConcentration, radius, interfaceVelocity, ', &
@@ -1368,14 +1370,15 @@ contains
         real(wp) :: void_max_glb, void_avg_glb, vol_glb
 
         integer :: i, j, k
-        integer, dimension(3) :: cell
 
         character(LEN=path_len + 2*name_len) :: file_loc
+        logical :: file_exist
 
         if (proc_rank == 0) then
             write (file_loc, '(A)') 'voidfraction.dat'
             file_loc = trim(case_dir)//'/D/'//trim(file_loc)
-            if (qtime == 0._wp) then
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (.not. file_exist) then
                 open (12, FILE=trim(file_loc), FORM='formatted', position='rewind')
                 !write (12, *) 'currentTime, averageVoidFraction, ', &
                 !    'maximumVoidFraction, totalParticlesVolume'
