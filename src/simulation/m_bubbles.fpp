@@ -37,6 +37,7 @@ contains
         !!  @param fBtait Tait EOS parameter
         !!  @param f_bub_adv_src Source for bubble volume fraction
         !!  @param f_divu Divergence of velocity
+        !!  @param fCson Speed of sound from fP (EL)
     function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson)
         !$acc routine seq
         real(wp), intent(in) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
@@ -340,6 +341,8 @@ contains
         !!  @param iR0 Bubble size index (EE) or bubble identifier (EL)
         !!  @param fmass_n Current gas mass (EL)
         !!  @param fbeta_c Mass transfer coefficient (EL)
+        !!  @param fR_m Mixture gas constant (EL)
+        !!  @param fgamma_m Mixture gamma (EL)
     function f_vflux(fR, fV, fpb, fmass_v, iR0, fmass_n, fbeta_c, fR_m, fgamma_m)
         !$acc routine seq
         real(wp), intent(in) :: fR
@@ -398,7 +401,6 @@ contains
         !!  @param fbeta_t Mass transfer coefficient (EL)
         !!  @param fR_m Mixture gas constant (EL)
         !!  @param fgamma_m Mixture gamma (EL)
-        !!  @param fconc_v Current vapor concentration (EL)
     function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, fbeta_t, fR_m, fgamma_m)
         !$acc routine seq
         real(wp), intent(in) :: fvflux
@@ -456,9 +458,9 @@ contains
         !!  @param fbeta_t Heat transfer coefficient (EL)
         !!  @param fCson Speed of sound (EL)
     subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                fntait, fBtait, f_bub_adv_src, f_divu, &
-                                bub_id, fmass_v, fmass_n, fbeta_c, &
-                                fbeta_t, fCson)
+                              fntait, fBtait, f_bub_adv_src, f_divu, &
+                              bub_id, fmass_v, fmass_n, fbeta_c, &
+                              fbeta_t, fCson)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_advance_step
 #else
@@ -477,7 +479,7 @@ contains
         real(wp), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2 !< Bubble radius, radial velocity, and radial acceleration for the inner loop
         real(wp), dimension(4) :: myPb_tmp1, myMv_tmp1, myPb_tmp2, myMv_tmp2 !< Gas pressure and vapor mass for the inner loop (EL)
 
-        tol = 1e-4_wp
+        tol = 1e-4_wp   ! Tolerance value
 
         h = f_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                 fntait, fBtait, f_bub_adv_src, f_divu, fCson)
@@ -577,10 +579,10 @@ contains
         !!  @param fBtait Tait EOS parameter
         !!  @param f_bub_adv_src Source for bubble volume fraction
         !!  @param f_divu Divergence of velocity
-        !!  @param h Time step size
+        !!  @param fCson Speed of sound (EL)
     function f_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                    fntait, fBtait, f_bub_adv_src, f_divu, &
-                                    fCson)
+                                 fntait, fBtait, f_bub_adv_src, f_divu, &
+                                 fCson)
         !$acc routine seq
         real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
@@ -645,15 +647,22 @@ contains
         !!  @param fBtait Tait EOS parameter
         !!  @param f_bub_adv_src Source for bubble volume fraction
         !!  @param f_divu Divergence of velocity
+        !!  @param bub_id Bubble identifier (EL)
+        !!  @param fmass_v Current mass of vapour (EL)
+        !!  @param fmass_n Current mass of gas (EL)
+        !!  @param fbeta_c Mass transfer coefficient (EL)
+        !!  @param fbeta_t Heat transfer coefficient (EL)
+        !!  @param fCson Speed of sound (EL)
         !!  @param h Time step size
         !!  @param myR_tmp Bubble radius at each stage
         !!  @param myV_tmp Bubble radial velocity at each stage
-        !!  @param err Estimated error
+        !!  @param myPb_tmp Internal bubble pressure at each stage (EL)
+        !!  @param myMv_tmp Mass of vapor in the bubble at each stage (EL)
     function f_advance_substep(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                 fntait, fBtait, f_bub_adv_src, f_divu, &
-                                 bub_id, fmass_v, fmass_n, fbeta_c, &
-                                 fbeta_t, fCson, h, &
-                                 myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
+                               fntait, fBtait, f_bub_adv_src, f_divu, &
+                               bub_id, fmass_v, fmass_n, fbeta_c, &
+                               fbeta_t, fCson, h, &
+                               myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
         !$acc routine seq
         real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu, h

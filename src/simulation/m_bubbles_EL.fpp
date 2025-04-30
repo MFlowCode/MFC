@@ -59,7 +59,7 @@ module m_bubbles_EL
     !$acc gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt)
 
     integer, private :: lag_num_ts                                  !<  Number of time stages in the time-stepping scheme
-    
+
     !$acc declare create(lag_num_ts)
 
     integer :: nBubs                            !< Number of bubbles in the local domain
@@ -486,6 +486,7 @@ contains
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param rhs_vf Calculated change of conservative variables
+        !! @param t_step Current time step
         !! @param stage Current stage in the time-stepper algorithm
     subroutine s_compute_bubble_EL_dynamics(q_cons_vf, q_prim_vf, t_step, rhs_vf, stage)
 
@@ -580,11 +581,11 @@ contains
 
             else
 
-                ! Radial acceleration from bubble models                   
+                ! Radial acceleration from bubble models
                 intfc_dveldt(k, stage) = f_rddot(myRho, myPinf, myR, myV, myR0, &
-                                                myPb, myPbdot, dmalf, dmntait, dmBtait, &
-                                                dm_bub_adv_src, dm_divu, &
-                                                myCson)
+                                                 myPb, myPbdot, dmalf, dmntait, dmBtait, &
+                                                 dm_bub_adv_src, dm_divu, &
+                                                 myCson)
                 intfc_draddt(k, stage) = myV
                 gas_dmvdt(k, stage) = myMvdot
                 gas_dpdt(k, stage) = myPbdot
