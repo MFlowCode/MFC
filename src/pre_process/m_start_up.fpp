@@ -180,7 +180,7 @@ contains
 
             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. &
                 num_bc_patches > 0) then
-                save_bc = .true.
+                bc_io = .true.
             end if
 
         else

@@ -216,7 +216,7 @@ contains
 
             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. &
                 num_bc_patches > 0) then
-                read_bc = .true.
+                bc_io = .true.
             endif
 
         else
@@ -289,7 +289,7 @@ contains
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
         end if
 
-        if (read_bc) then
+        if (bc_io) then
             call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
         else
             call s_assign_default_bc_type(bc_type)
@@ -949,7 +949,7 @@ contains
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
-        if (read_bc) then
+        if (bc_io) then
             call s_read_parallel_boundary_condition_files(bc_type)
         else
             call s_assign_default_bc_type(bc_type)
@@ -1480,7 +1480,6 @@ contains
 
 
         call s_initialize_mpi_common_module()
-        call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
         if (grid_geometry == 3) call s_initialize_fftw_module()
         call s_initialize_riemann_solvers_module()
@@ -1680,7 +1679,6 @@ contains
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_common_module()
-        call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()

@@ -161,7 +161,7 @@ contains
             status = 'new'
         end if
 
-        if (save_bc) then
+        if (bc_io) then
             call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir)
         end if
 
@@ -864,7 +864,7 @@ contains
         end if
 #endif
 
-        if (save_bc) then
+        if (bc_io) then
             call s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
         end if
 
