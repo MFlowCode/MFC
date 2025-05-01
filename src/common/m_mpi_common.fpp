@@ -60,7 +60,7 @@ contains
         ! storage to hold the largest buffer in the computational domain.
 
         if (qbmm .and. .not. polytropic) then
-            v_size = vec_size + 2*nb*4
+            v_size = sys_size + 2*nb*4
         else
             v_size = sys_size
         end if
@@ -701,7 +701,6 @@ contains
                         end do
                     end do
 
-#ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
                         !$acc parallel loop collapse(4) gang vector default(present) private(r)
                         do l = 0, p
@@ -733,7 +732,6 @@ contains
                             end do
                         end do
                     end if
-#endif
                 #:elif mpi_dir == 2
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, sys_size
@@ -749,7 +747,6 @@ contains
                         end do
                     end do
 
-#ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
                         do i = sys_size + 1, sys_size + 4
@@ -783,7 +780,6 @@ contains
                             end do
                         end do
                     end if
-#endif
                 #:else
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, sys_size
@@ -799,7 +795,6 @@ contains
                         end do
                     end do
 
-#ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
                         do i = sys_size + 1, sys_size + 4
@@ -833,7 +828,6 @@ contains
                             end do
                         end do
                     end if
-#endif
                 #:endif
             end if
         #:endfor
@@ -906,7 +900,6 @@ contains
                         end do
                     end do
 
-#ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
                         do l = 0, p
@@ -938,7 +931,6 @@ contains
                             end do
                         end do
                     end if
-#endif
                 #:elif mpi_dir == 2
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, sys_size
@@ -960,7 +952,6 @@ contains
                         end do
                     end do
 
-#ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
                         do i = sys_size + 1, sys_size + 4
@@ -994,7 +985,6 @@ contains
                             end do
                         end do
                     end if
-#endif
                 #:else
                     ! Unpacking buffer from bc_z%beg
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1018,7 +1008,6 @@ contains
                         end do
                     end do
 
-#ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
                         do i = sys_size + 1, sys_size + 4
@@ -1054,12 +1043,10 @@ contains
                             end do
                         end do
                     end if
-#endif
                 #:endif
             end if
         #:endfor
         call nvtxEndRange
-
 #endif
 
     end subroutine s_mpi_sendrecv_variables_buffers
@@ -1172,6 +1159,7 @@ contains
             end if
         #:endfor
 
+#ifdef MFC_SIMULATION
         ! Send/Recv
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
@@ -1199,6 +1187,12 @@ contains
                 #:endif
             end if
         #:endfor
+#else
+        call MPI_SENDRECV( &
+            p_send, buffer_count, mpi_p, dst_proc, send_tag, &
+            p_recv, buffer_count, mpi_p, src_proc, recv_tag, &
+            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+#endif
 
         ! Unpack Received Buffer
         #:for mpi_dir in [1, 2, 3]
@@ -1645,6 +1639,191 @@ contains
 #endif
 
     end subroutine s_mpi_decompose_computational_domain
+
+    !>  The goal of this procedure is to populate the buffers of
+        !!      the grid variables by communicating with the neighboring
+        !!      processors. Note that only the buffers of the cell-width
+        !!      distributions are handled in such a way. This is because
+        !!      the buffers of cell-boundary locations may be calculated
+        !!      directly from those of the cell-width distributions.
+        !!  @param mpi_dir MPI communication coordinate direction
+        !!  @param pbc_loc Processor boundary condition (PBC) location
+#ifndef MFC_PRE_PROCESS
+    subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
+
+        integer, intent(in) :: mpi_dir
+        integer, intent(in) :: pbc_loc
+
+#ifdef MFC_MPI
+
+        ! MPI Communication in x-direction
+        if (mpi_dir == 1) then
+
+            if (pbc_loc == -1) then      ! PBC at the beginning
+
+                if (bc_x%end >= 0) then      ! PBC at the beginning and end
+
+                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        dx(m - buff_size + 1), buff_size, &
+                        mpi_p, bc_x%end, 0, &
+                        dx(-buff_size), buff_size, &
+                        mpi_p, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                else                        ! PBC at the beginning only
+
+                    ! Send/receive buffer to/from bc_x%beg/bc_x%beg
+                    call MPI_SENDRECV( &
+                        dx(0), buff_size, &
+                        mpi_p, bc_x%beg, 1, &
+                        dx(-buff_size), buff_size, &
+                        mpi_p, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                end if
+
+            else                        ! PBC at the end
+
+                if (bc_x%beg >= 0) then      ! PBC at the end and beginning
+
+                    ! Send/receive buffer to/from bc_x%beg/bc_x%end
+                    call MPI_SENDRECV( &
+                        dx(0), buff_size, &
+                        mpi_p, bc_x%beg, 1, &
+                        dx(m + 1), buff_size, &
+                        mpi_p, bc_x%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                else                        ! PBC at the end only
+
+                    ! Send/receive buffer to/from bc_x%end/bc_x%end
+                    call MPI_SENDRECV( &
+                        dx(m - buff_size + 1), buff_size, &
+                        mpi_p, bc_x%end, 0, &
+                        dx(m + 1), buff_size, &
+                        mpi_p, bc_x%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                end if
+
+            end if
+            ! END: MPI Communication in x-direction
+
+            ! MPI Communication in y-direction
+        elseif (mpi_dir == 2) then
+
+            if (pbc_loc == -1) then      ! PBC at the beginning
+
+                if (bc_y%end >= 0) then      ! PBC at the beginning and end
+
+                    ! Send/receive buffer to/from bc_y%end/bc_y%beg
+                    call MPI_SENDRECV( &
+                        dy(n - buff_size + 1), buff_size, &
+                        mpi_p, bc_y%end, 0, &
+                        dy(-buff_size), buff_size, &
+                        mpi_p, bc_y%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                else                        ! PBC at the beginning only
+
+                    ! Send/receive buffer to/from bc_y%beg/bc_y%beg
+                    call MPI_SENDRECV( &
+                        dy(0), buff_size, &
+                        mpi_p, bc_y%beg, 1, &
+                        dy(-buff_size), buff_size, &
+                        mpi_p, bc_y%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                end if
+
+            else                        ! PBC at the end
+
+                if (bc_y%beg >= 0) then      ! PBC at the end and beginning
+
+                    ! Send/receive buffer to/from bc_y%beg/bc_y%end
+                    call MPI_SENDRECV( &
+                        dy(0), buff_size, &
+                        mpi_p, bc_y%beg, 1, &
+                        dy(n + 1), buff_size, &
+                        mpi_p, bc_y%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                else                        ! PBC at the end only
+
+                    ! Send/receive buffer to/from bc_y%end/bc_y%end
+                    call MPI_SENDRECV( &
+                        dy(n - buff_size + 1), buff_size, &
+                        mpi_p, bc_y%end, 0, &
+                        dy(n + 1), buff_size, &
+                        mpi_p, bc_y%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                end if
+
+            end if
+            ! END: MPI Communication in y-direction
+
+            ! MPI Communication in z-direction
+        else
+
+            if (pbc_loc == -1) then      ! PBC at the beginning
+
+                if (bc_z%end >= 0) then      ! PBC at the beginning and end
+
+                    ! Send/receive buffer to/from bc_z%end/bc_z%beg
+                    call MPI_SENDRECV( &
+                        dz(p - buff_size + 1), buff_size, &
+                        mpi_p, bc_z%end, 0, &
+                        dz(-buff_size), buff_size, &
+                        mpi_p, bc_z%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                else                        ! PBC at the beginning only
+
+                    ! Send/receive buffer to/from bc_z%beg/bc_z%beg
+                    call MPI_SENDRECV( &
+                        dz(0), buff_size, &
+                        mpi_p, bc_z%beg, 1, &
+                        dz(-buff_size), buff_size, &
+                        mpi_p, bc_z%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                end if
+
+            else                        ! PBC at the end
+
+                if (bc_z%beg >= 0) then      ! PBC at the end and beginning
+
+                    ! Send/receive buffer to/from bc_z%beg/bc_z%end
+                    call MPI_SENDRECV( &
+                        dz(0), buff_size, &
+                        mpi_p, bc_z%beg, 1, &
+                        dz(p + 1), buff_size, &
+                        mpi_p, bc_z%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                else                        ! PBC at the end only
+
+                    ! Send/receive buffer to/from bc_z%end/bc_z%end
+                    call MPI_SENDRECV( &
+                        dz(p - buff_size + 1), buff_size, &
+                        mpi_p, bc_z%end, 0, &
+                        dz(p + 1), buff_size, &
+                        mpi_p, bc_z%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                end if
+
+            end if
+
+        end if
+        ! END: MPI Communication in z-direction
+
+#endif
+
+    end subroutine s_mpi_sendrecv_grid_variables_buffers
+#endif
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_mpi_common_module
