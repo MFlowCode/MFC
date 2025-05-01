@@ -253,6 +253,14 @@ contains
             @:ALLOCATE(rhs_pb(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
                 idwbuff(2)%beg:idwbuff(2)%beg + 1, &
                 idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+        else
+            @:ALLOCATE(pb_ts(1)%sf(0,0,0,0,0))
+            @:ACC_SETUP_SFs(pb_ts(1))
+
+            @:ALLOCATE(pb_ts(2)%sf(0,0,0,0,0))
+            @:ACC_SETUP_SFs(pb_ts(2))
+
+            @:ALLOCATE(rhs_pb(0,0,0,0,0))
         end if
 
         @:ALLOCATE(mv_ts(1:2))
@@ -286,6 +294,14 @@ contains
             @:ALLOCATE(rhs_mv(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
                 idwbuff(2)%beg:idwbuff(2)%beg + 1, &
                 idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+        else
+            @:ALLOCATE(mv_ts(1)%sf(0,0,0,0,0))
+            @:ACC_SETUP_SFs(mv_ts(1))
+
+            @:ALLOCATE(mv_ts(2)%sf(0,0,0,0,0))
+            @:ACC_SETUP_SFs(mv_ts(2))
+
+            @:ALLOCATE(rhs_mv(0,0,0,0,0))
         end if
 
         ! Allocating the cell-average RHS time-stages for adaptive RKCK stepper

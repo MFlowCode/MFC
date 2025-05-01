@@ -47,6 +47,7 @@ contains
         bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
 
         @:ALLOCATE(bc_buffers(1:num_dims, -1:1))
+
 #ifndef MFC_POST_PROCESS
         if (bc_io) then
             @:ALLOCATE(bc_buffers(1, -1)%sf(1:sys_size, 0:n, 0:p))
@@ -73,8 +74,8 @@ contains
     subroutine s_populate_variables_buffers(q_prim_vf, pb, mv, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
 
         integer :: bc_loc, bc_dir
         integer :: k, l
@@ -97,7 +98,7 @@ contains
                         call s_slip_wall(q_prim_vf, pb, mv, 1, -1, k, l)
                     case (-16)    ! No-slip wall BC at beginning
                         call s_no_slip_wall(q_prim_vf, pb, mv, 1, -1, k, l)
-                    case (-17)
+                    case (-17)    ! Dirichlet BC at beginning
                         call s_dirichlet(q_prim_vf, pb, mv, 1, -1, k, l)
                     end select
                 end do
@@ -111,17 +112,17 @@ contains
             do l = 0, p
                 do k = 0, n
                     select case (int(bc_type(1, 1)%sf(0, k, l)))
-                    case (-13:-3) ! Ghost-cell extrap. BC at beginning
+                    case (-13:-3) ! Ghost-cell extrap. BC at end
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, 1, k, l)
-                    case (-2)     ! Symmetry BC at beginning
+                    case (-2)     ! Symmetry BC at end
                         call s_symmetry(q_prim_vf, pb, mv, 1, 1, k, l)
-                    case (-1)     ! Periodic BC at beginning
+                    case (-1)     ! Periodic BC at end
                         call s_periodic(q_prim_vf, pb, mv, 1, 1, k, l)
-                    case (-15)    ! Slip wall BC at beginning
+                    case (-15)    ! Slip wall BC at end
                         call s_slip_wall(q_prim_vf, pb, mv, 1, 1, k, l)
-                    case (-16)    ! No-slip wall BC at beginning
+                    case (-16)    ! No-slip wall BC at end
                         call s_no_slip_wall(q_prim_vf, pb, mv, 1, 1, k, l)
-                    case (-17)
+                    case (-17)    ! Dirichlet BC at end
                         call s_dirichlet(q_prim_vf, pb, mv, 1, 1, k, l)
                     end select
                 end do
@@ -141,7 +142,7 @@ contains
                     select case (int(bc_type(2, -1)%sf(k, 0, l)))
                     case (-13:-3) ! Ghost-cell extrap. BC at beginning
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, -1, k, l)
-                    case (-14)
+                    case (-14)    ! Axis BC at beginning
                         call s_axis(q_prim_vf, pb, mv, 2, -1, k, l)
                     case (-2)     ! Symmetry BC at beginning
                         call s_symmetry(q_prim_vf, pb, mv, 2, -1, k, l)
@@ -151,7 +152,7 @@ contains
                         call s_slip_wall(q_prim_vf, pb, mv, 2, -1, k, l)
                     case (-16)    ! No-slip wall BC at beginning
                         call s_no_slip_wall(q_prim_vf, pb, mv, 2, -1, k, l)
-                    case (-17)
+                    case (-17)    ! Dirichlet BC at beginning
                         call s_dirichlet(q_prim_vf, pb, mv, 2, -1, k, l)
                     end select
                 end do
@@ -165,17 +166,17 @@ contains
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(2, 1)%sf(k, 0, l)))
-                    case (-13:-3) ! Ghost-cell extrap. BC at beginning
+                    case (-13:-3) ! Ghost-cell extrap. BC at end
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, 1, k, l)
-                    case (-2)     ! Symmetry BC at beginning
+                    case (-2)     ! Symmetry BC at end
                         call s_symmetry(q_prim_vf, pb, mv, 2, 1, k, l)
-                    case (-1)     ! Periodic BC at beginning
+                    case (-1)     ! Periodic BC at end
                         call s_periodic(q_prim_vf, pb, mv, 2, 1, k, l)
-                    case (-15)    ! Slip wall BC at beginning
+                    case (-15)    ! Slip wall BC at end
                         call s_slip_wall(q_prim_vf, pb, mv, 2, 1, k, l)
-                    case (-16)    ! No-slip wall BC at beginning
+                    case (-16)    ! No-slip wall BC at end
                         call s_no_slip_wall(q_prim_vf, pb, mv, 2, 1, k, l)
-                    case (-17)
+                    case (-17)    ! Dirichlet BC at end
                         call s_dirichlet(q_prim_vf, pb, mv, 2, 1, k, l)
                     end select
                 end do
@@ -203,7 +204,7 @@ contains
                         call s_slip_wall(q_prim_vf, pb, mv, 3, -1, k, l)
                     case (-16)    ! No-slip wall BC at beginning
                         call s_no_slip_wall(q_prim_vf, pb, mv, 3, -1, k, l)
-                    case (-17)
+                    case (-17)    ! Dirichlet BC at beginning
                         call s_dirichlet(q_prim_vf, pb, mv, 3, -1, k, l)
                     end select
                 end do
@@ -217,17 +218,17 @@ contains
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(3, 1)%sf(k, l, 0)))
-                    case (-13:-3) ! Ghost-cell extrap. BC at beginning
+                    case (-13:-3) ! Ghost-cell extrap. BC at end
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, 1, k, l)
-                    case (-2)     ! Symmetry BC at beginning
+                    case (-2)     ! Symmetry BC at end
                         call s_symmetry(q_prim_vf, pb, mv, 3, 1, k, l)
-                    case (-1)     ! Periodic BC at beginning
+                    case (-1)     ! Periodic BC at end
                         call s_periodic(q_prim_vf, pb, mv, 3, 1, k, l)
-                    case (-15)    ! Slip wall BC at beginning
+                    case (-15)    ! Slip wall BC at end
                         call s_slip_wall(q_prim_vf, pb, mv, 3, 1, k, l)
-                    case (-16)    ! No-slip wall BC at beginning
+                    case (-16)    ! No-slip wall BC at end
                         call s_no_slip_wall(q_prim_vf, pb, mv, 3, 1, k, l)
-                    case (-17)
+                    case (-17)    ! Dirichlet BC at end
                         call s_dirichlet(q_prim_vf, pb, mv, 3, 1, k, l)
                     end select
                 end do
@@ -244,7 +245,7 @@ contains
         !$acc routine seq
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
@@ -313,7 +314,7 @@ contains
         !$acc routine seq
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
@@ -322,7 +323,6 @@ contains
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !< bc_x%beg
                 do j = 1, buff_size
-                    !$acc loop seq
                     do i = 1, contxe
                         q_prim_vf(i)%sf(-j, k, l) = &
                             q_prim_vf(i)%sf(j - 1, k, l)
@@ -331,14 +331,12 @@ contains
                     q_prim_vf(momxb)%sf(-j, k, l) = &
                         -q_prim_vf(momxb)%sf(j - 1, k, l)
 
-                    !$acc loop seq
                     do i = momxb + 1, sys_size
                         q_prim_vf(i)%sf(-j, k, l) = &
                             q_prim_vf(i)%sf(j - 1, k, l)
                     end do
 
                     if (elasticity) then
-                        !$acc loop seq
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(1, i))%sf(-j, k, l) = &
                                 -q_prim_vf(shear_BC_flip_indices(1, i))%sf(j - 1, k, l)
@@ -353,7 +351,6 @@ contains
                 end do
 
                 if (qbmm .and. .not. polytropic) then
-                    
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -367,7 +364,6 @@ contains
                 end if
             else !< bc_x%end
                 do j = 1, buff_size
-                    !$acc loop seq
                     do i = 1, contxe
                         q_prim_vf(i)%sf(m + j, k, l) = &
                             q_prim_vf(i)%sf(m - (j - 1), k, l)
@@ -376,14 +372,12 @@ contains
                     q_prim_vf(momxb)%sf(m + j, k, l) = &
                         -q_prim_vf(momxb)%sf(m - (j - 1), k, l)
 
-                    !$acc loop seq
                     do i = momxb + 1, sys_size
                         q_prim_vf(i)%sf(m + j, k, l) = &
                             q_prim_vf(i)%sf(m - (j - 1), k, l)
                     end do
 
                     if (elasticity) then
-                        !$acc loop seq
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(1, i))%sf(m + j, k, l) = &
                                 -q_prim_vf(shear_BC_flip_indices(1, i))%sf(m - (j - 1), k, l)
@@ -396,7 +390,7 @@ contains
                     end if
                 end do
                 if (qbmm .and. .not. polytropic) then
-                    
+
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -408,11 +402,10 @@ contains
                         end do
                     end do
                 end if
-            end if 
+            end if
         elseif (bc_dir == 2) then !< y-direction
             if (bc_loc == -1) then !< bc_y%beg
                 do j = 1, buff_size
-                    !$acc loop seq
                     do i = 1, momxb
                         q_prim_vf(i)%sf(k, -j, l) = &
                             q_prim_vf(i)%sf(k, j - 1, l)
@@ -421,14 +414,12 @@ contains
                     q_prim_vf(momxb + 1)%sf(k, -j, l) = &
                         -q_prim_vf(momxb + 1)%sf(k, j - 1, l)
 
-                    !$acc loop seq
                     do i = momxb + 2, sys_size
                         q_prim_vf(i)%sf(k, -j, l) = &
                             q_prim_vf(i)%sf(k, j - 1, l)
                     end do
 
                     if (elasticity) then
-                        !$acc loop seq
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, -j, l) = &
                                 -q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, j - 1, l)
@@ -438,7 +429,7 @@ contains
                     if (hyperelasticity) then
                         q_prim_vf(xibeg + 1)%sf(k, -j, l) = &
                             -q_prim_vf(xibeg + 1)%sf(k, j - 1, l)
-                    end if  
+                    end if
                 end do
 
                 if (qbmm .and. .not. polytropic) then
@@ -455,7 +446,6 @@ contains
                 end if
             else !< bc_y%end
                 do j = 1, buff_size
-                    !$acc loop seq
                     do i = 1, momxb
                         q_prim_vf(i)%sf(k, n + j, l) = &
                             q_prim_vf(i)%sf(k, n - (j - 1), l)
@@ -464,14 +454,12 @@ contains
                     q_prim_vf(momxb + 1)%sf(k, n + j, l) = &
                         -q_prim_vf(momxb + 1)%sf(k, n - (j - 1), l)
 
-                    !$acc loop seq
                     do i = momxb + 2, sys_size
                         q_prim_vf(i)%sf(k, n + j, l) = &
                             q_prim_vf(i)%sf(k, n - (j - 1), l)
                     end do
 
                     if (elasticity) then
-                        !$acc loop seq
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, n + j, l) = &
                                 -q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, n - (j - 1), l)
@@ -485,7 +473,6 @@ contains
                 end do
 
                 if (qbmm .and. .not. polytropic) then
-                    
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -501,7 +488,6 @@ contains
         elseif (bc_dir == 3) then !< z-direction
             if (bc_loc == -1) then !< bc_z%beg
                 do j = 1, buff_size
-                    !$acc loop seq
                     do i = 1, momxb + 1
                         q_prim_vf(i)%sf(k, l, -j) = &
                             q_prim_vf(i)%sf(k, l, j - 1)
@@ -510,14 +496,12 @@ contains
                     q_prim_vf(momxe)%sf(k, l, -j) = &
                         -q_prim_vf(momxe)%sf(k, l, j - 1)
 
-                    !$acc loop seq
                     do i = E_idx, sys_size
                         q_prim_vf(i)%sf(k, l, -j) = &
                             q_prim_vf(i)%sf(k, l, j - 1)
                     end do
 
                     if (elasticity) then
-                        !$acc loop seq
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, -j) = &
                                 -q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, j - 1)
@@ -531,7 +515,6 @@ contains
                 end do
 
                 if (qbmm .and. .not. polytropic) then
-                    
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -545,7 +528,6 @@ contains
                 end if
             else !< bc_z%end
                 do j = 1, buff_size
-                    !$acc loop seq
                     do i = 1, momxb + 1
                         q_prim_vf(i)%sf(k, l, p + j) = &
                             q_prim_vf(i)%sf(k, l, p - (j - 1))
@@ -554,14 +536,12 @@ contains
                     q_prim_vf(momxe)%sf(k, l, p + j) = &
                         -q_prim_vf(momxe)%sf(k, l, p - (j - 1))
 
-                    !$acc loop seq
                     do i = E_idx, sys_size
                         q_prim_vf(i)%sf(k, l, p + j) = &
                             q_prim_vf(i)%sf(k, l, p - (j - 1))
                     end do
 
                     if (elasticity) then
-                        !$acc loop seq
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, p + j) = &
                                 -q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, p - (j - 1))
@@ -575,7 +555,6 @@ contains
                 end do
 
                 if (qbmm .and. .not. polytropic) then
-                    
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -599,7 +578,7 @@ contains
             !$acc routine seq
 #endif
             type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-            real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+            real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
             integer, intent(in) :: bc_dir, bc_loc
             integer, intent(in) :: k, l
 
@@ -615,7 +594,6 @@ contains
                     end do
 
                     if (qbmm .and. .not. polytropic) then
-                        
                         do i = 1, nb
                             do q = 1, nnode
                                 do j = 1, buff_size
@@ -636,7 +614,6 @@ contains
                     end do
 
                     if (qbmm .and. .not. polytropic) then
-                        
                         do i = 1, nb
                             do q = 1, nnode
                                 do j = 1, buff_size
@@ -659,7 +636,6 @@ contains
                     end do
 
                     if (qbmm .and. .not. polytropic) then
-                        
                         do i = 1, nb
                             do q = 1, nnode
                                 do j = 1, buff_size
@@ -680,7 +656,6 @@ contains
                     end do
 
                     if (qbmm .and. .not. polytropic) then
-                        
                         do i = 1, nb
                             do q = 1, nnode
                                 do j = 1, buff_size
@@ -703,7 +678,6 @@ contains
                     end do
 
                     if (qbmm .and. .not. polytropic) then
-                        
                         do i = 1, nb
                             do q = 1, nnode
                                 do j = 1, buff_size
@@ -724,7 +698,6 @@ contains
                     end do
 
                     if (qbmm .and. .not. polytropic) then
-                        
                         do i = 1, nb
                             do q = 1, nnode
                                 do j = 1, buff_size
@@ -748,7 +721,7 @@ contains
             !$acc routine seq
 #endif
             type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-            real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+            real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
             integer, intent(in) :: bc_dir, bc_loc
             integer, intent(in) :: k, l
 
@@ -756,7 +729,6 @@ contains
 
             do j = 1, buff_size
                 if (z_cc(l) < pi) then
-                    !$acc loop seq
                     do i = 1, momxb
                         q_prim_vf(i)%sf(k, -j, l) = &
                             q_prim_vf(i)%sf(k, j - 1, l + ((p + 1)/2))
@@ -768,13 +740,11 @@ contains
                     q_prim_vf(momxe)%sf(k, -j, l) = &
                         -q_prim_vf(momxe)%sf(k, j - 1, l + ((p + 1)/2))
 
-                    !$acc loop seq
                     do i = E_idx, sys_size
                         q_prim_vf(i)%sf(k, -j, l) = &
                             q_prim_vf(i)%sf(k, j - 1, l + ((p + 1)/2))
                     end do
                 else
-                    !$acc loop seq
                     do i = 1, momxb
                         q_prim_vf(i)%sf(k, -j, l) = &
                             q_prim_vf(i)%sf(k, j - 1, l - ((p + 1)/2))
@@ -786,7 +756,6 @@ contains
                     q_prim_vf(momxe)%sf(k, -j, l) = &
                         -q_prim_vf(momxe)%sf(k, j - 1, l - ((p + 1)/2))
 
-                    !$acc loop seq
                     do i = E_idx, sys_size
                         q_prim_vf(i)%sf(k, -j, l) = &
                             q_prim_vf(i)%sf(k, j - 1, l - ((p + 1)/2))
@@ -795,7 +764,6 @@ contains
             end do
 
             if (qbmm .and. .not. polytropic) then
-                
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -817,7 +785,7 @@ contains
             !$acc routine seq
 #endif
             type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-            real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+            real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
             integer, intent(in) :: bc_dir, bc_loc
             integer, intent(in) :: k, l
 
@@ -916,7 +884,7 @@ contains
             !$acc routine seq
 #endif
             type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-            real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+            real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
             integer, intent(in) :: bc_dir, bc_loc
             integer, intent(in) :: k, l
 
@@ -1051,7 +1019,7 @@ contains
             !$acc routine seq
 #endif
             type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-            real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+            real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
             integer, intent(in) :: bc_dir, bc_loc
             integer, intent(in) :: k, l
 
@@ -1060,7 +1028,6 @@ contains
 #ifdef MFC_PRE_PROCESS
             call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, -1, k, l)
 #else
-
             if (bc_dir == 1) then !< x-direction
                 if (bc_loc == -1) then !bc_x%beg
                     do i = 1, sys_size
@@ -1120,7 +1087,7 @@ contains
 #else
             !$acc routine seq
 #endif
-            real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+            real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
             integer, intent(in) :: bc_dir, bc_loc
             integer, intent(in) :: k, l
 
