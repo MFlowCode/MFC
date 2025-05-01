@@ -607,11 +607,15 @@ contains
                 !$acc loop seq
                 do l = 1, 3
                     if (lag_params%vel_model == 1) then
-                        mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1),cell, l, q_prim_vf)
+                        mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1), &
+                                                    cell, l, q_prim_vf)
                         mtn_dveldt(k, l, stage) = 0._wp
                     elseif (lag_params%vel_model == 2) then
                         mtn_dposdt(k, l, stage) = mtn_vel(k,l,1)
-                        mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,1),intfc_rad(k,1),mtn_vel(k,l,1),cell,l,q_prim_vf)
+                        mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,1),&
+                                                    intfc_rad(k,1), mtn_vel(k,l,1), &
+                                                    gas_mg(k,1), gas_mv(k,1), &
+                                                    cell, l, q_prim_vf)
                     else
                         mtn_dposdt(k, l, stage) = 0._wp
                         mtn_dveldt(k, l, stage) = 0._wp
@@ -632,11 +636,15 @@ contains
                 !$acc loop seq
                 do l = 1, 3
                     if (lag_params%vel_model == 1) then
-                        mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1),cell, l, q_prim_vf)
+                        mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1), &
+                                                    cell, l, q_prim_vf)
                         mtn_dveldt(k, l, stage) = 0._wp
                     elseif (lag_params%vel_model == 2) then
                         mtn_dposdt(k, l, stage) = mtn_vel(k,l,1)
-                        mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,1),intfc_rad(k,1),mtn_vel(k,l,1),cell,l,q_prim_vf)
+                        mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,1),&
+                                                    intfc_rad(k,1), mtn_vel(k,l,1), &
+                                                    gas_mg(k,1), gas_mv(k,1), &
+                                                    cell, l, q_prim_vf)
                     else
                         mtn_dposdt(k, l, stage) = 0._wp
                         mtn_dveldt(k, l, stage) = 0._wp
