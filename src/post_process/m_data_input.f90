@@ -17,6 +17,8 @@ module m_data_input
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
+    use m_mpi_common
+
     use m_compile_specific
 
     use m_helper
@@ -586,7 +588,7 @@ contains
             ! Processor BC at the beginning
         else
 
-            call s_mpi_sendrecv_grid_vars_buffer_regions('beg', 'x')
+            call s_mpi_sendrecv_grid_variables_buffers(1, -1)
 
         end if
 
@@ -622,7 +624,7 @@ contains
             ! Processor BC at the end
         else
 
-            call s_mpi_sendrecv_grid_vars_buffer_regions('end', 'x')
+            call s_mpi_sendrecv_grid_variables_buffers(1, 1)
 
         end if
 
@@ -664,7 +666,7 @@ contains
                 ! Processor BC at the beginning
             else
 
-                call s_mpi_sendrecv_grid_vars_buffer_regions('beg', 'y')
+                call s_mpi_sendrecv_grid_variables_buffers(2, -1)
 
             end if
 
@@ -700,7 +702,7 @@ contains
                 ! Processor BC at the end
             else
 
-                call s_mpi_sendrecv_grid_vars_buffer_regions('end', 'y')
+                call s_mpi_sendrecv_grid_variables_buffers(2, 1)
 
             end if
 
@@ -742,7 +744,7 @@ contains
                     ! Processor BC at the beginning
                 else
 
-                    call s_mpi_sendrecv_grid_vars_buffer_regions('beg', 'z')
+                    call s_mpi_sendrecv_grid_variables_buffers(3, -1)
 
                 end if
 
@@ -778,7 +780,7 @@ contains
                     ! Processor BC at the end
                 else
 
-                    call s_mpi_sendrecv_grid_vars_buffer_regions('end', 'z')
+                    call s_mpi_sendrecv_grid_variables_buffers(3, 1)
 
                 end if
 

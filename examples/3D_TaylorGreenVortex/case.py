@@ -2,7 +2,7 @@
 import math
 import json
 
-N = 256
+N = 49
 
 Re = 1600
 L = 1
@@ -41,7 +41,7 @@ print(
             "p": N,
             "cyl_coord": "F",
             "dt": dt,
-            "t_step_start": 13529,
+            "t_step_start": 0,
             "t_step_stop": Nt,
             "t_step_save": int(Nt / 100),
             # Simulation Algorithm Parameters

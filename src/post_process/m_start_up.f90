@@ -33,6 +33,8 @@ module m_start_up
 
     use m_checker_common
 
+    use m_boundary_conditions
+
     use m_checker
 
     use m_thermochem, only: num_species, species_names
@@ -177,7 +179,7 @@ contains
 
         ! Populating the buffer regions of the conservative variables
         if (buff_size > 0) then
-            call s_populate_conservative_variables_buffer_regions()
+            call s_populate_variables_buffers(q_cons_vf)
             if (bubbles_lagrange) call s_populate_conservative_variables_buffer_regions(q_particle(1))
         end if
 

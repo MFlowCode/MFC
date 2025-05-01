@@ -50,7 +50,7 @@ contains
             call s_no_slip_wall(q_prim_vf, pb, mv, 1, -1)
         case default ! Processor BC at beginning
             call s_mpi_sendrecv_variables_buffers( &
-                q_prim_vf, pb, mv, 1, -1)
+                q_prim_vf, 1, -1, sys_size, pb, mv)
         end select
 
         select case (bc_x%end)
@@ -66,7 +66,7 @@ contains
             call s_no_slip_wall(q_prim_vf, pb, mv, 1, 1)
         case default ! Processor BC at end
             call s_mpi_sendrecv_variables_buffers( &
-                q_prim_vf, pb, mv, 1, 1)
+                q_prim_vf, 1, 1, sys_size, pb, mv)
         end select
 
 #ifdef MFC_SIMULATION
@@ -110,7 +110,7 @@ contains
             call s_no_slip_wall(q_prim_vf, pb, mv, 2, -1)
         case default ! Processor BC at beginning
             call s_mpi_sendrecv_variables_buffers( &
-                q_prim_vf, pb, mv, 2, -1)
+                q_prim_vf, 2, -1, sys_size, pb, mv)
         end select
 
         select case (bc_y%end)
@@ -126,7 +126,7 @@ contains
             call s_no_slip_wall(q_prim_vf, pb, mv, 2, 1)
         case default ! Processor BC at end
             call s_mpi_sendrecv_variables_buffers( &
-                q_prim_vf, pb, mv, 2, 1)
+                q_prim_vf, 2, 1, sys_size, pb, mv)
         end select
 
 #ifdef MFC_SIMULATION
@@ -168,7 +168,7 @@ contains
             call s_no_slip_wall(q_prim_vf, pb, mv, 3, -1)
         case default ! Processor BC at beginning
             call s_mpi_sendrecv_variables_buffers( &
-                q_prim_vf, pb, mv, 3, -1)
+                q_prim_vf, 3, -1, sys_size, pb, mv)
         end select
 
         select case (bc_z%end)
@@ -184,7 +184,7 @@ contains
             call s_no_slip_wall(q_prim_vf, pb, mv, 3, 1)
         case default ! Processor BC at end
             call s_mpi_sendrecv_variables_buffers( &
-                q_prim_vf, pb, mv, 3, 1)
+                q_prim_vf, 3, 1, sys_size, pb, mv)
         end select
 
 #ifdef MFC_SIMULATION
@@ -1470,7 +1470,7 @@ contains
                 end do
             end do
         else
-            call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, -1)
+            call s_mpi_sendrecv_variables_buffers(c_divs, 1, -1, num_dims + 1)
         end if
 
         if (bc_x%end <= -3) then !< ghost-cell extrapolation
@@ -1515,7 +1515,7 @@ contains
                 end do
             end do
         else
-            call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, 1)
+            call s_mpi_sendrecv_variables_buffers(c_divs, 1, 1, num_dims + 1)
         end if
 
         if (n == 0) then
@@ -1562,7 +1562,7 @@ contains
                 end do
             end do
         else
-            call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, -1)
+            call s_mpi_sendrecv_variables_buffers(c_divs, 2, -1, num_dims + 1)
         end if
 
         if (bc_y%end <= -3) then !< ghost-cell extrapolation
@@ -1607,7 +1607,7 @@ contains
                 end do
             end do
         else
-            call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, 1)
+            call s_mpi_sendrecv_variables_buffers(c_divs, 2, 1, num_dims + 1)
         end if
 
         if (p == 0) then
@@ -1654,7 +1654,7 @@ contains
                 end do
             end do
         else
-            call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, -1)
+            call s_mpi_sendrecv_variables_buffers(c_divs, 3, -1, num_dims + 1)
         end if
 
         if (bc_z%end <= -3) then !< ghost-cell extrapolation
@@ -1699,7 +1699,7 @@ contains
                 end do
             end do
         else
-            call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, 1)
+            call s_mpi_sendrecv_variables_buffers(c_divs, 3, 1, num_dims + 1)
         end if
 
     end subroutine s_populate_capillary_buffers
