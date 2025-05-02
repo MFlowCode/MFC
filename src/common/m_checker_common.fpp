@@ -262,6 +262,18 @@ contains
 
         @: PROHIBIT(cyl_coord .and. p > 0 .and. (bc_z%end /= -1 .and. bc_z%end /= -2), &
             "bc_z%end must be -1 or -2 for 3D cylindrical coordinates")
+
+#ifndef MFC_POST_PROCESS
+        if (num_bc_patches > 0) then
+            #:for DIR in [('x'), ('y'), ('z')]
+                #:for LOC in [('beg'), ('end')]
+                    @:PROHIBIT(bc_${DIR}$%${LOC}$ == -1 .or. (bc_${DIR}$%${LOC}$ <= -4 .and. bc_${DIR}$%${LOC}$ >= -14), &
+                        "bc_${DIR}$%${LOC}$ is not compatible with num_bc_patches > 0")
+                #:endfor
+            #:endfor
+        endif
+#endif
+
     end subroutine s_check_inputs_bc
 
     !> Checks constraints on the stiffened equation of state fluids parameters.

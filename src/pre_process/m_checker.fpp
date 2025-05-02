@@ -207,6 +207,7 @@ contains
         @:PROHIBIT(num_bc_patches > num_bc_patches_max, "num_bc_patches must be <= "//trim(iStr))
 
         do i = 1, num_bc_patches
+            call s_int_to_str(i, iStr)
 
             ! Line Segment BC
             if (patch_bc(i)%geometry == 1) then
@@ -218,6 +219,7 @@ contains
                         "Line Segment Patch of Dir ${DIR}$ can't have a length in Dir ${DIR}$ or 3" )
                 #:endfor
             end if
+
             ! Circle BC
             if (patch_bc(i)%geometry == 2) then
                 @:PROHIBIT(f_is_default(patch_bc(i)%radius), "Circle Patch must have radius defined")
@@ -228,8 +230,8 @@ contains
                     @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%centroid(${DIR}$)), &
                         "Circle Patch of Dir ${DIR}$ can't have a centroid in Dir ${DIR}$")
                 #:endfor
-
             end if
+
             ! Rectangle BC
             if (patch_bc(i)%geometry == 3) then
                 @:PROHIBIT( .not. f_is_default(patch_bc(i)%radius), "Rectangle Patch can't have radius defined")
@@ -240,9 +242,12 @@ contains
                     @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%length(${DIR}$)), &
                         "Rectangle Patch of Dir ${DIR}$ can't have a length in Dir ${DIR}$")
                 #:endfor
-
             end if
 
+            ! Incompatible BC check
+            @:PROHIBIT(((patch_bc(i)%type >= -14 .and. patch_bc(i)%type <= -4) .or. &
+                (patch_bc(i)%type == -1) .or. patch_bc(i)%type < -16), &
+                "Incompatible BC type for boundary condition patch"//trim(iStr))
         end do
 
     end subroutine
