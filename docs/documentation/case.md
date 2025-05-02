@@ -501,7 +501,7 @@ Boundary condition patches can be used with the following boundary condition typ
 - `-16` no-slip wall
 - `-17` Dirichlet
 
-Line segements along each domain edge are supported for 2D simulations.
+Line segments along each domain edge are supported for 2D simulations.
 Squares and circles on each face are supported for 3D simulations.
 
 #### Constant Time-Stepping
