@@ -271,7 +271,7 @@ contains
                         "bc_${DIR}$%${LOC}$ is not compatible with num_bc_patches > 0")
                 #:endfor
             #:endfor
-        endif
+        end if
 #endif
 
     end subroutine s_check_inputs_bc
