@@ -246,8 +246,8 @@ contains
 
             ! Incompatible BC check
             @:PROHIBIT(((patch_bc(i)%type >= -14 .and. patch_bc(i)%type <= -4) .or. &
-                (patch_bc(i)%type == -1) .or. patch_bc(i)%type < -16), &
-                "Incompatible BC type for boundary condition patch"//trim(iStr))
+                (patch_bc(i)%type == -1) .or. patch_bc(i)%type < -17), &
+                "Incompatible BC type for boundary condition patch "//trim(iStr))
         end do
 
     end subroutine
