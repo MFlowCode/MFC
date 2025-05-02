@@ -191,7 +191,7 @@ contains
         @:PROHIBIT(mixlayer_perturb .and. n == 0, "mixlayer_perturb requires n > 0")
         @:PROHIBIT(mixlayer_perturb .and. model_eqns /= 2, "mixlayer_perturb requires model_eqns = 2")
         @:PROHIBIT(mixlayer_perturb .and. num_fluids > 1, "mixlayer_perturb requires num_fluids = 1")
-        @:PROHIBIT(mixlayer_perturb .and. any((/bc_y%beg, bc_y%end/) /= -6), &
+        @:PROHIBIT(mixlayer_perturb .and. any((/bc_y%beg, bc_y%end/) /= BC_CHAR_NR_SUB_BUFFER), &
             "mixlayer_perturb requires both bc_y%beg and bc_y%end to be 6")
         @:PROHIBIT(elliptic_smoothing .and. elliptic_smoothing_iters < 1, &
             "elliptic_smoothing_iters must be positive")
@@ -245,8 +245,8 @@ contains
             end if
 
             ! Incompatible BC check
-            @:PROHIBIT(((patch_bc(i)%type >= -14 .and. patch_bc(i)%type <= -4) .or. &
-                (patch_bc(i)%type == -1) .or. patch_bc(i)%type < -17), &
+            @:PROHIBIT(((patch_bc(i)%type >= BC_AXIS .and. patch_bc(i)%type <= BC_RIEMANN_EXTRAP) .or. &
+                (patch_bc(i)%type == BC_PERIODIC) .or. patch_bc(i)%type < BC_DIRICHLET), &
                 "Incompatible BC type for boundary condition patch "//trim(iStr))
         end do
 

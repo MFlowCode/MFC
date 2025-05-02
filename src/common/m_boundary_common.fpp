@@ -88,17 +88,17 @@ contains
             do l = 0, p
                 do k = 0, n
                     select case (int(bc_type(1, -1)%sf(0, k, l)))
-                    case (-13:-3) ! Ghost-cell extrap. BC at beginning
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, -1, k, l)
-                    case (-2)     ! Symmetry BC at beginning
+                    case (BC_REFLECTIVE)
                         call s_symmetry(q_prim_vf, pb, mv, 1, -1, k, l)
-                    case (-1)     ! Periodic BC at beginning
+                    case (BC_PERIODIC)
                         call s_periodic(q_prim_vf, pb, mv, 1, -1, k, l)
-                    case (-15)    ! Slip wall BC at beginning
+                    case (BC_SLIP_WALL)
                         call s_slip_wall(q_prim_vf, pb, mv, 1, -1, k, l)
-                    case (-16)    ! No-slip wall BC at beginning
+                    case (BC_NO_SLIP_WALL)
                         call s_no_slip_wall(q_prim_vf, pb, mv, 1, -1, k, l)
-                    case (-17)    ! Dirichlet BC at beginning
+                    case (BC_DIRICHLET)
                         call s_dirichlet(q_prim_vf, pb, mv, 1, -1, k, l)
                     end select
                 end do
@@ -112,17 +112,17 @@ contains
             do l = 0, p
                 do k = 0, n
                     select case (int(bc_type(1, 1)%sf(0, k, l)))
-                    case (-13:-3) ! Ghost-cell extrap. BC at end
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP) ! Ghost-cell extrap. BC at end
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, 1, k, l)
-                    case (-2)     ! Symmetry BC at end
+                    case (BC_REFLECTIVE)
                         call s_symmetry(q_prim_vf, pb, mv, 1, 1, k, l)
-                    case (-1)     ! Periodic BC at end
+                    case (BC_PERIODIC)
                         call s_periodic(q_prim_vf, pb, mv, 1, 1, k, l)
-                    case (-15)    ! Slip wall BC at end
+                    case (BC_SLIP_WALL)
                         call s_slip_wall(q_prim_vf, pb, mv, 1, 1, k, l)
-                    case (-16)    ! No-slip wall BC at end
+                    case (BC_NO_SLIP_WALL)
                         call s_no_slip_wall(q_prim_vf, pb, mv, 1, 1, k, l)
-                    case (-17)    ! Dirichlet BC at end
+                    case (BC_DIRICHLET)
                         call s_dirichlet(q_prim_vf, pb, mv, 1, 1, k, l)
                     end select
                 end do
@@ -140,19 +140,19 @@ contains
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(2, -1)%sf(k, 0, l)))
-                    case (-13:-3) ! Ghost-cell extrap. BC at beginning
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, -1, k, l)
-                    case (-14)    ! Axis BC at beginning
+                    case (BC_AXIS)
                         call s_axis(q_prim_vf, pb, mv, 2, -1, k, l)
-                    case (-2)     ! Symmetry BC at beginning
+                    case (BC_REFLECTIVE)
                         call s_symmetry(q_prim_vf, pb, mv, 2, -1, k, l)
-                    case (-1)     ! Periodic BC at beginning
+                    case (BC_PERIODIC)
                         call s_periodic(q_prim_vf, pb, mv, 2, -1, k, l)
-                    case (-15)    ! Slip wall BC at beginning
+                    case (BC_SLIP_WALL)
                         call s_slip_wall(q_prim_vf, pb, mv, 2, -1, k, l)
-                    case (-16)    ! No-slip wall BC at beginning
+                    case (BC_NO_SLIP_WALL)
                         call s_no_slip_wall(q_prim_vf, pb, mv, 2, -1, k, l)
-                    case (-17)    ! Dirichlet BC at beginning
+                    case (BC_DIRICHLET)
                         call s_dirichlet(q_prim_vf, pb, mv, 2, -1, k, l)
                     end select
                 end do
@@ -166,17 +166,17 @@ contains
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(2, 1)%sf(k, 0, l)))
-                    case (-13:-3) ! Ghost-cell extrap. BC at end
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, 1, k, l)
-                    case (-2)     ! Symmetry BC at end
+                    case (BC_REFLECTIVE)
                         call s_symmetry(q_prim_vf, pb, mv, 2, 1, k, l)
-                    case (-1)     ! Periodic BC at end
+                    case (BC_PERIODIC)
                         call s_periodic(q_prim_vf, pb, mv, 2, 1, k, l)
-                    case (-15)    ! Slip wall BC at end
+                    case (BC_SLIP_WALL)
                         call s_slip_wall(q_prim_vf, pb, mv, 2, 1, k, l)
-                    case (-16)    ! No-slip wall BC at end
+                    case (BC_NO_SLIP_WALL)
                         call s_no_slip_wall(q_prim_vf, pb, mv, 2, 1, k, l)
-                    case (-17)    ! Dirichlet BC at end
+                    case (BC_DIRICHLET)
                         call s_dirichlet(q_prim_vf, pb, mv, 2, 1, k, l)
                     end select
                 end do
@@ -194,17 +194,17 @@ contains
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(3, -1)%sf(k, l, 0)))
-                    case (-13:-3) ! Ghost-cell extrap. BC at beginning
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, -1, k, l)
-                    case (-2)     ! Symmetry BC at beginning
+                    case (BC_REFLECTIVE)
                         call s_symmetry(q_prim_vf, pb, mv, 3, -1, k, l)
-                    case (-1)     ! Periodic BC at beginning
+                    case (BC_PERIODIC)
                         call s_periodic(q_prim_vf, pb, mv, 3, -1, k, l)
-                    case (-15)    ! Slip wall BC at beginning
+                    case (BC_SLIP_WALL)
                         call s_slip_wall(q_prim_vf, pb, mv, 3, -1, k, l)
-                    case (-16)    ! No-slip wall BC at beginning
+                    case (BC_NO_SLIP_WALL)
                         call s_no_slip_wall(q_prim_vf, pb, mv, 3, -1, k, l)
-                    case (-17)    ! Dirichlet BC at beginning
+                    case (BC_DIRICHLET)
                         call s_dirichlet(q_prim_vf, pb, mv, 3, -1, k, l)
                     end select
                 end do
@@ -218,17 +218,17 @@ contains
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(3, 1)%sf(k, l, 0)))
-                    case (-13:-3) ! Ghost-cell extrap. BC at end
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, 1, k, l)
-                    case (-2)     ! Symmetry BC at end
+                    case (BC_REFLECTIVE)
                         call s_symmetry(q_prim_vf, pb, mv, 3, 1, k, l)
-                    case (-1)     ! Periodic BC at end
+                    case (BC_PERIODIC)
                         call s_periodic(q_prim_vf, pb, mv, 3, 1, k, l)
-                    case (-15)    ! Slip wall BC at end
+                    case (BC_SlIP_WALL)
                         call s_slip_wall(q_prim_vf, pb, mv, 3, 1, k, l)
-                    case (-16)    ! No-slip wall BC at end
+                    case (BC_NO_SLIP_WALL)
                         call s_no_slip_wall(q_prim_vf, pb, mv, 3, 1, k, l)
-                    case (-17)    ! Dirichlet BC at end
+                    case (BC_DIRICHLET)
                         call s_dirichlet(q_prim_vf, pb, mv, 3, 1, k, l)
                     end select
                 end do
@@ -1171,13 +1171,14 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = 0, n
-                    if (bc_type(1, -1)%sf(0, k, l) == -1) then
-                        call s_color_periodic(c_divs, 1, -1, k, l)
-                    elseif (bc_type(1, -1)%sf(0, k, l) == -2) then
-                        call s_color_reflective(c_divs, 1, -1, k, l)
-                    else
-                        call s_color_ghost_cell_extrapolation(c_divs, 1, -1, k, l)
-                    end if
+                    select case (bc_type(1, -1)%sf(0, k, l))
+                    case (BC_PERIODIC)
+                        call s_color_function_periodic(c_divs, 1, -1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_color_function_reflective(c_divs, 1, -1, k, l)
+                    case default
+                        call s_color_function_ghost_cell_extrapolation(c_divs, 1, -1, k, l)
+                    end select
                 end do
             end do
         end if
@@ -1188,13 +1189,14 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = 0, n
-                    if (bc_type(1, 1)%sf(0, k, l) == -1) then
-                        call s_color_periodic(c_divs, 1, 1, k, l)
-                    elseif (bc_type(1, 1)%sf(0, k, l) == -2) then
-                        call s_color_reflective(c_divs, 1, 1, k, l)
-                    else
-                        call s_color_ghost_cell_extrapolation(c_divs, 1, 1, k, l)
-                    end if
+                    select case (bc_type(1, 1)%sf(0, k, l))
+                    case (BC_PERIODIC)
+                        call s_color_function_periodic(c_divs, 1, 1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_color_function_reflective(c_divs, 1, 1, k, l)
+                    case default
+                        call s_color_function_ghost_cell_extrapolation(c_divs, 1, 1, k, l)
+                    end select
                 end do
             end do
         end if
@@ -1208,13 +1210,14 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = -buff_size, m + buff_size
-                    if (bc_type(2, -1)%sf(k, 0, l) == -1) then
-                        call s_color_periodic(c_divs, 2, -1, k, l)
-                    elseif (bc_type(2, -1)%sf(k, 0, l) == -2) then
-                        call s_color_reflective(c_divs, 2, -1, k, l)
-                    else
-                        call s_color_ghost_cell_extrapolation(c_divs, 2, -1, k, l)
-                    end if
+                    select case (bc_type(2, -1)%sf(k, 0, l))
+                    case (BC_PERIODIC)
+                        call s_color_function_periodic(c_divs, 2, -1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_color_function_reflective(c_divs, 2, -1, k, l)
+                    case default
+                        call s_color_function_ghost_cell_extrapolation(c_divs, 2, -1, k, l)
+                    end select
                 end do
             end do
         end if
@@ -1225,13 +1228,14 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = -buff_size, m + buff_size
-                    if (bc_type(2, 1)%sf(k, 0, l) == -1) then
-                        call s_color_periodic(c_divs, 2, 1, k, l)
-                    elseif (bc_type(2, 1)%sf(k, 0, l) == -2) then
-                        call s_color_reflective(c_divs, 2, 1, k, l)
-                    else
-                        call s_color_ghost_cell_extrapolation(c_divs, 2, 1, k, l)
-                    end if
+                    select case (bc_type(2, 1)%sf(k, 0, l))
+                    case (BC_PERIODIC)
+                        call s_color_function_periodic(c_divs, 2, 1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_color_function_reflective(c_divs, 2, 1, k, l)
+                    case default
+                        call s_color_function_ghost_cell_extrapolation(c_divs, 2, 1, k, l)
+                    end select
                 end do
             end do
         end if
@@ -1245,13 +1249,14 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
-                    if (bc_type(3, -1)%sf(k, l, 0) == -1) then
-                        call s_color_periodic(c_divs, 3, -1, k, l)
-                    elseif (bc_type(3, -1)%sf(k, l, 0) == -2) then
-                        call s_color_reflective(c_divs, 3, -1, k, l)
-                    else
-                        call s_color_ghost_cell_extrapolation(c_divs, 3, -1, k, l)
-                    end if
+                    select case (bc_type(3, -1)%sf(k, l, 0))
+                    case (BC_PERIODIC)
+                        call s_color_function_periodic(c_divs, 3, -1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_color_function_reflective(c_divs, 3, -1, k, l)
+                    case default
+                        call s_color_function_ghost_cell_extrapolation(c_divs, 3, -1, k, l)
+                    end select
                 end do
             end do
         end if
@@ -1262,21 +1267,22 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
-                    if (bc_type(3, 1)%sf(k, l, 0) == -1) then
-                        call s_color_periodic(c_divs, 3, 1, k, l)
-                    elseif (bc_type(3, 1)%sf(k, l, 0) == -2) then
-                        call s_color_reflective(c_divs, 3, 1, k, l)
-                    else
-                        call s_color_ghost_cell_extrapolation(c_divs, 3, 1, k, l)
-                    end if
+                    select case (bc_type(3, 1)%sf(k, l, 0))
+                    case (BC_PERIODIC)
+                        call s_color_function_periodic(c_divs, 3, 1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_color_function_reflective(c_divs, 3, 1, k, l)
+                    case default
+                        call s_color_function_ghost_cell_extrapolation(c_divs, 3, 1, k, l)
+                    end select
                 end do
             end do
         end if
     end subroutine s_populate_capillary_buffers
 
-    subroutine s_color_periodic(c_divs, bc_dir, bc_loc, k, l)
+    subroutine s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_color_periodic
+        !DIR$ INLINEALWAYS s_color_function_periodic
 #else
         !$acc routine seq
 #endif
@@ -1330,11 +1336,11 @@ contains
             end if
         end if
 
-    end subroutine s_color_periodic
+    end subroutine s_color_function_periodic
 
-    subroutine s_color_reflective(c_divs, bc_dir, bc_loc, k, l)
+    subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_color_reflective
+        !DIR$ INLINEALWAYS s_color_function_reflective
 #else
         !$acc routine seq
 #endif
@@ -1412,11 +1418,11 @@ contains
             end if
         end if
 
-    end subroutine s_color_reflective
+    end subroutine s_color_function_reflective
 
-    subroutine s_color_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
+    subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_color_ghost_cell_extrapolation
+        !DIR$ INLINEALWAYS s_color_function_ghost_cell_extrapolation
 #else
         !$acc routine seq
 #endif
@@ -1470,7 +1476,7 @@ contains
             end if
         end if
 
-    end subroutine s_color_ghost_cell_extrapolation
+    end subroutine s_color_function_ghost_cell_extrapolation
 
     subroutine s_create_mpi_types(bc_type)
 

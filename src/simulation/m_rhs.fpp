@@ -971,12 +971,12 @@ contains
 
         if (idir == 1) then
 
-            if (bc_x%beg <= -5 .and. bc_x%beg >= -13) then
+            if (bc_x%beg <= BC_CHAR_SLIP_WALL .and. bc_x%beg >= BC_CHAR_SUP_OUTFLOW) then
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
                            flux_src_n(idir)%vf, idir, -1, irx, iry, irz)
             end if
 
-            if (bc_x%end <= -5 .and. bc_x%end >= -13) then
+            if (bc_x%end <= BC_CHAR_SLIP_WALL .and. bc_x%end >= BC_CHAR_SUP_OUTFLOW) then
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
                            flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
             end if
@@ -1080,12 +1080,12 @@ contains
             ! RHS Contribution in y-direction
             ! Applying the Riemann fluxes
 
-            if (bc_y%beg <= -5 .and. bc_y%beg >= -13) then
+            if (bc_y%beg <= BC_CHAR_SLIP_WALL .and. bc_y%beg >= BC_CHAR_SUP_OUTFLOW) then
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
                            flux_src_n(idir)%vf, idir, -1, irx, iry, irz)
             end if
 
-            if (bc_y%end <= -5 .and. bc_y%end >= -13) then
+            if (bc_y%end <= BC_CHAR_SLIP_WALL .and. bc_y%end >= BC_CHAR_SUP_OUTFLOW) then
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
                            flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
             end if
@@ -1254,12 +1254,12 @@ contains
 
             ! Applying the Riemann fluxes
 
-            if (bc_z%beg <= -5 .and. bc_z%beg >= -13) then
+            if (bc_z%beg <= BC_CHAR_SLIP_WALL .and. bc_z%beg >= BC_CHAR_SUP_OUTFLOW) then
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
                            flux_src_n(idir)%vf, idir, -1, irx, iry, irz)
             end if
 
-            if (bc_z%end <= -5 .and. bc_z%end >= -13) then
+            if (bc_z%end <= BC_CHAR_SLIP_WALL .and. bc_z%end >= BC_CHAR_SUP_OUTFLOW) then
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
                            flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
             end if
@@ -1550,7 +1550,7 @@ contains
                 end do
             end if
 
-            if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
+            if (cyl_coord .and. ((bc_y%beg == BC_REFLECTIVE) .or. (bc_y%beg == BC_AXIS))) then
                 if (viscous) then
                     if (p > 0) then
                         call s_compute_viscous_stress_tensor(q_prim_vf, &
@@ -1618,7 +1618,7 @@ contains
             ! Applying the geometrical viscous Riemann source fluxes calculated as average
             ! of values at cell boundaries
             if (cyl_coord) then
-                if ((bc_y%beg == -2) .or. (bc_y%beg == -14)) then
+                if ((bc_y%beg == BC_REFLECTIVE) .or. (bc_y%beg == BC_AXIS)) then
 
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p

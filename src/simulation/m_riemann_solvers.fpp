@@ -3459,7 +3459,7 @@ contains
         ! Population of Buffers in x-direction
         if (norm_dir == 1) then
 
-            if (bc_x%beg == -4) then    ! Riemann state extrap. BC at beginning
+            if (bc_x%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
@@ -3513,7 +3513,7 @@ contains
 
             end if
 
-            if (bc_x%end == -4) then    ! Riemann state extrap. BC at end
+            if (bc_x%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
 
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
@@ -3573,7 +3573,7 @@ contains
             ! Population of Buffers in y-direction
         elseif (norm_dir == 2) then
 
-            if (bc_y%beg == -4) then    ! Riemann state extrap. BC at beginning
+            if (bc_y%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
@@ -3622,7 +3622,7 @@ contains
 
             end if
 
-            if (bc_y%end == -4) then    ! Riemann state extrap. BC at end
+            if (bc_y%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
 
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
@@ -3676,7 +3676,7 @@ contains
             ! Population of Buffers in z-direction
         else
 
-            if (bc_z%beg == -4) then    ! Riemann state extrap. BC at beginning
+            if (bc_z%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
@@ -3719,7 +3719,7 @@ contains
 
             end if
 
-            if (bc_z%end == -4) then    ! Riemann state extrap. BC at end
+            if (bc_z%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
 
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size

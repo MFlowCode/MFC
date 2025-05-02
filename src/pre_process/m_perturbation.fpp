@@ -343,7 +343,7 @@ contains
         ai = bi + ci
 
         ! Apply BC to ar and ai matrices
-        if (bc_y%beg == -6 .and. bc_y%end == -6) then
+        if (bc_y%beg == BC_CHAR_NR_SUB_BUFFER .and. bc_y%end == BC_CHAR_NR_SUB_BUFFER) then
             ! Nonreflecting subsonic buffer BC
             call s_instability_nonreflecting_subsonic_buffer_bc(ar, ai, hr, hi, rho_mean, mach)
         end if

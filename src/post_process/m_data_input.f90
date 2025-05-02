@@ -563,21 +563,21 @@ contains
         ! Populating Buffer Regions in the x-direction
 
         ! Ghost-cell extrapolation BC at the beginning
-        if (bc_x%beg <= -3) then
+        if (bc_x%beg <= BC_GHOST_EXTRAP) then
 
             do i = 1, buff_size
                 dx(-i) = dx(0)
             end do
 
             ! Symmetry BC at the beginning
-        elseif (bc_x%beg == -2) then
+        elseif (bc_x%beg == BC_REFLECTIVE) then
 
             do i = 1, buff_size
                 dx(-i) = dx(i - 1)
             end do
 
             ! Periodic BC at the beginning
-        elseif (bc_x%beg == -1) then
+        elseif (bc_x%beg == BC_PERIODIC) then
 
             do i = 1, buff_size
                 dx(-i) = dx((m + 1) - i)
@@ -599,21 +599,21 @@ contains
         end do
 
         ! Ghost-cell extrapolation BC at the end
-        if (bc_x%end <= -3) then
+        if (bc_x%end <= BC_GHOST_EXTRAP) then
 
             do i = 1, buff_size
                 dx(m + i) = dx(m)
             end do
 
             ! Symmetry BC at the end
-        elseif (bc_x%end == -2) then
+        elseif (bc_x%end == BC_REFLECTIVE) then
 
             do i = 1, buff_size
                 dx(m + i) = dx((m + 1) - i)
             end do
 
             ! Periodic BC at the end
-        elseif (bc_x%end == -1) then
+        elseif (bc_x%end == BC_PERIODIC) then
 
             do i = 1, buff_size
                 dx(m + i) = dx(i - 1)
@@ -641,21 +641,21 @@ contains
         if (n > 0) then
 
             ! Ghost-cell extrapolation BC at the beginning
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
+            if (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_AXIS) then
 
                 do i = 1, buff_size
                     dy(-i) = dy(0)
                 end do
 
                 ! Symmetry BC at the beginning
-            elseif (bc_y%beg == -2 .or. bc_y%beg == -14) then
+            elseif (bc_y%beg == BC_REFLECTIVE .or. bc_y%beg == BC_AXIS)then
 
                 do i = 1, buff_size
                     dy(-i) = dy(i - 1)
                 end do
 
                 ! Periodic BC at the beginning
-            elseif (bc_y%beg == -1) then
+            elseif (bc_y%beg == BC_PERIODIC) then
 
                 do i = 1, buff_size
                     dy(-i) = dy((n + 1) - i)
@@ -677,21 +677,21 @@ contains
             end do
 
             ! Ghost-cell extrapolation BC at the end
-            if (bc_y%end <= -3) then
+            if (bc_y%end <= BC_GHOST_EXTRAP) then
 
                 do i = 1, buff_size
                     dy(n + i) = dy(n)
                 end do
 
                 ! Symmetry BC at the end
-            elseif (bc_y%end == -2) then
+            elseif (bc_y%end == BC_REFLECTIVE) then
 
                 do i = 1, buff_size
                     dy(n + i) = dy((n + 1) - i)
                 end do
 
                 ! Periodic BC at the end
-            elseif (bc_y%end == -1) then
+            elseif (bc_y%end == BC_PERIODIC) then
 
                 do i = 1, buff_size
                     dy(n + i) = dy(i - 1)
@@ -719,21 +719,21 @@ contains
             if (p > 0) then
 
                 ! Ghost-cell extrapolation BC at the beginning
-                if (bc_z%beg <= -3) then
+                if (bc_z%beg <= BC_GHOST_EXTRAP) then
 
                     do i = 1, buff_size
                         dz(-i) = dz(0)
                     end do
 
                     ! Symmetry BC at the beginning
-                elseif (bc_z%beg == -2) then
+                elseif (bc_z%beg == BC_REFLECTIVE) then
 
                     do i = 1, buff_size
                         dz(-i) = dz(i - 1)
                     end do
 
                     ! Periodic BC at the beginning
-                elseif (bc_z%beg == -1) then
+                elseif (bc_z%beg == BC_PERIODIC) then
 
                     do i = 1, buff_size
                         dz(-i) = dz((p + 1) - i)
@@ -755,21 +755,21 @@ contains
                 end do
 
                 ! Ghost-cell extrapolation BC at the end
-                if (bc_z%end <= -3) then
+                if (bc_z%end <= BC_GHOST_EXTRAP) then
 
                     do i = 1, buff_size
                         dz(p + i) = dz(p)
                     end do
 
                     ! Symmetry BC at the end
-                elseif (bc_z%end == -2) then
+                elseif (bc_z%end == BC_REFLECTIVE) then
 
                     do i = 1, buff_size
                         dz(p + i) = dz((p + 1) - i)
                     end do
 
                     ! Periodic BC at the end
-                elseif (bc_z%end == -1) then
+                elseif (bc_z%end == BC_PERIODIC) then
 
                     do i = 1, buff_size
                         dz(p + i) = dz(i - 1)
@@ -810,7 +810,7 @@ contains
         ! Populating Buffer Regions in the x-direction
 
         ! Ghost-cell extrapolation BC at the beginning
-        if (bc_x%beg <= -3) then
+        if (bc_x%beg <= BC_GHOST_EXTRAP) then
 
             do j = 1, buff_size
                 if (present(q_particle)) then
@@ -824,7 +824,7 @@ contains
             end do
 
             ! Symmetry BC at the beginning
-        elseif (bc_x%beg == -2) then
+        elseif (bc_x%beg == BC_REFLECTIVE) then
 
             do j = 1, buff_size
 
@@ -853,7 +853,7 @@ contains
             end do
 
             ! Periodic BC at the beginning
-        elseif (bc_x%beg == -1) then
+        elseif (bc_x%beg == BC_PERIODIC) then
 
             do j = 1, buff_size
                 if (present(q_particle)) then
@@ -880,7 +880,7 @@ contains
         end if
 
         ! Ghost-cell extrapolation BC at the end
-        if (bc_x%end <= -3) then
+        if (bc_x%end <= BC_GHOST_EXTRAP) then
 
             do j = 1, buff_size
                 if (present(q_particle)) then
@@ -895,7 +895,7 @@ contains
             end do
 
             ! Symmetry BC at the end
-        elseif (bc_x%end == -2) then
+        elseif (bc_x%end == BC_REFLECTIVE) then
 
             do j = 1, buff_size
 
@@ -925,7 +925,7 @@ contains
             end do
 
             ! Perodic BC at the end
-        elseif (bc_x%end == -1) then
+        elseif (bc_x%end == BC_PERIODIC) then
 
             do j = 1, buff_size
                 if (present(q_particle)) then
@@ -959,7 +959,7 @@ contains
         if (n > 0) then
 
             ! Ghost-cell extrapolation BC at the beginning
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
+            if (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_AXIS) then
 
                 do j = 1, buff_size
                     if (present(q_particle)) then
@@ -972,7 +972,7 @@ contains
                 end do
 
                 ! Axis BC at the beginning
-            elseif (bc_y%beg == -14) then
+            elseif (bc_y%beg == BC_AXIS) then
 
                 do j = 1, buff_size
                     do k = 0, p
@@ -1023,7 +1023,7 @@ contains
                 end do
 
                 ! Symmetry BC at the beginning
-            elseif (bc_y%beg == -2) then
+            elseif (bc_y%beg == BC_REFLECTIVE) then
 
                 do j = 1, buff_size
                     if (present(q_particle)) then
@@ -1051,7 +1051,7 @@ contains
                 end do
 
                 ! Periodic BC at the beginning
-            elseif (bc_y%beg == -1) then
+            elseif (bc_y%beg == BC_PERIODIC) then
 
                 do j = 1, buff_size
                     if (present(q_particle)) then
@@ -1078,7 +1078,7 @@ contains
             end if
 
             ! Ghost-cell extrapolation BC at the end
-            if (bc_y%end <= -3) then
+            if (bc_y%end <= BC_GHOST_EXTRAP) then
 
                 do j = 1, buff_size
                     if (present(q_particle)) then
@@ -1093,7 +1093,7 @@ contains
                 end do
 
                 ! Symmetry BC at the end
-            elseif (bc_y%end == -2) then
+            elseif (bc_y%end == BC_REFLECTIVE) then
 
                 do j = 1, buff_size
                     if (present(q_particle)) then
@@ -1121,7 +1121,7 @@ contains
                 end do
 
                 ! Perodic BC at the end
-            elseif (bc_y%end == -1) then
+            elseif (bc_y%end == BC_PERIODIC) then
 
                 do j = 1, buff_size
                     if (present(q_particle)) then
@@ -1155,7 +1155,7 @@ contains
             if (p > 0) then
 
                 ! Ghost-cell extrapolation BC at the beginning
-                if (bc_z%beg <= -3) then
+                if (bc_z%beg <= BC_GHOST_EXTRAP) then
 
                     do j = 1, buff_size
                         if (present(q_particle)) then
@@ -1168,7 +1168,7 @@ contains
                     end do
 
                     ! Symmetry BC at the beginning
-                elseif (bc_z%beg == -2) then
+                elseif (bc_z%beg == BC_REFLECTIVE) then
 
                     do j = 1, buff_size
                         if (present(q_particle)) then
@@ -1196,7 +1196,7 @@ contains
                     end do
 
                     ! Periodic BC at the beginning
-                elseif (bc_z%beg == -1) then
+                elseif (bc_z%beg == BC_PERIODIC) then
 
                     do j = 1, buff_size
                         if (present(q_particle)) then
@@ -1224,7 +1224,7 @@ contains
                 end if
 
                 ! Ghost-cell extrapolation BC at the end
-                if (bc_z%end <= -3) then
+                if (bc_z%end <= BC_GHOST_EXTRAP) then
 
                     do j = 1, buff_size
                         if (present(q_particle)) then
@@ -1239,7 +1239,7 @@ contains
                     end do
 
                     ! Symmetry BC at the end
-                elseif (bc_z%end == -2) then
+                elseif (bc_z%end == BC_REFLECTIVE) then
 
                     do j = 1, buff_size
                         if (present(q_particle)) then
@@ -1267,7 +1267,7 @@ contains
                     end do
 
                     ! Perodic BC at the end
-                elseif (bc_z%end == -1) then
+                elseif (bc_z%end == BC_PERIODIC) then
 
                     do j = 1, buff_size
                         if (present(q_particle)) then
