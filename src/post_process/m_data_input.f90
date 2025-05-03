@@ -648,7 +648,7 @@ contains
                 end do
 
                 ! Symmetry BC at the beginning
-            elseif (bc_y%beg == BC_REFLECTIVE .or. bc_y%beg == BC_AXIS)then
+            elseif (bc_y%beg == BC_REFLECTIVE .or. bc_y%beg == BC_AXIS) then
 
                 do i = 1, buff_size
                     dy(-i) = dy(i - 1)

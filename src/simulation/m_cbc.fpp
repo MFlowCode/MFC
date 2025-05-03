@@ -855,13 +855,13 @@ contains
                         Ma = vel(dir_idx(1))/c
 
                         if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SLIP_WALL) .or. &
-                            (cbc_loc ==  1 .and. bc${XYZ}$e == BC_CHAR_SLIP_WALL)) then
+                            (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SLIP_WALL)) then
                             call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_BUFFER) .or. &
-                                 (cbc_loc ==  1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_BUFFER)) then
+                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_BUFFER)) then
                             call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_INFLOW) .or. &
-                                 (cbc_loc ==  1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_INFLOW)) then
+                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_INFLOW)) then
                             call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                             ! Add GRCBC for Subsonic Inflow
                             if (bc_${XYZ}$%grcbc_in) then
@@ -882,7 +882,7 @@ contains
                                 L(advxe) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_OUTFLOW) .or. &
-                                 (cbc_loc ==  1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
+                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                             ! Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
@@ -894,16 +894,16 @@ contains
                                 end if
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_FF_SUB_OUTFLOW) .or. &
-                                 (cbc_loc ==  1 .and. bc${XYZ}$e == BC_CHAR_FF_SUB_OUTFLOW)) then
+                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_FF_SUB_OUTFLOW)) then
                             call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_CP_SUB_OUTFLOW) .or. &
-                                 (cbc_loc ==  1 .and. bc${XYZ}$e == BC_CHAR_CP_SUB_OUTFLOW)) then
+                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_CP_SUB_OUTFLOW)) then
                             call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SUP_INFLOW) .or. &
-                                 (cbc_loc ==  1 .and. bc${XYZ}$e == BC_CHAR_SUP_INFLOW)) then
+                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_INFLOW)) then
                             call s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SUP_OUTFLOW) .or. &
-                                 (cbc_loc ==  1 .and. bc${XYZ}$e == BC_CHAR_SUP_OUTFLOW)) then
+                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_OUTFLOW)) then
                             call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         end if
 
