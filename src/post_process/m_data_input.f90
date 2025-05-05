@@ -21,6 +21,8 @@ module m_data_input
 
     use m_compile_specific
 
+    use m_boundary_common
+
     use m_helper
 
     implicit none
@@ -55,6 +57,9 @@ module m_data_input
 
     type(scalar_field), allocatable, dimension(:), public :: q_particle !<
     !! Lagrangian solver (particle void fraction)
+
+    type(integer_field), allocatable, dimension(:, :), public :: bc_type !<
+    !! Boundary condition identifiers
 
     type(scalar_field), public :: q_T_sf !<
     !! Temperature field
@@ -127,6 +132,11 @@ contains
                              ' is missing. Exiting.')
         end if
 
+        if (bc_io) then
+            call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
+        else
+            call s_assign_default_bc_type(bc_type)
+        end if
         ! Reading the Grid Data File for the x-direction
 
         ! Checking whether x_cb.dat exists
@@ -545,6 +555,12 @@ contains
         end if
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
+
+        if (bc_io) then
+            call s_read_parallel_boundary_condition_files(bc_type)
+        else
+            call s_assign_default_bc_type(bc_type)
+        end if
 
 #endif
 
@@ -1411,6 +1427,20 @@ contains
 
         end if
 
+        ! Allocating arrays to store the bc types
+        allocate(bc_type(1:num_dims,-1:1))
+
+        allocate(bc_type(1,-1)%sf(0:0,0:n,0:p))
+        allocate(bc_type(1,1)%sf(0:0,0:n,0:p))
+        if (n > 0) then
+            allocate(bc_type(2,-1)%sf(-buff_size:m+buff_size,0:0,0:p))
+            allocate(bc_type(2,1)%sf(-buff_size:m+buff_size,0:0,0:p))
+            if (p > 0) then
+                allocate(bc_type(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+                allocate(bc_type(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+            end if
+        end if
+
         if (parallel_io .neqv. .true.) then
             s_read_data_files => s_read_serial_data_files
         else
@@ -1445,6 +1475,16 @@ contains
         if (chemistry) then
             deallocate (q_T_sf%sf)
         end if
+
+        deallocate(bc_type(1,-1)%sf, bc_type(1,1)%sf)
+        if (n > 0) then
+            deallocate(bc_type(2,-1)%sf, bc_type(2, 1)%sf)
+            if (p > 0) then
+                deallocate(bc_type(3,-1)%sf, bc_type(3,1)%sf)
+            end if
+        end if
+
+        deallocate(bc_type)
 
         s_read_data_files => null()
 

@@ -72,8 +72,6 @@ contains
 
     end subroutine s_initialize_mpi_proxy_module
 
-contains
-
     !>  Since only the processor with rank 0 reads and verifies
         !!      the consistency of user inputs, these are initially not
         !!      available to the other processors. Then, the purpose of

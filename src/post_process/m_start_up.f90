@@ -16,6 +16,10 @@ module m_start_up
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
+    use m_mpi_common            !< Common MPI subroutines
+
+    use m_boundary_common       !< Common boundary conditions subroutines
+
     use m_variables_conversion  !< Subroutines to change the state variables from
                                 !! one form to another
 
@@ -32,8 +36,6 @@ module m_start_up
     use m_compile_specific
 
     use m_checker_common
-
-    use m_boundary_conditions
 
     use m_checker
 
@@ -86,7 +88,8 @@ contains
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
             cfl_target, surface_tension, bubbles_lagrange, rkck_adap_dt, &
-            sim_data, hyperelasticity, Bx0, relativity, cont_damage
+            sim_data, hyperelasticity, Bx0, relativity, cont_damage, &
+            num_bc_patches
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -116,6 +119,11 @@ contains
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
 
             if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
+
+            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. &
+                num_bc_patches > 0) then
+                bc_io = .true.
+            endif
 
         else
             call s_mpi_abort('File post_process.inp is missing. Exiting.')
@@ -179,8 +187,8 @@ contains
 
         ! Populating the buffer regions of the conservative variables
         if (buff_size > 0) then
-            call s_populate_variables_buffers(q_cons_vf)
-            if (bubbles_lagrange) call s_populate_conservative_variables_buffer_regions(q_particle(1))
+            call s_populate_variables_buffers(bc_type, q_cons_vf)
+            !if (bubbles_lagrange) call s_populate_conservative_variables_buffer_regions(q_particle(1))
         end if
 
         ! Initialize the Temperature cache.

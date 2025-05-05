@@ -624,7 +624,7 @@ contains
         do q = 1, elliptic_smoothing_iters
 
             ! Communication of buffer regions and apply boundary conditions
-            call s_populate_variables_buffers(q_prim_vf, pb%sf, mv%sf, bc_type)
+            call s_populate_variables_buffers(bc_type, q_prim_vf, pb%sf, mv%sf)
 
             ! Perform smoothing and store in temp array
             if (n == 0) then

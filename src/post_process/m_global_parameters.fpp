@@ -147,6 +147,8 @@ module m_global_parameters
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
 
+    integer :: num_bc_patches
+    logical :: bc_io
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
@@ -370,6 +372,8 @@ contains
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
+        bc_io = .false.
+        num_bc_patches = dflt_int
 
         #:for DIM in ['x', 'y', 'z']
             #:for DIR in [1, 2, 3]
