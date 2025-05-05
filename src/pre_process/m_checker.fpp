@@ -32,6 +32,7 @@ contains
         call s_check_inputs_perturb_density
         call s_check_inputs_chemistry
         call s_check_inputs_misc
+        call s_check_bc
 
     end subroutine s_check_inputs
 
@@ -190,11 +191,65 @@ contains
         @:PROHIBIT(mixlayer_perturb .and. n == 0, "mixlayer_perturb requires n > 0")
         @:PROHIBIT(mixlayer_perturb .and. model_eqns /= 2, "mixlayer_perturb requires model_eqns = 2")
         @:PROHIBIT(mixlayer_perturb .and. num_fluids > 1, "mixlayer_perturb requires num_fluids = 1")
-        @:PROHIBIT(mixlayer_perturb .and. any((/bc_y%beg, bc_y%end/) /= -6), &
+        @:PROHIBIT(mixlayer_perturb .and. any((/bc_y%beg, bc_y%end/) /= BC_CHAR_NR_SUB_BUFFER), &
             "mixlayer_perturb requires both bc_y%beg and bc_y%end to be 6")
         @:PROHIBIT(elliptic_smoothing .and. elliptic_smoothing_iters < 1, &
             "elliptic_smoothing_iters must be positive")
 
     end subroutine s_check_inputs_misc
+
+    subroutine s_check_bc
+
+        integer :: i
+        character(len=5) :: iStr !< for int to string conversion
+
+        call s_int_to_str(num_bc_patches_max, iStr)
+        @:PROHIBIT(num_bc_patches > num_bc_patches_max, "num_bc_patches must be <= "//trim(iStr))
+
+        do i = 1, num_bc_patches
+            call s_int_to_str(i, iStr)
+
+            ! Line Segment BC
+            if (patch_bc(i)%geometry == 1) then
+                @:PROHIBIT( .not. f_is_default(patch_bc(i)%radius), "Line Segment Patch can't have radius defined")
+                #:for DIR in [('1'), ('2')]
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. (.not. f_is_default(patch_bc(i)%centroid(${DIR}$)) .or. .not. f_is_default(patch_bc(i)%centroid(3))), &
+                        "Line Segment Patch of Dir ${DIR}$ can't have a centroid in Dir ${DIR}$ or 3" )
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. (.not. f_is_default(patch_bc(i)%length(${DIR}$)) .or. .not. f_is_default(patch_bc(i)%length(3))), &
+                        "Line Segment Patch of Dir ${DIR}$ can't have a length in Dir ${DIR}$ or 3" )
+                #:endfor
+            end if
+
+            ! Circle BC
+            if (patch_bc(i)%geometry == 2) then
+                @:PROHIBIT(f_is_default(patch_bc(i)%radius), "Circle Patch must have radius defined")
+                @:PROHIBIT(.not. f_is_default(patch_bc(i)%length(1)) .or. .not. f_is_default(patch_bc(i)%length(2)) .or. .not. f_is_default(patch_bc(i)%length(3)), &
+                    "Circle Patch can't have lengths defined")
+
+                #:for DIR in [('1'), ('2'), ('3')]
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%centroid(${DIR}$)), &
+                        "Circle Patch of Dir ${DIR}$ can't have a centroid in Dir ${DIR}$")
+                #:endfor
+            end if
+
+            ! Rectangle BC
+            if (patch_bc(i)%geometry == 3) then
+                @:PROHIBIT( .not. f_is_default(patch_bc(i)%radius), "Rectangle Patch can't have radius defined")
+
+                #:for DIR, VAR in [('1', '2', '3'), ('2', '3', '1'), ('3', '1', '2')]
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%centroid(${DIR}$)), &
+                        "Rectangle Patch of Dir ${DIR}$ can't have a centroid in Dir ${DIR}$")
+                    @:PROHIBIT(patch_bc(i)%dir == ${DIR}$ .and. .not. f_is_default(patch_bc(i)%length(${DIR}$)), &
+                        "Rectangle Patch of Dir ${DIR}$ can't have a length in Dir ${DIR}$")
+                #:endfor
+            end if
+
+            ! Incompatible BC check
+            @:PROHIBIT(((patch_bc(i)%type >= BC_AXIS .and. patch_bc(i)%type <= BC_RIEMANN_EXTRAP) .or. &
+                (patch_bc(i)%type == BC_PERIODIC) .or. patch_bc(i)%type < BC_DIRICHLET), &
+                "Incompatible BC type for boundary condition patch "//trim(iStr))
+        end do
+
+    end subroutine
 
 end module m_checker

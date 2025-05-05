@@ -191,6 +191,12 @@ module m_global_parameters
     !! the maximum allowable number of patches, num_patches_max, may be changed
     !! in the module m_derived_types.f90.
 
+    integer :: num_bc_patches  !< Number of boundary condition patches
+    logical :: bc_io !< whether or not to save BC data
+    type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc
+    !! Database of the boundary condition patch parameters for each of the patches
+    !! employed in the configuration of the boundary conditions
+
     ! Fluids Physical Parameters
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
     !! Database of the physical parameters of each of the fluids that is present
@@ -438,6 +444,19 @@ contains
             if (chemistry) then
                 patch_icpp(i)%Y(:) = 0._wp
             end if
+        end do
+
+        num_bc_patches = 0
+        bc_io = .false.
+
+        do i = 1, num_bc_patches_max
+            patch_bc(i)%geometry = dflt_int
+            patch_bc(i)%type = dflt_int
+            patch_bc(i)%dir = dflt_int
+            patch_bc(i)%loc = dflt_int
+            patch_bc(i)%centroid(:) = dflt_real
+            patch_bc(i)%length(:) = dflt_real
+            patch_bc(i)%radius = dflt_real
         end do
 
         ! Tait EOS
