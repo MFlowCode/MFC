@@ -180,15 +180,10 @@ contains
         ! Populating the grid and conservative variables
         call s_read_data_files(t_step)
 
-        ! Populating the buffer regions of the grid variables
+        ! Populating the buffer regions of the grid and conservative variables
         if (buff_size > 0) then
             call s_populate_grid_variables_buffer_regions()
-        end if
-
-        ! Populating the buffer regions of the conservative variables
-        if (buff_size > 0) then
             call s_populate_variables_buffers(bc_type, q_cons_vf)
-            !if (bubbles_lagrange) call s_populate_conservative_variables_buffer_regions(q_particle(1))
         end if
 
         ! Initialize the Temperature cache.
@@ -674,7 +669,7 @@ contains
         ! Adding the lagrangian subgrid variables  to the formatted database file
         if (bubbles_lagrange) then
             !! Void fraction field
-            q_sf = 1._wp - q_particle(1)%sf( &
+            q_sf = 1._wp - q_cons_vf(beta_idx)%sf( &
                    -offset_x%beg:m + offset_x%end, &
                    -offset_y%beg:n + offset_y%end, &
                    -offset_z%beg:p + offset_z%end)

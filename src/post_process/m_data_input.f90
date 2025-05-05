@@ -32,7 +32,6 @@ module m_data_input
  s_read_serial_data_files, &
  s_read_parallel_data_files, &
  s_populate_grid_variables_buffer_regions, &
- s_populate_conservative_variables_buffer_regions, &
  s_finalize_data_input_module
 
     abstract interface
@@ -54,9 +53,6 @@ module m_data_input
 
     type(scalar_field), allocatable, dimension(:), public :: q_prim_vf !<
     !! Primitive variables
-
-    type(scalar_field), allocatable, dimension(:), public :: q_particle !<
-    !! Lagrangian solver (particle void fraction)
 
     type(integer_field), allocatable, dimension(:, :), public :: bc_type !<
     !! Boundary condition identifiers
@@ -250,29 +246,6 @@ contains
             end if
         end if
 
-        if (bubbles_lagrange) then !Lagrangian solver
-
-            ! Checking whether the data file associated with the variable
-            ! position of currently manipulated conservative variable exists
-            write (file_num, '(I0)') sys_size + 1
-            file_loc = trim(t_step_dir)//'/q_cons_vf'// &
-                       trim(file_num)//'.dat'
-            inquire (FILE=trim(file_loc), EXIST=file_check)
-
-            ! Reading the data file if it exists, exiting otherwise
-            if (file_check) then
-                open (1, FILE=trim(file_loc), FORM='unformatted', &
-                      STATUS='old', ACTION='read')
-                read (1) q_particle(1)%sf(0:m, 0:n, 0:p)
-                close (1)
-            else
-                print '(A)', 'File q_cons_vf'//trim(file_num)// &
-                    '.dat is missing in '//trim(t_step_dir)// &
-                    '. Exiting.'
-                call s_mpi_abort()
-            end if
-        end if
-
     end subroutine s_read_serial_data_files
 
     !>  This subroutine is called at each time-step that has to
@@ -303,14 +276,6 @@ contains
         character(len=10) :: t_step_string
 
         integer :: i
-
-        integer :: alt_sys !Altered sys_size for lagrangian solver
-
-        if (bubbles_lagrange) then
-            alt_sys = sys_size + 1
-        else
-            alt_sys = sys_size
-        end if
 
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))
@@ -467,8 +432,6 @@ contains
                 ! Initialize MPI data I/O
                 if (ib) then
                     call s_initialize_mpi_data(q_cons_vf, ib_markers)
-                elseif (bubbles_lagrange) then
-                    call s_initialize_mpi_data(q_cons_vf, beta=q_particle(1))
                 else
                     call s_initialize_mpi_data(q_cons_vf)
                 end if
@@ -483,46 +446,20 @@ contains
                 WP_MOK = int(8._wp, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size
-                        var_MOK = int(i, MPI_OFFSET_KIND)
-
-                        ! Initial displacement to skip at beginning of file
-                        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
-
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
-                                               'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               mpi_p, status, ierr)
-                    end do
-                else
-                    do i = 1, sys_size
-                        var_MOK = int(i, MPI_OFFSET_KIND)
-
-                        ! Initial displacement to skip at beginning of file
-                        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
-
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
-                                               'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               mpi_p, status, ierr)
-                    end do
-                end if
-
-                if (bubbles_lagrange) then !Lagrangian solver
-                    var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+                do i = 1, sys_size
+                    var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(sys_size + 1), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ(ifile, MPI_IO_DATA%var(sys_size + 1)%sf, data_size, &
-                                       mpi_p, status, ierr)
-                end if
+                    call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                           mpi_p, status, ierr)
+                end do
 
                 call s_mpi_barrier()
 
@@ -816,510 +753,6 @@ contains
 
     end subroutine s_populate_grid_variables_buffer_regions
 
-    !>  The purpose of this procedure is to populate the buffers
-        !!      of the cell-average conservative variables, depending on
-        !!      the boundary conditions.
-    subroutine s_populate_conservative_variables_buffer_regions(q_particle)
-
-        type(scalar_field), intent(inout), optional :: q_particle
-
-        integer :: i, j, k !< Generic loop iterators
-
-        ! Populating Buffer Regions in the x-direction
-
-        ! Ghost-cell extrapolation BC at the beginning
-        if (bc_x%beg <= BC_GHOST_EXTRAP) then
-
-            do j = 1, buff_size
-                if (present(q_particle)) then
-                    q_particle%sf(-j, 0:n, 0:p) = &
-                        q_particle%sf(0, 0:n, 0:p)
-                else
-                    do i = 1, sys_size
-                        q_cons_vf(i)%sf(-j, 0:n, 0:p) = q_cons_vf(i)%sf(0, 0:n, 0:p)
-                    end do
-                end if
-            end do
-
-            ! Symmetry BC at the beginning
-        elseif (bc_x%beg == BC_REFLECTIVE) then
-
-            do j = 1, buff_size
-
-                if (present(q_particle)) then
-                    q_particle%sf(-j, 0:n, 0:p) = &
-                        q_particle%sf(j - 1, 0:n, 0:p)
-                else
-                    ! Density or partial densities
-                    do i = 1, cont_idx%end
-                        q_cons_vf(i)%sf(-j, 0:n, 0:p) = &
-                            q_cons_vf(i)%sf(j - 1, 0:n, 0:p)
-                    end do
-
-                    ! x-component of momentum
-                    q_cons_vf(mom_idx%beg)%sf(-j, 0:n, 0:p) = &
-                        -q_cons_vf(mom_idx%beg)%sf(j - 1, 0:n, 0:p)
-
-                    ! Remaining momentum component(s), if any, as well as the
-                    ! energy and the variable(s) from advection equation(s)
-                    do i = mom_idx%beg + 1, sys_size
-                        q_cons_vf(i)%sf(-j, 0:n, 0:p) = &
-                            q_cons_vf(i)%sf(j - 1, 0:n, 0:p)
-                    end do
-                end if
-
-            end do
-
-            ! Periodic BC at the beginning
-        elseif (bc_x%beg == BC_PERIODIC) then
-
-            do j = 1, buff_size
-                if (present(q_particle)) then
-                    q_particle%sf(-j, 0:n, 0:p) = &
-                        q_particle%sf((m + 1) - j, 0:n, 0:p)
-                else
-                    do i = 1, sys_size
-                        q_cons_vf(i)%sf(-j, 0:n, 0:p) = &
-                            q_cons_vf(i)%sf((m + 1) - j, 0:n, 0:p)
-                    end do
-                end if
-            end do
-
-            ! Processor BC at the beginning
-        else
-            if (present(q_particle)) then
-                call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                             'beg', 'x', q_particle)
-            else
-                call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                             'beg', 'x')
-            end if
-
-        end if
-
-        ! Ghost-cell extrapolation BC at the end
-        if (bc_x%end <= BC_GHOST_EXTRAP) then
-
-            do j = 1, buff_size
-                if (present(q_particle)) then
-                    q_particle%sf(m + j, 0:n, 0:p) = &
-                        q_particle%sf(m, 0:n, 0:p)
-                else
-                    do i = 1, sys_size
-                        q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
-                            q_cons_vf(i)%sf(m, 0:n, 0:p)
-                    end do
-                end if
-            end do
-
-            ! Symmetry BC at the end
-        elseif (bc_x%end == BC_REFLECTIVE) then
-
-            do j = 1, buff_size
-
-                if (present(q_particle)) then
-                    q_particle%sf(m + j, 0:n, 0:p) = &
-                        q_particle%sf((m + 1) - j, 0:n, 0:p)
-                else
-
-                    ! Density or partial densities
-                    do i = 1, cont_idx%end
-                        q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
-                            q_cons_vf(i)%sf((m + 1) - j, 0:n, 0:p)
-                    end do
-
-                    ! x-component of momentum
-                    q_cons_vf(mom_idx%beg)%sf(m + j, 0:n, 0:p) = &
-                        -q_cons_vf(mom_idx%beg)%sf((m + 1) - j, 0:n, 0:p)
-
-                    ! Remaining momentum component(s), if any, as well as the
-                    ! energy and the variable(s) from advection equation(s)
-                    do i = mom_idx%beg + 1, sys_size
-                        q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
-                            q_cons_vf(i)%sf((m + 1) - j, 0:n, 0:p)
-                    end do
-                end if
-
-            end do
-
-            ! Perodic BC at the end
-        elseif (bc_x%end == BC_PERIODIC) then
-
-            do j = 1, buff_size
-                if (present(q_particle)) then
-                    q_particle%sf(m + j, 0:n, 0:p) = &
-                        q_particle%sf(j - 1, 0:n, 0:p)
-                else
-                    do i = 1, sys_size
-                        q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
-                            q_cons_vf(i)%sf(j - 1, 0:n, 0:p)
-                    end do
-                end if
-            end do
-
-            ! Processor BC at the end
-        else
-
-            if (present(q_particle)) then
-                call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                             'end', 'x', q_particle)
-            else
-                call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                             'end', 'x')
-            end if
-
-        end if
-
-        ! END: Populating Buffer Regions in the x-direction
-
-        ! Populating Buffer Regions in the y-direction
-
-        if (n > 0) then
-
-            ! Ghost-cell extrapolation BC at the beginning
-            if (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_AXIS) then
-
-                do j = 1, buff_size
-                    if (present(q_particle)) then
-                        q_particle%sf(:, -j, 0:p) = q_particle%sf(:, 0, 0:p)
-                    else
-                        do i = 1, sys_size
-                            q_cons_vf(i)%sf(:, -j, 0:p) = q_cons_vf(i)%sf(:, 0, 0:p)
-                        end do
-                    end if
-                end do
-
-                ! Axis BC at the beginning
-            elseif (bc_y%beg == BC_AXIS) then
-
-                do j = 1, buff_size
-                    do k = 0, p
-                        if (z_cc(k) < pi) then
-                            if (present(q_particle)) then
-                                q_particle%sf(:, -j, k) = &
-                                    q_particle%sf(:, j - 1, k + ((p + 1)/2))
-                            else
-                                do i = 1, mom_idx%beg
-                                    q_cons_vf(i)%sf(:, -j, k) = &
-                                        q_cons_vf(i)%sf(:, j - 1, k + ((p + 1)/2))
-                                end do
-
-                                q_cons_vf(mom_idx%beg + 1)%sf(:, -j, k) = &
-                                    -q_cons_vf(mom_idx%beg + 1)%sf(:, j - 1, k + ((p + 1)/2))
-
-                                q_cons_vf(mom_idx%end)%sf(:, -j, k) = &
-                                    -q_cons_vf(mom_idx%end)%sf(:, j - 1, k + ((p + 1)/2))
-
-                                do i = E_idx, sys_size
-                                    q_cons_vf(i)%sf(:, -j, k) = &
-                                        q_cons_vf(i)%sf(:, j - 1, k + ((p + 1)/2))
-                                end do
-                            end if
-                        else
-                            if (present(q_particle)) then
-                                q_particle%sf(:, -j, k) = &
-                                    q_particle%sf(:, j - 1, k - ((p + 1)/2))
-                            else
-                                do i = 1, mom_idx%beg
-                                    q_cons_vf(i)%sf(:, -j, k) = &
-                                        q_cons_vf(i)%sf(:, j - 1, k - ((p + 1)/2))
-                                end do
-
-                                q_cons_vf(mom_idx%beg + 1)%sf(:, -j, k) = &
-                                    -q_cons_vf(mom_idx%beg + 1)%sf(:, j - 1, k - ((p + 1)/2))
-
-                                q_cons_vf(mom_idx%end)%sf(:, -j, k) = &
-                                    -q_cons_vf(mom_idx%end)%sf(:, j - 1, k - ((p + 1)/2))
-
-                                do i = E_idx, sys_size
-                                    q_cons_vf(i)%sf(:, -j, k) = &
-                                        q_cons_vf(i)%sf(:, j - 1, k - ((p + 1)/2))
-                                end do
-                            end if
-                        end if
-                    end do
-                end do
-
-                ! Symmetry BC at the beginning
-            elseif (bc_y%beg == BC_REFLECTIVE) then
-
-                do j = 1, buff_size
-                    if (present(q_particle)) then
-                        q_particle%sf(:, -j, 0:p) = &
-                            q_particle%sf(:, j - 1, 0:p)
-                    else
-                        ! Density or partial densities and x-momentum component
-                        do i = 1, mom_idx%beg
-                            q_cons_vf(i)%sf(:, -j, 0:p) = &
-                                q_cons_vf(i)%sf(:, j - 1, 0:p)
-                        end do
-
-                        ! y-component of momentum
-                        q_cons_vf(mom_idx%beg + 1)%sf(:, -j, 0:p) = &
-                            -q_cons_vf(mom_idx%beg + 1)%sf(:, j - 1, 0:p)
-
-                        ! Remaining z-momentum component, if any, as well as the
-                        ! energy and variable(s) from advection equation(s)
-                        do i = mom_idx%beg + 2, sys_size
-                            q_cons_vf(i)%sf(:, -j, 0:p) = &
-                                q_cons_vf(i)%sf(:, j - 1, 0:p)
-                        end do
-                    end if
-
-                end do
-
-                ! Periodic BC at the beginning
-            elseif (bc_y%beg == BC_PERIODIC) then
-
-                do j = 1, buff_size
-                    if (present(q_particle)) then
-                        q_particle%sf(:, -j, 0:p) = &
-                            q_particle%sf(:, (n + 1) - j, 0:p)
-                    else
-                        do i = 1, sys_size
-                            q_cons_vf(i)%sf(:, -j, 0:p) = &
-                                q_cons_vf(i)%sf(:, (n + 1) - j, 0:p)
-                        end do
-                    end if
-                end do
-
-                ! Processor BC at the beginning
-            else
-                if (present(q_particle)) then
-                    call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                 'beg', 'y', q_particle)
-                else
-                    call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                 'beg', 'y')
-                end if
-
-            end if
-
-            ! Ghost-cell extrapolation BC at the end
-            if (bc_y%end <= BC_GHOST_EXTRAP) then
-
-                do j = 1, buff_size
-                    if (present(q_particle)) then
-                        q_particle%sf(:, n + j, 0:p) = &
-                            q_particle%sf(:, n, 0:p)
-                    else
-                        do i = 1, sys_size
-                            q_cons_vf(i)%sf(:, n + j, 0:p) = &
-                                q_cons_vf(i)%sf(:, n, 0:p)
-                        end do
-                    end if
-                end do
-
-                ! Symmetry BC at the end
-            elseif (bc_y%end == BC_REFLECTIVE) then
-
-                do j = 1, buff_size
-                    if (present(q_particle)) then
-                        q_particle%sf(:, n + j, 0:p) = &
-                            q_particle%sf(:, (n + 1) - j, 0:p)
-                    else
-                        ! Density or partial densities and x-momentum component
-                        do i = 1, mom_idx%beg
-                            q_cons_vf(i)%sf(:, n + j, 0:p) = &
-                                q_cons_vf(i)%sf(:, (n + 1) - j, 0:p)
-                        end do
-
-                        ! y-component of momentum
-                        q_cons_vf(mom_idx%beg + 1)%sf(:, n + j, 0:p) = &
-                            -q_cons_vf(mom_idx%beg + 1)%sf(:, (n + 1) - j, 0:p)
-
-                        ! Remaining z-momentum component, if any, as well as the
-                        ! energy and variable(s) from advection equation(s)
-                        do i = mom_idx%beg + 2, sys_size
-                            q_cons_vf(i)%sf(:, n + j, 0:p) = &
-                                q_cons_vf(i)%sf(:, (n + 1) - j, 0:p)
-                        end do
-                    end if
-
-                end do
-
-                ! Perodic BC at the end
-            elseif (bc_y%end == BC_PERIODIC) then
-
-                do j = 1, buff_size
-                    if (present(q_particle)) then
-                        q_particle%sf(:, n + j, 0:p) = &
-                            q_particle%sf(:, j - 1, 0:p)
-                    else
-                        do i = 1, sys_size
-                            q_cons_vf(i)%sf(:, n + j, 0:p) = &
-                                q_cons_vf(i)%sf(:, j - 1, 0:p)
-                        end do
-                    end if
-                end do
-
-                ! Processor BC at the end
-            else
-
-                if (present(q_particle)) then
-                    call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                 'end', 'y', q_particle)
-                else
-                    call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                 'end', 'y')
-                end if
-
-            end if
-
-            ! END: Populating Buffer Regions in the y-direction
-
-            ! Populating Buffer Regions in the z-direction
-
-            if (p > 0) then
-
-                ! Ghost-cell extrapolation BC at the beginning
-                if (bc_z%beg <= BC_GHOST_EXTRAP) then
-
-                    do j = 1, buff_size
-                        if (present(q_particle)) then
-                            q_particle%sf(:, :, -j) = q_particle%sf(:, :, 0)
-                        else
-                            do i = 1, sys_size
-                                q_cons_vf(i)%sf(:, :, -j) = q_cons_vf(i)%sf(:, :, 0)
-                            end do
-                        end if
-                    end do
-
-                    ! Symmetry BC at the beginning
-                elseif (bc_z%beg == BC_REFLECTIVE) then
-
-                    do j = 1, buff_size
-                        if (present(q_particle)) then
-                            q_particle%sf(:, :, -j) = &
-                                q_particle%sf(:, :, j - 1)
-                        else
-                            ! Density or the partial densities and the momentum
-                            ! components in x- and y-directions
-                            do i = 1, mom_idx%beg + 1
-                                q_cons_vf(i)%sf(:, :, -j) = &
-                                    q_cons_vf(i)%sf(:, :, j - 1)
-                            end do
-
-                            ! z-component of momentum
-                            q_cons_vf(mom_idx%end)%sf(:, :, -j) = &
-                                -q_cons_vf(mom_idx%end)%sf(:, :, j - 1)
-
-                            ! Energy and advection equation(s) variable(s)
-                            do i = E_idx, sys_size
-                                q_cons_vf(i)%sf(:, :, -j) = &
-                                    q_cons_vf(i)%sf(:, :, j - 1)
-                            end do
-                        end if
-
-                    end do
-
-                    ! Periodic BC at the beginning
-                elseif (bc_z%beg == BC_PERIODIC) then
-
-                    do j = 1, buff_size
-                        if (present(q_particle)) then
-                            q_particle%sf(:, :, -j) = &
-                                q_particle%sf(:, :, (p + 1) - j)
-                        else
-                            do i = 1, sys_size
-                                q_cons_vf(i)%sf(:, :, -j) = &
-                                    q_cons_vf(i)%sf(:, :, (p + 1) - j)
-                            end do
-                        end if
-                    end do
-
-                    ! Processor BC at the beginning
-                else
-
-                    if (present(q_particle)) then
-                        call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                     'beg', 'z', q_particle)
-                    else
-                        call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                     'beg', 'z')
-                    end if
-
-                end if
-
-                ! Ghost-cell extrapolation BC at the end
-                if (bc_z%end <= BC_GHOST_EXTRAP) then
-
-                    do j = 1, buff_size
-                        if (present(q_particle)) then
-                            q_particle%sf(:, :, p + j) = &
-                                q_particle%sf(:, :, p)
-                        else
-                            do i = 1, sys_size
-                                q_cons_vf(i)%sf(:, :, p + j) = &
-                                    q_cons_vf(i)%sf(:, :, p)
-                            end do
-                        end if
-                    end do
-
-                    ! Symmetry BC at the end
-                elseif (bc_z%end == BC_REFLECTIVE) then
-
-                    do j = 1, buff_size
-                        if (present(q_particle)) then
-                            q_particle%sf(:, :, p + j) = &
-                                q_particle%sf(:, :, (p + 1) - j)
-                        else
-                            ! Density or the partial densities and the momentum
-                            ! components in x- and y-directions
-                            do i = 1, mom_idx%beg + 1
-                                q_cons_vf(i)%sf(:, :, p + j) = &
-                                    q_cons_vf(i)%sf(:, :, (p + 1) - j)
-                            end do
-
-                            ! z-component of momentum
-                            q_cons_vf(mom_idx%end)%sf(:, :, p + j) = &
-                                -q_cons_vf(mom_idx%end)%sf(:, :, (p + 1) - j)
-
-                            ! Energy and advection equation(s) variable(s)
-                            do i = E_idx, sys_size
-                                q_cons_vf(i)%sf(:, :, p + j) = &
-                                    q_cons_vf(i)%sf(:, :, (p + 1) - j)
-                            end do
-                        end if
-
-                    end do
-
-                    ! Perodic BC at the end
-                elseif (bc_z%end == BC_PERIODIC) then
-
-                    do j = 1, buff_size
-                        if (present(q_particle)) then
-                            q_particle%sf(:, :, p + j) = &
-                                q_particle%sf(:, :, j - 1)
-                        else
-                            do i = 1, sys_size
-                                q_cons_vf(i)%sf(:, :, p + j) = &
-                                    q_cons_vf(i)%sf(:, :, j - 1)
-                            end do
-                        end if
-                    end do
-
-                    ! Processor BC at the end
-                else
-
-                    if (present(q_particle)) then
-                        call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                     'end', 'z', q_particle)
-                    else
-                        call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                     'end', 'z')
-                    end if
-
-                end if
-
-            end if
-
-        end if
-
-        ! END: Populating Buffer Regions in the z-direction
-
-    end subroutine s_populate_conservative_variables_buffer_regions
-
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
     subroutine s_initialize_data_input_module
@@ -1331,7 +764,6 @@ contains
         ! the simulation
         allocate (q_cons_vf(1:sys_size))
         allocate (q_prim_vf(1:sys_size))
-        if (bubbles_lagrange) allocate (q_particle(1))
 
         ! Allocating the parts of the conservative and primitive variables
         ! that do require the direct knowledge of the dimensionality of the
@@ -1358,12 +790,6 @@ contains
                                             -buff_size:p + buff_size))
                 end if
 
-                if (bubbles_lagrange) then
-                    allocate (q_particle(1)%sf(-buff_size:m + buff_size, &
-                                               -buff_size:n + buff_size, &
-                                               -buff_size:p + buff_size))
-                end if
-
                 if (chemistry) then
                     allocate (q_T_sf%sf(-buff_size:m + buff_size, &
                                         -buff_size:n + buff_size, &
@@ -1388,12 +814,6 @@ contains
                                             0:0))
                 end if
 
-                if (bubbles_lagrange) then
-                    allocate (q_particle(1)%sf(-buff_size:m + buff_size, &
-                                               -buff_size:n + buff_size, &
-                                               0:0))
-                end if
-
                 if (chemistry) then
                     allocate (q_T_sf%sf(-buff_size:m + buff_size, &
                                         -buff_size:n + buff_size, &
@@ -1415,10 +835,6 @@ contains
 
             if (ib) then
                 allocate (ib_markers%sf(-buff_size:m + buff_size, 0:0, 0:0))
-            end if
-
-            if (bubbles_lagrange) then
-                allocate (q_particle(1)%sf(-buff_size:m + buff_size, 0:0, 0:0))
             end if
 
             if (chemistry) then
@@ -1465,11 +881,6 @@ contains
 
         if (ib) then
             deallocate (ib_markers%sf)
-        end if
-
-        if (bubbles_lagrange) then
-            deallocate (q_particle(1)%sf)
-            deallocate (q_particle)
         end if
 
         if (chemistry) then

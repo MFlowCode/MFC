@@ -636,17 +636,17 @@ contains
 
         if (present(pb) .and. present(mv) .and. qbmm .and. .not. polytropic) then
             qbmm_comm = .true.
-            v_size = sys_size + 2*nb*4
+            v_size = nVar + 2*nb*4
             buffer_counts = (/ &
-                            buff_size*(nVar + 2*nb*4)*(n + 1)*(p + 1), &
-                            buff_size*(nVar + 2*nb*4)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*v_size*(n + 1)*(p + 1), &
+                            buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                             buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
                             /)
         else
             v_size = nVar
             buffer_counts = (/ &
-                            buff_size*nVar*(n + 1)*(p + 1), &
-                            buff_size*nVar*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*v_size*(n + 1)*(p + 1), &
+                            buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                             buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
                             /)
         end if

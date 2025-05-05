@@ -124,6 +124,7 @@ module m_global_parameters
     type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
     integer :: E_idx                               !< Index of energy equation
     integer :: n_idx                               !< Index of number density
+    integer :: beta_idx                            !< Index of lagrange bubbles beta
     type(int_bounds_info) :: adv_idx               !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx  !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
@@ -589,6 +590,11 @@ contains
                     pref = 1._wp
                 end if
 
+            end if
+
+            if (bubbles_lagrange) then
+                beta_idx = sys_size + 1
+                sys_size = beta_idx
             end if
 
             if (mhd) then

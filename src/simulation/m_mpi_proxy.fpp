@@ -44,31 +44,37 @@ module m_mpi_proxy
 
     !> @name Generic flags used to identify and report MPI errors
     !> @{
-    integer, private :: err_code, ierr, v_size
+    integer, private :: err_code, ierr, i_halo_size
     !> @}
-    !$acc declare create(v_size)
+    !$acc declare create(i_halo_size)
 
 contains
 
     subroutine s_initialize_mpi_proxy_module()
 
+#ifdef MFC_MPI
         if (ib) then
             if (n > 0) then
                 if (p > 0) then
-                    @:ALLOCATE(ib_buff_send(0:-1 + gp_layers * &
+                    i_halo_size = -1 + gp_layers * &
                                             & (m + 2*gp_layers + 1)* &
                                             & (n + 2*gp_layers + 1)* &
                                             & (p + 2*gp_layers + 1)/ &
-                                            & (min(m, n, p) + 2*gp_layers + 1)))
+                                            & (min(m, n, p) + 2*gp_layers + 1)
                 else
-                    @:ALLOCATE(ib_buff_send(0:-1 + gp_layers* &
-                                            & (max(m, n) + 2*gp_layers + 1)))
+                    i_halo_size = -1 + gp_layers* &
+                                            & (max(m, n) + 2*gp_layers + 1)
                 end if
             else
-                @:ALLOCATE(ib_buff_send(0:-1 + gp_layers))
+                i_halo_size = -1 + gp_layers
             end if
-            @:ALLOCATE(ib_buff_recv(0:ubound(ib_buff_send, 1)))
+
+            !$acc declare create(i_halo_size)
+
+            @:ALLOCATE(ib_buff_send(0:i_halo_size), ib_buff_recv(0:i_halo_size))
+
         end if
+#endif
 
     end subroutine s_initialize_mpi_proxy_module
 
@@ -229,834 +235,184 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
-    !>  The goal of this procedure is to populate the buffers of
-        !!      the cell-average conservative variables by communicating
-        !!      with the neighboring processors.
-    subroutine s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
+    subroutine s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers, mpi_dir, pbc_loc)
 
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in) :: gp_layers
 
-        integer :: i, j, k, l, r !< Generic loop iterators
-        integer, pointer, dimension(:) :: p_i_send, p_i_recv
+        integer, intent(in) :: gp_layers, mpi_dir, pbc_loc
+
+        integer :: i, j, k, l, r, q !< Generic loop iterators
+
+        integer :: buffer_counts(1:3), buffer_count
+
+        type(int_bounds_info) :: boundary_conditions(1:3)
+        integer :: beg_end(1:2), grid_dims(1:3)
+        integer :: dst_proc, src_proc, recv_tag, send_tag
+
+        logical :: beg_end_geq_0, qbmm_comm
+
+        integer :: pack_offset, unpack_offset
+
+        integer, pointer :: p_i_send, p_i_recv
 
 #ifdef MFC_MPI
-        !nCalls_time = nCalls_time + 1
 
-        ! MPI Communication in x-direction
-        if (bc_x%beg >= 0) then      ! PBC at the beginning
+        call nvtxStartRange("RHS-COMM-PACKBUF")
 
-            if (bc_x%end >= 0) then      ! PBC at the beginning and end
-
-                ! Packing buffer to be sent to bc_x%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = 0, n
-                        do j = m - gp_layers + 1, m
-                            r = ((j - m - 1) + gp_layers*((k + 1) + (n + 1)*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
+        buffer_counts = (/ &
                         gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 0, &
-                        p_i_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        gp_layers*(m + 2*buff_size + 1)*(p + 1), &
+                        gp_layers*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
+                        /)
 
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
+        buffer_count = buffer_counts(mpi_dir)
+        boundary_conditions = (/bc_x, bc_y, bc_z/)
+        beg_end = (/boundary_conditions(mpi_dir)%beg, boundary_conditions(mpi_dir)%end/)
+        beg_end_geq_0 = beg_end(max(pbc_loc, 0) - pbc_loc + 1) >= 0
 
-                    !$acc update host(ib_buff_send, ib_buff_send)
+        ! Implements:
+        ! pbc_loc  bc_x >= 0 -> [send/recv]_tag  [dst/src]_proc
+        ! -1 (=0)      0            ->     [1,0]       [0,0]      | 0 0 [1,0] [beg,beg]
+        ! -1 (=0)      1            ->     [0,0]       [1,0]      | 0 1 [0,0] [end,beg]
+        ! +1 (=1)      0            ->     [0,1]       [1,1]      | 1 0 [0,1] [end,end]
+        ! +1 (=1)      1            ->     [1,1]       [0,1]      | 1 1 [1,1] [beg,end]
 
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 0, &
-                        ib_buff_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+        send_tag = f_logical_to_int(.not. f_xor(beg_end_geq_0, pbc_loc == 1))
+        recv_tag = f_logical_to_int(pbc_loc == 1)
 
-#if defined(MFC_OpenACC)
-                end if
-#endif
+        dst_proc = beg_end(1 + f_logical_to_int(f_xor(pbc_loc == 1, beg_end_geq_0)))
+        src_proc = beg_end(1 + f_logical_to_int(pbc_loc == 1))
 
-            else                        ! PBC at the beginning only
+        grid_dims = (/m, n, p/)
 
-                ! Packing buffer to be sent to bc_x%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, gp_layers - 1
-                            r = (j + gp_layers*(k + (n + 1)*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 1, &
-                        p_i_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 1, &
-                        ib_buff_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            end if
-
-#if defined(MFC_OpenACC)
-            if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
-            end if
-#endif
-
-            ! Unpacking buffer received from bc_x%beg
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
-            do l = 0, p
-                do k = 0, n
-                    do j = -gp_layers, -1
-                        r = (j + gp_layers*((k + 1) + (n + 1)*l))
-                        ib_markers%sf(j, k, l) = ib_buff_recv(r)
-                    end do
-                end do
-            end do
-
+        pack_offset = 0
+        if (f_xor(pbc_loc == 1, beg_end_geq_0)) then
+            pack_offset = grid_dims(mpi_dir) - gp_layers + 1
         end if
 
-        if (bc_x%end >= 0) then                ! PBC at the end
-
-            if (bc_x%beg >= 0) then      ! PBC at the end and beginning
-
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                ! Packing buffer to be sent to bc_x%beg
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, gp_layers - 1
-                            r = (j + gp_layers*(k + (n + 1)*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 1, &
-                        p_i_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 1, &
-                        ib_buff_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            else                        ! PBC at the end only
-
-                ! Packing buffer to be sent to bc_x%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = 0, n
-                        do j = m - gp_layers + 1, m
-                            r = ((j - m - 1) + gp_layers*((k + 1) + (n + 1)*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 0, &
-                        p_i_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 0, &
-                        ib_buff_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            end if
-
-            if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
-            end if
-
-            ! Unpacking buffer received from bc_x%end
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
-            do l = 0, p
-                do k = 0, n
-                    do j = m + 1, m + gp_layers
-                        r = ((j - m - 1) + gp_layers*(k + (n + 1)*l))
-                        ib_markers%sf(j, k, l) = ib_buff_recv(r)
-                    end do
-                end do
-            end do
-
-        end if
-        ! END: MPI Communication in x-direction
-
-        ! MPI Communication in y-direction
-
-        if (bc_y%beg >= 0) then      ! PBC at the beginning
-
-            if (bc_y%end >= 0) then      ! PBC at the beginning and end
-
-                ! Packing buffer to be sent to bc_y%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = n - gp_layers + 1, n
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 ((k - n + gp_layers - 1) + gp_layers*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 0, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 0, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            else                        ! PBC at the beginning only
-
-                ! Packing buffer to be sent to bc_y%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = 0, gp_layers - 1
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 (k + gp_layers*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 1, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 1, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            end if
-
-#if defined(MFC_OpenACC)
-            if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
-            end if
-#endif
-
-            ! Unpacking buffer received from bc_y%beg
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
-            do l = 0, p
-                do k = -gp_layers, -1
-                    do j = -gp_layers, m + gp_layers
-                        r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                             ((k + gp_layers) + gp_layers*l))
-                        ib_markers%sf(j, k, l) = ib_buff_recv(r)
-                    end do
-                end do
-            end do
-
+        unpack_offset = 0
+        if (pbc_loc == 1) then
+            unpack_offset = grid_dims(mpi_dir) + gp_layers + 1
         end if
 
-        if (bc_y%end >= 0) then                   ! PBC at the end
-
-            if (bc_y%beg >= 0) then      ! PBC at the end and beginning
-
-                ! Packing buffer to be sent to bc_y%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = 0, gp_layers - 1
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 (k + gp_layers*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
+        ! Pack Buffer to Send
+        #:for mpi_dir in [1, 2, 3]
+            if (mpi_dir == ${mpi_dir}$) then
+                #:if mpi_dir == 1
+                    !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, gp_layers - 1
+                                r = (j + gp_layers * (k + (n + 1) * l))
+                                ib_buff_send(r) = ib_markers%sf(j + pack_offset, k, l)
+                            end do
                         end do
                     end do
-                end do
+                #:elif mpi_dir == 2
+                    !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                    do l = 0, p
+                        do k = 0, gp_layers - 1
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     (k + gp_layers*l))
+                                ib_buff_send(r) = ib_markers%sf(j, k + pack_offset, l)
+                            end do
+                        end do
+                    end do
+                #:else
+                    !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                    do l = 0, gp_layers - 1
+                        do k = -buff_size, n + buff_size
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     ((k + buff_size) + (n + 2*buff_size + 1)*l))
+                                ib_buff_send(r) = ib_markers%sf(j, k, l + pack_offset)
+                            end do
+                        end do
+                    end do
+                #:endif
+            end if
+        #:endfor
+        call nvtxEndRange ! Packbuf
 
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        p_i_send => ib_buff_send(0)
+        p_i_recv => ib_buff_recv(0)
 
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
+        ! Send/Recv
+        #:for rdma_mpi in [False, True]
+            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+                #:if rdma_mpi
+                    !$acc data attach(p_send, p_recv)
+                    !$acc host_data use_device(p_send, p_recv)
+                    call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
+                #:else
+                    call nvtxStartRange("RHS-COMM-DEV2HOST")
+                    !$acc update host(buff_send)
+                    call nvtxEndRange
+                    call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
+                #:endif
 
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
+                call MPI_SENDRECV( &
+                    p_i_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
+                    p_i_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
+                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 1, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
+                #:if rdma_mpi
                     !$acc end host_data
                     !$acc end data
                     !$acc wait
-                else
-#endif
+                #:else
+                    call nvtxStartRange("RHS-COMM-HOST2DEV")
+                    !$acc update device(buff_recv)
+                    call nvtxEndRange
+                #:endif
+            end if
+        #:endfor
 
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 1, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            else                        ! PBC at the end only
-
-                ! Packing buffer to be sent to bc_y%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = n - gp_layers + 1, n
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 ((k - n + gp_layers - 1) + gp_layers*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
+        ! Unpack Received Buffer
+        call nvtxStartRange("RHS-COMM-UNPACKBUF")
+        #:for mpi_dir in [1, 2, 3]
+            if (mpi_dir == ${mpi_dir}$) then
+                #:if mpi_dir == 1
+                    !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = -gp_layers, -1
+                                r = (j + gp_layers * ((k + 1) + (n + 1) * l))
+                                ib_markers%sf(j + unpack_offset, k, l) = ib_buff_recv(r)
+                            end do
                         end do
                     end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 0, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 0, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            end if
-
-#if defined(MFC_OpenACC)
-            if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
-            end if
-#endif
-
-            ! Unpacking buffer received form bc_y%end
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
-            do l = 0, p
-                do k = n + 1, n + gp_layers
-                    do j = -gp_layers, m + gp_layers
-                        r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                             ((k - n - 1) + gp_layers*l))
-                        ib_markers%sf(j, k, l) = ib_buff_recv(r)
-                    end do
-                end do
-            end do
-
-        end if
-        ! END: MPI Communication in y-direction
-
-        ! MPI Communication in z-direction
-        if (bc_z%beg >= 0) then      ! PBC at the beginning
-
-            if (bc_z%end >= 0) then      ! PBC at the beginning and end
-
-                ! Packing buffer to be sent to bc_z%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = p - gp_layers + 1, p
-                    do k = -gp_layers, n + gp_layers
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 ((k + gp_layers) + (n + 2*gp_layers + 1)* &
-                                  (l - p + gp_layers - 1)))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
+                #:elif mpi_dir == 2
+                    !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                    do l = 0, p
+                        do k = -gp_layers, -1
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     ((k + gp_layers) + gp_layers*l))
+                                ib_markers%sf(j, k + unpack_offset, l) = ib_buff_recv(r)
+                            end do
                         end do
                     end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 0, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 0, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            else                        ! PBC at the beginning only
-
-                ! Packing buffer to be sent to bc_z%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, gp_layers - 1
-                    do k = -gp_layers, n + gp_layers
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 ((k + gp_layers) + (n + 2*gp_layers + 1)*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
+                #:else
+                    ! Unpacking buffer from bc_z%beg
+                    !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                    do l = -gp_layers, -1
+                        do k = -buff_size, n + buff_size
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     ((k + buff_size) + (n + 2*buff_size + 1)* &
+                                     (l + gp_layers)))
+                                ib_markers%sf(j, k, l + unpack_offset) = ib_buff_recv(r)
+                            end do
                         end do
                     end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 1, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 1, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
+                #:endif
             end if
-
-#if defined(MFC_OpenACC)
-            if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
-            end if
-#endif
-
-            ! Unpacking buffer from bc_z%beg
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
-            do l = -gp_layers, -1
-                do k = -gp_layers, n + gp_layers
-                    do j = -gp_layers, m + gp_layers
-                        r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                             ((k + gp_layers) + (n + 2*gp_layers + 1)* &
-                              (l + gp_layers)))
-                        ib_markers%sf(j, k, l) = ib_buff_recv(r)
-                    end do
-                end do
-            end do
-
-        end if
-
-        if (bc_z%end >= 0) then                       ! PBC at the end
-
-            if (bc_z%beg >= 0) then      ! PBC at the end and beginning
-
-                ! Packing buffer to be sent to bc_z%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, gp_layers - 1
-                    do k = -gp_layers, n + gp_layers
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 ((k + gp_layers) + (n + 2*gp_layers + 1)*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 1, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 1, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            else                        ! PBC at the end only
-
-                ! Packing buffer to be sent to bc_z%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = p - gp_layers + 1, p
-                    do k = -gp_layers, n + gp_layers
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 ((k + gp_layers) + (n + 2*gp_layers + 1)* &
-                                  (l - p + gp_layers - 1)))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 0, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 0, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            end if
-
-#if defined(MFC_OpenACC)
-            if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
-            end if
-#endif
-
-            ! Unpacking buffer received from bc_z%end
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
-            do l = p + 1, p + gp_layers
-                do k = -gp_layers, n + gp_layers
-                    do j = -gp_layers, m + gp_layers
-                        r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                             ((k + gp_layers) + (n + 2*gp_layers + 1)* &
-                              (l - p - 1)))
-                        ib_markers%sf(j, k, l) = ib_buff_recv(r)
-                    end do
-                end do
-            end do
-
-        end if
-
-        ! END: MPI Communication in z-direction
-
+        #:endfor
+        call nvtxEndRange
 #endif
 
     end subroutine s_mpi_sendrecv_ib_buffers
