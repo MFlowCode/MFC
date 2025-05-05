@@ -108,6 +108,16 @@ module m_derived_types
 
     end type int_bounds_info
 
+    type bc_patch_parameters
+        integer :: geometry
+        integer :: type
+        integer :: dir
+        integer :: loc
+        real(wp), dimension(3) :: centroid
+        real(wp), dimension(3) :: length
+        real(wp) :: radius
+    end type bc_patch_parameters
+
     !> Derived type adding beginning (beg) and end bounds info as attributes
     type bounds_info
         real(wp) :: beg

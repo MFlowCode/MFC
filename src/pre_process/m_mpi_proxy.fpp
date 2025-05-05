@@ -10,7 +10,7 @@
 module m_mpi_proxy
 
 #ifdef MFC_MPI
-    use mpi                     !< Message passing interface (MPI) module
+    use mpi                    !< Message passing interface (MPI) module
 #endif
 
     use m_helper
@@ -23,15 +23,27 @@ module m_mpi_proxy
 
     implicit none
 
-    integer, private :: ierr
+    integer, private :: err_code, ierr, v_size !<
+        !! Generic flags used to identify and report MPI errors
+
+    real(wp), private, allocatable, dimension(:), target :: q_prims_buff_send !<
+        !! This variable is utilized to pack and send the buffer of the cell-average
+        !! primitive variables, for a single computational domain boundary at the
+        !! time, to the relevant neighboring processor.
+
+    real(wp), private, allocatable, dimension(:), target :: q_prims_buff_recv !<
+        !! q_prims_buff_recv is utilized to receive and unpack the buffer of the cell-
+        !! average primitive variables, for a single computational domain boundary
+        !! at the time, from the relevant neighboring processor.
+
+    ! integer :: halo_size
 
 contains
-
     !> Since only processor with rank 0 is in charge of reading
-        !!       and checking the consistency of the user provided inputs,
-        !!       these are not available to the remaining processors. This
-        !!       subroutine is then in charge of broadcasting the required
-        !!       information.
+            !!       and checking the consistency of the user provided inputs,
+            !!       these are not available to the remaining processors. This
+            !!       subroutine is then in charge of broadcasting the required
+            !!       information.
     subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
@@ -46,7 +58,8 @@ contains
             & 'loops_x', 'loops_y', 'loops_z', 'model_eqns', 'num_fluids',     &
             & 'weno_order', 'precision', 'perturb_flow_fluid', &
             & 'perturb_sph_fluid', 'num_patches', 'thermal', 'nb', 'dist_type',&
-            & 'R0_type', 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters']
+            & 'R0_type', 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters', &
+            & 'num_bc_patches' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -57,7 +70,7 @@ contains
             & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
             & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
             & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',&
-            & 'bubbles_lagrange', 'mhd', 'relativity', 'cont_damage' ]
+            & 'bubbles_lagrange', 'bc_io', 'mhd', 'relativity', 'cont_damage'  ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
@@ -72,6 +85,18 @@ contains
             & 'mixlayer_domain', 'Bx0' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
+
+        do i = 1, num_bc_patches_max
+            #:for VAR in ['geometry', 'type', 'dir', 'loc']
+                call MPI_BCAST(patch_bc(i)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            call MPI_BCAST(patch_bc(i)%radius, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+
+            #:for VAR in ['centroid', 'length']
+                call MPI_BCAST(patch_bc(i)%${VAR}$, size(patch_bc(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end do
 
         do i = 1, num_patches_max
             #:for VAR in [ 'geometry', 'smooth_patch_id']
@@ -132,10 +157,10 @@ contains
     end subroutine s_mpi_bcast_user_inputs
 
     !> Description: This subroutine takes care of efficiently distributing
-        !!              the computational domain among the available processors
-        !!             as well as recomputing some of the global parameters so
-        !!              that they reflect the configuration of sub-domain that is
-        !!              overseen by the local processor.
+            !!              the computational domain among the available processors
+            !!             as well as recomputing some of the global parameters so
+            !!              that they reflect the configuration of sub-domain that is
+            !!              overseen by the local processor.
     subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
@@ -335,7 +360,7 @@ contains
                 end do
 
                 ! Boundary condition at the beginning
-                if (proc_coords(3) > 0 .or. (bc_z%beg == -1 .and. num_procs_z > 1)) then
+                if (proc_coords(3) > 0 .or. (bc_z%beg == BC_PERIODIC .and. num_procs_z > 1)) then
                     proc_coords(3) = proc_coords(3) - 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                        bc_z%beg, ierr)
@@ -343,7 +368,7 @@ contains
                 end if
 
                 ! Boundary condition at the end
-                if (proc_coords(3) < num_procs_z - 1 .or. (bc_z%end == -1 .and. num_procs_z > 1)) then
+                if (proc_coords(3) < num_procs_z - 1 .or. (bc_z%end == BC_PERIODIC .and. num_procs_z > 1)) then
                     proc_coords(3) = proc_coords(3) + 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                        bc_z%end, ierr)
@@ -463,7 +488,7 @@ contains
             end do
 
             ! Boundary condition at the beginning
-            if (proc_coords(2) > 0 .or. (bc_y%beg == -1 .and. num_procs_y > 1)) then
+            if (proc_coords(2) > 0 .or. (bc_y%beg == BC_PERIODIC .and. num_procs_y > 1)) then
                 proc_coords(2) = proc_coords(2) - 1
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                    bc_y%beg, ierr)
@@ -471,7 +496,7 @@ contains
             end if
 
             ! Boundary condition at the end
-            if (proc_coords(2) < num_procs_y - 1 .or. (bc_y%end == -1 .and. num_procs_y > 1)) then
+            if (proc_coords(2) < num_procs_y - 1 .or. (bc_y%end == BC_PERIODIC .and. num_procs_y > 1)) then
                 proc_coords(2) = proc_coords(2) + 1
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                    bc_y%end, ierr)
@@ -544,14 +569,14 @@ contains
         end do
 
         ! Boundary condition at the beginning
-        if (proc_coords(1) > 0 .or. (bc_x%beg == -1 .and. num_procs_x > 1)) then
+        if (proc_coords(1) > 0 .or. (bc_x%beg == BC_PERIODIC .and. num_procs_x > 1)) then
             proc_coords(1) = proc_coords(1) - 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
             proc_coords(1) = proc_coords(1) + 1
         end if
 
         ! Boundary condition at the end
-        if (proc_coords(1) < num_procs_x - 1 .or. (bc_x%end == -1 .and. num_procs_x > 1)) then
+        if (proc_coords(1) < num_procs_x - 1 .or. (bc_x%end == BC_PERIODIC .and. num_procs_x > 1)) then
             proc_coords(1) = proc_coords(1) + 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
             proc_coords(1) = proc_coords(1) - 1
@@ -584,5 +609,5 @@ contains
 #endif
 
     end subroutine s_mpi_decompose_computational_domain
-
 end module m_mpi_proxy
+

@@ -22,6 +22,7 @@ module m_constants
     integer, parameter :: num_fluids_max = 10                     !< Maximum number of fluids in the simulation
     integer, parameter :: num_probes_max = 10                     !< Maximum number of flow probes in the simulation
     integer, parameter :: num_patches_max = 10
+    integer, parameter :: num_bc_patches_max = 10
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
     integer, parameter :: gp_layers = 3 !< Number of ghost point layers for IBM
@@ -83,5 +84,31 @@ module m_constants
 
     ! System constants
     integer, parameter :: CASE_FILE_ERROR_CODE = 22
+
+    ! Boundary condition enumeration
+    ! Abbreviations
+    !  CHAR - Characteristic
+    !  NR   -  Non-reflecting
+    !  SUB  - subsonic
+    !  SUP  - supersonic
+    !  FF   - Force-free
+    !  CP   - Constant pressure
+    integer, parameter :: BC_PERIODIC = -1
+    integer, parameter :: BC_REFLECTIVE = -2
+    integer, parameter :: BC_GHOST_EXTRAP = -3
+    integer, parameter :: BC_RIEMANN_EXTRAP = -4
+    integer, parameter :: BC_CHAR_SLIP_WALL = -5
+    integer, parameter :: BC_CHAR_NR_SUB_BUFFER = -6
+    integer, parameter :: BC_CHAR_NR_SUB_INFLOW = -7
+    integer, parameter :: BC_CHAR_NR_SUB_OUTFLOW = -8
+    integer, parameter :: BC_CHAR_FF_SUB_OUTFLOW = -9
+    integer, parameter :: BC_CHAR_CP_SUB_OUTFLOW = -10
+    integer, parameter :: BC_CHAR_SUP_INFLOW = -11
+    integer, parameter :: BC_CHAR_SUP_OUTFLOW = -12
+    integer, parameter :: BC_NULL = -13
+    integer, parameter :: BC_AXIS = -14
+    integer, parameter :: BC_SLIP_WALL = -15
+    integer, parameter :: BC_NO_SLIP_WALL = -16
+    integer, parameter :: BC_DIRICHLET = -17
 
 end module m_constants
