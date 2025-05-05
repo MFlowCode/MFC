@@ -614,7 +614,7 @@ contains
                         mtn_dposdt(k, l, stage) = mtn_vel(k,l,1)
                         mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,1),&
                                                     intfc_rad(k,1), mtn_vel(k,l,1), &
-                                                    gas_mg(k,1), gas_mv(k,1), &
+                                                    gas_mg(k), gas_mv(k), &
                                                     cell, l, q_prim_vf)
                     else
                         mtn_dposdt(k, l, stage) = 0._wp
@@ -643,7 +643,7 @@ contains
                         mtn_dposdt(k, l, stage) = mtn_vel(k,l,1)
                         mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,1),&
                                                     intfc_rad(k,1), mtn_vel(k,l,1), &
-                                                    gas_mg(k,1), gas_mv(k,1), &
+                                                    gas_mg(k), gas_mv(k), &
                                                     cell, l, q_prim_vf)
                     else
                         mtn_dposdt(k, l, stage) = 0._wp
