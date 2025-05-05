@@ -32,16 +32,6 @@ module m_mpi_proxy
 
     implicit none
 
-    real(wp), private, allocatable, dimension(:), target :: c_divs_buff_send !<
-    !! c_divs_buff_send is utilized to send and unpack the buffer of the cell-
-    !! centered color function derivatives, for a single computational domain
-    !! boundary at the time, to the the relevant neighboring processor
-
-    real(wp), private, allocatable, dimension(:), target :: c_divs_buff_recv
-    !! c_divs_buff_recv is utilized to receiver and unpack the buffer of the cell-
-    !! centered color function derivatives, for a single computational domain
-    !! boundary at the time, from the relevant neighboring processor
-
     integer, private, allocatable, dimension(:), target :: ib_buff_send !<
     !! This variable is utilized to pack and send the buffer of the immersed
     !! boundary markers, for a single computational domain boundary at the
@@ -52,16 +42,12 @@ module m_mpi_proxy
     !! immersed boundary markers, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
-    !$acc declare create( ib_buff_send, ib_buff_recv)
-    !$acc declare create(c_divs_buff_send, c_divs_buff_recv)
-
     !> @name Generic flags used to identify and report MPI errors
     !> @{
     integer, private :: err_code, ierr, v_size
     !> @}
     !$acc declare create(v_size)
 
-    
 contains
 
     subroutine s_initialize_mpi_proxy_module()
@@ -86,7 +72,9 @@ contains
 
     end subroutine s_initialize_mpi_proxy_module
 
-        !>  Since only the processor with rank 0 reads and verifies
+contains
+
+    !>  Since only the processor with rank 0 reads and verifies
         !!      the consistency of user inputs, these are initially not
         !!      available to the other processors. Then, the purpose of
         !!      this subroutine is to distribute the user inputs to the
@@ -110,7 +98,8 @@ contains
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', &
             & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',  'fd_order',     &
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
-            & 'R0_type', 'num_source', 'relax_model', 'num_ibs', 'n_start'       ]
+            & 'R0_type', 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
+            & 'num_bc_patches']
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -126,7 +115,7 @@ contains
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
             & 'viscous', 'shear_stress', 'bulk_stress', 'bubbles_lagrange',     &
-            & 'hyperelasticity', 'rkck_adap_dt', 'powell', 'cont_damage' ]
+            & 'hyperelasticity', 'rkck_adap_dt', 'bc_io', 'powell', 'cont_damage' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -242,7 +231,7 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
-        !>  The goal of this procedure is to populate the buffers of
+    !>  The goal of this procedure is to populate the buffers of
         !!      the cell-average conservative variables by communicating
         !!      with the neighboring processors.
     subroutine s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)

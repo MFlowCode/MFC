@@ -408,8 +408,10 @@ The parameters are used to specify options in algorithms that are used to integr
 Models and assumptions that are used to formulate and discritize the governing equations are described in [Bryngelson et al. (2019)](references.md).
 Details of the simulation algorithms and implementation of the WENO scheme can be found in [Coralic (2015)](references.md).
 
-- `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -12.
+- `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -16.
 See table [Boundary Conditions](#boundary-conditions) for details.
+Boundary condition patches can be used with non-characteristic boundary conditions.
+Their use is detailed in [Boundary Condition Patches](#boundary-condition-patches).
 
 - `bc_[x,y,z]%%vb[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%%beg` when using `bc_[x,y,z]%%beg = -16`.
 Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%beg = -16` to work properly. Normal velocities require `bc_[x,y,z]%%end = -15` or `\bc_[x,y,z]%%end = -16` to work properly.
@@ -478,6 +480,29 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 - `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
 
 - `hypoelasticity` activates elastic stress calculations for fluid-solid interactions. Requires `G` to be set in the fluid material's parameters.
+
+#### Boundary Condition Patches
+
+| Parameter              | Type    | Description                                                     |
+| ---:                   | :----:  |          :---                                                   |
+| `num_bc_patches`       | Integer | Number of boundary condition patches                            |
+| `dir`*                 | Integer | Direction of the boundary patch. [1]: x; [2]: y; [3]: z         |
+| `loc`*                 | Integer | Location of the patch in the domain                             |
+| `type`*                | Integer | The geometry of the patch. [1]: Line [2]: Circle [3]: Rectangle |
+| `x[y,z]_centroid`*     | Real    | Centroid of the boundary patch in the x[y,z]-direction          |
+| `length_x[y,z]`*       | Real    | Length of the boundary patch in the x[y,z]-direction            |
+| `radius`*              | Real    | Radius of the boundary patch                                    |
+*: These parameters should be prepended with `patch_bc(j)%` where $j$ is the patch index.
+
+Boundary condition patches can be used with the following boundary condition types:
+- `-2` reflective
+- `-3` ghost cell extrapolation
+- `-15` slip wall
+- `-16` no-slip wall
+- `-17` Dirichlet
+
+Line segments along each domain edge are supported for 2D simulations.
+Squares and circles on each face are supported for 3D simulations.
 
 #### Constant Time-Stepping
 

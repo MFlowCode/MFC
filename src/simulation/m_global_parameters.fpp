@@ -188,6 +188,10 @@ module m_global_parameters
 !$acc declare create(relax, relax_model, palpha_eps,ptgalpha_eps)
 !#endif
 
+    integer :: num_bc_patches
+    logical :: bc_io
+    integer :: BC_RIEMANN_EXTRAPOLATION
+    integer :: BC_GHOST_EXTRAPOLATION
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
@@ -579,6 +583,11 @@ contains
         chem_params%diffusion = .false.
         chem_params%reactions = .false.
         chem_params%gamma_method = 1
+
+        num_bc_patches = 0
+        bc_io = .false.
+        BC_RIEMANN_EXTRAPOLATION = -4
+        BC_GHOST_EXTRAPOLATION = -3
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int

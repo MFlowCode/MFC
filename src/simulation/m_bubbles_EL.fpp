@@ -19,7 +19,7 @@ module m_bubbles_EL
 
     use m_compile_specific
 
-    use m_boundary_conditions
+    use m_boundary_common
 
     use m_sim_helpers
 
@@ -1483,24 +1483,24 @@ contains
         end if
 
         ! For symmetric boundary condition
-        if (bc_x%beg == -2) then
+        if (bc_x%beg == BC_REFLECTIVE) then
             particle_in_domain = (particle_in_domain .and. (pos_part(1) >= x_cb(-1)))
         end if
-        if (bc_x%end == -2) then
+        if (bc_x%end == BC_REFLECTIVE) then
             particle_in_domain = (particle_in_domain .and. (pos_part(1) < x_cb(m)))
         end if
-        if (bc_y%beg == -2 .and. (.not. cyl_coord)) then
+        if (bc_y%beg == BC_REFLECTIVE .and. (.not. cyl_coord)) then
             particle_in_domain = (particle_in_domain .and. (pos_part(2) >= y_cb(-1)))
         end if
-        if (bc_y%end == -2 .and. (.not. cyl_coord)) then
+        if (bc_y%end == BC_REFLECTIVE .and. (.not. cyl_coord)) then
             particle_in_domain = (particle_in_domain .and. (pos_part(2) < y_cb(n)))
         end if
 
         if (p > 0) then
-            if (bc_z%beg == -2) then
+            if (bc_z%beg == BC_REFLECTIVE) then
                 particle_in_domain = (particle_in_domain .and. (pos_part(3) >= z_cb(-1)))
             end if
-            if (bc_z%end == -2) then
+            if (bc_z%end == BC_REFLECTIVE) then
                 particle_in_domain = (particle_in_domain .and. (pos_part(3) < z_cb(p)))
             end if
         end if

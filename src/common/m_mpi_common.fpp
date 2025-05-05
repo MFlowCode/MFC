@@ -40,11 +40,8 @@ module m_mpi_common
 
     !$acc declare create(buff_send, buff_recv)
 
-    integer :: halo_size
-    !$acc declare create(halo_size)
-
-    integer :: nVars !< nVars for surface tension communication
-    !$acc declare create(nVars)
+    integer :: halo_size, nVars
+    !$acc declare create(halo_size, nVars)
 
 contains
 
@@ -54,10 +51,9 @@ contains
     subroutine s_initialize_mpi_common_module
 
 #ifdef MFC_MPI
-
-        ! Allocating q_cons_buff_send/recv and ib_buff_send/recv. Please note that
-        ! for the sake of simplicity, both variables are provided sufficient
-        ! storage to hold the largest buffer in the computational domain.
+        ! Allocating buff_send/recv and. Please note that for the sake of 
+        ! simplicity, both variables are provided sufficient storage to hold 
+        ! the largest buffer in the computational domain.
 
         if (qbmm .and. .not. polytropic) then
             v_size = sys_size + 2*nb*4
@@ -83,7 +79,6 @@ contains
         !$acc update device(halo_size, v_size)
 
         @:ALLOCATE(buff_send(0:halo_size), buff_recv(0:halo_size))
-
 #endif
 
     end subroutine s_initialize_mpi_common_module
@@ -1608,6 +1603,7 @@ contains
 
     end subroutine s_mpi_sendrecv_grid_variables_buffers
 #endif
+
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_mpi_common_module
