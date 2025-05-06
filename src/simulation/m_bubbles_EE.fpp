@@ -65,6 +65,8 @@ contains
         @:ALLOCATE(bub_p_src(0:m, 0:n, 0:p, 1:nb))
         @:ALLOCATE(bub_m_src(0:m, 0:n, 0:p, 1:nb))
 
+        if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
+
     end subroutine s_initialize_bubbles_EE_module
 
     ! Compute the bubble volume fraction alpha from the bubble number density n
@@ -166,6 +168,7 @@ contains
 
         integer :: i, j, k, l, q, ii !< Loop variables
 
+        integer :: adap_dt_stop_max, adap_dt_stop !< fail-safe exit if max iteration count reached
         integer :: dmBub_id !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
@@ -186,7 +189,9 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp, myalpha_rho, myalpha)
+        adap_dt_stop_max = 0
+        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp, myalpha_rho, myalpha)  &
+        !$acc reduction(MAX:adap_dt_stop_max) copy(adap_dt_stop_max)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -283,8 +288,8 @@ contains
                                                 pb, pbdot, alf, n_tait, B_tait, &
                                                 bub_adv_src(j, k, l), divu%sf(j, k, l), &
                                                 dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
-                                                dmBeta_t, dmCson)
-
+                                                dmBeta_t, dmCson, adap_dt_stop)
+                            adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
                             q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
                             q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
 
@@ -310,6 +315,8 @@ contains
                 end do
             end do
         end do
+
+        if (adap_dt .and. adap_dt_stop_max > 0) stop "Adaptive time stepping failed to converge"
 
         if (.not. adap_dt) then
             !$acc parallel loop collapse(3) gang vector default(present)

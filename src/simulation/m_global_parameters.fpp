@@ -385,6 +385,7 @@ module m_global_parameters
     logical :: polydisperse !< Polydisperse bubbles
     logical :: adv_n        !< Solve the number density equation and compute alpha from number density
     logical :: adap_dt      !< Adaptive step size control
+    real(wp) :: adap_dt_tol !< Tolerance to control adaptive step size
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
@@ -406,7 +407,7 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-    !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles_euler, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, pi_fac)
+    !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles_euler, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, pi_fac)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
@@ -637,6 +638,7 @@ contains
 
         adv_n = .false.
         adap_dt = .false.
+        adap_dt_tol = dflt_real
 
         pi_fac = 1._wp
 

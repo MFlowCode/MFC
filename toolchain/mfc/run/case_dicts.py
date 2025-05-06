@@ -244,6 +244,7 @@ SIMULATION.update({
     'ptgalpha_eps': ParamType.REAL,
     'pi_fac': ParamType.REAL,
     'adap_dt': ParamType.LOG,
+    'adap_dt_tol': ParamType.REAL,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
     'n_start': ParamType.INT,

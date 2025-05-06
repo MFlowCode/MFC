@@ -135,6 +135,8 @@ contains
         @:ALLOCATE(mtn_dposdt(1:nBubs_glb, 1:3, 1:lag_num_ts))
         @:ALLOCATE(mtn_dveldt(1:nBubs_glb, 1:3, 1:lag_num_ts))
 
+        if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
+
         ! Starting bubbles
         call s_start_lagrange_inputs()
         call s_read_input_bubbles(q_cons_vf)
@@ -504,6 +506,8 @@ contains
         real(wp), dimension(contxe) :: myalpha_rho, myalpha
         real(wp), dimension(2) :: Re
         integer, dimension(3) :: cell
+
+        integer :: adap_dt_stop_max, adap_dt_stop !< fail-safe exit if max iteration count reached
         real(wp) :: dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu !< Dummy variables for unified subgrid bubble subroutines
 
         integer :: i, k, l
@@ -533,7 +537,9 @@ contains
         end if
 
         ! Radial motion model
-        !$acc parallel loop gang vector default(present) private(k, myalpha_rho, myalpha, Re, cell) copyin(stage)
+        adap_dt_stop_max = 0
+        !$acc parallel loop gang vector default(present) private(k, myalpha_rho, myalpha, Re, cell) &
+        !$acc reduction(MAX:adap_dt_stop_max) copy(adap_dt_stop_max) copyin(stage)
         do k = 1, nBubs
             ! Keller-Miksis model
 
@@ -571,7 +577,8 @@ contains
                 call s_advance_step(myRho, myPinf, myR, myV, myR0, myPb, myPbdot, dmalf, &
                                     dmntait, dmBtait, dm_bub_adv_src, dm_divu, &
                                     k, myMass_v, myMass_n, myBeta_c, &
-                                    myBeta_t, myCson)
+                                    myBeta_t, myCson, adap_dt_stop)
+                adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 
                 ! Update bubble state
                 intfc_rad(k, 1) = myR
@@ -593,6 +600,8 @@ contains
             end if
 
         end do
+
+        if (adap_dt .and. adap_dt_stop_max > 0) stop "Adaptive time stepping failed to converge"
 
         ! Bubbles remain in a fixed position
         !$acc parallel loop collapse(2) gang vector default(present) private(k) copyin(stage)

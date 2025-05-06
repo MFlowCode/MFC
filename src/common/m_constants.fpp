@@ -49,6 +49,10 @@ module m_constants
     integer, parameter :: mapCells = 3 !< Number of cells around the bubble where the smoothening function will have effect
     real(wp), parameter :: R_uni = 8314._wp ! Universal gas constant - J/kmol/K
 
+    ! Strang Splitting constants
+    real(wp), parameter :: dflt_adap_dt_tol = 1e-4_wp !< Default tolerance for adaptive step size
+    integer, parameter :: adap_dt_max_iters = 100 !< Maximum number of iterations
+
     ! Relativity
     integer, parameter :: relativity_cons_to_prim_max_iter = 100
 

@@ -460,7 +460,7 @@ contains
     subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                               fntait, fBtait, f_bub_adv_src, f_divu, &
                               bub_id, fmass_v, fmass_n, fbeta_c, &
-                              fbeta_t, fCson)
+                              fbeta_t, fCson, adap_dt_stop)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_advance_step
 #else
@@ -471,64 +471,69 @@ contains
         real(wp), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu
         integer, intent(in) :: bub_id
         real(wp), intent(in) :: fmass_n, fbeta_c, fbeta_t, fCson
+        integer, intent(out) :: adap_dt_stop
 
-        real(wp) :: tol
-        real(wp) :: err1, err2, err3, err4, err5 !< Error estimates for adaptive time stepping
+        real(wp), dimension(5) :: err !< Error estimates for adaptive time stepping
         real(wp) :: t_new !< Updated time step size
         real(wp) :: h !< Time step size
         real(wp), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2 !< Bubble radius, radial velocity, and radial acceleration for the inner loop
         real(wp), dimension(4) :: myPb_tmp1, myMv_tmp1, myPb_tmp2, myMv_tmp2 !< Gas pressure and vapor mass for the inner loop (EL)
-
-        tol = 1e-4_wp   ! Tolerance value
+        integer :: iter_count
 
         h = f_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                 fntait, fBtait, f_bub_adv_src, f_divu, fCson)
 
         ! Advancing one step
         t_new = 0._wp
-        do while (.true.)
+        iter_count = 0
+        adap_dt_stop = 0
+
+        do
+
             if (t_new + h > 0.5_wp*dt) then
                 h = 0.5_wp*dt - t_new
             end if
 
             ! Advancing one sub-step
-            do while (.true.)
+            do while (iter_count < adap_dt_max_iters)
+
+                iter_count = iter_count + 1
 
                 ! Advance one sub-step
-                err1 = f_advance_substep( &
-                       fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                       fntait, fBtait, f_bub_adv_src, f_divu, &
-                       bub_id, fmass_v, fmass_n, fbeta_c, &
-                       fbeta_t, fCson, h, &
-                       myR_tmp1, myV_tmp1, myPb_tmp1, myMv_tmp1)
+                err(1) = f_advance_substep( &
+                         fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                         fntait, fBtait, f_bub_adv_src, f_divu, &
+                         bub_id, fmass_v, fmass_n, fbeta_c, &
+                         fbeta_t, fCson, h, &
+                         myR_tmp1, myV_tmp1, myPb_tmp1, myMv_tmp1)
 
                 ! Advance one sub-step by advancing two half steps
-                err2 = f_advance_substep( &
-                       fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                       fntait, fBtait, f_bub_adv_src, f_divu, &
-                       bub_id, fmass_v, fmass_n, fbeta_c, &
-                       fbeta_t, fCson, 0.5_wp*h, &
-                       myR_tmp2, myV_tmp2, myPb_tmp2, myMv_tmp2)
+                err(2) = f_advance_substep( &
+                         fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                         fntait, fBtait, f_bub_adv_src, f_divu, &
+                         bub_id, fmass_v, fmass_n, fbeta_c, &
+                         fbeta_t, fCson, 0.5_wp*h, &
+                         myR_tmp2, myV_tmp2, myPb_tmp2, myMv_tmp2)
 
-                err3 = f_advance_substep( &
-                       fRho, fP, myR_tmp2(4), myV_tmp2(4), fR0, myPb_tmp2(4), fpbdot, alf, &
-                       fntait, fBtait, f_bub_adv_src, f_divu, &
-                       bub_id, myMv_tmp2(4), fmass_n, fbeta_c, &
-                       fbeta_t, fCson, 0.5_wp*h, &
-                       myR_tmp2, myV_tmp2, myPb_tmp2, myMv_tmp2)
+                err(3) = f_advance_substep( &
+                         fRho, fP, myR_tmp2(4), myV_tmp2(4), fR0, myPb_tmp2(4), fpbdot, alf, &
+                         fntait, fBtait, f_bub_adv_src, f_divu, &
+                         bub_id, myMv_tmp2(4), fmass_n, fbeta_c, &
+                         fbeta_t, fCson, 0.5_wp*h, &
+                         myR_tmp2, myV_tmp2, myPb_tmp2, myMv_tmp2)
 
-                err4 = abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4))
-                err5 = abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4))
-                if (abs(myV_tmp1(4)) < 1e-12_wp) err5 = 0._wp
+                err(4) = abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4))
+                err(5) = abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4))
+                if (abs(myV_tmp1(4)) < verysmall) err(5) = 0._wp
 
                 ! Determine acceptance/rejection and update step size
                 !   Rule 1: err1, err2, err3 < tol
                 !   Rule 2: myR_tmp1(4) > 0._wp
                 !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/fR) < tol
                 !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/fV) < tol
-                if ((err1 <= tol) .and. (err2 <= tol) .and. (err3 <= tol) &
-                    .and. (err4 < tol) .and. (err5 < tol) &
-                    .and. myR_tmp1(4) > 0._wp) then
+                if ((err(1) <= adap_dt_tol) .and. (err(2) <= adap_dt_tol) .and. &
+                    (err(3) <= adap_dt_tol) .and. (err(4) < adap_dt_tol) .and. &
+                    (err(5) < adap_dt_tol) .and. myR_tmp1(4) > 0._wp) then
 
                     ! Accepted. Finalize the sub-step
                     t_new = t_new + h
@@ -544,12 +549,12 @@ contains
                     end if
 
                     ! Update step size for the next sub-step
-                    h = h*min(2._wp, max(0.5_wp, (1e-4_wp/err1)**(1._wp/3._wp)))
+                    h = h*min(2._wp, max(0.5_wp, (adap_dt_tol/err(1))**(1._wp/3._wp)))
 
                     exit
                 else
                     ! Rejected. Update step size for the next try on sub-step
-                    if (err2 <= 1e-4_wp) then
+                    if (err(2) <= adap_dt_tol) then
                         h = 0.5_wp*h
                     else
                         h = 0.25_wp*h
@@ -558,9 +563,11 @@ contains
             end do
 
             ! Exit the loop if the final time reached dt
-            if (t_new == 0.5_wp*dt) exit
+            if (t_new == 0.5_wp*dt .or. iter_count >= adap_dt_max_iters) exit
 
         end do
+
+        if (iter_count >= adap_dt_max_iters) adap_dt_stop = 1
 
     end subroutine s_advance_step
 
@@ -589,8 +596,8 @@ contains
         real(wp), intent(IN) :: fCson
 
         real(wp) :: f_initial_substep_h
-        real(wp) :: h0, h1 !< Time step size
-        real(wp) :: d_0, d_1, d_2 !< norms
+        real(wp), dimension(2) :: h_size !< Time step size (h0, h1)
+        real(wp), dimension(3) :: d_norms !< norms (d_0, d_1, d_2)
         real(wp), dimension(2) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration
 
         ! Determine the starting time step
@@ -603,38 +610,39 @@ contains
                              fCson)
 
         ! Compute d_0 = ||y0|| and d_1 = ||f(x0,y0)||
-        d_0 = sqrt((myR_tmp(1)**2._wp + myV_tmp(1)**2._wp)/2._wp)
-        d_1 = sqrt((myV_tmp(1)**2._wp + myA_tmp(1)**2._wp)/2._wp)
-        if (d_0 < 1e-5_wp .or. d_1 < 1e-5_wp) then
-            h0 = 1e-6_wp
+        d_norms(1) = sqrt((myR_tmp(1)**2._wp + myV_tmp(1)**2._wp)/2._wp)
+        d_norms(2) = sqrt((myV_tmp(1)**2._wp + myA_tmp(1)**2._wp)/2._wp)
+        if (d_norms(1) < 1e-5_wp .or. d_norms(2) < 1e-5_wp) then
+            h_size(1) = 1e-6_wp
         else
-            h0 = 1e-2_wp*(d_0/d_1)
+            h_size(1) = 1e-2_wp*(d_norms(1)/d_norms(2))
         end if
 
         ! Evaluate f(x0+h0,y0+h0*f(x0,y0))
-        myR_tmp(2) = myR_tmp(1) + h0*myV_tmp(1)
-        myV_tmp(2) = myV_tmp(1) + h0*myA_tmp(1)
+        myR_tmp(2) = myR_tmp(1) + h_size(1)*myV_tmp(1)
+        myV_tmp(2) = myV_tmp(1) + h_size(1)*myA_tmp(1)
         myA_tmp(2) = f_rddot(fRho, fP, myR_tmp(2), myV_tmp(2), fR0, &
                              fpb, fpbdot, alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu, &
                              fCson)
 
         ! Compute d_2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
-        d_2 = sqrt(((myV_tmp(2) - myV_tmp(1))**2._wp + (myA_tmp(2) - myA_tmp(1))**2._wp)/2._wp)/h0
+        d_norms(3) = sqrt(((myV_tmp(2) - myV_tmp(1))**2._wp + (myA_tmp(2) - myA_tmp(1))**2._wp)/2._wp)/h_size(1)
 
         ! Set h1 = (0.01/max(d_1,d_2))^{1/(p+1)}
-        !      if max(d_1,d_2) < 1e-15_wp, h1 = max(1e-6_wp, h0*1e-3_wp)
-        if (max(d_1, d_2) < 1e-15_wp) then
-            h1 = max(1e-6_wp, h0*1e-3_wp)
+        !      if max(d_1,d_2) < 1e-15_wp, h_size(2) = max(1e-6_wp, h0*1e-3_wp)
+        if (max(d_norms(2), d_norms(3)) < 1e-15_wp) then
+            h_size(2) = max(1e-6_wp, h_size(1)*1e-3_wp)
         else
-            h1 = (1e-2_wp/max(d_1, d_2))**(1._wp/3._wp)
+            h_size(2) = (1e-2_wp/max(d_norms(2), d_norms(3)))**(1._wp/3._wp)
         end if
 
-        f_initial_substep_h = min(100._wp*h0, h1)
+        f_initial_substep_h = min(100._wp*h_size(1), h_size(2))
 
     end function f_initial_substep_h
 
-    !>  Integrate bubble variables over the given time step size, h
+    !>  Integrate bubble variables over the given time step size, h, using a
+        !!      third-order accurate embedded Runge–Kutta scheme.
         !!  @param fRho Current density
         !!  @param fP Current driving pressure
         !!  @param fR Current bubble radius
@@ -674,10 +682,8 @@ contains
         real(wp) :: f_advance_substep
         real(wp) :: err_R, err_V
 
-        real(wp) :: myVapFlux, myR_m, mygamma_m, Pb_tmp, Pbdot_tmp
-
-        Pb_tmp = fpb
-        Pbdot_tmp = fpbdot
+        myPb_tmp(1:4) = fpb
+        mydPbdt_tmp(1:4) = fpbdot
 
         ! Stage 0
         myR_tmp(1) = fR
@@ -685,15 +691,11 @@ contains
         if (bubbles_lagrange) then
             myPb_tmp(1) = fpb
             myMv_tmp(1) = fmass_v
-
-            myVapFlux = f_vflux(myR_tmp(1), myV_tmp(1), myPb_tmp(1), myMv_tmp(1), bub_id, fmass_n, fbeta_c, myR_m, mygamma_m)
-            mydPbdt_tmp(1) = f_bpres_dot(myVapFlux, myR_tmp(1), myV_tmp(1), myPb_tmp(1), myMv_tmp(1), bub_id, fbeta_t, myR_m, mygamma_m)
-            mydMvdt_tmp(1) = 4._wp*pi*myR_tmp(1)**2._wp*myVapFlux
-            Pb_tmp = myPb_tmp(1)
-            Pbdot_tmp = mydPbdt_tmp(1)
+            mydMvdt_tmp(1) = f_advance_EL(myR_tmp(1), myV_tmp(1), myPb_tmp(1), myMv_tmp(1), bub_id, &
+                                          fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(1))
         end if
         myA_tmp(1) = f_rddot(fRho, fP, myR_tmp(1), myV_tmp(1), fR0, &
-                             Pb_tmp, Pbdot_tmp, alf, fntait, fBtait, &
+                             myPb_tmp(1), mydPbdt_tmp(1), alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu, &
                              fCson)
 
@@ -703,15 +705,11 @@ contains
         if (bubbles_lagrange) then
             myPb_tmp(2) = myPb_tmp(1) + h*mydPbdt_tmp(1)
             myMv_tmp(2) = myMv_tmp(1) + h*mydMvdt_tmp(1)
-
-            myVapFlux = f_vflux(myR_tmp(2), myV_tmp(2), myPb_tmp(2), myMv_tmp(2), bub_id, fmass_n, fbeta_c, myR_m, mygamma_m)
-            mydPbdt_tmp(2) = f_bpres_dot(myVapFlux, myR_tmp(2), myV_tmp(2), myPb_tmp(2), myMv_tmp(2), bub_id, fbeta_t, myR_m, mygamma_m)
-            mydMvdt_tmp(2) = 4._wp*pi*myR_tmp(2)**2._wp*myVapFlux
-            Pb_tmp = myPb_tmp(2)
-            Pbdot_tmp = mydPbdt_tmp(2)
+            mydMvdt_tmp(2) = f_advance_EL(myR_tmp(2), myV_tmp(2), myPb_tmp(2), myMv_tmp(2), &
+                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(2))
         end if
         myA_tmp(2) = f_rddot(fRho, fP, myR_tmp(2), myV_tmp(2), fR0, &
-                             Pb_tmp, Pbdot_tmp, alf, fntait, fBtait, &
+                             myPb_tmp(2), mydPbdt_tmp(2), alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu, &
                              fCson)
 
@@ -721,15 +719,11 @@ contains
         if (bubbles_lagrange) then
             myPb_tmp(3) = myPb_tmp(1) + (h/4._wp)*(mydPbdt_tmp(1) + mydPbdt_tmp(2))
             myMv_tmp(3) = myMv_tmp(1) + (h/4._wp)*(mydMvdt_tmp(1) + mydMvdt_tmp(2))
-
-            myVapFlux = f_vflux(myR_tmp(3), myV_tmp(3), myPb_tmp(3), myMv_tmp(3), bub_id, fmass_n, fbeta_c, myR_m, mygamma_m)
-            mydPbdt_tmp(3) = f_bpres_dot(myVapFlux, myR_tmp(3), myV_tmp(3), myPb_tmp(3), myMv_tmp(3), bub_id, fbeta_t, myR_m, mygamma_m)
-            mydMvdt_tmp(3) = 4._wp*pi*myR_tmp(3)**2._wp*myVapFlux
-            Pb_tmp = myPb_tmp(3)
-            Pbdot_tmp = mydPbdt_tmp(3)
+            mydMvdt_tmp(3) = f_advance_EL(myR_tmp(3), myV_tmp(3), myPb_tmp(3), myMv_tmp(3), &
+                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(3))
         end if
         myA_tmp(3) = f_rddot(fRho, fP, myR_tmp(3), myV_tmp(3), fR0, &
-                             Pb_tmp, Pbdot_tmp, alf, fntait, fBtait, &
+                             myPb_tmp(3), mydPbdt_tmp(3), alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu, &
                              fCson)
 
@@ -739,15 +733,11 @@ contains
         if (bubbles_lagrange) then
             myPb_tmp(4) = myPb_tmp(1) + (h/6._wp)*(mydPbdt_tmp(1) + mydPbdt_tmp(2) + 4._wp*mydPbdt_tmp(3))
             myMv_tmp(4) = myMv_tmp(1) + (h/6._wp)*(mydMvdt_tmp(1) + mydMvdt_tmp(2) + 4._wp*mydMvdt_tmp(3))
-
-            myVapFlux = f_vflux(myR_tmp(4), myV_tmp(4), myPb_tmp(4), myMv_tmp(4), bub_id, fmass_n, fbeta_c, myR_m, mygamma_m)
-            mydPbdt_tmp(4) = f_bpres_dot(myVapFlux, myR_tmp(4), myV_tmp(4), myPb_tmp(4), myMv_tmp(4), bub_id, fbeta_t, myR_m, mygamma_m)
-            mydMvdt_tmp(4) = 4._wp*pi*myR_tmp(4)**2._wp*myVapFlux
-            Pb_tmp = myPb_tmp(4)
-            Pbdot_tmp = mydPbdt_tmp(4)
+            mydMvdt_tmp(4) = f_advance_EL(myR_tmp(4), myV_tmp(4), myPb_tmp(4), myMv_tmp(4), &
+                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(4))
         end if
         myA_tmp(4) = f_rddot(fRho, fP, myR_tmp(4), myV_tmp(4), fR0, &
-                             Pb_tmp, Pbdot_tmp, alf, fntait, fBtait, &
+                             myPb_tmp(4), mydPbdt_tmp(4), alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu, &
                              fCson)
 
@@ -757,12 +747,39 @@ contains
         err_V = (-5._wp*h/24._wp)*(myA_tmp(2) + myA_tmp(3) - 2._wp*myA_tmp(4)) &
                 /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
         ! Error correction for non-oscillating bubbles
-        if (bubbles_lagrange .and. myA_tmp(1) == 0._wp .and. myA_tmp(2) == 0._wp .and. &
-            myA_tmp(3) == 0._wp .and. myA_tmp(4) == 0._wp) then
+        if (bubbles_lagrange .and. f_approx_equal(myA_tmp(1), 0._wp) .and. f_approx_equal(myA_tmp(2), 0._wp) .and. &
+            f_approx_equal(myA_tmp(3), 0._wp) .and. f_approx_equal(myA_tmp(4), 0._wp)) then
             err_V = 0._wp
         end if
         f_advance_substep = sqrt((err_R**2._wp + err_V**2._wp)/2._wp)
 
     end function f_advance_substep
+
+    !>  Changes of pressure and vapor mass in the lagrange bubbles.
+        !!  @param bub_id Bubble identifier
+        !!  @param fmass_n Current mass of gas
+        !!  @param fbeta_c Mass transfer coefficient
+        !!  @param fbeta_t Heat transfer coefficient
+        !!  @param fR_tmp Bubble radius
+        !!  @param fV_tmp Bubble radial velocity
+        !!  @param fPb_tmp Internal bubble pressure
+        !!  @param fMv_tmp Mass of vapor in the bubble
+        !!  @param fdPbdt_tmp Rate of change of the internal bubble pressure
+        !!  @param fdMvdt_tmp Rate of change of the mass of vapor in the bubble
+    function f_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fmass_n, fbeta_c, fbeta_t, &
+                          fdPbdt_tmp)
+        !$acc routine seq
+        real(wp), intent(IN) :: fR_tmp, fV_tmp, fPb_tmp, fMv_tmp
+        real(wp), intent(IN) :: fmass_n, fbeta_c, fbeta_t
+        integer, intent(IN) :: bub_id
+        real(wp), intent(INOUT) :: fdPbdt_tmp
+
+        real(wp) :: fVapFlux, f_advance_EL, myR_m, mygamma_m
+
+        fVapFlux = f_vflux(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fmass_n, fbeta_c, myR_m, mygamma_m)
+        fdPbdt_tmp = f_bpres_dot(fVapFlux, fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fbeta_t, myR_m, mygamma_m)
+        f_advance_EL = 4._wp*pi*fR_tmp**2._wp*fVapFlux
+
+    end function f_advance_EL
 
 end module m_bubbles
