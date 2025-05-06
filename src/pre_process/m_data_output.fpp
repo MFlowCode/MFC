@@ -29,6 +29,10 @@ module m_data_output
 
     use m_delay_file_access
 
+    use m_boundary_common
+
+    use m_boundary_conditions
+
     use m_thermochem, only: species_names
 
     implicit none
@@ -47,15 +51,19 @@ module m_data_output
         !! @param ib_markers track if a cell is within the immersed boundary
         !! @param levelset closest distance from every cell to the IB
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-        subroutine s_write_abstract_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
+        subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
 
             import :: scalar_field, integer_field, sys_size, m, n, p, &
-                pres_field, levelset_field, levelset_norm_field
+                pres_field, levelset_field, levelset_norm_field, num_dims
 
             ! Conservative variables
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(in) :: q_cons_vf
+                intent(in) :: q_cons_vf, q_prim_vf
+
+            type(integer_field), &
+                dimension(1:num_dims, -1:1), &
+                intent(in) :: bc_type
 
             ! IB markers
             type(integer_field), &
@@ -88,10 +96,15 @@ contains
         !! @param ib_markers track if a cell is within the immersed boundary
         !! @param levelset closest distance from every cell to the IB
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-    subroutine s_write_serial_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
+    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
         type(scalar_field), &
             dimension(sys_size), &
-            intent(in) :: q_cons_vf
+            intent(in) :: q_cons_vf, q_prim_vf
+
+        ! BC types
+        type(integer_field), &
+            dimension(1:num_dims, -1:1), &
+            intent(in) :: bc_type
 
         ! IB markers
         type(integer_field), &
@@ -146,6 +159,10 @@ contains
             status = 'old'
         else
             status = 'new'
+        end if
+
+        if (bc_io) then
+            call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir)
         end if
 
         ! x-coordinate direction
@@ -539,12 +556,16 @@ contains
         !! @param ib_markers track if a cell is within the immersed boundary
         !! @param levelset closest distance from every cell to the IB
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-    subroutine s_write_parallel_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
+    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
 
         ! Conservative variables
         type(scalar_field), &
             dimension(sys_size), &
-            intent(in) :: q_cons_vf
+            intent(in) :: q_cons_vf, q_prim_vf
+
+        type(integer_field), &
+            dimension(1:num_dims, -1:1), &
+            intent(in) :: bc_type
 
         ! IB markers
         type(integer_field), &
@@ -842,6 +863,10 @@ contains
 
         end if
 #endif
+
+        if (bc_io) then
+            call s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
+        end if
 
     end subroutine s_write_parallel_data_files
 

@@ -51,7 +51,7 @@ module m_rhs
 
     use m_nvtx
 
-    use m_boundary_conditions
+    use m_boundary_common
 
     use m_helper
 
@@ -611,11 +611,12 @@ contains
 
     end subroutine s_initialize_rhs_module
 
-    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, stage)
+    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
@@ -673,7 +674,7 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("RHS-COMMUNICATION")
-        call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
+        call s_populate_variables_buffers(q_prim_qp%vf, pb, mv, bc_type)
         call nvtxEndRange
 
         call nvtxStartRange("RHS-ELASTIC")
@@ -704,7 +705,7 @@ contains
 
         if (surface_tension) then
             call nvtxStartRange("RHS-SURFACE-TENSION")
-            call s_get_capilary(q_prim_qp%vf)
+            call s_get_capilary(q_prim_qp%vf, bc_type)
             call nvtxEndRange
         end if
         ! Dimensional Splitting Loop
@@ -994,12 +995,12 @@ contains
 
         if (idir == 1) then
 
-            if (bc_x%beg <= -5 .and. bc_x%beg >= -13) then
+            if (bc_x%beg <= BC_CHAR_SLIP_WALL .and. bc_x%beg >= BC_CHAR_SUP_OUTFLOW) then
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
                            flux_src_n(idir)%vf, idir, -1, irx, iry, irz)
             end if
 
-            if (bc_x%end <= -5 .and. bc_x%end >= -13) then
+            if (bc_x%end <= BC_CHAR_SLIP_WALL .and. bc_x%end >= BC_CHAR_SUP_OUTFLOW) then
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
                            flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
             end if
@@ -1103,12 +1104,12 @@ contains
             ! RHS Contribution in y-direction
             ! Applying the Riemann fluxes
 
-            if (bc_y%beg <= -5 .and. bc_y%beg >= -13) then
+            if (bc_y%beg <= BC_CHAR_SLIP_WALL .and. bc_y%beg >= BC_CHAR_SUP_OUTFLOW) then
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
                            flux_src_n(idir)%vf, idir, -1, irx, iry, irz)
             end if
 
-            if (bc_y%end <= -5 .and. bc_y%end >= -13) then
+            if (bc_y%end <= BC_CHAR_SLIP_WALL .and. bc_y%end >= BC_CHAR_SUP_OUTFLOW) then
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
                            flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
             end if
@@ -1277,12 +1278,12 @@ contains
 
             ! Applying the Riemann fluxes
 
-            if (bc_z%beg <= -5 .and. bc_z%beg >= -13) then
+            if (bc_z%beg <= BC_CHAR_SLIP_WALL .and. bc_z%beg >= BC_CHAR_SUP_OUTFLOW) then
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
                            flux_src_n(idir)%vf, idir, -1, irx, iry, irz)
             end if
 
-            if (bc_z%end <= -5 .and. bc_z%end >= -13) then
+            if (bc_z%end <= BC_CHAR_SLIP_WALL .and. bc_z%end >= BC_CHAR_SUP_OUTFLOW) then
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
                            flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
             end if
@@ -1573,7 +1574,7 @@ contains
                 end do
             end if
 
-            if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
+            if (cyl_coord .and. ((bc_y%beg == BC_REFLECTIVE) .or. (bc_y%beg == BC_AXIS))) then
                 if (viscous) then
                     if (p > 0) then
                         call s_compute_viscous_stress_tensor(q_prim_vf, &
@@ -1641,7 +1642,7 @@ contains
             ! Applying the geometrical viscous Riemann source fluxes calculated as average
             ! of values at cell boundaries
             if (cyl_coord) then
-                if ((bc_y%beg == -2) .or. (bc_y%beg == -14)) then
+                if ((bc_y%beg == BC_REFLECTIVE) .or. (bc_y%beg == BC_AXIS)) then
 
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p

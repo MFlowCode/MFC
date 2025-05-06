@@ -224,8 +224,8 @@ contains
             #:for BOUND in ['beg', 'end']
                 @:PROHIBIT(${VAR}$ == 0 .and. bc_${X}$%${BOUND}$ /= dflt_int, "bc_${X}$%${BOUND}$ is not supported for ${VAR}$ = 0")
                 @:PROHIBIT(${VAR}$ > 0 .and. bc_${X}$%${BOUND}$ == dflt_int, "${VAR}$ != 0 but bc_${X}$%${BOUND}$ is not set")
-                @:PROHIBIT((bc_${X}$%beg == -1 .and. bc_${X}$%end /= -1) .or. &
-                    (bc_${X}$%end == -1 .and. bc_${X}$%beg /= -1), &
+                @:PROHIBIT((bc_${X}$%beg == BC_PERIODIC .and. bc_${X}$%end /= BC_PERIODIC) .or. &
+                    (bc_${X}$%end == BC_PERIODIC .and. bc_${X}$%beg /= BC_PERIODIC), &
                     "bc_${X}$%beg and bc_${X}$%end must be both periodic (= -1) or both non-periodic")
 
                 ! For cylindrical coordinates, y and z directions use a different check
@@ -236,32 +236,44 @@ contains
                 #:endif
 
                 if (.not. skip_check) then
-                    @:PROHIBIT(bc_${X}$%${BOUND}$ /= dflt_int .and. (bc_${X}$%${BOUND}$ > -1 .or. bc_${X}$%${BOUND}$ < -16), &
-                        "bc_${X}$%${BOUND}$ must be between -1 and -16")
+                    @:PROHIBIT(bc_${X}$%${BOUND}$ /= dflt_int .and. (bc_${X}$%${BOUND}$ > -1 .or. bc_${X}$%${BOUND}$ < BC_DIRICHLET), &
+                        "bc_${X}$%${BOUND}$ must be between -1 and -17")
 
-                    @:PROHIBIT(bc_${X}$%${BOUND}$ /= dflt_int .and. bc_${X}$%${BOUND}$ == -14, &
+                    @:PROHIBIT(bc_${X}$%${BOUND}$ /= dflt_int .and. bc_${X}$%${BOUND}$ == BC_AXIS, &
                         "bc_${X}$%${BOUND}$ must not be -14 for non-cylindrical coordinates")
                 end if
 
             #:endfor
         #:endfor
 
-        @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -13), &
+        @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_NULL), &
             "Boundary condition -13 is not supported")
 
         ! Check for y and z directions for cylindrical coordinates
         @: PROHIBIT(cyl_coord .and. n == 0, "n must be positive (2D or 3D) for cylindrical coordinates")
-        @: PROHIBIT(cyl_coord .and. p == 0 .and. bc_y%beg /= -2, "bc_y%beg must be -2 for 2D cylindrical coordinates (p = 0)")
-        @: PROHIBIT(cyl_coord .and. p > 0 .and. bc_y%beg /= -14, "bc_y%beg must be -14 for 3D cylindrical coordinates (p > 0)")
-        @: PROHIBIT(cyl_coord .and. (bc_y%end > -1 .or. bc_y%end < -16), "bc_y%end must be between -1 and -16")
-        @: PROHIBIT(cyl_coord .and. bc_y%end == -14, "bc_y%end must not be -14")
+        @: PROHIBIT(cyl_coord .and. p == 0 .and. bc_y%beg /= BC_REFLECTIVE, "bc_y%beg must be -2 for 2D cylindrical coordinates (p = 0)")
+        @: PROHIBIT(cyl_coord .and. p > 0 .and. bc_y%beg /= BC_AXIS, "bc_y%beg must be -14 for 3D cylindrical coordinates (p > 0)")
+        @: PROHIBIT(cyl_coord .and. (bc_y%end > BC_PERIODIC .or. bc_y%end < BC_DIRICHLET), "bc_y%end must be between -1 and -17")
+        @: PROHIBIT(cyl_coord .and. bc_y%end == BC_AXIS, "bc_y%end must not be -14")
 
         ! Check for y and z directions for 3D cylindrical coordinates
-        @: PROHIBIT(cyl_coord .and. p > 0 .and. (bc_z%beg /= -1 .and. bc_z%beg /= -2), &
+        @: PROHIBIT(cyl_coord .and. p > 0 .and. (bc_z%beg /= BC_PERIODIC .and. bc_z%beg /= BC_REFLECTIVE), &
             "bc_z%beg must be -1 or -2 for 3D cylindrical coordinates")
 
-        @: PROHIBIT(cyl_coord .and. p > 0 .and. (bc_z%end /= -1 .and. bc_z%end /= -2), &
+        @: PROHIBIT(cyl_coord .and. p > 0 .and. (bc_z%end /= BC_PERIODIC .and. bc_z%end /= BC_REFLECTIVE), &
             "bc_z%end must be -1 or -2 for 3D cylindrical coordinates")
+
+#ifndef MFC_POST_PROCESS
+        if (num_bc_patches > 0) then
+            #:for DIR in [('x'), ('y'), ('z')]
+                #:for LOC in [('beg'), ('end')]
+                    @:PROHIBIT(bc_${DIR}$%${LOC}$ == -1 .or. (bc_${DIR}$%${LOC}$ <= -4 .and. bc_${DIR}$%${LOC}$ >= -14), &
+                        "bc_${DIR}$%${LOC}$ is not compatible with num_bc_patches > 0")
+                #:endfor
+            #:endfor
+        end if
+#endif
+
     end subroutine s_check_inputs_bc
 
     !> Checks constraints on the stiffened equation of state fluids parameters.
@@ -336,13 +348,13 @@ contains
     subroutine s_check_inputs_moving_bc
         #:for X, VB2, VB3 in [('x', 'vb2', 'vb3'), ('y', 'vb3', 'vb1'), ('z', 'vb1', 'vb2')]
             if (any((/bc_${X}$%vb1, bc_${X}$%vb2, bc_${X}$%vb3/) /= 0._wp)) then
-                if (bc_${X}$%beg == -15) then
+                if (bc_${X}$%beg == BC_SLIP_WALL) then
                     if (any((/bc_${X}$%${VB2}$, bc_${X}$%${VB3}$/) /= 0._wp)) then
                         call s_mpi_abort("bc_${X}$%beg must be -15 if "// &
                                          "bc_${X}$%${VB2}$ or bc_${X}$%${VB3}$ "// &
                                          "is set. Exiting.", CASE_FILE_ERROR_CODE)
                     end if
-                elseif (bc_${X}$%beg /= -16) then
+                elseif (bc_${X}$%beg /= BC_NO_SLIP_WALL) then
                     call s_mpi_abort("bc_${X}$%beg must be -15 or -16 if "// &
                                      "bc_${X}$%vb[1,2,3] is set. Exiting.", CASE_FILE_ERROR_CODE)
                 end if
@@ -351,13 +363,13 @@ contains
 
         #:for X, VE2, VE3 in [('x', 've2', 've3'), ('y', 've3', 've1'), ('z', 've1', 've2')]
             if (any((/bc_${X}$%ve1, bc_${X}$%ve2, bc_${X}$%ve3/) /= 0._wp)) then
-                if (bc_${X}$%end == -15) then
+                if (bc_${X}$%end == BC_SLIP_WALL) then
                     if (any((/bc_${X}$%${VE2}$, bc_${X}$%${VE3}$/) /= 0._wp)) then
                         call s_mpi_abort("bc_${X}$%end must be -15 if "// &
                                          "bc_${X}$%${VE2}$ or bc_${X}$%${VE3}$ "// &
                                          "is set. Exiting.", CASE_FILE_ERROR_CODE)
                     end if
-                elseif (bc_${X}$%end /= -16) then
+                elseif (bc_${X}$%end /= BC_NO_SLIP_WALL) then
                     call s_mpi_abort("bc_${X}$%end must be -15 or -16 if "// &
                                      "bc_${X}$%ve[1,2,3] is set. Exiting.", CASE_FILE_ERROR_CODE)
                 end if

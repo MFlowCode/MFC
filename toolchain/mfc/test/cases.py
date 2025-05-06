@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 import os, typing, itertools
 
 from mfc   import common
@@ -70,7 +71,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     stack, cases = CaseGeneratorStack(), []
 
     def alter_bcs(dimInfo):
-        for bc in [ -1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3, -15, -16 ]:
+        for bc in [ -1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3, -15, -16, -17]:
             cases.append(define_case_d(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
     def alter_grcbc(dimInfo):
@@ -849,6 +850,55 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
+    def alter_bc_patches(dimInfo):
+       # BC_Patches
+
+        stack.push('BC Patches',{
+            'num_bc_patches': 1
+        })
+
+        if len(dimInfo[0]) > 2:
+            for direc in [1,2,3]:
+                stack.push('Circle' ,{
+                        'patch_bc(1)%geometry': 2, 'patch_bc(1)%dir': direc, 
+                        'patch_bc(1)%type': -17, 'patch_bc(1)%loc': -1
+                })
+
+                if direc==1:
+                    stack.push('X', {'patch_bc(1)%centroid(2)': 0,'patch_bc(1)%centroid(3)': 0, "patch_bc(1)%radius": 0.000125,})
+                elif direc==2:
+                    stack.push('Y', {'patch_bc(1)%centroid(1)': 0,'patch_bc(1)%centroid(3)': 0, "patch_bc(1)%radius": 0.000125,})
+                else:
+                    stack.push('Z', {'patch_bc(1)%centroid(1)': 0,'patch_bc(1)%centroid(2)': 0, "patch_bc(1)%radius": 0.000125,})
+
+
+                cases.append(define_case_d(stack, '', {}))
+
+                stack.pop()
+
+                stack.pop()
+
+        elif len(dimInfo[0]) > 1:
+            for direc in [1,2]:
+                stack.push('Line Segment' ,{
+                        'patch_bc(1)%geometry': 1, 'patch_bc(1)%dir': direc, 
+                        'patch_bc(1)%type': -17, 'patch_bc(1)%loc': -1
+                })
+
+                if direc==1:
+                    stack.push('X' ,{'patch_bc(1)%centroid(2)': 0.0, 'patch_bc(1)%length(2)': 0.0025})
+                else:
+                    stack.push('Y' ,{'patch_bc(1)%centroid(1)': 0.0, 'patch_bc(1)%length(1)': 0.0025})
+
+
+                cases.append(define_case_d(stack, '', {}))
+
+                stack.pop()
+
+                stack.pop()
+
+        stack.pop()
+
     def mhd_cases():
         params = {
             '1D': {"m": 200, "dt": 0.001, "t_step_stop": 200, "t_step_save": 200},
@@ -893,6 +943,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_elliptic_smoothing()
             alter_body_forces(dimInfo)
             alter_instability_wave(dimInfo)
+            alter_bc_patches(dimInfo)
             stack.pop()
             stack.pop()
 

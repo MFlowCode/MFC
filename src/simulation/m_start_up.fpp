@@ -35,6 +35,8 @@ module m_start_up
 
     use m_cbc                  !< Characteristic boundary conditions (CBC)
 
+    use m_boundary_common
+
     use m_acoustic_src      !< Acoustic source calculations
 
     use m_rhs                  !< Right-hane-side (RHS) evaluation procedures
@@ -82,6 +84,8 @@ module m_start_up
     use m_surface_tension
 
     use m_body_forces
+
+    use m_sim_helpers
 
     use m_mhd
 
@@ -175,7 +179,7 @@ contains
             cfl_adap_dt, cfl_const_dt, cfl_target, &
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
-            hyperelasticity, R0ref, Bx0, powell, &
+            hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar
 
         ! Checking that an input file has been provided by the user. If it
@@ -209,6 +213,11 @@ contains
             p_glb = p
 
             if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
+
+            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. &
+                num_bc_patches > 0) then
+                bc_io = .true.
+            endif
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
@@ -250,7 +259,8 @@ contains
     subroutine s_read_serial_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-
+        
+            
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the starting time-step directory
 
@@ -277,6 +287,12 @@ contains
 
         if (file_exist .neqv. .true.) then
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
+        end if
+
+        if (bc_io) then
+            call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
+        else
+            call s_assign_default_bc_type(bc_type)
         end if
 
         ! Cell-boundary Locations in x-direction
@@ -933,6 +949,12 @@ contains
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
+        if (bc_io) then
+            call s_read_parallel_boundary_condition_files(bc_type)
+        else
+            call s_assign_default_bc_type(bc_type)
+        end if
+
 #endif
 
     end subroutine s_read_parallel_data_files
@@ -951,15 +973,15 @@ contains
         ! coordinate direction, based on the selected boundary condition. In
         ! order, these are the ghost-cell extrapolation, symmetry, periodic,
         ! and processor boundary conditions.
-        if (bc_x%beg <= -3) then
+        if (bc_x%beg <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dx(-i) = dx(0)
             end do
-        elseif (bc_x%beg == -2) then
+        elseif (bc_x%beg == BC_REFLECTIVE) then
             do i = 1, buff_size
                 dx(-i) = dx(i - 1)
             end do
-        elseif (bc_x%beg == -1) then
+        elseif (bc_x%beg == BC_PERIODIC) then
             do i = 1, buff_size
                 dx(-i) = dx(m - (i - 1))
             end do
@@ -982,15 +1004,15 @@ contains
         ! coordinate direction, based on desired boundary condition. These
         ! include, in order, ghost-cell extrapolation, symmetry, periodic,
         ! and processor boundary conditions.
-        if (bc_x%end <= -3) then
+        if (bc_x%end <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dx(m + i) = dx(m)
             end do
-        elseif (bc_x%end == -2) then
+        elseif (bc_x%end == BC_REFLECTIVE) then
             do i = 1, buff_size
                 dx(m + i) = dx(m - (i - 1))
             end do
-        elseif (bc_x%end == -1) then
+        elseif (bc_x%end == BC_PERIODIC) then
             do i = 1, buff_size
                 dx(m + i) = dx(i - 1)
             end do
@@ -1019,15 +1041,15 @@ contains
         ! and processor boundary conditions.
         if (n == 0) then
             return
-        elseif (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
+        elseif (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_AXIS) then
             do i = 1, buff_size
                 dy(-i) = dy(0)
             end do
-        elseif (bc_y%beg == -2 .or. bc_y%beg == -14) then
+        elseif (bc_y%beg == BC_REFLECTIVE .or. bc_y%beg == BC_AXIS) then
             do i = 1, buff_size
                 dy(-i) = dy(i - 1)
             end do
-        elseif (bc_y%beg == -1) then
+        elseif (bc_y%beg == BC_PERIODIC) then
             do i = 1, buff_size
                 dy(-i) = dy(n - (i - 1))
             end do
@@ -1050,15 +1072,15 @@ contains
         ! coordinate direction, based on desired boundary condition. These
         ! include, in order, ghost-cell extrapolation, symmetry, periodic,
         ! and processor boundary conditions.
-        if (bc_y%end <= -3) then
+        if (bc_y%end <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dy(n + i) = dy(n)
             end do
-        elseif (bc_y%end == -2) then
+        elseif (bc_y%end == BC_REFLECTIVE) then
             do i = 1, buff_size
                 dy(n + i) = dy(n - (i - 1))
             end do
-        elseif (bc_y%end == -1) then
+        elseif (bc_y%end == BC_PERIODIC) then
             do i = 1, buff_size
                 dy(n + i) = dy(i - 1)
             end do
@@ -1087,15 +1109,15 @@ contains
         ! and processor boundary conditions.
         if (p == 0) then
             return
-        elseif (bc_z%beg <= -3) then
+        elseif (bc_z%beg <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dz(-i) = dz(0)
             end do
-        elseif (bc_z%beg == -2) then
+        elseif (bc_z%beg == BC_REFLECTIVE) then
             do i = 1, buff_size
                 dz(-i) = dz(i - 1)
             end do
-        elseif (bc_z%beg == -1) then
+        elseif (bc_z%beg == BC_PERIODIC) then
             do i = 1, buff_size
                 dz(-i) = dz(p - (i - 1))
             end do
@@ -1118,15 +1140,15 @@ contains
         ! coordinate direction, based on desired boundary condition. These
         ! include, in order, ghost-cell extrapolation, symmetry, periodic,
         ! and processor boundary conditions.
-        if (bc_z%end <= -3) then
+        if (bc_z%end <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dz(p + i) = dz(p)
             end do
-        elseif (bc_z%end == -2) then
+        elseif (bc_z%end == BC_REFLECTIVE) then
             do i = 1, buff_size
                 dz(p + i) = dz(p - (i - 1))
             end do
-        elseif (bc_z%end == -1) then
+        elseif (bc_z%end == BC_PERIODIC) then
             do i = 1, buff_size
                 dz(p + i) = dz(i - 1)
             end do
@@ -1463,7 +1485,6 @@ contains
 
 
         call s_initialize_mpi_common_module()
-        call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
         if (grid_geometry == 3) call s_initialize_fftw_module()
         call s_initialize_riemann_solvers_module()
@@ -1501,6 +1522,7 @@ contains
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
+        call s_initialize_boundary_common_module()
 
         ! Reading in the user provided initial condition and grid data
         call s_read_data_files(q_cons_ts(1)%vf)
@@ -1662,8 +1684,8 @@ contains
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_common_module()
-        call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
+        call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (bubbles_lagrange) call s_finalize_lagrangian_solver()
         if (viscous) then

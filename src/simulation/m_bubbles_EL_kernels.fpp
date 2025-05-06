@@ -156,8 +156,7 @@ contains
                             if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
 
                             ! Relocate cells for bubbles intersecting symmetric boundaries
-                            if (bc_x%beg == -2 .or. bc_x%end == -2 .or. bc_y%beg == -2 .or. bc_y%end == -2 &
-                                .or. bc_z%beg == -2 .or. bc_z%end == -2) then
+                            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
                                 call s_shift_cell_symmetric_bc(cellaux, cell)
                             end if
                         else
@@ -316,27 +315,27 @@ contains
         integer, dimension(3), intent(in) :: cell
 
         ! x-dir
-        if (bc_x%beg == -2 .and. (cell(1) <= mapCells - 1)) then
+        if (bc_x%beg == BC_REFLECTIVE .and. (cell(1) <= mapCells - 1)) then
             cellaux(1) = abs(cellaux(1)) - 1
         end if
-        if (bc_x%end == -2 .and. (cell(1) >= m + 1 - mapCells)) then
+        if (bc_x%end == BC_REFLECTIVE .and. (cell(1) >= m + 1 - mapCells)) then
             cellaux(1) = cellaux(1) - (2*(cellaux(1) - m) - 1)
         end if
 
         !y-dir
-        if (bc_y%beg == -2 .and. (cell(2) <= mapCells - 1)) then
+        if (bc_y%beg == BC_REFLECTIVE .and. (cell(2) <= mapCells - 1)) then
             cellaux(2) = abs(cellaux(2)) - 1
         end if
-        if (bc_y%end == -2 .and. (cell(2) >= n + 1 - mapCells)) then
+        if (bc_y%end == BC_REFLECTIVE .and. (cell(2) >= n + 1 - mapCells)) then
             cellaux(2) = cellaux(2) - (2*(cellaux(2) - n) - 1)
         end if
 
         if (p > 0) then
             !z-dir
-            if (bc_z%beg == -2 .and. (cell(3) <= mapCells - 1)) then
+            if (bc_z%beg == BC_REFLECTIVE .and. (cell(3) <= mapCells - 1)) then
                 cellaux(3) = abs(cellaux(3)) - 1
             end if
-            if (bc_z%end == -2 .and. (cell(3) >= p + 1 - mapCells)) then
+            if (bc_z%end == BC_REFLECTIVE .and. (cell(3) >= p + 1 - mapCells)) then
                 cellaux(3) = cellaux(3) - (2*(cellaux(3) - p) - 1)
             end if
         end if

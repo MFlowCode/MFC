@@ -19,7 +19,7 @@ module m_bubbles_EL
 
     use m_compile_specific
 
-    use m_boundary_conditions
+    use m_boundary_common
 
     use m_sim_helpers
 
@@ -318,13 +318,13 @@ contains
         call s_locate_cell(mtn_pos(bub_id, 1:3, 1), cell, mtn_s(bub_id, 1:3, 1))
 
         ! Check if the bubble is located in the ghost cell of a symmetric boundary
-        if (bc_x%beg == -2 .and. cell(1) < 0) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_x%beg)."
-        if (bc_x%end == -2 .and. cell(1) > m) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_x%end)."
-        if (bc_y%beg == -2 .and. cell(2) < 0) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_y%beg)."
-        if (bc_y%end == -2 .and. cell(2) > n) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_y%end)."
+        if (bc_x%beg == BC_REFLECTIVE .and. cell(1) < 0) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_x%beg)."
+        if (bc_x%end == BC_REFLECTIVE .and. cell(1) > m) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_x%end)."
+        if (bc_y%beg == BC_REFLECTIVE .and. cell(2) < 0) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_y%beg)."
+        if (bc_y%end == BC_REFLECTIVE .and. cell(2) > n) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_y%end)."
         if (p > 0) then
-            if (bc_z%beg == -2 .and. cell(3) < 0) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_z%beg)."
-            if (bc_z%end == -2 .and. cell(3) > p) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_z%end)."
+            if (bc_z%beg == BC_REFLECTIVE .and. cell(3) < 0) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_z%beg)."
+            if (bc_z%end == BC_REFLECTIVE .and. cell(3) > p) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_z%end)."
         end if
 
         ! If particle is in the ghost cells, find the closest non-ghost cell
@@ -1224,24 +1224,24 @@ contains
         end if
 
         ! For symmetric boundary condition
-        if (bc_x%beg == -2) then
+        if (bc_x%beg == BC_REFLECTIVE) then
             particle_in_domain = (particle_in_domain .and. (pos_part(1) >= x_cb(-1)))
         end if
-        if (bc_x%end == -2) then
+        if (bc_x%end == BC_REFLECTIVE) then
             particle_in_domain = (particle_in_domain .and. (pos_part(1) < x_cb(m)))
         end if
-        if (bc_y%beg == -2 .and. (.not. cyl_coord)) then
+        if (bc_y%beg == BC_REFLECTIVE .and. (.not. cyl_coord)) then
             particle_in_domain = (particle_in_domain .and. (pos_part(2) >= y_cb(-1)))
         end if
-        if (bc_y%end == -2 .and. (.not. cyl_coord)) then
+        if (bc_y%end == BC_REFLECTIVE .and. (.not. cyl_coord)) then
             particle_in_domain = (particle_in_domain .and. (pos_part(2) < y_cb(n)))
         end if
 
         if (p > 0) then
-            if (bc_z%beg == -2) then
+            if (bc_z%beg == BC_REFLECTIVE) then
                 particle_in_domain = (particle_in_domain .and. (pos_part(3) >= z_cb(-1)))
             end if
-            if (bc_z%end == -2) then
+            if (bc_z%end == BC_REFLECTIVE) then
                 particle_in_domain = (particle_in_domain .and. (pos_part(3) < z_cb(p)))
             end if
         end if
