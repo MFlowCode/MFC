@@ -71,7 +71,7 @@ contains
                 i_halo_size = -1 + gp_layers
             end if
 
-            !$acc declare create(i_halo_size)
+            !$acc update device(i_halo_size)
             @:ALLOCATE(ib_buff_send(0:i_halo_size), ib_buff_recv(0:i_halo_size))
         end if
 #endif
@@ -342,12 +342,12 @@ contains
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
                 #:if rdma_mpi
-                    !$acc data attach(p_send, p_recv)
-                    !$acc host_data use_device(p_send, p_recv)
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
                     call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
                 #:else
                     call nvtxStartRange("RHS-COMM-DEV2HOST")
-                    !$acc update host(buff_send)
+                    !$acc update host(ib_buff_send)
                     call nvtxEndRange
                     call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
                 #:endif
@@ -365,7 +365,7 @@ contains
                     !$acc wait
                 #:else
                     call nvtxStartRange("RHS-COMM-HOST2DEV")
-                    !$acc update device(buff_recv)
+                    !$acc update device(ib_buff_recv)
                     call nvtxEndRange
                 #:endif
             end if
