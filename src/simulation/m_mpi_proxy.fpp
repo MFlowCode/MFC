@@ -44,8 +44,10 @@ module m_mpi_proxy
 
     !> @name Generic flags used to identify and report MPI errors
     !> @{
-    integer, private :: err_code, ierr, i_halo_size
+    integer, private :: err_code, ierr
     !> @}
+
+    integer :: i_halo_size
     !$acc declare create(i_halo_size)
 
 contains
@@ -70,9 +72,7 @@ contains
             end if
 
             !$acc declare create(i_halo_size)
-
             @:ALLOCATE(ib_buff_send(0:i_halo_size), ib_buff_recv(0:i_halo_size))
-
         end if
 #endif
 
@@ -235,11 +235,11 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
-    subroutine s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers, mpi_dir, pbc_loc)
+    subroutine s_mpi_sendrecv_ib_buffers(ib_markers, mpi_dir, pbc_loc)
 
         type(integer_field), intent(inout) :: ib_markers
 
-        integer, intent(in) :: gp_layers, mpi_dir, pbc_loc
+        integer, intent(in) :: mpi_dir, pbc_loc
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
 
@@ -261,8 +261,8 @@ contains
 
         buffer_counts = (/ &
                         gp_layers*(n + 1)*(p + 1), &
-                        gp_layers*(m + 2*buff_size + 1)*(p + 1), &
-                        gp_layers*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
+                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
+                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1) &
                         /)
 
         buffer_count = buffer_counts(mpi_dir)
@@ -312,8 +312,8 @@ contains
                     !$acc parallel loop collapse(3) gang vector default(present) private(r)
                     do l = 0, p
                         do k = 0, gp_layers - 1
-                            do j = -buff_size, m + buff_size
-                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                            do j = -gp_layers, m + gp_layers 
+                                r = ((j + gp_layers) + (m + 2*gp_layers+ 1)* &
                                      (k + gp_layers*l))
                                 ib_buff_send(r) = ib_markers%sf(j, k + pack_offset, l)
                             end do
@@ -322,10 +322,10 @@ contains
                 #:else
                     !$acc parallel loop collapse(3) gang vector default(present) private(r)
                     do l = 0, gp_layers - 1
-                        do k = -buff_size, n + buff_size
-                            do j = -buff_size, m + buff_size
-                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                     ((k + buff_size) + (n + 2*buff_size + 1)*l))
+                        do k = -gp_layers, n + gp_layers
+                            do j = -gp_layers, m + gp_layers
+                                r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
+                                     ((k + gp_layers) + (n + 2*gp_layers + 1)*l))
                                 ib_buff_send(r) = ib_markers%sf(j, k, l + pack_offset)
                             end do
                         end do
@@ -389,8 +389,8 @@ contains
                     !$acc parallel loop collapse(3) gang vector default(present) private(r)
                     do l = 0, p
                         do k = -gp_layers, -1
-                            do j = -buff_size, m + buff_size
-                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                            do j = -gp_layers, m + gp_layers
+                                r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
                                      ((k + gp_layers) + gp_layers*l))
                                 ib_markers%sf(j, k + unpack_offset, l) = ib_buff_recv(r)
                             end do
@@ -400,10 +400,10 @@ contains
                     ! Unpacking buffer from bc_z%beg
                     !$acc parallel loop collapse(3) gang vector default(present) private(r)
                     do l = -gp_layers, -1
-                        do k = -buff_size, n + buff_size
-                            do j = -buff_size, m + buff_size
-                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                     ((k + buff_size) + (n + 2*buff_size + 1)* &
+                        do k = -gp_layers, n + gp_layers
+                            do j = -gp_layers, m + gp_layers
+                                r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
+                                     ((k + gp_layers) + (n + 2*gp_layers + 1)* &
                                      (l + gp_layers)))
                                 ib_markers%sf(j, k, l + unpack_offset) = ib_buff_recv(r)
                             end do
@@ -420,9 +420,11 @@ contains
     subroutine s_mpi_send_random_number(phi_rn, num_freq)
         integer, intent(in) :: num_freq
         real(wp), intent(inout), dimension(1:num_freq) :: phi_rn
+
 #ifdef MFC_MPI
         call MPI_BCAST(phi_rn, num_freq, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
+
     end subroutine s_mpi_send_random_number
 
     subroutine s_finalize_mpi_proxy_module()

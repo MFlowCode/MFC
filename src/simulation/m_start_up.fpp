@@ -1480,6 +1480,7 @@ contains
 
 
         call s_initialize_mpi_common_module()
+        call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
         if (grid_geometry == 3) call s_initialize_fftw_module()
         call s_initialize_riemann_solvers_module()
@@ -1686,6 +1687,7 @@ contains
         if (viscous) then
             call s_finalize_viscous_module()
         end if
+        call s_finalize_mpi_proxy_module()
 
         if (surface_tension)  call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()

@@ -85,7 +85,7 @@ contains
         !$acc update device(levelset_norm%sf)
 
         ! Get neighboring IB variables from other processors
-        call s_populate_ib_buffers(ib_markers, gp_layers)
+        call s_populate_ib_buffers(ib_markers)
 
         !$acc update host(ib_markers%sf)
 
@@ -108,15 +108,14 @@ contains
 
     end subroutine s_ibm_setup
 
-    subroutine s_populate_ib_buffers(ib_markers, gp_layers)
+    subroutine s_populate_ib_buffers(ib_markers)
 
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in) :: gp_layers
 
         #:for DIRC, DIRI in [('x', 1), ('y', 2), ('z', 3)]
             #:for LOCC, LOCI in [('beg', -1), ('end', 1)]
-                if (bc_${DIRC}$%${LOCC}$ > 0) then
-                    call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers, ${DIRI}$, ${LOCI}$)
+                if (bc_${DIRC}$%${LOCC}$ >= 0) then
+                    call s_mpi_sendrecv_ib_buffers(ib_markers, ${DIRI}$, ${LOCI}$)
                 end if
             #:endfor
         #:endfor
