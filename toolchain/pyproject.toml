@@ -38,8 +38,8 @@ dependencies = [
     "matplotlib",
 
     # Chemistry
-    "cantera==3.0.1",
-    "pyrometheus==1.0.2"
+    "cantera==3.1.0",
+    "pyrometheus@git+https://github.com/pyrometheus/pyrometheus.git@main"
 ]
 
 [tool.hatch.metadata]
