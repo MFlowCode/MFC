@@ -230,4 +230,4 @@ MFC computations have used many supercomputing systems. A partial list is below
 
 ## Contributors
 
-[![Contributors](https://contributors-img.web.app/image?repo=OWNER/REPO)](https://github.com/mflowcode/mfc/graphs/contributors)
+[![Contributors](https://contributors-img.web.app/image?repo=mflowcode/mfc)](https://github.com/mflowcode/mfc/graphs/contributors)
