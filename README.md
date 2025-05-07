@@ -226,3 +226,8 @@ MFC computations have used many supercomputing systems. A partial list is below
   * PSC Bridges(1/2), NCSA Delta, SDSC Comet and Expanse, Purdue Anvil, TACC Stampede(1-3), and TAMU ACES via ACCESS-CI allocations from Bryngelson, Colonius, Rodriguez, and more.
   * DOD systems Onyx, Carpenter, Nautilus, and Narwhal via the DOD HPCMP program
   * Sandia National Labs systems Doom and Attaway and testbed systems Weaver and Vortex
+
+
+## Contributors
+
+[![Contributors](https://contributors-img.web.app/image?repo=mflowcode/mfc)](https://github.com/mflowcode/mfc/graphs/contributors)
