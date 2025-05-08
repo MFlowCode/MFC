@@ -32,8 +32,6 @@ contains
 
     subroutine s_initialize_perturbation_module()
 
-        bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
-
         if (mixlayer_perturb) then
             mixlayer_bc_fd = 2
             nbp = n + 2

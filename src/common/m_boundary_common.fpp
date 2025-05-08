@@ -27,8 +27,6 @@ module m_boundary_common
     type(scalar_field), dimension(:, :), allocatable :: bc_buffers
     !$acc declare create(bc_buffers)
 
-    real(wp) :: bcxb, bcxe, bcyb, bcye, bczb, bcze
-
 #ifdef MFC_MPI
     integer, dimension(1:3, -1:1) :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
 #endif
@@ -42,9 +40,10 @@ module m_boundary_common
  s_read_serial_boundary_condition_files, &
  s_read_parallel_boundary_condition_files, &
  s_assign_default_bc_type, &
+ s_populate_grid_variables_buffers, &
  s_finalize_boundary_common_module
 
-    public :: bc_buffers, bcxb, bcxe, bcyb, bcye, bczb, bcze
+    public :: bc_buffers
 
 #ifdef MFC_MPI
     public :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
@@ -53,8 +52,6 @@ module m_boundary_common
 contains
 
     subroutine s_initialize_boundary_common_module()
-
-        bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
 
         @:ALLOCATE(bc_buffers(1:num_dims, -1:1))
 
@@ -89,7 +86,7 @@ contains
         integer :: k, l
 
         ! Population of Buffers in x-direction
-        if (bcxb >= 0) then
+        if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb, mv)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -113,7 +110,7 @@ contains
             end do
         end if
 
-        if (bcxe >= 0) then
+        if (bc_x%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, 1, sys_size, pb, mv)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -141,7 +138,7 @@ contains
 
         if (n == 0) return
 
-        if (bcyb >= 0) then
+        if (bc_y%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, -1, sys_size, pb, mv)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -167,7 +164,7 @@ contains
             end do
         end if
 
-        if (bcye >= 0) then
+        if (bc_y%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, 1, sys_size, pb, mv)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -195,7 +192,7 @@ contains
 
         if (p == 0) return
 
-        if (bczb >= 0) then
+        if (bc_z%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, -1, sys_size, pb, mv)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -219,7 +216,7 @@ contains
             end do
         end if
 
-        if (bcze >= 0) then
+        if (bc_z%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1, sys_size, pb, mv)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1173,7 +1170,7 @@ contains
         integer :: i, j, k, l
 
         !< x-direction
-        if (bcxb >= 0) then
+        if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 1, -1, num_dims + 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1191,7 +1188,7 @@ contains
             end do
         end if
 
-        if (bcxe >= 0) then
+        if (bc_x%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 1, 1, num_dims + 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1212,7 +1209,7 @@ contains
         if (n == 0) return
 
         !< y-direction
-        if (bcyb >= 0) then
+        if (bc_y%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 2, -1, num_dims + 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1230,7 +1227,7 @@ contains
             end do
         end if
 
-        if (bcye >= 0) then
+        if (bc_y%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 2, 1, num_dims + 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1251,7 +1248,7 @@ contains
         if (p == 0) return
 
         !< z-direction
-        if (bczb >= 0) then
+        if (bc_z%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 3, -1, num_dims + 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1269,7 +1266,7 @@ contains
             end do
         end if
 
-        if (bcze >= 0) then
+        if (bc_z%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 3, 1, num_dims + 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1789,6 +1786,195 @@ contains
         end if
 
     end subroutine s_assign_default_bc_type
+
+#ifndef MFC_PRE_PROCESS
+    !> The purpose of this subroutine is to populate the buffers
+        !!          of the grid variables, which are constituted of the cell-
+        !!          boundary locations and cell-width distributions, based on
+        !!          the boundary conditions.
+    subroutine s_populate_grid_variables_buffers
+
+        integer :: i !< Generic loop iterator
+
+#ifndef MFC_POST_PROCESS
+        ! Required for compatibiliy between codes
+        type(int_bounds_info) :: offset_x, offset_y, offset_z
+        offset_x%beg = buff_size; offset_x%end = buff_size
+        offset_y%beg = buff_size; offset_y%end = buff_size
+        offset_z%beg = buff_size; offset_z%end = buff_size
+#endif
+
+        ! Population of Buffers in x-direction
+
+        ! Populating cell-width distribution buffer at bc_x%beg
+        if (bc_x%beg >= 0) then
+            call s_mpi_sendrecv_grid_variables_buffers(1, -1)
+        elseif (bc_x%beg <= BC_GHOST_EXTRAP) then
+            do i = 1, buff_size
+                dx(-i) = dx(0)
+            end do
+        elseif (bc_x%beg == BC_REFLECTIVE) then
+            do i = 1, buff_size
+                dx(-i) = dx(i - 1)
+            end do
+        elseif (bc_x%beg == BC_PERIODIC) then
+            do i = 1, buff_size
+                dx(-i) = dx(m - (i - 1))
+            end do
+        endif
+
+        ! Computing the cell-boundary and center locations buffer at bc_x%beg
+        do i = 1, offset_x%beg
+            x_cb(-1 - i) = x_cb(-i) - dx(-i)
+        enddo
+
+        do i = 1, buff_size
+            x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
+        end do
+
+        ! Populating the cell-width distribution buffer at bc_x%end
+        if (bc_x%end >= 0) then
+            call s_mpi_sendrecv_grid_variables_buffers(1, 1)
+        elseif (bc_x%end <= BC_GHOST_EXTRAP) then
+            do i = 1, buff_size
+                dx(m + i) = dx(m)
+            end do
+        elseif (bc_x%end == BC_REFLECTIVE) then
+            do i = 1, buff_size
+                dx(m + i) = dx(m - (i - 1))
+            end do
+        elseif (bc_x%end == BC_PERIODIC) then
+            do i = 1, buff_size
+                dx(m + i) = dx(i - 1)
+            end do
+        endif
+
+        ! Populating the cell-boundary and center locations buffer at bc_x%end
+        do i = 1, offset_x%end
+            x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
+        end do
+
+        do i = 1, buff_size
+            x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
+        enddo
+        ! END: Population of Buffers in x-direction
+
+        ! Population of Buffers in y-direction
+
+        ! Populating cell-width distribution buffer at bc_y%beg
+        if (n == 0) then
+            return
+        elseif (bc_y%beg >= 0) then
+            call s_mpi_sendrecv_grid_variables_buffers(2, -1)
+        elseif (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_AXIS) then
+            do i = 1, buff_size
+                dy(-i) = dy(0)
+            end do
+        elseif (bc_y%beg == BC_REFLECTIVE .or. bc_y%beg == BC_AXIS) then
+            do i = 1, buff_size
+                dy(-i) = dy(i - 1)
+            end do
+        elseif (bc_y%beg == BC_PERIODIC) then
+            do i = 1, buff_size
+                dy(-i) = dy(n - (i - 1))
+            end do
+        endif
+
+        ! Computing the cell-boundary and center locations buffer at bc_y%beg
+        do i = 1, offset_y%beg
+            y_cb(-1 - i) = y_cb(-i) - dy(-i)
+        enddo
+
+        do i = 1, buff_size
+            y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
+        enddo
+
+        ! Populating the cell-width distribution buffer at bc_y%end
+        if (bc_y%end >= 0) then
+            call s_mpi_sendrecv_grid_variables_buffers(2, 1)
+        elseif (bc_y%end <= BC_GHOST_EXTRAP) then
+            do i = 1, buff_size
+                dy(n + i) = dy(n)
+            end do
+        elseif (bc_y%end == BC_REFLECTIVE) then
+            do i = 1, buff_size
+                dy(n + i) = dy(n - (i - 1))
+            end do
+        elseif (bc_y%end == BC_PERIODIC) then
+            do i = 1, buff_size
+                dy(n + i) = dy(i - 1)
+            end do
+        endif
+
+        ! Populating the cell-boundary and center locations buffer at bc_y%end
+        do i = 1, offset_y%end
+            y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
+        enddo
+
+        do i = 1, buff_size
+            y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
+        end do
+        ! END: Population of Buffers in y-direction
+
+        ! Population of Buffers in z-direction
+
+        ! Populating cell-width distribution buffer at bc_z%beg
+        if (p == 0) then
+            return
+        elseif (Bc_z%beg >= 0) then
+            call s_mpi_sendrecv_grid_variables_buffers(3, -1)
+        elseif (bc_z%beg <= BC_GHOST_EXTRAP) then
+            do i = 1, buff_size
+                dz(-i) = dz(0)
+            end do
+        elseif (bc_z%beg == BC_REFLECTIVE) then
+            do i = 1, buff_size
+                dz(-i) = dz(i - 1)
+            end do
+        elseif (bc_z%beg == BC_PERIODIC) then
+            do i = 1, buff_size
+                dz(-i) = dz(p - (i - 1))
+            end do
+        endif
+
+        ! Computing the cell-boundary and center locations buffer at bc_z%beg
+        do i = 1, offset_z%beg
+            z_cb(-1 - i) = z_cb(-i) - dz(-i)
+        enddo
+
+        do i = 1, buff_size
+            z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
+        enddo
+
+        ! Populating the cell-width distribution buffer at bc_z%end
+        if (bc_z%end >= 0) then
+            call s_mpi_sendrecv_grid_variables_buffers(3, 1)
+        elseif (bc_z%end <= BC_GHOST_EXTRAP) then
+            do i = 1, buff_size
+                dz(p + i) = dz(p)
+            end do
+        elseif (bc_z%end == BC_REFLECTIVE) then
+            do i = 1, buff_size
+                dz(p + i) = dz(p - (i - 1))
+            end do
+        elseif (bc_z%end == BC_PERIODIC) then
+            do i = 1, buff_size
+                dz(p + i) = dz(i - 1)
+            end do
+        endif
+
+        ! Populating the cell-boundary and center locations buffer at bc_z%end
+        do i = 1, buff_size
+            z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
+        enddo
+
+        do i = 1, buff_size
+            z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
+        enddo
+        ! END: Population of Buffers in z-direction
+
+    end subroutine s_populate_grid_variables_buffers
+#endif
 
     subroutine s_finalize_boundary_common_module()
 

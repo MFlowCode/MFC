@@ -182,7 +182,7 @@ contains
 
         ! Populating the buffer regions of the grid and conservative variables
         if (buff_size > 0) then
-            call s_populate_grid_variables_buffer_regions()
+            call s_populate_grid_variables_buffers()
             call s_populate_variables_buffers(bc_type, q_cons_vf)
         end if
 
@@ -694,13 +694,15 @@ contains
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
-        if (bubbles_euler .and. nb > 1) then
-            call s_simpson
-        end if
+        if (bubbles_euler .and. nb > 1) call s_simpson
         if (bubbles_euler .and. .not. polytropic) then
             call s_initialize_nonpoly()
         end if
-        if (num_procs > 1) call s_initialize_mpi_proxy_module()
+        if (num_procs > 1) then 
+            call s_initialize_mpi_proxy_module()
+            call s_initialize_mpi_common_module()
+        endif
+        call s_initialize_boundary_common_module()
         call s_initialize_variables_conversion_module()
         call s_initialize_data_input_module()
         call s_initialize_derived_variables_module()
@@ -753,7 +755,10 @@ contains
         call s_finalize_derived_variables_module()
         call s_finalize_data_input_module()
         call s_finalize_variables_conversion_module()
-        if (num_procs > 1) call s_finalize_mpi_proxy_module()
+        if (num_procs > 1) then
+            call s_finalize_mpi_proxy_module()
+            call s_finalize_mpi_common_module()
+        endif
         call s_finalize_global_parameters_module()
 
         ! Finalizing the MPI environment
