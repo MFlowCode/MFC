@@ -44,7 +44,7 @@ module m_mpi_proxy
 
     !> @name Generic flags used to identify and report MPI errors
     !> @{
-    integer, private :: err_code, ierr
+    integer, private :: ierr
     !> @}
 
     integer :: i_halo_size

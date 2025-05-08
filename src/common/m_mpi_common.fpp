@@ -24,7 +24,7 @@ module m_mpi_common
 
     implicit none
 
-    integer, private :: err_code, ierr, v_size !<
+    integer, private :: ierr, v_size !<
     !$acc declare create(v_size)
     !! Generic flags used to identify and report MPI errors
 
@@ -123,24 +123,11 @@ contains
     !! @param beta Eulerian void fraction from lagrangian bubbles
     subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta)
 
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(in) :: q_cons_vf
-
-        type(integer_field), &
-            optional, &
-            intent(in) :: ib_markers
-
-        type(levelset_field), &
-            optional, &
-            intent(IN) :: levelset
-
-        type(levelset_norm_field), &
-            optional, &
-            intent(IN) :: levelset_norm
-
-        type(scalar_field), &
-            intent(in), optional :: beta
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(integer_field), optional, intent(in) :: ib_markers
+        type(levelset_field), optional, intent(IN) :: levelset
+        type(levelset_norm_field), optional, intent(IN) :: levelset_norm
+        type(scalar_field), intent(in), optional :: beta
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start

@@ -23,20 +23,8 @@ module m_mpi_proxy
 
     implicit none
 
-    integer, private :: err_code, ierr, v_size !<
-        !! Generic flags used to identify and report MPI errors
-
-    real(wp), private, allocatable, dimension(:), target :: q_prims_buff_send !<
-        !! This variable is utilized to pack and send the buffer of the cell-average
-        !! primitive variables, for a single computational domain boundary at the
-        !! time, to the relevant neighboring processor.
-
-    real(wp), private, allocatable, dimension(:), target :: q_prims_buff_recv !<
-        !! q_prims_buff_recv is utilized to receive and unpack the buffer of the cell-
-        !! average primitive variables, for a single computational domain boundary
-        !! at the time, from the relevant neighboring processor.
-
-    ! integer :: halo_size
+    integer, private :: ierr !<
+    !! Generic flag used to identify and report MPI errors
 
 contains
     !> Since only processor with rank 0 is in charge of reading

@@ -23,14 +23,6 @@ module m_mpi_proxy
 
     implicit none
 
-    !> @name Buffers of the conservative variables received/sent from/to neighboring
-    !! processors. Note that these variables are structured as vectors rather
-    !! than arrays.
-    !> @{
-    real(wp), allocatable, dimension(:) :: q_cons_buffer_in
-    real(wp), allocatable, dimension(:) :: q_cons_buffer_out
-    !> @}
-
     !> @name Receive counts and displacement vector variables, respectively, used in
     !! enabling MPI to gather varying amounts of data from all processes to the
     !! root process
@@ -41,7 +33,7 @@ module m_mpi_proxy
 
     !> @name Generic flags used to identify and report MPI errors
     !> @{
-    integer, private :: err_code, ierr
+    integer, private :: ierr
     !> @}
 
 contains
@@ -53,61 +45,6 @@ contains
 #ifdef MFC_MPI
 
         integer :: i !< Generic loop iterator
-
-        ! Allocating vectorized buffer regions of conservative variables.
-        ! The length of buffer vectors are set according to the size of the
-        ! largest buffer region in the sub-domain.
-        if (buff_size > 0) then
-
-            ! Simulation is at least 2D
-            if (n > 0) then
-
-                ! Simulation is 3D
-                if (p > 0) then
-
-                    allocate (q_cons_buffer_in(0:buff_size* &
-                                               sys_size* &
-                                               (m + 2*buff_size + 1)* &
-                                               (n + 2*buff_size + 1)* &
-                                               (p + 2*buff_size + 1)/ &
-                                               (min(m, n, p) &
-                                                + 2*buff_size + 1) - 1))
-                    allocate (q_cons_buffer_out(0:buff_size* &
-                                                sys_size* &
-                                                (m + 2*buff_size + 1)* &
-                                                (n + 2*buff_size + 1)* &
-                                                (p + 2*buff_size + 1)/ &
-                                                (min(m, n, p) &
-                                                 + 2*buff_size + 1) - 1))
-
-                    ! Simulation is 2D
-                else
-
-                    allocate (q_cons_buffer_in(0:buff_size* &
-                                               sys_size* &
-                                               (max(m, n) &
-                                                + 2*buff_size + 1) - 1))
-                    allocate (q_cons_buffer_out(0:buff_size* &
-                                                sys_size* &
-                                                (max(m, n) &
-                                                 + 2*buff_size + 1) - 1))
-
-                end if
-
-                ! Simulation is 1D
-            else
-
-                allocate (q_cons_buffer_in(0:buff_size*sys_size - 1))
-                allocate (q_cons_buffer_out(0:buff_size*sys_size - 1))
-
-            end if
-
-            ! Initially zeroing out the vectorized buffer region variables
-            ! to avoid possible underflow from any unused allocated memory
-            q_cons_buffer_in = 0._wp
-            q_cons_buffer_out = 0._wp
-
-        end if
 
         ! Allocating and configuring the receive counts and the displacement
         ! vector variables used in variable-gather communication procedures.
@@ -366,10 +303,7 @@ contains
     subroutine s_mpi_gather_data_extents(q_sf, data_extents)
 
         real(wp), dimension(:, :, :), intent(in) :: q_sf
-
-        real(wp), &
-            dimension(1:2, 0:num_procs - 1), &
-            intent(inout) :: data_extents
+        real(wp), dimension(1:2, 0:num_procs - 1), intent(inout) :: data_extents
 
 #ifdef MFC_MPI
 
@@ -395,13 +329,8 @@ contains
         !!  @param q_root_sf Flow variable defined on the entire computational domain
     subroutine s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
 
-        real(wp), &
-            dimension(0:m), &
-            intent(in) :: q_sf
-
-        real(wp), &
-            dimension(0:m), &
-            intent(inout) :: q_root_sf
+        real(wp), dimension(0:m), intent(in) :: q_sf
+        real(wp), dimension(0:m), intent(inout) :: q_root_sf
 
 #ifdef MFC_MPI
 
@@ -420,12 +349,6 @@ contains
     subroutine s_finalize_mpi_proxy_module
 
 #ifdef MFC_MPI
-
-        ! Deallocating the conservative variables buffer vectors
-        if (buff_size > 0) then
-            deallocate (q_cons_buffer_in)
-            deallocate (q_cons_buffer_out)
-        end if
 
         ! Deallocating the receive counts and the displacement vector
         ! variables used in variable-gather communication procedures
