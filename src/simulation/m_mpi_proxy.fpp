@@ -58,7 +58,7 @@ contains
         if (ib) then
             if (n > 0) then
                 if (p > 0) then
-                    i_halo_size = -1 + gp_layers * &
+                    i_halo_size = -1 + gp_layers* &
                                             & (m + 2*gp_layers + 1)* &
                                             & (n + 2*gp_layers + 1)* &
                                             & (p + 2*gp_layers + 1)/ &
@@ -303,7 +303,7 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, gp_layers - 1
-                                r = (j + gp_layers * (k + (n + 1) * l))
+                                r = (j + gp_layers*(k + (n + 1)*l))
                                 ib_buff_send(r) = ib_markers%sf(j + pack_offset, k, l)
                             end do
                         end do
@@ -312,8 +312,8 @@ contains
                     !$acc parallel loop collapse(3) gang vector default(present) private(r)
                     do l = 0, p
                         do k = 0, gp_layers - 1
-                            do j = -gp_layers, m + gp_layers 
-                                r = ((j + gp_layers) + (m + 2*gp_layers+ 1)* &
+                            do j = -gp_layers, m + gp_layers
+                                r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
                                      (k + gp_layers*l))
                                 ib_buff_send(r) = ib_markers%sf(j, k + pack_offset, l)
                             end do
@@ -380,7 +380,7 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = -gp_layers, -1
-                                r = (j + gp_layers * ((k + 1) + (n + 1) * l))
+                                r = (j + gp_layers*((k + 1) + (n + 1)*l))
                                 ib_markers%sf(j + unpack_offset, k, l) = ib_buff_recv(r)
                             end do
                         end do
@@ -404,7 +404,7 @@ contains
                             do j = -gp_layers, m + gp_layers
                                 r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
                                      ((k + gp_layers) + (n + 2*gp_layers + 1)* &
-                                     (l + gp_layers)))
+                                      (l + gp_layers)))
                                 ib_markers%sf(j, k, l + unpack_offset) = ib_buff_recv(r)
                             end do
                         end do

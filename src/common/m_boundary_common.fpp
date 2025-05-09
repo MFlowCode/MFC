@@ -21,11 +21,10 @@ module m_boundary_common
 
     use m_compile_specific
 
-
     implicit none
 
     type(scalar_field), dimension(:, :), allocatable :: bc_buffers
-    !$acc declare create(bc_buffers)
+!$acc declare create(bc_buffers)
 
 #ifdef MFC_MPI
     integer, dimension(1:3, -1:1) :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
@@ -1787,7 +1786,6 @@ contains
 
     end subroutine s_assign_default_bc_type
 
-#ifndef MFC_PRE_PROCESS
     !> The purpose of this subroutine is to populate the buffers
         !!          of the grid variables, which are constituted of the cell-
         !!          boundary locations and cell-width distributions, based on
@@ -1796,14 +1794,15 @@ contains
 
         integer :: i !< Generic loop iterator
 
-#ifndef MFC_POST_PROCESS
-        ! Required for compatibiliy between codes
+#ifdef MFC_SIMULATION
+        ! Required for compatibility between codes
         type(int_bounds_info) :: offset_x, offset_y, offset_z
         offset_x%beg = buff_size; offset_x%end = buff_size
         offset_y%beg = buff_size; offset_y%end = buff_size
         offset_z%beg = buff_size; offset_z%end = buff_size
 #endif
 
+#ifndef MFC_PRE_PROCESS
         ! Population of Buffers in x-direction
 
         ! Populating cell-width distribution buffer at bc_x%beg
@@ -1821,12 +1820,12 @@ contains
             do i = 1, buff_size
                 dx(-i) = dx(m - (i - 1))
             end do
-        endif
+        end if
 
         ! Computing the cell-boundary and center locations buffer at bc_x%beg
         do i = 1, offset_x%beg
             x_cb(-1 - i) = x_cb(-i) - dx(-i)
-        enddo
+        end do
 
         do i = 1, buff_size
             x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
@@ -1847,7 +1846,7 @@ contains
             do i = 1, buff_size
                 dx(m + i) = dx(i - 1)
             end do
-        endif
+        end if
 
         ! Populating the cell-boundary and center locations buffer at bc_x%end
         do i = 1, offset_x%end
@@ -1856,7 +1855,7 @@ contains
 
         do i = 1, buff_size
             x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
-        enddo
+        end do
         ! END: Population of Buffers in x-direction
 
         ! Population of Buffers in y-direction
@@ -1878,16 +1877,16 @@ contains
             do i = 1, buff_size
                 dy(-i) = dy(n - (i - 1))
             end do
-        endif
+        end if
 
         ! Computing the cell-boundary and center locations buffer at bc_y%beg
         do i = 1, offset_y%beg
             y_cb(-1 - i) = y_cb(-i) - dy(-i)
-        enddo
+        end do
 
         do i = 1, buff_size
             y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
-        enddo
+        end do
 
         ! Populating the cell-width distribution buffer at bc_y%end
         if (bc_y%end >= 0) then
@@ -1904,12 +1903,12 @@ contains
             do i = 1, buff_size
                 dy(n + i) = dy(i - 1)
             end do
-        endif
+        end if
 
         ! Populating the cell-boundary and center locations buffer at bc_y%end
         do i = 1, offset_y%end
             y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
-        enddo
+        end do
 
         do i = 1, buff_size
             y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
@@ -1935,16 +1934,16 @@ contains
             do i = 1, buff_size
                 dz(-i) = dz(p - (i - 1))
             end do
-        endif
+        end if
 
         ! Computing the cell-boundary and center locations buffer at bc_z%beg
         do i = 1, offset_z%beg
             z_cb(-1 - i) = z_cb(-i) - dz(-i)
-        enddo
+        end do
 
         do i = 1, buff_size
             z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
-        enddo
+        end do
 
         ! Populating the cell-width distribution buffer at bc_z%end
         if (bc_z%end >= 0) then
@@ -1961,20 +1960,21 @@ contains
             do i = 1, buff_size
                 dz(p + i) = dz(i - 1)
             end do
-        endif
+        end if
 
         ! Populating the cell-boundary and center locations buffer at bc_z%end
         do i = 1, buff_size
             z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
-        enddo
+        end do
 
         do i = 1, buff_size
             z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
-        enddo
+        end do
         ! END: Population of Buffers in z-direction
 
-    end subroutine s_populate_grid_variables_buffers
 #endif
+
+    end subroutine s_populate_grid_variables_buffers
 
     subroutine s_finalize_boundary_common_module()
 

@@ -123,7 +123,7 @@ contains
             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. &
                 num_bc_patches > 0) then
                 bc_io = .true.
-            endif
+            end if
 
         else
             call s_mpi_abort('File post_process.inp is missing. Exiting.')
@@ -698,10 +698,10 @@ contains
         if (bubbles_euler .and. .not. polytropic) then
             call s_initialize_nonpoly()
         end if
-        if (num_procs > 1) then 
+        if (num_procs > 1) then
             call s_initialize_mpi_proxy_module()
             call s_initialize_mpi_common_module()
-        endif
+        end if
         call s_initialize_boundary_common_module()
         call s_initialize_variables_conversion_module()
         call s_initialize_data_input_module()
@@ -758,7 +758,7 @@ contains
         if (num_procs > 1) then
             call s_finalize_mpi_proxy_module()
             call s_finalize_mpi_common_module()
-        endif
+        end if
         call s_finalize_global_parameters_module()
 
         ! Finalizing the MPI environment

@@ -40,8 +40,9 @@ module m_mpi_common
 
     !$acc declare create(buff_send, buff_recv)
 
-    integer :: halo_size
-    !$acc declare create(halo_size)
+    integer :: halo_size, nVars
+    !$acc declare create(halo_size, nVars)
+
 
 contains
 

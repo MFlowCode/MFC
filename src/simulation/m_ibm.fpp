@@ -85,7 +85,7 @@ contains
         !$acc update device(levelset_norm%sf)
 
         ! Get neighboring IB variables from other processors
-        call s_populate_ib_buffers(ib_markers)
+        call s_populate_ib_buffers()
 
         !$acc update host(ib_markers%sf)
 
@@ -108,9 +108,7 @@ contains
 
     end subroutine s_ibm_setup
 
-    subroutine s_populate_ib_buffers(ib_markers)
-
-        type(integer_field), intent(inout) :: ib_markers
+    subroutine s_populate_ib_buffers()
 
         #:for DIRC, DIRI in [('x', 1), ('y', 2), ('z', 3)]
             #:for LOCC, LOCI in [('beg', -1), ('end', 1)]
