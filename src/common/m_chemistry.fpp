@@ -9,7 +9,7 @@
 module m_chemistry
 
     use m_thermochem, only: &
-        num_species, mol_weights, get_temperature, get_net_production_rates
+        num_species, molecular_weights, get_temperature, get_net_production_rates
 
     use m_global_parameters
 
@@ -91,7 +91,7 @@ contains
                     !$acc loop seq
                     do eqn = chemxb, chemxe
 
-                        omega_m = mol_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+                        omega_m = molecular_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
 
                         rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
 
