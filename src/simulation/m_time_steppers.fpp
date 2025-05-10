@@ -32,8 +32,6 @@ module m_time_steppers
 
     use m_boundary_common
 
-    use m_boundary_conditions
-
     use m_helper
 
     use m_sim_helpers
