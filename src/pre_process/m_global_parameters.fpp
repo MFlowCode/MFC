@@ -267,10 +267,6 @@ module m_global_parameters
     integer :: chemxb, chemxe
     !> @}
 
-    !> @ lagrangian solver parameters
-    logical :: rkck_adap_dt
-    !> @}
-
     integer, allocatable, dimension(:, :, :) :: logic_grid
 
     type(pres_field) :: pb
@@ -544,9 +540,6 @@ contains
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%G = 0._wp
         end do
-
-        ! Lagrangian solver
-        rkck_adap_dt = .false.
 
         Bx0 = dflt_real
 
