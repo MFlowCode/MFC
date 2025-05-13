@@ -544,20 +544,8 @@ contains
         end if
 
         ! Adding the vorticity to the formatted database file
-        if (p > 0) then
-            do i = 1, num_vels
-                if (omega_wrt(i)) then
-
-                    call s_derive_vorticity_component(i, q_prim_vf, q_sf)
-
-                    write (varname, '(A,I0)') 'omega', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                    varname(:) = ' '
-                end if
-            end do
-        elseif (n > 0) then
-            do i = 1, num_vels
+        if (n > 0) then
+            do i = 1, 3
                 if (omega_wrt(i)) then
 
                     call s_derive_vorticity_component(i, q_prim_vf, q_sf)

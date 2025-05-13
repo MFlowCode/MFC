@@ -325,8 +325,10 @@ contains
 
         real(wp) :: ptilde_L, ptilde_R
         real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
+        real(wp) :: vel_L_tmp, vel_R_tmp
         real(wp) :: Ms_L, Ms_R, pres_SL, pres_SR
         real(wp) :: alpha_L_sum, alpha_R_sum
+        real(wp) :: zcoef, pcorr !< low Mach number correction
 
         type(riemann_states) :: c_fast, pres_mag
         type(riemann_states_vec3) :: B
@@ -738,7 +740,7 @@ contains
                                                (pres_L - pres_R)/ &
                                                (rho_avg*c_avg))
                             end if
-
+                            
                             s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                             xi_M = (5e-1_wp + sign(5e-1_wp, s_L)) &
@@ -748,6 +750,10 @@ contains
                                    + (5e-1_wp - sign(5e-1_wp, s_L)) &
                                    *(5e-1_wp + sign(5e-1_wp, s_R))
 
+                            if (low_Mach == 1) then
+                                @:compute_low_Mach_correction()
+                            end if
+    
                             ! Mass
                             if (.not. relativity) then
                                 !$acc loop seq
@@ -852,7 +858,8 @@ contains
                                                 + dir_flg(dir_idx(i))*(pres_L - ptilde_L)) &
                                          + s_M*s_P*(rho_L*vel_L(dir_idx(i)) &
                                                     - rho_R*vel_R(dir_idx(i)))) &
-                                        /(s_M - s_P)
+                                        /(s_M - s_P) &
+                                        + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R(dir_idx(i)) - vel_L(dir_idx(i)))
                                 end do
                             else if (hypoelasticity) then
                                 !$acc loop seq
@@ -882,7 +889,8 @@ contains
                                                 + dir_flg(dir_idx(i))*pres_L) &
                                          + s_M*s_P*(rho_L*vel_L(dir_idx(i)) &
                                                     - rho_R*vel_R(dir_idx(i)))) &
-                                        /(s_M - s_P)
+                                        /(s_M - s_P) &
+                                        + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R(dir_idx(i)) - vel_L(dir_idx(i)))
                                 end do
                             end if
 
@@ -907,7 +915,8 @@ contains
                                     (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
                                      + s_M*s_P*(E_L - E_R)) &
-                                    /(s_M - s_P)
+                                    /(s_M - s_P) &
+                                    + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R_rms - vel_L_rms)/2._wp
                             else if (hypoelasticity) then
                                 !TODO: simplify this so it's not split into 3
                                 if (num_dims == 1) then
@@ -946,7 +955,8 @@ contains
                                     (s_M*vel_R(dir_idx(1))*(E_R + pres_R) &
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L) &
                                      + s_M*s_P*(E_L - E_R)) &
-                                    /(s_M - s_P)
+                                    /(s_M - s_P) &
+                                    + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R_rms - vel_L_rms)/2._wp
                             end if
 
                             ! Elastic Stresses
@@ -2252,8 +2262,6 @@ contains
 
                                 if (low_Mach == 1) then
                                     @:compute_low_Mach_correction()
-                                else
-                                    pcorr = 0._wp
                                 end if
 
                                 !$acc loop seq
@@ -2731,8 +2739,6 @@ contains
                                 ! MASS FLUX.
                                 if (low_Mach == 1) then
                                     @:compute_low_Mach_correction()
-                                else
-                                    pcorr = 0._wp
                                 end if
 
                                 !$acc loop seq
