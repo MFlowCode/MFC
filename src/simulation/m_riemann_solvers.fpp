@@ -740,7 +740,7 @@ contains
                                                (pres_L - pres_R)/ &
                                                (rho_avg*c_avg))
                             end if
-                            
+
                             s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                             xi_M = (5e-1_wp + sign(5e-1_wp, s_L)) &
@@ -752,8 +752,10 @@ contains
 
                             if (low_Mach == 1) then
                                 @:compute_low_Mach_correction()
+                            else
+                                pcorr = 0._wp
                             end if
-    
+
                             ! Mass
                             if (.not. relativity) then
                                 !$acc loop seq
@@ -2262,6 +2264,8 @@ contains
 
                                 if (low_Mach == 1) then
                                     @:compute_low_Mach_correction()
+                                else
+                                    pcorr = 0._wp
                                 end if
 
                                 !$acc loop seq
@@ -2739,6 +2743,8 @@ contains
                                 ! MASS FLUX.
                                 if (low_Mach == 1) then
                                     @:compute_low_Mach_correction()
+                                else
+                                    pcorr = 0._wp
                                 end if
 
                                 !$acc loop seq

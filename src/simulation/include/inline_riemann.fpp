@@ -84,7 +84,7 @@
         pcorr = 0._wp
 
         if (low_Mach == 1) then
-            pcorr = - (s_P - s_M)*(rho_L + rho_R)/8._wp*(zcoef - 1._wp)
+            pcorr = -(s_P - s_M)*(rho_L + rho_R)/8._wp*(zcoef - 1._wp)
         end if
 
     else if (riemann_solver == 2) then
