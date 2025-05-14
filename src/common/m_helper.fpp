@@ -286,7 +286,7 @@ contains
     !! @param a First vector.
     !! @param b Second vector.
     !! @return The cross product of the two vectors.
-    function f_cross(a, b) result(c)
+    pure function f_cross(a, b) result(c)
 
         real(wp), dimension(3), intent(in) :: a, b
         real(wp), dimension(3) :: c
@@ -312,7 +312,7 @@ contains
     !> This procedure creates a transformation matrix.
     !! @param  p Parameters for the transformation.
     !! @return Transformation matrix.
-    function f_create_transform_matrix(p, center) result(out_matrix)
+    pure function f_create_transform_matrix(p, center) result(out_matrix)
 
         type(ic_model_parameters), intent(in) :: p
         t_vec3, optional, intent(in) :: center
@@ -424,7 +424,7 @@ contains
     !> This procedure creates a bounding box for a model.
     !! @param model Model to create bounding box for.
     !! @return Bounding box.
-    function f_create_bbox(model) result(bbox)
+    pure function f_create_bbox(model) result(bbox)
 
         type(t_model), intent(in) :: model
         type(t_bbox) :: bbox
@@ -449,7 +449,11 @@ contains
 
     end function f_create_bbox
 
-    function f_xor(lhs, rhs) result(res)
+    !> This procedure performs xor on lhs and rhs.
+    !! @param lhs logical input.
+    !! @param rhs other logical input.
+    !! @return xored result.
+    elemental function f_xor(lhs, rhs) result(res)
 
         logical, intent(in) :: lhs, rhs
         logical :: res
@@ -457,7 +461,10 @@ contains
         res = (lhs .and. .not. rhs) .or. (.not. lhs .and. rhs)
     end function f_xor
 
-    function f_logical_to_int(predicate) result(int)
+    !> This procedure converts logical to 1 or 0.
+    !! @param perdicate A Logical argument.
+    !! @return 1 if .true., 0 if .false..
+    elemental function f_logical_to_int(predicate) result(int)
 
         logical, intent(in) :: predicate
         integer :: int
@@ -473,7 +480,7 @@ contains
     !! @param x is the input value
     !! @param l is the degree
     !! @return P is the unassociated legendre polynomial evaluated at x
-    recursive function unassociated_legendre(x, l) result(P)
+    pure recursive function unassociated_legendre(x, l) result(P)
 
         integer, intent(in) :: l
         real(wp), intent(in) :: x
@@ -495,7 +502,7 @@ contains
     !! @param l is the degree
     !! @param m is the order
     !! @return Y is the spherical harmonic function evaluated at x and phi
-    recursive function spherical_harmonic_func(x, phi, l, m) result(Y)
+    elemental recursive function spherical_harmonic_func(x, phi, l, m) result(Y)
 
         integer, intent(in) :: l, m
         real(wp), intent(in) :: x, phi
@@ -517,7 +524,7 @@ contains
     !! @param l is the degree
     !! @param m is the order
     !! @return P is the associated legendre polynomial evaluated at x
-    recursive function associated_legendre(x, l, m) result(P)
+    elemental recursive function associated_legendre(x, l, m) result(P)
 
         integer, intent(in) :: l, m
         real(wp), intent(in) :: x
@@ -542,7 +549,7 @@ contains
     !> This function calculates the double factorial value of an integer
     !! @param n is the input integer
     !! @return R is the double factorial value of n
-    recursive function double_factorial(n) result(R)
+    elemental recursive function double_factorial(n) result(R)
 
         integer, intent(in) :: n
         integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
@@ -561,7 +568,7 @@ contains
     !> The following function calculates the factorial value of an integer
     !! @param n is the input integer
     !! @return R is the factorial value of n
-    recursive function factorial(n) result(R)
+    elemental recursive function factorial(n) result(R)
 
         integer, intent(in) :: n
         integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer

@@ -22,7 +22,7 @@ contains
     !! @param b Second number.
     !! @param tol_input Relative error (default = 1e-6_wp).
     !! @return Result of the comparison.
-    logical function f_approx_equal(a, b, tol_input) result(res)
+    logical elemental function f_approx_equal(a, b, tol_input) result(res)
         !$acc routine seq
         real(wp), intent(in) :: a, b
         real(wp), optional, intent(in) :: tol_input
@@ -45,7 +45,7 @@ contains
 
     !> Checks if a real(wp) variable is of default value.
     !! @param var Variable to check.
-    logical function f_is_default(var) result(res)
+    logical elemental function f_is_default(var) result(res)
         !$acc routine seq
         real(wp), intent(in) :: var
 
@@ -54,7 +54,7 @@ contains
 
     !> Checks if ALL elements of a real(wp) array are of default value.
     !! @param var_array Array to check.
-    logical function f_all_default(var_array) result(res)
+    logical pure function f_all_default(var_array) result(res)
         real(wp), intent(in) :: var_array(:)
         logical :: res_array(size(var_array))
         integer :: i
@@ -68,7 +68,7 @@ contains
 
     !> Checks if a real(wp) variable is an integer.
     !! @param var Variable to check.
-    logical function f_is_integer(var) result(res)
+    logical elemental function f_is_integer(var) result(res)
         !$acc routine seq
         real(wp), intent(in) :: var
 

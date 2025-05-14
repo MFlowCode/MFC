@@ -1119,7 +1119,7 @@ contains
 
     end subroutine s_hyqmom
 
-    function f_quad(abscX, abscY, wght_in, q, r, s)
+    pure function f_quad(abscX, abscY, wght_in, q, r, s)
         !$acc routine seq
         real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
         real(wp), intent(in) :: q, r, s
@@ -1135,7 +1135,7 @@ contains
 
     end function f_quad
 
-    function f_quad2D(abscX, abscY, wght_in, pow)
+    pure function f_quad2D(abscX, abscY, wght_in, pow)
         !$acc routine seq
         real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
         real(wp), dimension(3), intent(in) :: pow

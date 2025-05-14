@@ -2398,7 +2398,7 @@ contains
 
     end subroutine s_convert_cylindrical_to_cartesian_coord
 
-    function f_convert_cyl_to_cart(cyl) result(cart)
+    pure function f_convert_cyl_to_cart(cyl) result(cart)
 
         !$acc routine seq
 
@@ -2424,7 +2424,7 @@ contains
     !! @param myth Angle
     !! @param offset Thickness
     !! @param a Starting position
-    function f_r(myth, offset, a)
+    elemental function f_r(myth, offset, a)
         !$acc routine seq
         real(wp), intent(in) :: myth, offset, a
         real(wp) :: b

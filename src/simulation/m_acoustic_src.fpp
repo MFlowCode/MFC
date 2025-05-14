@@ -690,7 +690,7 @@ contains
     !! @param ai Acoustic source index
     !! @param c Speed of sound
     !! @return frequency_local Converted frequency
-    function f_frequency_local(freq_conv_flag, ai, c)
+    elemental function f_frequency_local(freq_conv_flag, ai, c)
         !$acc routine seq
         logical, intent(in) :: freq_conv_flag
         integer, intent(in) :: ai
@@ -709,7 +709,7 @@ contains
     !! @param c Speed of sound
     !! @param ai Acoustic source index
     !! @return gauss_sigma_time_local Converted Gaussian sigma time
-    function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
+    elemental function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
         !$acc routine seq
         logical, intent(in) :: gauss_conv_flag
         integer, intent(in) :: ai

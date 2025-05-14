@@ -532,7 +532,7 @@ contains
     !! @param ray      Ray.
     !! @param triangle Triangle.
     !! @return         True if the ray intersects the triangle, false otherwise.
-    function f_intersects_triangle(ray, triangle) result(intersects)
+    pure function f_intersects_triangle(ray, triangle) result(intersects)
 
         type(t_ray), intent(in) :: ray
         type(t_triangle), intent(in) :: triangle
@@ -1107,7 +1107,7 @@ contains
     !! @param point                        The cell centers of the current levelset cell
     !! @param spacing                      Dimensions of the current levelset cell
     !! @return                             Distance which the levelset distance without interpolation
-    function f_distance(boundary_v, boundary_vertex_count, boundary_edge_count, point, spacing) result(distance)
+    pure function f_distance(boundary_v, boundary_vertex_count, boundary_edge_count, point, spacing) result(distance)
         integer, intent(in) :: boundary_vertex_count, boundary_edge_count
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
         t_vec3, intent(in) :: point
@@ -1181,7 +1181,7 @@ contains
     !! @param point                        The cell centers of the current levelset cell
     !! @param spacing                      Dimensions of the current levelset cell
     !! @return                             Distance which the levelset distance without interpolation
-    function f_interpolated_distance(interpolated_boundary_v, total_vertices, point, spacing) result(distance)
+    pure function f_interpolated_distance(interpolated_boundary_v, total_vertices, point, spacing) result(distance)
         integer, intent(in) :: total_vertices
         real(wp), intent(in), dimension(1:total_vertices, 1:3) :: interpolated_boundary_v
         t_vec3, intent(in) :: point
@@ -1210,7 +1210,7 @@ contains
     end function f_interpolated_distance
 
     !> This procedure calculates the barycentric facet area
-    function f_tri_area(tri) result(tri_area)
+    pure function f_tri_area(tri) result(tri_area)
         real(wp), dimension(1:3, 1:3), intent(in) :: tri
         t_vec3 :: AB, AC, cross
         real(wp) :: tri_area
