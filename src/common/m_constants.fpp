@@ -53,7 +53,14 @@ module m_constants
     ! Strang Splitting constants
     real(wp), parameter :: dflt_adap_dt_tol = 1e-4_wp !< Default tolerance for adaptive step size
     integer, parameter :: adap_dt_max_iters = 100 !< Maximum number of iterations
-
+    ! Constants of the algorithm described by Heirer, E. Hairer S.P.Nørsett G. Wanner, Solving Ordinary Differential Equations I, Chapter II.4
+    ! to choose the initial time step size for the adaptive time stepping routine
+    real(wp), parameter :: threshold_first_guess = 1e-5_wp
+    real(wp), parameter :: threshold_second_guess = 1e-15_wp
+    real(wp), parameter :: scale_first_guess = 1e-3_wp
+    real(wp), parameter :: scale_guess = 1e-2_wp
+    real(wp), parameter :: small_guess = 1e-6_wp
+    
     ! Relativity
     integer, parameter :: relativity_cons_to_prim_max_iter = 100
 

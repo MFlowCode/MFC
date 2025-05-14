@@ -572,13 +572,14 @@ contains
             call s_compute_cson_from_pinf(k, q_prim_vf, myPinf, cell, myRho, gamma, pi_inf, myCson)
 
             ! Adaptive time stepping
+            adap_dt_stop = 0
+            
             if (adap_dt) then
 
                 call s_advance_step(myRho, myPinf, myR, myV, myR0, myPb, myPbdot, dmalf, &
                                     dmntait, dmBtait, dm_bub_adv_src, dm_divu, &
                                     k, myMass_v, myMass_n, myBeta_c, &
                                     myBeta_t, myCson, adap_dt_stop)
-                adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 
                 ! Update bubble state
                 intfc_rad(k, 1) = myR
@@ -598,6 +599,8 @@ contains
                 gas_dpdt(k, stage) = myPbdot
 
             end if
+
+            adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 
         end do
 

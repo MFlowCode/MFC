@@ -612,10 +612,10 @@ contains
         ! Compute d_0 = ||y0|| and d_1 = ||f(x0,y0)||
         d_norms(1) = sqrt((myR_tmp(1)**2._wp + myV_tmp(1)**2._wp)/2._wp)
         d_norms(2) = sqrt((myV_tmp(1)**2._wp + myA_tmp(1)**2._wp)/2._wp)
-        if (d_norms(1) < 1e-5_wp .or. d_norms(2) < 1e-5_wp) then
-            h_size(1) = 1e-6_wp
+        if (d_norms(1) < threshold_first_guess .or. d_norms(2) < threshold_first_guess) then
+            h_size(1) = small_guess
         else
-            h_size(1) = 1e-2_wp*(d_norms(1)/d_norms(2))
+            h_size(1) = scale_guess*(d_norms(1)/d_norms(2))
         end if
 
         ! Evaluate f(x0+h0,y0+h0*f(x0,y0))
@@ -631,13 +631,13 @@ contains
 
         ! Set h1 = (0.01/max(d_1,d_2))^{1/(p+1)}
         !      if max(d_1,d_2) < 1e-15_wp, h_size(2) = max(1e-6_wp, h0*1e-3_wp)
-        if (max(d_norms(2), d_norms(3)) < 1e-15_wp) then
-            h_size(2) = max(1e-6_wp, h_size(1)*1e-3_wp)
+        if (max(d_norms(2), d_norms(3)) < threshold_second_guess) then
+            h_size(2) = max(small_guess, h_size(1)*scale_first_guess)
         else
-            h_size(2) = (1e-2_wp/max(d_norms(2), d_norms(3)))**(1._wp/3._wp)
+            h_size(2) = (scale_guess/max(d_norms(2), d_norms(3)))**(1._wp/3._wp)
         end if
 
-        f_initial_substep_h = min(100._wp*h_size(1), h_size(2))
+        f_initial_substep_h = min(h_size(1)/scale_guess, h_size(2))
 
     end function f_initial_substep_h
 

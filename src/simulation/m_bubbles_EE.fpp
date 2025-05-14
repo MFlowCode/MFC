@@ -282,6 +282,8 @@ contains
                         end if
 
                         ! Adaptive time stepping
+                        adap_dt_stop = 0
+
                         if (adap_dt) then
 
                             call s_advance_step(myRho, myP, myR, myV, R0(q), &
@@ -289,7 +291,7 @@ contains
                                                 bub_adv_src(j, k, l), divu%sf(j, k, l), &
                                                 dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
                                                 dmBeta_t, dmCson, adap_dt_stop)
-                            adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
+                            
                             q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
                             q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
 
@@ -301,6 +303,8 @@ contains
                             bub_v_src(j, k, l, q) = nbub*rddot
                             bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                         end if
+
+                        adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 
                         if (alf < 1.e-11_wp) then
                             bub_adv_src(j, k, l) = 0._wp
