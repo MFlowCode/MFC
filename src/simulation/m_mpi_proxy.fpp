@@ -429,9 +429,11 @@ contains
 
     subroutine s_finalize_mpi_proxy_module()
 
+#ifdef MFC_MPI
         if (ib) then
             @:DEALLOCATE(ib_buff_send, ib_buff_recv)
         end if
+#endif
 
     end subroutine s_finalize_mpi_proxy_module
 

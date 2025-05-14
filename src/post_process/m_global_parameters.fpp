@@ -474,7 +474,7 @@ contains
         integer :: i, j, fac
 
         ! Setting m_root equal to m in the case of a 1D serial simulation
-        if (num_procs > 1 .and. n == 0) m_root = m_glb
+        if (n == 0) m_root = m_glb
 
         ! Gamma/Pi_inf Model
         if (model_eqns == 1) then
