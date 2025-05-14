@@ -1222,7 +1222,7 @@ contains
                 end do
 
                 ! Boundary condition at the beginning
-                if (proc_coords(3) > 0 .or. (bc_z%beg == -1 .and. num_procs_z > 1)) then
+                if (proc_coords(3) > 0 .or. (bc_z%beg == BC_PERIODIC .and. num_procs_z > 1)) then
                     proc_coords(3) = proc_coords(3) - 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                        bc_z%beg, ierr)
@@ -1230,19 +1230,55 @@ contains
                 end if
 
                 ! Boundary condition at the end
-                if (proc_coords(3) < num_procs_z - 1 .or. (bc_z%end == -1 .and. num_procs_z > 1)) then
+                if (proc_coords(3) < num_procs_z - 1 .or. (bc_z%end == BC_PERIODIC .and. num_procs_z > 1)) then
                     proc_coords(3) = proc_coords(3) + 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                        bc_z%end, ierr)
                     proc_coords(3) = proc_coords(3) - 1
                 end if
 
+#ifdef MFC_POST_PROCESS
+                ! Ghost zone at the beginning
+                if (proc_coords(3) > 0 .and. format == 1) then
+                    offset_z%beg = 2
+                else
+                    offset_z%beg = 0
+                end if
+
+                ! Ghost zone at the end
+                if (proc_coords(3) < num_procs_z - 1 .and. format == 1) then
+                    offset_z%end = 2
+                else
+                    offset_z%end = 0
+                end if
+#endif
+
+                ! Beginning and end sub-domain boundary locations
                 if (parallel_io) then
                     if (proc_coords(3) < rem_cells) then
                         start_idx(3) = (p + 1)*proc_coords(3)
                     else
                         start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
                     end if
+                else
+#ifdef MFC_PRE_PROCESS
+                    if (old_grid .neqv. .true.) then
+                        dz = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
+
+                        if (proc_coords(3) < rem_cells) then
+                            z_domain%beg = z_domain%beg + dz*real((p + 1)* &
+                                                                  proc_coords(3))
+                            z_domain%end = z_domain%end - dz*real((p + 1)* &
+                                                                  (num_procs_z - proc_coords(3) - 1) &
+                                                                  - (num_procs_z - rem_cells))
+                        else
+                            z_domain%beg = z_domain%beg + dz*real((p + 1)* &
+                                                                  proc_coords(3) + rem_cells)
+                            z_domain%end = z_domain%end - dz*real((p + 1)* &
+                                                                  (num_procs_z - proc_coords(3) - 1))
+                        end if
+                    end if
+#endif
                 end if
 
                 ! 2D Cartesian Processor Topology
@@ -1325,7 +1361,7 @@ contains
             end do
 
             ! Boundary condition at the beginning
-            if (proc_coords(2) > 0 .or. (bc_y%beg == -1 .and. num_procs_y > 1)) then
+            if (proc_coords(2) > 0 .or. (bc_y%beg == BC_PERIODIC .and. num_procs_y > 1)) then
                 proc_coords(2) = proc_coords(2) - 1
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                    bc_y%beg, ierr)
@@ -1333,19 +1369,55 @@ contains
             end if
 
             ! Boundary condition at the end
-            if (proc_coords(2) < num_procs_y - 1 .or. (bc_y%end == -1 .and. num_procs_y > 1)) then
+            if (proc_coords(2) < num_procs_y - 1 .or. (bc_y%end == BC_PERIODIC .and. num_procs_y > 1)) then
                 proc_coords(2) = proc_coords(2) + 1
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                    bc_y%end, ierr)
                 proc_coords(2) = proc_coords(2) - 1
             end if
 
+#ifdef MFC_POST_PROCESS
+            ! Ghost zone at the beginning
+            if (proc_coords(2) > 0 .and. format == 1) then
+                offset_y%beg = 2
+            else
+                offset_y%beg = 0
+            end if
+
+            ! Ghost zone at the end
+            if (proc_coords(2) < num_procs_y - 1 .and. format == 1) then
+                offset_y%end = 2
+            else
+                offset_y%end = 0
+            end if
+#endif
+
+            ! Beginning and end sub-domain boundary locations
             if (parallel_io) then
                 if (proc_coords(2) < rem_cells) then
                     start_idx(2) = (n + 1)*proc_coords(2)
                 else
                     start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
                 end if
+            else
+#ifdef MFC_PRE_PROCESS
+                if (old_grid .neqv. .true.) then
+                    dy = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
+
+                    if (proc_coords(2) < rem_cells) then
+                        y_domain%beg = y_domain%beg + dy*real((n + 1)* &
+                                                              proc_coords(2))
+                        y_domain%end = y_domain%end - dy*real((n + 1)* &
+                                                              (num_procs_y - proc_coords(2) - 1) &
+                                                              - (num_procs_y - rem_cells))
+                    else
+                        y_domain%beg = y_domain%beg + dy*real((n + 1)* &
+                                                              proc_coords(2) + rem_cells)
+                        y_domain%end = y_domain%end - dy*real((n + 1)* &
+                                                              (num_procs_y - proc_coords(2) - 1))
+                    end if
+                end if
+#endif
             end if
 
             ! 1D Cartesian Processor Topology
@@ -1381,27 +1453,62 @@ contains
         end do
 
         ! Boundary condition at the beginning
-        if (proc_coords(1) > 0 .or. (bc_x%beg == -1 .and. num_procs_x > 1)) then
+        if (proc_coords(1) > 0 .or. (bc_x%beg == BC_PERIODIC .and. num_procs_x > 1)) then
             proc_coords(1) = proc_coords(1) - 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
             proc_coords(1) = proc_coords(1) + 1
         end if
 
         ! Boundary condition at the end
-        if (proc_coords(1) < num_procs_x - 1 .or. (bc_x%end == -1 .and. num_procs_x > 1)) then
+        if (proc_coords(1) < num_procs_x - 1 .or. (bc_x%end == BC_PERIODIC .and. num_procs_x > 1)) then
             proc_coords(1) = proc_coords(1) + 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
             proc_coords(1) = proc_coords(1) - 1
         end if
 
+#ifdef MFC_POST_PROCESS
+        ! Ghost zone at the beginning
+        if (proc_coords(1) > 0 .and. format == 1 .and. n > 0) then
+            offset_x%beg = 2
+        else
+            offset_x%beg = 0
+        end if
+
+        ! Ghost zone at the end
+        if (proc_coords(1) < num_procs_x - 1 .and. format == 1 .and. n > 0) then
+            offset_x%end = 2
+        else
+            offset_x%end = 0
+        end if
+#endif
+
+        ! Beginning and end sub-domain boundary locations
         if (parallel_io) then
             if (proc_coords(1) < rem_cells) then
                 start_idx(1) = (m + 1)*proc_coords(1)
             else
                 start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
             end if
-        end if
+        else
+#ifdef MFC_PRE_PROCESS
+            if (old_grid .neqv. .true.) then
+                dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
 
+                if (proc_coords(1) < rem_cells) then
+                    x_domain%beg = x_domain%beg + dx*real((m + 1)* &
+                                                          proc_coords(1))
+                    x_domain%end = x_domain%end - dx*real((m + 1)* &
+                                                          (num_procs_x - proc_coords(1) - 1) &
+                                                          - (num_procs_x - rem_cells))
+                else
+                    x_domain%beg = x_domain%beg + dx*real((m + 1)* &
+                                                          proc_coords(1) + rem_cells)
+                    x_domain%end = x_domain%end - dx*real((m + 1)* &
+                                                          (num_procs_x - proc_coords(1) - 1))
+                end if
+            end if
+#endif
+        end if
 #endif
 
     end subroutine s_mpi_decompose_computational_domain

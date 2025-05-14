@@ -1029,9 +1029,7 @@ contains
 
         integer :: j, i, q
 
-#ifdef MFC_PRE_PROCESS
-        call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, -1, k, l)
-#else
+#ifdef MFC_SIMULATION
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
                 do i = 1, sys_size
@@ -1081,6 +1079,8 @@ contains
                 end do
             end if
         end if
+#else
+        call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
 #endif
 
     end subroutine s_dirichlet
