@@ -357,6 +357,52 @@ contains
 
     end subroutine s_initialize_time_steppers_module
 
+    subroutine s_evolve_q_pb_mv(index1, index2, scaler1, scaler2, scaler3, scaler4)  !! TODO :: Get a better name for this
+
+        integer, intent(in) :: index1, index2  !! TODO :: I have no idea what index is meant to represent. Rename this.
+        real(wp), intent(in) :: scaler1, scaler2, scaler3, scaler4
+        integer :: i, j, k, l, q
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(index1)%vf(i)%sf(j, k, l) = &
+                            (scaler1 * q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + scaler2 * q_cons_ts(index2)%vf(i)%sf(j, k, l) &
+                             + scaler3 * dt * rhs_vf(i)%sf(j, k, l)) / scaler4
+                    end do
+                end do
+            end do
+        end do
+
+        !Evolve pb and mv for non-polytropic qbmm
+        !! TODO :: It really feels like this loop should be separated from the above loop. Consider making two different subroutines
+        if (qbmm .and. (.not. polytropic)) then
+            !$acc parallel loop collapse(5) gang vector default(present)
+            do i = 1, nb
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            do q = 1, nnode
+                                pb_ts(index1)%sf(j, k, l, q, i) = &
+                                    (scaler1 * pb_ts(1)%sf(j, k, l, q, i) &
+                                     + scaler2 * pb_ts(index2)%sf(j, k, l, q, i) &
+                                     + scaler3 * dt * rhs_pb(j, k, l, q, i)) / scaler4
+                                mv_ts(index1)%sf(j, k, l, q, i) = &
+                                    (scaler1 * mv_ts(1)%sf(j, k, l, q, i) &
+                                     + scaler2 * mv_ts(index2)%sf(j, k, l, q, i) &
+                                     + scaler3 * dt * rhs_mv(j, k, l, q, i)) / scaler4
+                            end do
+                        end do
+                    end do
+                end do
+            end do
+        end if
+
+    end subroutine s_evolve_q_pb_mv
+
     !> 1st order TVD RK time-stepping algorithm
         !! @param t_step Current time step
     subroutine s_1st_order_tvd_rk(t_step, time_avg)
@@ -398,53 +444,8 @@ contains
             call s_update_lagrange_tdv_rk(stage=1)
         end if
 
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-        !Evolve pb and mv for non-polytropic qbmm
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(1)%sf(j, k, l, q, i) = &
-                                    pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(1)%sf(j, k, l, q, i) = &
-                                    mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
+        call s_evolve_q_pb_mv(1, 1, 1._wp, 1._wp, 1._wp, 1._wp)
+        
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
 
