@@ -573,7 +573,7 @@ contains
 
             ! Adaptive time stepping
             adap_dt_stop = 0
-            
+
             if (adap_dt) then
 
                 call s_advance_step(myRho, myPinf, myR, myV, myR0, myPb, myPbdot, dmalf, &

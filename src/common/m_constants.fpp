@@ -60,7 +60,7 @@ module m_constants
     real(wp), parameter :: scale_first_guess = 1e-3_wp
     real(wp), parameter :: scale_guess = 1e-2_wp
     real(wp), parameter :: small_guess = 1e-6_wp
-    
+
     ! Relativity
     integer, parameter :: relativity_cons_to_prim_max_iter = 100
 
