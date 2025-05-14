@@ -791,20 +791,6 @@ contains
                                     (3._wp*pb_ts(1)%sf(j, k, l, q, i) &
                                      + pb_ts(2)%sf(j, k, l, q, i) &
                                      + dt*rhs_pb(j, k, l, q, i))/4._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     (3._wp*mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
@@ -815,6 +801,24 @@ contains
                 end do
             end do
         end if
+
+        !! if (qbmm .and. (.not. polytropic)) then
+        !!     !$acc parallel loop collapse(5) gang vector default(present)
+        !!     do i = 1, nb
+        !!         do l = 0, p
+        !!             do k = 0, n
+        !!                 do j = 0, m
+        !!                     do q = 1, nnode
+        !!                         mv_ts(2)%sf(j, k, l, q, i) = &
+        !!                             (3._wp*mv_ts(1)%sf(j, k, l, q, i) &
+        !!                              + mv_ts(2)%sf(j, k, l, q, i) &
+        !!                              + dt*rhs_mv(j, k, l, q, i))/4._wp
+        !!                     end do
+        !!                 end do
+        !!             end do
+        !!         end do
+        !!     end do
+        !! end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
 
