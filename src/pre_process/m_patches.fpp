@@ -2424,7 +2424,7 @@ contains
     !! @param myth Angle
     !! @param offset Thickness
     !! @param a Starting position
-    elemental function f_r(myth, offset, a)
+    pure elemental function f_r(myth, offset, a)
         !$acc routine seq
         real(wp), intent(in) :: myth, offset, a
         real(wp) :: b

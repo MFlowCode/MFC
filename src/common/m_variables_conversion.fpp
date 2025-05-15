@@ -1660,7 +1660,7 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-    subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
+    pure subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_fast_magnetosonic_speed
 #else

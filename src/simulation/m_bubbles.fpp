@@ -98,7 +98,7 @@ contains
         !!  @param fCpinf Driving bubble pressure
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
-    elemental function f_H(fCpbw, fCpinf, fntait, fBtait)
+    pure elemental function f_H(fCpbw, fCpinf, fntait, fBtait)
         !$acc routine seq
         real(wp), intent(in) :: fCpbw, fCpinf, fntait, fBtait
 
@@ -118,7 +118,7 @@ contains
         !! @param fntait Tait EOS parameter
         !! @param fBtait Tait EOS parameter
         !! @param fH Bubble enthalpy
-    elemental function f_cgas(fCpinf, fntait, fBtait, fH)
+    pure elemental function f_cgas(fCpinf, fntait, fBtait, fH)
         !$acc routine seq
         real(wp), intent(in) :: fCpinf, fntait, fBtait, fH
 
@@ -141,7 +141,7 @@ contains
         !!  @param fBtait Tait EOS parameter
         !!  @param advsrc Advection equation source term
         !!  @param divu Divergence of velocity
-    elemental function f_cpinfdot(fRho, fP, falf, fntait, fBtait, advsrc, divu)
+    pure elemental function f_cpinfdot(fRho, fP, falf, fntait, fBtait, advsrc, divu)
         !$acc routine seq
         real(wp), intent(in) :: fRho, fP, falf, fntait, fBtait, advsrc, divu
 
@@ -207,7 +207,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fCpbw Boundary wall pressure
-    elemental function f_rddot_RP(fCp, fRho, fR, fV, fR0, fCpbw)
+    pure elemental function f_rddot_RP(fCp, fRho, fR, fV, fR0, fCpbw)
         !$acc routine seq
         real(wp), intent(in) :: fCp, fRho, fR, fV, fR0, fCpbw
 

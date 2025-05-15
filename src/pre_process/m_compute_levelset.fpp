@@ -71,7 +71,7 @@ contains
 
     end subroutine s_circle_levelset
 
-    subroutine s_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -154,7 +154,7 @@ contains
 
     end subroutine s_airfoil_levelset
 
-    subroutine s_3D_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_3D_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm

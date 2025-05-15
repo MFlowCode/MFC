@@ -1030,7 +1030,7 @@ contains
 
     end subroutine s_mom_inv
 
-    subroutine s_chyqmom(momin, wght, abscX, abscY)
+    pure subroutine s_chyqmom(momin, wght, abscX, abscY)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_chyqmom
 #else
@@ -1097,7 +1097,7 @@ contains
 
     end subroutine s_chyqmom
 
-    subroutine s_hyqmom(frho, fup, fmom)
+    pure subroutine s_hyqmom(frho, fup, fmom)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_hyqmom
 #else

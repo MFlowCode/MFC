@@ -592,7 +592,7 @@ contains
     !! @param boundary_v                 Output boundary vertices/normals.
     !! @param boundary_vertex_count      Output total boundary vertex count
     !! @param boundary_edge_count        Output total boundary edge counts
-    subroutine f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+    pure subroutine f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
         type(t_model), intent(in) :: model
         real(wp), allocatable, intent(out), dimension(:, :, :) :: boundary_v !< Output boundary vertices/normals
         integer, intent(out) :: boundary_vertex_count, boundary_edge_count !< Output boundary vertex/edge count
@@ -705,7 +705,7 @@ contains
     !! @param edge                 Edges end points to be registered
     !! @param edge_index           Edge index iterator
     !! @param edge_count           Total number of edges
-    subroutine f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
+    pure subroutine f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
         integer, intent(inout) :: edge_index !< Edge index iterator
         integer, intent(inout) :: edge_count !< Total number of edges
         real(wp), intent(in), dimension(1:2, 1:2) :: edge !< Edges end points to be registered
@@ -723,7 +723,7 @@ contains
     !! @param boundary_edge_count       Output total number of boundary edges
     !! @param spacing                   Dimensions of the current levelset cell
     !! @param interpolate               Logical output
-    subroutine f_check_interpolation_2D(boundary_v, boundary_edge_count, spacing, interpolate)
+    pure subroutine f_check_interpolation_2D(boundary_v, boundary_edge_count, spacing, interpolate)
         logical, intent(inout) :: interpolate !< Logical indicator of interpolation
         integer, intent(in) :: boundary_edge_count !< Number of boundary edges
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
@@ -753,7 +753,7 @@ contains
     !! @param model              Model to search in.
     !! @param spacing            Dimensions of the current levelset cell
     !! @param interpolate        Logical output
-    subroutine f_check_interpolation_3D(model, spacing, interpolate)
+    pure subroutine f_check_interpolation_3D(model, spacing, interpolate)
         logical, intent(inout) :: interpolate
         type(t_model), intent(in) :: model
         t_vec3, intent(in) :: spacing
@@ -1044,7 +1044,7 @@ contains
     !! @param point        The cell centers of the current level cell
     !! @param normals      The output levelset normals
     !! @param distance     The output levelset distance
-    subroutine f_distance_normals_3D(model, point, normals, distance)
+    pure subroutine f_distance_normals_3D(model, point, normals, distance)
         type(t_model), intent(IN) :: model
         t_vec3, intent(in) :: point
         t_vec3, intent(out) :: normals
@@ -1140,7 +1140,7 @@ contains
     !! @param point                        The cell centers of the current levelset cell
     !! @param spacing                      Dimensions of the current levelset cell
     !! @param normals                      Output levelset normals without interpolation
-    subroutine f_normals(boundary_v, boundary_vertex_count, boundary_edge_count, point, spacing, normals)
+    pure subroutine f_normals(boundary_v, boundary_vertex_count, boundary_edge_count, point, spacing, normals)
         integer, intent(in) :: boundary_vertex_count, boundary_edge_count
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
         t_vec3, intent(in) :: point

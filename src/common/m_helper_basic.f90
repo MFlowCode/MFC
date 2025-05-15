@@ -22,7 +22,7 @@ contains
     !! @param b Second number.
     !! @param tol_input Relative error (default = 1e-6_wp).
     !! @return Result of the comparison.
-    logical elemental function f_approx_equal(a, b, tol_input) result(res)
+    logical pure elemental function f_approx_equal(a, b, tol_input) result(res)
         !$acc routine seq
         real(wp), intent(in) :: a, b
         real(wp), optional, intent(in) :: tol_input
@@ -45,7 +45,7 @@ contains
 
     !> Checks if a real(wp) variable is of default value.
     !! @param var Variable to check.
-    logical elemental function f_is_default(var) result(res)
+    logical pure elemental function f_is_default(var) result(res)
         !$acc routine seq
         real(wp), intent(in) :: var
 
@@ -68,14 +68,14 @@ contains
 
     !> Checks if a real(wp) variable is an integer.
     !! @param var Variable to check.
-    logical elemental function f_is_integer(var) result(res)
+    logical pure elemental function f_is_integer(var) result(res)
         !$acc routine seq
         real(wp), intent(in) :: var
 
         res = f_approx_equal(var, real(nint(var), wp))
     end function f_is_integer
 
-    subroutine s_configure_coordinate_bounds(weno_polyn, buff_size, idwint, idwbuff, &
+    pure subroutine s_configure_coordinate_bounds(weno_polyn, buff_size, idwint, idwbuff, &
                                              viscous, bubbles_lagrange, m, n, p, num_dims)
 
         integer, intent(in) :: weno_polyn, m, n, p, num_dims

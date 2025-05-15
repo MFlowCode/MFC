@@ -322,7 +322,7 @@ contains
         !!  @param b right-hane-side
         !!  @param sol Solution
         !!  @param ndim Problem size
-    subroutine s_solve_linear_system(A, b, sol, ndim)
+    pure subroutine s_solve_linear_system(A, b, sol, ndim)
 
         integer, intent(in) :: ndim
         real(wp), dimension(ndim, ndim), intent(inout) :: A
@@ -477,7 +477,7 @@ contains
         !!      quantity storage variable, q_sf.
         !!  @param q_prim_vf Primitive variables
         !!  @param q_sf Q_M
-    subroutine s_derive_qm(q_prim_vf, q_sf)
+    pure subroutine s_derive_qm(q_prim_vf, q_sf)
         type(scalar_field), &
             dimension(sys_size), &
             intent(in) :: q_prim_vf

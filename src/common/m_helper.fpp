@@ -42,7 +42,7 @@ contains
         !! @param vftmp is the void fraction
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
+    pure subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
         !$acc routine seq
         real(wp), intent(in) :: vftmp
         real(wp), dimension(nb), intent(in) :: Rtmp
@@ -56,7 +56,7 @@ contains
 
     end subroutine s_comp_n_from_prim
 
-    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
+    pure subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
         !$acc routine seq
         real(wp), intent(in) :: vftmp
         real(wp), dimension(nb), intent(in) :: nRtmp
@@ -219,7 +219,7 @@ contains
         !! @param peclet Peclet number
         !! @param Re_trans Real part of the transport coefficients
         !! @param Im_trans Imaginary part of the transport coefficients
-    subroutine s_transcoeff(omega, peclet, Re_trans, Im_trans)
+    pure elemental subroutine s_transcoeff(omega, peclet, Re_trans, Im_trans)
 
         real(wp), intent(in) :: omega, peclet
         real(wp), intent(out) :: Re_trans, Im_trans
@@ -238,7 +238,7 @@ contains
 
     end subroutine s_transcoeff
 
-    subroutine s_int_to_str(i, res)
+    pure subroutine s_int_to_str(i, res)
 
         integer, intent(in) :: i
         character(len=*), intent(inout) :: res
@@ -299,7 +299,7 @@ contains
     !> This procedure swaps two real numbers.
     !! @param lhs Left-hand side.
     !! @param rhs Right-hand side.
-    subroutine s_swap(lhs, rhs)
+    pure elemental subroutine s_swap(lhs, rhs)
 
         real(wp), intent(inout) :: lhs, rhs
         real(wp) :: ltemp
@@ -373,7 +373,7 @@ contains
     !> This procedure transforms a vector by a matrix.
     !! @param vec Vector to transform.
     !! @param matrix Transformation matrix.
-    subroutine s_transform_vec(vec, matrix)
+    pure subroutine s_transform_vec(vec, matrix)
 
         t_vec3, intent(inout) :: vec
         t_mat4x4, intent(in) :: matrix
@@ -388,7 +388,7 @@ contains
     !> This procedure transforms a triangle by a matrix, one vertex at a time.
     !! @param triangle Triangle to transform.
     !! @param matrix   Transformation matrix.
-    subroutine s_transform_triangle(triangle, matrix, matrix_n)
+    pure subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
         type(t_triangle), intent(inout) :: triangle
         t_mat4x4, intent(in) :: matrix, matrix_n
@@ -408,7 +408,7 @@ contains
     !> This procedure transforms a model by a matrix, one triangle at a time.
     !! @param model  Model to transform.
     !! @param matrix Transformation matrix.
-    subroutine s_transform_model(model, matrix, matrix_n)
+    pure subroutine s_transform_model(model, matrix, matrix_n)
 
         type(t_model), intent(inout) :: model
         t_mat4x4, intent(in) :: matrix, matrix_n
@@ -453,7 +453,7 @@ contains
     !! @param lhs logical input.
     !! @param rhs other logical input.
     !! @return xored result.
-    elemental function f_xor(lhs, rhs) result(res)
+    pure elemental function f_xor(lhs, rhs) result(res)
 
         logical, intent(in) :: lhs, rhs
         logical :: res
@@ -464,7 +464,7 @@ contains
     !> This procedure converts logical to 1 or 0.
     !! @param perdicate A Logical argument.
     !! @return 1 if .true., 0 if .false..
-    elemental function f_logical_to_int(predicate) result(int)
+    pure elemental function f_logical_to_int(predicate) result(int)
 
         logical, intent(in) :: predicate
         integer :: int
@@ -502,7 +502,7 @@ contains
     !! @param l is the degree
     !! @param m is the order
     !! @return Y is the spherical harmonic function evaluated at x and phi
-    elemental recursive function spherical_harmonic_func(x, phi, l, m) result(Y)
+    pure recursive function spherical_harmonic_func(x, phi, l, m) result(Y)
 
         integer, intent(in) :: l, m
         real(wp), intent(in) :: x, phi
@@ -524,7 +524,7 @@ contains
     !! @param l is the degree
     !! @param m is the order
     !! @return P is the associated legendre polynomial evaluated at x
-    elemental recursive function associated_legendre(x, l, m) result(P)
+    pure recursive function associated_legendre(x, l, m) result(P)
 
         integer, intent(in) :: l, m
         real(wp), intent(in) :: x
@@ -549,7 +549,7 @@ contains
     !> This function calculates the double factorial value of an integer
     !! @param n is the input integer
     !! @return R is the double factorial value of n
-    elemental recursive function double_factorial(n) result(R)
+    pure recursive function double_factorial(n) result(R)
 
         integer, intent(in) :: n
         integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
@@ -568,7 +568,7 @@ contains
     !> The following function calculates the factorial value of an integer
     !! @param n is the input integer
     !! @return R is the factorial value of n
-    elemental recursive function factorial(n) result(R)
+    pure recursive function factorial(n) result(R)
 
         integer, intent(in) :: n
         integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
