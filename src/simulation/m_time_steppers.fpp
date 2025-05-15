@@ -369,9 +369,9 @@ contains
                 do k = 0, n
                     do j = 0, m
                         q_cons_ts(index)%vf(i)%sf(j, k, l) = &
-                            (scaler1 * q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + scaler2 * q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + scaler3 * dt * rhs_vf(i)%sf(j, k, l)) / (scaler1 + scaler2)  !! TODO :: scaler1 + scaler2 should be called a normalization constant
+                            (scaler1*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + scaler2*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + scaler3*dt*rhs_vf(i)%sf(j, k, l))/(scaler1 + scaler2)  !! TODO :: scaler1 + scaler2 should be called a normalization constant
                     end do
                 end do
             end do
@@ -386,14 +386,14 @@ contains
                         do j = 0, m
                             do q = 1, nnode
                                 pb_ts(index)%sf(j, k, l, q, i) = &
-                                    (scaler1 * pb_ts(1)%sf(j, k, l, q, i) &
-                                     + scaler2 * pb_ts(2)%sf(j, k, l, q, i) &
-                                     + scaler3 * dt * rhs_pb(j, k, l, q, i)) / (scaler1 + scaler2)
+                                    (scaler1*pb_ts(1)%sf(j, k, l, q, i) &
+                                     + scaler2*pb_ts(2)%sf(j, k, l, q, i) &
+                                     + scaler3*dt*rhs_pb(j, k, l, q, i))/(scaler1 + scaler2)
 
                                 mv_ts(index)%sf(j, k, l, q, i) = &
-                                    (scaler1 * mv_ts(1)%sf(j, k, l, q, i) &
-                                     + scaler2 * mv_ts(2)%sf(j, k, l, q, i) &
-                                     + scaler3 * dt * rhs_mv(j, k, l, q, i)) / (scaler1 + scaler2)
+                                    (scaler1*mv_ts(1)%sf(j, k, l, q, i) &
+                                     + scaler2*mv_ts(2)%sf(j, k, l, q, i) &
+                                     + scaler3*dt*rhs_mv(j, k, l, q, i))/(scaler1 + scaler2)
                             end do
                         end do
                     end do
