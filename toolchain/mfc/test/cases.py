@@ -988,6 +988,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 continue
             def modify_example_case(case: dict):
                 case['parallel_io'] = 'F'
+                # temp muscl tests
+                case['muscl_order'] = 2
+                case['recon_type'] = 2
+                case['mapped_weno'] = 'F'
+                case['wenoz'] = 'F'
+                case['teno'] = 'F'
+                case['mp_weno'] = 'F'
                 if 't_step_stop' in case and case['t_step_stop'] >= 50:
                     case['t_step_start'] = 0
                     case['t_step_stop'] = 50

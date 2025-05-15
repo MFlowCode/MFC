@@ -31,7 +31,7 @@ contains
         if (igr) then
             call s_check_inputs_igr
         else
-            call s_check_inputs_weno
+            ! call s_check_inputs_weno
             call s_check_inputs_riemann_solver
             call s_check_inputs_model_eqns
             call s_check_inputs_acoustic_src
@@ -45,6 +45,7 @@ contains
             call s_check_inputs_mhd
             call s_check_inputs_continuum_damage
         end if
+        call s_check_inputs_riemann_solver
         call s_check_inputs_time_stepping
         call s_check_inputs_stiffened_eos_viscosity
         call s_check_inputs_body_forces

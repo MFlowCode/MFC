@@ -100,6 +100,7 @@ contains
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
             & 'R0_type', 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
             & 'num_bc_patches', 'num_igr_iters', 'num_igr_warm_start_iters']
+            & 'recon_type', 'muscl_order', 'muscl_lim']
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

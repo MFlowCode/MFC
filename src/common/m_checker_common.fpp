@@ -49,7 +49,11 @@ contains
             call s_check_inputs_phase_change
             call s_check_inputs_ibm
 #endif
-            call s_check_inputs_weno
+    !        if (recon_type == WENO_TYPE) then
+    !            call s_check_inputs_weno
+    !        elseif (recon_type == MUSCL_TYPE) then
+            ! TODO
+    !        end if
             call s_check_inputs_surface_tension
             call s_check_inputs_mhd
         end if

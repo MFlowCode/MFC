@@ -104,6 +104,8 @@ PRE_PROCESS.update({
     'elliptic_smoothing_iters': ParamType.INT,
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
+    'recon_type': ParamType.INT,
+    'muscl_order': ParamType.INT,
 })
 
 for ib_id in range(1, 10+1):
@@ -305,6 +307,8 @@ SIMULATION.update({
     'alf_factor': ParamType.REAL,
     'igr_iter_solver': ParamType.INT,
     'igr_pres_lim': ParamType.LOG,
+    'recon_type': ParamType.INT,
+    'muscl_order': ParamType.INT,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
