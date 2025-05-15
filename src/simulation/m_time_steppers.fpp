@@ -389,7 +389,18 @@ contains
                                     (scaler1*pb_ts(1)%sf(j, k, l, q, i) &
                                      + scaler2*pb_ts(2)%sf(j, k, l, q, i) &
                                      + scaler3*dt*rhs_pb(j, k, l, q, i))/(scaler1 + scaler2)
+                            end do
+                        end do
+                    end do
+                end do
+            end do
 
+            !$acc parallel loop collapse(5) gang vector default(present)
+            do i = 1, nb
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            do q = 1, nnode
                                 mv_ts(index)%sf(j, k, l, q, i) = &
                                     (scaler1*mv_ts(1)%sf(j, k, l, q, i) &
                                      + scaler2*mv_ts(2)%sf(j, k, l, q, i) &
