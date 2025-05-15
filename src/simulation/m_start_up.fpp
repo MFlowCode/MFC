@@ -31,6 +31,9 @@ module m_start_up
     use m_weno                 !< Weighted and essentially non-oscillatory (WENO)
                                !! schemes for spatial reconstruction of variables
 
+    use m_muscl                !< Monotonic Upstream-centered (MUSCL)
+                               !! schemes for convservation laws 
+
     use m_riemann_solvers      !< Exact and approximate Riemann problem solvers
 
     use m_cbc                  !< Characteristic boundary conditions (CBC)
@@ -177,7 +180,8 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
-            cont_damage, tau_star, cont_damage_s, alpha_bar
+            cont_damage, tau_star, cont_damage_s, alpha_bar, &
+            recon_type, muscl_order, muscl_lim
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1317,7 +1321,11 @@ contains
         ! Computation of parameters, allocation of memory, association of pointers,
         ! and/or execution of any other tasks that are needed to properly configure
         ! the modules. The preparations below DO DEPEND on the grid being complete.
-        call s_initialize_weno_module()
+        if (recon_type == WENO_TYPE) then
+            call s_initialize_weno_module()
+        elseif (recon_type == MUSCL_TYPE) then
+            call s_initialize_muscl_module()
+        end if
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         print *, "[MEM-INST] After: s_initialize_weno_module"
@@ -1456,7 +1464,12 @@ contains
         call s_finalize_rhs_module()
         call s_finalize_cbc_module()
         call s_finalize_riemann_solvers_module()
-        call s_finalize_weno_module()
+        if (recon_type == WENO_TYPE) then
+            call s_finalize_weno_module()
+        elseif (recon_type == MUSCL_TYPE) then
+            call s_finalize_muscl_module()
+        end if
+
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_common_module()
