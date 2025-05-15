@@ -67,18 +67,18 @@ contains
 
                     allocate (q_cons_buffer_in(0:buff_size* &
                                                sys_size* &
-                                               (m + 2*buff_size + 1)* &
-                                               (n + 2*buff_size + 1)* &
-                                               (p + 2*buff_size + 1)/ &
+                                               (m + 2*buff_size + 1)/ &
                                                (min(m, n, p) &
-                                                + 2*buff_size + 1) - 1))
+                                                + 2*buff_size + 1)* &
+                                               (n + 2*buff_size + 1)* &
+                                               (p + 2*buff_size + 1) - 1))
                     allocate (q_cons_buffer_out(0:buff_size* &
                                                 sys_size* &
-                                                (m + 2*buff_size + 1)* &
-                                                (n + 2*buff_size + 1)* &
-                                                (p + 2*buff_size + 1)/ &
+                                                (m + 2*buff_size + 1)/ &
                                                 (min(m, n, p) &
-                                                 + 2*buff_size + 1) - 1))
+                                                 + 2*buff_size + 1)* &
+                                                (n + 2*buff_size + 1)* &
+                                                (p + 2*buff_size + 1) - 1))
 
                     ! Simulation is 2D
                 else
