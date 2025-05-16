@@ -99,7 +99,7 @@ contains
         @:PROHIBIT(riemann_solver /= 3 .and. avg_state == dflt_int, "avg_state must be set if riemann_solver != 3")
         @:PROHIBIT(all(low_Mach /= (/0, 1, 2/)), "low_Mach must be 0, 1 or 2")
         @:PROHIBIT(riemann_solver /= 2 .and. low_Mach == 2, "low_Mach = 2 requires riemann_solver = 2")
-        @:PROHIBIT(low_Mach /= 0 .and. model_eqns /= 2, "low_Mach = 1 or 2 requires model_eqns = 2")
+        @:PROHIBIT(low_Mach /= 0 .and. all(model_eqns /= (/2, 3/)), "low_Mach = 1 or 2 requires model_eqns = 2 or 3")
     end subroutine s_check_inputs_riemann_solver
 
     !> Checks constraints on geometry and precision

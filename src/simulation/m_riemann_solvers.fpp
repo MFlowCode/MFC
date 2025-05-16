@@ -369,7 +369,8 @@ contains
                 !$acc xi_field_L, xi_field_R,                                   &
                 !$acc Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR,             &
                 !$acc Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2,                     &
-                !$acc c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm)
+                !$acc c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm,               &
+                !$acc pcorr, zcoef, vel_L_tmp, vel_R_tmp)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -750,6 +751,7 @@ contains
                                    + (5e-1_wp - sign(5e-1_wp, s_L)) &
                                    *(5e-1_wp + sign(5e-1_wp, s_R))
 
+                            ! Low Mach correction
                             if (low_Mach == 1) then
                                 @:compute_low_Mach_correction()
                             else
@@ -1299,7 +1301,8 @@ contains
                     !$acc private(vel_L, vel_R, vel_K_Star, Re_L, Re_R, rho_avg, h_avg, gamma_avg,  &
                     !$acc s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R,     &
                     !$acc Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2,   &
-                    !$acc tau_e_L, tau_e_R, G_L, G_R, flux_ene_e, xi_field_L, xi_field_R)
+                    !$acc tau_e_L, tau_e_R, G_L, G_R, flux_ene_e, xi_field_L, xi_field_R, pcorr,    &
+                    !$acc zcoef, vel_L_tmp, vel_R_tmp)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1488,6 +1491,11 @@ contains
                                     end do
                                 end if
 
+                                ! Low Mach correction
+                                if (low_Mach == 2) then
+                                    @:compute_low_Mach_correction()
+                                end if
+
                                 ! COMPUTING THE DIRECT WAVE SPEEDS
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
@@ -1563,6 +1571,13 @@ contains
                                 vel_K_Star = vel_L(idx1)*(1_wp - xi_MP) + xi_MP*vel_R(idx1) + &
                                              xi_MP*xi_PP*(s_S - vel_R(idx1))
 
+                                ! Low Mach correction
+                                if (low_Mach == 1) then
+                                    @:compute_low_Mach_correction()
+                                else
+                                    pcorr = 0._wp
+                                end if
+
                                 ! COMPUTING FLUXES
                                 ! MASS FLUX.
                                 !$acc loop seq
@@ -1578,12 +1593,14 @@ contains
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = rho_Star*vel_K_Star* &
-                                                                                (dir_flg(idxi)*vel_K_Star + (1_wp - dir_flg(idxi))*(xi_M*vel_L(idxi) + xi_P*vel_R(idxi))) + dir_flg(idxi)*p_Star
+                                                                                (dir_flg(idxi)*vel_K_Star + (1_wp - dir_flg(idxi))*(xi_M*vel_L(idxi) + xi_P*vel_R(idxi))) + dir_flg(idxi)*p_Star &
+                                                                                + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
                                 end do
 
                                 ! ENERGY FLUX.
                                 ! f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
-                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_star + p_Star)*vel_K_Star
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_star + p_Star)*vel_K_Star &
+                                                                    + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
@@ -1635,7 +1652,8 @@ contains
                                         ((xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1))* &
                                          (gammas(i)*p_K_Star + pi_infs(i)) + &
                                          (xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1))* &
-                                         qvs(i))*vel_K_Star
+                                         qvs(i))*vel_K_Star &
+                                         + (s_M/s_L)*(s_P/s_R)*pcorr*s_S*(xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1))
                                 end do
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
@@ -1715,6 +1733,7 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
+
                                 !$acc loop seq
                                 do i = 1, contxe
                                     alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
@@ -2212,6 +2231,7 @@ contains
                                     end do
                                 end if
 
+                                ! Low Mach correction
                                 if (low_Mach == 2) then
                                     @:compute_low_Mach_correction()
                                 end if
@@ -2262,6 +2282,7 @@ contains
                                 xi_M = (5e-1_wp + sign(5e-1_wp, s_S))
                                 xi_P = (5e-1_wp - sign(5e-1_wp, s_S))
 
+                                ! Low Mach correction
                                 if (low_Mach == 1) then
                                     @:compute_low_Mach_correction()
                                 else
@@ -2679,6 +2700,7 @@ contains
                                     end do
                                 end if
 
+                                ! Low Mach correction
                                 if (low_Mach == 2) then
                                     @:compute_low_Mach_correction()
                                 end if
@@ -2739,14 +2761,15 @@ contains
                                 xi_M = (5e-1_wp + sign(5e-1_wp, s_S))
                                 xi_P = (5e-1_wp - sign(5e-1_wp, s_S))
 
-                                ! COMPUTING THE HLLC FLUXES
-                                ! MASS FLUX.
+                                ! Low Mach correction
                                 if (low_Mach == 1) then
                                     @:compute_low_Mach_correction()
                                 else
                                     pcorr = 0._wp
                                 end if
 
+                                ! COMPUTING THE HLLC FLUXES
+                                ! MASS FLUX.
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &

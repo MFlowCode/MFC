@@ -174,11 +174,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
 
     def alter_low_Mach_correction():
-        stack.push('', {'riemann_solver': 2, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'dt': 1e-7})
+        stack.push('', {'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'dt': 1e-7})
 
         for low_Mach in [1, 2]:
             stack.push(f"low_Mach={low_Mach}", {'low_Mach': low_Mach})
+            stack.push(f"riemann_solver=1",{'riemann_solver': 1})
             cases.append(define_case_d(stack, '', {}))
+            stack.pop()
+            stack.push(f"riemann_solver=2",{'riemann_solver': 2})
+            cases.append(define_case_d(stack, '', {}))
+            stack.pop()
             stack.pop()
 
         stack.pop()
