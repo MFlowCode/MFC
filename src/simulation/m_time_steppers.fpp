@@ -357,6 +357,65 @@ contains
 
     end subroutine s_initialize_time_steppers_module
 
+    subroutine s_evolve_q_pb_mv(index, scaler1, scaler2, scaler3, scaler4)  !! TODO :: Get a better name for this
+
+        integer, intent(in) :: index  !! TODO :: Rename this
+        real(wp), intent(in) :: scaler1, scaler2, scaler3, scaler4  !! TODO :: Rename these too
+        integer :: i, j, k, l, q
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(index)%vf(i)%sf(j, k, l) = &
+                            (scaler1*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + scaler2*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + scaler3*dt*rhs_vf(i)%sf(j, k, l))/scaler4  !! TODO :: scaler4 should be called a normalization constant
+                    end do
+                end do
+            end do
+        end do
+
+        !Evolve pb and mv for non-polytropic qbmm
+        if (qbmm .and. (.not. polytropic)) then
+            !$acc parallel loop collapse(5) gang vector default(present)
+            do i = 1, nb
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            do q = 1, nnode
+                                pb_ts(index)%sf(j, k, l, q, i) = &
+                                    (scaler1*pb_ts(1)%sf(j, k, l, q, i) &
+                                     + scaler2*pb_ts(2)%sf(j, k, l, q, i) &
+                                     + scaler3*dt*rhs_pb(j, k, l, q, i))/scaler4
+                            end do
+                        end do
+                    end do
+                end do
+            end do
+        end if
+
+        if (qbmm .and. (.not. polytropic)) then
+            !$acc parallel loop collapse(5) gang vector default(present)
+            do i = 1, nb
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            do q = 1, nnode
+                                mv_ts(index)%sf(j, k, l, q, i) = &
+                                    (scaler1*mv_ts(1)%sf(j, k, l, q, i) &
+                                     + scaler2*mv_ts(2)%sf(j, k, l, q, i) &
+                                     + scaler3*dt*rhs_mv(j, k, l, q, i))/scaler4
+                            end do
+                        end do
+                    end do
+                end do
+            end do
+        end if
+
+    end subroutine s_evolve_q_pb_mv
+
     !> 1st order TVD RK time-stepping algorithm
         !! @param t_step Current time step
     subroutine s_1st_order_tvd_rk(t_step, time_avg)
@@ -503,53 +562,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=1)
         end if
 
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-        !Evolve pb and mv for non-polytropic qbmm
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(2)%sf(j, k, l, q, i) = &
-                                    pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(2)%sf(j, k, l, q, i) = &
-                                    mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
+        call s_evolve_q_pb_mv(2, 1._wp, 0._wp, 1._wp, 1._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
 
@@ -578,55 +591,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=2)
         end if
 
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/2._wp
-                    end do
-                end do
-            end do
-        end do
-
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(1)%sf(j, k, l, q, i) = &
-                                    (pb_ts(1)%sf(j, k, l, q, i) &
-                                     + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/2._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(1)%sf(j, k, l, q, i) = &
-                                    (mv_ts(1)%sf(j, k, l, q, i) &
-                                     + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/2._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
+        call s_evolve_q_pb_mv(1, 1._wp, 1._wp, 1._wp, 2._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
@@ -691,53 +656,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=1)
         end if
 
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-        !Evolve pb and mv for non-polytropic qbmm
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(2)%sf(j, k, l, q, i) = &
-                                    pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(2)%sf(j, k, l, q, i) = &
-                                    mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
+        call s_evolve_q_pb_mv(2, 1._wp, 0._wp, 1._wp, 1._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
 
@@ -766,55 +685,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=2)
         end if
 
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
-                    end do
-                end do
-            end do
-        end do
-
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(2)%sf(j, k, l, q, i) = &
-                                    (3._wp*pb_ts(1)%sf(j, k, l, q, i) &
-                                     + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/4._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(2)%sf(j, k, l, q, i) = &
-                                    (3._wp*mv_ts(1)%sf(j, k, l, q, i) &
-                                     + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/4._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
+        call s_evolve_q_pb_mv(2, 3._wp, 1._wp, 1._wp, 4._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
 
@@ -842,55 +713,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=3)
         end if
 
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
-                    end do
-                end do
-            end do
-        end do
-
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(1)%sf(j, k, l, q, i) = &
-                                    (pb_ts(1)%sf(j, k, l, q, i) &
-                                     + 2._wp*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2._wp*dt*rhs_pb(j, k, l, q, i))/3._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(1)%sf(j, k, l, q, i) = &
-                                    (mv_ts(1)%sf(j, k, l, q, i) &
-                                     + 2._wp*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2._wp*dt*rhs_mv(j, k, l, q, i))/3._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
+        call s_evolve_q_pb_mv(1, 1._wp, 2._wp, 2._wp, 3._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
