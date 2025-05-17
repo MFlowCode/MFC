@@ -371,7 +371,7 @@ contains
                         q_cons_ts(index)%vf(i)%sf(j, k, l) = &
                             (scaler1*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + scaler2*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + scaler3*dt*rhs_vf(i)%sf(j, k, l))/scaler4  !! TODO :: scaler1 + scaler2 should be called a normalization constant
+                             + scaler3*dt*rhs_vf(i)%sf(j, k, l))/scaler4  !! TODO :: scaler4 should be called a normalization constant
                     end do
                 end do
             end do
@@ -394,7 +394,9 @@ contains
                     end do
                 end do
             end do
+        end if
 
+        if (qbmm .and. (.not. polytropic)) then
             !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -484,7 +486,9 @@ contains
                     end do
                 end do
             end do
+        end if
 
+        if (qbmm .and. (.not. polytropic)) then
             !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -558,7 +562,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=1)
         end if
 
-        call s_evolve_q_pb_mv(2, 1.0_wp, 0.0_wp, 1.0_wp, 1.0_wp)
+        call s_evolve_q_pb_mv(2, 1._wp, 0._wp, 1._wp, 1._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
 
@@ -587,7 +591,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=2)
         end if
 
-        call s_evolve_q_pb_mv(1, 1.0_wp, 1.0_wp, 1.0_wp, 2.0_wp)
+        call s_evolve_q_pb_mv(1, 1._wp, 1._wp, 1._wp, 2._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
@@ -652,7 +656,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=1)
         end if
 
-        call s_evolve_q_pb_mv(2, 1.0_wp, 0.0_wp, 1.0_wp, 1.0_wp)
+        call s_evolve_q_pb_mv(2, 1._wp, 0._wp, 1._wp, 1._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
 
@@ -681,7 +685,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=2)
         end if
 
-        call s_evolve_q_pb_mv(2, 3.0_wp, 1.0_wp, 1.0_wp, 4.0_wp)
+        call s_evolve_q_pb_mv(2, 3._wp, 1._wp, 1._wp, 4._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
 
@@ -709,7 +713,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=3)
         end if
 
-        call s_evolve_q_pb_mv(1, 1.0_wp, 2.0_wp, 2.0_wp, 3.0_wp)
+        call s_evolve_q_pb_mv(1, 1._wp, 2._wp, 2._wp, 3._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
