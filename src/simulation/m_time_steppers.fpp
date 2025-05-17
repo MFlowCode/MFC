@@ -484,7 +484,7 @@ contains
                     end do
                 end do
             end do
-            
+
             !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
