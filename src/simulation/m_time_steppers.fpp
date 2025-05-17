@@ -490,6 +490,7 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
+                            do q = 1, nnode
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     mv_ts(1)%sf(j, k, l, q, i) &
                                     + dt*rhs_mv(j, k, l, q, i)
