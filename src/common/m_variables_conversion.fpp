@@ -1467,8 +1467,8 @@ contains
         real(wp) :: qv_K
         real(wp), dimension(2) :: Re_K
         real(wp) :: G_K
-                real(wp), dimension(num_species) :: Ys
-        real(wp) :: T,Mw,R_gas
+        real(wp), dimension(num_species) :: Y_K
+        real(wp) :: T_K, mix_mol_weight, R_gas
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -1481,7 +1481,7 @@ contains
         ! Computing the flux variables from the primitive variables, without
         ! accounting for the contribution of either viscosity or capillarity
 #ifdef MFC_SIMULATION
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_K, vel_K, alpha_K, Re_K, Ys)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_K, vel_K, alpha_K, Re_K, Y_K)
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1524,17 +1524,14 @@ contains
                     if (chemistry) then
                         !$acc loop seq
                         do i = chemxb, chemxe
-                           Ys(i - chemxb + 1) = qK_prim_vf(j,k,l,i)
+                            Y_K(i - chemxb + 1) = qK_prim_vf(j, k, l, i)
                         end do
-
-
-                            call get_mixture_molecular_weight(Ys, Mw)
-                          ! print *, gas_constant
-                            R_gas=gas_constant/Mw
-                            T=pres_K/rho_K/R_gas
-                    !    T = q_T_sf%sf(j, k, l)
-                        call get_mixture_energy_mass(T, Ys, E_K)
-                        E_K = rho_K*E_K+5e-1_wp*rho_K*vel_K_sum
+                        !Computing the energy from the internal energy of the mixture
+                        call get_mixture_molecular_weight(Y_k, mix_mol_weight)
+                        R_gas = gas_constant/mix_mol_weight
+                        T_K= pres_K/rho_K/R_gas
+                        call get_mixture_energy_mass(T_K, Y_K, E_K)
+                        E_K = rho_K*E_K + 5e-1_wp*rho_K*vel_K_sum
                     else
                         ! Computing the energy from the pressure
                         E_K = gamma_K*pres_K + pi_inf_K &
@@ -1558,10 +1555,13 @@ contains
                     ! energy flux, u(E+p)
                     FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
 
-                                        !$acc loop seq
-                    do i=1,num_species
-                        FK_vf(j, k, l, i-1+chemxb) = vel_K(dir_idx(1))*(rho_K*Ys(i))
-                    end do
+                    ! Species advection Flux, \rho*u*Y
+                    if (chemistry) then 
+                        !$acc loop seq
+                        do i=1, num_species
+                            FK_vf(j, k, l, i - 1 + chemxb) = vel_K(dir_idx(1))*(rho_K*Y_K(i))
+                        end do
+                    end if
 
                     if (riemann_solver == 1 .or. riemann_solver == 4) then
                         !$acc loop seq
