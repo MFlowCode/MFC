@@ -30,6 +30,10 @@ module m_cbc
 
     use m_compute_cbc
 
+    use m_thermochem, only: &
+    get_mixture_energy_mass,get_mixture_specific_heat_cv_mass,get_mixture_specific_heat_cp_mass,gas_constant, &
+    get_mixture_molecular_weight,get_species_enthalpies_rt,molecular_weights, get_species_specific_heats_r
+
     implicit none
 
     private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
@@ -153,7 +157,7 @@ contains
 
             @:ALLOCATE(F_rsx_vf(0:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, 1:adv_idx%end))
+                is3%beg:is3%end, 1:sys_size))
 
             @:ALLOCATE(F_src_rsx_vf(0:buff_size, &
                 is2%beg:is2%end, &
@@ -163,7 +167,7 @@ contains
 
         @:ALLOCATE(flux_rsx_vf_l(-1:buff_size, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:adv_idx%end))
+            is3%beg:is3%end, 1:sys_size))
 
         @:ALLOCATE(flux_src_rsx_vf_l(-1:buff_size, &
             is2%beg:is2%end, &
@@ -196,7 +200,7 @@ contains
 
                 @:ALLOCATE(F_rsy_vf(0:buff_size, &
                     is2%beg:is2%end, &
-                    is3%beg:is3%end, 1:adv_idx%end))
+                    is3%beg:is3%end, 1:sys_size))
 
                 @:ALLOCATE(F_src_rsy_vf(0:buff_size, &
                     is2%beg:is2%end, &
@@ -206,7 +210,7 @@ contains
 
             @:ALLOCATE(flux_rsy_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, 1:adv_idx%end))
+                is3%beg:is3%end, 1:sys_size))
 
             @:ALLOCATE(flux_src_rsy_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
@@ -241,7 +245,7 @@ contains
 
                 @:ALLOCATE(F_rsz_vf(0:buff_size, &
                     is2%beg:is2%end, &
-                    is3%beg:is3%end, 1:adv_idx%end))
+                    is3%beg:is3%end, 1:sys_size))
 
                 @:ALLOCATE(F_src_rsz_vf(0:buff_size, &
                     is2%beg:is2%end, &
@@ -251,7 +255,7 @@ contains
 
             @:ALLOCATE(flux_rsz_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, 1:adv_idx%end))
+                is3%beg:is3%end, 1:sys_size))
 
             @:ALLOCATE(flux_src_rsz_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
@@ -651,6 +655,10 @@ contains
         real(wp) :: qv          !< Cell averaged fluid reference energy
         real(wp) :: c
         real(wp) :: Ma
+        real(wp), dimension(num_species) :: Ys, h_k, dYs_dt, dYs_ds,Xs,Gamma_i,Cp_i
+        real(wp) :: T,sum_lol,sum_lol2
+        real(wp) :: Cv_T, Cv_Tref,T_ref,Cp_T,e_mix,dT_dt,Mw,R_gas,gamma_ii
+
 
         real(wp) :: vel_K_sum, vel_dv_dt_sum
 
@@ -684,7 +692,7 @@ contains
                                                                is1, is2, is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
                     !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = 1, advxe
+                    do i = 1, sys_size
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 flux_rs${XYZ}$_vf_l(0, k, r, i) = F_rs${XYZ}$_vf(0, k, r, i) &
@@ -715,7 +723,7 @@ contains
                                                                is1, is2, is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
                     !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, advxe
+                    do i = 1, sys_size
                         do j = 0, 1
                             do r = is3%beg, is3%end
                                 do k = is2%beg, is2%end
@@ -757,7 +765,7 @@ contains
                 end if
 
                 ! FD2 or FD4 of RHS at j = 0
-                !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
+                !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda, Ys,dYs_dt,dYs_ds,h_k)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
 
@@ -796,7 +804,50 @@ contains
                             mf(i) = alpha_rho(i)/rho
                         end do
 
-                        E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_K_sum
+                        if (chemistry) then
+                            !$acc loop seq
+                            do i = chemxb, chemxe
+                                Ys(i - chemxb + 1) =  q_prim_rs${XYZ}$_vf(0, k, r, i)
+                            end do
+                           ! T= q_T_sf%sf(0, k, r)
+                          
+                       !     call get_mixture_energy_mass(T, Ys, e_mix)
+                        !    E=rho*e_mix+5e-1_wp*rho*vel_K_sum
+                      !  print *, E
+                        !    call get_mixture_molecular_weight(Ys, MW)
+                            call get_mixture_molecular_weight(Ys, Mw)
+                          ! print *, gas_constant
+                            R_gas=gas_constant/Mw
+                            T=pres/rho/R_gas
+                            call get_mixture_specific_heat_cv_mass(T, Ys, Cv_T)
+                            call get_mixture_specific_heat_cp_mass(T, Ys, Cp_T)
+                            call get_mixture_energy_mass(T, Ys, e_mix)
+                            E=rho*e_mix+5e-1_wp*rho*vel_K_sum
+                           ! Xss(:) = Ys*MW/molecular_weights(:)
+                           ! call get_species_specific_heats_r(T, Cp_iL)
+                                Xs(:) = Ys(:)*MW/molecular_weights(:)
+        
+                                call get_species_specific_heats_r(T, Cp_i)
+                           
+                                if (chem_params%gamma_method == 1) then
+                                    ! gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
+                                    Gamma_i = Cp_i/(Cp_i - 1.0_wp)
+
+                                    gamma = sum(Xs(:)/(Gamma_i(:) - 1.0_wp))
+                                else if (chem_params%gamma_method == 2) then
+                                    ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
+                                    call get_mixture_specific_heat_cp_mass(T, Ys, Cp_T)
+                                     call get_mixture_specific_heat_cv_mass(T, Ys, Cv_T)
+
+                                    gamma = Cp_T/Cv_T
+                                    gamma = 1.0_wp/(gamma - 1.0_wp)
+
+                                end if                          !   Gamma_i = Cp_iL/(Cp_iL - 1.0d0)
+                          !  gamma = sum(Xss(:)/(Gamma_i(:) - 1.0d0))
+                            ! print*, E
+                        else
+                            E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_K_sum
+                        end if
                         H = (E + pres)/rho
 
                         ! Compute mixture sound speed
@@ -818,6 +869,11 @@ contains
                         !$acc loop seq
                         do i = 1, advxe - E_idx
                             dadv_ds(i) = 0._wp
+                        end do
+
+                        !$acc loop seq
+                        do i=1, num_species
+                             dYs_ds(i)=0._wp
                         end do
 
                         !$acc loop seq
@@ -845,6 +901,15 @@ contains
                                              fd_coef_${XYZ}$ (j, cbc_loc) + &
                                              dadv_ds(i)
                             end do
+
+                              if (chemistry) then
+                            !$acc loop seq
+                            do i=1, num_species
+                                 dYs_ds(i)= q_prim_rs${XYZ}$_vf(j, k, r, chemxb-1 + i)* &
+                                            fd_coef_${XYZ}$ (j, cbc_loc) + &
+                                            dYs_ds(i)
+                            end do
+                          end if
                         end do
 
                         ! First-Order Temporal Derivatives of Primitive Variables
@@ -883,7 +948,7 @@ contains
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_OUTFLOW) .or. &
                                  (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
-                            call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                            call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                             ! Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
                                 L(advxe) = c*(1._wp - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
@@ -904,7 +969,7 @@ contains
                             call s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SUP_OUTFLOW) .or. &
                                  (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_OUTFLOW)) then
-                            call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                            call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                         end if
 
                         ! Be careful about the cylindrical coordinate!
@@ -934,6 +999,13 @@ contains
                         do i = 1, num_dims
                             vel_dv_dt_sum = vel_dv_dt_sum + vel(i)*dvel_dt(i)
                         end do
+
+                                                if (chemistry) then
+                           !$acc loop seq
+                           do i=1,num_species
+                               dYs_dt(i)=-1._wp*L(chemxb+i-1)
+                           end do
+                        end if
 
                         ! The treatment of void fraction source is unclear
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
@@ -978,13 +1050,44 @@ contains
                                                                         + rho*dvel_dt(i - contxe))
                         end do
 
-                        flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
-                                                               + ds(0)*(pres*dgamma_dt &
-                                                                        + gamma*dpres_dt &
-                                                                        + dpi_inf_dt &
-                                                                        + dqv_dt &
-                                                                        + rho*vel_dv_dt_sum &
-                                                                        + 5e-1_wp*drho_dt*vel_K_sum)
+                        if (chemistry) then
+                           ! call get_mixture_specific_heat_cv_mass(T,Ys,Cv_T)
+                           ! dT_dt=T/(c*c*rho)*(-1._wp/(2._wp*gamma)*(L(advxe)+L(1))+L(2))
+                          ! dT_dt=dpres_dt/489/rho-pres/489/rho/rho*drho_dt
+                          ! call get_mixture_specific_heat_cv_mass(298.15d0,Ys,Cv_Tref)
+                           ! call get_mixture_molecular_weight(Ys, Mw)
+                          ! print *, gas_constant
+                           ! R_gas=gas_constant/Mw
+                            call get_species_enthalpies_rt(T, h_k)
+                            !h_k(:)= h_k(:)*gas_constant/molecular_weights(:)*T
+                            sum_lol=0._wp
+                            !$acc loop seq
+                            do i=1,num_species
+                            h_k(i)=h_k(i)*gas_constant/molecular_weights(i)*T
+                            sum_lol=sum_lol+(rho*h_k(i)-pres*Mw/molecular_weights(i)*Cp_T/R_gas)*(dYs_dt(i))
+                            end do
+                            ! flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
+                            !         +1.0*ds(0)*((0.5d0*vel(1)*vel(1)+e_mix+Cp_T*T+pres/rho)*(drho_dt)+Cv_T/R_gas*(dpres_dt)+rho*vel_dv_dt_sum+sum_lol)
+                            flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
+                                    + ds(0)*((E/rho+pres/rho)*drho_dt+rho*vel_dv_dt_sum+Cp_T*T*L(2)/(c*c)+sum_lol)
+                          !  flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
+                          !                                     + ds(0)*(H*drho_dt-dpres_dt-(gamma*(-L(2)+1.0d0/gamma/2.0d0*((1.0d0-vel(1)/c)*L(1)+(1.0d0+vel(1)/c)*L(5)))))
+                            !  print *, ((E/rho+pres/rho)*drho_dt+rho*vel_dv_dt_sum+Cp_T*T*L(2)/(c*c))
+                            !  print *, c
+                            !$acc loop seq
+                            do i=1,num_species
+                               flux_rs${XYZ}$_vf_l(-1, k, r, i-1+chemxb) = flux_rs${XYZ}$_vf_l(0, k, r, chemxb+i-1) &
+                                                                             +ds(0)*(drho_dt*Ys(i)+rho*dYs_dt(i))
+                            end do
+                        else
+                            flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
+                                                                  + ds(0)*(pres*dgamma_dt &
+                                                                            + gamma*dpres_dt &
+                                                                            + dpi_inf_dt &
+                                                                            + dqv_dt &
+                                                                            + rho*vel_dv_dt_sum &
+                                                                            + 5e-1_wp*drho_dt*vel_K_sum)
+                        end if
 
                         if (riemann_solver == 1) then
                             !$acc loop seq
@@ -1106,7 +1209,7 @@ contains
             end do
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, advxe
+            do i = 1, sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1182,7 +1285,7 @@ contains
             end do
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, advxe
+            do i = 1, sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1258,7 +1361,7 @@ contains
             end do
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, advxe
+            do i = 1, sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1339,7 +1442,7 @@ contains
         if (cbc_dir == 1) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, advxe
+            do i = 1, sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1390,7 +1493,7 @@ contains
         elseif (cbc_dir == 2) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, advxe
+            do i = 1, sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1443,7 +1546,7 @@ contains
         else
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, advxe
+            do i = 1, sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
