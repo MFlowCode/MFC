@@ -479,7 +479,17 @@ contains
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     pb_ts(1)%sf(j, k, l, q, i) &
                                     + dt*rhs_pb(j, k, l, q, i)
-
+                            end do
+                        end do
+                    end do
+                end do
+            end do
+            
+            !$acc parallel loop collapse(5) gang vector default(present)
+            do i = 1, nb
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     mv_ts(1)%sf(j, k, l, q, i) &
                                     + dt*rhs_mv(j, k, l, q, i)
