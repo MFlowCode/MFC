@@ -461,7 +461,7 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively ([Toro, 2013](references.md)).
 `riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations ([Miyoshi and Kusano, 2005](references.md)).
 
-- `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method ([Chen et al., 2022](references.md)) and the improved velocity reconstruction method ([Thornber et al., 2008](references.md)). This feature requires `riemann_solver = 2` and `model_eqns = 2`.
+- `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method ([Chen et al., 2022](references.md)) and the improved velocity reconstruction method ([Thornber et al., 2008](references.md)). This feature requires `model_eqns = 2` or `3`. `low_Mach = 1` works for `riemann_solver = 1` and `2`, but `low_Mach = 2` only works for `riemann_solver = 2`.
 
 - `avg_state` specifies the choice of the method to compute averaged variables at the cell-boundaries from the left and the right states in the Riemann solver by an integer of 1 or 2.
 `avg_state = 1` and `2` correspond to Roe- and arithmetic averages, respectively.
