@@ -357,10 +357,10 @@ contains
 
     end subroutine s_initialize_time_steppers_module
 
-    subroutine s_evolve_q_pb_mv(index, scaler1, scaler2, scaler3)  !! TODO :: Get a better name for this
+    subroutine s_evolve_q_pb_mv(index, scaler1, scaler2, scaler3, scaler4)  !! TODO :: Get a better name for this
 
         integer, intent(in) :: index  !! TODO :: Rename this
-        real(wp), intent(in) :: scaler1, scaler2, scaler3  !! TODO :: Rename these too
+        real(wp), intent(in) :: scaler1, scaler2, scaler3, scaler4  !! TODO :: Rename these too
         integer :: i, j, k, l, q
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -371,7 +371,7 @@ contains
                         q_cons_ts(index)%vf(i)%sf(j, k, l) = &
                             (scaler1*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + scaler2*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + scaler3*dt*rhs_vf(i)%sf(j, k, l))/(scaler1 + scaler2)  !! TODO :: scaler1 + scaler2 should be called a normalization constant
+                             + scaler3*dt*rhs_vf(i)%sf(j, k, l))/scaler4  !! TODO :: scaler1 + scaler2 should be called a normalization constant
                     end do
                 end do
             end do
@@ -388,7 +388,7 @@ contains
                                 pb_ts(index)%sf(j, k, l, q, i) = &
                                     (scaler1*pb_ts(1)%sf(j, k, l, q, i) &
                                      + scaler2*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + scaler3*dt*rhs_pb(j, k, l, q, i))/(scaler1 + scaler2)
+                                     + scaler3*dt*rhs_pb(j, k, l, q, i))/scaler4
                             end do
                         end do
                     end do
@@ -404,7 +404,7 @@ contains
                                 mv_ts(index)%sf(j, k, l, q, i) = &
                                     (scaler1*mv_ts(1)%sf(j, k, l, q, i) &
                                      + scaler2*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + scaler3*dt*rhs_mv(j, k, l, q, i))/(scaler1 + scaler2)
+                                     + scaler3*dt*rhs_mv(j, k, l, q, i))/scaler4
                             end do
                         end do
                     end do
@@ -479,6 +479,7 @@ contains
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     pb_ts(1)%sf(j, k, l, q, i) &
                                     + dt*rhs_pb(j, k, l, q, i)
+
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     mv_ts(1)%sf(j, k, l, q, i) &
                                     + dt*rhs_mv(j, k, l, q, i)
@@ -546,7 +547,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=1)
         end if
 
-        call s_evolve_q_pb_mv(2, 1.0_wp, 0.0_wp, 1.0_wp)
+        call s_evolve_q_pb_mv(2, 1.0_wp, 0.0_wp, 1.0_wp, 1.0_wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
 
@@ -575,7 +576,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=2)
         end if
 
-        call s_evolve_q_pb_mv(1, 1.0_wp, 1.0_wp, 1.0_wp)
+        call s_evolve_q_pb_mv(1, 1.0_wp, 1.0_wp, 1.0_wp, 2.0_wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
@@ -640,7 +641,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=1)
         end if
 
-        call s_evolve_q_pb_mv(2, 1.0_wp, 0.0_wp, 1.0_wp)
+        call s_evolve_q_pb_mv(2, 1.0_wp, 0.0_wp, 1.0_wp, 1.0_wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
 
@@ -669,7 +670,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=2)
         end if
 
-        call s_evolve_q_pb_mv(2, 3.0_wp, 1.0_wp, 1.0_wp)
+        call s_evolve_q_pb_mv(2, 3.0_wp, 1.0_wp, 1.0_wp, 4.0_wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
 
@@ -697,7 +698,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=3)
         end if
 
-        call s_evolve_q_pb_mv(1, 1.0_wp, 2.0_wp, 2.0_wp)
+        call s_evolve_q_pb_mv(1, 1.0_wp, 2.0_wp, 2.0_wp, 3.0_wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
