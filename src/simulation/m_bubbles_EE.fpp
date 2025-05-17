@@ -168,7 +168,7 @@ contains
 
         integer :: i, j, k, l, q, ii !< Loop variables
 
-        integer :: adap_dt_stop_max, adap_dt_stop !< fail-safe exit if max iteration count reached
+        integer :: adap_dt_stop_max, adap_dt_stop !< Fail-safe exit if max iteration count reached
         integer :: dmBub_id !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
@@ -320,7 +320,7 @@ contains
             end do
         end do
 
-        if (adap_dt .and. adap_dt_stop_max > 0) stop "Adaptive time stepping failed to converge"
+        if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         if (.not. adap_dt) then
             !$acc parallel loop collapse(3) gang vector default(present)

@@ -1431,8 +1431,7 @@ contains
             !$acc update host(intfc_rad)
             do i = 1, nBubs
                 if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
-                    print *, "Bubble radius is negative or NaN", proc_rank, t_step, i, intfc_rad(i, 1)
-                    error stop "Bubble radius is negative or NaN, please reduce dt"
+                    call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
                 end if
             end do
 

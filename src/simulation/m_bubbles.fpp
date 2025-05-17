@@ -457,6 +457,7 @@ contains
         !!  @param fbeta_c Mass transfer coefficient (EL)
         !!  @param fbeta_t Heat transfer coefficient (EL)
         !!  @param fCson Speed of sound (EL)
+        !!  @param adap_dt_stop Fail-safe exit if max iteration count reached
     subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                               fntait, fBtait, f_bub_adv_src, f_divu, &
                               bub_id, fmass_v, fmass_n, fbeta_c, &
@@ -471,17 +472,18 @@ contains
         real(wp), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu
         integer, intent(in) :: bub_id
         real(wp), intent(in) :: fmass_n, fbeta_c, fbeta_t, fCson
-        integer, intent(out) :: adap_dt_stop
+        integer, intent(inout) :: adap_dt_stop
 
         real(wp), dimension(5) :: err !< Error estimates for adaptive time stepping
         real(wp) :: t_new !< Updated time step size
         real(wp) :: h !< Time step size
         real(wp), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2 !< Bubble radius, radial velocity, and radial acceleration for the inner loop
         real(wp), dimension(4) :: myPb_tmp1, myMv_tmp1, myPb_tmp2, myMv_tmp2 !< Gas pressure and vapor mass for the inner loop (EL)
+        real(wp) :: fR2, fV2, fpb2, fmass_v2
         integer :: iter_count
 
-        h = f_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                fntait, fBtait, f_bub_adv_src, f_divu, fCson)
+        call s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                                 fntait, fBtait, f_bub_adv_src, f_divu, fCson, h)
 
         ! Advancing one step
         t_new = 0._wp
@@ -500,27 +502,30 @@ contains
                 iter_count = iter_count + 1
 
                 ! Advance one sub-step
-                err(1) = f_advance_substep( &
-                         fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                         fntait, fBtait, f_bub_adv_src, f_divu, &
-                         bub_id, fmass_v, fmass_n, fbeta_c, &
-                         fbeta_t, fCson, h, &
-                         myR_tmp1, myV_tmp1, myPb_tmp1, myMv_tmp1)
+                call s_advance_substep(err(1), &
+                                       fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                                       fntait, fBtait, f_bub_adv_src, f_divu, &
+                                       bub_id, fmass_v, fmass_n, fbeta_c, &
+                                       fbeta_t, fCson, h, &
+                                       myR_tmp1, myV_tmp1, myPb_tmp1, myMv_tmp1)
 
                 ! Advance one sub-step by advancing two half steps
-                err(2) = f_advance_substep( &
-                         fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                         fntait, fBtait, f_bub_adv_src, f_divu, &
-                         bub_id, fmass_v, fmass_n, fbeta_c, &
-                         fbeta_t, fCson, 0.5_wp*h, &
-                         myR_tmp2, myV_tmp2, myPb_tmp2, myMv_tmp2)
+                call s_advance_substep(err(2), &
+                                       fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                                       fntait, fBtait, f_bub_adv_src, f_divu, &
+                                       bub_id, fmass_v, fmass_n, fbeta_c, &
+                                       fbeta_t, fCson, 0.5_wp*h, &
+                                       myR_tmp2, myV_tmp2, myPb_tmp2, myMv_tmp2)
 
-                err(3) = f_advance_substep( &
-                         fRho, fP, myR_tmp2(4), myV_tmp2(4), fR0, myPb_tmp2(4), fpbdot, alf, &
-                         fntait, fBtait, f_bub_adv_src, f_divu, &
-                         bub_id, myMv_tmp2(4), fmass_n, fbeta_c, &
-                         fbeta_t, fCson, 0.5_wp*h, &
-                         myR_tmp2, myV_tmp2, myPb_tmp2, myMv_tmp2)
+                fR2 = myR_tmp2(4); fV2 = myV_tmp2(4)
+                fpb2 = myPb_tmp2(4); fmass_v2 = myMv_tmp2(4)
+
+                call s_advance_substep(err(3), &
+                                       fRho, fP, fR2, fV2, fR0, fpb2, fpbdot, alf, &
+                                       fntait, fBtait, f_bub_adv_src, f_divu, &
+                                       bub_id, fmass_v2, fmass_n, fbeta_c, &
+                                       fbeta_t, fCson, 0.5_wp*h, &
+                                       myR_tmp2, myV_tmp2, myPb_tmp2, myMv_tmp2)
 
                 err(4) = abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4))
                 err(5) = abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4))
@@ -587,15 +592,20 @@ contains
         !!  @param f_bub_adv_src Source for bubble volume fraction
         !!  @param f_divu Divergence of velocity
         !!  @param fCson Speed of sound (EL)
-    function f_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                 fntait, fBtait, f_bub_adv_src, f_divu, &
-                                 fCson)
+        !!  @param h Time step size
+    subroutine s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                                   fntait, fBtait, f_bub_adv_src, f_divu, &
+                                   fCson, h)
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_initial_substep_h
+#else
         !$acc routine seq
+#endif
         real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
         real(wp), intent(IN) :: fCson
+        real(wp), intent(OUT) :: h
 
-        real(wp) :: f_initial_substep_h
         real(wp), dimension(2) :: h_size !< Time step size (h0, h1)
         real(wp), dimension(3) :: d_norms !< norms (d_0, d_1, d_2)
         real(wp), dimension(2) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration
@@ -637,12 +647,13 @@ contains
             h_size(2) = (scale_guess/max(d_norms(2), d_norms(3)))**(1._wp/3._wp)
         end if
 
-        f_initial_substep_h = min(h_size(1)/scale_guess, h_size(2))
+        h = min(h_size(1)/scale_guess, h_size(2))
 
-    end function f_initial_substep_h
+    end subroutine s_initial_substep_h
 
     !>  Integrate bubble variables over the given time step size, h, using a
         !!      third-order accurate embedded Runge–Kutta scheme.
+        !!  @param err Estimated error
         !!  @param fRho Current density
         !!  @param fP Current driving pressure
         !!  @param fR Current bubble radius
@@ -666,12 +677,17 @@ contains
         !!  @param myV_tmp Bubble radial velocity at each stage
         !!  @param myPb_tmp Internal bubble pressure at each stage (EL)
         !!  @param myMv_tmp Mass of vapor in the bubble at each stage (EL)
-    function f_advance_substep(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                               fntait, fBtait, f_bub_adv_src, f_divu, &
-                               bub_id, fmass_v, fmass_n, fbeta_c, &
-                               fbeta_t, fCson, h, &
-                               myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
+    subroutine s_advance_substep(err, fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                                 fntait, fBtait, f_bub_adv_src, f_divu, &
+                                 bub_id, fmass_v, fmass_n, fbeta_c, &
+                                 fbeta_t, fCson, h, &
+                                 myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_advance_substep
+#else
         !$acc routine seq
+#endif
+        real(wp), intent(OUT) :: err
         real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu, h
         integer, intent(IN) :: bub_id
@@ -679,7 +695,6 @@ contains
         real(wp), dimension(4), intent(OUT) :: myR_tmp, myV_tmp, myPb_tmp, myMv_tmp
 
         real(wp), dimension(4) :: myA_tmp, mydPbdt_tmp, mydMvdt_tmp
-        real(wp) :: f_advance_substep
         real(wp) :: err_R, err_V
 
         myPb_tmp(1:4) = fpb
@@ -751,9 +766,9 @@ contains
             f_approx_equal(myA_tmp(3), 0._wp) .and. f_approx_equal(myA_tmp(4), 0._wp)) then
             err_V = 0._wp
         end if
-        f_advance_substep = sqrt((err_R**2._wp + err_V**2._wp)/2._wp)
+        err = sqrt((err_R**2._wp + err_V**2._wp)/2._wp)
 
-    end function f_advance_substep
+    end subroutine s_advance_substep
 
     !>  Changes of pressure and vapor mass in the lagrange bubbles.
         !!  @param bub_id Bubble identifier
@@ -766,8 +781,8 @@ contains
         !!  @param fMv_tmp Mass of vapor in the bubble
         !!  @param fdPbdt_tmp Rate of change of the internal bubble pressure
         !!  @param fdMvdt_tmp Rate of change of the mass of vapor in the bubble
-    function f_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fmass_n, fbeta_c, fbeta_t, &
-                          fdPbdt_tmp)
+    function f_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, &
+                          fmass_n, fbeta_c, fbeta_t, fdPbdt_tmp)
         !$acc routine seq
         real(wp), intent(IN) :: fR_tmp, fV_tmp, fPb_tmp, fMv_tmp
         real(wp), intent(IN) :: fmass_n, fbeta_c, fbeta_t

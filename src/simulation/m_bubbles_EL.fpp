@@ -224,7 +224,7 @@ contains
                     indomain = particle_in_domain(inputBubble(1:3))
                     id = id + 1
                     if (id > lag_params%nBubs_glb .and. proc_rank == 0) then
-                        call s_mpi_abort('Current number of bubbles is larger than nBubs_glb')
+                        call s_mpi_abort("Current number of bubbles is larger than nBubs_glb")
                     end if
                     if (indomain) then
                         bub_id = bub_id + 1
@@ -236,7 +236,7 @@ contains
                 end do
                 close (94)
             else
-                stop "Lagrange bubbles: you have to initialize them in input/lag_bubbles.dat"
+                call s_mpi_abort("Initialize the lagrange bubbles in input/lag_bubbles.dat")
             end if
         else
             if (proc_rank == 0) print *, 'Restarting lagrange bubbles at save_count: ', save_count
@@ -318,13 +318,18 @@ contains
         call s_locate_cell(mtn_pos(bub_id, 1:3, 1), cell, mtn_s(bub_id, 1:3, 1))
 
         ! Check if the bubble is located in the ghost cell of a symmetric boundary
-        if (bc_x%beg == BC_REFLECTIVE .and. cell(1) < 0) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_x%beg)."
-        if (bc_x%end == BC_REFLECTIVE .and. cell(1) > m) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_x%end)."
-        if (bc_y%beg == BC_REFLECTIVE .and. cell(2) < 0) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_y%beg)."
-        if (bc_y%end == BC_REFLECTIVE .and. cell(2) > n) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_y%end)."
+        if ((bc_x%beg == BC_REFLECTIVE .and. cell(1) < 0) .or. &
+            (bc_x%end == BC_REFLECTIVE .and. cell(1) > m) .or. &
+            (bc_y%beg == BC_REFLECTIVE .and. cell(2) < 0) .or. &
+            (bc_y%end == BC_REFLECTIVE .and. cell(2) > n)) then
+            call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric boundary.")
+        end if
+
         if (p > 0) then
-            if (bc_z%beg == BC_REFLECTIVE .and. cell(3) < 0) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_z%beg)."
-            if (bc_z%end == BC_REFLECTIVE .and. cell(3) > p) stop "Lagrange bubble is in the ghost cells of a symmetric boundary (bc_z%end)."
+            if ((bc_z%beg == BC_REFLECTIVE .and. cell(3) < 0) .or. &
+                (bc_z%end == BC_REFLECTIVE .and. cell(3) > p)) then
+                call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric boundary.")
+            end if
         end if
 
         ! If particle is in the ghost cells, find the closest non-ghost cell
@@ -355,7 +360,7 @@ contains
         gas_mv(bub_id, 1) = pv*volparticle*(1._wp/(R_v*Tw))*(massflag) ! vapermass
         gas_mg(bub_id) = (gas_p(bub_id, 1) - pv*(massflag))*volparticle*(1._wp/(R_n*Tw)) ! gasmass
         if (gas_mg(bub_id) <= 0._wp) then
-            stop 'The initial mass of gas inside the bubble is negative. Check your initial conditions'
+            call s_mpi_abort("The initial mass of gas inside the bubble is negative. Check the initial conditions.")
         end if
         totalmass = gas_mg(bub_id) + gas_mv(bub_id, 1) ! totalmass
 
@@ -363,7 +368,7 @@ contains
         concvap = gas_mv(bub_id, 1)/(gas_mv(bub_id, 1) + gas_mg(bub_id))
         omegaN = (3._wp*(gas_p(bub_id, 1) - pv*(massflag)) + 4._wp*(1._wp/Web)/bub_R0(bub_id))/rhol
         if (pv*(massflag) > gas_p(bub_id, 1)) then
-            stop "Lagrange bubble initially located in a region with pressure below the vapor pressure."
+            call s_mpi_abort("Lagrange bubble initially located in a region with pressure below the vapor pressure.")
         end if
         omegaN = sqrt(omegaN/bub_R0(bub_id)**2._wp)
 
@@ -379,7 +384,9 @@ contains
         call s_transcoeff(1._wp, PeG, Re_trans, Im_trans)
         gas_betaC(bub_id) = Re_trans*(massflag)*lag_params%diffcoefvap
 
-        if (gas_mg(bub_id) <= 0._wp) stop "Negative gas mass in the bubble, check if the bubble is in the domain."
+        if (gas_mg(bub_id) <= 0._wp) then
+            call s_mpi_abort("Negative gas mass in the bubble, check if the bubble is in the domain.")
+        end if
 
     end subroutine s_add_bubbles
 
@@ -507,7 +514,7 @@ contains
         real(wp), dimension(2) :: Re
         integer, dimension(3) :: cell
 
-        integer :: adap_dt_stop_max, adap_dt_stop !< fail-safe exit if max iteration count reached
+        integer :: adap_dt_stop_max, adap_dt_stop !< Fail-safe exit if max iteration count reached
         real(wp) :: dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu !< Dummy variables for unified subgrid bubble subroutines
 
         integer :: i, k, l
@@ -604,7 +611,7 @@ contains
 
         end do
 
-        if (adap_dt .and. adap_dt_stop_max > 0) stop "Adaptive time stepping failed to converge"
+        if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         ! Bubbles remain in a fixed position
         !$acc parallel loop collapse(2) gang vector default(present) private(k) copyin(stage)
