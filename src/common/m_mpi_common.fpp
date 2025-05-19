@@ -637,7 +637,7 @@ contains
                             /)
         end if
 
-        !$acc update device(v_size, nVar)
+        !$acc update device(v_size)
 
         buffer_count = buffer_counts(mpi_dir)
         boundary_conditions = (/bc_x, bc_y, bc_z/)

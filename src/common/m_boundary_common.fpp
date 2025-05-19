@@ -255,9 +255,11 @@ contains
 
         integer :: j, q, i
 
+#ifndef MFC_POST_PROCESS
         if (qbmm .and. .not. polytropic) then
             call s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc, k, l)
         end if
+#endif
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
@@ -795,9 +797,11 @@ contains
 
         integer :: j, q, i
 
+#ifndef MFC_POST_PROCESS
         if (qbmm .and. .not. polytropic) then
             call s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc, k, l)
         end if
+#endif
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !< bc_x%beg
@@ -894,9 +898,11 @@ contains
 
         integer :: j, q, i
 
+#ifndef MFC_POST_PROCESS
         if (qbmm .and. .not. polytropic) then
             call s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc, k, l)
         end if
+#endif
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !< bc_x%beg
