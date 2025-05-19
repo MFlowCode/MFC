@@ -317,7 +317,7 @@ module m_global_parameters
 
     !> @name Lagrangian bubbles
     !> @{
-    logical :: bubbles_lagrange, rkck_adap_dt
+    logical :: bubbles_lagrange
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
@@ -448,7 +448,6 @@ contains
 
         ! Lagrangian bubbles modeling
         bubbles_lagrange = .false.
-        rkck_adap_dt = .false.
 
         ! IBM
         num_ibs = dflt_int

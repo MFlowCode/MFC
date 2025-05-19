@@ -58,10 +58,6 @@ module m_time_steppers
     type(integer_field), allocatable, dimension(:, :) :: bc_type !<
     !! Boundary condition identifiers
 
-    type(vector_field), allocatable, dimension(:) :: rhs_ts_rkck
-    !! Cell-average RHS variables at each time-stage (TS)
-    !! Adaptive 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time stepper
-
     type(vector_field), allocatable, dimension(:) :: q_prim_ts !<
     !! Cell-average primitive variables at consecutive TIMESTEPS
 
@@ -77,7 +73,7 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare create(q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, rhs_ts_rkck, q_prim_ts, rhs_mv, rhs_pb, max_dt)
+    !$acc declare create(q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts, rhs_mv, rhs_pb, max_dt)
 
 contains
 
@@ -91,7 +87,7 @@ contains
         ! Setting number of time-stages for selected time-stepping scheme
         if (time_stepper == 1) then
             num_ts = 1
-        elseif (any(time_stepper == (/2, 3, 4/))) then
+        elseif (any(time_stepper == (/2, 3/))) then
             num_ts = 2
         end if
 
@@ -302,27 +298,13 @@ contains
             @:ALLOCATE(rhs_mv(0,0,0,0,0))
         end if
 
-        ! Allocating the cell-average RHS time-stages for adaptive RKCK stepper
-        if (bubbles_lagrange .and. time_stepper == 4) then
-            @:ALLOCATE(rhs_ts_rkck(1:num_ts_rkck))
-            do i = 1, num_ts_rkck
-                @:ALLOCATE(rhs_ts_rkck(i)%vf(1:sys_size))
-            end do
-            do i = 1, num_ts_rkck
-                do j = 1, sys_size
-                    @:ALLOCATE(rhs_ts_rkck(i)%vf(j)%sf(0:m, 0:n, 0:p))
-                end do
-                @:ACC_SETUP_VFs(rhs_ts_rkck(i))
-            end do
-        else
-            ! Allocating the cell-average RHS variables
-            @:ALLOCATE(rhs_vf(1:sys_size))
+        ! Allocating the cell-average RHS variables
+        @:ALLOCATE(rhs_vf(1:sys_size))
 
-            do i = 1, sys_size
-                @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
-                @:ACC_SETUP_SFs(rhs_vf(i))
-            end do
-        end if
+        do i = 1, sys_size
+            @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
+            @:ACC_SETUP_SFs(rhs_vf(i))
+        end do
 
         ! Opening and writing the header of the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
@@ -367,7 +349,7 @@ contains
         ! Stage 1 of 1
         call nvtxStartRange("TIMESTEP")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
 
 #ifdef DEBUG
         print *, 'got rhs'
@@ -391,10 +373,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
-            call s_update_lagrange_tdv_rk(stage=1)
-        end if
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -480,7 +459,7 @@ contains
 
         call nvtxStartRange("TIMESTEP")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -496,10 +475,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
-            call s_update_lagrange_tdv_rk(stage=1)
-        end if
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -569,12 +545,9 @@ contains
 
         ! Stage 2 of 2
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
-            call s_update_lagrange_tdv_rk(stage=2)
-        end if
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -668,7 +641,7 @@ contains
             call nvtxStartRange("TIMESTEP")
         end if
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -684,10 +657,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
-            call s_update_lagrange_tdv_rk(stage=1)
-        end if
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -757,12 +727,9 @@ contains
 
         ! Stage 2 of 3
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
-            call s_update_lagrange_tdv_rk(stage=2)
-        end if
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -833,12 +800,9 @@ contains
         end if
 
         ! Stage 3 of 3
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=3)
-            call s_update_lagrange_tdv_rk(stage=3)
-        end if
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -936,13 +900,13 @@ contains
         call nvtxStartRange("TIMESTEP")
 
         ! Stage 1 of 3
-        call s_adaptive_dt_bubble(t_step)
+        call s_adaptive_dt_bubble(t_step, 1)
 
         ! Stage 2 of 3
         call s_3rd_order_tvd_rk(t_step, time_avg)
 
         ! Stage 3 of 3
-        call s_adaptive_dt_bubble(t_step)
+        call s_adaptive_dt_bubble(t_step, 3)
 
         call nvtxEndRange
 
@@ -954,9 +918,9 @@ contains
 
     !> Bubble source part in Strang operator splitting scheme
         !! @param t_step Current time-step
-    subroutine s_adaptive_dt_bubble(t_step)
+    subroutine s_adaptive_dt_bubble(t_step, stage)
 
-        integer, intent(in) :: t_step
+        integer, intent(in) :: t_step, stage
 
         type(vector_field) :: gm_alpha_qp
 
@@ -967,9 +931,27 @@ contains
             idwint, &
             gm_alpha_qp%vf)
 
-        call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+        if (bubbles_euler) then
 
-        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+            call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+            call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
+        elseif (bubbles_lagrange) then
+
+            call s_populate_variables_buffers(q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, bc_type)
+            call s_compute_bubble_EL_dynamics(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf, stage)
+            call s_transfer_data_to_tmp()
+            call s_smear_voidfraction()
+            if (stage == 3) then
+                if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
+                if (lag_params%write_bubbles) then
+                    !$acc update host(gas_p, gas_mv, intfc_rad, intfc_vel)
+                    call s_write_lag_particles(mytime)
+                end if
+                call s_write_void_evol(mytime)
+            end if
+
+        end if
 
     end subroutine s_adaptive_dt_bubble
 
@@ -1096,148 +1078,6 @@ contains
 
     end subroutine s_time_step_cycling
 
-    !> (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepping algorithm (Cash J. and Karp A., 1990)
-        !!      Method for initial value problems with rapidly varying RHS. A maximum error between the 4th and 5th
-        !!      order Runge-Kutta-Cash-Karp solutions for the same time step size is calculated. If the error is
-        !!      smaller than a tolerance, then the algorithm employs the 5th order solution, while if not, both
-        !!      eulerian/lagrangian variables are re-calculated with a smaller time step size.
-        !! @param t_step Current time-step
-        !! @param hdid Advanced time increment (adaptive time stepping)
-    subroutine s_4th_5th_order_rkck(t_step, time_avg)
-
-        integer, intent(in) :: t_step
-        real(wp), intent(out) :: time_avg
-
-        logical :: restart_rkck_step, start_rkck_step
-        real(wp) :: lag_largestep, rkck_errmax, dt_did
-        integer :: RKstep
-
-        mytime = mytime - dt
-
-        start_rkck_step = .true.
-        restart_rkck_step = .false.
-
-        do while (start_rkck_step .or. restart_rkck_step)
-
-            start_rkck_step = .false.
-            restart_rkck_step = .false.
-
-            ! FIRST TIME-STAGE
-            RKstep = 1
-            rkck_time_tmp = mytime + rkck_c1*dt
-!$acc update device (rkck_time_tmp)
-
-#ifdef DEBUG
-            if (proc_rank == 0) print *, 'RKCK 1st time-stage at', rkck_time_tmp
-#endif
-            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(1)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_ts_rkck(1)%vf, RKstep)
-            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
-            if (restart_rkck_step) cycle
-
-            ! SECOND TIME-STAGE
-            RKstep = 2
-            rkck_time_tmp = mytime + rkck_c2*dt
-!$acc update device (rkck_time_tmp)
-
-#ifdef DEBUG
-            if (proc_rank == 0) print *, 'RKCK 2nd time-stage at', rkck_time_tmp
-#endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(2)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(2)%vf, RKstep)
-            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
-            if (restart_rkck_step) cycle
-
-            ! THIRD TIME-STAGE
-            RKstep = 3
-            rkck_time_tmp = mytime + rkck_c3*dt
-!$acc update device (rkck_time_tmp)
-
-#ifdef DEBUG
-            if (proc_rank == 0) print *, 'RKCK 3rd time-stage at', rkck_time_tmp
-#endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(3)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(3)%vf, RKstep)
-            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
-            if (restart_rkck_step) cycle
-
-            ! FOURTH TIME-STAGE
-            RKstep = 4
-            rkck_time_tmp = mytime + rkck_c4*dt
-!$acc update device (rkck_time_tmp)
-
-#ifdef DEBUG
-            if (proc_rank == 0) print *, 'RKCK 4th time-stage at', rkck_time_tmp
-#endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(4)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(4)%vf, RKstep)
-            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
-            if (restart_rkck_step) cycle
-
-            ! FIFTH TIME-STAGE
-            RKstep = 5
-            rkck_time_tmp = mytime + rkck_c5*dt
-!$acc update device (rkck_time_tmp)
-
-#ifdef DEBUG
-            if (proc_rank == 0) print *, 'RKCK 5th time-stage at', rkck_time_tmp
-#endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(5)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(5)%vf, 5)
-            call s_update_tmp_rkck(5, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
-            if (restart_rkck_step) cycle
-
-            ! SIXTH TIME-STAGE
-            RKstep = 6
-            rkck_time_tmp = mytime + rkck_c6*dt
-!$acc update device (rkck_time_tmp)
-
-#ifdef DEBUG
-            if (proc_rank == 0) print *, 'RKCK 6th time-stage at', rkck_time_tmp
-#endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(6)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(6)%vf, 6)
-            call s_update_tmp_rkck(6, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
-            if (restart_rkck_step) cycle
-
-            dt_did = dt
-
-            if (rkck_adap_dt) then
-                ! TRUNCATION ERROR
-#ifdef DEBUG
-                if (proc_rank == 0) print *, 'Computing truncation error (4th/5th RKCK)'
-#endif
-                call s_calculate_rkck_truncation_error(rkck_errmax)
-                call s_compute_rkck_dt(lag_largestep, restart_rkck_step, rkck_errmax)
-                if (restart_rkck_step) cycle
-            end if
-
-        end do
-
-        !> Update values
-        mytime = mytime + dt_did
-        call s_update_rkck(q_cons_ts)
-
-        call s_write_void_evol(mytime)
-        if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
-
-        if (lag_params%write_bubbles) then
-            !$acc update host(gas_p, gas_mv, intfc_rad, intfc_vel)
-            call s_write_lag_particles(mytime)
-        end if
-
-        if (run_time_info) then
-            call s_write_run_time_information(q_prim_vf, t_step)
-        end if
-
-    end subroutine s_4th_5th_order_rkck
-
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_time_steppers_module
 
@@ -1308,23 +1148,12 @@ contains
 
         @:DEALLOCATE(q_prim_vf)
 
-        ! Deallocating the cell-average RHS variable for adaptive method, Lagrangian solver
-        if (bubbles_lagrange .and. time_stepper == 4) then ! RKCK stepper
-            do i = 1, num_ts_rkck
-                do j = 1, sys_size
-                    @:DEALLOCATE(rhs_ts_rkck(i)%vf(j)%sf)
-                end do
-                @:DEALLOCATE(rhs_ts_rkck(i)%vf)
-            end do
-            @:DEALLOCATE(rhs_ts_rkck)
-        else
-            ! Deallocating the cell-average RHS variables
-            do i = 1, sys_size
-                @:DEALLOCATE(rhs_vf(i)%sf)
-            end do
+        ! Deallocating the cell-average RHS variables
+        do i = 1, sys_size
+            @:DEALLOCATE(rhs_vf(i)%sf)
+        end do
 
-            @:DEALLOCATE(rhs_vf)
-        end if
+        @:DEALLOCATE(rhs_vf)
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
