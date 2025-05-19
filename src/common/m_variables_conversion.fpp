@@ -1529,14 +1529,14 @@ contains
                         !Computing the energy from the internal energy of the mixture
                         call get_mixture_molecular_weight(Y_k, mix_mol_weight)
                         R_gas = gas_constant/mix_mol_weight
-                        T_K= pres_K/rho_K/R_gas
+                        T_K = pres_K/rho_K/R_gas
                         call get_mixture_energy_mass(T_K, Y_K, E_K)
                         E_K = rho_K*E_K + 5e-1_wp*rho_K*vel_K_sum
                     else
                         ! Computing the energy from the pressure
                         E_K = gamma_K*pres_K + pi_inf_K &
-                        + 5e-1_wp*rho_K*vel_K_sum + qv_K
-                    end if 
+                              + 5e-1_wp*rho_K*vel_K_sum + qv_K
+                    end if
 
                     ! mass flux, this should be \alpha_i \rho_i u_i
                     !$acc loop seq
@@ -1556,9 +1556,9 @@ contains
                     FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
 
                     ! Species advection Flux, \rho*u*Y
-                    if (chemistry) then 
+                    if (chemistry) then
                         !$acc loop seq
-                        do i=1, num_species
+                        do i = 1, num_species
                             FK_vf(j, k, l, i - 1 + chemxb) = vel_K(dir_idx(1))*(rho_K*Y_K(i))
                         end do
                     end if

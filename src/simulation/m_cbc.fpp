@@ -31,11 +31,11 @@ module m_cbc
     use m_compute_cbc
 
     use m_thermochem, only: &
-    get_mixture_energy_mass,get_mixture_specific_heat_cv_mass, &
-    get_mixture_specific_heat_cp_mass,gas_constant, &
-    get_mixture_molecular_weight,get_species_enthalpies_rt, &
-    molecular_weights, get_species_specific_heats_r, &
-    get_mole_fractions,get_species_specific_heats_r
+        get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, &
+        get_mixture_specific_heat_cp_mass, gas_constant, &
+        get_mixture_molecular_weight, get_species_enthalpies_rt, &
+        molecular_weights, get_species_specific_heats_r, &
+        get_mole_fractions, get_species_specific_heats_r
 
     implicit none
 
@@ -134,7 +134,7 @@ contains
 
         if (chemistry) then
             flux_cbc_index = sys_size
-        else 
+        else
             flux_cbc_index = adv_idx%end
         end if
         !$acc update device(flux_cbc_index)
@@ -670,7 +670,6 @@ contains
         real(wp) :: Cv, Cp, e_mix, Mw, R_gas
         real(wp), dimension(num_species) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
 
-
         real(wp) :: vel_K_sum, vel_dv_dt_sum
 
         integer :: i, j, k, r, q !< Generic loop iterators
@@ -818,7 +817,7 @@ contains
                         if (chemistry) then
                             !$acc loop seq
                             do i = chemxb, chemxe
-                                Ys(i - chemxb + 1) =  q_prim_rs${XYZ}$_vf(0, k, r, i)
+                                Ys(i - chemxb + 1) = q_prim_rs${XYZ}$_vf(0, k, r, i)
                             end do
 
                             call get_mixture_molecular_weight(Ys, Mw)
@@ -836,7 +835,6 @@ contains
                             else if (chem_params%gamma_method == 2) then
                                 !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
                                 call get_mixture_specific_heat_cv_mass(T, Ys, Cv)
-                                call get_mixture_specific_heat_cp_mass(T, Ys, Cp)
                                 gamma = 1.0_wp/(Cp/Cv - 1.0_wp)
                             end if
                         else
@@ -866,10 +864,12 @@ contains
                             dadv_ds(i) = 0._wp
                         end do
 
-                        !$acc loop seq
-                        do i=1, num_species
-                             dYs_ds(i) = 0._wp
-                        end do
+                        if (chemistry) then
+                            !$acc loop seq
+                            do i = 1, num_species
+                                dYs_ds(i) = 0._wp
+                            end do
+                        end if
 
                         !$acc loop seq
                         do j = 0, buff_size
@@ -899,12 +899,12 @@ contains
 
                             if (chemistry) then
                                 !$acc loop seq
-                                do i=1, num_species
+                                do i = 1, num_species
                                     dYs_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, chemxb - 1 + i)* &
-                                               fd_coef_${XYZ}$ (j, cbc_loc) + &
-                                               dYs_ds(i)
+                                                fd_coef_${XYZ}$ (j, cbc_loc) + &
+                                                dYs_ds(i)
                                 end do
-                          end if
+                            end if
                         end do
 
                         ! First-Order Temporal Derivatives of Primitive Variables
@@ -919,7 +919,7 @@ contains
                             call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_BUFFER) .or. &
                                  (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_BUFFER)) then
-                            call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                            call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_INFLOW) .or. &
                                  (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_INFLOW)) then
                             call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
@@ -1051,19 +1051,19 @@ contains
                             sum_Enthalpies = 0._wp
                             !$acc loop seq
                             do i = 1, num_species
-                            h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
-                            sum_Enthalpies = sum_Enthalpies+ (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
+                                h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
+                                sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
                             end do
                             flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
-                                    + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2)/(c*c) + sum_Enthalpies)
+                                                                   + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2)/(c*c) + sum_Enthalpies)
                             !$acc loop seq
-                            do i=1,num_species
-                               flux_rs${XYZ}$_vf_l(-1, k, r, i - 1 + chemxb) = flux_rs${XYZ}$_vf_l(0, k, r, chemxb + i - 1) &
-                                                                             + ds(0)*(drho_dt*Ys(i) + rho*dYs_dt(i))
+                            do i = 1, num_species
+                                flux_rs${XYZ}$_vf_l(-1, k, r, i - 1 + chemxb) = flux_rs${XYZ}$_vf_l(0, k, r, chemxb + i - 1) &
+                                                                                + ds(0)*(drho_dt*Ys(i) + rho*dYs_dt(i))
                             end do
                         else
                             flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
-                                                                  + ds(0)*(pres*dgamma_dt &
+                                                                   + ds(0)*(pres*dgamma_dt &
                                                                             + gamma*dpres_dt &
                                                                             + dpi_inf_dt &
                                                                             + dqv_dt &
