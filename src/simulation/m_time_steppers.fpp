@@ -938,7 +938,7 @@ contains
 
         elseif (bubbles_lagrange) then
 
-            call s_populate_variables_buffers(q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, bc_type)
+            call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             call s_compute_bubble_EL_dynamics(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf, stage)
             call s_transfer_data_to_tmp()
             call s_smear_voidfraction()

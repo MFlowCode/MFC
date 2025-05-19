@@ -291,11 +291,7 @@ SIMULATION.update({
     'surface_tension': ParamType.LOG,
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
-<<<<<<< HEAD
-    'rkck_tolerance': ParamType.REAL,
-=======
     'num_bc_patches': ParamType.INT,
->>>>>>> upstream/master
     'powell': ParamType.LOG,
     'tau_star': ParamType.REAL,
     'cont_damage_s': ParamType.REAL,
