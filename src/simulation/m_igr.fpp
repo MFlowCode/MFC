@@ -12,21 +12,26 @@ module m_igr
 
     use m_helper
 
+    use m_boundary_common
+
     implicit none
 
     private; public :: s_initialize_igr_module, &
         s_igr_iterative_solve, &
         s_igr_riemann_solver, &
-        s_igr_sigma, &
+        s_igr_sigma_x, &
         s_initialize_igr, &
         s_igr_flux_add
 
     real(wp), allocatable, dimension(:, :, :) :: jac, jac_rhs, jac_old
-    type(scalar_field), pointer, dimension(1) :: jac_sf
     !$acc declare create(jac, jac_rhs)
 
     real(wp), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
+
+
+    real(wp) :: alf_igr
+    !$acc declare create(alf_igr)
 
 #ifdef _CRAYFTN
     real(wp), allocatable, dimension(:) :: coeff_L, coeff_R
@@ -68,7 +73,6 @@ contains
         @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, &
                      idwbuff(2)%beg:idwbuff(2)%end, &
                      idwbuff(3)%beg:idwbuff(3)%end))
-        jac_sf(1) => jac
         @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
 
         if (igr_iter_solver == 1) then ! Jacobi iteration
@@ -187,7 +191,7 @@ contains
                 end do
             end do
 
-            call s_populate_F_igr_buffers(bc_type, jac_sf(1))
+            call s_populate_F_igr_buffers(bc_type, jac)
 
             if (igr_iter_solver == 1) then ! Jacobi iteration
                 !$acc parallel loop collapse(3) gang default(present)
@@ -211,7 +215,6 @@ contains
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: q_prim_vf
-        integer, intent(in) :: idir
 
         real(wp) :: F_L, vel_L,rho_L
         real(wp), dimension(num_fluids) :: alpha_rho_L
@@ -302,26 +305,61 @@ contains
 
     end subroutine s_igr_sigma_x
 
-    function f_reconstruct_state_L(q_sf, idir) result(q_L)
+    function f_reconstruct_state_L(q_sf, j, k, l, idir) result(q_L)
 
-        q_L = (1._wp/60._wp) * (-3._wp * q_sf(j-1, k, l) + &
-                27._wp * q_sf(j, k, l) + &
-                47._wp * q_sf(j+1, k, l) -   &
-                13._wp * q_sf(j+2, k, l) + &
-                2._wp * q_sf(j+3, k, l))
+        real(wp), dimension(:,:,:), intent(in) :: q_sf
+        integer, intent(in) :: j, k, l, idir
+        real(wp) :: q_L
+
+        if (idir == 1) then
+            q_L = (1._wp/60._wp) * (-3._wp * q_sf(j-1, k, l) + &
+                    27._wp * q_sf(j, k, l) + &
+                    47._wp * q_sf(j+1, k, l) -   &
+                    13._wp * q_sf(j+2, k, l) + &
+                    2._wp * q_sf(j+3, k, l))
+        else if (idir == 2) then
+            q_L = (1._wp/60._wp) * (-3._wp * q_sf(j, k-1, l) + &
+                    27._wp * q_sf(j, k, l) + &
+                    47._wp * q_sf(j, k+1, l) -   &
+                    13._wp * q_sf(j, k+2, l) + &
+                    2._wp * q_sf(j, k+3, l))
+        else if (idir == 3) then
+            q_L = (1._wp/60._wp) * (-3._wp * q_sf(j, k, l-1) + &
+                    27._wp * q_sf(j, k, l) + &
+                    47._wp * q_sf(j, k, l+1) -   &
+                    13._wp * q_sf(j, k, l+2) + &
+                    2._wp * q_sf(j, k, l+3))
+        end if
 
     end function f_reconstruct_state_L
 
-    function f_reconstruct_state_R(q_sf, idir) result(q_R)
+    function f_reconstruct_state_R(q_sf, j, k, l, idir) result(q_R)
 
-        q_R = (1._wp/60._wp) * (-3._wp * q_sf(j+2, k, l) + &
-                27._wp * q_sf(j+1, k, l) + &
-                47._wp * q_sf(j, k, l) -   &
-                13._wp * q_sf(j-1, k, l) + &
-                2._wp * q_sf(j-2, k, l))
+        real(wp), dimension(:,:,:), intent(in) :: q_sf
+        integer, intent(in) :: j, k, l, idir
+        real(wp) :: q_R
 
-    end function f_reconstruct_state_L
+        if (idir == 1) then
+            q_R = (1._wp/60._wp) * (-3._wp * q_sf(j+2, k, l) + &
+                    27._wp * q_sf(j+1, k, l) + &
+                    47._wp * q_sf(j, k, l) -   &
+                    13._wp * q_sf(j-1, k, l) + &
+                    2._wp * q_sf(j-2, k, l))
+        else if (idir == 2) then
+            q_R = (1._wp/60._wp) * (-3._wp * q_sf(j, k+2, l) + &
+                    27._wp * q_sf(j, k+1, l) + &
+                    47._wp * q_sf(j, k, l) -   &
+                    13._wp * q_sf(j, k-1, l) + &
+                    2._wp * q_sf(j, k-2, l))
+        else if (idir == 3) then
+            q_R = (1._wp/60._wp) * (-3._wp * q_sf(j, k, l+2) + &
+                    27._wp * q_sf(j, k, l+1) + &
+                    47._wp * q_sf(j, k, l) -   &
+                    13._wp * q_sf(j, k, l-1) + &
+                    2._wp * q_sf(j, k, l-2))
+        end if
 
+    end function f_reconstruct_state_R
 
     subroutine s_igr_riemann_solver(q_prim_vf, rhs_vf, idir)
 
@@ -2714,14 +2752,11 @@ contains
         end if
         !$acc update device(alf_igr)
 
-        omega = 1.0_wp
-        !$acc update device(omega)
-
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = -1, p+1
            do k = -1, n+1
                 do j = -1,m+1
-                    do i = 1, vec_size
+                    do i = 1, sys_size
                         rhs_vf(i)%sf(j,k,l) = 0._wp
                     end do
                 end do

@@ -34,6 +34,7 @@ module m_boundary_common
  s_populate_variables_buffers, &
  s_create_mpi_types, &
  s_populate_capillary_buffers, &
+ s_populate_F_igr_buffers, &
  s_write_serial_boundary_condition_files, &
  s_write_parallel_boundary_condition_files, &
  s_read_serial_boundary_condition_files, &
@@ -1488,10 +1489,13 @@ contains
 
     end subroutine s_color_function_ghost_cell_extrapolation
 
-    subroutine s_populate_F_igr_buffers(bc_type, jac_sf)
+    subroutine s_populate_F_igr_buffers(bc_type, jac)
 
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
-        type(scalar_field), dimension(1), intent(inout) :: jac_sf
+        real(wp), dimension(:,:,:), intent(inout) :: jac
+
+        type(scalar_field), dimension(1) :: jac_sf
+        integer :: j, k, l
 
         if(bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 1, -1, 1)
@@ -1517,9 +1521,7 @@ contains
             end do
         end if
 
-        if (n == 0) then
-            return
-        else if (bc_x%end >= 0) then
+        if (bc_x%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 1, 1, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1543,7 +1545,9 @@ contains
             end do
         end if
 
-        if(bc_y%beg >= 0) then
+        if (n == 0) then
+            return
+        else if (bc_y%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 2, -1, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1567,7 +1571,7 @@ contains
             end do
         end if
 
-        if(bc_%end >= 0) then
+        if(bc_y%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 2, 1, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)

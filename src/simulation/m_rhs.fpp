@@ -35,6 +35,8 @@ module m_rhs
 
     use m_bubbles_EE           !< Ensemble-averaged bubble dynamics routines
 
+    use m_bubbles_EL
+
     use m_qbmm                 !< Moment inversion
 
     use m_hypoelastic
@@ -569,9 +571,9 @@ contains
             !$acc parallel loop collapse(4) gang vector default(present)
             do id = 1, num_dims
                 do i = 1, sys_size
-                    do l = startz, p - startz
-                        do k = starty, n - starty
-                            do j = startx, m - startx
+                    do l = idwbuff(3)%beg, idwbuff(3)%end
+                        do k = idwbuff(2)%beg, idwbuff(2)%end
+                            do j = idwbuff(1)%beg, idwbuff(1)%end
                                 flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0._wp
                             end do
                         end do
@@ -643,17 +645,18 @@ contains
 
     end subroutine s_initialize_rhs_module
 
-    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
+    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
+        integer, intent(in) :: stage
 
         !real(wp), dimension(0:m, 0:n, 0:p) :: nbub
         real(wp) :: t_start, t_finish
@@ -701,7 +704,7 @@ contains
 
         if(igr) then
             call nvtxStartRange("RHS-COMMUNICATION")
-            call s_populate_variables_buffers(q_cons_vf, pb, mv, bc_type)
+            call s_populate_variables_buffers(bc_type, q_cons_vf, pb, mv)
             call nvtxEndRange
         else
             call nvtxStartRange("RHS-CONVERT")
@@ -714,7 +717,7 @@ contains
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")
-            call s_populate_variables_buffers(q_prim_qp%vf, pb, mv, bc_type)
+            call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb, mv)
             call nvtxEndRange
         end if
 
@@ -746,7 +749,7 @@ contains
 
         if (surface_tension) then
             call nvtxStartRange("RHS-SURFACE-TENSION")
-            call s_get_capilary(q_prim_qp%vf)
+            call s_get_capilary(q_prim_qp%vf, bc_type)
             call nvtxEndRange
         end if
 
@@ -767,7 +770,7 @@ contains
 
                 if(id == 1) then
                     call nvtxStartRange("IGR_Jacobi")
-                    call s_igr_iterative_solve(q_cons_vf,t_step)
+                    call s_igr_iterative_solve(q_cons_vf,bc_type,t_step)
                     call nvtxEndRange
 
                     call nvtxStartRange("IGR_SIGMA")
@@ -953,7 +956,7 @@ contains
             call nvtxEndRange
         end if
 
-        ! Add bubles source term
+        ! Add bubbles source term
         if (bubbles_euler .and. (.not. adap_dt) .and. (.not. qbmm)) then
             call nvtxStartRange("RHS-BUBBLES-SRC")
             call s_compute_bubble_EE_source( &
@@ -962,6 +965,27 @@ contains
                 t_step, &
                 rhs_vf)
             call nvtxEndRange
+        end if
+
+        if (bubbles_lagrange) then
+            ! RHS additions for sub-grid bubbles_lagrange
+            call nvtxStartRange("RHS-EL-BUBBLES-SRC")
+            call s_compute_bubbles_EL_source( &
+                q_cons_qp%vf(1:sys_size), &
+                q_prim_qp%vf(1:sys_size), &
+                rhs_vf)
+            call nvtxEndRange
+            ! Compute bubble dynamics
+            if (.not. adap_dt) then
+                call nvtxStartRange("RHS-EL-BUBBLES-DYN")
+                call s_compute_bubble_EL_dynamics( &
+                    q_cons_qp%vf(1:sys_size), &
+                    q_prim_qp%vf(1:sys_size), &
+                    t_step, &
+                    rhs_vf, &
+                    stage)
+                call nvtxEndRange
+            end if
         end if
 
         if (chemistry .and. chem_params%reactions) then
@@ -2050,8 +2074,8 @@ contains
                                                   norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
@@ -2102,8 +2126,8 @@ contains
                                                               norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
 
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction

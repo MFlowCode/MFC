@@ -157,6 +157,10 @@ module m_global_parameters
     logical :: shear_stress  !< Shear stresses
     logical :: bulk_stress   !< Bulk stresses
     logical :: cont_damage   !< Continuum damage modeling
+    logical :: igr           !< Use information geometric regularization
+    integer :: igr_iter_solver !< IGR elliptic solver
+    integer :: num_igr_iters !< number of iterations for elliptic solve
+    real(wp) :: alf_factor  !< alpha factor for IGR
 
     !$acc declare create(chemistry)
 
@@ -568,6 +572,10 @@ contains
         shear_stress = .false.
         bulk_stress = .false.
         cont_damage = .false.
+        igr = .false.
+        igr_iter_solver = 1
+        num_igr_iters = dflt_num_igr_iters
+        alf_factor = dflt_alf_factor
 
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.
