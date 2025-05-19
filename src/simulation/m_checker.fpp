@@ -115,7 +115,7 @@ contains
         if (.not. cfl_dt) then
             @:PROHIBIT(dt <= 0)
         end if
-        @:PROHIBIT(time_stepper < 1 .or. time_stepper > 5)
+        @:PROHIBIT(time_stepper < 1 .or. time_stepper > 3)
     end subroutine s_check_inputs_time_stepping
 
     !> Checks constraints on parameters related to 6-equation model
@@ -278,8 +278,8 @@ contains
     subroutine s_check_inputs_adapt_dt
         @:PROHIBIT(adap_dt .and. time_stepper /= 3, "adapt_dt requires Runge-Kutta 3 (time_stepper = 3)")
         @:PROHIBIT(adap_dt .and. qbmm)
-        @:PROHIBIT(adap_dt .and. (.not. polytropic))
-        @:PROHIBIT(adap_dt .and. (.not. adv_n))
+        @:PROHIBIT(adap_dt .and. (.not. polytropic) .and. (.not. bubbles_lagrange))
+        @:PROHIBIT(adap_dt .and. (.not. adv_n) .and. (.not. bubbles_lagrange))
     end subroutine s_check_inputs_adapt_dt
 
     !> Checks constraints on alternative sound speed parameters (alt_soundspeed)
@@ -332,6 +332,7 @@ contains
         @:PROHIBIT(bubbles_lagrange .and. file_per_process, "file_per_process must be false for bubbles_lagrange")
         @:PROHIBIT(bubbles_lagrange .and. n==0, "bubbles_lagrange accepts 2D and 3D simulations only")
         @:PROHIBIT(bubbles_lagrange .and. model_eqns==3, "The 6-equation flow model does not support bubbles_lagrange")
+        @:PROHIBIT(bubbles_lagrange .and. lag_params%cluster_type>=2 .and. lag_params%smooth_type/=1, "cluster_type=2 requires smooth_type=1")
     end subroutine s_check_inputs_bubbles_lagrange
 
     !> Checks constraints on continuum damage model parameters
