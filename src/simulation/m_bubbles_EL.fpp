@@ -531,7 +531,7 @@ contains
                 myR = intfc_rad(k, 2)
                 myV = intfc_vel(k, 2)
                 myPb = gas_p(k, 2)
-                pint = f_cpbw_KM(myR0, myR, myV, myPb)
+                pint = f_cpbw_KM(myR0, myR, myV, myPb, gam, Ca, Web, Re_inv, polytropic)
                 pint = pint + 0.5_wp*myV**2._wp
                 if (lag_params%cluster_type == 2) then
                     bub_dphidt(k) = (paux - pint) + term2
@@ -561,7 +561,7 @@ contains
             myR0 = bub_R0(k)
 
             ! Vapor and heat fluxes
-            myVapFlux = f_vflux(myR, myV, myPb, myMass_v, k, myMass_n, myBeta_c, myR_m, mygamma_m)
+            myVapFlux = f_vflux(myR, myV, myPb, myMass_v, k, mass_n0, Re_trans_c, chi_vw, rho_mw, Pe_c, pv, R_v, Tw, thermal, bubbles_lagrange, myMass_n, myBeta_c, myR_m, mygamma_m)
             myPbdot = f_bpres_dot(myVapFlux, myR, myV, myPb, myMass_v, k, myBeta_t, myR_m, mygamma_m)
             myMvdot = 4._wp*pi*myR**2._wp*myVapFlux
 

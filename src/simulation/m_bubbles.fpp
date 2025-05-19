@@ -79,16 +79,23 @@ contains
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
-    function f_cpbw(fR0, fR, fV, fpb)
+        !!  @param gam_l Physical Bubble parameter (pass in from global parameters)
+        !!  @param Ca_l Cavitation number (pass in from global parameters)
+        !!  @param Web_l Weber number (pass in from global parameters)
+        !!  @param Re_inv_l Inverse Reynolds number (pass in from global parameters)
+        !!  @param polytropic_l Polytropic  switch (pass in from global parameters)
+    pure elemental function f_cpbw(fR0, fR, fV, fpb, gam_l, Ca_l, Web_l, Re_inv_l, polytropic_l)
         !$acc routine seq
         real(wp), intent(in) :: fR0, fR, fV, fpb
+        real(wp), intent(in) :: gam_l, Ca_l, Web_l, Re_inv_l
+        logical, intent(in) :: polytropic_l
 
         real(wp) :: f_cpbw
 
-        if (polytropic) then
-            f_cpbw = (Ca + 2._wp/Web/fR0)*((fR0/fR)**(3._wp*gam)) - Ca - 4._wp*Re_inv*fV/fR - 2._wp/(fR*Web)
+        if (polytropic_l) then
+            f_cpbw = (Ca + 2._wp/Web_l/fR0)*((fR0/fR)**(3._wp*gam_l)) - Ca_l - 4._wp*Re_inv_l*fV/fR - 2._wp/(fR*Web_l)
         else
-            f_cpbw = fpb - 1._wp - 4._wp*Re_inv*fV/fR - 2._wp/(fR*Web)
+            f_cpbw = fpb - 1._wp - 4._wp*Re_inv_l*fV/fR - 2._wp/(fR*Web_l)
         end if
 
     end function f_cpbw
@@ -171,21 +178,28 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fpbdot Time derivative of the internal bubble pressure
-    function f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot)
+        !!  @param gam_l Physical Bubble parameter (pass in from global parameters)
+        !!  @param Ca_l Cavitation number (pass in from global parameters)
+        !!  @param Web_l Weber number (pass in from global parameters)
+        !!  @param Re_inv_l Inverse Reynolds number (pass in from global parameters)
+        !!  @param polytropic_l Polytropic  switch (pass in from global parameters)
+    pure elemental function f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot, gam_l, Ca_l, Web_l, Re_inv_l, polytropic_l)
         !$acc routine seq
         real(wp), intent(in) :: fCpbw, fCpinf, fCpinf_dot, fntait, fBtait
         real(wp), intent(in) :: fR, fV, fR0, fpbdot
+        real(wp), intent(in) :: gam_l, Ca_l, Web_l, Re_inv_l
+        logical, intent(in) :: polytropic_l
 
         real(wp) :: tmp1, tmp2
         real(wp) :: f_Hdot
 
-        if (polytropic) then
-            tmp1 = (fR0/fR)**(3._wp*gam)
-            tmp1 = -3._wp*gam*(Ca + 2._wp/Web/fR0)*tmp1*fV/fR
+        if (polytropic_l) then
+            tmp1 = (fR0/fR)**(3._wp*gam_l)
+            tmp1 = -3._wp*gam_l*(Ca_l + 2._wp/Web_l/fR0)*tmp1*fV/fR
         else
             tmp1 = fpbdot
         end if
-        tmp2 = (2._wp/Web + 4._wp*Re_inv*fV)*fV/(fR**2._wp)
+        tmp2 = (2._wp/Web_l + 4._wp*Re_inv_l*fV)*fV/(fR**2._wp)
 
         f_Hdot = &
             (fCpbw/(1._wp + fBtait) + 1._wp)**(-1._wp/fntait)*(tmp1 + tmp2) &
@@ -230,16 +244,18 @@ contains
         !!  @param fcgas Current gas sound speed
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
-    function f_rddot_G(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait)
+        !!  @param Re_inv_l Inverse Reynolds number (pass in from global parameters)
+    pure elemental function f_rddot_G(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait, Re_inv_l)
         !$acc routine seq
         real(wp), intent(in) :: fCpbw, fR, fV, fH, fHdot
         real(wp), intent(in) :: fcgas, fntait, fBtait
+        real(wp), intent(in) :: Re_inv_l
 
         real(wp) :: tmp1, tmp2, tmp3
         real(wp) :: f_rddot_G
 
         tmp1 = fV/fcgas
-        tmp2 = 1._wp + 4._wp*Re_inv/fcgas/fR*(fCpbw/(1._wp + fBtait) + 1._wp) &
+        tmp2 = 1._wp + 4._wp*Re_inv_l/fcgas/fR*(fCpbw/(1._wp + fBtait) + 1._wp) &
                **(-1._wp/fntait)
         tmp3 = 1.5_wp*fV**2._wp*(tmp1/3._wp - 1._wp) + fH*(1._wp + tmp1) &
                + fR*fHdot*(1._wp - tmp1)/fcgas
@@ -253,22 +269,29 @@ contains
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
-    function f_cpbw_KM(fR0, fR, fV, fpb)
+        !!  @param gam_l Physical Bubble parameter (pass in from global parameters)
+        !!  @param Ca_l Cavitation number (pass in from global parameters)
+        !!  @param Web_l Weber number (pass in from global parameters)
+        !!  @param Re_inv_l Inverse Reynolds number (pass in from global parameters)
+        !!  @param polytropic_l Polytropic  switch (pass in from global parameters)
+    pure elemental function f_cpbw_KM(fR0, fR, fV, fpb, gam_l, Ca_l, Web_l, Re_inv_l, polytropic_l)
         !$acc routine seq
         real(wp), intent(in) :: fR0, fR, fV, fpb
+        real(wp), intent(in) :: gam_l, Ca_l, Web_l, Re_inv_l
+        logical, intent(in)  :: polytropic_l
 
         real(wp) :: f_cpbw_KM
 
-        if (polytropic) then
-            f_cpbw_KM = Ca*((fR0/fR)**(3._wp*gam)) - Ca + 1._wp
-            if (.not. f_is_default(Web)) f_cpbw_KM = f_cpbw_KM + &
-                                                     (2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))
+        if (polytropic_l) then
+            f_cpbw_KM = Ca_l*((fR0/fR)**(3._wp*gam_l)) - Ca_l + 1._wp
+            if (.not. f_is_default(Web_l)) f_cpbw_KM = f_cpbw_KM + &
+                                                     (2._wp/(Web_l*fR0))*((fR0/fR)**(3._wp*gam_l))
         else
             f_cpbw_KM = fpb
         end if
 
-        if (.not. f_is_default(Web)) f_cpbw_KM = f_cpbw_KM - 2._wp/(fR*Web)
-        if (.not. f_is_default(Re_inv)) f_cpbw_KM = f_cpbw_KM - 4._wp*Re_inv*fV/fR
+        if (.not. f_is_default(Web_l)) f_cpbw_KM = f_cpbw_KM - 2._wp/(fR*Web_l)
+        if (.not. f_is_default(Re_inv_l)) f_cpbw_KM = f_cpbw_KM - 4._wp*Re_inv_l*fV/fR
 
     end function f_cpbw_KM
 
@@ -281,34 +304,42 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fC Current sound speed
-    function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC)
+        !!  @param gam_l Physical Bubble parameter (pass in from global parameters)
+        !!  @param Ca_l Cavitation number (pass in from global parameters)
+        !!  @param Web_l Weber number (pass in from global parameters)
+        !!  @param Re_inv_l Inverse Reynolds number (pass in from global parameters)
+        !!  @param polytropic_l Polytropic switch (pass in from global parameters)
+        !!  @param bubbles_lagrange_l Lagrangian subgrid bubble model switch (pass in from global parameters)
+    pure elemental function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC, gam_l, Ca_l, Web_l, Re_inv_l, polytropic_l, bubbles_lagrange_l)
         !$acc routine seq
         real(wp), intent(in) :: fpbdot, fCp, fCpbw
         real(wp), intent(in) :: fRho, fR, fV, fR0, fC
+        real(wp), intent(in) :: gam_l, Ca_l, Web_l, Re_inv_l
+        logical, intent(in) :: polytropic_l, bubbles_lagrange_l
 
         real(wp) :: tmp1, tmp2, cdot_star
         real(wp) :: f_rddot_KM
 
-        if (polytropic) then
-            cdot_star = -3._wp*gam*Ca*((fR0/fR)**(3._wp*gam))*fV/fR
-            if (.not. f_is_default(Web)) cdot_star = cdot_star - &
-                                                     3._wp*gam*(2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))*fV/fR
+        if (polytropic_l) then
+            cdot_star = -3._wp*gam_l*Ca_l*((fR0/fR)**(3._wp*gam_l))*fV/fR
+            if (.not. f_is_default(Web_l)) cdot_star = cdot_star - &
+                                                     3._wp*gam_l*(2._wp/(Web_l*fR0))*((fR0/fR)**(3._wp*gam_l))*fV/fR
         else
             cdot_star = fpbdot
         end if
 
-        if (.not. f_is_default(Web)) cdot_star = cdot_star + (2._wp/Web)*fV/(fR**2._wp)
-        if (.not. f_is_default(Re_inv)) cdot_star = cdot_star + 4._wp*Re_inv*((fV/fR)**2._wp)
+        if (.not. f_is_default(Web_l)) cdot_star = cdot_star + (2._wp/Web_l)*fV/(fR**2._wp)
+        if (.not. f_is_default(Re_inv_l)) cdot_star = cdot_star + 4._wp*Re_inv_l*((fV/fR)**2._wp)
 
         tmp1 = fV/fC
         tmp2 = 1.5_wp*(fV**2._wp)*(tmp1/3._wp - 1._wp) + &
                (1._wp + tmp1)*(fCpbw - fCp)/fRho + &
                cdot_star*fR/(fRho*fC)
 
-        if (f_is_default(Re_inv)) then
+        if (f_is_default(Re_inv_l)) then
             f_rddot_KM = tmp2/(fR*(1._wp - tmp1))
         else
-            f_rddot_KM = tmp2/(fR*(1._wp - tmp1) + 4._wp*Re_inv/(fRho*fC))
+            f_rddot_KM = tmp2/(fR*(1._wp - tmp1) + 4._wp*Re_inv_l/(fRho*fC))
         end if
 
     end function f_rddot_KM
@@ -341,9 +372,15 @@ contains
         !!  @param iR0 Bubble size index (EE) or bubble identifier (EL)
         !!  @param fmass_n Current gas mass (EL)
         !!  @param fbeta_c Mass transfer coefficient (EL)
-        !!  @param fR_m Mixture gas constant (EL)
-        !!  @param fgamma_m Mixture gamma (EL)
-    function f_vflux(fR, fV, fpb, fmass_v, iR0, fmass_n, fbeta_c, fR_m, fgamma_m)
+        !!  @param fconc_v Current vapor concentration (EL)
+        !!  @param gam_l Physical Bubble parameter (pass in from global parameters)
+        !!  @param Ca_l Cavitation number (pass in from global parameters)
+        !!  @param Web_l Weber number (pass in from global parameters)
+        !!  @param Re_inv_l Inverse Reynolds number (pass in from global parameters)
+        !!  @param polytropic_l Polytropic switch (pass in from global parameters)
+        !!  @param bubbles_lagrange_l Lagrangian subgrid bubble model switch (pass in from global parameters)
+        !!  @param thermal_l Thermal behavior (pass in from global parameters)
+    pure function f_vflux(fR, fV, fpb, fmass_v, iR0, mass_n0_l, Re_trans_c_l, chi_vw_l, rho_mw_l, Pe_c_l, pv_l, R_v_l, Tw_l, thermal_l, bubbles_lagrange_l, fmass_n, fbeta_c, fR_m, fgamma_m)
         !$acc routine seq
         real(wp), intent(in) :: fR
         real(wp), intent(in) :: fV
@@ -353,15 +390,20 @@ contains
         real(wp), intent(in), optional :: fmass_n, fbeta_c
         real(wp), intent(out), optional :: fR_m, fgamma_m
 
+        real(wp), dimension(:), intent(in) :: mass_n0_l, Re_trans_c_l
+        real(wp), intent(in) :: chi_vw_l, rho_mw_l, Pe_c_l, pv_l, R_v_l, Tw_l
+        integer, intent(in) :: thermal_l
+        logical, intent(in) :: bubbles_lagrange_l
+
         real(wp) :: chi_bar
         real(wp) :: rho_mw_lag
         real(wp) :: grad_chi
         real(wp) :: conc_v
         real(wp) :: f_vflux
 
-        if (thermal == 3) then !transfer
+        if (thermal_l == 3) then !transfer
             ! constant transfer model
-            if (bubbles_lagrange) then
+            if (bubbles_lagrange_l) then
                 ! Mixture properties (gas+vapor) in the bubble
                 conc_v = fmass_v/(fmass_v + fmass_n)
                 if (lag_params%massTransfer_model) then
@@ -385,7 +427,7 @@ contains
             end if
         else
             ! polytropic
-            f_vflux = pv*fV/(R_v*Tw)
+            f_vflux = pv_l*fV/(R_v_l*Tw_l)
         end if
 
     end function f_vflux
