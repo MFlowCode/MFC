@@ -397,7 +397,6 @@ contains
                         end do
                     end do
                 #:else
-                    ! Unpacking buffer from bc_z%beg
                     !$acc parallel loop collapse(3) gang vector default(present) private(r)
                     do l = -gp_layers, -1
                         do k = -gp_layers, n + gp_layers

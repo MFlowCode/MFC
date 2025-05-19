@@ -1488,6 +1488,161 @@ contains
 
     end subroutine s_color_function_ghost_cell_extrapolation
 
+    subroutine s_populate_F_igr_buffers(bc_type, jac_sf)
+
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(scalar_field), dimension(1), intent(inout) :: jac_sf
+
+        if(bc_x%beg >= 0) then
+            call s_mpi_sendrecv_variables_buffers(jac_sf, 1, -1, 1)
+        else
+            !$acc parallel loop gang vector collapse(2) default(present)
+            do l = 0, p
+                do k = 0, n
+                    select case(bc_type(1, -1)%sf(0, k, l))
+                    case (BC_PERIODIC)
+                        do j = 1, buff_size
+                            jac(-j, k, l) = jac(m-j+1,k,l)
+                        end do
+                    case (BC_REFLECTIVE)
+                        do j = 1, buff_size
+                            jac(-j, k, l) = jac(j - 1,k,l)
+                        end do
+                    case default
+                        do j = 1, buff_size
+                            jac(-j, k, l) = jac(0,k,l)
+                        end do
+                    end select
+                end do
+            end do
+        end if
+
+        if (n == 0) then
+            return
+        else if (bc_x%end >= 0) then
+            call s_mpi_sendrecv_variables_buffers(jac_sf, 1, 1, 1)
+        else
+            !$acc parallel loop collapse(2) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    select case(bc_type(1, 1)%sf(0, k, l))
+                    case (BC_PERIODIC)
+                        do j = 1, buff_size
+                            jac(m+j, k, l) = jac(j-1,k,l)
+                        end do
+                    case (BC_REFLECTIVE)
+                        do j = 1, buff_size
+                            jac(m+j, k, l) = jac(m - (j - 1),k,l)
+                        end do
+                    case default
+                        do j = 1, buff_size
+                            jac(m+j, k, l) = jac(m,k,l)
+                        end do
+                    end select
+                end do
+            end do
+        end if
+
+        if(bc_y%beg >= 0) then
+            call s_mpi_sendrecv_variables_buffers(jac_sf, 2, -1, 1)
+        else
+            !$acc parallel loop collapse(2) gang vector default(present)
+            do l = 0, p
+                do k = idwbuff(1)%beg, idwbuff(1)%end
+                    select case (bc_type(2, -1)%sf(k, 0, l))
+                    case (BC_PERIODIC)
+                        do j = 1, buff_size
+                            jac(k,-j,l) = jac(k,n-j+1,l)
+                        end do
+                    case (BC_REFLECTIVE)
+                        do j = 1, buff_size
+                            jac(k,-j,l) = jac(k,j-1,l)
+                        end do
+                    case default
+                        do j = 1, buff_size
+                            jac(k,-j,l) = jac(k,0,l)
+                        end do
+                    end select
+                end do
+            end do
+        end if
+
+        if(bc_%end >= 0) then
+            call s_mpi_sendrecv_variables_buffers(jac_sf, 2, 1, 1)
+        else
+            !$acc parallel loop collapse(2) gang vector default(present)
+            do l = 0, p
+                do k = idwbuff(1)%beg, idwbuff(1)%end
+                    select case (bc_type(2, 1)%sf(k, 0, l))
+                    case (BC_PERIODIC)
+                        do j = 1, buff_size
+                            jac(k,n+j,l) = jac(k,j-1,l)
+                        end do
+                    case (BC_REFLECTIVE)
+                        do j = 1, buff_size
+                            jac(k,n+j,l) = jac(k,n - (j-1),l)
+                        end do
+                    case default
+                        do j = 1, buff_size
+                            jac(k,n+j,l) = jac(k,n,l)
+                        end do
+                    end select
+                end do
+            end do
+        end if
+
+        if (p == 0) then
+            return
+        else if(bc_z%beg >= 0) then
+            call s_mpi_sendrecv_variables_buffers(jac_sf, 3, -1, 1)
+        else
+            !$acc parallel loop collapse(2) gang vector default(present)
+            do l = idwbuff(2)%beg, idwbuff(2)%end
+                do k = idwbuff(1)%beg, idwbuff(1)%end
+                    select case (bc_type(3, -1)%sf(k, l, 0))
+                    case (BC_PERIODIC)
+                        do j = 1, buff_size
+                            jac(k,l,-j) = jac(k,l,p-j+1)
+                        end do
+                    case (BC_REFLECTIVE)
+                        do j = 1, buff_size
+                            jac(k,l,-j) = jac(k,l,j - 1)
+                        end do
+                    case default
+                        do j = 1, buff_size
+                            jac(k,l,-j) = jac(k,l,0)
+                        end do
+                    end select
+                end do
+            end do
+        end if
+
+        if(bc_z%end >= 0) then
+            call s_mpi_sendrecv_variables_buffers(jac_sf, 3, 1, 1)
+        else
+            !$acc parallel loop gang vector collapse(2) default(present)
+            do l = idwbuff(2)%beg, idwbuff(2)%end
+                do k = idwbuff(1)%beg, idwbuff(1)%end
+                    select case (bc_type(3, -1)%sf(k, l, 0))
+                    case (BC_PERIODIC)
+                        do j = 1, buff_size
+                            jac(k,l,p+j) = jac(k,l,j-1)
+                        end do
+                    case (BC_REFLECTIVE)
+                        do j = 1, buff_size
+                            jac(k,l,p+j) = jac(k,l,p - (j-1))
+                        end do
+                    case default
+                        do j = 1, buff_size
+                            jac(k,l,p+j) = jac(k,l,p)
+                        end do
+                    end select
+                end do
+            end do
+        end if
+
+    end subroutine s_populate_F_igr_buffers
+
     subroutine s_create_mpi_types(bc_type)
 
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
