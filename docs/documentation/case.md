@@ -436,7 +436,7 @@ The effect and use of the source term are assessed by [Schmidmayer et al., 2019]
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer.
 Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md)).
 
-- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`.
+- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles_euler = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`. Additionally, it can be used with ``bubbles_lagrange = 'T'`` and `time_stepper = 3`
 
 - `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, 5, and 7, that correspond to the 1st, 3rd, 5th, and 7th order, respectively.
 
@@ -790,8 +790,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `x0`                  | Real    | Reference length                                          |
 | `Thost`               | Real    | Temperature of the surrounding liquid (host)              |
 | `diffcoefvap`         | Real    | Vapor diffusivity in the gas                              |
-| `rkck_adap_dt`        | Logical | Activates the adaptive rkck time stepping algorithm       |
-| `rkck_tolerance`      | Real    | Admissible error truncation tolerance in the rkck stepper  |
 
 - `nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
 
@@ -804,8 +802,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - `heatTransfer_model` Activates the heat transfer model at the bubble's interface based on ([Preston et al., 2007](references.md)).
 
 - `massTransfer_model` Activates the mass transfer model at the bubble's interface based on ([Preston et al., 2007](references.md)).
-
-- `rkck_adap_dt` Activates the adaptive 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepping algorithm (requires `time_stepper ==4`). A maximum error between the 4th and 5th order Runge-Kutta-Cash-Karp solutions for the same time step size is calculated. If the error is smaller than a tolerance (`rkck_tolerance`), then the algorithm employs the 5th order solution, while if not, both eulerian/lagrangian variables are re-calculated with a smaller time step size.
 
 ### 10. Velocity Field Setup
 
