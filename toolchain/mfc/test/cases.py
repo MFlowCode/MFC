@@ -156,11 +156,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     def alter_igr():
         stack.push('IGR',{'igr': 'T',  'alf_factor': 10, 'num_igr_iters': 10,
-                       'elliptic_smoothing': 'T', 'elliptic_smoothing_iters': 10,
-                       'igr_order': 5})
+                       'elliptic_smoothing': 'T', 'elliptic_smoothing_iters': 10})
 
-        cases.append(define_case_d(stack, 'Jacobi', {'igr_iter_solver': 1}))
-        cases.append(define_case_d(stack, 'Gauss Seidel', {'igr_iter_solver': 2}))
+        for order in [3, 5]:
+            stack.push(f"igr_order={order}", {'igr_order': order})
+
+            cases.append(define_case_d(stack, 'Jacobi', {'igr_iter_solver': 1}))
+            if order == 5:
+                cases.append(define_case_d(stack, 'Gauss Seidel', {'igr_iter_solver': 2}))
+
+            stack.pop()
 
         stack.pop()
 

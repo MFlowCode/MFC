@@ -280,11 +280,11 @@ contains
                     5._wp * q_sf(j+1, k, l) - &
                     1._wp * q_sf(j+2, k, l))
         else if (idir == 2) then
-            q_L = (1._wp/6._wp) * (3._wp * q_sf(j, k, l) - &
-                    5._wp * q_sf(j, k+1, l) + &
+            q_L = (1._wp/6._wp) * (2._wp * q_sf(j, k, l) + &
+                    5._wp * q_sf(j, k+1, l) - &
                     1._wp * q_sf(j, k+2, l))
         else if (idir == 3) then
-            q_L = (1._wp/6._wp) * (3._wp * q_sf(j, k, l) + &
+            q_L = (1._wp/6._wp) * (2._wp * q_sf(j, k, l) + &
                     5._wp * q_sf(j, k, l+1) - &
                     1._wp * q_sf(j, k, l+2))
         end if
