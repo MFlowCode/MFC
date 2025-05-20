@@ -213,7 +213,7 @@ contains
         end do
     end subroutine s_igr_iterative_solve
 
-    function f_reconstruct_state_L(q_sf, j, k, l, idir) result(q_L)
+    function f_reconstruct_state_L_5th_order(q_sf, j, k, l, idir) result(q_L)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: q_sf
         integer, intent(in) :: j, k, l, idir
@@ -239,9 +239,9 @@ contains
                     2._wp * q_sf(j, k, l+3))
         end if
 
-    end function f_reconstruct_state_L
+    end function f_reconstruct_state_L_5th_order
 
-    function f_reconstruct_state_R(q_sf, j, k, l, idir) result(q_R)
+    function f_reconstruct_state_R_5th_order(q_sf, j, k, l, idir) result(q_R)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: q_sf
         integer, intent(in) :: j, k, l, idir
@@ -267,9 +267,79 @@ contains
                     2._wp * q_sf(j, k, l-2))
         end if
 
+    end function f_reconstruct_state_R_5th_order
+
+    function f_reconstruct_state_L_3rd_order(q_sf, j, k, l, idir) result(q_L)
+
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: q_sf
+        integer, intent(in) :: j, k, l, idir
+        real(wp) :: q_L
+
+        if (idir == 1) then
+            q_L = (1._wp/6._wp) * (2._wp * q_sf(j, k, l) + &
+                    5._wp * q_sf(j+1, k, l) - &
+                    1._wp * q_sf(j+2, k, l))
+        else if (idir == 2) then
+            q_L = (1._wp/6._wp) * (3._wp * q_sf(j, k, l) - &
+                    5._wp * q_sf(j, k+1, l) + &
+                    1._wp * q_sf(j, k+2, l))
+        else if (idir == 3) then
+            q_L = (1._wp/6._wp) * (3._wp * q_sf(j, k, l) + &
+                    5._wp * q_sf(j, k, l+1) - &
+                    1._wp * q_sf(j, k, l+2))
+        end if
+
+    end function f_reconstruct_state_L_3rd_order
+
+    function f_reconstruct_state_R_3rd_order(q_sf, j, k, l, idir) result(q_R)
+
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: q_sf
+        integer, intent(in) :: j, k, l, idir
+        real(wp) :: q_R
+
+        if (idir == 1) then
+            q_R = (1._wp/6._wp) * (2._wp * q_sf(j+1, k, l) + &
+                    5._wp * q_sf(j, k, l) - &
+                    1._wp * q_sf(j-1, k, l))
+        else if (idir == 2) then
+            q_R = (1._wp/6._wp) * (2._wp * q_sf(j, k+1, l) + &
+                    5._wp * q_sf(j, k, l) - &
+                    1._wp * q_sf(j, k-1, l))
+        else if (idir == 3) then
+            q_R = (1._wp/6._wp) * (2._wp * q_sf(j, k, l+1) + &
+                    5._wp * q_sf(j, k, l) - &
+                    1._wp * q_sf(j, k, l-1))
+        end if
+
+    end function f_reconstruct_state_R_3rd_order
+
+    function f_reconstruct_state_L(q_sf, j, k, l, idir) result(q_L)
+
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: q_sf
+        integer, intent(in) :: j, k, l, idir
+        real(wp) :: q_L
+
+        if (igr_order == 5) then
+            q_L = f_reconstruct_state_L_5th_order(q_sf, j, k, l, idir)
+        else if (igr_order == 3) then
+            q_L = f_reconstruct_state_L_3rd_order(q_sf, j, k, l, idir)
+        end if
+
+    end function f_reconstruct_state_L
+
+    function f_reconstruct_state_R(q_sf, j, k, l, idir) result(q_R)
+
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: q_sf
+        integer, intent(in) :: j, k, l, idir
+        real(wp) :: q_R
+
+        if (igr_order == 5) then
+            q_R = f_reconstruct_state_R_5th_order(q_sf, j, k, l, idir)
+        else if (igr_order == 3) then
+            q_R = f_reconstruct_state_R_3rd_order(q_sf, j, k, l, idir)
+        end if
+
     end function f_reconstruct_state_R
-
-
 
     subroutine s_igr_sigma_x(q_prim_vf, rhs_vf)
 
@@ -283,7 +353,7 @@ contains
         real(wp) :: F_L, vel_L, rho_L, F_R, vel_R, rho_R
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(F_L, vel_L,alpha_rho_L)
+        !$acc parallel loop collapse(3) gang vector default(present) private(F_L,vel_L,alpha_rho_L,F_R,vel_R,alpha_rho_R)
         do l = 0, p
             do k = 0, n
                 do j = -1, m

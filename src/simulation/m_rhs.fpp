@@ -51,7 +51,7 @@ module m_rhs
 
     use m_nvtx
 
-    use m_boundary_conditions
+    use m_boundary_common
 
     use m_helper
 

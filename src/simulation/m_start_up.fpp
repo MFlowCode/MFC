@@ -164,7 +164,7 @@ contains
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
             nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, &
-            num_fluids, mhd, relativity, igr, &
+            num_fluids, mhd, relativity, igr, igr_order, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
@@ -262,8 +262,8 @@ contains
     subroutine s_read_serial_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        
-            
+
+
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the starting time-step directory
 
@@ -1460,6 +1460,9 @@ contains
         if (ib) then
             !$acc update device(ib_markers%sf)
         end if
+
+        !$acc update device(igr, igr_order)
+
     end subroutine s_initialize_gpu_vars
 
     subroutine s_finalize_modules

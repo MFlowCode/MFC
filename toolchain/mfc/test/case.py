@@ -274,8 +274,6 @@ print(json.dumps({{**case, **mods}}))
 
         return 1e8 * tolerance if single else tolerance
 
-
-
 @dataclasses.dataclass
 class TestCaseBuilder:
     trace:        str

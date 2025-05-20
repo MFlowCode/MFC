@@ -300,6 +300,7 @@ SIMULATION.update({
     'num_igr_iters': ParamType.INT,
     'alf_factor': ParamType.REAL,
     'igr_iter_solver': ParamType.INT,
+    'igr_order': ParamType.INT,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
@@ -475,7 +476,7 @@ ALL.update(SIMULATION)
 ALL.update(POST_PROCESS)
 
 CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order", 
-                     "num_fluids", "mhd", "relativity", "igr" ]
+                     "num_fluids", "mhd", "relativity", "igr", "igr_order"]
 
 _properties = { k: v.value for k, v in ALL.items() }
 

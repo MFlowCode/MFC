@@ -227,6 +227,7 @@ class Case:
 #:set mhd                   = {mhd}
 #:set relativity            = {relativity}
 #:set igr                   = {igr}
+#:set igr_order             = {self.params.get("igr_order", -1)}
 """
 
         return """\

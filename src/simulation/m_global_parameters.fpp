@@ -122,6 +122,7 @@ module m_global_parameters
         logical, parameter :: mhd = (${mhd}$ /= 0)                  !< Magnetohydrodynamics
         logical, parameter :: relativity = (${relativity}$ /= 0)    !< Relativity (only for MHD)
         logical, parameter :: igr = (${igr}$ /= 0)                  !< Use information geometric regularization
+        integer, parameter :: igr_order = ${igr_order}$             !< Reconstruction order for IGR
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
@@ -134,7 +135,8 @@ module m_global_parameters
         real(wp) :: wenoz_q       !< Power constant for WENO-Z
         logical :: mhd            !< Magnetohydrodynamics
         logical :: relativity     !< Relativity (only for MHD)
-        logical :: igr
+        logical :: igr            !< Use information geometric regularization
+        integer :: igr_order
     #:endif
 
     real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
@@ -180,7 +182,7 @@ module m_global_parameters
 
     #:if not MFC_CASE_OPTIMIZATION
         !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, &
-        !$acc num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity, igr)
+        !$acc num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity, igr, igr_order)
     #:endif
 
     !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage)
@@ -584,6 +586,7 @@ contains
             teno = .false.
             wenoz_q = dflt_real
             igr = .false.
+            igr_order = dflt_int
         #:endif
 
         chem_params%diffusion = .false.
@@ -799,6 +802,7 @@ contains
             !$acc update device(weno_num_stencils)
             !$acc update device(nb)
             !$acc update device(num_dims, num_vels, num_fluids)
+            !$acc update device(igr, igr_order)
         #:endif
 
         ! Initializing the number of fluids for which viscous effects will
