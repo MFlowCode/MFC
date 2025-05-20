@@ -94,6 +94,7 @@ module m_global_parameters
     integer :: tensor_size           !< Number of components in the nonsymmetric tensor
     logical :: pre_stress            !< activate pre_stressed domain
     logical :: cont_damage           !< continuum damage modeling
+    logical :: igr                   !< Use information geometric regularization
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
@@ -337,6 +338,7 @@ contains
         ptgalpha_eps = dflt_real
         num_fluids = dflt_int
         weno_order = dflt_int
+        igr = .false.
 
         hypoelasticity = .false.
         hyperelasticity = .false.
@@ -589,7 +591,15 @@ contains
             mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
-            adv_idx%end = E_idx + num_fluids
+            if (igr) then
+                if (num_fluids == 1) then
+                    adv_idx%end = adv_idx%beg
+                else
+                    adv_idx%end = E_idx + num_fluids - 1
+                end if
+            else
+                adv_idx%end = E_idx + num_fluids
+            end if
 
             sys_size = adv_idx%end
 
@@ -856,7 +866,7 @@ contains
         call s_configure_coordinate_bounds(weno_polyn, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
-                                           num_dims)
+                                           num_dims, igr)
 
 #ifdef MFC_MPI
 

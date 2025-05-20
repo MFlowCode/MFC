@@ -21,14 +21,14 @@ module m_igr
         s_igr_riemann_solver, &
         s_igr_sigma_x, &
         s_initialize_igr, &
-        s_igr_flux_add
+        s_igr_flux_add, &
+        s_finalize_igr_module
 
     real(wp), allocatable, dimension(:, :, :) :: jac, jac_rhs, jac_old
     !$acc declare create(jac, jac_rhs)
 
     real(wp), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
-
 
     real(wp) :: alf_igr
     !$acc declare create(alf_igr)
@@ -2817,5 +2817,23 @@ contains
         end if
 
     end subroutine s_igr_flux_add
+
+    subroutine s_finalize_igr_module()
+
+        if (viscous) then
+            @:DEALLOCATE(Res)
+        end if
+
+        @:DEALLOCATE(jac, jac_rhs)
+
+        if (igr_iter_solver == 1) then ! Jacobi iteration
+            @:DEALLOCATE(jac_old)
+        end if
+
+#ifdef _CRAYFTN
+        @:DEALLOCATE(coeff_L, coeff_R)
+#endif
+
+    end subroutine s_finalize_igr_module
 
 end module m_igr

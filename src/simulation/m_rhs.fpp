@@ -61,6 +61,8 @@ module m_rhs
 
     use m_chemistry
 
+    use m_mhd
+
     use m_igr
 
     implicit none
@@ -927,6 +929,11 @@ contains
                 end if
                 ! END: Additional physics and source terms
             end if
+
+            call nvtxStartRange("RHS-MHD")
+            if (mhd .and. powell) call s_compute_mhd_powell_rhs(q_prim_qp%vf, rhs_vf)
+            call nvtxEndRange
+
         end do
         ! END: Dimensional Splitting Loop
 
@@ -993,6 +1000,8 @@ contains
             call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
             call nvtxEndRange
         end if
+
+        if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, rhs_vf)
 
         ! END: Additional pphysics and source terms
 

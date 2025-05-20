@@ -61,6 +61,7 @@ COMMON = {
     'relativity': ParamType.LOG,
     'cont_damage': ParamType.LOG,
     'num_bc_patches': ParamType.INT,
+    'igr': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -296,6 +297,9 @@ SIMULATION.update({
     'tau_star': ParamType.REAL,
     'cont_damage_s': ParamType.REAL,
     'alpha_bar': ParamType.REAL,
+    'num_igr_iters': ParamType.INT,
+    'alf_factor': ParamType.REAL,
+    'igr_iter_solver': ParamType.INT,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
@@ -470,7 +474,8 @@ ALL.update(PRE_PROCESS)
 ALL.update(SIMULATION)
 ALL.update(POST_PROCESS)
 
-CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order", "num_fluids", "mhd", "relativity" ]
+CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order", 
+                     "num_fluids", "mhd", "relativity", "igr" ]
 
 _properties = { k: v.value for k, v in ALL.items() }
 

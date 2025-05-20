@@ -121,6 +121,7 @@ module m_global_parameters
         real(wp), parameter :: wenoz_q = ${wenoz_q}$                !< Power constant for WENO-Z
         logical, parameter :: mhd = (${mhd}$ /= 0)                  !< Magnetohydrodynamics
         logical, parameter :: relativity = (${relativity}$ /= 0)    !< Relativity (only for MHD)
+        logical, parameter :: igr = (${igr}$ /= 0)                  !< Use information geometric regularization
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
@@ -133,6 +134,7 @@ module m_global_parameters
         real(wp) :: wenoz_q       !< Power constant for WENO-Z
         logical :: mhd            !< Magnetohydrodynamics
         logical :: relativity     !< Relativity (only for MHD)
+        logical :: igr
     #:endif
 
     real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
@@ -157,7 +159,6 @@ module m_global_parameters
     logical :: shear_stress  !< Shear stresses
     logical :: bulk_stress   !< Bulk stresses
     logical :: cont_damage   !< Continuum damage modeling
-    logical :: igr           !< Use information geometric regularization
     integer :: igr_iter_solver !< IGR elliptic solver
     integer :: num_igr_iters !< number of iterations for elliptic solve
     real(wp) :: alf_factor  !< alpha factor for IGR
@@ -178,7 +179,8 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity)
+        !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, &
+        !$acc num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity, igr)
     #:endif
 
     !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage)
@@ -572,7 +574,6 @@ contains
         shear_stress = .false.
         bulk_stress = .false.
         cont_damage = .false.
-        igr = .false.
         igr_iter_solver = 1
         num_igr_iters = dflt_num_igr_iters
         alf_factor = dflt_alf_factor
@@ -582,6 +583,7 @@ contains
             wenoz = .false.
             teno = .false.
             wenoz_q = dflt_real
+            igr = .false.
         #:endif
 
         chem_params%diffusion = .false.
@@ -836,7 +838,15 @@ contains
                 mom_idx%end = cont_idx%end + num_vels
                 E_idx = mom_idx%end + 1
                 adv_idx%beg = E_idx + 1
-                adv_idx%end = E_idx + num_fluids
+                if (igr) then
+                    if (num_fluids == 1) then
+                        adv_idx%end = adv_idx%beg
+                    else
+                        adv_idx%end = E_idx + num_fluids - 1
+                    end if
+                else
+                    adv_idx%end = E_idx + num_fluids
+                end if
 
                 sys_size = adv_idx%end
 
@@ -1182,7 +1192,7 @@ contains
         call s_configure_coordinate_bounds(weno_polyn, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
-                                           num_dims)
+                                           num_dims, igr)
         !$acc update device(idwint, idwbuff)
 
         ! Configuring Coordinate Direction Indexes

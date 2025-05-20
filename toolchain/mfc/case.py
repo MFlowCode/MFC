@@ -189,6 +189,7 @@ class Case:
             wenoz  = 1 if self.params.get("wenoz", 'F') == 'T' else 0
             teno   = 1 if self.params.get("teno", 'F') == 'T' else 0
             wenojs = 0 if (mapped_weno or wenoz or teno) else 1
+            igr = 1 if self.params.get("igr", 'F') == 'T' else 0
 
             weno_order = int(self.params["weno_order"])
             weno_polyn = int((self.params["weno_order"] - 1) / 2)
@@ -225,6 +226,7 @@ class Case:
 #:set wenoz_q               = {self.params.get("wenoz_q", -1)}
 #:set mhd                   = {mhd}
 #:set relativity            = {relativity}
+#:set igr                   = {igr}
 """
 
         return """\

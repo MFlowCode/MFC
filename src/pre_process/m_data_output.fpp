@@ -162,7 +162,11 @@ contains
         end if
 
         if (bc_io) then
-            call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir, old_grid)
+            if (igr) then
+                call s_write_serial_boundary_condition_files(q_cons_vf, bc_type, t_step_dir, old_grid)
+            else
+                call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir, old_grid)
+            end if
         end if
 
         ! x-coordinate direction
@@ -236,7 +240,7 @@ contains
                        //'.dat'
             open (1, FILE=trim(file_loc), FORM='unformatted', &
                   STATUS=status)
-            write (1) q_cons_vf(i)%sf
+            write (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
             close (1)
         end do
 
@@ -865,7 +869,11 @@ contains
 #endif
 
         if (bc_io) then
-            call s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
+            if (igr) then
+                call s_write_parallel_boundary_condition_files(q_cons_vf, bc_type)
+            else
+                call s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
+            end if
         end if
 
     end subroutine s_write_parallel_data_files
