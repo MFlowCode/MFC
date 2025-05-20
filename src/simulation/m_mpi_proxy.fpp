@@ -91,7 +91,9 @@ contains
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
             & 'viscous', 'shear_stress', 'bulk_stress', 'bubbles_lagrange',     &
-            & 'hyperelasticity', 'rkck_adap_dt', 'bc_io', 'powell', 'cont_damage' ]
+            & 'hyperelasticity', 'rkck_adap_dt', 'bc_io', 'powell', 'cont_damage', &
+            & 'periodic_ibs', 'compute_CD', 'periodic_forcing', 'fourier_transform_filtering', & 
+            & 'store_levelset', 'slab_domain_decomposition' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -130,7 +132,8 @@ contains
             & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',    &
             & 'z_domain%beg', 'z_domain%end', 'x_a', 'x_b', 'y_a', 'y_b', 'z_a', &
             & 'z_b', 't_stop', 't_save', 'cfl_target', 'rkck_tolerance', 'Bx0',  &
-            & 'tau_star', 'cont_damage_s', 'alpha_bar' ]
+            & 'tau_star', 'cont_damage_s', 'alpha_bar', 'mu_visc', 'u_inf_ref',  & 
+            & 'rho_inf_ref', 'T_inf_ref' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -294,6 +297,19 @@ contains
 
                     end do
 
+                else if (slab_domain_decomposition) then 
+                    if (proc_rank == 0) then 
+                        print *, 'slab domain decomposition...'
+                    end if 
+                    
+                    ! continuous x and y direction, block decomposition in z
+                    num_procs_x = 1
+                    num_procs_y = 1
+                    num_procs_z = num_procs
+                    ierr = -1
+                    if (mod((p+1), num_procs_z) == 0) then 
+                        ierr = 0
+                    end if
                 else
 
                     ! Initial estimate of optimal processor topology

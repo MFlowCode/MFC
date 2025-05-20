@@ -46,6 +46,12 @@ module m_time_steppers
 
     use m_body_forces
 
+    use m_compute_particle_forces
+
+    use m_additional_forcing 
+
+    use m_volume_filtering
+
     implicit none
 
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
@@ -79,7 +85,12 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
+    type(scalar_field), allocatable, dimension(:) :: div_pres_visc_stress
+
+    type(scalar_field), allocatable, dimension(:) :: q_cons_filtered
+
     !$acc declare create(q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, rhs_ts_rkck, q_prim_ts, rhs_mv, rhs_pb, max_dt)
+    !$acc declare create(div_pres_visc_stress)
 
 contains
 
@@ -354,6 +365,26 @@ contains
                 @:ACC_SETUP_SFs(bc_type(i,j))
             end do
         end do
+
+        if (compute_CD) then
+            @:ALLOCATE(div_pres_visc_stress(momxb:momxe))
+            do i = momxb, momxe
+                @:ALLOCATE(div_pres_visc_stress(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    idwbuff(2)%beg:idwbuff(2)%end, &
+                    idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(div_pres_visc_stress(i))
+            end do
+        end if
+
+        if (fourier_transform_filtering) then 
+            @:ALLOCATE(q_cons_filtered(1:sys_size))
+            do i = 1, sys_size
+                @:ALLOCATE(q_cons_filtered(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    idwbuff(2)%beg:idwbuff(2)%end, &
+                    idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_cons_filtered(i))
+            end do
+        end if
 
     end subroutine s_initialize_time_steppers_module
 
@@ -670,7 +701,20 @@ contains
             call nvtxStartRange("TIMESTEP")
         end if
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        if (periodic_forcing) then 
+            call s_compute_phase_average(q_cons_ts(1)%vf, t_step+1)
+            call s_compute_periodic_forcing(q_cons_ts(1)%vf)
+        end if
+
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, div_pres_visc_stress)
+
+        if (compute_CD) then
+            call s_compute_drag_coefficient(div_pres_visc_stress)
+        end if
+
+        if (periodic_forcing) then 
+            call s_add_periodic_forcing(rhs_vf)
+        end if
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -761,6 +805,10 @@ contains
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
+        if (periodic_forcing) then 
+            call s_add_periodic_forcing(rhs_vf)
+        end if
+
         if (bubbles_lagrange) then
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
             call s_update_lagrange_tdv_rk(stage=2)
@@ -836,6 +884,10 @@ contains
 
         ! Stage 3 of 3
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+
+        if (periodic_forcing) then 
+            call s_add_periodic_forcing(rhs_vf)
+        end if
 
         if (bubbles_lagrange) then
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=3)
@@ -1326,6 +1378,13 @@ contains
             end do
 
             @:DEALLOCATE(rhs_vf)
+        end if
+
+        if (compute_CD) then
+            do i = momxb, momxe
+                @:DEALLOCATE(div_pres_visc_stress(i)%sf)
+            end do
+            @:DEALLOCATE(div_pres_visc_stress)
         end if
 
         ! Writing the footer of and closing the run-time information file

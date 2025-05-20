@@ -319,6 +319,10 @@ module m_global_parameters
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
 
+    logical :: periodic_ibs
+    logical :: store_levelset
+    logical :: slab_domain_decomposition
+
 contains
 
     !> Assigns default values to user inputs prior to reading
@@ -459,6 +463,10 @@ contains
 
         ! MHD
         Bx0 = dflt_real
+
+        periodic_ibs = .false.
+        store_levelset = .true.
+        slab_domain_decomposition = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 

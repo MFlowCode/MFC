@@ -501,6 +501,19 @@ module m_global_parameters
     !$acc declare create(tau_star, cont_damage_s, alpha_bar)
     !> @}
 
+    logical :: periodic_ibs
+    logical :: compute_CD
+    real(wp) :: mu_visc !< reference viscosity
+    real(wp) :: u_inf_ref !< reference freestream velocity
+    real(wp) :: rho_inf_ref !< reference freestream density 
+    real(wp) :: T_inf_ref !< reference freestream temperature
+    logical :: periodic_forcing
+    logical :: fourier_transform_filtering
+    logical :: store_levelset
+    logical :: slab_domain_decomposition
+
+    !$acc declare create(mu_visc, u_inf_ref, rho_inf_ref, T_inf_ref)
+
 contains
 
     !> Assigns default values to the user inputs before reading
@@ -775,6 +788,17 @@ contains
             mhd = .false.
             relativity = .false.
         #:endif
+
+        periodic_ibs = .false.
+        compute_CD = .false.
+        mu_visc = dflt_real
+        u_inf_ref = dflt_real
+        rho_inf_ref = dflt_real
+        T_inf_ref = dflt_real
+        periodic_forcing = .false.
+        fourier_transform_filtering = .false.
+        store_levelset = .true.
+        slab_domain_decomposition = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 

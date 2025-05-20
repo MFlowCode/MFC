@@ -61,6 +61,9 @@ COMMON = {
     'Bx0': ParamType.REAL,
     'relativity': ParamType.LOG,
     'cont_damage': ParamType.LOG,
+    'periodic_ibs': ParamType.LOG,
+    'store_levelset': ParamType.LOG,
+    'slab_domain_decomposition': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -103,7 +106,7 @@ PRE_PROCESS.update({
     'bubbles_lagrange': ParamType.LOG,
 })
 
-for ib_id in range(1, 10+1):
+for ib_id in range(1, 1000+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
                           ("theta", ParamType.REAL), ("slip", ParamType.LOG),
                           ("c", ParamType.REAL), ("p", ParamType.REAL),
@@ -297,6 +300,13 @@ SIMULATION.update({
     'tau_star': ParamType.REAL,
     'cont_damage_s': ParamType.REAL,
     'alpha_bar': ParamType.REAL,
+    'compute_CD': ParamType.LOG,
+    'mu_visc': ParamType.REAL, 
+    'u_inf_ref': ParamType.REAL,
+    'rho_inf_ref': ParamType.REAL,
+    'T_inf_ref': ParamType.REAL,
+    'periodic_forcing': ParamType.LOG,
+    'fourier_transform_filtering': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',

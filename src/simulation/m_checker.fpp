@@ -346,6 +346,14 @@ contains
     subroutine s_check_inputs_misc
         @:PROHIBIT(probe_wrt .and. fd_order == dflt_int, "fd_order must be specified for probe_wrt")
         @:PROHIBIT(integral_wrt .and. (.not. bubbles_euler))
+        #:for X in ['x', 'y', 'z']
+            #:for BOUND in ['beg', 'end']
+                @:PROHIBIT(periodic_forcing .and. bc_${X}$%${BOUND}$ /= BC_PERIODIC, &
+                    "Periodic forcing requires all BCs to be periodic")
+                @:PROHIBIT(fourier_transform_filtering .and. bc_${X}$%${BOUND}$ /= BC_PERIODIC, &
+                    "Explicit filtering of flow data requires all BCs to be periodic due to fourier transform")
+            #:endfor
+        #:endfor
     end subroutine s_check_inputs_misc
 
     subroutine s_check_inputs_mhd

@@ -89,6 +89,12 @@ module m_start_up
 
     use m_mhd
 
+    use m_compute_particle_forces
+
+    use m_additional_forcing 
+
+    use m_volume_filtering
+
     implicit none
 
     private; public :: s_read_input_file, &
@@ -180,7 +186,10 @@ contains
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
-            cont_damage, tau_star, cont_damage_s, alpha_bar
+            cont_damage, tau_star, cont_damage_s, alpha_bar, & 
+            periodic_ibs, compute_CD, mu_visc, u_inf_ref, rho_inf_ref, T_inf_ref, & 
+            periodic_forcing, fourier_transform_filtering, store_levelset, & 
+            slab_domain_decomposition
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -434,33 +443,35 @@ contains
                 call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
             end if
 
-            ! Read Levelset
-            write (file_path, '(A)') &
-                trim(t_step_dir)//'/levelset.dat'
-            inquire (FILE=trim(file_path), EXIST=file_exist)
-            if (file_exist) then
-                open (2, FILE=trim(file_path), &
-                        FORM='unformatted', &
-                        ACTION='read', &
-                        STATUS='old')
-                read (2) levelset%sf(0:m, 0:n, 0:p, 1:num_ibs); close (2)
-                ! print*, 'check', STL_levelset(106, 50, 0, 1)
-            else
-                call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
-            end if
+            if (store_levelset) then
+                ! Read Levelset
+                write (file_path, '(A)') &
+                    trim(t_step_dir)//'/levelset.dat'
+                inquire (FILE=trim(file_path), EXIST=file_exist)
+                if (file_exist) then
+                    open (2, FILE=trim(file_path), &
+                            FORM='unformatted', &
+                            ACTION='read', &
+                            STATUS='old')
+                    read (2) levelset%sf(0:m, 0:n, 0:p, 1:num_ibs); close (2)
+                    ! print*, 'check', STL_levelset(106, 50, 0, 1)
+                else
+                    call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
+                end if
 
-            ! Read Levelset Norm
-            write (file_path, '(A)') &
-                trim(t_step_dir)//'/levelset_norm.dat'
-            inquire (FILE=trim(file_path), EXIST=file_exist)
-            if (file_exist) then
-                open (2, FILE=trim(file_path), &
-                        FORM='unformatted', &
-                        ACTION='read', &
-                        STATUS='old')
-                read (2) levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3); close (2)
-            else
-                call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
+                ! Read Levelset Norm
+                write (file_path, '(A)') &
+                    trim(t_step_dir)//'/levelset_norm.dat'
+                inquire (FILE=trim(file_path), EXIST=file_exist)
+                if (file_exist) then
+                    open (2, FILE=trim(file_path), &
+                            FORM='unformatted', &
+                            ACTION='read', &
+                            STATUS='old')
+                    read (2) levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3); close (2)
+                else
+                    call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
+                end if
             end if
 
             do i = 1, num_ibs
@@ -693,44 +704,46 @@ contains
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
                     end if
 
-                    ! Read Levelset
-                    write (file_loc, '(A)') 'levelset.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                    if (store_levelset) then
+                        ! Read Levelset
+                        write (file_loc, '(A)') 'levelset.dat'
+                        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                        inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-                    if (file_exist) then
+                        if (file_exist) then
 
-                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                        disp = 0
+                            disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
-                                               'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
-                                           mpi_p, status, ierr)
+                            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
+                                                'native', mpi_info_int, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
+                                            mpi_p, status, ierr)
 
-                    else
-                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
-                    end if
+                        else
+                            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+                        end if
 
-                    ! Read Levelset Norm
-                    write (file_loc, '(A)') 'levelset_norm.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                        ! Read Levelset Norm
+                        write (file_loc, '(A)') 'levelset_norm.dat'
+                        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                        inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-                    if (file_exist) then
+                        if (file_exist) then
 
-                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                        disp = 0
+                            disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelsetnorm_DATA%view, &
-                                               'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
-                                           mpi_p, status, ierr)
+                            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelsetnorm_DATA%view, &
+                                                'native', mpi_info_int, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
+                                            mpi_p, status, ierr)
 
-                    else
-                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+                        else
+                            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+                        end if
                     end if
 
                 end if
@@ -842,44 +855,46 @@ contains
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
                     end if
 
-                    ! Read Levelset
-                    write (file_loc, '(A)') 'levelset.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                    if (store_levelset) then
+                        ! Read Levelset
+                        write (file_loc, '(A)') 'levelset.dat'
+                        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                        inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-                    if (file_exist) then
+                        if (file_exist) then
 
-                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                        disp = 0
+                            disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
-                                               'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
-                                           mpi_p, status, ierr)
+                            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
+                                                'native', mpi_info_int, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
+                                            mpi_p, status, ierr)
 
-                    else
-                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
-                    end if
+                        else
+                            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+                        end if
 
-                    ! Read Levelset Norm
-                    write (file_loc, '(A)') 'levelset_norm.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                        ! Read Levelset Norm
+                        write (file_loc, '(A)') 'levelset_norm.dat'
+                        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                        inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-                    if (file_exist) then
+                        if (file_exist) then
 
-                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                        disp = 0
+                            disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelsetnorm_DATA%view, &
-                                               'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
-                                           mpi_p, status, ierr)
+                            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelsetnorm_DATA%view, &
+                                                'native', mpi_info_int, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
+                                            mpi_p, status, ierr)
 
-                    else
-                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+                        else
+                            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+                        end if
                     end if
 
                 end if
@@ -1552,6 +1567,10 @@ contains
 
         if (mhd .and. powell) call s_initialize_mhd_powell_module
 
+        call s_initialize_particle_forces_module()
+        call s_initialize_additional_forcing_module()
+        if (fourier_transform_filtering) call s_initialize_fftw_explicit_filter_module()
+
     end subroutine s_initialize_modules
 
     subroutine s_initialize_mpi_domain
@@ -1663,6 +1682,9 @@ contains
         if (ib) then
             !$acc update device(ib_markers%sf)
         end if
+
+        !$acc update device(mu_visc, u_inf_ref, rho_inf_ref, T_inf_ref)
+
     end subroutine s_initialize_gpu_vars
 
     subroutine s_finalize_modules
@@ -1690,6 +1712,10 @@ contains
         if (surface_tension)  call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
         if (mhd .and. powell) call s_finalize_mhd_powell_module
+
+        call s_finalize_particle_forces_module()
+        call s_finalize_additional_forcing_module()
+        if (fourier_transform_filtering) call s_finalize_fftw_explicit_filter_module
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

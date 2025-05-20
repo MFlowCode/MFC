@@ -22,6 +22,8 @@ program p_main
 
     use m_nvtx
 
+    use m_volume_filtering
+
     implicit none
 
     integer :: t_step !< Iterator for the time-stepping loop
@@ -53,6 +55,10 @@ program p_main
     call nvtxStartRange("INIT-GPU-VARS")
     call s_initialize_gpu_vars()
     call nvtxEndRange
+
+    call s_initialize_fluid_indicator_function()
+    if (fourier_transform_filtering) call s_initialize_filtering_kernel()
+    if (fourier_transform_filtering) call s_initialize_filtered_fluid_indicator_function(q_cons_filtered(advxb))
 
     ! Setting the time-step iterator to the first time-step
     if (cfl_dt) then

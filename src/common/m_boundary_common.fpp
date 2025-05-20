@@ -32,7 +32,8 @@ module m_boundary_common
  s_populate_variables_buffers, &
  s_create_mpi_types, &
  s_populate_capillary_buffers, &
- s_finalize_boundary_common_module
+ s_finalize_boundary_common_module, & 
+ s_populate_scalarfield_buffers
 
     public :: bc_buffers, bcxb, bcxe, bcyb, bcye, bczb, bcze
 
@@ -237,6 +238,152 @@ contains
         ! END: Population of Buffers in z-direction
 
     end subroutine s_populate_variables_buffers
+
+    !>  The purpose of this procedure is to populate the buffers of any scalar field.  Used in unclosed term calculation
+    subroutine s_populate_scalarfield_buffers(q_temp)
+
+        type(scalar_field), intent(inout) :: q_temp
+
+        ! currently only considering periodic boundary conditions 
+
+        ! X-dir
+        select case (bc_x%beg)
+        case (-1)     ! Periodic BC at beginning
+            call s_periodic_scalarfield(q_temp, 1, -1)
+        case default ! Processor BC at beginning
+            call s_mpi_sendrecv_variables_buffers_scalarfield( &
+                q_temp, 1, -1)
+        end select
+
+        select case (bc_x%end)
+        case (-1)     ! Periodic BC at end
+            call s_periodic_scalarfield(q_temp, 1, 1)
+        case default ! Processor BC at end
+            call s_mpi_sendrecv_variables_buffers_scalarfield( &
+                q_temp, 1, 1)
+        end select
+
+        ! Y-dir
+        select case (bc_y%beg)
+        case (-1)     ! Periodic BC at beginning
+            call s_periodic_scalarfield(q_temp, 2, -1)
+        case default ! Processor BC at beginning
+            call s_mpi_sendrecv_variables_buffers_scalarfield( &
+                q_temp, 2, -1)
+        end select
+
+        select case (bc_y%end)
+        case (-1)     ! Periodic BC at end
+            call s_periodic_scalarfield(q_temp, 2, 1)
+        case default ! Processor BC at end
+            call s_mpi_sendrecv_variables_buffers_scalarfield( &
+                q_temp, 2, 1)
+        end select
+
+        ! Z-dir
+        select case (bc_z%beg)
+        case (-1)     ! Periodic BC at beginning
+            call s_periodic_scalarfield(q_temp, 3, -1)
+        case default ! Processor BC at beginning
+            call s_mpi_sendrecv_variables_buffers_scalarfield( &
+                q_temp, 3, -1)
+        end select
+
+        select case (bc_z%end)
+        case (-1)     ! Periodic BC at end
+            call s_periodic_scalarfield(q_temp, 3, 1)
+        case default ! Processor BC at end
+            call s_mpi_sendrecv_variables_buffers_scalarfield( &
+                q_temp, 3, 1)
+        end select
+    
+    end subroutine s_populate_scalarfield_buffers
+
+    subroutine s_periodic_scalarfield(q_temp, bc_dir, bc_loc)
+
+        type(scalar_field), intent(inout) :: q_temp
+        integer, intent(in) :: bc_dir, bc_loc
+
+        integer :: j, k, l, q, i
+
+        !< x-direction
+        if (bc_dir == 1) then
+            if (bc_loc == -1) then !< bc_x%beg
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            q_temp%sf(-j, k, l) = &
+                                q_temp%sf(m - (j - 1), k, l)
+                        end do
+                    end do
+                end do
+
+            else !< bc_x%end
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            q_temp%sf(m + j, k, l) = &
+                                q_temp%sf(j - 1, k, l)
+                        end do
+                    end do
+                end do
+            end if
+
+        !< y-direction
+        elseif (bc_dir == 2) then
+            if (bc_loc == -1) then !< bc_y%beg
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do k = 0, p
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            q_temp%sf(l, -j, k) = &
+                                q_temp%sf(l, n - (j - 1), k)
+                        end do
+                    end do
+                end do
+
+            else !< bc_y%end
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do k = 0, p
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            q_temp%sf(l, n + j, k) = &
+                                q_temp%sf(l, j - 1, k)
+                        end do
+                    end do
+                end do
+            end if
+
+        !< z-direction
+        elseif (bc_dir == 3) then
+            if (bc_loc == -1) then !< bc_z%beg
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do j = 1, buff_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            q_temp%sf(k, l, -j) = &
+                                q_temp%sf(k, l, p - (j - 1))
+                        end do
+                    end do
+                end do
+
+            else !< bc_z%end
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do j = 1, buff_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            q_temp%sf(k, l, p + j) = &
+                                q_temp%sf(k, l, j - 1)
+                        end do
+                    end do
+                end do
+            end if
+
+        end if
+
+    end subroutine s_periodic_scalarfield
 
     subroutine s_ghost_cell_extrapolation(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN

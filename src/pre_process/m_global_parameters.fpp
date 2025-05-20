@@ -283,6 +283,10 @@ module m_global_parameters
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
+    logical :: periodic_ibs
+    logical :: store_levelset
+    logical :: slab_domain_decomposition
+
 contains
 
     !>  Assigns default values to user inputs prior to reading
@@ -549,6 +553,10 @@ contains
         rkck_adap_dt = .false.
 
         Bx0 = dflt_real
+
+        periodic_ibs = .false.
+        store_levelset = .true.
+        slab_domain_decomposition = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 

@@ -171,7 +171,8 @@ contains
             & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',          &
             & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange',        &
             & 'rkck_adap_dt', 'output_partial_domain', 'relativity',           &
-            & 'cont_damage' ]
+            & 'cont_damage', 'periodic_ibs', 'store_levelset',                 &
+            & 'slab_domain_decomposition' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -297,6 +298,19 @@ contains
 
                     end do
 
+                else if (slab_domain_decomposition) then 
+                    if (proc_rank == 0) then 
+                        print *, 'slab domain decomposition...'
+                    end if 
+                    
+                    ! continuous x and y direction, block decomposition in z
+                    num_procs_x = 1
+                    num_procs_y = 1
+                    num_procs_z = num_procs
+                    ierr = -1
+                    if (mod((p+1), num_procs_z) == 0) then 
+                        ierr = 0
+                    end if
                 else
 
                     ! Initial values of the processor factorization optimization

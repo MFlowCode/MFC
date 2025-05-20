@@ -92,8 +92,10 @@ contains
 
         allocate (ib_markers%sf(0:m, 0:n, 0:p))
 
-        allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
-        allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+        if (store_levelset) then 
+            allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
+            allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+        end if
 
         if (qbmm .and. .not. polytropic) then
             !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
