@@ -154,6 +154,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
+    def alter_igr():
+        stack.push('',{'igr': 'T',  'alf_factor': 10, 'num_igr_iters': 10,
+            'elliptic_smoothing': 'T', 'elliptic_smoothing_iters': 10})
+
+        cases.append(define_case_d(stack, 'IGR', {}))
+
+        stack.pop()
+
     def alter_riemann_solvers(num_fluids):
         for riemann_solver in [1, 2]:
             stack.push(f"riemann_solver={riemann_solver}", {'riemann_solver': riemann_solver})
@@ -205,13 +213,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_riemann_solvers(num_fluids)
             alter_low_Mach_correction()
             alter_ib(dimInfo)
+            if len(dimInfo[0]) > 1:
+                alter_igr()
 
+            
             if num_fluids == 1:
+
                 stack.push("Viscous", {
                     'fluid_pp(1)%Re(1)' : 0.0001, 'dt' : 1e-11, 'patch_icpp(1)%vel(1)': 1.0,
                     'viscous': 'T'})
 
                 alter_ib(dimInfo, six_eqn_model=True)
+
+                if len(dimInfo[0]) > 1:
+                    alter_igr()
 
                 cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
                 cases.append(define_case_d(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
@@ -230,6 +245,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'patch_icpp(1)%vel(1)': 1.0, 'viscous': 'T'})
 
                 alter_ib(dimInfo, six_eqn_model=True)
+
+                if len(dimInfo[0]) > 1:
+                    alter_igr()
 
                 cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
                 cases.append(define_case_d(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))

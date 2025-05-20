@@ -2130,7 +2130,7 @@ contains
         end if
 
         ! Populating the cell-boundary and center locations buffer at bc_z%end
-        do i = 1, buff_size
+        do i = 1, offset_z%end
             z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
         end do
 
