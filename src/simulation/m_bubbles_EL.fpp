@@ -562,7 +562,7 @@ contains
 
             ! Vapor and heat fluxes
             myVapFlux = f_vflux(myR, myV, myPb, myMass_v, k, mass_n0, Re_trans_c, chi_vw, rho_mw, Pe_c, pv, R_v, Tw, thermal, bubbles_lagrange, myMass_n, myBeta_c, myR_m, mygamma_m)
-            myPbdot = f_bpres_dot(myVapFlux, myR, myV, myPb, myMass_v, k, myBeta_t, myR_m, mygamma_m)
+            myPbdot = f_bpres_dot(myVapFlux, myR, myV, myPb, myMass_v, k, Tw, R_v, pv, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, k_mw, thermal, bubbles_lagrange, myBeta_t, myR_m, mygamma_m)
             myMvdot = 4._wp*pi*myR**2._wp*myVapFlux
 
             ! Obtaining driving pressure
