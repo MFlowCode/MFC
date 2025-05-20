@@ -761,9 +761,16 @@ contains
             if (igr) then
 
                 if (id == 1) then
-                    call nvtxStartRange("IGR_SETUP")
-                    call s_initialize_igr(q_cons_vf, rhs_vf)
-                    call nvtxEndRange
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = -1, p+1
+                       do k = -1, n+1
+                            do j = -1,m+1
+                                do i = 1, sys_size
+                                    rhs_vf(i)%sf(j,k,l) = 0._wp
+                                end do
+                            end do
+                        end do
+                    end do
                 end if
 
                 call nvtxStartRange("IGR_RIEMANN")
