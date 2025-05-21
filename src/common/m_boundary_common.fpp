@@ -26,6 +26,10 @@ module m_boundary_common
     type(scalar_field), dimension(:, :), allocatable :: bc_buffers
 !$acc declare create(bc_buffers)
 
+
+    type(scalar_field), dimension(1) :: jac_sf
+!$acc declare create(jac_sf)
+
 #ifdef MFC_MPI
     integer, dimension(1:3, -1:1) :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
 #endif
@@ -1494,10 +1498,11 @@ contains
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
         real(wp), target, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(inout) :: jac
 
-        type(scalar_field), dimension(1) :: jac_sf
         integer :: j, k, l
 
+        !$acc kernels
         jac_sf(1)%sf => jac
+        !$acc end kernels
 
         if(bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 1, -1, 1)

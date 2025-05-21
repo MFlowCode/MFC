@@ -127,7 +127,7 @@ contains
         integer :: num_iters
 
         if (t_step  == t_step_start) then
-            num_iters = num_igr_iters
+            num_iters = igr_warm_start_iters
         else
             num_iters = num_igr_iters
         end if
