@@ -68,7 +68,7 @@
             ! Calculate domain information for mapping
             domain_start = x_coords(1)
             domain_end = x_coords(nRows)
-            x_step = (domain_end - domain_start) / (nRows - 1)
+            x_step = x_coords(2) - x_coords(1)
 
             delta = x_cc(0)- domain_start
 
@@ -83,7 +83,7 @@
     idx = i + 1 + global_offset
     do f = 1, nFiles
         if (idx .ge. 1 .and. idx .le nRows) then
-            q_prim_vf(f)%sf(i, 0, 0) = stored_values(i+1, f)
+            q_prim_vf(f)%sf(i, 0, 0) = stored_values(idx, f)
         end if
     end do
 
