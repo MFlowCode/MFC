@@ -461,7 +461,7 @@ contains
         !!  @param k_mw_l Bubble Wall properties (pass in from bubbles module)
         !!  @param thermal_l Thermal Behavior (pass in from global parameters)
         !!  @param bubbles_lagrange_l Lagrangian subgrid bubble model switch (pass in from global parameters)
-        !!  @param fbeta_t Mass transfer coefficient (EL) 
+        !!  @param fbeta_t Mass transfer coefficient (EL)
         !!  @param fR_m Mixture gas constant (EL)
         !!  @param fgamma_m Mixture gamma (EL)
     pure function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, Tw_l, R_v_l, pv_l, pb0_l, mass_n0_l, mass_v0_l, Pe_T_l, Re_trans_T_l, k_mw_l, thermal_l, bubbles_lagrange_l, fbeta_t, fR_m, fgamma_m)
