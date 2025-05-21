@@ -38,6 +38,12 @@ contains
         !!  @param f_bub_adv_src Source for bubble volume fraction
         !!  @param f_divu Divergence of velocity
         !!  @param fCson Speed of sound from fP (EL)
+        !!  @param gam_l Physical Bubble parameter (pass in from global parameters)
+        !!  @param Ca_l Cavitation number (pass in from global parameters)
+        !!  @param Web_l Weber number (pass in from global parameters)
+        !!  @param Re_inv_l Inverse Reynolds number (pass in from global parameters)
+        !!  @param bubbles_euler_l Bubbles euler on/off (pass in from global parameters)
+        !!  @param polytropic_l Polytropic  switch (pass in from global parameters)
     pure elemental function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson, gam_l, Ca_l, Web_l, Re_inv_l, bubbles_euler_l, polytropic_l)
         !$acc routine seq
         real(wp), intent(in) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
@@ -311,7 +317,6 @@ contains
         !!  @param Web_l Weber number (pass in from global parameters)
         !!  @param Re_inv_l Inverse Reynolds number (pass in from global parameters)
         !!  @param polytropic_l Polytropic switch (pass in from global parameters)
-        !!  @param bubbles_lagrange_l Lagrangian subgrid bubble model switch (pass in from global parameters)
     pure elemental function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC, gam_l, Ca_l, Web_l, Re_inv_l, polytropic_l)
         !$acc routine seq
         real(wp), intent(in) :: fpbdot, fCp, fCpbw
@@ -385,7 +390,6 @@ contains
         !!  @param thermal_l Thermal behavior (pass in from global parameters)
         !!  @param fmass_n Current gas mass (EL)
         !!  @param fbeta_c Mass transfer coefficient (EL)
-        !!  @param fconc_v Current vapor concentration (EL)
     function f_vflux(fR, fV, fpb, fmass_v, iR0, mass_n0_l, Re_trans_c_l, chi_vw_l, rho_mw_l, Pe_c_l, pv_l, R_v_l, Tw_l, thermal_l, bubbles_lagrange_l, fmass_n, fbeta_c, fR_m, fgamma_m)
         !$acc routine seq
         real(wp), intent(in) :: fR
@@ -446,11 +450,21 @@ contains
         !!  @param fpb Current internal bubble pressure
         !!  @param fmass_v Current mass of vapour
         !!  @param iR0 Bubble size index (EE) or bubble identifier (EL)
-        !!  @param fbeta_t Mass transfer coefficient (EL)
+        !!  @param Tw_l Physical bubble parameters (pass in from global parameters)
+        !!  @param R_v_l Physical bubble parameters (pass in from global parameters)
+        !!  @param pv_l Physical bubble parameters (pass in from global parameters)
+        !!  @param pb0_l Physical bubble parameters (pass in from global parameters)
+        !!  @param mass_n0_l Physical bubble parameters (pass in from global parameters)
+        !!  @param mass_v0_l Physical bubble parameters (pass in from global parameters)
+        !!  @param Pe_T_l Physical bubble parameters (pass in from global parameters)
+        !!  @param Re_trans_T_l Physical bubble parameters (pass in from global parameters)
+        !!  @param k_mw_l Bubble Wall properties (pass in from bubbles module)
+        !!  @param thermal_l Thermal Behavior (pass in from global parameters)
+        !!  @param bubbles_lagrange_l Lagrangian subgrid bubble model switch (pass in from global parameters)
+        !!  @param fbeta_t Mass transfer coefficient (EL) 
         !!  @param fR_m Mixture gas constant (EL)
         !!  @param fgamma_m Mixture gamma (EL)
-        !!  @param fconc_v Current vapor concentration (EL)
-    function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, Tw_l, R_v_l, pv_l, pb0_l, mass_n0_l, mass_v0_l, Pe_T_l, Re_trans_T_l, k_mw_l, thermal_l, bubbles_lagrange_l, fbeta_t, fR_m, fgamma_m)
+    pure function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, Tw_l, R_v_l, pv_l, pb0_l, mass_n0_l, mass_v0_l, Pe_T_l, Re_trans_T_l, k_mw_l, thermal_l, bubbles_lagrange_l, fbeta_t, fR_m, fgamma_m)
         !$acc routine seq
         real(wp), intent(in) :: fvflux
         real(wp), intent(in) :: fR
