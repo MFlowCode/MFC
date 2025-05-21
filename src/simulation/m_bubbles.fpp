@@ -38,11 +38,13 @@ contains
         !!  @param f_bub_adv_src Source for bubble volume fraction
         !!  @param f_divu Divergence of velocity
         !!  @param fCson Speed of sound from fP (EL)
-    function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson)
+    pure elemental function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson, gam_l, Ca_l, Web_l, Re_inv_l, bubbles_euler_l, polytropic_l)
         !$acc routine seq
         real(wp), intent(in) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu
         real(wp), intent(in) :: fCson
+        real(wp), intent(in) :: gam_l, Ca_l, Web_l, Re_inv_l
+        logical, intent(in) :: bubbles_euler_l, polytropic_l
 
         real(wp) :: fCpbw, fCpinf, fCpinf_dot, fH, fHdot, c_gas, c_liquid
         real(wp) :: f_rddot
@@ -50,25 +52,25 @@ contains
         if (bubble_model == 1) then
             ! Gilmore bubbles
             fCpinf = fP - pref
-            fCpbw = f_cpbw(fR0, fR, fV, fpb)
+            fCpbw = f_cpbw(fR0, fR, fV, fpb, gam_l, Ca_l, Web_l, Re_inv_l, polytropic_l)
             fH = f_H(fCpbw, fCpinf, fntait, fBtait)
             c_gas = f_cgas(fCpinf, fntait, fBtait, fH)
             fCpinf_dot = f_cpinfdot(fRho, fP, alf, fntait, fBtait, f_bub_adv_src, f_divu)
-            fHdot = f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot)
-            f_rddot = f_rddot_G(fCpbw, fR, fV, fH, fHdot, c_gas, fntait, fBtait)
+            fHdot = f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot, gam_l, Ca_l, Web_l, Re_inv_l, polytropic_l)
+            f_rddot = f_rddot_G(fCpbw, fR, fV, fH, fHdot, c_gas, fntait, fBtait, Re_inv_l)
         else if (bubble_model == 2) then
             ! Keller-Miksis bubbles
             fCpinf = fP
-            fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
-            if (bubbles_euler) then
+            fCpbw = f_cpbw_KM(fR0, fR, fV, fpb, gam_l, Ca_l, Web_l, Re_inv_l, polytropic_l)
+            if (bubbles_euler_l) then
                 c_liquid = sqrt(fntait*(fP + fBtait)/(fRho*(1._wp - alf)))
             else
                 c_liquid = fCson
             end if
-            f_rddot = f_rddot_KM(fpbdot, fCpinf, fCpbw, fRho, fR, fV, fR0, c_liquid)
+            f_rddot = f_rddot_KM(fpbdot, fCpinf, fCpbw, fRho, fR, fV, fR0, c_liquid, gam_l, Ca_l, Web_l, Re_inv_l, polytropic_l)
         else if (bubble_model == 3) then
             ! Rayleigh-Plesset bubbles
-            fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
+            fCpbw = f_cpbw_KM(fR0, fR, fV, fpb, gam_l, Ca_l, Web_l, Re_inv_l, polytropic_l)
             f_rddot = f_rddot_RP(fP, fRho, fR, fV, fR0, fCpbw)
         end if
 
@@ -310,12 +312,12 @@ contains
         !!  @param Re_inv_l Inverse Reynolds number (pass in from global parameters)
         !!  @param polytropic_l Polytropic switch (pass in from global parameters)
         !!  @param bubbles_lagrange_l Lagrangian subgrid bubble model switch (pass in from global parameters)
-    pure elemental function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC, gam_l, Ca_l, Web_l, Re_inv_l, polytropic_l, bubbles_lagrange_l)
+    pure elemental function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC, gam_l, Ca_l, Web_l, Re_inv_l, polytropic_l)
         !$acc routine seq
         real(wp), intent(in) :: fpbdot, fCp, fCpbw
         real(wp), intent(in) :: fRho, fR, fV, fR0, fC
         real(wp), intent(in) :: gam_l, Ca_l, Web_l, Re_inv_l
-        logical, intent(in) :: polytropic_l, bubbles_lagrange_l
+        logical, intent(in) :: polytropic_l
 
         real(wp) :: tmp1, tmp2, cdot_star
         real(wp) :: f_rddot_KM
@@ -384,7 +386,7 @@ contains
         !!  @param fmass_n Current gas mass (EL)
         !!  @param fbeta_c Mass transfer coefficient (EL)
         !!  @param fconc_v Current vapor concentration (EL)
-    pure function f_vflux(fR, fV, fpb, fmass_v, iR0, mass_n0_l, Re_trans_c_l, chi_vw_l, rho_mw_l, Pe_c_l, pv_l, R_v_l, Tw_l, thermal_l, bubbles_lagrange_l, fmass_n, fbeta_c, fR_m, fgamma_m)
+    function f_vflux(fR, fV, fpb, fmass_v, iR0, mass_n0_l, Re_trans_c_l, chi_vw_l, rho_mw_l, Pe_c_l, pv_l, R_v_l, Tw_l, thermal_l, bubbles_lagrange_l, fmass_n, fbeta_c, fR_m, fgamma_m)
         !$acc routine seq
         real(wp), intent(in) :: fR
         real(wp), intent(in) :: fV
@@ -448,7 +450,7 @@ contains
         !!  @param fR_m Mixture gas constant (EL)
         !!  @param fgamma_m Mixture gamma (EL)
         !!  @param fconc_v Current vapor concentration (EL)
-    function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, Tw_l, R_v_l, pv_l, pb0_l, mass_n0_l, mass_v0_l, Pe_T_l, Re_trans_T_l, k_mw_l, thermal_l, bubbles_lagrange_l,fbeta_t, fR_m, fgamma_m)
+    function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, Tw_l, R_v_l, pv_l, pb0_l, mass_n0_l, mass_v0_l, Pe_T_l, Re_trans_T_l, k_mw_l, thermal_l, bubbles_lagrange_l, fbeta_t, fR_m, fgamma_m)
         !$acc routine seq
         real(wp), intent(in) :: fvflux
         real(wp), intent(in) :: fR
@@ -670,7 +672,7 @@ contains
         myA_tmp(1) = f_rddot(fRho, fP, myR_tmp(1), myV_tmp(1), fR0, &
                              fpb, fpbdot, alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu, &
-                             fCson)
+                             fCson, gam, Ca, Web, Re_inv, bubbles_euler, polytropic)
 
         ! Compute d_0 = ||y0|| and d_1 = ||f(x0,y0)||
         d_norms(1) = sqrt((myR_tmp(1)**2._wp + myV_tmp(1)**2._wp)/2._wp)
@@ -687,7 +689,7 @@ contains
         myA_tmp(2) = f_rddot(fRho, fP, myR_tmp(2), myV_tmp(2), fR0, &
                              fpb, fpbdot, alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu, &
-                             fCson)
+                             fCson, gam, Ca, Web, Re_inv, bubbles_euler, polytropic)
 
         ! Compute d_2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
         d_norms(3) = sqrt(((myV_tmp(2) - myV_tmp(1))**2._wp + (myA_tmp(2) - myA_tmp(1))**2._wp)/2._wp)/h_size(1)
@@ -765,7 +767,7 @@ contains
         myA_tmp(1) = f_rddot(fRho, fP, myR_tmp(1), myV_tmp(1), fR0, &
                              myPb_tmp(1), mydPbdt_tmp(1), alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu, &
-                             fCson)
+                             fCson, gam, Ca, Web, Re_inv, bubbles_euler, polytropic)
 
         ! Stage 1
         myR_tmp(2) = myR_tmp(1) + h*myV_tmp(1)
@@ -779,7 +781,7 @@ contains
         myA_tmp(2) = f_rddot(fRho, fP, myR_tmp(2), myV_tmp(2), fR0, &
                              myPb_tmp(2), mydPbdt_tmp(2), alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu, &
-                             fCson)
+                             fCson, gam, Ca, Web, Re_inv, bubbles_euler, polytropic)
 
         ! Stage 2
         myR_tmp(3) = myR_tmp(1) + (h/4._wp)*(myV_tmp(1) + myV_tmp(2))
@@ -793,7 +795,7 @@ contains
         myA_tmp(3) = f_rddot(fRho, fP, myR_tmp(3), myV_tmp(3), fR0, &
                              myPb_tmp(3), mydPbdt_tmp(3), alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu, &
-                             fCson)
+                             fCson, gam, Ca, Web, Re_inv, bubbles_euler, polytropic)
 
         ! Stage 3
         myR_tmp(4) = myR_tmp(1) + (h/6._wp)*(myV_tmp(1) + myV_tmp(2) + 4._wp*myV_tmp(3))
@@ -807,7 +809,7 @@ contains
         myA_tmp(4) = f_rddot(fRho, fP, myR_tmp(4), myV_tmp(4), fR0, &
                              myPb_tmp(4), mydPbdt_tmp(4), alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu, &
-                             fCson)
+                             fCson, gam, Ca, Web, Re_inv, bubbles_euler, polytropic)
 
         ! Estimate error
         err_R = (-5._wp*h/24._wp)*(myV_tmp(2) + myV_tmp(3) - 2._wp*myV_tmp(4)) &
@@ -844,8 +846,8 @@ contains
 
         real(wp) :: fVapFlux, f_advance_EL, myR_m, mygamma_m
 
-        fVapFlux = f_vflux(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fmass_n, fbeta_c, myR_m, mygamma_m)
-        fdPbdt_tmp = f_bpres_dot(fVapFlux, fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fbeta_t, myR_m, mygamma_m)
+        fVapFlux = f_vflux(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, mass_n0, Re_trans_c, chi_vw, rho_mw, Pe_c, pv, R_v, Tw, thermal, bubbles_lagrange, fmass_n, fbeta_c, myR_m, mygamma_m)
+        fdPbdt_tmp = f_bpres_dot(fVapFlux, fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, Tw, R_v, pv, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, k_mw, thermal, bubbles_lagrange, fbeta_t, myR_m, mygamma_m)
         f_advance_EL = 4._wp*pi*fR_tmp**2._wp*fVapFlux
 
     end function f_advance_EL

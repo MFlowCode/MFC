@@ -272,7 +272,7 @@ contains
                             pb = q_prim_vf(ps(q))%sf(j, k, l)
                             mv = q_prim_vf(ms(q))%sf(j, k, l)
                             call s_bwproperty(pb, q)
-                            vflux = f_vflux(myR, myV, mv, q, mass_n0, Re_trans_c, chi_vw, rho_mw, Pe_c, pv, R_v, Tw, thermal, bubbles_lagrange)
+                            vflux = f_vflux(myR, myV, pb, mv, q, mass_n0, Re_trans_c, chi_vw, rho_mw, Pe_c, pv, R_v, Tw, thermal, bubbles_lagrange)
                             pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q, Tw, R_v, pv, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, k_mw, thermal, bubbles_lagrange)
 
                             bub_p_src(j, k, l, q) = nbub*pbdot
@@ -299,7 +299,7 @@ contains
                             rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
                                             pb, pbdot, alf, n_tait, B_tait, &
                                             bub_adv_src(j, k, l), divu%sf(j, k, l), &
-                                            dmCson)
+                                            dmCson, gam, Ca, Web, Re_inv, bubbles_euler, polytropic)
                             bub_v_src(j, k, l, q) = nbub*rddot
                             bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                         end if
