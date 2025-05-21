@@ -513,8 +513,8 @@ contains
                                 call get_mixture_molecular_weight(Ys_L, MW_L)
                                 call get_mixture_molecular_weight(Ys_R, MW_R)
 
-                                Xs_L(:) = Ys_L(:)*MW_L/mol_weights(:)
-                                Xs_R(:) = Ys_R(:)*MW_R/mol_weights(:)
+                                Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
+                                Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
 
                                 R_gas_L = gas_constant/MW_L
                                 R_gas_R = gas_constant/MW_R
@@ -1029,8 +1029,8 @@ contains
                                     Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                     Y_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
 
-                                    flux_rs${XYZ}$_vf(j, k, l, i) = (s_M*Y_R*rho_R*vel_R(dir_idx(norm_dir)) &
-                                                                     - s_P*Y_L*rho_L*vel_L(dir_idx(norm_dir)) &
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = (s_M*Y_R*rho_R*vel_R(dir_idx(1)) &
+                                                                     - s_P*Y_L*rho_L*vel_L(dir_idx(1)) &
                                                                      + s_M*s_P*(Y_L*rho_L - Y_R*rho_R)) &
                                                                     /(s_M - s_P)
                                     flux_src_rs${XYZ}$_vf(j, k, l, i) = 0._wp
@@ -2573,8 +2573,8 @@ contains
                                     call get_mixture_molecular_weight(Ys_L, MW_L)
                                     call get_mixture_molecular_weight(Ys_R, MW_R)
 
-                                    Xs_L(:) = Ys_L(:)*MW_L/mol_weights(:)
-                                    Xs_R(:) = Ys_R(:)*MW_R/mol_weights(:)
+                                    Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
+                                    Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
 
                                     R_gas_L = gas_constant/MW_L
                                     R_gas_R = gas_constant/MW_R
