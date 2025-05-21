@@ -156,11 +156,11 @@ contains
         integer, intent(inout) :: t_step
         if (proc_rank == 0) then
             if (cfl_dt) then
-                print '(" ["I3"%]  Saving "I8" of "I0"")', &
+                print '(" [", I3, "%]  Saving ", I8, " of ", I0, "")', &
                     int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), &
                     t_step, n_save
             else
-                print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
+                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " @ t_step = ", I0, "")', &
                     int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                     (t_step - t_step_start)/t_step_save + 1, &
                     (t_step_stop - t_step_start)/t_step_save + 1, &
@@ -708,7 +708,7 @@ contains
             call s_read_input_file()
             call s_check_input_file()
 
-            print '(" Post-processing a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
+            print '(" Post-processing a ", I0, "x", I0, "x", I0, " case on ", I0, " rank(s)")', m, n, p, num_procs
         end if
 
         ! Broadcasting the user inputs to all of the processors and performing the
