@@ -299,7 +299,7 @@ contains
                             rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
                                             pb, pbdot, alf, n_tait, B_tait, &
                                             bub_adv_src(j, k, l), divu%sf(j, k, l), &
-                                            dmCson, gam, Ca, Web, Re_inv, bubbles_euler, polytropic)
+                                            dmCson)
                             bub_v_src(j, k, l, q) = nbub*rddot
                             bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                         end if

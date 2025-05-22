@@ -600,7 +600,7 @@ contains
                 intfc_dveldt(k, stage) = f_rddot(myRho, myPinf, myR, myV, myR0, &
                                                  myPb, myPbdot, dmalf, dmntait, dmBtait, &
                                                  dm_bub_adv_src, dm_divu, &
-                                                 myCson, gam, Ca, Web, Re_inv, bubbles_euler, polytropic)
+                                                 myCson)
                 intfc_draddt(k, stage) = myV
                 gas_dmvdt(k, stage) = myMvdot
                 gas_dpdt(k, stage) = myPbdot
