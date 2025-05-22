@@ -70,7 +70,7 @@ contains
 
     end subroutine s_comp_n_from_cons
 
-    subroutine s_print_2D_array(A, div)
+    impure subroutine s_print_2D_array(A, div)
 
         real(wp), dimension(:, :), intent(in) :: A
         real(wp), optional, intent(in) :: div
@@ -101,7 +101,7 @@ contains
     end subroutine s_print_2D_array
 
     !> Initializes non-polydisperse bubble modeling
-    subroutine s_initialize_nonpoly
+    impure subroutine s_initialize_nonpoly
 
         integer :: ir
         real(wp) :: rhol0, pl0, uu, D_m, temp, omega_ref
@@ -238,7 +238,7 @@ contains
 
     end subroutine s_transcoeff
 
-    pure subroutine s_int_to_str(i, res)
+    pure elemental subroutine s_int_to_str(i, res)
 
         integer, intent(in) :: i
         character(len=*), intent(inout) :: res
@@ -549,36 +549,29 @@ contains
     !> This function calculates the double factorial value of an integer
     !! @param n is the input integer
     !! @return R is the double factorial value of n
-    pure recursive function double_factorial(n) result(R)
+    pure elemental function double_factorial(n) result(R)
 
         integer, intent(in) :: n
         integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
         integer(kind=int64_kind) :: R
+        integer :: i
 
-        if (n <= 0) then
-            R = 1
-        else if (n == 1) then
-            R = 1
-        else
-            R = n*double_factorial(n - 2)
-        end if
+        R = product((/(i, i=n, 1, -2)/))
 
     end function double_factorial
 
     !> The following function calculates the factorial value of an integer
     !! @param n is the input integer
     !! @return R is the factorial value of n
-    pure recursive function factorial(n) result(R)
+    pure elemental function factorial(n) result(R)
 
         integer, intent(in) :: n
         integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
         integer(kind=int64_kind) :: R
 
-        if (n == 0) then
-            R = 1
-        else
-            R = n*factorial(n - 1)
-        end if
+        integer :: i
+
+        R = product((/(i, i=n, 1,-1)/))
 
     end function factorial
 

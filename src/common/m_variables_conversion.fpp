@@ -79,7 +79,7 @@ contains
         !!  @param gamma Specific heat ratio function
         !!  @param pi_inf Liquid stiffness function
         !!  @param qv Fluid reference energy
-    subroutine s_convert_to_mixture_variables(q_vf, i, j, k, &
+    impure subroutine s_convert_to_mixture_variables(q_vf, i, j, k, &
                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
@@ -115,7 +115,7 @@ contains
         !! @param pres Pressure to calculate
         !! @param stress Shear Stress
         !! @param mom Momentum
-    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
+    pure subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
 
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_pressure
@@ -205,7 +205,7 @@ contains
         !! @param gamma  specific heat ratio function
         !! @param pi_inf liquid stiffness
         !! @param qv fluid reference energy
-    subroutine s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
+    impure subroutine s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
                                                       rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
@@ -252,7 +252,7 @@ contains
         !! @param gamma specific heat ratio
         !! @param pi_inf liquid stiffness
         !! @param qv fluid reference energy
-    subroutine s_convert_species_to_mixture_variables_bubbles(q_vf, j, k, l, &
+    impure subroutine s_convert_species_to_mixture_variables_bubbles(q_vf, j, k, l, &
                                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
@@ -376,7 +376,7 @@ contains
         !! @param gamma specific heat ratio
         !! @param pi_inf liquid stiffness
         !! @param qv fluid reference energy
-    subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
+    impure subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
                                                       gamma, pi_inf, qv, Re_K, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
@@ -461,7 +461,7 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables
 
-    subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
+    pure subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
                                                           gamma_K, pi_inf_K, qv_K, &
                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
                                                           G_K, G)
@@ -545,7 +545,7 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables_acc
 
-    subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
+    pure subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
                                                                   gamma_K, pi_inf_K, qv_K, &
                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
 #ifdef _CRAYFTN
@@ -616,7 +616,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_variables_conversion_module
+    impure subroutine s_initialize_variables_conversion_module
 
         integer :: i, j
 
@@ -743,7 +743,7 @@ contains
     end subroutine s_initialize_variables_conversion_module
 
     !Initialize mv at the quadrature nodes based on the initialized moments and sigma
-    subroutine s_initialize_mv(qK_cons_vf, mv)
+    pure subroutine s_initialize_mv(qK_cons_vf, mv)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
@@ -776,7 +776,7 @@ contains
     end subroutine s_initialize_mv
 
     !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
-    subroutine s_initialize_pb(qK_cons_vf, mv, pb)
+    pure subroutine s_initialize_pb(qK_cons_vf, mv, pb)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
@@ -816,7 +816,7 @@ contains
         !! @param ix Index bounds in first coordinate direction
         !! @param iy Index bounds in second coordinate direction
         !! @param iz Index bounds in third coordinate direction
-    subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, &
+    impure subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, &
                                                              q_T_sf, &
                                                              qK_prim_vf, &
                                                              ibounds, &
@@ -1167,7 +1167,7 @@ contains
         !!  @param ix Index bounds in the first coordinate direction
         !!  @param iy Index bounds in the second coordinate direction
         !!  @param iz Index bounds in the third coordinate direction
-    subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, &
+    impure subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                              q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -1565,7 +1565,7 @@ contains
 #endif
     end subroutine s_convert_primitive_to_flux_variables
 
-    subroutine s_finalize_variables_conversion_module()
+    impure subroutine s_finalize_variables_conversion_module()
 
         integer :: i !< Generic loop iterators
 

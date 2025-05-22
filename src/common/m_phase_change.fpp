@@ -47,7 +47,7 @@ contains
     !> This subroutine should dispatch to the correct relaxation solver based
         !!      some parameter. It replaces the procedure pointer, which CCE
         !!      is breaking on.
-    subroutine s_relaxation_solver(q_cons_vf)
+    impure subroutine s_relaxation_solver(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         ! This is empty because in current master the procedure pointer
         ! was never assigned
@@ -58,7 +58,7 @@ contains
         !!      by setting the parameters needed for phase change and
         !!      selecting the phase change module that will be used
         !!      (pT- or pTg-equilibrium)
-    subroutine s_initialize_phasechange_module
+    impure subroutine s_initialize_phasechange_module
         ! variables used in the calculation of the saturation curves for fluids 1 and 2
         A = (gs_min(lp)*cvs(lp) - gs_min(vp)*cvs(vp) &
              + qvps(vp) - qvps(lp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
@@ -78,7 +78,7 @@ contains
         !!      model, also considering mass depletion, depending on the incoming
         !!      state conditions.
         !!  @param q_cons_vf Cell-average conservative variables
-    subroutine s_infinite_relaxation_k(q_cons_vf)
+    pure subroutine s_infinite_relaxation_k(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp) :: pS, pSOV, pSSL !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
@@ -732,7 +732,7 @@ contains
         !!  @param pSat Saturation Pressure
         !!  @param TSat Saturation Temperature
         !!  @param TSIn equilibrium Temperature
-    pure subroutine s_TSat(pSat, TSat, TSIn)
+    pure elemental subroutine s_TSat(pSat, TSat, TSIn)
 
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_TSat
@@ -793,7 +793,7 @@ contains
     end subroutine s_TSat
 
     !>  This subroutine finalizes the phase change module
-    subroutine s_finalize_relaxation_solver_module
+    impure subroutine s_finalize_relaxation_solver_module
     end subroutine s_finalize_relaxation_solver_module
 
 #endif

@@ -59,7 +59,7 @@ contains
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_derived_variables_module
+    impure subroutine s_initialize_derived_variables_module
 
         ! Allocating the gradient magnitude of the density variable provided
         ! that numerical Schlieren function is outputted during post-process
@@ -115,7 +115,7 @@ contains
         !!      ratio. The latter is stored in the derived flow quantity
         !!      storage variable, q_sf.
         !!  @param q_sf Specific heat ratio
-    subroutine s_derive_specific_heat_ratio(q_sf)
+    pure subroutine s_derive_specific_heat_ratio(q_sf)
 
         real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
