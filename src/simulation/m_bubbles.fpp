@@ -266,13 +266,14 @@ contains
         real(wp), intent(in) :: fR0, fR, fV, fpb
 <<<<<<< HEAD
         real(wp), intent(in) :: gam_l, Ca_l, Web_l, Re_inv_l
-        logical, intent(in) :: polytropic_l
+        logical, intent(in)  :: polytropic_l
 
         real(wp) :: f_cpbw_KM
 
         if (polytropic_l) then
             f_cpbw_KM = Ca_l*((fR0/fR)**(3._wp*gam_l)) - Ca_l + 1._wp
             if (.not. f_is_default(Web_l)) f_cpbw_KM = f_cpbw_KM + &
+<<<<<<< HEAD
                                                        (2._wp/(Web_l*fR0))*((fR0/fR)**(3._wp*gam_l))
 =======
 
@@ -283,6 +284,9 @@ contains
             if (.not. f_is_default(Web)) f_cpbw_KM = f_cpbw_KM + &
                                                      (2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))
 >>>>>>> parent of 1c9d815a (Refactoring functions to not use globals)
+=======
+                                                     (2._wp/(Web_l*fR0))*((fR0/fR)**(3._wp*gam_l))
+>>>>>>> parent of 2090b48f (Made bubble functions pure)
         else
             f_cpbw_KM = fpb
         end if
@@ -327,6 +331,7 @@ contains
         if (polytropic_l) then
             cdot_star = -3._wp*gam_l*Ca_l*((fR0/fR)**(3._wp*gam_l))*fV/fR
             if (.not. f_is_default(Web_l)) cdot_star = cdot_star - &
+<<<<<<< HEAD
                                                        3._wp*gam_l*(2._wp/(Web_l*fR0))*((fR0/fR)**(3._wp*gam_l))*fV/fR
 =======
         if (polytropic) then
@@ -334,6 +339,9 @@ contains
             if (.not. f_is_default(Web)) cdot_star = cdot_star - &
                                                      3._wp*gam*(2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))*fV/fR
 >>>>>>> parent of 1c9d815a (Refactoring functions to not use globals)
+=======
+                                                     3._wp*gam_l*(2._wp/(Web_l*fR0))*((fR0/fR)**(3._wp*gam_l))*fV/fR
+>>>>>>> parent of 2090b48f (Made bubble functions pure)
         else
             cdot_star = fpbdot
         end if
@@ -378,30 +386,14 @@ contains
     !>  Function that computes the vapour flux
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
+        !!  @param fpb 
         !!  @param fmass_v Current mass of vapour
         !!  @param iR0 Bubble size index (EE) or bubble identifier (EL)
-<<<<<<< HEAD
-        !!  @param mass_n0_l Physical Bubble parameter (pass in from global parameters)
-        !!  @param Re_trans_c_l Physical Bubble parameter (pass in from global parameters)
-        !!  @param chi_vw_l Bubble wall properties (pass in from Bubble Module)
-        !!  @param rho_mw_l Bubble wall properties (pass in from Bubble Module)
-        !!  @param Pe_c_l Physical Bubble parameter (pass in from global parameters)
-        !!  @param pv_l Physical Bubble parameter (pass in from global parameters)
-        !!  @param R_v_l Physical Bubble parameter (pass in from global parameters)
-        !!  @param Tw_l Physical Bubble parameter (pass in from global parameters)
-        !!  @param polytropic_l Polytropic switch (pass in from global parameters)
-        !!  @param bubbles_lagrange_l Lagrangian subgrid bubble model switch (pass in from global parameters)
-        !!  @param thermal_l Thermal behavior (pass in from global parameters)
-        !!  @param fmass_n Current gas mass (EL)
-        !!  @param fbeta_c Mass transfer coefficient (EL)
-    function f_vflux(fR, fV, fpb, fmass_v, iR0, mass_n0_l, Re_trans_c_l, chi_vw_l, rho_mw_l, Pe_c_l, pv_l, R_v_l, Tw_l, thermal_l, bubbles_lagrange_l, fmass_n, fbeta_c, fR_m, fgamma_m)
-=======
         !!  @param fmass_n Current gas mass (EL)
         !!  @param fbeta_c Mass transfer coefficient (EL)
         !!  @param fR_m Mixture gas constant (EL)
         !!  @param fgamma_m Mixture gamma (EL)
     function f_vflux(fR, fV, fpb, fmass_v, iR0, fmass_n, fbeta_c, fR_m, fgamma_m)
->>>>>>> parent of 1c9d815a (Refactoring functions to not use globals)
         !$acc routine seq
         real(wp), intent(in) :: fR
         real(wp), intent(in) :: fV
@@ -456,21 +448,10 @@ contains
         !!  @param fpb Current internal bubble pressure
         !!  @param fmass_v Current mass of vapour
         !!  @param iR0 Bubble size index (EE) or bubble identifier (EL)
-        !!  @param Tw_l Physical bubble parameters (pass in from global parameters)
-        !!  @param R_v_l Physical bubble parameters (pass in from global parameters)
-        !!  @param pv_l Physical bubble parameters (pass in from global parameters)
-        !!  @param pb0_l Physical bubble parameters (pass in from global parameters)
-        !!  @param mass_n0_l Physical bubble parameters (pass in from global parameters)
-        !!  @param mass_v0_l Physical bubble parameters (pass in from global parameters)
-        !!  @param Pe_T_l Physical bubble parameters (pass in from global parameters)
-        !!  @param Re_trans_T_l Physical bubble parameters (pass in from global parameters)
-        !!  @param k_mw_l Bubble Wall properties (pass in from bubbles module)
-        !!  @param thermal_l Thermal Behavior (pass in from global parameters)
-        !!  @param bubbles_lagrange_l Lagrangian subgrid bubble model switch (pass in from global parameters)
         !!  @param fbeta_t Mass transfer coefficient (EL)
         !!  @param fR_m Mixture gas constant (EL)
         !!  @param fgamma_m Mixture gamma (EL)
-    pure function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, Tw_l, R_v_l, pv_l, pb0_l, mass_n0_l, mass_v0_l, Pe_T_l, Re_trans_T_l, k_mw_l, thermal_l, bubbles_lagrange_l, fbeta_t, fR_m, fgamma_m)
+    function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, fbeta_t, fR_m, fgamma_m)
         !$acc routine seq
         real(wp), intent(in) :: fvflux
         real(wp), intent(in) :: fR
@@ -478,12 +459,6 @@ contains
         real(wp), intent(in) :: fpb
         real(wp), intent(in) :: fmass_v
         integer, intent(in) :: iR0
-        real(wp), intent(in) :: Tw_l, R_v_l, pv_l
-        real(wp), dimension(:), allocatable, intent(in) :: pb0_l, mass_n0_l, mass_v0_l, Pe_T_l
-        real(wp), dimension(:), allocatable, intent(in) :: Re_trans_T_l
-        real(wp), intent(in) :: k_mw_l
-        integer, intent(in) :: thermal_l
-        logical, intent(in) :: bubbles_lagrange_l
         real(wp), intent(in), optional :: fbeta_t, fR_m, fgamma_m
 
         real(wp) :: T_bar
@@ -491,22 +466,22 @@ contains
         real(wp) :: f_bpres_dot
         real(wp) :: heatflux
 
-        if (thermal_l == 3) then
-            if (bubbles_lagrange_l) then
+        if (thermal == 3) then
+            if (bubbles_lagrange) then
                 T_bar = fpb*(4._wp/3._wp*pi*fR**3._wp)/fR_m
-                grad_T = -fbeta_t*(T_bar - Tw_l)
+                grad_T = -fbeta_t*(T_bar - Tw)
                 heatflux = (fgamma_m - 1._wp)/fgamma_m*grad_T/fR
-                f_bpres_dot = 3._wp*fgamma_m*(-fV*fpb + fvflux*R_v_l*Tw_l &
+                f_bpres_dot = 3._wp*fgamma_m*(-fV*fpb + fvflux*R_v*Tw &
                                               + heatflux)/fR
                 return
             end if
-            T_bar = Tw_l*(fpb/pb0_l(iR0))*(fR/R0(iR0))**3 &
-                    *(mass_n0_l(iR0) + mass_v0_l(iR0))/(mass_n0_l(iR0) + fmass_v)
-            grad_T = -Re_trans_T_l(iR0)*(T_bar - Tw_l)
-            f_bpres_dot = 3._wp*gamma_m*(-fV*fpb + fvflux*R_v_l*Tw_l &
-                                         + pb0_l(iR0)*k_mw_l*grad_T/Pe_T_l(iR0)/fR)/fR
+            T_bar = Tw*(fpb/pb0(iR0))*(fR/R0(iR0))**3 &
+                    *(mass_n0(iR0) + mass_v0(iR0))/(mass_n0(iR0) + fmass_v)
+            grad_T = -Re_trans_T(iR0)*(T_bar - Tw)
+            f_bpres_dot = 3._wp*gamma_m*(-fV*fpb + fvflux*R_v*Tw &
+                                         + pb0(iR0)*k_mw*grad_T/Pe_T(iR0)/fR)/fR
         else
-            f_bpres_dot = -3._wp*gamma_m*fV/fR*(fpb - pv_l)
+            f_bpres_dot = -3._wp*gamma_m*fV/fR*(fpb - pv)
         end if
 
     end function f_bpres_dot
