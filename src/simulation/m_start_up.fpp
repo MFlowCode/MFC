@@ -35,6 +35,8 @@ module m_start_up
 
     use m_cbc                  !< Characteristic boundary conditions (CBC)
 
+    use m_boundary_common
+
     use m_acoustic_src      !< Acoustic source calculations
 
     use m_rhs                  !< Right-hane-side (RHS) evaluation procedures
@@ -82,6 +84,8 @@ module m_start_up
     use m_surface_tension
 
     use m_body_forces
+
+    use m_sim_helpers
 
     use m_mhd
 
@@ -168,14 +172,14 @@ contains
             relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
             R0_type, file_per_process, sigma, &
-            pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
+            pi_fac, adv_n, adap_dt, adap_dt_tol, &
+            bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target, &
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
-            rkck_adap_dt, rkck_tolerance, &
-            hyperelasticity, R0ref, Bx0, powell, &
+            hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar
 
         ! Checking that an input file has been provided by the user. If it
@@ -208,7 +212,12 @@ contains
             n_glb = n
             p_glb = p
 
-            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
+
+            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. &
+                num_bc_patches > 0) then
+                bc_io = .true.
+            endif
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
@@ -250,7 +259,8 @@ contains
     subroutine s_read_serial_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-
+        
+            
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the starting time-step directory
 
@@ -277,6 +287,12 @@ contains
 
         if (file_exist .neqv. .true.) then
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
+        end if
+
+        if (bc_io) then
+            call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
+        else
+            call s_assign_default_bc_type(bc_type)
         end if
 
         ! Cell-boundary Locations in x-direction
@@ -933,6 +949,12 @@ contains
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
+        if (bc_io) then
+            call s_read_parallel_boundary_condition_files(bc_type)
+        else
+            call s_assign_default_bc_type(bc_type)
+        end if
+
 #endif
 
     end subroutine s_read_parallel_data_files
@@ -951,15 +973,15 @@ contains
         ! coordinate direction, based on the selected boundary condition. In
         ! order, these are the ghost-cell extrapolation, symmetry, periodic,
         ! and processor boundary conditions.
-        if (bc_x%beg <= -3) then
+        if (bc_x%beg <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dx(-i) = dx(0)
             end do
-        elseif (bc_x%beg == -2) then
+        elseif (bc_x%beg == BC_REFLECTIVE) then
             do i = 1, buff_size
                 dx(-i) = dx(i - 1)
             end do
-        elseif (bc_x%beg == -1) then
+        elseif (bc_x%beg == BC_PERIODIC) then
             do i = 1, buff_size
                 dx(-i) = dx(m - (i - 1))
             end do
@@ -982,15 +1004,15 @@ contains
         ! coordinate direction, based on desired boundary condition. These
         ! include, in order, ghost-cell extrapolation, symmetry, periodic,
         ! and processor boundary conditions.
-        if (bc_x%end <= -3) then
+        if (bc_x%end <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dx(m + i) = dx(m)
             end do
-        elseif (bc_x%end == -2) then
+        elseif (bc_x%end == BC_REFLECTIVE) then
             do i = 1, buff_size
                 dx(m + i) = dx(m - (i - 1))
             end do
-        elseif (bc_x%end == -1) then
+        elseif (bc_x%end == BC_PERIODIC) then
             do i = 1, buff_size
                 dx(m + i) = dx(i - 1)
             end do
@@ -1019,15 +1041,15 @@ contains
         ! and processor boundary conditions.
         if (n == 0) then
             return
-        elseif (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
+        elseif (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_AXIS) then
             do i = 1, buff_size
                 dy(-i) = dy(0)
             end do
-        elseif (bc_y%beg == -2 .or. bc_y%beg == -14) then
+        elseif (bc_y%beg == BC_REFLECTIVE .or. bc_y%beg == BC_AXIS) then
             do i = 1, buff_size
                 dy(-i) = dy(i - 1)
             end do
-        elseif (bc_y%beg == -1) then
+        elseif (bc_y%beg == BC_PERIODIC) then
             do i = 1, buff_size
                 dy(-i) = dy(n - (i - 1))
             end do
@@ -1050,15 +1072,15 @@ contains
         ! coordinate direction, based on desired boundary condition. These
         ! include, in order, ghost-cell extrapolation, symmetry, periodic,
         ! and processor boundary conditions.
-        if (bc_y%end <= -3) then
+        if (bc_y%end <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dy(n + i) = dy(n)
             end do
-        elseif (bc_y%end == -2) then
+        elseif (bc_y%end == BC_REFLECTIVE) then
             do i = 1, buff_size
                 dy(n + i) = dy(n - (i - 1))
             end do
-        elseif (bc_y%end == -1) then
+        elseif (bc_y%end == BC_PERIODIC) then
             do i = 1, buff_size
                 dy(n + i) = dy(i - 1)
             end do
@@ -1087,15 +1109,15 @@ contains
         ! and processor boundary conditions.
         if (p == 0) then
             return
-        elseif (bc_z%beg <= -3) then
+        elseif (bc_z%beg <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dz(-i) = dz(0)
             end do
-        elseif (bc_z%beg == -2) then
+        elseif (bc_z%beg == BC_REFLECTIVE) then
             do i = 1, buff_size
                 dz(-i) = dz(i - 1)
             end do
-        elseif (bc_z%beg == -1) then
+        elseif (bc_z%beg == BC_PERIODIC) then
             do i = 1, buff_size
                 dz(-i) = dz(p - (i - 1))
             end do
@@ -1118,15 +1140,15 @@ contains
         ! coordinate direction, based on desired boundary condition. These
         ! include, in order, ghost-cell extrapolation, symmetry, periodic,
         ! and processor boundary conditions.
-        if (bc_z%end <= -3) then
+        if (bc_z%end <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dz(p + i) = dz(p)
             end do
-        elseif (bc_z%end == -2) then
+        elseif (bc_z%end == BC_REFLECTIVE) then
             do i = 1, buff_size
                 dz(p + i) = dz(p - (i - 1))
             end do
-        elseif (bc_z%end == -1) then
+        elseif (bc_z%end == BC_PERIODIC) then
             do i = 1, buff_size
                 dz(p + i) = dz(i - 1)
             end do
@@ -1231,13 +1253,13 @@ contains
         integer :: i
 
         if (cfl_dt) then
-            if (cfl_const_dt .and. t_step == 0 .and. .not. rkck_adap_dt) call s_compute_dt()
+            if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
 
-            if (cfl_adap_dt .and. .not. rkck_adap_dt) call s_compute_dt()
+            if (cfl_adap_dt) call s_compute_dt()
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0 .and. .not. rkck_adap_dt) then
+            if (dt < 1e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
                 print*, "Delta t = ", dt
                 call s_mpi_abort("Delta t has become too small")
             end if
@@ -1297,9 +1319,6 @@ contains
             call s_3rd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
-        elseif (time_stepper == 4) then
-            ! (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepper (Cash J. and Karp A., 1990)
-            call s_4th_5th_order_rkck(t_step, time_avg)
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
@@ -1409,10 +1428,18 @@ contains
         end if
 
         if (bubbles_lagrange) then
+            !$acc update host(intfc_rad)
+            do i = 1, nBubs
+                if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
+                    call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
+                end if
+            end do
+
             !$acc update host(q_beta%vf(1)%sf)
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, q_beta%vf(1))
-            !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_vel)
+            !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_vel, mtn_pos, mtn_vel)
             call s_write_restart_lag_bubbles(save_count) !parallel
+
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count)
@@ -1458,7 +1485,6 @@ contains
 
 
         call s_initialize_mpi_common_module()
-        call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
         if (grid_geometry == 3) call s_initialize_fftw_module()
         call s_initialize_riemann_solvers_module()
@@ -1496,6 +1522,7 @@ contains
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
+        call s_initialize_boundary_common_module()
 
         ! Reading in the user provided initial condition and grid data
         call s_read_data_files(q_cons_ts(1)%vf)
@@ -1617,7 +1644,7 @@ contains
         if (chemistry) then
             !$acc update device(q_T_sf%sf)
         end if
-        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, n_idx, pi_fac, low_Mach)
+        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, n_idx, pi_fac, low_Mach)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
         !$acc update device(acoustic_source, num_source)
@@ -1659,8 +1686,8 @@ contains
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_common_module()
-        call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
+        call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (bubbles_lagrange) call s_finalize_lagrangian_solver()
         if (viscous) then

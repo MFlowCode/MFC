@@ -170,8 +170,7 @@ contains
             & 'file_per_process', 'relax', 'cf_wrt',                           &
             & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',          &
             & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange',        &
-            & 'rkck_adap_dt', 'output_partial_domain', 'relativity',           &
-            & 'cont_damage' ]
+            & 'output_partial_domain', 'relativity', 'cont_damage' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -401,7 +400,7 @@ contains
                 end do
 
                 ! Boundary condition at the beginning
-                if (proc_coords(3) > 0 .or. bc_z%beg == -1) then
+                if (proc_coords(3) > 0 .or. bc_z%beg == BC_PERIODIC) then
                     proc_coords(3) = proc_coords(3) - 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                        bc_z%beg, ierr)
@@ -416,7 +415,7 @@ contains
                 end if
 
                 ! Boundary condition at the end
-                if (proc_coords(3) < num_procs_z - 1 .or. bc_z%end == -1) then
+                if (proc_coords(3) < num_procs_z - 1 .or. bc_z%end == BC_PERIODIC) then
                     proc_coords(3) = proc_coords(3) + 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                        bc_z%end, ierr)
@@ -523,7 +522,7 @@ contains
             end do
 
             ! Boundary condition at the beginning
-            if (proc_coords(2) > 0 .or. bc_y%beg == -1) then
+            if (proc_coords(2) > 0 .or. bc_y%beg == BC_PERIODIC) then
                 proc_coords(2) = proc_coords(2) - 1
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                    bc_y%beg, ierr)
@@ -538,7 +537,7 @@ contains
             end if
 
             ! Boundary condition at the end
-            if (proc_coords(2) < num_procs_y - 1 .or. bc_y%end == -1) then
+            if (proc_coords(2) < num_procs_y - 1 .or. bc_y%end == BC_PERIODIC) then
                 proc_coords(2) = proc_coords(2) + 1
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                    bc_y%end, ierr)
@@ -601,7 +600,7 @@ contains
         end do
 
         ! Boundary condition at the beginning
-        if (proc_coords(1) > 0 .or. bc_x%beg == -1) then
+        if (proc_coords(1) > 0 .or. bc_x%beg == BC_PERIODIC) then
             proc_coords(1) = proc_coords(1) - 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
             proc_coords(1) = proc_coords(1) + 1
@@ -615,7 +614,7 @@ contains
         end if
 
         ! Boundary condition at the end
-        if (proc_coords(1) < num_procs_x - 1 .or. bc_x%end == -1) then
+        if (proc_coords(1) < num_procs_x - 1 .or. bc_x%end == BC_PERIODIC) then
             proc_coords(1) = proc_coords(1) + 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
             proc_coords(1) = proc_coords(1) - 1

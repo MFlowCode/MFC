@@ -32,16 +32,6 @@ module m_mpi_proxy
 
     implicit none
 
-    real(wp), private, allocatable, dimension(:), target :: c_divs_buff_send !<
-    !! c_divs_buff_send is utilized to send and unpack the buffer of the cell-
-    !! centered color function derivatives, for a single computational domain
-    !! boundary at the time, to the the relevant neighboring processor
-
-    real(wp), private, allocatable, dimension(:), target :: c_divs_buff_recv
-    !! c_divs_buff_recv is utilized to receiver and unpack the buffer of the cell-
-    !! centered color function derivatives, for a single computational domain
-    !! boundary at the time, from the relevant neighboring processor
-
     integer, private, allocatable, dimension(:), target :: ib_buff_send !<
     !! This variable is utilized to pack and send the buffer of the immersed
     !! boundary markers, for a single computational domain boundary at the
@@ -52,49 +42,13 @@ module m_mpi_proxy
     !! immersed boundary markers, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
-    !$acc declare create( ib_buff_send, ib_buff_recv)
-    !$acc declare create(c_divs_buff_send, c_divs_buff_recv)
-
     !> @name Generic flags used to identify and report MPI errors
     !> @{
     integer, private :: err_code, ierr, v_size
     !> @}
     !$acc declare create(v_size)
 
-    integer :: nVars !< nVars for surface tension communication
-    !$acc declare create(nVars)
-
 contains
-
-    !> The computation of parameters, the allocation of memory,
-        !!      the association of pointers and/or the execution of any
-        !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_mpi_proxy_module
-
-#ifdef MFC_MPI
-        if (surface_tension) then
-            nVars = num_dims + 1
-            if (n > 0) then
-                if (p > 0) then
-                    @:ALLOCATE(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)* &
-                                             & (m + 2*buff_size + 1)* &
-                                             & (n + 2*buff_size + 1)* &
-                                             & (p + 2*buff_size + 1)/ &
-                                             & (min(m, n, p) + 2*buff_size + 1)))
-                else
-                    @:ALLOCATE(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)* &
-                                             & (max(m, n) + 2*buff_size + 1)))
-                end if
-            else
-                @:ALLOCATE(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)))
-            end if
-
-            @:ALLOCATE(c_divs_buff_recv(0:ubound(c_divs_buff_send, 1)))
-        end if
-        !$acc update device(v_size, nVars)
-#endif
-
-    end subroutine s_initialize_mpi_proxy_module
 
     !>  Since only the processor with rank 0 reads and verifies
         !!      the consistency of user inputs, these are initially not
@@ -120,7 +74,8 @@ contains
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', &
             & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',  'fd_order',     &
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
-            & 'R0_type', 'num_source', 'relax_model', 'num_ibs', 'n_start'       ]
+            & 'R0_type', 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
+            & 'num_bc_patches']
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -136,7 +91,7 @@ contains
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
             & 'viscous', 'shear_stress', 'bulk_stress', 'bubbles_lagrange',     &
-            & 'hyperelasticity', 'rkck_adap_dt', 'powell', 'cont_damage' ]
+            & 'hyperelasticity', 'bc_io', 'powell', 'cont_damage' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -174,8 +129,8 @@ contains
             & 'bc_x%pres_in','bc_x%pres_out','bc_y%pres_in','bc_y%pres_out', 'bc_z%pres_in','bc_z%pres_out', &
             & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',    &
             & 'z_domain%beg', 'z_domain%end', 'x_a', 'x_b', 'y_a', 'y_b', 'z_a', &
-            & 'z_b', 't_stop', 't_save', 'cfl_target', 'rkck_tolerance', 'Bx0',  &
-            & 'tau_star', 'cont_damage_s', 'alpha_bar' ]
+            & 'z_b', 't_stop', 't_save', 'cfl_target', 'Bx0',  &
+            & 'tau_star', 'cont_damage_s', 'alpha_bar', 'adap_dt_tol' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -439,7 +394,7 @@ contains
                 end do
 
                 ! Boundary condition at the beginning
-                if (proc_coords(3) > 0 .or. (bc_z%beg == -1 .and. num_procs_z > 1)) then
+                if (proc_coords(3) > 0 .or. (bc_z%beg == BC_PERIODIC .and. num_procs_z > 1)) then
                     proc_coords(3) = proc_coords(3) - 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                        bc_z%beg, ierr)
@@ -447,7 +402,7 @@ contains
                 end if
 
                 ! Boundary condition at the end
-                if (proc_coords(3) < num_procs_z - 1 .or. (bc_z%end == -1 .and. num_procs_z > 1)) then
+                if (proc_coords(3) < num_procs_z - 1 .or. (bc_z%end == BC_PERIODIC .and. num_procs_z > 1)) then
                     proc_coords(3) = proc_coords(3) + 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                        bc_z%end, ierr)
@@ -542,7 +497,7 @@ contains
             end do
 
             ! Boundary condition at the beginning
-            if (proc_coords(2) > 0 .or. (bc_y%beg == -1 .and. num_procs_y > 1)) then
+            if (proc_coords(2) > 0 .or. (bc_y%beg == BC_PERIODIC .and. num_procs_y > 1)) then
                 proc_coords(2) = proc_coords(2) - 1
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                    bc_y%beg, ierr)
@@ -550,7 +505,7 @@ contains
             end if
 
             ! Boundary condition at the end
-            if (proc_coords(2) < num_procs_y - 1 .or. (bc_y%end == -1 .and. num_procs_y > 1)) then
+            if (proc_coords(2) < num_procs_y - 1 .or. (bc_y%end == BC_PERIODIC .and. num_procs_y > 1)) then
                 proc_coords(2) = proc_coords(2) + 1
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                    bc_y%end, ierr)
@@ -598,14 +553,14 @@ contains
         end do
 
         ! Boundary condition at the beginning
-        if (proc_coords(1) > 0 .or. (bc_x%beg == -1 .and. num_procs_x > 1)) then
+        if (proc_coords(1) > 0 .or. (bc_x%beg == BC_PERIODIC .and. num_procs_x > 1)) then
             proc_coords(1) = proc_coords(1) - 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
             proc_coords(1) = proc_coords(1) + 1
         end if
 
         ! Boundary condition at the end
-        if (proc_coords(1) < num_procs_x - 1 .or. (bc_x%end == -1 .and. num_procs_x > 1)) then
+        if (proc_coords(1) < num_procs_x - 1 .or. (bc_x%end == BC_PERIODIC .and. num_procs_x > 1)) then
             proc_coords(1) = proc_coords(1) + 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
             proc_coords(1) = proc_coords(1) - 1
@@ -1657,217 +1612,6 @@ contains
 
     end subroutine s_mpi_sendrecv_ib_buffers
 
-    subroutine s_mpi_sendrecv_capilary_variables_buffers(c_divs_vf, mpi_dir, pbc_loc)
-
-        type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs_vf
-        integer, intent(in) :: mpi_dir, pbc_loc
-
-        integer :: i, j, k, l, r, q !< Generic loop iterators
-
-        integer :: buffer_counts(1:3), buffer_count
-
-        type(int_bounds_info) :: boundary_conditions(1:3)
-        integer :: beg_end(1:2), grid_dims(1:3)
-        integer :: dst_proc, src_proc, recv_tag, send_tag
-
-        logical :: beg_end_geq_0
-
-        integer :: pack_offset, unpack_offset
-        real(wp), pointer :: p_send, p_recv
-
-#ifdef MFC_MPI
-
-        nVars = num_dims + 1
-        !$acc update device(nVars)
-
-        buffer_counts = (/ &
-                        buff_size*nVars*(n + 1)*(p + 1), &
-                        buff_size*nVars*(m + 2*buff_size + 1)*(p + 1), &
-                        buff_size*nVars*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
-                        /)
-
-        buffer_count = buffer_counts(mpi_dir)
-        boundary_conditions = (/bc_x, bc_y, bc_z/)
-        beg_end = (/boundary_conditions(mpi_dir)%beg, boundary_conditions(mpi_dir)%end/)
-        beg_end_geq_0 = beg_end(max(pbc_loc, 0) - pbc_loc + 1) >= 0
-
-        ! Implements:
-        ! pbc_loc  bc_x >= 0 -> [send/recv]_tag  [dst/src]_proc
-        ! -1 (=0)      0            ->     [1,0]       [0,0]      | 0 0 [1,0] [beg,beg]
-        ! -1 (=0)      1            ->     [0,0]       [1,0]      | 0 1 [0,0] [end,beg]
-        ! +1 (=1)      0            ->     [0,1]       [1,1]      | 1 0 [0,1] [end,end]
-        ! +1 (=1)      1            ->     [1,1]       [0,1]      | 1 1 [1,1] [beg,end]
-
-        send_tag = f_logical_to_int(.not. f_xor(beg_end_geq_0, pbc_loc == 1))
-        recv_tag = f_logical_to_int(pbc_loc == 1)
-
-        dst_proc = beg_end(1 + f_logical_to_int(f_xor(pbc_loc == 1, beg_end_geq_0)))
-        src_proc = beg_end(1 + f_logical_to_int(pbc_loc == 1))
-
-        grid_dims = (/m, n, p/)
-
-        pack_offset = 0
-        if (f_xor(pbc_loc == 1, beg_end_geq_0)) then
-            pack_offset = grid_dims(mpi_dir) - buff_size + 1
-        end if
-
-        unpack_offset = 0
-        if (pbc_loc == 1) then
-            unpack_offset = grid_dims(mpi_dir) + buff_size + 1
-        end if
-
-        ! Pack Buffer to Send
-        #:for mpi_dir in [1, 2, 3]
-            if (mpi_dir == ${mpi_dir}$) then
-                #:if mpi_dir == 1
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, buff_size - 1
-                                do i = 1, nVars
-                                    r = (i - 1) + nVars*(j + buff_size*(k + (n + 1)*l))
-                                    c_divs_buff_send(r) = c_divs_vf(i)%sf(j + pack_offset, k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-
-                #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, nVars
-                        do l = 0, p
-                            do k = 0, buff_size - 1
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + nVars* &
-                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         (k + buff_size*l))
-                                    c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k + pack_offset, l)
-                                end do
-                            end do
-                        end do
-                    end do
-
-                #:else
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, nVars
-                        do l = 0, buff_size - 1
-                            do k = -buff_size, n + buff_size
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + nVars* &
-                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                    c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k, l + pack_offset)
-                                end do
-                            end do
-                        end do
-                    end do
-                #:endif
-            end if
-        #:endfor
-
-        ! Send/Recv
-        #:for rdma_mpi in [False, True]
-            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
-                p_send => c_divs_buff_send(0)
-                p_recv => c_divs_buff_recv(0)
-
-                #:if rdma_mpi
-                    !$acc data attach(p_send, p_recv)
-                    !$acc host_data use_device(p_send, p_recv)
-                #:else
-                    !$acc update host(c_divs_buff_send)
-                #:endif
-
-                call MPI_SENDRECV( &
-                    p_send, buffer_count, mpi_p, dst_proc, send_tag, &
-                    p_recv, buffer_count, mpi_p, src_proc, recv_tag, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                #:if rdma_mpi
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                #:else
-                    !$acc update device(c_divs_buff_recv)
-                #:endif
-            end if
-        #:endfor
-
-        ! Unpack Received Buffer
-        #:for mpi_dir in [1, 2, 3]
-            if (mpi_dir == ${mpi_dir}$) then
-                #:if mpi_dir == 1
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = -buff_size, -1
-                                do i = 1, nVars
-                                    r = (i - 1) + nVars* &
-                                        (j + buff_size*((k + 1) + (n + 1)*l))
-                                    c_divs_vf(i)%sf(j + unpack_offset, k, l) = c_divs_buff_recv(r)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(c_divs_vf(i)%sf(j, k, l))) then
-                                        print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
-                                    end if
-#endif
-                                end do
-                            end do
-                        end do
-                    end do
-
-                #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, nVars
-                        do l = 0, p
-                            do k = -buff_size, -1
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + nVars* &
-                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + buff_size) + buff_size*l))
-                                    c_divs_vf(i)%sf(j, k + unpack_offset, l) = c_divs_buff_recv(r)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(c_divs_vf(i)%sf(j, k, l))) then
-                                        print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
-                                    end if
-#endif
-                                end do
-                            end do
-                        end do
-                    end do
-
-                #:else
-                    ! Unpacking buffer from bc_z%beg
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, nVars
-                        do l = -buff_size, -1
-                            do k = -buff_size, n + buff_size
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + nVars* &
-                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + buff_size) + (n + 2*buff_size + 1)* &
-                                          (l + buff_size)))
-                                    c_divs_vf(i)%sf(j, k, l + unpack_offset) = c_divs_buff_recv(r)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(c_divs_vf(i)%sf(j, k, l))) then
-                                        print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
-                                    end if
-#endif
-                                end do
-                            end do
-                        end do
-                    end do
-
-                #:endif
-            end if
-        #:endfor
-
-#endif
-
-    end subroutine s_mpi_sendrecv_capilary_variables_buffers
-
     subroutine s_mpi_send_random_number(phi_rn, num_freq)
         integer, intent(in) :: num_freq
         real(wp), intent(inout), dimension(1:num_freq) :: phi_rn
@@ -1875,16 +1619,5 @@ contains
         call MPI_BCAST(phi_rn, num_freq, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
     end subroutine s_mpi_send_random_number
-
-    !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_mpi_proxy_module
-
-#ifdef MFC_MPI
-        if (surface_tension) then
-            @:DEALLOCATE(c_divs_buff_send, c_divs_buff_recv)
-        end if
-#endif
-
-    end subroutine s_finalize_mpi_proxy_module
 
 end module m_mpi_proxy

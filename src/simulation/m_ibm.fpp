@@ -135,6 +135,7 @@ contains
 
         real(wp) :: pres_IP, coeff
         real(wp), dimension(3) :: vel_IP, vel_norm_IP
+        real(wp) :: c_IP
         real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
         real(wp), dimension(nb) :: r_IP, v_IP, pb_IP, mv_IP
         real(wp), dimension(nb*nmom) :: nmom_IP
@@ -170,19 +171,19 @@ contains
             !Interpolate primitive variables at image point associated w/ GP
             if (bubbles_euler .and. .not. qbmm) then
                 call s_interpolate_image_point(q_prim_vf, gp, &
-                                               alpha_rho_IP, alpha_IP, pres_IP, vel_IP, &
+                                               alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
                                                r_IP, v_IP, pb_IP, mv_IP)
             else if (qbmm .and. polytropic) then
                 call s_interpolate_image_point(q_prim_vf, gp, &
-                                               alpha_rho_IP, alpha_IP, pres_IP, vel_IP, &
+                                               alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
                                                r_IP, v_IP, pb_IP, mv_IP, nmom_IP)
             else if (qbmm .and. .not. polytropic) then
                 call s_interpolate_image_point(q_prim_vf, gp, &
-                                               alpha_rho_IP, alpha_IP, pres_IP, vel_IP, &
+                                               alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
                                                r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
             else
                 call s_interpolate_image_point(q_prim_vf, gp, &
-                                               alpha_rho_IP, alpha_IP, pres_IP, vel_IP)
+                                               alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
             end if
 
             dyn_pres = 0._wp
@@ -193,6 +194,10 @@ contains
                 q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
                 q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
             end do
+
+            if (surface_tension) then
+                q_prim_vf(c_idx)%sf(j, k, l) = c_IP
+            end if
 
             if (model_eqns /= 4) then
                 ! If in simulation, use acc mixture subroutines
@@ -233,6 +238,11 @@ contains
                 q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
                 q_cons_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
             end do
+
+            ! Set color function
+            if (surface_tension) then
+                q_cons_vf(c_idx)%sf(j, k, l) = c_IP
+            end if
 
             ! Set Energy
             if (bubbles_euler) then
@@ -308,6 +318,10 @@ contains
                 q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
                 q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
             end do
+
+            if (surface_tension) then
+                q_prim_vf(c_idx)%sf(j, k, l) = c_IP
+            end if
 
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
                                                             alpha_rho_IP, Re_K, j, k, l)
@@ -725,16 +739,18 @@ contains
 
     !> Function that uses the interpolation coefficients and the current state
     !! at the cell centers in order to estimate the state at the image point
-    subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
+    subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
         !$acc routine seq
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_prim_vf !< Primitive Variables
+
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(INOUT) :: pb, mv
 
         type(ghost_point), intent(IN) :: gp
         real(wp), intent(INOUT) :: pres_IP
         real(wp), dimension(3), intent(INOUT) :: vel_IP
+        real(wp), intent(INOUT) :: c_IP
         real(wp), dimension(num_fluids), intent(INOUT) :: alpha_IP, alpha_rho_IP
         real(wp), optional, dimension(:), intent(INOUT) :: r_IP, v_IP, pb_IP, mv_IP
         real(wp), optional, dimension(:), intent(INOUT) :: nmom_IP
@@ -757,6 +773,8 @@ contains
         alpha_IP = 0._wp
         pres_IP = 0._wp
         vel_IP = 0._wp
+
+        if (surface_tension) c_IP = 0._wp
 
         if (bubbles_euler) then
             r_IP = 0._wp
@@ -800,6 +818,10 @@ contains
                         alpha_IP(l) = alpha_IP(l) + coeff* &
                                       q_prim_vf(advxb + l - 1)%sf(i, j, k)
                     end do
+
+                    if (surface_tension) then
+                        c_IP = c_IP + coeff*q_prim_vf(c_idx)%sf(i, j, k)
+                    end if
 
                     if (bubbles_euler .and. .not. qbmm) then
                         !$acc loop seq

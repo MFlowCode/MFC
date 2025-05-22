@@ -408,8 +408,10 @@ The parameters are used to specify options in algorithms that are used to integr
 Models and assumptions that are used to formulate and discritize the governing equations are described in [Bryngelson et al. (2019)](references.md).
 Details of the simulation algorithms and implementation of the WENO scheme can be found in [Coralic (2015)](references.md).
 
-- `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -12.
+- `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -16.
 See table [Boundary Conditions](#boundary-conditions) for details.
+Boundary condition patches can be used with non-characteristic boundary conditions.
+Their use is detailed in [Boundary Condition Patches](#boundary-condition-patches).
 
 - `bc_[x,y,z]%%vb[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%%beg` when using `bc_[x,y,z]%%beg = -16`.
 Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%beg = -16` to work properly. Normal velocities require `bc_[x,y,z]%%end = -15` or `\bc_[x,y,z]%%end = -16` to work properly.
@@ -434,7 +436,7 @@ The effect and use of the source term are assessed by [Schmidmayer et al., 2019]
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer.
 Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md)).
 
-- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`.
+- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles_euler = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`. Additionally, it can be used with ``bubbles_lagrange = 'T'`` and `time_stepper = 3`
 
 - `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, 5, and 7, that correspond to the 1st, 3rd, 5th, and 7th order, respectively.
 
@@ -459,7 +461,7 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively ([Toro, 2013](references.md)).
 `riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations ([Miyoshi and Kusano, 2005](references.md)).
 
-- `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method ([Chen et al., 2022](references.md)) and the improved velocity reconstruction method ([Thornber et al., 2008](references.md)). This feature requires `riemann_solver = 2` and `model_eqns = 2`.
+- `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method ([Chen et al., 2022](references.md)) and the improved velocity reconstruction method ([Thornber et al., 2008](references.md)). This feature requires `model_eqns = 2` or `3`. `low_Mach = 1` works for `riemann_solver = 1` and `2`, but `low_Mach = 2` only works for `riemann_solver = 2`.
 
 - `avg_state` specifies the choice of the method to compute averaged variables at the cell-boundaries from the left and the right states in the Riemann solver by an integer of 1 or 2.
 `avg_state = 1` and `2` correspond to Roe- and arithmetic averages, respectively.
@@ -478,6 +480,29 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 - `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
 
 - `hypoelasticity` activates elastic stress calculations for fluid-solid interactions. Requires `G` to be set in the fluid material's parameters.
+
+#### Boundary Condition Patches
+
+| Parameter              | Type    | Description                                                     |
+| ---:                   | :----:  |          :---                                                   |
+| `num_bc_patches`       | Integer | Number of boundary condition patches                            |
+| `dir`*                 | Integer | Direction of the boundary patch. [1]: x; [2]: y; [3]: z         |
+| `loc`*                 | Integer | Location of the patch in the domain                             |
+| `type`*                | Integer | The geometry of the patch. [1]: Line [2]: Circle [3]: Rectangle |
+| `x[y,z]_centroid`*     | Real    | Centroid of the boundary patch in the x[y,z]-direction          |
+| `length_x[y,z]`*       | Real    | Length of the boundary patch in the x[y,z]-direction            |
+| `radius`*              | Real    | Radius of the boundary patch                                    |
+*: These parameters should be prepended with `patch_bc(j)%` where $j$ is the patch index.
+
+Boundary condition patches can be used with the following boundary condition types:
+- `-2` reflective
+- `-3` ghost cell extrapolation
+- `-15` slip wall
+- `-16` no-slip wall
+- `-17` Dirichlet
+
+Line segments along each domain edge are supported for 2D simulations.
+Squares and circles on each face are supported for 3D simulations.
 
 #### Constant Time-Stepping
 
@@ -765,8 +790,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `x0`                  | Real    | Reference length                                          |
 | `Thost`               | Real    | Temperature of the surrounding liquid (host)              |
 | `diffcoefvap`         | Real    | Vapor diffusivity in the gas                              |
-| `rkck_adap_dt`        | Logical | Activates the adaptive rkck time stepping algorithm       |
-| `rkck_tolerance`      | Real    | Admissible error truncation tolerance in the rkck stepper  |
 
 - `nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
 
@@ -779,8 +802,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - `heatTransfer_model` Activates the heat transfer model at the bubble's interface based on ([Preston et al., 2007](references.md)).
 
 - `massTransfer_model` Activates the mass transfer model at the bubble's interface based on ([Preston et al., 2007](references.md)).
-
-- `rkck_adap_dt` Activates the adaptive 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepping algorithm (requires `time_stepper ==4`). A maximum error between the 4th and 5th order Runge-Kutta-Cash-Karp solutions for the same time step size is calculated. If the error is smaller than a tolerance (`rkck_tolerance`), then the algorithm employs the 5th order solution, while if not, both eulerian/lagrangian variables are re-calculated with a smaller time step size.
 
 ### 10. Velocity Field Setup
 

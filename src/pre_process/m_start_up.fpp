@@ -52,6 +52,10 @@ module m_start_up
 
     use m_checker
 
+    use m_boundary_common
+
+    use m_boundary_conditions
+
     implicit none
 
     private; 
@@ -143,8 +147,9 @@ contains
             palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
             sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
             n_start_old, surface_tension, hyperelasticity, pre_stress, &
-            rkck_adap_dt, elliptic_smoothing, elliptic_smoothing_iters, &
-            viscous, bubbles_lagrange, Bx0, relativity, cont_damage
+            elliptic_smoothing, elliptic_smoothing_iters, &
+            viscous, bubbles_lagrange, bc_x, bc_y, bc_z, num_bc_patches, &
+            patch_bc, Bx0, relativity, cont_damage
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -171,7 +176,12 @@ contains
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
 
-            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
+
+            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_DIRICHLET) .or. &
+                num_bc_patches > 0) then
+                bc_io = .true.
+            end if
 
         else
             call s_mpi_abort('File pre_process.inp is missing. Exiting.')
@@ -776,6 +786,7 @@ contains
         call s_initialize_initial_condition_module()
         call s_initialize_perturbation_module()
         call s_initialize_assign_variables_module()
+        call s_initialize_boundary_common_module()
         if (relax) call s_initialize_phasechange_module()
 
         ! Create the D directory if it doesn't exit, to store
@@ -847,7 +858,7 @@ contains
             call s_infinite_relaxation_k(q_cons_vf)
         end if
 
-        call s_write_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
+        call s_write_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
 
         call cpu_time(finish)
     end subroutine s_apply_initial_condition
@@ -927,6 +938,7 @@ contains
         call s_finalize_global_parameters_module()
         call s_finalize_assign_variables_module()
         call s_finalize_perturbation_module()
+        call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
 
         ! Finalization of the MPI environment

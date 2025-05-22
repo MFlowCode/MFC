@@ -188,6 +188,10 @@ module m_global_parameters
 !$acc declare create(relax, relax_model, palpha_eps,ptgalpha_eps)
 !#endif
 
+    integer :: num_bc_patches
+    logical :: bc_io
+    integer :: BC_RIEMANN_EXTRAPOLATION
+    integer :: BC_GHOST_EXTRAPOLATION
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
@@ -296,7 +300,7 @@ module m_global_parameters
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
-    !$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx, B_idx)
+    !$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx, B_idx, c_idx)
 
     integer :: shear_num !! Number of shear stress components
     integer, dimension(3) :: shear_indices !<
@@ -387,6 +391,7 @@ module m_global_parameters
     logical :: polydisperse !< Polydisperse bubbles
     logical :: adv_n        !< Solve the number density equation and compute alpha from number density
     logical :: adap_dt      !< Adaptive step size control
+    real(wp) :: adap_dt_tol !< Tolerance to control adaptive step size
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
@@ -408,7 +413,7 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-    !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles_euler, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, pi_fac)
+    !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles_euler, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, pi_fac)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
@@ -481,10 +486,7 @@ module m_global_parameters
     !> @{!
     logical :: bubbles_lagrange                         !< Lagrangian subgrid bubble model switch
     type(bubbles_lagrange_parameters) :: lag_params     !< Lagrange bubbles' parameters
-    logical :: rkck_adap_dt                             !< Activates the adaptive rkck time stepping algorithm
-    real(wp) :: rkck_time_tmp, rkck_tolerance    !Temp time (in rkck stepper) and tolerance error
-    real(wp) :: dt_max                           !< Maximum time step size
-    !$acc declare create(bubbles_lagrange, lag_params, rkck_adap_dt, dt_max, rkck_time_tmp, rkck_tolerance)
+    !$acc declare create(bubbles_lagrange, lag_params)
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
@@ -582,6 +584,11 @@ contains
         chem_params%reactions = .false.
         chem_params%gamma_method = 1
 
+        num_bc_patches = 0
+        bc_io = .false.
+        BC_RIEMANN_EXTRAPOLATION = -4
+        BC_GHOST_EXTRAPOLATION = -3
+
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
@@ -642,6 +649,7 @@ contains
 
         adv_n = .false.
         adap_dt = .false.
+        adap_dt_tol = dflt_real
 
         pi_fac = 1._wp
 
@@ -752,10 +760,6 @@ contains
         lag_params%Thost = dflt_real
         lag_params%x0 = dflt_real
         lag_params%diffcoefvap = dflt_real
-        rkck_adap_dt = .false.
-        rkck_time_tmp = dflt_real
-        rkck_tolerance = dflt_real
-        dt_max = dflt_real
 
         ! Continuum damage model
         tau_star = dflt_real
@@ -1216,7 +1220,7 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, c_idx)
         !$acc update device(b_size, xibeg, xiend, tensor_size)
 
         !$acc update device(species_idx)
