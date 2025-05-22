@@ -38,7 +38,11 @@ cd "${MFC_ROOT_DIR}"
 cd - > /dev/null
 echo
 
-export MPICH_GPU_SUPPORT_ENABLED=1
+% if gpu:
+    export MPICH_GPU_SUPPORT_ENABLED=1
+% else:
+    export MPICH_GPU_SUPPORT_ENABLED=0
+% endif
 
 % for target in targets:
     ${helpers.run_prologue(target)}
