@@ -171,8 +171,8 @@ contains
                     end select
 
                     if (qbmm .and. (.not. polytropic) .and. &
-                        (bc_type(2, -1)%sf(0, k, l) <= BC_GHOST_EXTRAP) .and. &
-                        (bc_type(2, -1)%sf(0, k, l) /= BC_AXIS)) then
+                        (bc_type(2, -1)%sf(k, 0, l) <= BC_GHOST_EXTRAP) .and. &
+                        (bc_type(2, -1)%sf(k, 0, l) /= BC_AXIS)) then
                         call s_qbmm_extrapolation(2, -1, k, l, pb, mv)
                     end if
                 end do
@@ -201,7 +201,7 @@ contains
                     end select
 
                     if (qbmm .and. (.not. polytropic) .and. &
-                        (bc_type(2, 1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                        (bc_type(2, 1)%sf(k, 0, l) <= BC_GHOST_EXTRAP)) then
                         call s_qbmm_extrapolation(2, 1, k, l, pb, mv)
                     end if
                 end do
@@ -234,7 +234,7 @@ contains
                     end select
 
                     if (qbmm .and. (.not. polytropic) .and. &
-                        (bc_type(3, -1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                        (bc_type(3, -1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
                         call s_qbmm_extrapolation(3, -1, k, l, pb, mv)
                     end if
                 end do
@@ -263,7 +263,7 @@ contains
                     end select
 
                     if (qbmm .and. (.not. polytropic) .and. &
-                        (bc_type(3, 1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                        (bc_type(3, 1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
                         call s_qbmm_extrapolation(3, 1, k, l, pb, mv)
                     end if
                 end do
