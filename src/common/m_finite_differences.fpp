@@ -68,7 +68,7 @@ contains
     !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
     !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
     pure subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s, buff_size, &
-                                                             fd_number_in, fd_order_in, offset_s)
+                                                        fd_number_in, fd_order_in, offset_s)
 
         integer :: lB, lE !< loop bounds
         integer, intent(IN) :: q

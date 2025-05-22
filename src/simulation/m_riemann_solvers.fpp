@@ -2142,11 +2142,11 @@ contains
                                     do i = 1, nb
                                         if (.not. qbmm) then
                                             if (polytropic) then
-                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), 0._wp, gam, Ca, Web, Re_inv, polytropic)
-                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), 0._wp, gam, Ca, Web, Re_inv, polytropic)
+                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), 0._wp)
+                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), 0._wp)
                                             else
-                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), P0_L(i), gam, Ca, Web, Re_inv, polytropic)
-                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), P0_R(i), gam, Ca, Web, Re_inv, polytropic)
+                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), P0_L(i))
+                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), P0_R(i))
                                             end if
                                         end if
                                     end do
