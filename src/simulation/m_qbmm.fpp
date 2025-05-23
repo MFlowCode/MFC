@@ -43,7 +43,7 @@ module m_qbmm
 
 contains
 
-    subroutine s_initialize_qbmm_module
+    impure subroutine s_initialize_qbmm_module
 
         integer :: i1, i2, q, i, j
 
@@ -411,7 +411,7 @@ contains
 
     end subroutine s_initialize_qbmm_module
 
-    subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb, mv, rhs_mv)
+    pure subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb, mv, rhs_mv)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
@@ -679,7 +679,7 @@ contains
 
 !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
 
-    subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
+    pure subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff_nonpoly
 #else
@@ -752,7 +752,7 @@ contains
     end subroutine s_coeff_nonpoly
 
 !Coefficient array for polytropic model (pb for each R0 bin accounted for in wght_pb)
-    subroutine s_coeff(pres, rho, c, coeffs)
+    pure subroutine s_coeff(pres, rho, c, coeffs)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff
 #else

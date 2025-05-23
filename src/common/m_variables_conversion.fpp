@@ -79,7 +79,7 @@ contains
         !!  @param gamma Specific heat ratio function
         !!  @param pi_inf Liquid stiffness function
         !!  @param qv Fluid reference energy
-    impure subroutine s_convert_to_mixture_variables(q_vf, i, j, k, &
+    subroutine s_convert_to_mixture_variables(q_vf, i, j, k, &
                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
@@ -205,7 +205,7 @@ contains
         !! @param gamma  specific heat ratio function
         !! @param pi_inf liquid stiffness
         !! @param qv fluid reference energy
-    impure subroutine s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
+    subroutine s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
                                                       rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
@@ -252,7 +252,7 @@ contains
         !! @param gamma specific heat ratio
         !! @param pi_inf liquid stiffness
         !! @param qv fluid reference energy
-    impure subroutine s_convert_species_to_mixture_variables_bubbles(q_vf, j, k, l, &
+    subroutine s_convert_species_to_mixture_variables_bubbles(q_vf, j, k, l, &
                                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
@@ -376,7 +376,7 @@ contains
         !! @param gamma specific heat ratio
         !! @param pi_inf liquid stiffness
         !! @param qv fluid reference energy
-    impure subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
+    subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
                                                       gamma, pi_inf, qv, Re_K, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
@@ -816,7 +816,7 @@ contains
         !! @param ix Index bounds in first coordinate direction
         !! @param iy Index bounds in second coordinate direction
         !! @param iz Index bounds in third coordinate direction
-    impure subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, &
+    subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, &
                                                              q_T_sf, &
                                                              qK_prim_vf, &
                                                              ibounds, &

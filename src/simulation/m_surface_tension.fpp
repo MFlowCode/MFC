@@ -44,7 +44,7 @@ module m_surface_tension
 
 contains
 
-    subroutine s_initialize_surface_tension_module
+    impure subroutine s_initialize_surface_tension_module
 
         @:ALLOCATE(c_divs(1:num_dims + 1))
 
@@ -225,7 +225,7 @@ contains
 
     end subroutine s_compute_capilary_source_flux
 
-    subroutine s_get_capilary(q_prim_vf, bc_type)
+    impure subroutine s_get_capilary(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
@@ -376,7 +376,7 @@ contains
 
     end subroutine s_reconstruct_cell_boundary_values_capillary
 
-    subroutine s_finalize_surface_tension_module
+    impure subroutine s_finalize_surface_tension_module
 
         do j = 1, num_dims
             @:DEALLOCATE(c_divs(j)%sf)
