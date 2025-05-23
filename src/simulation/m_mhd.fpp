@@ -33,7 +33,7 @@ module m_mhd
 
 contains
 
-    subroutine s_initialize_mhd_powell_module
+    impure subroutine s_initialize_mhd_powell_module
 
         integer :: i, k, r
 
@@ -69,7 +69,7 @@ contains
         !!      S = - (divB) [ 0, Bx, By, Bz, vdotB, vx, vy, vz ]^T
         !!  @param q_prim_vf  Primitive variables
         !!  @param rhs_vf     rhs variables
-    subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)
+    pure subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
@@ -136,7 +136,7 @@ contains
 
     end subroutine s_compute_mhd_powell_rhs
 
-    subroutine s_finalize_mhd_powell_module
+    impure subroutine s_finalize_mhd_powell_module
 
         @:DEALLOCATE(du_dx, dv_dx, dw_dx)
         @:DEALLOCATE(fd_coeff_x_h)
