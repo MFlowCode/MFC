@@ -33,7 +33,7 @@ module m_check_ib_patches
 
 contains
 
-    subroutine s_check_ib_patches
+    impure subroutine s_check_ib_patches
 
         integer :: i
 
@@ -85,7 +85,7 @@ contains
         !!      the circle patch have consistently been inputted by the
         !!      user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_circle_ib_patch_geometry(patch_id)
+    impure subroutine s_check_circle_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -103,7 +103,7 @@ contains
         !!      the airfoil patch have consistently been inputted by the
         !!      user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_airfoil_ib_patch_geometry(patch_id)
+    impure subroutine s_check_airfoil_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -124,7 +124,7 @@ contains
         !!      the 3d airfoil patch have consistently been inputted by the
         !!      user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_3d_airfoil_ib_patch_geometry(patch_id)
+    impure subroutine s_check_3d_airfoil_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -147,7 +147,7 @@ contains
         !!      the rectangle patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_rectangle_ib_patch_geometry(patch_id)
+    impure subroutine s_check_rectangle_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -170,7 +170,7 @@ contains
         !!      the sphere patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_sphere_ib_patch_geometry(patch_id)
+    impure subroutine s_check_sphere_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -193,7 +193,7 @@ contains
         !!      the cuboid patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_cuboid_ib_patch_geometry(patch_id)
+    impure subroutine s_check_cuboid_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -220,7 +220,7 @@ contains
         !!      the cylinder patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_cylinder_ib_patch_geometry(patch_id)
+    impure subroutine s_check_cylinder_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -261,7 +261,7 @@ contains
         !!      the model patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_model_ib_patch_geometry(patch_id)
+    impure subroutine s_check_model_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -282,7 +282,7 @@ contains
     !!>  This subroutine verifies that the geometric parameters of
         !!      the inactive patch remain unaltered by the user inputs.
         !!  @param patch_id Patch identifier
-    subroutine s_check_inactive_ib_patch_geometry(patch_id)
+    impure subroutine s_check_inactive_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 

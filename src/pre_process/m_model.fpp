@@ -29,7 +29,7 @@ contains
     !> This procedure reads a binary STL file.
     !! @param filepath Path to the STL file.
     !! @param model The binary of the STL file.
-    subroutine s_read_stl_binary(filepath, model)
+    impure subroutine s_read_stl_binary(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out) :: model
@@ -78,7 +78,7 @@ contains
     !> This procedure reads an ASCII STL file.
     !! @param filepath Path to the STL file.
     !! @param model the STL file.
-    subroutine s_read_stl_ascii(filepath, model)
+    impure subroutine s_read_stl_ascii(filepath, model)
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out) :: model
 
@@ -186,7 +186,7 @@ contains
     !> This procedure reads an STL file.
     !! @param filepath Path to the STL file.
     !! @param model the STL file.
-    subroutine s_read_stl(filepath, model)
+    impure subroutine s_read_stl(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out) :: model
@@ -220,7 +220,7 @@ contains
     !> This procedure reads an OBJ file.
     !! @param filepath Path to the odj file.
     !! @param model The obj file.
-    subroutine s_read_obj(filepath, model)
+    impure subroutine s_read_obj(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out) :: model
@@ -296,7 +296,7 @@ contains
     !> This procedure reads a mesh from a file.
     !! @param filepath Path to the file to read.
     !! @return The model read from the file.
-    function f_model_read(filepath) result(model)
+    impure function f_model_read(filepath) result(model)
 
         character(LEN=*), intent(in) :: filepath
 
@@ -318,7 +318,7 @@ contains
     !> This procedure writes a binary STL file.
     !! @param filepath Path to the STL file.
     !! @param model STL to write
-    subroutine s_write_stl(filepath, model)
+    impure subroutine s_write_stl(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(in) :: model
@@ -368,7 +368,7 @@ contains
     !> This procedure writes an OBJ file.
     !! @param filepath Path to the obj file.
     !! @param model obj to write.
-    subroutine s_write_obj(filepath, model)
+    impure subroutine s_write_obj(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(in) :: model
@@ -405,7 +405,7 @@ contains
     !> This procedure writes a binary STL file.
     !! @param filepath  Path to the file to write.
     !! @param model Model to write.
-    subroutine s_model_write(filepath, model)
+    impure subroutine s_model_write(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(in) :: model
@@ -424,7 +424,7 @@ contains
     end subroutine s_model_write
 
     !> This procedure frees the memory allocated for an STL mesh.
-    subroutine s_model_free(model)
+    pure subroutine s_model_free(model)
 
         type(t_model), intent(inout) :: model
 
@@ -432,7 +432,7 @@ contains
 
     end subroutine s_model_free
 
-    function f_read_line(iunit, line) result(bIsLine)
+    impure function f_read_line(iunit, line) result(bIsLine)
 
         integer, intent(in) :: iunit
         character(80), intent(out) :: line
@@ -461,7 +461,7 @@ contains
 
     end function f_read_line
 
-    subroutine s_skip_ignored_lines(iunit, buffered_line, is_buffered)
+    impure subroutine s_skip_ignored_lines(iunit, buffered_line, is_buffered)
         integer, intent(in) :: iunit
         character(80), intent(inout) :: buffered_line
         logical, intent(inout) :: is_buffered
@@ -485,7 +485,7 @@ contains
     !! @param spacing  Space around the point to search in (grid spacing).
     !! @param spc      Number of samples per cell.
     !! @return True if the point is inside the octree, false otherwise.
-    function f_model_is_inside(model, point, spacing, spc) result(fraction)
+    impure function f_model_is_inside(model, point, spacing, spc) result(fraction)
 
         type(t_model), intent(in) :: model
         t_vec3, intent(in) :: point
@@ -799,7 +799,7 @@ contains
     !! @param spacing                      Dimensions of the current levelset cell
     !! @param interpolated_boundary_v      Output all the boundary vertices of the interpolated 2D model
     !! @param total_vertices               Total number of vertices after interpolation
-    subroutine f_interpolate_2D(boundary_v, boundary_edge_count, spacing, interpolated_boundary_v, total_vertices)
+    pure subroutine f_interpolate_2D(boundary_v, boundary_edge_count, spacing, interpolated_boundary_v, total_vertices)
         real(wp), intent(in), dimension(:, :, :) :: boundary_v
         t_vec3, intent(in) :: spacing
         real(wp), allocatable, intent(inout), dimension(:, :) :: interpolated_boundary_v
@@ -893,7 +893,7 @@ contains
     !! @param spacing                      Dimensions of the current levelset cell
     !! @param interpolated_boundary_v      Output all the boundary vertices of the interpolated 3D model
     !! @param total_vertices               Total number of vertices after interpolation
-    subroutine f_interpolate_3D(model, spacing, interpolated_boundary_v, total_vertices)
+    impure subroutine f_interpolate_3D(model, spacing, interpolated_boundary_v, total_vertices)
         t_vec3, intent(in) :: spacing
         type(t_model), intent(in) :: model
         real(wp), allocatable, intent(inout), dimension(:, :) :: interpolated_boundary_v

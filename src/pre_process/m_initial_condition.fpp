@@ -68,7 +68,7 @@ contains
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_initial_condition_module
+    impure subroutine s_initialize_initial_condition_module
 
         integer :: i, j, k, l !< generic loop iterators
 
@@ -211,7 +211,7 @@ contains
     end subroutine s_generate_initial_condition
 
     !>  Deallocation procedures for the module
-    subroutine s_finalize_initial_condition_module
+    impure subroutine s_finalize_initial_condition_module
 
         integer :: i !< Generic loop iterator
 

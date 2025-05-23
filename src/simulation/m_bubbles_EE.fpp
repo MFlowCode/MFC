@@ -31,7 +31,7 @@ module m_bubbles_EE
 
 contains
 
-    subroutine s_initialize_bubbles_EE_module
+    impure subroutine s_initialize_bubbles_EE_module
 
         integer :: l
 
@@ -71,7 +71,7 @@ contains
 
     ! Compute the bubble volume fraction alpha from the bubble number density n
         !! @param q_cons_vf is the conservative variable
-    subroutine s_comp_alpha_from_n(q_cons_vf)
+    pure subroutine s_comp_alpha_from_n(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp) :: nR3bar
         integer(wp) :: i, j, k, l

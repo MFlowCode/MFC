@@ -115,7 +115,7 @@ contains
         !! @param pres Pressure to calculate
         !! @param stress Shear Stress
         !! @param mom Momentum
-    pure subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
+    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
 
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_pressure

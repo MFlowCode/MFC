@@ -48,7 +48,7 @@ module m_ibm
 contains
 
     !>  Allocates memory for the variables in the IBM module
-    subroutine s_initialize_ibm_module()
+    impure subroutine s_initialize_ibm_module()
 
         if (p > 0) then
             @:ALLOCATE(ib_markers%sf(-gp_layers:m+gp_layers, &
@@ -76,7 +76,7 @@ contains
 
     !> Initializes the values of various IBM variables, such as ghost points and
     !! image points.
-    subroutine s_ibm_setup()
+    impure subroutine s_ibm_setup()
 
         integer :: i, j, k
 
@@ -113,7 +113,7 @@ contains
         !!  @param q_prim_vf Primitive variables
         !!  @param pb Internal bubble pressure
         !!  @param mv Mass of vapor in bubble
-    subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb, mv)
+    pure subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb, mv)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -739,7 +739,7 @@ contains
 
     !> Function that uses the interpolation coefficients and the current state
     !! at the cell centers in order to estimate the state at the image point
-    subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
+    pure subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
         !$acc routine seq
         type(scalar_field), &
             dimension(sys_size), &
@@ -860,7 +860,7 @@ contains
     end subroutine s_interpolate_image_point
 
     !> Subroutine to deallocate memory reserved for the IBM module
-    subroutine s_finalize_ibm_module()
+    impure subroutine s_finalize_ibm_module()
 
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(levelset%sf)

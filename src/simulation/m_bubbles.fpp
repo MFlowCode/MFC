@@ -314,7 +314,7 @@ contains
     !>  Subroutine that computes bubble wall properties for vapor bubbles
         !!  @param pb Internal bubble pressure
         !!  @param iR0 Current bubble size index
-    impure elemental subroutine s_bwproperty(pb, iR0)
+      subroutine s_bwproperty(pb, iR0)
         !$acc routine seq
         real(wp), intent(in) :: pb
         integer, intent(in) :: iR0

@@ -23,7 +23,7 @@ contains
 
     !> Checks compatibility of parameters in the input file.
         !! Used by the post_process stage
-    subroutine s_check_inputs
+    impure subroutine s_check_inputs
 
         call s_check_inputs_output_format
         call s_check_inputs_partial_domain
