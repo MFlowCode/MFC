@@ -532,7 +532,7 @@ contains
     !! @param ray      Ray.
     !! @param triangle Triangle.
     !! @return         True if the ray intersects the triangle, false otherwise.
-    pure function f_intersects_triangle(ray, triangle) result(intersects)
+    pure elemental function f_intersects_triangle(ray, triangle) result(intersects)
 
         type(t_ray), intent(in) :: ray
         type(t_triangle), intent(in) :: triangle
