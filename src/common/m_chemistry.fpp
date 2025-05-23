@@ -30,7 +30,6 @@ contains
         integer :: x, y, z, eqn
         real(wp) :: energy, mean_molecular_weight
         real(wp), dimension(num_species) :: Ys
-
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
@@ -39,7 +38,7 @@ contains
                         Ys(eqn - chemxb + 1) = &
                             q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
                     end do
-
+                        
                     ! e = E - 1/2*|u|^2
                     ! cons. E_idx     = \rho E
                     ! cons. contxb    = \rho         (1-fluid model)
@@ -50,11 +49,14 @@ contains
                         energy = energy - &
                                  0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z))**2._wp
                     end do
-
+                    
                     call get_temperature(energy, dflt_T_guess, Ys, .true., q_T_sf%sf(x, y, z))
-                end do
+                    end do
+
             end do
         end do
+
+                 print *, 3
 
     end subroutine s_compute_q_T_sf
 

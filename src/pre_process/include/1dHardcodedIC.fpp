@@ -1,7 +1,7 @@
 #:def Hardcoded1DVariables()
     ! Place any declaration of intermediate variables here
     integer, parameter :: nFiles = 14   ! Can be changed to any number
-    integer, parameter :: nRows  = 100000!
+    integer, parameter :: nRows  = 512!
     integer :: f, iter, ios, unit, idx
     real(8) :: x_len, x_step
     integer :: global_offset
@@ -12,10 +12,10 @@
     real(kind(0d0)), dimension(nRows) :: x_coords
     logical :: files_loaded = .false.
     real(kind(0d0)) :: domain_start, domain_end
-    character(len=*), parameter :: init_dir = "/home/pain/ChemMFC/examples/Initial/"
+    character(len=*), parameter :: init_dir = "/home/pain/MFC-Adam/examples/1D_New_Shock/D/"
     character(len=20) :: file_num_str     ! For storing the file number as a string
     character(len=20) :: zeros_part       ! For the trailing zeros part
-    character(len=6), parameter :: zeros_default = "000000"  ! Default zeros (can be changed)
+    character(len=6), parameter :: zeros_default = "018681"  ! Default zeros (can be changed)
     
     ! Generate file names dynamically in a loop
     do f = 1, nFiles
@@ -68,25 +68,26 @@
             ! Calculate domain information for mapping
             domain_start = x_coords(1)
             domain_end = x_coords(nRows)
-            x_step = x_coords(2) - x_coords(1)
+            x_step = x_cc(1)-x_cc(0)
 
-            delta = x_cc(0)- domain_start
+            delta = x_cc(0)- domain_start+0.0016/4!-x_step/2.0
+            print *, x_cc(i), i
 
-            global_offset = int (delta/x_step)
+            global_offset = nint (abs(delta)/x_step)
             
             print *, "All data files loaded. Domain range:", domain_start, "to", domain_end
             files_loaded = .true.
     endif
     ! Simple direct mapping - find the closest index without interpolation
     ! Assign values directly from stored data for each file
+    print *, global_offset, x_cc(0), delta, x_step
     !
     idx = i + 1 + global_offset
     do f = 1, nFiles
-        if (idx .ge. 1 .and. idx .le nRows) then
+        if (idx .ge. 1 ) then
             q_prim_vf(f)%sf(i, 0, 0) = stored_values(idx, f)
         end if
     end do
-
     case default
         call s_int_to_str(patch_id, iStr)
         call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))

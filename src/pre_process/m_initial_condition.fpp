@@ -178,7 +178,8 @@ contains
         integer :: i  !< Generic loop operator
 
         ! First, compute the temperature field from the conservative variables.
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+        !if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up

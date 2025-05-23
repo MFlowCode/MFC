@@ -846,7 +846,6 @@ contains
         call cpu_time(start)
 
         if (old_ic) call s_read_ic_data_files(q_cons_vf, ib_markers)
-
         call s_generate_initial_condition()
 
         if (relax) then
