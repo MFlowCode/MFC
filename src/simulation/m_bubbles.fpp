@@ -314,7 +314,7 @@ contains
     !>  Subroutine that computes bubble wall properties for vapor bubbles
         !!  @param pb Internal bubble pressure
         !!  @param iR0 Current bubble size index
-      subroutine s_bwproperty(pb, iR0)
+    subroutine s_bwproperty(pb, iR0)
         !$acc routine seq
         real(wp), intent(in) :: pb
         integer, intent(in) :: iR0
@@ -335,7 +335,7 @@ contains
     !>  Function that computes the vapour flux
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
-        !!  @param fpb 
+        !!  @param fpb
         !!  @param fmass_v Current mass of vapour
         !!  @param iR0 Bubble size index (EE) or bubble identifier (EL)
         !!  @param fmass_n Current gas mass (EL)
@@ -593,8 +593,8 @@ contains
         !!  @param fCson Speed of sound (EL)
         !!  @param h Time step size
     pure subroutine s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                   fntait, fBtait, f_bub_adv_src, f_divu, &
-                                   fCson, h)
+                                        fntait, fBtait, f_bub_adv_src, f_divu, &
+                                        fCson, h)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_initial_substep_h
 #else

@@ -374,13 +374,13 @@ contains
         !!  @param vcfl_max_glb Global maximum VCFL stability criterion
         !!  @param Rc_min_glb Global minimum Rc stability criterion
     impure subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
-                                                       vcfl_max_loc, &
-                                                       ccfl_max_loc, &
-                                                       Rc_min_loc, &
-                                                       icfl_max_glb, &
-                                                       vcfl_max_glb, &
-                                                       ccfl_max_glb, &
-                                                       Rc_min_glb)
+                                                              vcfl_max_loc, &
+                                                              ccfl_max_loc, &
+                                                              Rc_min_loc, &
+                                                              icfl_max_glb, &
+                                                              vcfl_max_glb, &
+                                                              ccfl_max_glb, &
+                                                              Rc_min_glb)
 
         real(wp), intent(in) :: icfl_max_loc
         real(wp), intent(in) :: vcfl_max_loc

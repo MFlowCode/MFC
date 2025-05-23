@@ -387,7 +387,7 @@ contains
     !> The purpose of this procedure is to calculate the characteristic cell volume
             !! @param cell Computational coordinates (x, y, z)
             !! @param Charvol Characteristic volume
-    pure subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
+    pure elemental subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_get_char_vol
 #else

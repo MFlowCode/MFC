@@ -847,7 +847,7 @@ contains
         !!  @param sweep_coord Coordinate direction normal to the processor boundary
         !!  @param q_particle Projection of the lagrangian particles in the Eulerian framework
     impure subroutine s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, pbc_loc, &
-                                                       sweep_coord, q_particle)
+                                                              sweep_coord, q_particle)
 
         type(scalar_field), &
             dimension(sys_size), &

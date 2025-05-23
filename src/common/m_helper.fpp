@@ -571,7 +571,7 @@ contains
 
         integer :: i
 
-        R = product((/(i, i=n, 1,-1)/))
+        R = product((/(i, i=n, 1, -1)/))
 
     end function factorial
 
