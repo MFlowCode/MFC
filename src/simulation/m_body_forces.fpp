@@ -28,7 +28,7 @@ contains
 
     !> This subroutine inializes the module global array of mixture
     !! densities in each grid cell
-    subroutine s_initialize_body_forces_module
+    impure subroutine s_initialize_body_forces_module
 
         ! Simulation is at least 2D
         if (n > 0) then
@@ -168,7 +168,7 @@ contains
 
     end subroutine s_compute_body_forces_rhs
 
-    subroutine s_finalize_body_forces_module
+    impure subroutine s_finalize_body_forces_module
 
         @:DEALLOCATE(rhoM)
 

@@ -37,7 +37,7 @@ module m_hypoelastic
 
 contains
 
-    subroutine s_initialize_hypoelastic_module
+    impure subroutine s_initialize_hypoelastic_module
 
         integer :: i, k, r
 
@@ -370,7 +370,7 @@ contains
 
     end subroutine s_compute_hypoelastic_rhs
 
-    subroutine s_finalize_hypoelastic_module()
+    impure subroutine s_finalize_hypoelastic_module()
 
         @:DEALLOCATE(Gs)
         @:DEALLOCATE(rho_K_field, G_K_field)
@@ -387,7 +387,7 @@ contains
 
     end subroutine s_finalize_hypoelastic_module
 
-    subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
+    pure subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf

@@ -38,7 +38,7 @@ contains
         !!  @param f_bub_adv_src Source for bubble volume fraction
         !!  @param f_divu Divergence of velocity
         !!  @param fCson Speed of sound from fP (EL)
-    function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson)
+    pure elemental function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson)
         !$acc routine seq
         real(wp), intent(in) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu
@@ -79,7 +79,7 @@ contains
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
-    function f_cpbw(fR0, fR, fV, fpb)
+    pure elemental function f_cpbw(fR0, fR, fV, fpb)
         !$acc routine seq
         real(wp), intent(in) :: fR0, fR, fV, fpb
 
@@ -98,7 +98,7 @@ contains
         !!  @param fCpinf Driving bubble pressure
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
-    function f_H(fCpbw, fCpinf, fntait, fBtait)
+    pure elemental function f_H(fCpbw, fCpinf, fntait, fBtait)
         !$acc routine seq
         real(wp), intent(in) :: fCpbw, fCpinf, fntait, fBtait
 
@@ -118,7 +118,7 @@ contains
         !! @param fntait Tait EOS parameter
         !! @param fBtait Tait EOS parameter
         !! @param fH Bubble enthalpy
-    function f_cgas(fCpinf, fntait, fBtait, fH)
+    pure elemental function f_cgas(fCpinf, fntait, fBtait, fH)
         !$acc routine seq
         real(wp), intent(in) :: fCpinf, fntait, fBtait, fH
 
@@ -141,7 +141,7 @@ contains
         !!  @param fBtait Tait EOS parameter
         !!  @param advsrc Advection equation source term
         !!  @param divu Divergence of velocity
-    function f_cpinfdot(fRho, fP, falf, fntait, fBtait, advsrc, divu)
+    pure elemental function f_cpinfdot(fRho, fP, falf, fntait, fBtait, advsrc, divu)
         !$acc routine seq
         real(wp), intent(in) :: fRho, fP, falf, fntait, fBtait, advsrc, divu
 
@@ -171,7 +171,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fpbdot Time derivative of the internal bubble pressure
-    function f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot)
+    pure elemental function f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot)
         !$acc routine seq
         real(wp), intent(in) :: fCpbw, fCpinf, fCpinf_dot, fntait, fBtait
         real(wp), intent(in) :: fR, fV, fR0, fpbdot
@@ -207,7 +207,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fCpbw Boundary wall pressure
-    function f_rddot_RP(fCp, fRho, fR, fV, fR0, fCpbw)
+    pure elemental function f_rddot_RP(fCp, fRho, fR, fV, fR0, fCpbw)
         !$acc routine seq
         real(wp), intent(in) :: fCp, fRho, fR, fV, fR0, fCpbw
 
@@ -230,7 +230,7 @@ contains
         !!  @param fcgas Current gas sound speed
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
-    function f_rddot_G(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait)
+    pure elemental function f_rddot_G(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait)
         !$acc routine seq
         real(wp), intent(in) :: fCpbw, fR, fV, fH, fHdot
         real(wp), intent(in) :: fcgas, fntait, fBtait
@@ -253,10 +253,9 @@ contains
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
-    function f_cpbw_KM(fR0, fR, fV, fpb)
+    pure elemental function f_cpbw_KM(fR0, fR, fV, fpb)
         !$acc routine seq
         real(wp), intent(in) :: fR0, fR, fV, fpb
-
         real(wp) :: f_cpbw_KM
 
         if (polytropic) then
@@ -281,14 +280,13 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fC Current sound speed
-    function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC)
+    pure elemental function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC)
         !$acc routine seq
         real(wp), intent(in) :: fpbdot, fCp, fCpbw
         real(wp), intent(in) :: fRho, fR, fV, fR0, fC
 
         real(wp) :: tmp1, tmp2, cdot_star
         real(wp) :: f_rddot_KM
-
         if (polytropic) then
             cdot_star = -3._wp*gam*Ca*((fR0/fR)**(3._wp*gam))*fV/fR
             if (.not. f_is_default(Web)) cdot_star = cdot_star - &
@@ -337,6 +335,7 @@ contains
     !>  Function that computes the vapour flux
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
+        !!  @param fpb
         !!  @param fmass_v Current mass of vapour
         !!  @param iR0 Bubble size index (EE) or bubble identifier (EL)
         !!  @param fmass_n Current gas mass (EL)
@@ -401,7 +400,7 @@ contains
         !!  @param fbeta_t Mass transfer coefficient (EL)
         !!  @param fR_m Mixture gas constant (EL)
         !!  @param fgamma_m Mixture gamma (EL)
-    function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, fbeta_t, fR_m, fgamma_m)
+    pure elemental function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, fbeta_t, fR_m, fgamma_m)
         !$acc routine seq
         real(wp), intent(in) :: fvflux
         real(wp), intent(in) :: fR
@@ -593,9 +592,9 @@ contains
         !!  @param f_divu Divergence of velocity
         !!  @param fCson Speed of sound (EL)
         !!  @param h Time step size
-    subroutine s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                   fntait, fBtait, f_bub_adv_src, f_divu, &
-                                   fCson, h)
+    pure subroutine s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                                        fntait, fBtait, f_bub_adv_src, f_divu, &
+                                        fCson, h)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_initial_substep_h
 #else

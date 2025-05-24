@@ -70,7 +70,7 @@ contains
     !>  The purpose of this subroutine is to create the fftw plan
         !!      that will be used in the forward and backward DFTs when
         !!      applying the Fourier filter in the azimuthal direction.
-    subroutine s_initialize_fftw_module
+    impure subroutine s_initialize_fftw_module
 
         ! Size of input array going into DFT
         real_size = p + 1
@@ -128,7 +128,7 @@ contains
         !!      to remove the high-frequency content. This alleviates the
         !!      restrictive CFL condition arising from cells near the axis.
         !! @param q_cons_vf Conservative variables
-    subroutine s_apply_fourier_filter(q_cons_vf)
+    impure subroutine s_apply_fourier_filter(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(c_double), pointer :: p_real(:)
@@ -299,7 +299,7 @@ contains
     !>  The purpose of this subroutine is to destroy the fftw plan
         !!      that will be used in the forward and backward DFTs when
         !!      applying the Fourier filter in the azimuthal direction.
-    subroutine s_finalize_fftw_module
+    impure subroutine s_finalize_fftw_module
 
 #if defined(MFC_OpenACC)
         @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)

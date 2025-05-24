@@ -23,7 +23,7 @@ contains
 
     !> Checks compatibility of parameters in the input file.
         !! Used by the post_process stage
-    subroutine s_check_inputs
+    impure subroutine s_check_inputs
 
         call s_check_inputs_output_format
         call s_check_inputs_partial_domain
@@ -39,13 +39,13 @@ contains
     end subroutine s_check_inputs
 
     !> Checks constraints on output format parameters
-    subroutine s_check_inputs_output_format
+    impure subroutine s_check_inputs_output_format
         @:PROHIBIT(format /= 1 .and. format /= 2)
         @:PROHIBIT(precision /= 1 .and. precision /= 2)
     end subroutine s_check_inputs_output_format
 
     !> Checks constraints on partial domain parameters
-    subroutine s_check_inputs_partial_domain
+    impure subroutine s_check_inputs_partial_domain
         @:PROHIBIT(output_partial_domain .and. format == 1)
         @:PROHIBIT(output_partial_domain .and. precision == 1)
         @:PROHIBIT(output_partial_domain .and. any([flux_wrt, heat_ratio_wrt, pres_inf_wrt, c_wrt, schlieren_wrt, qm_wrt, ib, any(omega_wrt)]))
@@ -60,7 +60,7 @@ contains
     end subroutine s_check_inputs_partial_domain
 
     !> Checks constraints on partial density parameters
-    subroutine s_check_inputs_partial_density
+    impure subroutine s_check_inputs_partial_density
         character(len=5) :: iStr
         integer :: i
 
@@ -72,26 +72,26 @@ contains
     end subroutine s_check_inputs_partial_density
 
     !> Checks constraints on momentum parameters
-    subroutine s_check_inputs_momentum
+    impure subroutine s_check_inputs_momentum
         @:PROHIBIT(n == 0 .and. mom_wrt(2))
         @:PROHIBIT(p == 0 .and. mom_wrt(3))
     end subroutine s_check_inputs_momentum
 
     !> Checks constraints on velocity parameters
-    subroutine s_check_inputs_velocity
+    impure subroutine s_check_inputs_velocity
         @:PROHIBIT(n == 0 .and. vel_wrt(2))
         @:PROHIBIT(p == 0 .and. vel_wrt(3))
     end subroutine s_check_inputs_velocity
 
     !> Checks constraints on flux limiter parameters
-    subroutine s_check_inputs_flux_limiter
+    impure subroutine s_check_inputs_flux_limiter
         @:PROHIBIT(n == 0 .and. flux_wrt(2))
         @:PROHIBIT(p == 0 .and. flux_wrt(3))
         @:PROHIBIT(all(flux_lim /= (/dflt_int, 1, 2, 3, 4, 5, 6, 7/)), "flux_lim must be between 1 and 7")
     end subroutine s_check_inputs_flux_limiter
 
     !> Checks constraints on volume fraction parameters
-    subroutine s_check_inputs_volume_fraction
+    impure subroutine s_check_inputs_volume_fraction
         character(len=5) :: iStr
         integer :: i
 
@@ -103,7 +103,7 @@ contains
     end subroutine s_check_inputs_volume_fraction
 
     !> Checks constraints on vorticity parameters
-    subroutine s_check_inputs_vorticity
+    impure subroutine s_check_inputs_vorticity
         @:PROHIBIT(n == 0 .and. any(omega_wrt))
         @:PROHIBIT(p == 0 .and. (omega_wrt(1) .or. omega_wrt(2)))
         @:PROHIBIT(any(omega_wrt) .and. fd_order == dflt_int, "fd_order must be set for omega_wrt")
@@ -111,7 +111,7 @@ contains
 
     !> Checks constraints on numerical Schlieren parameters
         !! (schlieren_wrt and schlieren_alpha)
-    subroutine s_check_inputs_schlieren
+    impure subroutine s_check_inputs_schlieren
         character(len=5) :: iStr
         integer :: i
 
@@ -130,13 +130,13 @@ contains
     end subroutine s_check_inputs_schlieren
 
     !> Checks constraints on surface tension parameters (cf_wrt and sigma)
-    subroutine s_check_inputs_surface_tension
+    impure subroutine s_check_inputs_surface_tension
         @:PROHIBIT(cf_wrt .and. .not. surface_tension, &
             "cf_wrt can only be enabled if the surface coefficient is set")
     end subroutine s_check_inputs_surface_tension
 
     !> Checks constraints on the absence of flow variables
-    subroutine s_check_inputs_no_flow_variables
+    impure subroutine s_check_inputs_no_flow_variables
         @:PROHIBIT(.not. any([ &
             (/rho_wrt, E_wrt, pres_wrt, gamma_wrt, heat_ratio_wrt, pi_inf_wrt, &
               pres_inf_wrt, cons_vars_wrt, prim_vars_wrt, c_wrt, schlieren_wrt/), &

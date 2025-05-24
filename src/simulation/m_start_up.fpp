@@ -112,7 +112,7 @@ contains
 
    !> Read data files. Dispatch subroutine that replaces procedure pointer.
         !! @param q_cons_vf Conservative variables
-    subroutine s_read_data_files(q_cons_vf)
+    impure subroutine s_read_data_files(q_cons_vf)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -130,7 +130,7 @@ contains
     !>  The purpose of this procedure is to first verify that an
         !!      input file has been made available by the user. Provided
         !!      that this is so, the input file is then read in.
-    subroutine s_read_input_file
+    impure subroutine s_read_input_file
 
         ! Relative path to the input file provided by the user
         character(LEN=name_len), parameter :: file_path = './simulation.inp'
@@ -228,7 +228,7 @@ contains
     !> The goal of this procedure is to verify that each of the
     !!      user provided inputs is valid and that their combination
     !!      constitutes a meaningful configuration for the simulation.
-    subroutine s_check_input_file
+    impure subroutine s_check_input_file
 
         ! Relative path to the current directory file in the case directory
         character(LEN=path_len) :: file_path
@@ -256,7 +256,7 @@ contains
         !!              up the latter. This procedure also calculates the cell-
         !!              width distributions from the cell-boundary locations.
         !! @param q_cons_vf Cell-averaged conservative variables
-    subroutine s_read_serial_data_files(q_cons_vf)
+    impure subroutine s_read_serial_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         
@@ -501,7 +501,7 @@ contains
     end subroutine s_read_serial_data_files
 
         !! @param q_cons_vf Conservative variables
-    subroutine s_read_parallel_data_files(q_cons_vf)
+    impure subroutine s_read_parallel_data_files(q_cons_vf)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -963,7 +963,7 @@ contains
         !!          of the grid variables, which are constituted of the cell-
         !!          boundary locations and cell-width distributions, based on
         !!          the boundary conditions.
-    subroutine s_populate_grid_variables_buffers
+    impure subroutine s_populate_grid_variables_buffers
 
         integer :: i !< Generic loop iterator
 
@@ -1239,7 +1239,7 @@ contains
 
     end subroutine s_initialize_internal_energy_equations
 
-    subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+    impure subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
         integer, intent(inout) :: t_step
         real(wp), intent(inout) :: time_avg, time_final
         real(wp), intent(inout) :: io_time_avg, io_time_final
@@ -1329,7 +1329,7 @@ contains
 
     end subroutine s_perform_time_step
 
-    subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+    impure subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
 
         integer, intent(inout) :: t_step
         real(wp), intent(inout) :: time_avg, time_final
@@ -1391,7 +1391,7 @@ contains
 
     end subroutine s_save_performance_metrics
 
-    subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
+    impure subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
         integer, intent(inout) :: t_step
         real(wp), intent(inout) :: start, finish, io_time_avg
         integer, intent(inout) :: nt
@@ -1460,7 +1460,7 @@ contains
 
     end subroutine s_save_data
 
-    subroutine s_initialize_modules
+    impure subroutine s_initialize_modules
 
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
@@ -1558,7 +1558,7 @@ contains
 
     end subroutine s_initialize_modules
 
-    subroutine s_initialize_mpi_domain
+    impure subroutine s_initialize_mpi_domain
         integer :: ierr
 #ifdef MFC_OpenACC
         real(wp) :: starttime, endtime
@@ -1669,7 +1669,7 @@ contains
         end if
     end subroutine s_initialize_gpu_vars
 
-    subroutine s_finalize_modules
+    impure subroutine s_finalize_modules
 
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
