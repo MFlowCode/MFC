@@ -113,8 +113,8 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("--clean",                    action="store_true",                    default=False,      help="Clean the case before running.")
     run.add_argument("--ncu",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Compute.")
     run.add_argument("--nsys",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Systems.")
-    run.add_argument("--omni",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM omniperf.")
-    run.add_argument("--roc",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM rocprof.")
+    run.add_argument("--rcu",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM rocprof-compute.")
+    run.add_argument("--rsys",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM rocprof-systems.")
 
     # BENCH
     add_common_arguments(bench)
