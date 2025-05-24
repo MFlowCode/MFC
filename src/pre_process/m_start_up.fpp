@@ -10,7 +10,7 @@ module m_start_up
 
     use m_derived_types         !< Definitions of the derived types
 
-    use m_global_parameters     !< Global parameters for the code
+    use m_global_parameters     !< Global parameters for the codeI
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
@@ -38,7 +38,7 @@ module m_start_up
 
     use m_helper
 
-#ifdef MFC_MPI
+#ifdef MFC_MP
     use mpi                     !< Message passing interface (MPI) module
 #endif
 
@@ -134,8 +134,8 @@ contains
             model_eqns, num_fluids, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
             hypoelasticity, mhd, patch_icpp, fluid_pp, precision, parallel_io, &
-            mixlayer_vel_profile, mixlayer_vel_coef, mixlayer_domain, &
-            mixlayer_perturb, &
+            mixlayer_vel_profile, mixlayer_vel_coef, &
+            mixlayer_perturb, mixlayer_perturb_seed, mixlayer_perturb_nk, &
             pi_fac, perturb_flow, perturb_flow_fluid, perturb_flow_mag, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &
             cyl_coord, loops_x, loops_y, loops_z, &

@@ -34,7 +34,8 @@ module m_helper
               associated_legendre, &
               spherical_harmonic_func, &
               double_factorial, &
-              factorial
+              factorial, &
+              f_random_unit_vector
 
 contains
 
@@ -574,5 +575,20 @@ contains
         end if
 
     end function factorial
+
+    ! Generate a random unit vector (spherical distribution)
+    function f_random_unit_vector() result(vec)
+        real(wp) :: vec(3)
+        real(wp) :: theta, phi
+
+        call random_number(theta)
+        call random_number(phi)
+        theta = 2.0_wp*pi*theta
+        phi = acos(2.0_wp*phi - 1.0_wp)
+        vec(1) = sin(phi)*cos(theta)
+        vec(2) = sin(phi)*sin(theta)
+        vec(3) = cos(phi)
+
+    end function f_random_unit_vector
 
 end module m_helper
