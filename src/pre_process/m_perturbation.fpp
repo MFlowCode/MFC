@@ -241,6 +241,8 @@ contains
             end do
         end do
 
+        print *, proc_rank, j, r, l, q_prim_vf(momxb + 2)%sf(j, r, l)
+
     end subroutine s_perturb_mixlayer
 
 
