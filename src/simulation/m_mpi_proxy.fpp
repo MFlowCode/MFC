@@ -591,8 +591,8 @@ contains
         integer, intent(in) :: mpi_dir
         integer, intent(in) :: pbc_loc
 
-        integer :: dst_proc(1:3)
 
+        
 #ifdef MFC_MPI
 
         ! MPI Communication in x-direction
@@ -771,7 +771,7 @@ contains
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in) :: gp_layers
 
-        integer :: i, j, k, l, r !< Generic loop iterators
+        integer :: j, k, l, r !< Generic loop iterators
         integer, pointer, dimension(:) :: p_i_send, p_i_recv
 
 #ifdef MFC_MPI

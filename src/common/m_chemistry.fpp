@@ -28,7 +28,7 @@ contains
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
         integer :: x, y, z, eqn
-        real(wp) :: energy, mean_molecular_weight
+        real(wp) :: energy
         real(wp), dimension(num_species) :: Ys
 
         do z = bounds(3)%beg, bounds(3)%end

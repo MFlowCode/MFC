@@ -329,9 +329,9 @@ contains
         real(wp), dimension(ndim), intent(inout) :: b
         real(wp), dimension(ndim), intent(out) :: sol
 
-        integer, dimension(ndim) :: ipiv
 
-        integer :: nrhs, lda, ldb, info
+        
+
         !EXTERNAL DGESV
 
         integer :: i, j, k
@@ -491,7 +491,7 @@ contains
         real(wp), &
             dimension(1:3, 1:3) :: q_jacobian_sf, S, S2, O, O2
 
-        real(wp) :: trS, trS2, trO2, Q, IIS
+        real(wp) :: trS, Q, IIS
         integer :: j, k, l, r, jj, kk !< Generic loop iterators
 
         do l = -offset_z%beg, p + offset_z%end
@@ -585,8 +585,8 @@ contains
             !! The first position in the variable contains the maximum value and
             !! the second contains the rank of the processor on which it occurred.
 
-        real(wp) :: alpha_unadv !< Unadvected volume fraction
 
+        
         integer :: i, j, k, l !< Generic loop iterators
 
         ! Computing Gradient Magnitude of Density
