@@ -35,8 +35,6 @@ contains
 
     subroutine s_initialize_mhd_powell_module
 
-
-        
         ! Additional safety check beyond m_checker
         if (n == 0) call s_mpi_abort('Fatal Error: Powell correction is not applicable for 1D')
 

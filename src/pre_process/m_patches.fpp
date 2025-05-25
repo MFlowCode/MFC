@@ -1570,10 +1570,8 @@ contains
 
         integer :: i, j, k !< generic loop iterators
 
-
         complex(wp), parameter :: cmplx_i = (0._wp, 1._wp)
 
-        
         ! Transferring the patch's centroid and radius information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
@@ -1719,7 +1717,6 @@ contains
         ! Generic loop iterators
         integer :: i, j, k !< generic loop iterators
         real(wp) :: radius
-
 
         !! Variables to initialize the pressure field that corresponds to the
             !! bubble-collapse test case found in Tiwari et al. (2013)

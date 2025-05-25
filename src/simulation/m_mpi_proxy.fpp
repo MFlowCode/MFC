@@ -591,8 +591,6 @@ contains
         integer, intent(in) :: mpi_dir
         integer, intent(in) :: pbc_loc
 
-
-        
 #ifdef MFC_MPI
 
         ! MPI Communication in x-direction

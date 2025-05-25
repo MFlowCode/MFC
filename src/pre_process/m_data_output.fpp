@@ -140,9 +140,6 @@ contains
         real(wp) :: rho                          !< Temporary density
         real(wp) :: pres, T                         !< Temporary pressure
 
-
-
-        
         real(wp) :: rhoYks(1:num_species) !< Temporary species mass fractions
 
         real(wp) :: pres_mag

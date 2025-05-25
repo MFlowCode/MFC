@@ -860,7 +860,6 @@ contains
         ! Generic loop iterator
         integer :: i, j, k
 
-        
         ! Silo-HDF5 Database Format
 
         if (format == 1) then
@@ -1104,7 +1103,6 @@ contains
         integer(KIND=MPI_OFFSET_KIND) :: disp
         integer :: view
 
-
         logical :: lg_bub_file, file_exist
 
         integer, dimension(2) :: gsizes, lsizes, start_idx_part
@@ -1292,7 +1290,6 @@ contains
         real(wp), dimension(num_fluids) :: adv
         integer :: i, j, k, l, s !looping indices
 
-        
         Egk = 0_wp
         Elp = 0_wp
         Egint = 0_wp

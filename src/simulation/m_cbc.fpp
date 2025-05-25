@@ -641,7 +641,6 @@ contains
         real(wp), dimension(sys_size) :: L
         real(wp), dimension(3) :: lambda
 
-        
         real(wp) :: rho         !< Cell averaged density
         real(wp) :: pres        !< Cell averaged pressure
         real(wp) :: E           !< Cell averaged energy
@@ -656,8 +655,6 @@ contains
 
         integer :: i, j, k, r !< Generic loop iterators
 
-        
-        
         ! Reshaping of inputted data and association of the FD and PI
         ! coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction

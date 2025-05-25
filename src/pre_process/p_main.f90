@@ -12,7 +12,6 @@ program p_main
 
     implicit none
 
-
     logical :: file_exists
     real(wp) :: start, finish, time_avg, time_final
     real(wp), allocatable, dimension(:) :: proc_time

@@ -395,7 +395,6 @@ contains
 
         integer :: i
 
-
         do i = 1, 3
             call s_transform_vec(triangle%v(i, :), matrix)
         end do

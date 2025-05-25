@@ -315,8 +315,6 @@ contains
         integer :: dir, loc
         character(len=path_len) :: file_loc, file_path
 
-
-        
 #ifdef MFC_MPI
         integer :: ierr
         integer :: file_id

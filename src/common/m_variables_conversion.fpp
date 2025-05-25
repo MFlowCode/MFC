@@ -1188,7 +1188,6 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
 
-
         real(wp), dimension(num_species) :: Ys
         real(wp) :: e_mix, mix_mol_weight, T
         real(wp) :: pres_mag
@@ -1567,8 +1566,6 @@ contains
 
     subroutine s_finalize_variables_conversion_module()
 
-
-
         ! Deallocating the density, the specific heat ratio function and the
         ! liquid stiffness function
 #ifdef MFC_POST_PROCESS
@@ -1674,7 +1671,6 @@ contains
 
         real(wp) :: B2, term, disc
 
-        
         B2 = sum(B**2)
 
         if (.not. relativity) then

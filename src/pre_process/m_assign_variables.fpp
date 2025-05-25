@@ -111,15 +111,8 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
-
-
-        
-        
-        
-        
         real(wp) :: Ys(1:num_species)
 
-        
         integer :: smooth_patch_id
         integer :: i !< generic loop operator
 
@@ -308,14 +301,8 @@ contains
         real(wp) :: rcoord, theta, phi, xi_sph
         real(wp), dimension(3) :: xi_cart
 
-
-        
-
-        
-
         real(wp) :: Ys(1:num_species)
 
-        
         real(wp), dimension(sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes
 

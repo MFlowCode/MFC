@@ -329,9 +329,6 @@ contains
         real(wp), dimension(ndim), intent(inout) :: b
         real(wp), dimension(ndim), intent(out) :: sol
 
-
-        
-
         !EXTERNAL DGESV
 
         integer :: i, j, k
@@ -585,8 +582,6 @@ contains
             !! The first position in the variable contains the maximum value and
             !! the second contains the rank of the processor on which it occurred.
 
-
-        
         integer :: i, j, k, l !< Generic loop iterators
 
         ! Computing Gradient Magnitude of Density
