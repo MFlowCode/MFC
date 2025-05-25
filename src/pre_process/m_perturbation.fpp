@@ -158,11 +158,11 @@ contains
     subroutine s_perturb_mixlayer(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(mixlayer_perturb_nk) :: k, Ek
-        real(wp), dimension(3, 3) :: Rij, Lmat
+        real(wp), dimension(3,3) :: Rij, Lmat
         real(wp), dimension(3) :: velfluc, khat, xi, sig_tmp, sig
-        real(wp) :: dk, k0, phi, alpha, Eksum, q, uu0, ierr
+        real(wp) :: dk, k0, phi, alpha, Eksum, q, uu0
         integer, allocatable :: seed(:)
-        integer :: nseed
+        integer :: nseed, ierr
         integer :: i, j, l, r
 
         ! Use user-input seed for pseudorandom number generator
