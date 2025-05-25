@@ -142,8 +142,8 @@ module m_global_parameters
     logical :: mixlayer_vel_profile !< Set hyperbolic tangent streamwise velocity profile
     real(wp) :: mixlayer_vel_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
     logical :: mixlayer_perturb !< Superimpose instability waves to surrounding fluid flow
-    integer :: mixlayer_perturb_seed   !< Seed for perturbation with mixlayer_perturb flag
     integer :: mixlayer_perturb_nk   !< Number of Fourier modes for perturbation with mixlayer_perturb flag
+    integer :: prng_seed   !< Seed for pseudo-random number generator
 
     real(wp) :: pi_fac !< Factor for artificial pi_inf
 
@@ -373,8 +373,8 @@ contains
         mixlayer_vel_profile = .false.
         mixlayer_vel_coef = 1._wp
         mixlayer_perturb = .false.
-        mixlayer_perturb_seed = 0
         mixlayer_perturb_nk = 100
+        prng_seed = 1
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
         perturb_flow_mag = dflt_real

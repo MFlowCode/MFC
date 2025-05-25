@@ -159,22 +159,19 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(mixlayer_perturb_nk) :: k, Ek
         real(wp), dimension(3,3) :: Rij, Lmat
-        real(wp), dimension(3) :: velfluc, khat, xi, sig_tmp, sig
-        real(wp) :: dk, k0, phi, alpha, Eksum, q, uu0
-        integer, allocatable :: seed(:)
-        integer :: nseed, ierr
-        integer :: i, j, l, r
+        real(wp), dimension(3) :: velfluc, sig_tmp, sig
+        real(wp) :: dk, k0, alpha, Eksum, q, uu0
+        real(wp), dimension(3,0:n,mixlayer_perturb_nk) :: khat, xi
+        real(wp), dimension(0:n,mixlayer_perturb_nk) :: phi
+        integer :: i, j, l, r, ierr
 
-        ! Use user-input seed for pseudorandom number generator
-        call random_seed(size=nseed)
-        allocate (seed(nseed))
-        seed = mixlayer_perturb_seed
-        call random_seed(put=seed)
+        ! Initialize random number        
+        call s_initialize_perturb_mixlayer(khat,xi,phi)
 
         ! Initialize parameters
         dk = 1._wp/mixlayer_perturb_nk
         k0 = 0.4446_wp  ! Most unstable mode obtained from linear stability
-        ! analysis. See Michalke (1964, JFM) for details
+                        ! analysis. See Michalke (1964, JFM) for details
 
         ! Compute pre-determined energy spectra
         Eksum = 0_wp
@@ -210,28 +207,30 @@ contains
 
             ! Compute perturbation for each Fourier component
             do i = 1, mixlayer_perturb_nk
-                ! Generate random numbers for unit wavevector khat,
-                ! random unit vector xi, and random mode phase phi
-                if (proc_rank == 0) then
-                    khat = f_random_unit_vector()
-                    xi = f_random_unit_vector()
-                    call random_number(phi)
-                end if
-#ifdef MFC_MPI
-                call MPI_BCAST(khat, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(xi, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(phi, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-#endif
+!                 ! Generate random numbers for unit wavevector khat,
+!                 ! random unit vector xi, and random mode phase phi
+!                 if (proc_rank == 0) then
+!                     khat = f_random_unit_vector()
+!                     xi = f_random_unit_vector()
+!                     phi = f_prng()
+!                 end if
+        
+! #ifdef MFC_MPI
+!                 call MPI_BCAST(khat, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+!                 call MPI_BCAST(xi, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+!                 call MPI_BCAST(phi, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+! #endif
+
                 ! Compute mode direction by two-time cross product
-                sig_tmp = f_cross(xi, khat)
+                sig_tmp = f_cross(xi(:,r,i), khat(:,r,i))
                 sig_tmp = sig_tmp/sqrt(sum(sig_tmp**2))
-                sig = f_cross(khat, sig_tmp)
+                sig = f_cross(khat(:,r,i), sig_tmp)
 
                 ! Compute perturbation for each grid
                 do l = 0, p
                     do j = 0, m
                         q = sqrt(Ek(i)/Eksum)
-                        alpha = k(i)*(khat(1)*x_cc(j) + khat(2)*y_cc(r) + khat(3)*z_cc(l)) + 2_wp*pi*phi
+                        alpha = k(i)*(khat(1,r,i)*x_cc(j) + khat(2,r,i)*y_cc(r) + khat(3,r,i)*z_cc(l)) + 2_wp*pi*phi(r,i)
                         velfluc = 2_wp*q*sig*cos(alpha)
                         velfluc = matmul(Lmat, velfluc)
                         q_prim_vf(momxb)%sf(j, r, l) = q_prim_vf(momxb)%sf(j, r, l) + velfluc(1)
@@ -243,6 +242,51 @@ contains
         end do
 
     end subroutine s_perturb_mixlayer
+
+
+    subroutine s_initialize_perturb_mixlayer(khat, xi, phi)
+
+        real(wp), dimension(3,0:n,mixlayer_perturb_nk), intent(out) :: khat, xi
+        real(wp), dimension(0:n,mixlayer_perturb_nk), intent(out) :: phi
+        integer :: i, j, k, l
+
+        if (proc_rank == 0) then
+            do j = 0, n
+                do i = 1, mixlayer_perturb_nk
+                    khat(:,j,i) = f_random_unit_vector()
+                    xi(:,j,i) = f_random_unit_vector()
+                    phi(j,i) = f_prng()
+                end do
+            end do
+        end if
+
+    end subroutine s_initialize_perturb_mixlayer
+
+    ! Generate a random unit vector (spherical distribution)
+    function f_random_unit_vector() result(vec)
+        real(wp) :: vec(3)
+        real(wp) :: theta, phi
+
+        theta = f_prng()
+        phi = f_prng()
+        theta = 2.0_wp*pi*theta
+        phi = acos(2.0_wp*phi - 1.0_wp)
+        vec(1) = sin(phi)*cos(theta)
+        vec(2) = sin(phi)*sin(theta)
+        vec(3) = cos(phi)
+
+    end function f_random_unit_vector
+
+    !>  This function generates a pseudo-random number between 0 and 1 based on
+    !!  linear congruential generator. 
+    function f_prng() result(val)
+        
+        real(wp) :: val
+
+        prng_seed = mod(multiplier*prng_seed + increment, modulus)
+        val = prng_seed / modulus
+
+    end function f_prng
 
     subroutine s_finalize_perturbation_module()
 

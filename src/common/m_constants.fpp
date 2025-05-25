@@ -82,6 +82,11 @@ module m_constants
     ! Relativity
     integer, parameter :: relativity_cons_to_prim_max_iter = 100
 
+    ! Pseudo-random number generator
+    integer, parameter :: modulus = 2**31
+    integer, parameter :: multiplier = 1103515245
+    integer, parameter :: increment = 12345
+
     ! System constants
     integer, parameter :: CASE_FILE_ERROR_CODE = 22
 
