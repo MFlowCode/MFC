@@ -1637,8 +1637,8 @@ contains
         real(wp) :: void_max_glb, void_avg_glb, vol_glb
 
         integer :: i, j, k
-        integer, dimension(3) :: cell
 
+        
         character(LEN=path_len + 2*name_len) :: file_loc
 
         if (proc_rank == 0) then

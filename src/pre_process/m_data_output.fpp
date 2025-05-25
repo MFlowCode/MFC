@@ -131,7 +131,7 @@ contains
         character(LEN=len_trim(t_step_dir) + name_len) :: file_loc !<
             !! Generic string used to store the address of a particular file
 
-        integer :: i, j, k, l, r, c, dir !< Generic loop iterator
+        integer :: i, j, k, l, r, c !< Generic loop iterator
         integer :: t_step
 
         real(wp), dimension(nb) :: nRtmp         !< Temporary bubble concentration
@@ -140,9 +140,9 @@ contains
         real(wp) :: rho                          !< Temporary density
         real(wp) :: pres, T                         !< Temporary pressure
 
-        real(wp) :: nR3
-        real(wp) :: ntmp
 
+
+        
         real(wp) :: rhoYks(1:num_species) !< Temporary species mass fractions
 
         real(wp) :: pres_mag

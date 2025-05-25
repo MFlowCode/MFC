@@ -77,7 +77,7 @@ contains
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
         integer, intent(IN) :: ib_patch_id
 
-        real(wp) :: radius, dist, global_dist
+        real(wp) :: dist, global_dist
         integer :: global_id
         real(wp) :: x_centroid, y_centroid, x_act, y_act, theta
         real(wp), dimension(3) :: dist_vec
@@ -160,7 +160,7 @@ contains
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
         integer, intent(IN) :: ib_patch_id
 
-        real(wp) :: radius, dist, dist_surf, dist_side, global_dist
+        real(wp) :: dist, dist_surf, dist_side, global_dist
         integer :: global_id
         real(wp) :: x_centroid, y_centroid, z_centroid, lz, z_max, z_min, x_act, y_act, theta
         real(wp), dimension(3) :: dist_vec
@@ -507,10 +507,10 @@ contains
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
         integer, intent(IN) :: ib_patch_id
 
-        real(wp) :: radius, dist
+        real(wp) :: radius
         real(wp) :: x_centroid, y_centroid, z_centroid
         real(wp) :: length_x, length_y, length_z
-        real(wp), dimension(3) :: pos_vec, centroid_vec, dist_vec, dist_sides_vec, dist_surface_vec
+        real(wp), dimension(3) :: pos_vec, centroid_vec, dist_sides_vec, dist_surface_vec
         real(wp) :: dist_side, dist_surface, side_pos
         type(bounds_info) :: boundary
         integer :: i, j, k !< Loop index variables
