@@ -1,10 +1,43 @@
-This file was created on 2025-05-24 17:59:31.662454.
+This file was created on 2025-05-24 19:12:28.328439.
 
 mfc.sh:
 
-    Invocation: test --generate -o mixlayer_perturb -- -c carpenter
+    Invocation: test -o mixlayer_perturb --generate -- -c carpenter
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        657344b7cd489c30746631922fe5bc42696c7b17 on mixlayer (dirty)
+    Git:        33b8244b05b1fb788d1d70306f8b42c77e5fa95f on mixlayer (dirty)
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.28.1 on carpenter02
+    
+        C       : GNU v7.5.0 (/usr/bin/gcc)
+        Fortran : GNU v7.5.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /p/global/hyeoksu/MFC/mixlayer/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/gcc
+        CXX      : /usr/bin/g++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 simulation:
 
@@ -105,39 +138,6 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.28.1 on carpenter02
-    
-        C       : GNU v7.5.0 (/usr/bin/gcc)
-        Fortran : GNU v7.5.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /p/global/hyeoksu/MFC/mixlayer/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/gcc
-        CXX      : /usr/bin/g++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
 CPU:
 
     CPU Info:
@@ -159,7 +159,7 @@ CPU:
     Frequency boost:                      enabled
     CPU max MHz:                          3707.8120
     CPU min MHz:                          1500.0000
-    BogoMIPS:                             4792.76
+    BogoMIPS:                             4792.82
     Flags:                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 invpcid_single hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd amd_ppin cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid overflow_recov succor smca fsrm flush_l1d
     Virtualization:                       AMD-V
     L1d cache:                            6 MiB (192 instances)

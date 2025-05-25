@@ -12,12 +12,10 @@ module m_perturbation
 
     use m_mpi_proxy              !< Message passing interface (MPI) module proxy
 
-    use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
-
     use m_boundary_common   ! Boundary conditions module
 
     use m_helper
-
+    
     use ieee_arithmetic
 
     implicit none
@@ -165,7 +163,7 @@ contains
         real(wp) :: dk, k0, phi, alpha, Eksum, q, uu0, ierr
         integer, allocatable :: seed(:)
         integer :: nseed
-        integer :: nk, i, j, l, r
+        integer :: i, j, l, r
 
         ! Use user-input seed for pseudorandom number generator
         call random_seed(size=nseed)
@@ -180,7 +178,7 @@ contains
 
         ! Compute pre-determined energy spectra
         Eksum = 0_wp
-        do i = 1, nk
+        do i = 1, mixlayer_perturb_nk
             k(i) = dk*i
             Ek(i) = (k(i)/k0)**4._wp*exp(-2._wp*(k(i)/k0)**2._wp)
             Eksum = Eksum + Ek(i)
@@ -211,7 +209,7 @@ contains
             Lmat(3, 3) = sqrt(Rij(3, 3) - Lmat(3, 1)**2_wp - Lmat(3, 2)**2_wp)
 
             ! Compute perturbation for each Fourier component
-            do i = 1, nk
+            do i = 1, mixlayer_perturb_nk
                 ! Generate random numbers for unit wavevector khat,
                 ! random unit vector xi, and random mode phase phi
                 if (proc_rank == 0) then

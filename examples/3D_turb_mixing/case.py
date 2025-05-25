@@ -63,7 +63,7 @@ print(
             "n": Ny,
             "p": Nz,
             "dt": dt,
-            "t_step_start": t_save * 10,
+            "t_step_start": t_step_start,
             "t_step_stop": t_step_stop,
             "t_step_save": t_save,
             # Simulation Algorithm Parameters
