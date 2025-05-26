@@ -4467,22 +4467,22 @@ contains
 
     end subroutine s_compute_cylindrical_viscous_source_flux
 
-    !>  The goal of this subroutine is to evaluate and account
-        !!      for the contribution of viscous stresses in the source
-        !!      flux for the momentum and energy.
-        !!  @param velL_vf  Left, WENO reconstructed, cell-boundary values of the velocity
-        !!  @param velR_vf Right, WENO reconstructed, cell-boundary values of the velocity
-        !!  @param dvelL_dx_vf  Left, WENO reconstructed cell-avg. x-dir derivative of the velocity
-        !!  @param dvelL_dy_vf  Left, WENO reconstructed cell-avg. y-dir derivative of the velocity
-        !!  @param dvelL_dz_vf  Left, WENO reconstructed cell-avg. z-dir derivative of the velocity
-        !!  @param dvelR_dx_vf Right, WENO reconstructed cell-avg. x-dir derivative of the velocity
-        !!  @param dvelR_dy_vf Right, WENO reconstructed cell-avg. y-dir derivative of the velocity
-        !!  @param dvelR_dz_vf Right, WENO reconstructed cell-avg. z-dir derivative of the velocity
-        !!  @param flux_src_vf Intercell flux
-        !!  @param norm_dir Dimensional splitting coordinate direction
-        !!  @param ix Index bounds in  first coordinate direction
-        !!  @param iy Index bounds in second coordinate direction
-        !!  @param iz Index bounds in  third coordinate direction
+    !> @brief Computes Cartesian viscous source flux contributions for momentum and energy.
+    !! Calculates averaged velocity gradients, gets Re and interface velocities,
+    !! calls helpers for shear/bulk stress, then updates `flux_src_vf`.
+    !! @param[in] velL_vf Left boundary velocity (num_dims scalar_field).
+    !! @param[in] dvelL_dx_vf Left boundary d(vel)/dx (num_dims scalar_field).
+    !! @param[in] dvelL_dy_vf Left boundary d(vel)/dy (num_dims scalar_field).
+    !! @param[in] dvelL_dz_vf Left boundary d(vel)/dz (num_dims scalar_field).
+    !! @param[in] velR_vf Right boundary velocity (num_dims scalar_field).
+    !! @param[in] dvelR_dx_vf Right boundary d(vel)/dx (num_dims scalar_field).
+    !! @param[in] dvelR_dy_vf Right boundary d(vel)/dy (num_dims scalar_field).
+    !! @param[in] dvelR_dz_vf Right boundary d(vel)/dz (num_dims scalar_field).
+    !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
+    !! @param[in] norm_dir Interface normal direction (1=x, 2=y, 3=z).
+    !! @param[in] ix X-direction loop bounds (int_bounds_info).
+    !! @param[in] iy Y-direction loop bounds (int_bounds_info).
+    !! @param[in] iz Z-direction loop bounds (int_bounds_info).
     subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
                                                        dvelL_dx_vf, &
                                                        dvelL_dy_vf, &
@@ -4495,469 +4495,187 @@ contains
                                                        norm_dir, &
                                                        ix, iy, iz)
 
-        type(scalar_field), &
-            dimension(num_dims), &
-            intent(in) :: velL_vf, velR_vf, &
-                          dvelL_dx_vf, dvelR_dx_vf, &
-                          dvelL_dy_vf, dvelR_dy_vf, &
-                          dvelL_dz_vf, dvelR_dz_vf
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(inout) :: flux_src_vf
-
+        ! Arguments
+        type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dy_vf, dvelR_dy_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
-        ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
-        ! boundary values of cell-average first-order spatial derivatives
-        ! of velocity
-        real(wp), dimension(num_dims) :: dvel_avg_dx
-        real(wp), dimension(num_dims) :: dvel_avg_dy
-        real(wp), dimension(num_dims) :: dvel_avg_dz
+        ! Local variables
+        real(wp), dimension(num_dims, num_dims) :: vel_grad_avg        !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+        real(wp), dimension(num_dims, num_dims) :: current_tau_shear   !< Current shear stress tensor.
+        real(wp), dimension(num_dims, num_dims) :: current_tau_bulk    !< Current bulk stress tensor.
+        real(wp), dimension(num_dims) :: vel_src_at_interface         !< Interface velocities (u,v,w) for viscous work.
+        integer, dimension(3) :: idx_right_phys                     !< Physical (j,k,l) indices for right state.
 
-        real(wp), dimension(num_dims, num_dims) :: tau_Re !< Viscous stress tensor
+        real(wp) :: Re_shear !< Interface shear Reynolds number.
+        real(wp) :: Re_bulk  !< Interface bulk Reynolds number.
 
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: j_loop         !< Physical x-index loop iterator.
+        integer :: k_loop         !< Physical y-index loop iterator.
+        integer :: l_loop         !< Physical z-index loop iterator.
+        integer :: i_dim          !< Generic dimension/component iterator.
+        integer :: vel_comp_idx   !< Velocity component iterator (1=u, 2=v, 3=w).
 
-        ! Viscous Stresses in x-direction
-        if (norm_dir == 1) then
+        real(wp) :: divergence_v   !< Velocity divergence at interface.
 
-            if (shear_stress) then              ! Shear stresses
-                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, tau_Re)
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
+        !$acc parallel loop collapse(3) gang vector default(present) &
+        !$acc private(idx_right_phys, vel_grad_avg, &
+        !$acc current_tau_shear, current_tau_bulk, vel_src_at_interface, &
+        !$acc Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx)
+        do l_loop = isz%beg, isz%end
+            do k_loop = isy%beg, isy%end
+                do j_loop = isx%beg, isx%end
 
-                            dvel_avg_dx(1) = 5e-1_wp*(dvelL_dx_vf(1)%sf(j, k, l) &
-                                                      + dvelR_dx_vf(1)%sf(j + 1, k, l))
+                    idx_right_phys(1) = j_loop
+                    idx_right_phys(2) = k_loop
+                    idx_right_phys(3) = l_loop
+                    idx_right_phys(norm_dir) = idx_right_phys(norm_dir) + 1
 
-                            tau_Re(1, 1) = (4._wp/3._wp)*dvel_avg_dx(1)/ &
-                                           Re_avg_rsx_vf(j, k, l, 1)
-
-                            flux_src_vf(momxb)%sf(j, k, l) = &
-                                flux_src_vf(momxb)%sf(j, k, l) - &
-                                tau_Re(1, 1)
-
-                            flux_src_vf(E_idx)%sf(j, k, l) = &
-                                flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsx_vf(j, k, l, 1)* &
-                                tau_Re(1, 1)
-
-                        end do
+                    vel_grad_avg = 0.0_wp
+                    do vel_comp_idx = 1, num_dims
+                        vel_grad_avg(vel_comp_idx, 1) = 0.5_wp*(dvelL_dx_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
+                                                                dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
+                        if (num_dims > 1) then
+                            vel_grad_avg(vel_comp_idx, 2) = 0.5_wp*(dvelL_dy_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
+                                                                    dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
+                        end if
+                        if (num_dims > 2) then
+                            vel_grad_avg(vel_comp_idx, 3) = 0.5_wp*(dvelL_dz_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
+                                                                    dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
+                        end if
                     end do
-                end do
-            end if
 
-            if (bulk_stress) then              ! Bulk stresses
-                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, tau_Re)
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
-
-                            dvel_avg_dx(1) = 5e-1_wp*(dvelL_dx_vf(1)%sf(j, k, l) &
-                                                      + dvelR_dx_vf(1)%sf(j + 1, k, l))
-
-                            tau_Re(1, 1) = dvel_avg_dx(1)/ &
-                                           Re_avg_rsx_vf(j, k, l, 2)
-
-                            flux_src_vf(momxb)%sf(j, k, l) = &
-                                flux_src_vf(momxb)%sf(j, k, l) - &
-                                tau_Re(1, 1)
-
-                            flux_src_vf(E_idx)%sf(j, k, l) = &
-                                flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsx_vf(j, k, l, 1)* &
-                                tau_Re(1, 1)
-
-                        end do
+                    divergence_v = 0.0_wp
+                    do i_dim = 1, num_dims
+                        divergence_v = divergence_v + vel_grad_avg(i_dim, i_dim)
                     end do
-                end do
-            end if
 
-            if (n == 0) return
-
-            if (shear_stress) then              ! Shear stresses
-                !$acc parallel loop collapse(3) gang vector default(present) private(dvel_avg_dx, dvel_avg_dy, tau_Re)
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
-
-                            !$acc loop seq
-                            do i = 1, 2
-                                dvel_avg_dy(i) = &
-                                    5e-1_wp*(dvelL_dy_vf(i)%sf(j, k, l) &
-                                             + dvelR_dy_vf(i)%sf(j + 1, k, l))
-                            end do
-
-                            dvel_avg_dx(2) = 5e-1_wp*(dvelL_dx_vf(2)%sf(j, k, l) &
-                                                      + dvelR_dx_vf(2)%sf(j + 1, k, l))
-
-                            tau_Re(1, 1) = -(2._wp/3._wp)*dvel_avg_dy(2)/ &
-                                           Re_avg_rsx_vf(j, k, l, 1)
-
-                            tau_Re(1, 2) = (dvel_avg_dy(1) + dvel_avg_dx(2))/ &
-                                           Re_avg_rsx_vf(j, k, l, 1)
-
-                            !$acc loop seq
-                            do i = 1, 2
-
-                                flux_src_vf(contxe + i)%sf(j, k, l) = &
-                                    flux_src_vf(contxe + i)%sf(j, k, l) - &
-                                    tau_Re(1, i)
-
-                                flux_src_vf(E_idx)%sf(j, k, l) = &
-                                    flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsx_vf(j, k, l, i)* &
-                                    tau_Re(1, i)
-
-                            end do
-
+                    vel_src_at_interface = 0.0_wp
+                    if (norm_dir == 1) then
+                        Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
+                        Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
+                        do i_dim = 1, num_dims
+                            vel_src_at_interface(i_dim) = vel_src_rsx_vf(j_loop, k_loop, l_loop, i_dim)
                         end do
-                    end do
-                end do
-            end if
-
-            if (bulk_stress) then              ! Bulk stresses
-                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dy, tau_Re)
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
-
-                            dvel_avg_dy(2) = 5e-1_wp*(dvelL_dy_vf(2)%sf(j, k, l) &
-                                                      + dvelR_dy_vf(2)%sf(j + 1, k, l))
-
-                            tau_Re(1, 1) = dvel_avg_dy(2)/ &
-                                           Re_avg_rsx_vf(j, k, l, 2)
-
-                            flux_src_vf(momxb)%sf(j, k, l) = &
-                                flux_src_vf(momxb)%sf(j, k, l) - &
-                                tau_Re(1, 1)
-
-                            flux_src_vf(E_idx)%sf(j, k, l) = &
-                                flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsx_vf(j, k, l, 1)* &
-                                tau_Re(1, 1)
-
+                    else if (norm_dir == 2) then
+                        Re_shear = Re_avg_rsy_vf(k_loop, j_loop, l_loop, 1)
+                        Re_bulk = Re_avg_rsy_vf(k_loop, j_loop, l_loop, 2)
+                        do i_dim = 1, num_dims
+                            vel_src_at_interface(i_dim) = vel_src_rsy_vf(k_loop, j_loop, l_loop, i_dim)
                         end do
-                    end do
-                end do
-            end if
-
-            if (p == 0) return
-
-            if (shear_stress) then              ! Shear stresses
-                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dz, tau_Re)
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
-
-                            !$acc loop seq
-                            do i = 1, 3, 2
-                                dvel_avg_dz(i) = &
-                                    5e-1_wp*(dvelL_dz_vf(i)%sf(j, k, l) &
-                                             + dvelR_dz_vf(i)%sf(j + 1, k, l))
-                            end do
-
-                            dvel_avg_dx(3) = 5e-1_wp*(dvelL_dx_vf(3)%sf(j, k, l) &
-                                                      + dvelR_dx_vf(3)%sf(j + 1, k, l))
-
-                            tau_Re(1, 1) = -(2._wp/3._wp)*dvel_avg_dz(3)/ &
-                                           Re_avg_rsx_vf(j, k, l, 1)
-
-                            tau_Re(1, 3) = (dvel_avg_dz(1) + dvel_avg_dx(3))/ &
-                                           Re_avg_rsx_vf(j, k, l, 1)
-
-                            !$acc loop seq
-                            do i = 1, 3, 2
-                                flux_src_vf(contxe + i)%sf(j, k, l) = &
-                                    flux_src_vf(contxe + i)%sf(j, k, l) - &
-                                    tau_Re(1, i)
-
-                                flux_src_vf(E_idx)%sf(j, k, l) = &
-                                    flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsx_vf(j, k, l, i)* &
-                                    tau_Re(1, i)
-
-                            end do
-
+                    else
+                        Re_shear = Re_avg_rsz_vf(l_loop, k_loop, j_loop, 1)
+                        Re_bulk = Re_avg_rsz_vf(l_loop, k_loop, j_loop, 2)
+                        do i_dim = 1, num_dims
+                            vel_src_at_interface(i_dim) = vel_src_rsz_vf(l_loop, k_loop, j_loop, i_dim)
                         end do
-                    end do
-                end do
-            end if
+                    end if
 
-            if (bulk_stress) then              ! Bulk stresses
-                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dz, tau_Re)
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
+                    if (shear_stress) then
+                        current_tau_shear = 0.0_wp
+                        call s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, current_tau_shear)
 
-                            dvel_avg_dz(3) = 5e-1_wp*(dvelL_dz_vf(3)%sf(j, k, l) &
-                                                      + dvelR_dz_vf(3)%sf(j + 1, k, l))
+                        do i_dim = 1, num_dims
+                            flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) = &
+                                flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) - current_tau_shear(norm_dir, i_dim)
 
-                            tau_Re(1, 1) = dvel_avg_dz(3)/ &
-                                           Re_avg_rsx_vf(j, k, l, 2)
-
-                            flux_src_vf(momxb)%sf(j, k, l) = &
-                                flux_src_vf(momxb)%sf(j, k, l) - &
-                                tau_Re(1, 1)
-
-                            flux_src_vf(E_idx)%sf(j, k, l) = &
-                                flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsx_vf(j, k, l, 1)* &
-                                tau_Re(1, 1)
-
+                            flux_src_vf(E_idx)%sf(j_loop, k_loop, l_loop) = &
+                                flux_src_vf(E_idx)%sf(j_loop, k_loop, l_loop) - &
+                                vel_src_at_interface(i_dim)*current_tau_shear(norm_dir, i_dim)
                         end do
-                    end do
-                end do
-            end if
-            ! END: Viscous Stresses in x-direction
+                    end if
 
-            ! Viscous Stresses in y-direction
-        elseif (norm_dir == 2) then
+                    if (bulk_stress) then
+                        current_tau_bulk = 0.0_wp
+                        call s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, current_tau_bulk)
 
-            if (shear_stress) then              ! Shear stresses
-                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, tau_Re)
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
+                        do i_dim = 1, num_dims
+                            flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) = &
+                                flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) - current_tau_bulk(norm_dir, i_dim)
 
-                            !$acc loop seq
-                            do i = 1, 2
-
-                                dvel_avg_dx(i) = &
-                                    5e-1_wp*(dvelL_dx_vf(i)%sf(j, k, l) &
-                                             + dvelR_dx_vf(i)%sf(j, k + 1, l))
-
-                                dvel_avg_dy(i) = &
-                                    5e-1_wp*(dvelL_dy_vf(i)%sf(j, k, l) &
-                                             + dvelR_dy_vf(i)%sf(j, k + 1, l))
-
-                            end do
-
-                            tau_Re(2, 1) = (dvel_avg_dy(1) + dvel_avg_dx(2))/ &
-                                           Re_avg_rsy_vf(k, j, l, 1)
-
-                            tau_Re(2, 2) = (4._wp*dvel_avg_dy(2) &
-                                            - 2._wp*dvel_avg_dx(1))/ &
-                                           (3._wp*Re_avg_rsy_vf(k, j, l, 1))
-
-                            !$acc loop seq
-                            do i = 1, 2
-
-                                flux_src_vf(contxe + i)%sf(j, k, l) = &
-                                    flux_src_vf(contxe + i)%sf(j, k, l) - &
-                                    tau_Re(2, i)
-
-                                flux_src_vf(E_idx)%sf(j, k, l) = &
-                                    flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsy_vf(k, j, l, i)* &
-                                    tau_Re(2, i)
-
-                            end do
-
+                            flux_src_vf(E_idx)%sf(j_loop, k_loop, l_loop) = &
+                                flux_src_vf(E_idx)%sf(j_loop, k_loop, l_loop) - &
+                                vel_src_at_interface(i_dim)*current_tau_bulk(norm_dir, i_dim)
                         end do
-                    end do
+                    end if
+
                 end do
-            end if
-
-            if (bulk_stress) then              ! Bulk stresses
-                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, tau_Re)
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
-
-                            dvel_avg_dx(1) = 5e-1_wp*(dvelL_dx_vf(1)%sf(j, k, l) &
-                                                      + dvelR_dx_vf(1)%sf(j, k + 1, l))
-
-                            dvel_avg_dy(2) = 5e-1_wp*(dvelL_dy_vf(2)%sf(j, k, l) &
-                                                      + dvelR_dy_vf(2)%sf(j, k + 1, l))
-
-                            tau_Re(2, 2) = (dvel_avg_dx(1) + dvel_avg_dy(2))/ &
-                                           Re_avg_rsy_vf(k, j, l, 2)
-
-                            flux_src_vf(momxb + 1)%sf(j, k, l) = &
-                                flux_src_vf(momxb + 1)%sf(j, k, l) - &
-                                tau_Re(2, 2)
-
-                            flux_src_vf(E_idx)%sf(j, k, l) = &
-                                flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsy_vf(k, j, l, 2)* &
-                                tau_Re(2, 2)
-
-                        end do
-                    end do
-                end do
-            end if
-
-            if (p == 0) return
-
-            if (shear_stress) then              ! Shear stresses
-                !$acc parallel loop collapse(3) gang vector default(present) private(  dvel_avg_dy, dvel_avg_dz, tau_Re)
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
-
-                            !$acc loop seq
-                            do i = 2, 3
-                                dvel_avg_dz(i) = &
-                                    5e-1_wp*(dvelL_dz_vf(i)%sf(j, k, l) &
-                                             + dvelR_dz_vf(i)%sf(j, k + 1, l))
-                            end do
-
-                            dvel_avg_dy(3) = 5e-1_wp*(dvelL_dy_vf(3)%sf(j, k, l) &
-                                                      + dvelR_dy_vf(3)%sf(j, k + 1, l))
-
-                            tau_Re(2, 2) = -(2._wp/3._wp)*dvel_avg_dz(3)/ &
-                                           Re_avg_rsy_vf(k, j, l, 1)
-
-                            tau_Re(2, 3) = (dvel_avg_dz(2) + dvel_avg_dy(3))/ &
-                                           Re_avg_rsy_vf(k, j, l, 1)
-
-                            !$acc loop seq
-                            do i = 2, 3
-
-                                flux_src_vf(contxe + i)%sf(j, k, l) = &
-                                    flux_src_vf(contxe + i)%sf(j, k, l) - &
-                                    tau_Re(2, i)
-
-                                flux_src_vf(E_idx)%sf(j, k, l) = &
-                                    flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsy_vf(k, j, l, i)* &
-                                    tau_Re(2, i)
-
-                            end do
-
-                        end do
-                    end do
-                end do
-            end if
-
-            if (bulk_stress) then              ! Bulk stresses
-                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dz, tau_Re)
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
-
-                            dvel_avg_dz(3) = 5e-1_wp*(dvelL_dz_vf(3)%sf(j, k, l) &
-                                                      + dvelR_dz_vf(3)%sf(j, k + 1, l))
-
-                            tau_Re(2, 2) = dvel_avg_dz(3)/ &
-                                           Re_avg_rsy_vf(k, j, l, 2)
-
-                            flux_src_vf(momxb + 1)%sf(j, k, l) = &
-                                flux_src_vf(momxb + 1)%sf(j, k, l) - &
-                                tau_Re(2, 2)
-
-                            flux_src_vf(E_idx)%sf(j, k, l) = &
-                                flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsy_vf(k, j, l, 2)* &
-                                tau_Re(2, 2)
-
-                        end do
-                    end do
-                end do
-            end if
-            ! END: Viscous Stresses in y-direction
-
-            ! Viscous Stresses in z-direction
-        else
-
-            if (shear_stress) then              ! Shear stresses
-                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
-
-                            !$acc loop seq
-                            do i = 1, 3, 2
-                                dvel_avg_dx(i) = &
-                                    5e-1_wp*(dvelL_dx_vf(i)%sf(j, k, l) &
-                                             + dvelR_dx_vf(i)%sf(j, k, l + 1))
-                            end do
-
-                            !$acc loop seq
-                            do i = 2, 3
-                                dvel_avg_dy(i) = &
-                                    5e-1_wp*(dvelL_dy_vf(i)%sf(j, k, l) &
-                                             + dvelR_dy_vf(i)%sf(j, k, l + 1))
-                            end do
-
-                            !$acc loop seq
-                            do i = 1, 3
-                                dvel_avg_dz(i) = &
-                                    5e-1_wp*(dvelL_dz_vf(i)%sf(j, k, l) &
-                                             + dvelR_dz_vf(i)%sf(j, k, l + 1))
-                            end do
-
-                            tau_Re(3, 1) = (dvel_avg_dz(1) + dvel_avg_dx(3))/ &
-                                           Re_avg_rsz_vf(l, k, j, 1)
-
-                            tau_Re(3, 2) = (dvel_avg_dz(2) + dvel_avg_dy(3))/ &
-                                           Re_avg_rsz_vf(l, k, j, 1)
-
-                            tau_Re(3, 3) = (4._wp*dvel_avg_dz(3) &
-                                            - 2._wp*dvel_avg_dx(1) &
-                                            - 2._wp*dvel_avg_dy(2))/ &
-                                           (3._wp*Re_avg_rsz_vf(l, k, j, 1))
-
-                            !$acc loop seq
-                            do i = 1, 3
-
-                                flux_src_vf(contxe + i)%sf(j, k, l) = &
-                                    flux_src_vf(contxe + i)%sf(j, k, l) - &
-                                    tau_Re(3, i)
-
-                                flux_src_vf(E_idx)%sf(j, k, l) = &
-                                    flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsz_vf(l, k, j, i)* &
-                                    tau_Re(3, i)
-
-                            end do
-
-                        end do
-                    end do
-                end do
-            end if
-
-            if (bulk_stress) then              ! Bulk stresses
-                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
-
-                            dvel_avg_dx(1) = 5e-1_wp*(dvelL_dx_vf(1)%sf(j, k, l) &
-                                                      + dvelR_dx_vf(1)%sf(j, k, l + 1))
-
-                            dvel_avg_dy(2) = 5e-1_wp*(dvelL_dy_vf(2)%sf(j, k, l) &
-                                                      + dvelR_dy_vf(2)%sf(j, k, l + 1))
-
-                            dvel_avg_dz(3) = 5e-1_wp*(dvelL_dz_vf(3)%sf(j, k, l) &
-                                                      + dvelR_dz_vf(3)%sf(j, k, l + 1))
-
-                            tau_Re(3, 3) = (dvel_avg_dx(1) &
-                                            + dvel_avg_dy(2) &
-                                            + dvel_avg_dz(3))/ &
-                                           Re_avg_rsz_vf(l, k, j, 2)
-
-                            flux_src_vf(momxe)%sf(j, k, l) = &
-                                flux_src_vf(momxe)%sf(j, k, l) - &
-                                tau_Re(3, 3)
-
-                            flux_src_vf(E_idx)%sf(j, k, l) = &
-                                flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsz_vf(l, k, j, 3)* &
-                                tau_Re(3, 3)
-
-                        end do
-                    end do
-                end do
-            end if
-
-        end if
-        ! END: Viscous Stresses in z-direction
+            end do
+        end do
+        !$acc end parallel loop
 
     end subroutine s_compute_cartesian_viscous_source_flux
+
+    !> @brief Calculates shear stress tensor components.
+    !! tau_ij_shear = ( (dui/dxj + duj/dxi) - (2/3)*(div_v)*delta_ij ) / Re_shear
+    !! @param[in] vel_grad_avg Averaged velocity gradient tensor (d(vel_i)/d(coord_j)).
+    !! @param[in] Re_shear Shear Reynolds number.
+    !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
+    !! @param[out] tau_shear_out Calculated shear stress tensor (stress on i-face, j-direction).
+    subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
+        use m_global_parameters, only: wp, num_dims, sgm_eps
+        implicit none
+
+        ! Arguments
+        real(wp), dimension(num_dims, num_dims), intent(in) :: vel_grad_avg
+        real(wp), intent(in) :: Re_shear
+        real(wp), intent(in) :: divergence_v
+        real(wp), dimension(num_dims, num_dims), intent(out) :: tau_shear_out
+
+        ! Local variables
+        integer :: i_dim !< Loop iterator for face normal.
+        integer :: j_dim !< Loop iterator for force component direction.
+
+        tau_shear_out = 0.0_wp
+
+        if (abs(Re_shear) < sgm_eps) then
+            return
+        end if
+
+        do i_dim = 1, num_dims
+            do j_dim = 1, num_dims
+                tau_shear_out(i_dim, j_dim) = (vel_grad_avg(j_dim, i_dim) + vel_grad_avg(i_dim, j_dim))/Re_shear
+                if (i_dim == j_dim) then
+                    tau_shear_out(i_dim, j_dim) = tau_shear_out(i_dim, j_dim) - &
+                                                  (2.0_wp/3.0_wp)*divergence_v/Re_shear
+                end if
+            end do
+        end do
+
+    end subroutine s_calculate_shear_stress_tensor
+
+    !> @brief Calculates bulk stress tensor components (diagonal only).
+    !! tau_ii_bulk = (div_v) / Re_bulk. Off-diagonals are zero.
+    !! @param[in] Re_bulk Bulk Reynolds number.
+    !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
+    !! @param[out] tau_bulk_out Calculated bulk stress tensor (stress on i-face, i-direction).
+    subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
+        use m_global_parameters, only: wp, num_dims, sgm_eps
+        implicit none
+
+        ! Arguments
+        real(wp), intent(in) :: Re_bulk
+        real(wp), intent(in) :: divergence_v
+        real(wp), dimension(num_dims, num_dims), intent(out) :: tau_bulk_out
+
+        ! Local variables
+        integer :: i_dim !< Loop iterator for diagonal components.
+
+        tau_bulk_out = 0.0_wp
+
+        if (abs(Re_bulk) < sgm_eps) then
+            return
+        end if
+
+        do i_dim = 1, num_dims
+            tau_bulk_out(i_dim, i_dim) = divergence_v/Re_bulk
+        end do
+
+    end subroutine s_calculate_bulk_stress_tensor
 
     !>  Deallocation and/or disassociation procedures that are
         !!      needed to finalize the selected Riemann problem solver
