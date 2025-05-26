@@ -45,17 +45,17 @@ def __profiler_prepend() -> typing.List[str]:
 
         return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")
 
-    if ARG("omni") is not None:
-        if not does_command_exist("omniperf"):
-            raise MFCException("Failed to locate [bold red]ROCM Omniperf[/bold red] (omniperf).")
+    if ARG("rcu") is not None:
+        if not does_command_exist("rocprof-compute"):
+            raise MFCException("Failed to locate [bold red]ROCM rocprof-compute[/bold red] (rocprof-compute).")
 
-        return ["omniperf", "profile"] + ARG("omni") + ["--"]
+        return ["rocprof-compute", "profile", "-n", ARG("name").replace('-', '_').replace('.', '_')] + ARG("rcu") + ["--"]
 
-    if ARG("roc") is not None:
+    if ARG("rsys") is not None:
         if not does_command_exist("rocprof"):
-            raise MFCException("Failed to locate [bold red]ROCM rocprof[/bold red] (rocprof).")
+            raise MFCException("Failed to locate [bold red]ROCM rocprof-systems[/bold red] (rocprof-systems).")
 
-        return ["rocprof"] + ARG("roc")
+        return ["rocprof"] + ARG("rsys")
 
     return []
 

@@ -39,7 +39,19 @@ dependencies = [
 
     # Chemistry
     "cantera==3.1.0",
-    "pyrometheus@git+https://github.com/DimAdam-01/pyrometheus.git@main"
+    "pyrometheus == 1.0.3",
+
+    # Frontier Profiling
+    "astunparse==1.6.2",
+    "colorlover",
+    "dash>=1.12.0",
+    "pymongo",
+    "tabulate",
+    "tqdm",
+    "dash-svg",
+    "dash-bootstrap-components",
+    "kaleido",
+    "plotille"
 ]
 
 [tool.hatch.metadata]
