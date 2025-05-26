@@ -473,13 +473,13 @@ contains
 
     end function f_interpolate_velocity
 
-    function f_get_acceleration(pos,rad,vel,mg,mv,cell,i,q_prim_vf) result(a)
+    function f_get_acceleration(pos,rad,vel,mg,mv,Re,cell,i,q_prim_vf) result(a)
 !$acc routine seq
         integer, dimension(3) :: cell
         integer :: i
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(wp) :: a, area, vol, mass, force, drag_force, vel
-        real(wp) :: pos, rad, dp, v_rel, mg, mv
+        real(wp) :: a, vol, mass, force, vel
+        real(wp) :: pos, rad, dp, v_rel, mg, mv, Re
 
         if (i == 1) then
             dp = (q_prim_vf(E_idx)%sf(cell(1) + 1,cell(2),cell(3)) - &
@@ -488,7 +488,7 @@ contains
         elseif (i == 2) then
             dp = (q_prim_vf(E_idx)%sf(cell(1),cell(2) + 1,cell(3)) - &
                   q_prim_vf(E_idx)%sf(cell(1),cell(2) - 1,cell(3))) / &
-                  (y_cc(cell(2) + 1) -y_cc(cell(2) - 1))
+                  (y_cc(cell(2) + 1) - y_cc(cell(2) - 1))
         elseif (i == 3 .and. p > 0) then
             dp = (q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3) + 1) - &
                   q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3) - 1)) / &
@@ -497,12 +497,12 @@ contains
             dp = 0._wp
         end if
 
-        area = pi * rad**2._wp
-        force = -1._wp * area * dp
+        vol = (4._wp/3._wp) * pi * rad**3._wp
+        force = -1._wp * vol * dp
 
         if (lag_params%drag_model == 1) then ! Stokes drag
             v_rel = vel - f_interpolate_velocity(pos,cell,i,q_prim_vf)
-            force = force - (6._wp * pi * rad * v_rel) / fluid_pp(1)%Re(1)
+            force = force - (6._wp * pi * rad * v_rel) / Re
         end if
 
         a = force / (mg + mv)

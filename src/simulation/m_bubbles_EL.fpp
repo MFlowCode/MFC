@@ -320,17 +320,17 @@ contains
         call s_locate_cell(mtn_pos(bub_id, 1:3, 1), cell, mtn_s(bub_id, 1:3, 1))
 
         ! Check if the bubble is located in the ghost cell of a symmetric boundary
-        if ((bc_x%beg == BC_REFLECTIVE .and. cell(1) < 0) .or. &
-            (bc_x%end == BC_REFLECTIVE .and. cell(1) > m) .or. &
-            (bc_y%beg == BC_REFLECTIVE .and. cell(2) < 0) .or. &
-            (bc_y%end == BC_REFLECTIVE .and. cell(2) > n)) then
-            call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric boundary.")
+        if ((any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(1) < 0) .or. &
+            (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(1) > m) .or. &
+            (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(2) < 0) .or. &
+            (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(2) > n)) then
+            call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric or wall boundary.")
         end if
 
         if (p > 0) then
-            if ((bc_z%beg == BC_REFLECTIVE .and. cell(3) < 0) .or. &
-                (bc_z%end == BC_REFLECTIVE .and. cell(3) > p)) then
-                call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric boundary.")
+            if ((any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(3) < 0) .or. &
+                (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(3) > p)) then
+                call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric or wall boundary.")
             end if
         end if
 
@@ -545,13 +545,11 @@ contains
             end do
         end if
 
-
-! Radial motion model
+        ! Radial motion model
         adap_dt_stop_max = 0
         !$acc parallel loop gang vector default(present) private(k, myalpha_rho, myalpha, Re, cell) &
         !$acc reduction(MAX:adap_dt_stop_max) copy(adap_dt_stop_max) copyin(stage)
         do k = 1, nBubs
-            ! Keller-Miksis model
 
             ! Current bubble state
             myPb = gas_p(k, 2)
@@ -610,20 +608,22 @@ contains
 
             end if
 
-            if (lag_params%vel_model == 1) then
-                mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1), &
-                                            cell, l, q_prim_vf)
-                mtn_dveldt(k, l, stage) = 0._wp
-            elseif (lag_params%vel_model == 2) then
-                mtn_dposdt(k, l, stage) = mtn_vel(k,l,1)
-                mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,1),&
-                                            intfc_rad(k,1), mtn_vel(k,l,1), &
-                                            gas_mg(k), gas_mv(k), &
-                                            cell, l, q_prim_vf)
-            else
-                mtn_dposdt(k, l, stage) = 0._wp
-                mtn_dveldt(k, l, stage) = 0._wp
-            end if
+            do l = 1, 3
+                if (lag_params%vel_model == 1) then
+                    mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1), &
+                                                cell, l, q_prim_vf)
+                    mtn_dveldt(k, l, stage) = 0._wp
+                elseif (lag_params%vel_model == 2) then
+                    mtn_dposdt(k, l, stage) = mtn_vel(k,l,1)
+                    mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,1), &
+                                                intfc_rad(k,1), mtn_vel(k,l,1), &
+                                                gas_mg(k), gas_mv(k, 1), &
+                                                Re(1), cell, l, q_prim_vf)
+                else
+                    mtn_dposdt(k, l, stage) = 0._wp
+                    mtn_dveldt(k, l, stage) = 0._wp
+                end if
+            end do
 
             adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 
@@ -1044,6 +1044,8 @@ contains
                 gas_mv(k, 1) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
             end do
 
+            if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=1)
+
             call s_transfer_data_to_tmp()
             call s_write_void_evol(mytime)
             if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
@@ -1066,6 +1068,8 @@ contains
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
 
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=2)
+
             elseif (stage == 2) then
                 !$acc parallel loop gang vector default(present) private(k)
                 do k = 1, nBubs
@@ -1078,10 +1082,11 @@ contains
                     gas_mv(k, 1) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2._wp
                 end do
 
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=1)
+
                 call s_transfer_data_to_tmp()
                 call s_write_void_evol(mytime)
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
-
                 if (lag_params%write_bubbles) then
                     !$acc update host(gas_p, gas_mv, intfc_rad, intfc_vel)
                     call s_write_lag_particles(mytime)
@@ -1102,6 +1107,8 @@ contains
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
 
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=2)
+
             elseif (stage == 2) then
                 !$acc parallel loop gang vector default(present) private(k)
                 do k = 1, nBubs
@@ -1113,6 +1120,9 @@ contains
                     gas_p(k, 2) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/4._wp
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4._wp
                 end do
+
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=2)
+
             elseif (stage == 3) then
                 !$acc parallel loop gang vector default(present) private(k)
                 do k = 1, nBubs
@@ -1125,6 +1135,8 @@ contains
                     gas_mv(k, 1) = gas_mv(k, 1) + (2._wp/3._wp)*dt*(gas_dmvdt(k, 1)/4._wp + gas_dmvdt(k, 2)/4._wp + gas_dmvdt(k, 3))
                 end do
 
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=1)
+
                 call s_transfer_data_to_tmp()
                 call s_write_void_evol(mytime)
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
@@ -1135,10 +1147,48 @@ contains
                 end if
 
             end if
-
         end if
 
     end subroutine s_update_lagrange_tdv_rk
+
+    !> This subroutine enforces reflective and wall boundary conditions for EL bubbles
+    subroutine s_enforce_EL_bubbles_boundary_conditions(dest)
+
+        integer :: dest
+        integer :: k
+
+        !$acc parallel loop gang vector default(present)
+        do k = 1, nBubs
+
+            if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                .and. mtn_pos(k,1,dest) < x_cb(-1) + intfc_rad(k,dest)) then
+                mtn_pos(k, 1, dest) = x_cb(-1) + intfc_rad(k,dest)
+            else if (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                .and. mtn_pos(k,1,dest) > x_cb(m) - intfc_rad(k,dest)) then
+                mtn_pos(k, 1, dest) = x_cb(m) - intfc_rad(k,dest)
+            end if
+
+            if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                .and. mtn_pos(k,2,dest) < y_cb(-1) + intfc_rad(k,dest)) then
+                mtn_pos(k, 2, dest) = y_cb(-1) + intfc_rad(k,dest)
+            else if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                .and. mtn_pos(k,2,dest) > y_cb(n) - intfc_rad(k,dest)) then
+                mtn_pos(k, 2, dest) = y_cb(n) - intfc_rad(k,dest)
+            end if
+
+            if (p > 0) then
+                if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                    .and. mtn_pos(k,3,dest) < z_cb(-1) + intfc_rad(k,dest)) then
+                    mtn_pos(k, 3, dest) = z_cb(-1) + intfc_rad(k,dest)
+                else if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                    .and. mtn_pos(k,3,dest) > z_cb(p) - intfc_rad(k,dest)) then
+                    mtn_pos(k, 3, dest) = z_cb(p) - intfc_rad(k,dest)
+                end if
+            end if
+
+        end do
+
+    end subroutine s_enforce_EL_bubbles_boundary_conditions
 
     !> This subroutine returns the computational coordinate of the cell for the given position.
           !! @param pos Input coordinates
@@ -1242,25 +1292,25 @@ contains
                                   (pos_part(3) < z_cb(p + buff_size)) .and. (pos_part(3) >= z_cb(-buff_size - 1)))
         end if
 
-        ! For symmetric boundary condition
-        if (bc_x%beg == BC_REFLECTIVE) then
+        ! For symmetric and wall boundary condition
+        if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
             particle_in_domain = (particle_in_domain .and. (pos_part(1) >= x_cb(-1)))
         end if
-        if (bc_x%end == BC_REFLECTIVE) then
+        if (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
             particle_in_domain = (particle_in_domain .and. (pos_part(1) < x_cb(m)))
         end if
-        if (bc_y%beg == BC_REFLECTIVE .and. (.not. cyl_coord)) then
+        if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. (.not. cyl_coord)) then
             particle_in_domain = (particle_in_domain .and. (pos_part(2) >= y_cb(-1)))
         end if
-        if (bc_y%end == BC_REFLECTIVE .and. (.not. cyl_coord)) then
+        if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. (.not. cyl_coord)) then
             particle_in_domain = (particle_in_domain .and. (pos_part(2) < y_cb(n)))
         end if
 
         if (p > 0) then
-            if (bc_z%beg == BC_REFLECTIVE) then
+            if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
                 particle_in_domain = (particle_in_domain .and. (pos_part(3) >= z_cb(-1)))
             end if
-            if (bc_z%end == BC_REFLECTIVE) then
+            if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
                 particle_in_domain = (particle_in_domain .and. (pos_part(3) < z_cb(p)))
             end if
         end if

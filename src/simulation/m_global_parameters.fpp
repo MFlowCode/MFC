@@ -328,6 +328,10 @@ module m_global_parameters
     !$acc declare create(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
     !$acc declare create(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
 
+    !$acc declare create(bc_x%beg, bc_x%end)
+    !$acc declare create(bc_y%beg, bc_y%end)
+    !$acc declare create(bc_z%beg, bc_z%end)
+
     integer :: fd_order !<
     !! The order of the finite-difference (fd) approximations of the first-order
     !! derivatives that need to be evaluated when the CoM or flow probe data
@@ -1250,12 +1254,12 @@ contains
         @:ALLOCATE(x_cc(-buff_size:m + buff_size))
         @:ALLOCATE(dx(-buff_size:m + buff_size))
 
-        if (n == 0) return; 
+        if (n == 0) return;
         @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE(dy(-buff_size:n + buff_size))
 
-        if (p == 0) return; 
+        if (p == 0) return;
         @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
@@ -1334,10 +1338,10 @@ contains
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x_cb, x_cc, dx)
 
-        if (n == 0) return; 
+        if (n == 0) return;
         @:DEALLOCATE(y_cb, y_cc, dy)
 
-        if (p == 0) return; 
+        if (p == 0) return;
         @:DEALLOCATE(z_cb, z_cc, dz)
 
     end subroutine s_finalize_global_parameters_module

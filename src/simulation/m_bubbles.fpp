@@ -47,7 +47,10 @@ contains
         real(wp) :: fCpbw, fCpinf, fCpinf_dot, fH, fHdot, c_gas, c_liquid
         real(wp) :: f_rddot
 
-        if (bubble_model == 1) then
+        if (bubble_model == 0) then
+            ! Particle
+            f_rddot = 0._wp
+        else if (bubble_model == 1) then
             ! Gilmore bubbles
             fCpinf = fP - pref
             fCpbw = f_cpbw(fR0, fR, fV, fpb)
