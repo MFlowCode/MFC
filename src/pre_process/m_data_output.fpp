@@ -162,7 +162,7 @@ contains
         end if
 
         if (bc_io) then
-            call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir)
+            call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir, old_grid)
         end if
 
         ! x-coordinate direction

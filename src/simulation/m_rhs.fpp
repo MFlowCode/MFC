@@ -674,7 +674,7 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("RHS-COMMUNICATION")
-        call s_populate_variables_buffers(q_prim_qp%vf, pb, mv, bc_type)
+        call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb, mv)
         call nvtxEndRange
 
         call nvtxStartRange("RHS-ELASTIC")
