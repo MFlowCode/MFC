@@ -846,15 +846,15 @@ contains
 
         real(wp) :: rhoYks(1:num_species)
 
-        real(wp) :: vftmp, nR3, nbub_sc, R3tmp
+        real(wp) :: vftmp, nbub_sc
 
         real(wp) :: G_K
 
-        real(wp) :: pres, Yksum
+        real(wp) :: pres
 
-        integer :: i, j, k, l, q !< Generic loop iterators
+        integer :: i, j, k, l !< Generic loop iterators
 
-        real(wp) :: ntmp, T
+        real(wp) :: T
         real(wp) :: pres_mag
 
         real(wp) :: Ga ! Lorentz factor (gamma in relativity)
@@ -885,7 +885,7 @@ contains
 
         !$acc parallel loop collapse(3) gang vector default(present) &
         !$acc private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, &
-        !$acc pi_inf_K, qv_K, dyn_pres_K, R3tmp, rhoYks, B)
+        !$acc pi_inf_K, qv_K, dyn_pres_K, rhoYks, B)
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -1181,13 +1181,12 @@ contains
         real(wp) :: pi_inf
         real(wp) :: qv
         real(wp) :: dyn_pres
-        real(wp) :: nbub, R3, vftmp, R3tmp
+        real(wp) :: nbub, R3tmp
         real(wp), dimension(nb) :: Rtmp
         real(wp) :: G
         real(wp), dimension(2) :: Re_K
 
-        integer :: i, j, k, l, q !< Generic loop iterators
-        integer :: spec
+        integer :: i, j, k, l !< Generic loop iterators
 
         real(wp), dimension(num_species) :: Ys
         real(wp) :: e_mix, mix_mol_weight, T
@@ -1592,8 +1591,6 @@ contains
 
     subroutine s_finalize_variables_conversion_module()
 
-        integer :: i !< Generic loop iterators
-
         ! Deallocating the density, the specific heat ratio function and the
         ! liquid stiffness function
 #ifdef MFC_POST_PROCESS
@@ -1698,7 +1695,6 @@ contains
         integer, intent(in) :: norm
 
         real(wp) :: B2, term, disc
-        real(wp) :: term2
 
         B2 = sum(B**2)
 

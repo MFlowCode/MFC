@@ -395,8 +395,6 @@ contains
 
         integer :: i
 
-        real(wp), dimension(1:4) :: tmp
-
         do i = 1, 3
             call s_transform_vec(triangle%v(i, :), matrix)
         end do
