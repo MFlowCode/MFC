@@ -663,12 +663,13 @@ contains
                             if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                                 .or. &
                                 ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                                .or. &
-                                ((i >= chemxb) .and. (i <= chemxe)) &
                                 ) then
                                 write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
                             else
                                 write (2, FMT) x_cb(j), y_cb(k), q_prim_vf(i)%sf(j, k, 0)
+                                if (i .eq. 14) then 
+                                  print *, q_prim_vf(i)%sf(j,k,0) 
+                                end if
                             end if
                         end do
                         write (2, *)

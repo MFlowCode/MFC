@@ -23,11 +23,11 @@ sol_R.DPX = 0.18075, 35594, 'H2:2,O2:1,AR:7'
 u_l = 0
 u_r = -487.34
 
-L  = 0.24
-Nx = 800
-Ny = 200
+L  = 0.12
+Nx = 400
+Ny = 402
 dx =   L/Nx
-dy = (L/8)/Ny
+dy = (L)/Ny
 dt = min(dx,dy)/abs(u_r)*0.05*0.1*0.2
 Tend=830e-6
 
@@ -44,7 +44,7 @@ case = {
     'x_domain%beg'                 : 0,
     'x_domain%end'                 : L,
     'y_domain%beg'                 : 0,
-    'y_domain%end'                 : L/4,
+    'y_domain%end'                 : L,
     'm'                            : Nx,
     'n'                            : Ny,
     'p'                            : 0,
@@ -96,9 +96,9 @@ case = {
 
     'patch_icpp(1)%geometry'       : 3,
     'patch_icpp(1)%x_centroid'     : L/2,
-    'patch_icpp(1)%y_centroid'     : L/8,
+    'patch_icpp(1)%y_centroid'     : L/2,
     'patch_icpp(1)%length_x'       : L,
-    'patch_icpp(1)%length_y'       : L/4,
+    'patch_icpp(1)%length_y'       : L,
     'patch_icpp(1)%vel(1)'         : -487.34,
     'patch_icpp(1)%vel(2)'         : 0.0,
     'patch_icpp(1)%pres'           : sol_R.P,
@@ -111,10 +111,10 @@ case = {
     # ==========================================================================
 
     'patch_icpp(2)%geometry'       : 7,
-    'patch_icpp(2)%x_centroid'     : L/4,
-    'patch_icpp(2)%y_centroid'     : L/8,
-    'patch_icpp(2)%length_x'       : L/2,
-    'patch_icpp(2)%length_y'       : L/4,
+    'patch_icpp(2)%x_centroid'     : L/2,
+    'patch_icpp(2)%y_centroid'     : L/2,
+    'patch_icpp(2)%length_x'       : L,
+    'patch_icpp(2)%length_y'       : L,
     'patch_icpp(2)%hcid'           : 207,
     'patch_icpp(2)%vel(1)'         : 0,
     'patch_icpp(2)%vel(2)'         : 0,

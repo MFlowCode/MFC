@@ -19,11 +19,11 @@ ctfile    = 'h2o2.yaml'
 
 sol_L     = ct.Solution(ctfile)
 sol_L.DPX = 0.18075, 35594, 'H2:2,O2:1,AR:7'
-Nx = 400
-Ny = 402
+Nx = 512
+Ny = 30
 Nz = 15
 
-L = 0.12
+L = 0.016
 dx =   L/Nx
 dy = (L/8)/Ny
 dz = (L/8)/Nz
@@ -47,9 +47,9 @@ case =   {
             "x_domain%beg": 0,
             "x_domain%end": L,
             "y_domain%beg": 0,
-            "y_domain%end": L,
+            "y_domain%end": L/2,
             "z_domain%beg": 0,
-            "z_domain%end":  L,
+            "z_domain%end":  L/4,
             "m": Nx,
             "n": Ny,
             "p": Nz,
@@ -73,8 +73,8 @@ case =   {
             "riemann_solver": 2,
             "wave_speeds": 1,
             "avg_state": 2,
-            "bc_x%beg": -1,
-            "bc_x%end": -1,
+            "bc_x%beg": -7,
+            "bc_x%end": -8,
             "bc_y%beg": -1,
             "bc_y%end": -1,
             "bc_z%beg": -1,
@@ -101,11 +101,11 @@ case =   {
             "patch_icpp(1)%geometry": 13,
             "patch_icpp(1)%hcid"           : 302,
             "patch_icpp(1)%x_centroid": L/2,
-            "patch_icpp(1)%y_centroid": L/2,
-            "patch_icpp(1)%z_centroid": L/2,
+            "patch_icpp(1)%y_centroid": L/4,
+            "patch_icpp(1)%z_centroid": L/8,
             "patch_icpp(1)%length_x":  L,
-            "patch_icpp(1)%length_y": L,
-            "patch_icpp(1)%length_z":  L,
+            "patch_icpp(1)%length_y": L/2,
+            "patch_icpp(1)%length_z":  L/4,
             "patch_icpp(1)%vel(1)": 0,
             "patch_icpp(1)%vel(2)": 0,
             "patch_icpp(1)%vel(3)": 0,

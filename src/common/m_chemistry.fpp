@@ -56,8 +56,6 @@ contains
             end do
         end do
 
-                 print *, 3
-
     end subroutine s_compute_q_T_sf
 
     subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_T_sf, q_prim_qp, bounds)

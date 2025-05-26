@@ -22,9 +22,9 @@ sol_L.TPX =  300,  101325, 'H:1'
 
 L    = 0.016
 Nx   = 512
-Ny   = 256
+Ny   = 30
 dx   = L / Nx
-dy   = dx
+#dy   = dx
 dt   = 3.3e-8
 Tend = 0.9e-4
 
@@ -80,7 +80,7 @@ data = {
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "T",
-    "parallel_io": "T",
+    "parallel_io": "F",
  "chem_wrt_T"                  : "T",
     "omega_wrt(3)"    :"T",
     "fd_order"        : 2,
