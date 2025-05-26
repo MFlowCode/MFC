@@ -30,6 +30,7 @@ contains
         integer :: x, y, z, eqn
         real(wp) :: energy, mean_molecular_weight
         real(wp), dimension(num_species) :: Ys
+
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
@@ -52,7 +53,6 @@ contains
 
                     call get_temperature(energy, dflt_T_guess, Ys, .true., q_T_sf%sf(x, y, z))
                 end do
-
             end do
         end do
 

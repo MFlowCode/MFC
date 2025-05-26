@@ -171,8 +171,9 @@
             q_prim_vf(f + jump)%sf(i, j, k) = stored_values(data_i, data_j, f)
         end do
         ! Set z velocity to zero
-        q_prim_vf(4)%sf(i, j, k) = 0.0_wp        ! Put your variable assignments here
+        q_prim_vf(4)%sf(i, j, k) = 0.0_wp
 
+        ! Put your variable assignments here
     case default
         call s_int_to_str(patch_id, iStr)
         call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))
