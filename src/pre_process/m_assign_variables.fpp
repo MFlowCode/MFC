@@ -111,14 +111,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
-        real(wp) :: rho    !< density
-        real(wp), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
-        real(wp) :: pres   !< pressure
-        real(wp) :: gamma  !< specific heat ratio function
-        real(wp) :: x_centroid, y_centroid
-        real(wp) :: epsilon, beta
         real(wp) :: Ys(1:num_species)
-        real(wp) :: mean_molecular_weight
 
         integer :: smooth_patch_id
         integer :: i !< generic loop operator
@@ -308,13 +301,7 @@ contains
         real(wp) :: rcoord, theta, phi, xi_sph
         real(wp), dimension(3) :: xi_cart
 
-        real(wp), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
-        real(wp) :: pres   !< pressure
-        real(wp) :: x_centroid, y_centroid
-        real(wp) :: epsilon, beta
-
         real(wp) :: Ys(1:num_species)
-        real(wp) :: mean_molecular_weight
 
         real(wp), dimension(sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes

@@ -655,7 +655,6 @@ contains
         real(wp), dimension(num_fluids) :: adv, dadv_ds
         real(wp), dimension(sys_size) :: L
         real(wp), dimension(3) :: lambda
-        real(wp), dimension(num_species) :: Y_s
 
         real(wp) :: rho         !< Cell averaged density
         real(wp) :: pres        !< Cell averaged pressure
@@ -672,9 +671,7 @@ contains
 
         real(wp) :: vel_K_sum, vel_dv_dt_sum
 
-        integer :: i, j, k, r, q !< Generic loop iterators
-
-        real(wp) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
+        integer :: i, j, k, r !< Generic loop iterators
 
         ! Reshaping of inputted data and association of the FD and PI
         ! coefficients, or CBC coefficients, respectively, hinging on

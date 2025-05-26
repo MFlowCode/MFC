@@ -160,7 +160,7 @@ contains
 #ifdef MFC_MPI
 
         ! Generic loop iterator
-        integer :: i, j, q, k, l
+        integer :: i, j
 
         !Altered system size for the lagrangian subgrid bubble model
         integer :: alt_sys
@@ -309,7 +309,7 @@ contains
         integer, intent(in) :: root               ! Rank of the root process
         real(wp), allocatable, intent(out) :: gathered_vector(:) ! Gathered vector on the root process
 
-        integer :: i, offset, ierr
+        integer :: i, ierr
         integer, allocatable :: recounts(:), displs(:)
 
 #ifdef MFC_MPI
@@ -1076,7 +1076,7 @@ contains
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs_vf
         integer, intent(in) :: mpi_dir, pbc_loc
 
-        integer :: i, j, k, l, r, q !< Generic loop iterators
+        integer :: i, j, k, l, r !< Generic loop iterators
 
         integer :: buffer_counts(1:3), buffer_count
 
