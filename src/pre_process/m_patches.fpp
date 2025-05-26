@@ -101,7 +101,6 @@ contains
                     call s_ellipsoid(i, patch_id_fp, q_prim_vf)
                     ! Analytical function patch for testing purposes
                 elseif (patch_icpp(i)%geometry == 13) then
-                  print *, "Hooo"
                     call s_3D_analytical(i, patch_id_fp, q_prim_vf)
                     ! Spherical harmonic patch
                 elseif (patch_icpp(i)%geometry == 14) then
@@ -1541,6 +1540,7 @@ contains
                                                                 eta, q_prim_vf, patch_id_fp)
 
                         @:Hardcoded3D()
+
                         ! Updating the patch identities bookkeeping variable
                         if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
 
@@ -1549,7 +1549,6 @@ contains
                 end do
             end do
         end do
-
 
     end subroutine s_3D_analytical
 

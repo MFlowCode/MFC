@@ -36,8 +36,8 @@ sol_R.DPX = 0.18075, 35594, "H2:2,O2:1,AR:7"
 u_l = 0
 u_r = -487.34
 
-L = 0.24
-Nx = 800
+L = 0.12
+Nx = 400 * args.scale
 dx = L / Nx
 dt = dx / abs(u_r) * 0.02
 Tend = 230e-6
@@ -57,9 +57,9 @@ case = {
     "p": 0,
     "dt": float(dt),
     "t_step_start": 0,
-    "t_step_stop": 1,
-    "t_step_save": 1,
-    "t_step_print": 1,
+    "t_step_stop": NT,
+    "t_step_save": NS,
+    "t_step_print": NS,
     "parallel_io": "F" if args.mfc.get("mpi", True) else "F",
     # Simulation Algorithm Parameters
     "model_eqns": 2,
@@ -88,24 +88,20 @@ case = {
     "precision": 2,
     "prim_vars_wrt": "T",
     "chem_wrt_T": "T",
-  
     "patch_icpp(1)%geometry": 1,
-    "patch_icpp(1)%x_centroid":  L / 2,
-    "patch_icpp(1)%length_x": L ,
-    "patch_icpp(1)%vel(1)": u_r,
-    "patch_icpp(1)%pres": sol_R.P,
+    "patch_icpp(1)%x_centroid": L / 4,
+    "patch_icpp(1)%length_x": L / 2,
+    "patch_icpp(1)%vel(1)": u_l,
+    "patch_icpp(1)%pres": sol_L.P,
     "patch_icpp(1)%alpha(1)": 1,
-    "patch_icpp(1)%alpha_rho(1)": sol_R.density,
-
-      'patch_icpp(2)%geometry'       : 15,
-    'patch_icpp(2)%hcid'           : 100,
-    "patch_icpp(2)%x_centroid": L / 4,
+    "patch_icpp(1)%alpha_rho(1)": sol_L.density,
+    "patch_icpp(2)%geometry": 1,
+    "patch_icpp(2)%x_centroid": 3 * L / 4,
     "patch_icpp(2)%length_x": L / 2,
-    "patch_icpp(2)%vel(1)": u_l,
-    "patch_icpp(2)%pres": sol_L.P,
+    "patch_icpp(2)%vel(1)": u_r,
+    "patch_icpp(2)%pres": sol_R.P,
     "patch_icpp(2)%alpha(1)": 1,
-    "patch_icpp(2)%alpha_rho(1)": sol_L.density,
-     'patch_icpp(2)%alter_patch(1)' : 'T',
+    "patch_icpp(2)%alpha_rho(1)": sol_R.density,
     # Fluids Physical Parameters
     "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0,
