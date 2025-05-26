@@ -142,7 +142,10 @@ module m_global_parameters
     logical :: mixlayer_vel_profile !< Set hyperbolic tangent streamwise velocity profile
     real(wp) :: mixlayer_vel_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
     logical :: mixlayer_perturb !< Superimpose instability waves to surrounding fluid flow
-    integer :: mixlayer_perturb_nk   !< Number of Fourier modes for perturbation with mixlayer_perturb flag
+    integer :: mixlayer_perturb_nk  !< Number of Fourier modes for perturbation with mixlayer_perturb flag
+    integer :: mixlayer_perturb_k0  !< Peak wavenumber of prescribed energy spectra with mixlayer_perturb flag
+                                    !! Default value (0.4446) is most unstable mode obtained from linear stability analysis 
+                                    !! See Michalke (1964, JFM) for details
 
     real(wp) :: pi_fac !< Factor for artificial pi_inf
 
@@ -373,6 +376,7 @@ contains
         mixlayer_vel_coef = 1._wp
         mixlayer_perturb = .false.
         mixlayer_perturb_nk = 100
+        mixlayer_perturb_k0 = 0.4446_wp
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
         perturb_flow_mag = dflt_real

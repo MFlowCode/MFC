@@ -81,7 +81,8 @@ contains
             & 'bc_x%end', 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',      &
             & 'perturb_flow_mag', 'pref', 'rhoref', 'poly_sigma', 'R0ref',     &
             & 'Web', 'Ca', 'Re_inv', 'sigR', 'sigV', 'rhoRV', 'palpha_eps',    &
-            & 'ptgalpha_eps', 'sigma', 'pi_fac', 'mixlayer_vel_coef', 'Bx0']
+            & 'ptgalpha_eps', 'sigma', 'pi_fac', 'mixlayer_vel_coef', 'Bx0',   &
+            & 'mixlayer_perturb_k0']
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

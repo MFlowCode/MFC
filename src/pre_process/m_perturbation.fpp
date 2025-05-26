@@ -160,25 +160,23 @@ contains
         real(wp), dimension(mixlayer_perturb_nk) :: k, Ek
         real(wp), dimension(3, 3) :: Rij, Lmat
         real(wp), dimension(3) :: velfluc, sig_tmp, sig, khat, xi
-        real(wp) :: dk, k0, alpha, Eksum, q, uu0, phi
+        real(wp) :: dk, alpha, Eksum, q, uu0, phi
         integer :: i, j, l, r, ierr
 
         ! Initialize parameters
         dk = 1._wp/mixlayer_perturb_nk
-        k0 = 0.4446_wp  ! Most unstable mode obtained from linear stability
-        ! analysis. See Michalke (1964, JFM) for details
 
-        ! Compute pre-determined energy spectra
+        ! Compute prescribed energy spectra
         Eksum = 0_wp
         do i = 1, mixlayer_perturb_nk
             k(i) = dk*i
-            Ek(i) = (k(i)/k0)**4._wp*exp(-2._wp*(k(i)/k0)**2._wp)
+            Ek(i) = (k(i)/mixlayer_perturb_k0)**4._wp*exp(-2._wp*(k(i)/mixlayer_perturb_k0)**2._wp)
             Eksum = Eksum + Ek(i)
         end do
 
         ! Main loop
         do r = 0, n
-            ! Compute pre-determined Reynolds stress tensor with about half
+            ! Compute prescribed Reynolds stress tensor with about half
             ! magnitude of its self-similar value
             Rij(:, :) = 0_wp
             uu0 = patch_icpp(1)%vel(1)**2._wp &

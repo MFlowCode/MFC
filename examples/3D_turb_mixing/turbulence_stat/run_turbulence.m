@@ -6,62 +6,67 @@ if exist("variables", 'dir')
 end
 
 %% Initialization
+disp("Initialize"); tic;
 % Create directories
 create_directory();
 % Read user inputs
 set_user_inputs(); load variables/user_inputs.mat;
 % Set grids
-create_grid(); load variables/grid.mat;
+create_grid(); load variables/user_inputs.mat;
 % Pre-allocate variables
-vth = zeros(1,Nfiles);       % Vorticity thickness
-mth = zeros(1,Nfiles);       % Momentum thickness
-y_norm_mth = zeros(np,Nfiles);
-y_norm_vth = zeros(np,Nfiles);
-ruu = zeros(np,Nfiles);      % Reynolds stress: (rho u u)
-rvv = zeros(np,Nfiles);      % Reynolds stress: (rho v v)
-rww = zeros(np,Nfiles);      % Reynolds stress: (rho w w)
-ruv = zeros(np,Nfiles);      % Reynolds stress: (rho u v)
+mth = zeros(1,Nfiles);          % Momentum thickness
+vth = zeros(1,Nfiles);          % Vorticity thickness
+y_norm_mth = zeros(np,Nfiles);  % y-coord / momentum thickness
+y_norm_vth = zeros(np,Nfiles);  % y-coord / vorticity thickness
+ruu = zeros(np,Nfiles);         % Reynolds stress: (rho u u)
+rvv = zeros(np,Nfiles);         % Reynolds stress: (rho v v)
+rww = zeros(np,Nfiles);         % Reynolds stress: (rho w w)
+ruv = zeros(np,Nfiles);         % Reynolds stress: (rho u v)
+toc;
 
 %% Loop over timesteps
 for i = 1:Nfiles
 
     % Read data in conservative form
-    qc = f_read_data(strcat("../restart_data/lustre_",int2str(timesteps(i)),".dat"));
-
-    % Convert conservative variables to primitive variables
-    qp = f_convert_cons_to_prim(qc);
+    disp(" "); disp("[1/6] Read data ..."); tic;
+    qp = f_read_data(strcat("../restart_data/lustre_",int2str(timesteps(i)),".dat")); toc;
 
     % Compute mean quantities
-    [qp_mean qp_fluc] = f_compute_qp_mean_fluc(qp);
+    disp("[2/6] Compute mean and fluctuating quantities ..."); tic;
+    [qp_mean qp_fluc] = f_compute_qp_mean_fluc(qp); toc;
 
     % Compute derivatives
+    disp("[3/6] Compute velocity derivatives ..."); tic;
     [dvel_ds dvelmean_dy dvelfluc_ds] = ...
-        f_compute_vel_derivatives(qp(momxb:momxe,:,:,:), qp_mean(momxb:momxe,:), qp_fluc(momxb:momxe,:,:,:));
+        f_compute_vel_derivatives(qp(momxb:momxe,:,:,:), qp_mean(momxb:momxe,:), qp_fluc(momxb:momxe,:,:,:)); toc;
 
     % Compute mixing layer thickness
-    [vth(i) mth(i) y_norm_mth(:,i) y_norm_vth(:,i)] = f_compute_mixing_layer_thickness(qp_mean,dvelmean_dy);
+    disp("[4/6] Compute mixing layer thickness ..."); tic;
+    [vth(i) mth(i) y_norm_mth(:,i) y_norm_vth(:,i)] = f_compute_mixing_layer_thickness(qp_mean,dvelmean_dy); toc;
 
     % Compute Reynolds stress
-    [ruu(:,i) rvv(:,i) rww(:,i) ruv(:,i)] = f_compute_Reynolds_stress(qp(1,:,:,:), qp_fluc(momxb:momxe,:,:,:));
-    plot_Reynolds_stress(y_norm_vth(:,i), ruu(:,i), rvv(:,i), rww(:,i), ruv(:,i), timesteps(i));
+    disp("[5/6] Compute Reynolds stress ..."); tic;
+    [ruu(:,i) rvv(:,i) rww(:,i) ruv(:,i)] = f_compute_Reynolds_stress(qp(1,:,:,:), qp_fluc(momxb:momxe,:,:,:), ...
+                                                                    y_norm_vth(:,i), timesteps(i)); toc;
 
     % Compute TKE budget
+    disp("[6/6] Compute TKE budget ..."); tic;
     [T P D] = f_compute_tke_budget(dvel_ds, dvelmean_dy, dvelfluc_ds, ...
                                 squeeze(qp(1,:,:,:)), qp_fluc(momxb:momxe,:,:,:), squeeze(qp(E_idx,:,:,:)), ...
-                                mth(i), y_norm_mth(:,i), timesteps(i));
-    plot_tke_budget(y_norm_mth(:,i), T, P, D, timesteps(i));
+                                y_norm_mth(:,i), mth(i), timesteps(i)); toc;
 
 end
 
-% PLOT
-plot_mixlayer_thickness(time, mth, vth);
-plot_growth_rate(time, mth);
-plot_Reynolds_stress(y_norm_vth, ruu, rvv, rww, ruv, "all");
+% Plot growth_rate
+disp("Plot growth rate"); tic;
+plot_growth_rate(time, mth); toc;
+
+disp("End of program");
 
 
 %% FUNCTIONS
 % Read lustre files
-function qc = f_read_data(filename)
+function qp = f_read_data(filename)
 
     load variables/user_inputs.mat;
 
@@ -74,6 +79,8 @@ function qc = f_read_data(filename)
     % Reassign density & velocity components
     qc = permute(reshape(A, mp, np, pp, sys_size),[4 1 2 3]);
 
+    % Convert conservative variables to primitive variables
+    qp = f_convert_cons_to_prim(qc);
 end
 
 % Convert conservative variables to primitive variables
@@ -103,7 +110,7 @@ function [qp_mean qp_fluc] = f_compute_qp_mean_fluc(qp)
     load variables/user_inputs.mat;
 
     % Compute mean quantities
-    qp_mean = zeros(sys_size,np);
+    qp_mean = zeros(E_idx,np);
 
     % mean rho
     qp_mean(contxb:contxe,:) = squeeze(mean(qp(contxb:contxe,:,:,:),[2 4]));
@@ -117,7 +124,7 @@ function [qp_mean qp_fluc] = f_compute_qp_mean_fluc(qp)
     qp_mean(E_idx,:) = squeeze(mean(qp(E_idx,:,:,:),[2 4]));
 
     % fluctuation
-    qp_fluc = qp - permute(repmat(qp_mean, [1 1 mp pp]), [1 3 2 4]);
+    qp_fluc = qp(1:E_idx,:,:,:) - permute(repmat(qp_mean, [1 1 mp pp]), [1 3 2 4]);
 end
 
 % f_compute_vel_derivatives
@@ -173,7 +180,6 @@ end
 function [vth mth y_norm_mth y_norm_vth] = f_compute_mixing_layer_thickness(qp_mean, dvelmean_dy)
 
     load variables/user_inputs.mat;
-    load variables/grid.mat;
 
     % Compute vorticity thickness
     vth = 2 / max(abs(dvelmean_dy(1,:)),[],"all");
@@ -189,7 +195,7 @@ function [vth mth y_norm_mth y_norm_vth] = f_compute_mixing_layer_thickness(qp_m
 end
 
 % f_compute_Reynolds_stress
-function [ruu rvv rww ruv] = f_compute_Reynolds_stress(rho, vel_fluc)
+function [ruu rvv rww ruv] = f_compute_Reynolds_stress(rho, vel_fluc, y_norm_vth, timestep)
 
     rho = squeeze(rho);
     vel_fluc1 = squeeze(vel_fluc(1, :, :, :));
@@ -201,6 +207,13 @@ function [ruu rvv rww ruv] = f_compute_Reynolds_stress(rho, vel_fluc)
     rvv = mean(rho .* vel_fluc2.^2, [1 3]);
     rww = mean(rho .* vel_fluc3.^2, [1 3]);
     ruv = mean(rho .* vel_fluc1.*vel_fluc2, [1 3]);
+
+    % Plot Reynolds stress
+    plot_Reynolds_stress(ruu, rvv, rww, ruv, y_norm_vth, timestep);
+
+    % Save data
+    save("results/Reynolds_stress_data/tstep_"+string(timestep)+".mat","y_norm_vth","ruu","rvv","rww","ruv");
+
 end
 
 % f_compute_strain_rate_tensor
@@ -216,10 +229,9 @@ function [SS S11 S12 S13 S22 S23 S33] = f_compute_strain_rate_tensor(dvel_ds);
 end
 
 % f_compute_tke_budget
-function [T P D] = f_compute_tke_budget(dvel_ds, dvelmean_dy, dvelfluc_ds, rho, vel_fluc, pres_fluc, mth, y_norm_mth, timestep)
+function [T P D] = f_compute_tke_budget(dvel_ds, dvelmean_dy, dvelfluc_ds, rho, vel_fluc, pres_fluc, y_norm_mth, mth, timestep)
 
     load variables/user_inputs.mat;
-    load variables/grid.mat;
 
     % Compute strain-rate tensor
     [SS S11 S12 S13 S22 S23 S33] = f_compute_strain_rate_tensor(dvel_ds);
@@ -245,7 +257,6 @@ function [T P D] = f_compute_tke_budget(dvel_ds, dvelmean_dy, dvelfluc_ds, rho, 
         end
     end
     sigfluc = sig - permute(repmat(sigmean, [1 1 1 mp pp]), [1 2 4 3 5]);
-    clear sig SS S11 S12 S13 S21 S22 S23 S31 S32 S33
     
     % Transport (T)
     T1 = -0.5*mean(...
@@ -257,9 +268,6 @@ function [T P D] = f_compute_tke_budget(dvel_ds, dvelmean_dy, dvelfluc_ds, rho, 
          squeeze(sigfluc(1,2,:,:,:)).*squeeze(vel_fluc(1,:,:,:)) ...
        + squeeze(sigfluc(2,2,:,:,:)).*squeeze(vel_fluc(2,:,:,:)) ...
        + squeeze(sigfluc(3,2,:,:,:)).*squeeze(vel_fluc(3,:,:,:)),[1 3]);
-    T1 = T1 / (8/mth); % normalization
-    T2 = T2 / (8/mth); % normalization
-    T3 = T3 / (8/mth); % normalization
     T0 = T1 + T2 + T3;
     T = f_compute_derivative_1d(T0,y_cc); 
 
@@ -267,9 +275,6 @@ function [T P D] = f_compute_tke_budget(dvel_ds, dvelmean_dy, dvelfluc_ds, rho, 
     P1 = -mean(rho.*squeeze(vel_fluc(1,:,:,:).*vel_fluc(2,:,:,:)),[1 3]).*squeeze(dvelmean_dy(1,:));
     P2 = -mean(rho.*squeeze(vel_fluc(2,:,:,:).*vel_fluc(2,:,:,:)),[1 3]).*squeeze(dvelmean_dy(2,:));
     P3 = -mean(rho.*squeeze(vel_fluc(3,:,:,:).*vel_fluc(2,:,:,:)),[1 3]).*squeeze(dvelmean_dy(3,:));
-    P1 = P1 / (8/mth); % normalization
-    P2 = P2 / (8/mth); % normalization
-    P3 = P3 / (8/mth); % normalization
     P = P1 + P2 + P3;
 
     % Dissipation (D)
@@ -282,14 +287,15 @@ function [T P D] = f_compute_tke_budget(dvel_ds, dvelmean_dy, dvelfluc_ds, rho, 
                     + sigfluc(1,3,:,:,:).*dvelfluc_ds(1,3,:,:,:) ...
                     + sigfluc(2,3,:,:,:).*dvelfluc_ds(2,3,:,:,:)  ...
                     + sigfluc(3,3,:,:,:).*dvelfluc_ds(3,3,:,:,:)), [1 3]);
-    D = D / (8/mth); % normalization
 
-    save(post_stat_dir+"/tke_budget_data/tke_budget_"+string(timestep)+".mat","y_norm_mth","T","T1","T2","T3","P","P1","P2","P3","D","mth");
+    % Plot TKE budget
+    plot_tke_budget(T, P, D, y_norm_mth, mth, timestep);
+
+    % Save data
+    save("results/tke_budget_data/tstep_"+string(timestep)+".mat","y_norm_mth","mth","T0","P","D");
 
 end
 
-
-%% HELPER FUNCTIONS
 % Create directory for saving results
 function create_directory()
     if ~exist(strcat("results"), "dir")
@@ -303,6 +309,9 @@ function create_directory()
     end
     if ~exist(strcat("results/Reynolds_stress"), "dir")
         mkdir(strcat("results/Reynolds_stress"));
+    end
+    if ~exist(strcat("results/Reynolds_stress_data"), "dir")
+        mkdir(strcat("results/Reynolds_stress_data"));
     end
 end
 
@@ -358,7 +367,7 @@ function create_grid()
     z_cc = (z_cb(2:ppp) + z_cb(1:pp))/2;
 
     % Save variables
-    save variables/grid.mat
+    save variables/user_inputs.mat
 end
 
 % compute the wall-normal derivative of a discretized function, fun(y)
@@ -411,7 +420,12 @@ end
 
 %% PLOTS
 % plot_tke_budget
-function plot_tke_budget(y_norm_mth, T, P, D, timestep)
+function plot_tke_budget(T, P, D, y_norm_mth, mth, timestep)
+
+    % Normalizaiton
+    T = T / (8/mth);
+    P = P / (8/mth);
+    D = D / (8/mth);
 
     load variables/user_inputs.mat;
 
@@ -424,31 +438,7 @@ function plot_tke_budget(y_norm_mth, T, P, D, timestep)
     xlabel('$y/\delta_\theta$','interpreter','latex');
     set(gca,'TickLabelInterpreter','latex');
     
-    saveas(f1, "results/tke_budget/tke_budget_tstep_"+string(timestep),"png");
-    close(f1);
-end
-
-% plot_mixlayer_thickness
-function plot_mixlayer_thickness(time, mth, vth)
-
-    load variables/user_inputs.mat;
-
-    f1 = figure("DefaultAxesFontSize", 18); 
-    plot(time,mth,'-ko','LineWidth',2); hold on; grid on;
-    axis([min(time) max(time) 0 16]);
-    xlabel('$t U_1 / \delta_{\omega h}^0$','interpreter','latex');
-    ylabel('$\delta_\theta / \delta_{\omega h}^0$','interpreter','latex');
-    set(gca,'TickLabelInterpreter','latex');
-    saveas(f1, "results/momentum_thickness.png"); 
-    close(f1);
-
-    f1 = figure("DefaultAxesFontSize", 18); 
-    plot(time,vth,'-ko','LineWidth',2); hold on; grid on;
-    xlim([min(time) max(time)]);
-    xlabel('$t U_1 / \delta_{\omega h}^0$','interpreter','latex');
-    ylabel('$\delta_\omega / \delta_{\omega h}^0$','interpreter','latex');
-    set(gca,'TickLabelInterpreter','latex');
-    saveas(f1, "results/vorticity_thickness.png"); 
+    saveas(f1, "results/tke_budget/tstep_"+string(timestep),"png");
     close(f1);
 end
 
@@ -459,6 +449,8 @@ function plot_growth_rate(time, mth)
 
     % Growth rate
     dmth = (mth(2:end) - mth(1:end-1)) ./ (time(2:end) - time(1:end-1));
+
+    % Normalization
     dmth = dmth / 2; % (dmth/dt) * (1/Delta U)
 
     % growth rate
@@ -482,35 +474,37 @@ function plot_growth_rate(time, mth)
             'Interpreter','latex','location','northeast');
     set(gca,'TickLabelInterpreter','latex');
 
-    saveas(f_growth_rate, post_stat_dir+"/growth_rate.png"); 
+    saveas(f_growth_rate, "results/growth_rate.png"); 
     close(f_growth_rate); 
-    disp("f_growth_rate saved");
 end
 
 % plot_Reynolds_stress
-function plot_Reynolds_stress(y_norm_mth, ruu, rvv, rww, ruv, timestep)
+function plot_Reynolds_stress(ruu, rvv, rww, ruv, y_norm_vth, timestep)
+
     load variables/user_inputs.mat;
 
+    % Sqrt & Normalization
     ruu = sqrt(ruu) / 2;
     rvv = sqrt(rvv) / 2;
     rww = sqrt(rww) / 2;
     ruv(ruv > 0) = 0;
     ruv = sqrt(-ruv) / 2;
 
+    % Plot
     f1 = figure("DefaultAxesFontSize", 18); 
 
     % sqrt(ruu)/Delta U
-    A = readmatrix("data/Bell_Mehta_1990/ruu.dat");
+    A = readmatrix("reference_data/Bell_Mehta_1990/ruu.dat");
     y_norm_ref1 = A(:,1); ruu_ref1 = A(:,2);
-    A = readmatrix("data/Vaghefi_2014/ruu.dat");
+    A = readmatrix("reference_data/Vaghefi_2014/ruu.dat");
     y_norm_ref2 = A(:,1); ruu_ref2 = A(:,2);
-    A = readmatrix("data/Wang_et_al_2022/ruu.dat");
+    A = readmatrix("reference_data/Wang_et_al_2022/ruu.dat");
     y_norm_ref3 = A(:,1); ruu_ref3 = A(:,2);
     subplot(2,2,1); hold on;
     plot(y_norm_ref1,ruu_ref1,'g+','LineWidth',2);
     plot(y_norm_ref2,ruu_ref2,'b-.','LineWidth',1);
     plot(y_norm_ref3,ruu_ref3,'r--','LineWidth',1);
-    plot(y_norm_mth,ruu,'k-','LineWidth',1); grid on;
+    plot(y_norm_vth,ruu,'k-','LineWidth',1); grid on;
     axis([-1.5 1.5 0 0.25]);
     xticks([-1.5:0.5:1.5]);
     yticks([0:0.05:0.25]);
@@ -519,17 +513,17 @@ function plot_Reynolds_stress(y_norm_mth, ruu, rvv, rww, ruv, timestep)
     set(gca,'TickLabelInterpreter','latex');
 
     % sqrt(rvv)/Delta U
-    A = readmatrix("data/Bell_Mehta_1990/rvv.dat");
+    A = readmatrix("reference_data/Bell_Mehta_1990/rvv.dat");
     y_norm_ref1 = A(:,1); rvv_ref1 = A(:,2);
-    A = readmatrix("data/Vaghefi_2014/rvv.dat");
+    A = readmatrix("reference_data/Vaghefi_2014/rvv.dat");
     y_norm_ref2 = A(:,1); rvv_ref2 = A(:,2);
-    A = readmatrix("data/Wang_et_al_2022/rvv.dat");
+    A = readmatrix("reference_data/Wang_et_al_2022/rvv.dat");
     y_norm_ref3 = A(:,1); rvv_ref3 = A(:,2);
     subplot(2,2,2); hold on;
     plot(y_norm_ref1,rvv_ref1,'g+','LineWidth',2);
     plot(y_norm_ref2,rvv_ref2,'b-.','LineWidth',1);
     plot(y_norm_ref3,rvv_ref3,'r--','LineWidth',1);
-    plot(y_norm_mth,rvv,'k-','LineWidth',1); grid on;
+    plot(y_norm_vth,rvv,'k-','LineWidth',1); grid on;
     axis([-1.5 1.5 0 0.25]); 
     xticks([-1.5:0.5:1.5]);
     yticks([0:0.05:0.25]);
@@ -538,17 +532,17 @@ function plot_Reynolds_stress(y_norm_mth, ruu, rvv, rww, ruv, timestep)
     set(gca,'TickLabelInterpreter','latex');
 
     % sqrt(rww)/Delta U
-    A = readmatrix("data/Bell_Mehta_1990/rww.dat");
+    A = readmatrix("reference_data/Bell_Mehta_1990/rww.dat");
     y_norm_ref1 = A(:,1); rww_ref1 = A(:,2);
-    A = readmatrix("data/Vaghefi_2014/rww.dat");
+    A = readmatrix("reference_data/Vaghefi_2014/rww.dat");
     y_norm_ref2 = A(:,1); rww_ref2 = A(:,2);    
-    A = readmatrix("data/Wang_et_al_2022/rww.dat");
+    A = readmatrix("reference_data/Wang_et_al_2022/rww.dat");
     y_norm_ref3 = A(:,1); rww_ref3 = A(:,2);
     subplot(2,2,3); hold on;
     plot(y_norm_ref1,rww_ref1,'g+','LineWidth',2);
     plot(y_norm_ref2,rww_ref2,'b-.','LineWidth',1);
     plot(y_norm_ref3,rww_ref3,'r--','LineWidth',1);
-    plot(y_norm_mth,rww,'k-','LineWidth',1); grid on;
+    plot(y_norm_vth,rww,'k-','LineWidth',1); grid on;
     axis([-1.5 1.5 0 0.25]); 
     xticks([-1.5:0.5:1.5]);
     yticks([0:0.05:0.25]);
@@ -557,17 +551,17 @@ function plot_Reynolds_stress(y_norm_mth, ruu, rvv, rww, ruv, timestep)
     set(gca,'TickLabelInterpreter','latex');
 
     % sqrt(-rvu)/Delta U
-    A = readmatrix("data/Bell_Mehta_1990/ruv.dat");
+    A = readmatrix("reference_data/Bell_Mehta_1990/ruv.dat");
     y_norm_ref1 = A(:,1); ruv_ref1 = A(:,2);
-    A = readmatrix("data/Vaghefi_2014/ruv.dat");
+    A = readmatrix("reference_data/Vaghefi_2014/ruv.dat");
     y_norm_ref2 = A(:,1); ruv_ref2 = A(:,2);   
-    A = readmatrix("data/Wang_et_al_2022/ruv.dat");
+    A = readmatrix("reference_data/Wang_et_al_2022/ruv.dat");
     y_norm_ref3 = A(:,1); ruv_ref3 = A(:,2); 
     subplot(2,2,4); hold on;
     plot(y_norm_ref1,ruv_ref1,'g+','LineWidth',2);
     plot(y_norm_ref2,ruv_ref2,'b-.','LineWidth',1);
     plot(y_norm_ref3,ruv_ref3,'r--','LineWidth',1);
-    plot(y_norm_mth,ruv,'k-','LineWidth',1); grid on;
+    plot(y_norm_vth,ruv,'k-','LineWidth',1); grid on;
     axis([-1.5 1.5 0 0.25]); 
     xticks([-1.5:0.5:1.5]);
     yticks([0:0.05:0.25]);
@@ -580,7 +574,7 @@ function plot_Reynolds_stress(y_norm_mth, ruu, rvv, rww, ruv, timestep)
     %         'Interpreter','latex','location','northeast');
     set(gca,'TickLabelInterpreter','latex');
 
-    saveas(f1, "results/Reynolds_stress/Reynolds_stress_"+string(timestep),"png");
+    saveas(f1, "results/Reynolds_stress/tstep_"+string(timestep),"png");
     close(f1);
 
 end

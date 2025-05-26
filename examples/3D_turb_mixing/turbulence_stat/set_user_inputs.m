@@ -9,10 +9,6 @@ function set_user_inputs()
     %% Reynolds number
     Re = 320;   % Reynolds number
 
-    %% Configuration
-    num_fluids = 1; % Number of fluids
-    num_dims = 3;   % Number of dimensions
-
     %% Grids
     Lx = 160.0; % Domain size in x-direction
     Ly = 160.0; % Domain size in y-direction
@@ -30,13 +26,17 @@ function set_user_inputs()
     loops_y = 2;
 
     %% Time
-    Nt_beg = 0;
-    Nt_end = 384;
+    Nt_beg = 384*30;
+    Nt_end = 384*50;
     Nt_save = 384;
-    dt = 0.02609262883235486;
+    dt = 0.013033561420658195;
     Nfiles  = (Nt_end - Nt_beg)/Nt_save + 1;
     timesteps = Nt_beg:Nt_save:Nt_end;
     time = timesteps*dt;
+
+    %% Configuration
+    num_fluids = 1; % Number of fluids
+    num_dims = 3;   % Number of dimensions
 
     %% Index
     contxb = 1;
