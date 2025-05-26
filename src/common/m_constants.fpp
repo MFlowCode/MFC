@@ -83,7 +83,7 @@ module m_constants
     integer, parameter :: relativity_cons_to_prim_max_iter = 100
 
     ! Pseudo-random number generator
-    integer, parameter :: modulus = 2**31 - 1
+    integer, parameter :: modulus = 2**30 - 1
     integer, parameter :: multiplier = 1103515245
     integer, parameter :: increment = 12345
     integer, parameter :: amplifier = 3**13

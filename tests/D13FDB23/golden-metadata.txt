@@ -1,12 +1,12 @@
-This file was created on 2025-05-26 02:42:33.965866.
+This file was created on 2025-05-26 02:58:11.891382.
 
 mfc.sh:
 
     Invocation: test -o mixlayer_perturb --generate -- -c carpenter
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        3427b0c1c5f917bd2e5b7698aec2d41c71e0011f on mixlayer (dirty)
+    Git:        83fa91f3b29d453818e6cd78a1ddb0d4fe985dd9 on mixlayer (dirty)
 
-syscheck:
+simulation:
 
     CMake Configuration:
     
@@ -16,9 +16,9 @@ syscheck:
         Fortran : GNU v7.5.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -72,7 +72,7 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+syscheck:
 
     CMake Configuration:
     
@@ -82,9 +82,9 @@ simulation:
         Fortran : GNU v7.5.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
