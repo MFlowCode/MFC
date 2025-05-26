@@ -97,9 +97,6 @@ jobs:
       matrix:
         device: ['cpu', 'gpu']
         lbl: ['gt', 'frontier']
-        exclude:
-          - device:   cpu
-            lbl: frontier
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
@@ -116,7 +113,7 @@ jobs:
 
       - name: Build
         if:   matrix.lbl == 'frontier'
-        run:  bash .github/workflows/frontier/build.sh
+        run:  bash .github/workflows/frontier/build.sh ${{ matrix.device }}
 
       - name: Test
         if:   matrix.lbl == 'frontier'

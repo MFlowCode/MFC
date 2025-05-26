@@ -54,5 +54,5 @@ To make sure the code is performing as expected on GPU devices, I have:
 - [ ] Ran the code on MI200+ GPUs and ensure the new features performed as expected (the GPU results match the CPU results)
 - [ ] Enclosed the new feature via `nvtx` ranges so that they can be identified in profiles
 - [ ] Ran a Nsight Systems profile using `./mfc.sh run XXXX --gpu -t simulation --nsys`, and have attached the output file (`.nsys-rep`) and plain text results to this PR
-- [ ] Ran an Omniperf profile using `./mfc.sh run XXXX --gpu -t simulation --omniperf`, and have attached the output file and plain text results to this PR.
+- [ ] Ran a Rocprof Systems profile using `./mfc.sh run XXXX --gpu -t simulation --rsys --hip-trace`, and have attached the output file and plain text results to this PR.
 - [ ] Ran my code using various numbers of different GPUs (1, 2, and 8, for example) in parallel and made sure that the results scale similarly to what happens if you run without the new code/feature
