@@ -15,7 +15,7 @@ module m_perturbation
     use m_boundary_common   ! Boundary conditions module
 
     use m_helper
-    
+
     use ieee_arithmetic
 
     implicit none
@@ -158,7 +158,7 @@ contains
     subroutine s_perturb_mixlayer(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(mixlayer_perturb_nk) :: k, Ek
-        real(wp), dimension(3,3) :: Rij, Lmat
+        real(wp), dimension(3, 3) :: Rij, Lmat
         real(wp), dimension(3) :: velfluc, sig_tmp, sig, khat, xi
         real(wp) :: dk, k0, alpha, Eksum, q, uu0, phi
         integer :: i, j, l, r, ierr
@@ -166,7 +166,7 @@ contains
         ! Initialize parameters
         dk = 1._wp/mixlayer_perturb_nk
         k0 = 0.4446_wp  ! Most unstable mode obtained from linear stability
-                        ! analysis. See Michalke (1964, JFM) for details
+        ! analysis. See Michalke (1964, JFM) for details
 
         ! Compute pre-determined energy spectra
         Eksum = 0_wp
@@ -236,7 +236,6 @@ contains
 
     end subroutine s_perturb_mixlayer
 
-
     subroutine s_generate_random_perturbation(khat, xi, phi, ik, yloc)
         integer, intent(in) :: ik
         real(wp), intent(in) :: yloc
@@ -246,18 +245,18 @@ contains
         integer :: seed, kfac, yfac
 
         kfac = ik*amplifier
-        yfac = NINT((sin(yloc) + 1_wp)*amplifier)
-        seed = NINT(0.5_wp*modmul(kfac) + 0.5_wp*modmul(yfac))
-        
-        call s_prng(theta,seed)
-        call s_prng(eta,seed)
-        khat = f_unit_vector(theta,eta)
+        yfac = nint((sin(yloc) + 1_wp)*amplifier)
+        seed = nint(0.5_wp*modmul(kfac) + 0.5_wp*modmul(yfac))
 
-        call s_prng(theta,seed)
-        call s_prng(eta,seed)
-        xi = f_unit_vector(theta,eta)
-        
-        call s_prng(phi,seed)
+        call s_prng(theta, seed)
+        call s_prng(eta, seed)
+        khat = f_unit_vector(theta, eta)
+
+        call s_prng(theta, seed)
+        call s_prng(eta, seed)
+        xi = f_unit_vector(theta, eta)
+
+        call s_prng(phi, seed)
 
     end subroutine s_generate_random_perturbation
 
@@ -275,14 +274,14 @@ contains
     end function f_unit_vector
 
     !>  This function generates a pseudo-random number between 0 and 1 based on
-    !!  linear congruential generator. 
+    !!  linear congruential generator.
     subroutine s_prng(var, seed)
         integer, intent(inout) :: seed
         real(wp), intent(out) :: var
         integer :: i
 
         seed = mod(modmul(seed), modulus)
-        var = seed/real(modulus,wp)
+        var = seed/real(modulus, wp)
 
     end subroutine s_prng
 
@@ -291,9 +290,9 @@ contains
         integer :: xint, val
         real(wp) :: x
 
-        x = (multiplier/real(modulus,wp))*a + (increment/real(modulus,wp))
-        xint = floor(x)        
-        val = NINT((x - xint)*modulus)
+        x = (multiplier/real(modulus, wp))*a + (increment/real(modulus, wp))
+        xint = floor(x)
+        val = nint((x - xint)*modulus)
 
     end function modmul
 
