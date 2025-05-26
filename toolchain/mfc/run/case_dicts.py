@@ -74,7 +74,6 @@ PRE_PROCESS.update({
     'mixlayer_domain': ParamType.REAL,
     'mixlayer_perturb': ParamType.LOG,
     'mixlayer_perturb_nk': ParamType.INT,
-    'prng_seed': ParamType.INT,
     'perturb_flow': ParamType.LOG,
     'perturb_flow_fluid': ParamType.INT,
     'perturb_flow_mag': ParamType.REAL,
