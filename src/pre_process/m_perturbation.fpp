@@ -159,14 +159,9 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(mixlayer_perturb_nk) :: k, Ek
         real(wp), dimension(3,3) :: Rij, Lmat
-        real(wp), dimension(3) :: velfluc, sig_tmp, sig
-        real(wp) :: dk, k0, alpha, Eksum, q, uu0
-        real(wp), dimension(3,0:n,mixlayer_perturb_nk) :: khat, xi
-        real(wp), dimension(0:n,mixlayer_perturb_nk) :: phi
+        real(wp), dimension(3) :: velfluc, sig_tmp, sig, khat, xi
+        real(wp) :: dk, k0, alpha, Eksum, q, uu0, phi
         integer :: i, j, l, r, ierr
-
-        ! Initialize random number        
-        call s_initialize_perturb_mixlayer(khat,xi,phi)
 
         ! Initialize parameters
         dk = 1._wp/mixlayer_perturb_nk
@@ -207,30 +202,28 @@ contains
 
             ! Compute perturbation for each Fourier component
             do i = 1, mixlayer_perturb_nk
-!                 ! Generate random numbers for unit wavevector khat,
-!                 ! random unit vector xi, and random mode phase phi
-!                 if (proc_rank == 0) then
-!                     khat = f_random_unit_vector()
-!                     xi = f_random_unit_vector()
-!                     phi = f_prng()
-!                 end if
-        
-! #ifdef MFC_MPI
-!                 call MPI_BCAST(khat, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-!                 call MPI_BCAST(xi, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-!                 call MPI_BCAST(phi, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-! #endif
+                ! Generate random numbers for unit wavevector khat,
+                ! random unit vector xi, and random mode phase phi
+                if (proc_rank == 0) then
+                    call s_generate_random_perturbation(khat, xi, phi, i, y_cc(r))
+                end if
+
+#ifdef MFC_MPI
+                call MPI_BCAST(khat, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(xi, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(phi, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+#endif
 
                 ! Compute mode direction by two-time cross product
-                sig_tmp = f_cross(xi(:,r,i), khat(:,r,i))
+                sig_tmp = f_cross(xi, khat)
                 sig_tmp = sig_tmp/sqrt(sum(sig_tmp**2))
-                sig = f_cross(khat(:,r,i), sig_tmp)
+                sig = f_cross(khat, sig_tmp)
 
                 ! Compute perturbation for each grid
                 do l = 0, p
                     do j = 0, m
                         q = sqrt(Ek(i)/Eksum)
-                        alpha = k(i)*(khat(1,r,i)*x_cc(j) + khat(2,r,i)*y_cc(r) + khat(3,r,i)*z_cc(l)) + 2_wp*pi*phi(r,i)
+                        alpha = k(i)*(khat(1)*x_cc(j) + khat(2)*y_cc(r) + khat(3)*z_cc(l)) + 2_wp*pi*phi
                         velfluc = 2_wp*q*sig*cos(alpha)
                         velfluc = matmul(Lmat, velfluc)
                         q_prim_vf(momxb)%sf(j, r, l) = q_prim_vf(momxb)%sf(j, r, l) + velfluc(1)
@@ -241,54 +234,68 @@ contains
             end do
         end do
 
-        print *, proc_rank, j, r, l, q_prim_vf(momxb + 2)%sf(j, r, l)
-
     end subroutine s_perturb_mixlayer
 
 
-    subroutine s_initialize_perturb_mixlayer(khat, xi, phi)
+    subroutine s_generate_random_perturbation(khat, xi, phi, ik, yloc)
+        integer, intent(in) :: ik
+        real(wp), intent(in) :: yloc
+        real(wp), dimension(3), intent(out) :: khat, xi
+        real(wp), intent(out) :: phi
+        real(wp) :: theta, eta
+        integer :: seed, kfac, yfac
 
-        real(wp), dimension(3,0:n,mixlayer_perturb_nk), intent(out) :: khat, xi
-        real(wp), dimension(0:n,mixlayer_perturb_nk), intent(out) :: phi
-        integer :: i, j, k, l
+        kfac = ik*amplifier
+        yfac = NINT((sin(yloc) + 1_wp)*amplifier)
+        seed = NINT(0.5_wp*modmul(kfac) + 0.5_wp*modmul(yfac))
+        
+        call s_prng(theta,seed)
+        call s_prng(eta,seed)
+        khat = f_unit_vector(theta,eta)
 
-        if (proc_rank == 0) then
-            do j = 0, n
-                do i = 1, mixlayer_perturb_nk
-                    khat(:,j,i) = f_random_unit_vector()
-                    xi(:,j,i) = f_random_unit_vector()
-                    phi(j,i) = f_prng()
-                end do
-            end do
-        end if
+        call s_prng(theta,seed)
+        call s_prng(eta,seed)
+        xi = f_unit_vector(theta,eta)
+        
+        call s_prng(phi,seed)
 
-    end subroutine s_initialize_perturb_mixlayer
+    end subroutine s_generate_random_perturbation
 
     ! Generate a random unit vector (spherical distribution)
-    function f_random_unit_vector() result(vec)
-        real(wp) :: vec(3)
-        real(wp) :: theta, phi
+    function f_unit_vector(theta, eta) result(vec)
+        real(wp) :: theta, eta
+        real(wp), dimension(3) :: vec
 
-        theta = f_prng()
-        phi = f_prng()
         theta = 2.0_wp*pi*theta
-        phi = acos(2.0_wp*phi - 1.0_wp)
-        vec(1) = sin(phi)*cos(theta)
-        vec(2) = sin(phi)*sin(theta)
-        vec(3) = cos(phi)
+        eta = acos(2.0_wp*eta - 1.0_wp)
+        vec(1) = sin(eta)*cos(theta)
+        vec(2) = sin(eta)*sin(theta)
+        vec(3) = cos(eta)
 
-    end function f_random_unit_vector
+    end function f_unit_vector
 
     !>  This function generates a pseudo-random number between 0 and 1 based on
     !!  linear congruential generator. 
-    function f_prng() result(val)
-        
-        real(wp) :: val
+    subroutine s_prng(var, seed)
+        integer, intent(inout) :: seed
+        real(wp), intent(out) :: var
+        integer :: i
 
-        prng_seed = mod(multiplier*prng_seed + increment, modulus)
-        val = prng_seed / modulus
+        seed = mod(modmul(seed), modulus)
+        var = seed/real(modulus,wp)
 
-    end function f_prng
+    end subroutine s_prng
+
+    function modmul(a) result(val)
+        integer, intent(in) :: a
+        integer :: xint, val
+        real(wp) :: x
+
+        x = (multiplier/real(modulus,wp))*a + (increment/real(modulus,wp))
+        xint = floor(x)        
+        val = NINT((x - xint)*modulus)
+
+    end function modmul
 
     subroutine s_finalize_perturbation_module()
 
