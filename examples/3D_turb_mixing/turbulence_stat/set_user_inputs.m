@@ -27,7 +27,7 @@ function set_user_inputs()
 
     %% Time
     Nt_beg = 384*25;
-    Nt_end = 384*40;
+    Nt_end = 384*26;
     Nt_save = 384;
     dt = 0.013033561420658195;
     Nfiles  = (Nt_end - Nt_beg)/Nt_save + 1;

@@ -1,10 +1,5 @@
 close all; clear all;
 
-%% Remove pre-existing var files
-if exist("variables", 'dir')
-    delete variables/*.mat;
-end
-
 %% Initialization
 disp("Initialize"); tic;
 % Create directories
@@ -13,6 +8,8 @@ create_directory();
 set_user_inputs(); load variables/user_inputs.mat;
 % Set grids
 create_grid(); load variables/user_inputs.mat;
+% Allocate array for momentum thickness
+mth = zeros(Nfiles,1);
 toc;
 
 %% Loop over timesteps
@@ -33,7 +30,7 @@ for i = 1:Nfiles
 
     % Compute mixing layer thickness
     disp("[4/6] Compute mixing layer thickness ..."); tic;
-    [vth mth y_norm_mth y_norm_vth] = f_compute_mixing_layer_thickness(qp_mean,dvelmean_dy); toc;
+    [vth mth(i) y_norm_mth y_norm_vth] = f_compute_mixing_layer_thickness(qp_mean,dvelmean_dy); toc;
 
     % Compute Reynolds stress
     disp("[5/6] Compute Reynolds stress ..."); tic;
@@ -43,14 +40,25 @@ for i = 1:Nfiles
     disp("[6/6] Compute TKE budget ..."); tic;
     f_compute_tke_budget(dvel_ds, dvelmean_dy, dvelfluc_ds, ...
                         squeeze(qp(1,:,:,:)), qp_fluc(momxb:momxe,:,:,:), squeeze(qp(E_idx,:,:,:)), ...
-                        y_norm_mth, mth, timesteps(i)); toc;
+                        y_norm_mth, mth(i), timesteps(i)); toc;
 end
+disp("End of loop");
+
+% Compute mixing layer growth rate
+disp("Compute growth rate ..."); tic;
+plot_growth_rate(time,mth); toc;
+
 disp("End of program");
 
 
 %% FUNCTIONS
 % Create directory for saving results
 function create_directory()
+    if exist("variables", 'dir')
+        delete variables/*.mat;
+    else
+        mkdir(strcat("variables"));
+    end
     if ~exist(strcat("results"), "dir")
         mkdir(strcat("results"));
     end
@@ -575,4 +583,39 @@ function plot_tke_budget(T, P, D, y_norm_mth, mth, timestep)
 
     saveas(f1, "results/tke_budget/tstep_"+string(timestep),"png");
     close(f1);
+end
+
+% Compute and plot growth rate
+function plot_growth_rate(time, mth)
+
+    % Growth rate
+    dmth = (mth(2:end) - mth(1:end-1)) ./ (time(2:end) - time(1:end-1));
+
+    % Normalization
+    dmth = dmth / 2; % (dmth/dt) * (1/Delta U)
+
+    % Integrated growth rate
+    f_growth_rate = figure("DefaultAxesFontSize", 18); 
+
+    plot(time(1:end-1),dmth,'-ko','LineWidth',2); hold on; grid on;
+    plot([0 max(time)],[0.012 0.012], 'r--','LineWidth',1);
+    plot([0 max(time)],[0.0135 0.0135], 'b--','LineWidth',1);
+    plot([0 max(time)],[0.014 0.014], 'g--','LineWidth',1);
+    plot([0 max(time)],[0.015 0.015], 'c--','LineWidth',1);
+    plot([0 max(time)],[0.017 0.017], 'm--.','LineWidth',1);
+    axis([0 max(time) 0 0.04]);
+    xlabel('$t U_1 / \delta_{\omega h}^0$','interpreter','latex');
+    ylabel('$\dot{\delta}_{\theta} / \Delta U$','interpreter','latex');
+    legend("$\mbox{Present}$",...
+            "$0.012^{[1]}$",...     % [1] Baltzer & Livescu (2020, JFM) 
+            "$0.0135^{[2]}$",...    % [2] Vaghefi (2014, Thesis) 
+            "$0.014^{[3,4]}$",...   % [3] Rogers & Moser (1993, PoF) [4] Blakeley et al. (2023, JFM)
+            "$0.015^{[5]}$",...     % [5] Sharan, Matheou & Dimotakis (2019, JFM)
+            "$0.017^{[6]}$",...     % [6] Almagro et al. (2017, JFM)
+            'Interpreter','latex','location','northeast');
+    set(gca,'TickLabelInterpreter','latex');
+
+    saveas(f_growth_rate, "results/growth_rate.png"); 
+    close(f_growth_rate); 
+
 end
