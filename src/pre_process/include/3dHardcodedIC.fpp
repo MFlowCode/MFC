@@ -10,7 +10,7 @@
     !> @param xRows          Number of grid points in the x-direction
     !> @param yRows          Number of grid points in the y-direction
     !> @param init_dir       Directory containing the `prim.*.dat` files
- 
+
     ! Place any declaration of intermediate variables here
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
 
@@ -19,7 +19,7 @@
     integer, parameter :: nFiles = 15   ! Number of files (variables)
     integer, parameter :: xRows = 401   ! Number of points in x
     integer, parameter :: yRows = 403   ! Number of points in y
-    integer, parameter :: nRows = xRows*yRows  
+    integer, parameter :: nRows = xRows*yRows
     integer :: f, iter, ios, unit, idx, idy, jump, index_x, index_y
     real(wp) :: x_len, x_step, y_len, y_step
     integer :: global_offset_x, global_offset_y  ! MPI subdomain offsets
@@ -118,8 +118,8 @@
                     iter = iter + 1
                     read (unit, *, iostat=ios) x_coords(iter), y_coords(iter), stored_values(iix, iiy, 1)
                     if (ios /= 0) then
-                        write(errmsg, '(A,A,A,I0,A)') 'Error reading "', trim(fileNames(1)), &
-                        '" at indices (', iix, ',', iiy, ')'
+                        write (errmsg, '(A,A,A,I0,A)') 'Error reading "', trim(fileNames(1)), &
+                            '" at indices (', iix, ',', iiy, ')'
                         call s_mpi_abort(trim(errmsg))
                     end if
                 end do
@@ -136,8 +136,8 @@
                         ! Read and discard x,y, then read the value
                         read (unit, *, iostat=ios) dummy_x, dummy_y, stored_values(iix, iiy, f)
                         if (ios /= 0) then
-                            write(errmsg, '(A,A,I0,A,I0,A)') 'Error reading "', trim(fileNames(f)), &
-                            '" at indices (', iix, ',', iiy, ')'
+                            write (errmsg, '(A,A,I0,A,I0,A)') 'Error reading "', trim(fileNames(f)), &
+                                '" at indices (', iix, ',', iiy, ')'
                             call s_mpi_abort(trim(errmsg))
                         end if
                     end do
@@ -169,7 +169,7 @@
         data_j = j + 1 + global_offset_y - index_y  ! y-direction index in data grid
 
         do f = 1, nFiles
-            if (f .ge. momxe) then
+            if (f >= momxe) then
                 jump = 1
             else
                 jump = 0

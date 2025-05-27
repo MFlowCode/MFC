@@ -8,8 +8,8 @@
 !> initial conditions for your simulation based on those 1D results.
 !>
 !> It provides:
-!>   - Import of files named  
-!>     `prim.<variable>.00.<timestep>.dat` 
+!>   - Import of files named
+!>     `prim.<variable>.00.<timestep>.dat`
 !>     (produced when parallel I/O is disabled in `case.py`).
 !>   - Configurable parameters:
 !>       - @c nFiles: total number of primitive‐variable files.
@@ -25,7 +25,7 @@
     integer :: f, iter, ios, unit, idx
     real(wp) :: x_len, x_step
     integer :: global_offset            ! MPI subdomain offset
-    real(wp) :: delta         
+    real(wp) :: delta
     character(len=100), dimension(nFiles) :: fileNames ! Arrays to store all data from files
     character(len=200) :: errmsg
     real(wp), dimension(nRows, nFiles) :: stored_values  ! Imported Data
@@ -67,8 +67,8 @@
                 do iter = 1, nRows
                     read (unit, *, iostat=ios) x_coords(iter), stored_values(iter, f)
                     if (ios /= 0) then
-                        write(errmsg, '(A,A,A,I0,A)') ' Error reading "', trim(fileNames(f)), &
-                        '" at index (', iter, ')'
+                        write (errmsg, '(A,A,A,I0,A)') ' Error reading "', trim(fileNames(f)), &
+                            '" at index (', iter, ')'
                         call s_mpi_abort(trim(errmsg)) ! Exit loop on error
                     end if
                 end do

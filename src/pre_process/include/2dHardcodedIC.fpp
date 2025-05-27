@@ -169,7 +169,7 @@
             q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
         end if
 
-      case (250) ! MHD Orszag-Tang vortex
+    case (250) ! MHD Orszag-Tang vortex
         ! gamma = 5/3
         !   rho = 25/(36*pi)
         !     p = 5/(12*pi)
@@ -197,48 +197,47 @@
             q_prim_vf(E_idx)%sf(i, j, 0) = 3.e-5_wp
         end if
 
-      case (270)
-          if (.not. files_loaded) then
-              ! Print status message
-              index_1 = i
-              do f = 1, nFiles
-                  ! Open the file for reading
-                  open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
-                  if (ios /= 0) then
-                      cycle  ! Skip this file on error
-                  end if
-                  ! Read all rows at once into memory
-                  do iter = 1, nRows
-                      read (unit, *, iostat=ios) x_coords(iter), stored_values(iter, f)
-                      if (ios /= 0) then
-                          write(errmsg, '(A,A,A,I0,A)') 'Error reading "', trim(fileNames(f)), &
-                          '" at index (', iter,')'
-                          call s_mpi_abort(trim(errmsg)) ! Exit loop on error
-                      end if
-                  end do
-                  close (unit)
-              end do
-              ! Calculate domain information for mapping
-              domain_start = x_coords(1)
-              domain_end = x_coords(nRows)
-              x_step = x_cc(1) - x_cc(0)
-              delta_x = x_cc(index_1) - domain_start + x_step/2
-              global_offset = nint(abs(delta_x)/x_step)
-              files_loaded = .true.
-          end if
-          ! Calculate the index in the file data array corresponding to x_cc(i)
-          idx = i + 1 + global_offset - index_1
-          do f = 1, nFiles
-              if (f .ge. momxe) then
-                  jump = 1
-              else
-                  jump = 0
-              end if
-              q_prim_vf(f + jump)%sf(i, j, 0) = stored_values(idx, f)
-          end do
-          ! Set element the velocity paraller to y explicitly to zero
-          q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
-
+    case (270)
+        if (.not. files_loaded) then
+            ! Print status message
+            index_1 = i
+            do f = 1, nFiles
+                ! Open the file for reading
+                open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
+                if (ios /= 0) then
+                    cycle  ! Skip this file on error
+                end if
+                ! Read all rows at once into memory
+                do iter = 1, nRows
+                    read (unit, *, iostat=ios) x_coords(iter), stored_values(iter, f)
+                    if (ios /= 0) then
+                        write (errmsg, '(A,A,A,I0,A)') 'Error reading "', trim(fileNames(f)), &
+                            '" at index (', iter, ')'
+                        call s_mpi_abort(trim(errmsg)) ! Exit loop on error
+                    end if
+                end do
+                close (unit)
+            end do
+            ! Calculate domain information for mapping
+            domain_start = x_coords(1)
+            domain_end = x_coords(nRows)
+            x_step = x_cc(1) - x_cc(0)
+            delta_x = x_cc(index_1) - domain_start + x_step/2
+            global_offset = nint(abs(delta_x)/x_step)
+            files_loaded = .true.
+        end if
+        ! Calculate the index in the file data array corresponding to x_cc(i)
+        idx = i + 1 + global_offset - index_1
+        do f = 1, nFiles
+            if (f >= momxe) then
+                jump = 1
+            else
+                jump = 0
+            end if
+            q_prim_vf(f + jump)%sf(i, j, 0) = stored_values(idx, f)
+        end do
+        ! Set element the velocity paraller to y explicitly to zero
+        q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
 
     case default
         if (proc_rank == 0) then
