@@ -172,13 +172,13 @@ contains
             relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
             R0_type, file_per_process, sigma, &
-            pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
+            pi_fac, adv_n, adap_dt, adap_dt_tol, &
+            bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target, &
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
-            rkck_adap_dt, rkck_tolerance, &
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar
 
@@ -212,7 +212,7 @@ contains
             n_glb = n
             p_glb = p
 
-            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. &
                 num_bc_patches > 0) then
@@ -1253,13 +1253,13 @@ contains
         integer :: i
 
         if (cfl_dt) then
-            if (cfl_const_dt .and. t_step == 0 .and. .not. rkck_adap_dt) call s_compute_dt()
+            if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
 
-            if (cfl_adap_dt .and. .not. rkck_adap_dt) call s_compute_dt()
+            if (cfl_adap_dt) call s_compute_dt()
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0 .and. .not. rkck_adap_dt) then
+            if (dt < 1e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
                 print*, "Delta t = ", dt
                 call s_mpi_abort("Delta t has become too small")
             end if
@@ -1279,7 +1279,7 @@ contains
 
         if (cfl_dt) then
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" ["I3"%] Time "ES16.6" dt = "ES16.6" @ Time Step = "I8"")', &
+                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8, "")', &
                     int(ceiling(100._wp*(mytime/t_stop))), &
                     mytime, &
                     dt, &
@@ -1287,7 +1287,7 @@ contains
             end if
         else
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
+                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I0, "")', &
                    int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                     t_step - t_step_start + 1, &
                     t_step_stop - t_step_start + 1, &
@@ -1319,9 +1319,6 @@ contains
             call s_3rd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
-        elseif (time_stepper == 4) then
-            ! (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepper (Cash J. and Karp A., 1990)
-            call s_4th_5th_order_rkck(t_step, time_avg)
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
@@ -1431,9 +1428,16 @@ contains
         end if
 
         if (bubbles_lagrange) then
+            !$acc update host(intfc_rad)
+            do i = 1, nBubs
+                if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
+                    call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
+                end if
+            end do
+
             !$acc update host(q_beta%vf(1)%sf)
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, q_beta%vf(1))
-            !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_rad, intfc_vel)
+            !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_vel)
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
@@ -1639,7 +1643,7 @@ contains
         if (chemistry) then
             !$acc update device(q_T_sf%sf)
         end if
-        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, n_idx, pi_fac, low_Mach)
+        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, n_idx, pi_fac, low_Mach)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
         !$acc update device(acoustic_source, num_source)

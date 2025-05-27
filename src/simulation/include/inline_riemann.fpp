@@ -37,8 +37,8 @@
         call get_species_enthalpies_rt(T_L, h_iL)
         call get_species_enthalpies_rt(T_R, h_iR)
 
-        h_iL = h_iL*gas_constant/mol_weights*T_L
-        h_iR = h_iR*gas_constant/mol_weights*T_R
+        h_iL = h_iL*gas_constant/molecular_weights*T_L
+        h_iR = h_iR*gas_constant/molecular_weights*T_R
         call get_species_specific_heats_r(T_L, Cp_iL)
         call get_species_specific_heats_r(T_R, Cp_iR)
 
@@ -48,17 +48,17 @@
 
         if (abs(T_L - T_R) < eps) then
             ! Case when T_L and T_R are very close
-            Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(i) + 0.5_wp*Cp_iR(:))*gas_constant/mol_weights(:))
-            Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(i) + 0.5_wp*Cp_iR(:))*gas_constant/mol_weights(:) - gas_constant/mol_weights(:)))
+            Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:))
+            Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:) - gas_constant/molecular_weights(:)))
         else
             ! Normal calculation when T_L and T_R are sufficiently different
             Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
-            Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - gas_constant/mol_weights(:)))
+            Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - gas_constant/molecular_weights(:)))
         end if
 
         gamma_avg = Cp_avg/Cv_avg
 
-        Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*gas_constant/mol_weights(:)*T_avg
+        Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*gas_constant/molecular_weights(:)*T_avg
         c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
     end if
 
@@ -78,19 +78,30 @@
 
 #:def compute_low_Mach_correction()
 
-    zcoef = min(1._wp, max(vel_L_rms**5e-1_wp/c_L, vel_R_rms**5e-1_wp/c_R))
-    pcorr = 0._wp
+    if (riemann_solver == 1) then
 
-    if (low_Mach == 1) then
-        pcorr = rho_L*rho_R* &
-                (s_L - vel_L(dir_idx(1)))*(s_R - vel_R(dir_idx(1)))*(vel_R(dir_idx(1)) - vel_L(dir_idx(1)))/ &
-                (rho_R*(s_R - vel_R(dir_idx(1))) - rho_L*(s_L - vel_L(dir_idx(1))))* &
-                (zcoef - 1._wp)
-    else if (low_Mach == 2) then
-        vel_L_tmp = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + zcoef*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
-        vel_R_tmp = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + zcoef*(vel_R(dir_idx(1)) - vel_L(dir_idx(1))))
-        vel_L(dir_idx(1)) = vel_L_tmp
-        vel_R(dir_idx(1)) = vel_R_tmp
+        zcoef = min(1._wp, max(vel_L_rms**5e-1_wp/c_L, vel_R_rms**5e-1_wp/c_R))
+        pcorr = 0._wp
+
+        if (low_Mach == 1) then
+            pcorr = -(s_P - s_M)*(rho_L + rho_R)/8._wp*(zcoef - 1._wp)
+        end if
+
+    else if (riemann_solver == 2) then
+        zcoef = min(1._wp, max(vel_L_rms**5e-1_wp/c_L, vel_R_rms**5e-1_wp/c_R))
+        pcorr = 0._wp
+
+        if (low_Mach == 1) then
+            pcorr = rho_L*rho_R* &
+                    (s_L - vel_L(dir_idx(1)))*(s_R - vel_R(dir_idx(1)))*(vel_R(dir_idx(1)) - vel_L(dir_idx(1)))/ &
+                    (rho_R*(s_R - vel_R(dir_idx(1))) - rho_L*(s_L - vel_L(dir_idx(1))))* &
+                    (zcoef - 1._wp)
+        else if (low_Mach == 2) then
+            vel_L_tmp = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + zcoef*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
+            vel_R_tmp = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + zcoef*(vel_R(dir_idx(1)) - vel_L(dir_idx(1))))
+            vel_L(dir_idx(1)) = vel_L_tmp
+            vel_R(dir_idx(1)) = vel_R_tmp
+        end if
     end if
 
 #:enddef compute_low_Mach_correction

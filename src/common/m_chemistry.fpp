@@ -9,7 +9,7 @@
 module m_chemistry
 
     use m_thermochem, only: &
-        num_species, mol_weights, get_temperature, get_net_production_rates
+        num_species, molecular_weights, get_temperature, get_net_production_rates
 
     use m_global_parameters
 
@@ -28,7 +28,7 @@ contains
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
         integer :: x, y, z, eqn
-        real(wp) :: energy, mean_molecular_weight
+        real(wp) :: energy
         real(wp), dimension(num_species) :: Ys
 
         do z = bounds(3)%beg, bounds(3)%end
@@ -91,7 +91,7 @@ contains
                     !$acc loop seq
                     do eqn = chemxb, chemxe
 
-                        omega_m = mol_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+                        omega_m = molecular_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
 
                         rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
 

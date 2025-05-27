@@ -83,7 +83,7 @@ contains
             polydisperse, poly_sigma, file_per_process, relax, &
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
-            cfl_target, surface_tension, bubbles_lagrange, rkck_adap_dt, &
+            cfl_target, surface_tension, bubbles_lagrange, &
             sim_data, hyperelasticity, Bx0, relativity, cont_damage
 
         ! Inquiring the status of the post_process.inp file
@@ -113,7 +113,7 @@ contains
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
 
-            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
         else
             call s_mpi_abort('File post_process.inp is missing. Exiting.')
@@ -156,11 +156,11 @@ contains
         integer, intent(inout) :: t_step
         if (proc_rank == 0) then
             if (cfl_dt) then
-                print '(" ["I3"%]  Saving "I8" of "I0"")', &
+                print '(" [", I3, "%]  Saving ", I8, " of ", I0, "")', &
                     int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), &
                     t_step, n_save
             else
-                print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
+                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " @ t_step = ", I0, "")', &
                     int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                     (t_step - t_step_start)/t_step_save + 1, &
                     (t_step_stop - t_step_start)/t_step_save + 1, &
@@ -544,31 +544,17 @@ contains
         end if
 
         ! Adding the vorticity to the formatted database file
-        if (p > 0) then
-            do i = 1, num_vels
-                if (omega_wrt(i)) then
+        do i = 1, 3
+            if (omega_wrt(i)) then
 
-                    call s_derive_vorticity_component(i, q_prim_vf, q_sf)
+                call s_derive_vorticity_component(i, q_prim_vf, q_sf)
 
-                    write (varname, '(A,I0)') 'omega', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
+                write (varname, '(A,I0)') 'omega', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
 
-                    varname(:) = ' '
-                end if
-            end do
-        elseif (n > 0) then
-            do i = 1, num_vels
-                if (omega_wrt(i)) then
-
-                    call s_derive_vorticity_component(i, q_prim_vf, q_sf)
-
-                    write (varname, '(A,I0)') 'omega', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                    varname(:) = ' '
-                end if
-            end do
-        end if
+                varname(:) = ' '
+            end if
+        end do
 
         if (ib) then
             q_sf = real(ib_markers%sf(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end))
@@ -722,7 +708,7 @@ contains
             call s_read_input_file()
             call s_check_input_file()
 
-            print '(" Post-processing a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
+            print '(" Post-processing a ", I0, "x", I0, "x", I0, " case on ", I0, " rank(s)")', m, n, p, num_procs
         end if
 
         ! Broadcasting the user inputs to all of the processors and performing the
