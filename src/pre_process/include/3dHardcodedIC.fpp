@@ -3,8 +3,8 @@
     !>
     !> @details
     !> Reads a 2D primitive-variable dataset and replicates it across the third
-    !> dimension (z). Parameters control file counts (number of primitive variables),
-    !> grid resolution, and domain offsets in x, and y.
+    !> dimension (z), these files are produced when parallel I/O is disabled in `case.py`.
+    !> Parameters control file counts (number of primitive variables) grid resolution, and domain offsets in x, and y.
     !>
     !> @param nFiles         Number of primitive-variable files to read
     !> @param xRows          Number of grid points in the x-direction

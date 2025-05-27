@@ -4,8 +4,8 @@
 !>
 !> @details
 !> Reads a sequence of 1D primitive-variable files and maps them onto
-!> a 2D domain along the x-direction. Parameters control file counts,
-!> grid resolution, and domain offsets.
+!> a 2D domain along the x-direction. These files are produced when parallel I/O is disabled in `case.py`.
+!> Parameters control file counts, grid resolution, and domain offsets.
 !>
 !> @param nFiles        Number of primitive-variable files to read
 !> @param nRows         Number of grid points per row
@@ -28,7 +28,7 @@
     real(wp), dimension(nRows) :: x_coords
     logical :: files_loaded = .false.
     real(wp) :: domain_start, domain_end
-    character(len=*), parameter :: init_dir = "/MFC/examples/1D_reactive_shocktube/D/"
+    character(len=*), parameter :: init_dir = "/home/pain/MFC-Adam/examples/1D_reactive_shocktube/D/"
     character(len=20) :: file_num_str     ! For storing the file number as a string
     character(len=20) :: zeros_part       ! For the trailing zeros part
     character(len=6), parameter :: zeros_default = "018681"  ! Default zeros (can be changed)

@@ -19,7 +19,7 @@ sol_R.DPX = 0.18075, 35594, "H2:2,O2:1,AR:7"
 u_l = 0
 u_r = -487.34
 
-L = 0.12
+L = 0.24
 Nx = 800
 Ny = 200
 dx = L / Nx
@@ -32,10 +32,8 @@ SAVE_COUNT = 100
 NS = NT // SAVE_COUNT
 
 case = {
-    # Logistics ================================================================
     "run_time_info": "T",
-    # ==========================================================================
-    # Computational Domain Parameters ==========================================
+    # Computational Domain Parameters
     "x_domain%beg": 0,
     "x_domain%end": L,
     "y_domain%beg": 0,
@@ -49,7 +47,7 @@ case = {
     "t_step_save": 1,
     "t_step_print": 1,
     "parallel_io": "F",  # if args.mfc.get("mpi", True) else 'F',
-    # Simulation Algorithm Parameters ==========================================
+    # Simulation Algorithm Parameters
     "model_eqns": 2,
     "num_fluids": 1,
     "num_patches": 2,
@@ -68,18 +66,16 @@ case = {
     "bc_x%end": -3,
     "bc_y%beg": -1,
     "bc_y%end": -1,
-    # Chemistry ================================================================
+    # Chemistry
     "chemistry": "T" if not args.chemistry else "T",
     "chem_params%diffusion": "F",
     "chem_params%reactions": "F",
     "cantera_file": ctfile,
-    # ==========================================================================
-    # Formatted Database Files Structure Parameters ============================
+    # Formatted Database Files Structure Parameters
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "T",
     "chem_wrt_T": "T",
-    # ==========================================================================
     "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%x_centroid": L / 2,
     "patch_icpp(1)%y_centroid": L / 8,
@@ -90,9 +86,6 @@ case = {
     "patch_icpp(1)%pres": sol_R.P,
     "patch_icpp(1)%alpha(1)": 1,
     "patch_icpp(1)%alpha_rho(1)": sol_R.density,
-    # ==========================================================================
-    # ==========================================================================
-    # ==========================================================================
     "patch_icpp(2)%geometry": 7,
     "patch_icpp(2)%x_centroid": L / 4,
     "patch_icpp(2)%y_centroid": L / 8,
@@ -101,21 +94,19 @@ case = {
     "patch_icpp(2)%hcid": 270,
     "patch_icpp(2)%vel(1)": 0,
     "patch_icpp(2)%vel(2)": 0,
-    "patch_icpp(2)%pres": sol_R.P,
+    "patch_icpp(2)%pres": sol_L.P,
     "patch_icpp(2)%alpha(1)": 1,
-    "patch_icpp(2)%alpha_rho(1)": sol_R.density,
-    #  'patch_icpp(1)%alter_patch(1)' : 'F',
+    "patch_icpp(2)%alpha_rho(1)": sol_L.density,
     "patch_icpp(2)%alter_patch(1)": "T",
-    # ==========================================================================
     # Fluids Physical Parameters ===============================================
     "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0,
-    # ==========================================================================
 }
 
 if args.chemistry:
     for i in range(len(sol_L.Y)):
         case[f"chem_wrt_Y({1})"] = "T"
+        case[f"patch_icpp(1)%Y({i+1})"] = sol_R.Y[i]
 
 if __name__ == "__main__":
     print(json.dumps(case))
