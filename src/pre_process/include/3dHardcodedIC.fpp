@@ -1,25 +1,37 @@
 #:def Hardcoded3DVariables()
+    !> @brief Initialize a 3D grid by projecting a 2D profile along the z-direction.
+    !>
+    !> @details
+    !> Reads a 2D primitive-variable dataset and replicates it across the third
+    !> dimension (z). Parameters control file counts (number of primitive variables),
+    !> grid resolution, and domain offsets in x, and y.
+    !>
+    !> @param nFiles         Number of primitive-variable files to read
+    !> @param xRows          Number of grid points in the x-direction
+    !> @param yRows          Number of grid points in the y-direction
+    !> @param init_dir       Directory containing the `prim.*.dat` files
+ 
     ! Place any declaration of intermediate variables here
-
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
 
     real(wp) :: eps
 
-    integer, parameter :: nFiles = 15   ! Can be changed to any number
-    integer, parameter :: xRows = 401
-    integer, parameter :: yRows = 403
-    integer, parameter :: nRows = xRows*yRows
+    integer, parameter :: nFiles = 15   ! Number of files (variables)
+    integer, parameter :: xRows = 401   ! Number of points in x
+    integer, parameter :: yRows = 403   ! Number of points in y
+    integer, parameter :: nRows = xRows*yRows  
     integer :: f, iter, ios, unit, idx, idy, jump, index_x, index_y
     real(wp) :: x_len, x_step, y_len, y_step
-    integer :: global_offset_x, global_offset_y
+    integer :: global_offset_x, global_offset_y  ! MPI subdomain offsets
     real(wp) :: delta_x, delta_y
     real(wp) :: dummy_x, dummy_y
     real(wp) :: current_x
-    real(wp) :: sim_x_step, sim_y_step
+    real(wp) :: sim_x_step, sim_y_step           ! Simulation grid steps
     integer :: nx_data, ny_data, data_i, data_j, iix, iiy
     character(len=100), dimension(nFiles) :: fileNames
+    character(len=200) :: errmsg
     ! Arrays to store all data from files - read once, use many times
-    real(wp), dimension(xRows, yRows, nFiles) :: stored_values
+    real(wp), dimension(xRows, yRows, nFiles) :: stored_values   ! Imported 2D Data
     real(wp), dimension(nRows) :: x_coords, y_coords
     logical :: files_loaded = .false.
     real(wp) :: domain_xstart, domain_xend, domain_ystart, domain_yend
@@ -90,27 +102,25 @@
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
 
-    case (302)
+    case (370)
         if (.not. files_loaded) then
             ! Print status message
-            print *, "Loading all data files..."
             index_x = i
             index_y = j
             open (newunit=unit, file=trim(fileNames(1)), status='old', action='read', iostat=ios)
             if (ios /= 0) then
-                print *, "Error opening coordinate file: ", trim(fileNames(1))
                 return
             end if
 
-            print *, "Reading coordinates and values from first file..."
             iter = 0
             do iix = 1, xRows
                 do iiy = 1, yRows
                     iter = iter + 1
                     read (unit, *, iostat=ios) x_coords(iter), y_coords(iter), stored_values(iix, iiy, 1)
                     if (ios /= 0) then
-                        print *, "Error reading coordinates at row ", iter
-                        exit
+                        write(errmsg, '(A,A,A,I0,A)') 'Error reading "', trim(fileNames(1)), &
+                        '" at indices (', iix, ',', iiy, ')'
+                        call s_mpi_abort(trim(errmsg))
                     end if
                 end do
             end do
@@ -119,7 +129,6 @@
             do f = 2, nFiles
                 open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
                 if (ios /= 0) then
-                    print *, "Error opening file: ", trim(fileNames(f))
                     cycle
                 end if
                 do iix = 1, xRows
@@ -127,8 +136,9 @@
                         ! Read and discard x,y, then read the value
                         read (unit, *, iostat=ios) dummy_x, dummy_y, stored_values(iix, iiy, f)
                         if (ios /= 0) then
-                            print *, "Error reading file ", trim(fileNames(f)), " at ix=", iix, " iy=", iiy
-                            exit
+                            write(errmsg, '(A,A,I0,A,I0,A)') 'Error reading "', trim(fileNames(f)), &
+                            '" at indices (', iix, ',', iiy, ')'
+                            call s_mpi_abort(trim(errmsg))
                         end if
                     end do
                 end do
@@ -152,10 +162,6 @@
             global_offset_x = nint(abs(delta_x)/sim_x_step)
             global_offset_y = nint(abs(delta_y)/sim_y_step)
 
-            print *, "Domain X: ", domain_xstart, " to ", domain_xend
-            print *, "Domain Y: ", domain_ystart, " to ", domain_yend
-            print *, "All ", nFiles, " files loaded successfully!"
-
             files_loaded = .true.
         end if
 
@@ -163,7 +169,7 @@
         data_j = j + 1 + global_offset_y - index_y  ! y-direction index in data grid
 
         do f = 1, nFiles
-            if (f > 3) then
+            if (f .ge. momxe) then
                 jump = 1
             else
                 jump = 0
@@ -171,7 +177,7 @@
             q_prim_vf(f + jump)%sf(i, j, k) = stored_values(data_i, data_j, f)
         end do
         ! Set z velocity to zero
-        q_prim_vf(4)%sf(i, j, k) = 0.0_wp
+        q_prim_vf(momxe)%sf(i, j, k) = 0.0_wp
 
         ! Put your variable assignments here
     case default

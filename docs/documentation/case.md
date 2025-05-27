@@ -236,6 +236,15 @@ and use `patch_icpp(i)%%geometry = 7` and `patch_icpp(i)%%hcid = 200` in the inp
 Additional variables can be declared in `Hardcoded1[2,3]DVariables` and used in `hardcoded1[2,3]D`.
 As a convention, any hard coded patches that are part of the MFC master branch should be identified as 1[2,3]xx where the first digit indicates the number of dimensions.
 
+Also Several custom hard-coded patches are already defined to support common workflows. These include:
+
+case(100) in 1dHardcodedIC.fpp: used to initialize the domain with data from a previous 1D simulation or external source (e.g. Cantera), allowing reuse of existing 1D profiles.
+
+case(270) in 2dHardcodedIC.fpp: used to create 2D fields by extruding a 1D profile along the second spatial dimensions, This allows the solution of a 1D case at a
+specific timestep to be extended uniformly in the transverse direction and used as a full 2D initial condition.
+
+case(370) in 3dHardcodedIC.fpp: used to build 3D domains by extruding 2D data along the third dimension.
+
 #### Parameter Descriptions
 
 - `num_patches` defines the total number of patches defined in the domain.

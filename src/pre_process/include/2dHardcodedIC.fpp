@@ -1,26 +1,37 @@
 #:def Hardcoded2DVariables()
-
+!> @file  2DHardcodedIC.fpp
+!> @brief Initialize a 2D grid by projecting a 1D profile.
+!>
+!> @details
+!> Reads a sequence of 1D primitive-variable files and maps them onto
+!> a 2D domain along the x-direction. Parameters control file counts,
+!> grid resolution, and domain offsets.
+!>
+!> @param nFiles        Number of primitive-variable files to read
+!> @param nRows         Number of grid points per row
+!> @param init_dir      Directory containing the `prim.*.dat` files
     real(wp) :: eps
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: factor
 
-    integer, parameter :: nFiles = 14   ! Can be changed to any number
-    integer, parameter :: nRows = 401!
+    integer, parameter :: nFiles = 14   ! Number of files (variables)
+    integer, parameter :: nRows = 401   ! Number of grid points
     integer :: f, iter, ios, unit, idx, jump, index_1
     real(wp) :: x_len, x_step
-    integer :: global_offset
+    integer :: global_offset  ! MPI subdomain offset
     real(wp) :: delta_x
     character(len=100), dimension(nFiles) :: fileNames
+    character(len=200) :: errmsg
     ! Arrays to store all data from files
-    real(wp), dimension(nRows, nFiles) :: stored_values
+    real(wp), dimension(nRows, nFiles) :: stored_values  ! Imported Data
     real(wp), dimension(nRows) :: x_coords
     logical :: files_loaded = .false.
     real(wp) :: domain_start, domain_end
-    character(len=*), parameter :: init_dir = "/home/YourDirectory"
+    character(len=*), parameter :: init_dir = "/MFC/examples/1D_reactive_shocktube/D/"
     character(len=20) :: file_num_str     ! For storing the file number as a string
     character(len=20) :: zeros_part       ! For the trailing zeros part
-    character(len=6), parameter :: zeros_default = "000000"  ! Default zeros (can be changed)
+    character(len=6), parameter :: zeros_default = "018681"  ! Default zeros (can be changed)
     ! Generate file names in a loop
     do f = 1, nFiles
         ! Convert file number to string with proper formatting
@@ -158,51 +169,7 @@
             q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
         end if
 
-    case (207)
-        if (.not. files_loaded) then
-            ! Print status message
-            index_1 = i
-            do f = 1, nFiles
-                ! Open the file for reading
-                open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
-                if (ios /= 0) then
-                    print *, "Error opening file: ", trim(fileNames(f))
-                    cycle  ! Skip this file on error
-                end if
-                ! Read all rows at once into memory
-                do iter = 1, nRows
-                    read (unit, *, iostat=ios) x_coords(iter), stored_values(iter, f)
-                    if (ios /= 0) then
-                        print *, "Error reading file ", trim(fileNames(f)), " at row ", iter
-                        exit  ! Exit loop on error
-                    end if
-                end do
-                close (unit)
-            end do
-            ! Calculate domain information for mapping
-            domain_start = x_coords(1)
-            domain_end = x_coords(nRows)
-            x_step = x_cc(1) - x_cc(0)
-            delta_x = x_cc(index_1) - domain_start + x_step/2
-            global_offset = nint(abs(delta_x)/x_step)
-            print *, "All data files loaded. Domain range:", domain_start, "to", domain_end
-            files_loaded = .true.
-        end if
-        ! Calculate the index in the file data array corresponding to x_cc(i)
-        idx = i + 1 + global_offset - index_1
-        ! Assign values from stored data for each file (with your small adjustment for f > 2)
-        do f = 1, nFiles
-            if (f > 2) then
-                jump = 1
-            else
-                jump = 0
-            end if
-            q_prim_vf(f + jump)%sf(i, j, 0) = stored_values(idx, f)
-        end do
-        ! Set element 3 (perpedicular velocity v) explicitly to zero
-        q_prim_vf(3)%sf(i, j, 0) = 0.0_wp
-
-    case (250) ! MHD Orszag-Tang vortex
+      case (250) ! MHD Orszag-Tang vortex
         ! gamma = 5/3
         !   rho = 25/(36*pi)
         !     p = 5/(12*pi)
@@ -229,6 +196,49 @@
             q_prim_vf(contxb)%sf(i, j, 0) = 1.e-4_wp
             q_prim_vf(E_idx)%sf(i, j, 0) = 3.e-5_wp
         end if
+
+      case (270)
+          if (.not. files_loaded) then
+              ! Print status message
+              index_1 = i
+              do f = 1, nFiles
+                  ! Open the file for reading
+                  open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
+                  if (ios /= 0) then
+                      cycle  ! Skip this file on error
+                  end if
+                  ! Read all rows at once into memory
+                  do iter = 1, nRows
+                      read (unit, *, iostat=ios) x_coords(iter), stored_values(iter, f)
+                      if (ios /= 0) then
+                          write(errmsg, '(A,A,A,I0,A)') 'Error reading "', trim(fileNames(f)), &
+                          '" at index (', iter,')'
+                          call s_mpi_abort(trim(errmsg)) ! Exit loop on error
+                      end if
+                  end do
+                  close (unit)
+              end do
+              ! Calculate domain information for mapping
+              domain_start = x_coords(1)
+              domain_end = x_coords(nRows)
+              x_step = x_cc(1) - x_cc(0)
+              delta_x = x_cc(index_1) - domain_start + x_step/2
+              global_offset = nint(abs(delta_x)/x_step)
+              files_loaded = .true.
+          end if
+          ! Calculate the index in the file data array corresponding to x_cc(i)
+          idx = i + 1 + global_offset - index_1
+          do f = 1, nFiles
+              if (f .ge. momxe) then
+                  jump = 1
+              else
+                  jump = 0
+              end if
+              q_prim_vf(f + jump)%sf(i, j, 0) = stored_values(idx, f)
+          end do
+          ! Set element the velocity paraller to y explicitly to zero
+          q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
+
 
     case default
         if (proc_rank == 0) then
