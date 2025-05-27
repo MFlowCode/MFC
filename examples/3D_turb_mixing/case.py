@@ -31,11 +31,11 @@ dz = Lz / float(Nz)
 
 # Time advancement
 cfl = 0.5
-T = 250.0
+T = 200.0
 dt = cfl * dx / (u0 / M0 + 1)
 Ntfinal = int(T / dt)
 Ntstart = 0
-Nfiles = 50
+Nfiles = 40
 t_save = int(math.ceil((Ntfinal - 0) / float(Nfiles)))
 Nt = t_save * Nfiles
 t_step_start = Ntstart
