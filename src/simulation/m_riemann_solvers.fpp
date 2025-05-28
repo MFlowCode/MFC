@@ -4144,6 +4144,7 @@ contains
                             tau_Re(2, 2) = (4._wp*dvel_avg_dy(2) - 2._wp*dvel_avg_dx(1) - &
                                             2._wp*avg_vel(2)/y_cb(k_idx))/(3._wp*Re_avg_rsy_vf(k_idx, j_idx, l_idx, 1))
 
+                            !$acc loop seq
                             do i_loop = 1, 2 ! Axial (1) and radial (2) momentum components
                                 flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) = &
                                     flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) - tau_Re(2, i_loop)
