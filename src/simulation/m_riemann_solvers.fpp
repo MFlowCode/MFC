@@ -3940,164 +3940,338 @@ contains
 
     end subroutine s_initialize_riemann_solver
 
-    !> @brief Computes cylindrical viscous source flux contributions for momentum and energy.
-        !! Calculates Cartesian components of the stress tensor using averaged velocity derivatives
-        !! and cylindrical geometric factors, then updates `flux_src_vf`.
-        !! Assumes x-dir is axial (z_cyl), y-dir is radial (r_cyl), z-dir is azimuthal (theta_cyl for derivatives).
-        !! @param[in] velL_vf Left boundary velocity ($v_x, v_y, v_z$) (num_dims scalar_field).
-        !! @param[in] dvelL_dx_vf Left boundary $\partial v_i/\partial x$ (num_dims scalar_field).
-        !! @param[in] dvelL_dy_vf Left boundary $\partial v_i/\partial y$ (num_dims scalar_field).
-        !! @param[in] dvelL_dz_vf Left boundary $\partial v_i/\partial z$ (num_dims scalar_field).
-        !! @param[in] velR_vf Right boundary velocity ($v_x, v_y, v_z$) (num_dims scalar_field).
-        !! @param[in] dvelR_dx_vf Right boundary $\partial v_i/\partial x$ (num_dims scalar_field).
-        !! @param[in] dvelR_dy_vf Right boundary $\partial v_i/\partial y$ (num_dims scalar_field).
-        !! @param[in] dvelR_dz_vf Right boundary $\partial v_i/\partial z$ (num_dims scalar_field).
-        !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
-        !! @param[in] norm_dir Interface normal direction (1=x-face, 2=y-face, 3=z-face).
-        !! @param[in] ix Global X-direction loop bounds (int_bounds_info).
-        !! @param[in] iy Global Y-direction loop bounds (int_bounds_info).
-        !! @param[in] iz Global Z-direction loop bounds (int_bounds_info).
+    !> @brief Computes viscous source fluxes for cylindrical coordinates.
+    !! This subroutine evaluates the contribution of viscous stresses (both shear and bulk)
+    !! to the source terms for momentum and energy equations in a cylindrical coordinate system.
+    !! It handles calculations based on the normal direction of the flux (axial, radial, or azimuthal).
+    !!
+    !! @param velL_vf Left WENO-reconstructed cell-boundary values of the velocity components.
+    !! @param dvelL_dx_vf Left WENO-reconstructed cell-boundary values of the x-derivative of velocity components.
+    !! @param dvelL_dy_vf Left WENO-reconstructed cell-boundary values of the y-derivative of velocity components.
+    !! @param dvelL_dz_vf Left WENO-reconstructed cell-boundary values of the z-derivative of velocity components.
+    !! @param velR_vf Right WENO-reconstructed cell-boundary values of the velocity components.
+    !! @param dvelR_dx_vf Right WENO-reconstructed cell-boundary values of the x-derivative of velocity components.
+    !! @param dvelR_dy_vf Right WENO-reconstructed cell-boundary values of the y-derivative of velocity components.
+    !! @param dvelR_dz_vf Right WENO-reconstructed cell-boundary values of the z-derivative of velocity components.
+    !! @param flux_src_vf Array to which the computed viscous source fluxes are added.
+    !! @param norm_dir Integer indicating the normal direction for flux calculation (1 for axial, 2 for radial, 3 for azimuthal).
+    !! @param ix Index bounds in the first coordinate direction for loops.
+    !! @param iy Index bounds in the second coordinate direction for loops.
+    !! @param iz Index bounds in the third coordinate direction for loops.
     subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, &
-                                                         dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, &
+                                                         dvelL_dx_vf, &
+                                                         dvelL_dy_vf, &
+                                                         dvelL_dz_vf, &
                                                          velR_vf, &
-                                                         dvelR_dx_vf, dvelR_dy_vf, dvelR_dz_vf, &
-                                                         flux_src_vf, norm_dir, ix, iy, iz)
+                                                         dvelR_dx_vf, &
+                                                         dvelR_dy_vf, &
+                                                         dvelR_dz_vf, &
+                                                         flux_src_vf, &
+                                                         norm_dir, &
+                                                         ix, iy, iz)
+
+        implicit none
 
         type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dy_vf, dvelR_dy_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
+
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
+
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
-        ! Local variables
-        real(wp), dimension(num_dims) :: avg_v_int       !!< Averaged interface velocity $(v_x, v_y, v_z)$ (grid directions).
-        real(wp), dimension(num_dims) :: avg_dvdx_int    !!< Averaged interface $\partial v_i/\partial x$ (grid dir 1).
-        real(wp), dimension(num_dims) :: avg_dvdy_int    !!< Averaged interface $\partial v_i/\partial y$ (grid dir 2).
-        real(wp), dimension(num_dims) :: avg_dvdz_int    !!< Averaged interface $\partial v_i/\partial z$ (grid dir 3).
+        real(wp), dimension(num_dims) :: avg_vel
+        real(wp), dimension(num_dims) :: dvel_avg_dx
+        real(wp), dimension(num_dims) :: dvel_avg_dy
+        real(wp), dimension(num_dims) :: dvel_avg_dz
 
-        real(wp), dimension(num_dims) :: stress_vector_shear !!< Shear stress vector $(\sigma_{N1}, \sigma_{N2}, \sigma_{N3})$ on N-face (grid directions).
-        real(wp) :: stress_normal_bulk  !!< Normal bulk stress component $\sigma_{NN}$ on N-face.
+        real(wp), dimension(num_dims, num_dims) :: tau_Re ! Viscous stress tensor components
 
-        real(wp) :: Re_s, Re_b        !!< Effective interface shear and bulk Reynolds numbers.
-        real(wp), dimension(num_dims) :: vel_src_int !!< Interface velocity $(v_1,v_2,v_3)$ (grid directions) for viscous work.
-        real(wp) :: r_eff             !!< Effective radius at interface for cylindrical terms.
-        real(wp) :: div_v_term_const  !!< Common term $-(2/3)(\nabla \cdot \mathbf{v}) / \text{Re}_s$ for shear stress diagonal.
-        real(wp) :: divergence_cyl    !!< Full divergence $\nabla \cdot \mathbf{v}$ in cylindrical coordinates.
+        integer :: i_loop      ! Loop iterator for components
+        integer :: j_idx, k_idx, l_idx ! Spatial loop iterators
 
-        integer :: j, k, l           !!< Loop iterators for $x, y, z$ grid directions.
-        integer :: i_vel             !!< Loop iterator for velocity components.
-        integer :: idx_rp(3)         !!< Indices $(j,k,l)$ of 'right' point for averaging.
+        ! norm_dir = 1: Axial direction flux (e.g., z-flux if grid x-axis is solver's z-axis)
+        !               In this block, for derivatives: dx is axial, dy is radial, dz is azimuthal component of gradient.
+        if (norm_dir == 1) then
+            ! Part 1: Axial derivative contributions (1D, 2D, 3D cylindrical)
+            !$acc parallel loop collapse(3) gang vector default(present) &
+            !$acc private(dvel_avg_dx, tau_Re)
+            do l_idx = iz%beg, iz%end
+                do k_idx = iy%beg, iy%end
+                    do j_idx = ix%beg, ix%end
 
-        !$acc parallel loop collapse(3) gang vector default(present) &
-        !$acc private(idx_rp, avg_v_int, avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, &
-        !$acc         Re_s, Re_b, vel_src_int, r_eff, divergence_cyl, &
-        !$acc         stress_vector_shear, stress_normal_bulk, div_v_term_const)
-        do l = iz%beg, iz%end
-            do k = iy%beg, iy%end
-                do j = ix%beg, ix%end
+                        dvel_avg_dx(1) = 0.5_wp*(dvelL_dx_vf(1)%sf(j_idx, k_idx, l_idx) + &
+                                                 dvelR_dx_vf(1)%sf(j_idx + 1, k_idx, l_idx))
 
-                    ! Determine indices for the 'right' state for averaging across the interface
-                    idx_rp = [j, k, l]
-                    idx_rp(norm_dir) = idx_rp(norm_dir) + 1
-
-                    ! Average velocities and their derivatives at the interface
-                    ! For cylindrical: x-dir ~ axial (z_cyl), y-dir ~ radial (r_cyl), z-dir ~ azimuthal (theta_cyl)
-                    do i_vel = 1, num_dims
-                        avg_v_int(i_vel) = 0.5_wp*(velL_vf(i_vel)%sf(j, k, l) + velR_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
-
-                        avg_dvdx_int(i_vel) = 0.5_wp*(dvelL_dx_vf(i_vel)%sf(j, k, l) + &
-                                                      dvelR_dx_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
-                        if (num_dims > 1) then
-                            avg_dvdy_int(i_vel) = 0.5_wp*(dvelL_dy_vf(i_vel)%sf(j, k, l) + &
-                                                          dvelR_dy_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
-                        else
-                            avg_dvdy_int(i_vel) = 0.0_wp
+                        if (shear_stress) then
+                            ! tau_zz_shear (normal-normal stress component in axial direction)
+                            tau_Re(1, 1) = (4._wp/3._wp)*dvel_avg_dx(1)/Re_avg_rsx_vf(j_idx, k_idx, l_idx, 1)
+                            flux_src_vf(momxb)%sf(j_idx, k_idx, l_idx) = flux_src_vf(momxb)%sf(j_idx, k_idx, l_idx) - tau_Re(1, 1)
+                            flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) = flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) - &
+                                                                         vel_src_rsx_vf(j_idx, k_idx, l_idx, 1)*tau_Re(1, 1)
                         end if
-                        if (num_dims > 2) then
-                            avg_dvdz_int(i_vel) = 0.5_wp*(dvelL_dz_vf(i_vel)%sf(j, k, l) + &
-                                                          dvelR_dz_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
-                        else
-                            avg_dvdz_int(i_vel) = 0.0_wp
+
+                        if (bulk_stress) then
+                            ! tau_zz_bulk
+                            tau_Re(1, 1) = dvel_avg_dx(1)/Re_avg_rsx_vf(j_idx, k_idx, l_idx, 2)
+                            flux_src_vf(momxb)%sf(j_idx, k_idx, l_idx) = flux_src_vf(momxb)%sf(j_idx, k_idx, l_idx) - tau_Re(1, 1)
+                            flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) = flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) - &
+                                                                         vel_src_rsx_vf(j_idx, k_idx, l_idx, 1)*tau_Re(1, 1)
                         end if
                     end do
-
-                    ! Get Re numbers and interface velocity for viscous work
-                    select case (norm_dir)
-                    case (1) ! x-face (axial face in z_cyl direction)
-                        Re_s = Re_avg_rsx_vf(j, k, l, 1)
-                        Re_b = Re_avg_rsx_vf(j, k, l, 2)
-                        vel_src_int = vel_src_rsx_vf(j, k, l, 1:num_dims)
-                        r_eff = y_cc(k)
-                    case (2) ! y-face (radial face in r_cyl direction)
-                        Re_s = Re_avg_rsy_vf(k, j, l, 1)
-                        Re_b = Re_avg_rsy_vf(k, j, l, 2)
-                        vel_src_int = vel_src_rsy_vf(k, j, l, 1:num_dims)
-                        r_eff = y_cb(k)
-                    case (3) ! z-face (azimuthal face in theta_cyl direction)
-                        Re_s = Re_avg_rsz_vf(l, k, j, 1)
-                        Re_b = Re_avg_rsz_vf(l, k, j, 2)
-                        vel_src_int = vel_src_rsz_vf(l, k, j, 1:num_dims)
-                        r_eff = y_cc(k)
-                    end select
-
-                    ! Divergence in cylindrical coordinates (vx=vz_cyl, vy=vr_cyl, vz=vtheta_cyl)
-                    divergence_cyl = avg_dvdx_int(1) + avg_dvdy_int(2) + avg_v_int(2)/r_eff
-                    if (num_dims > 2) then
-                        divergence_cyl = divergence_cyl + avg_dvdz_int(3)/r_eff
-                    end if
-
-                    stress_vector_shear = 0.0_wp
-                    stress_normal_bulk = 0.0_wp
-
-                    if (shear_stress) then
-                        div_v_term_const = -(2.0_wp/3.0_wp)*divergence_cyl/Re_s
-
-                        select case (norm_dir)
-                        case (1) ! X-face (axial normal, z_cyl)
-                            stress_vector_shear(1) = (2.0_wp*avg_dvdx_int(1))/Re_s + div_v_term_const
-                            if (num_dims > 1) then
-                                stress_vector_shear(2) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
-                            end if
-                            if (num_dims > 2) then
-                                stress_vector_shear(3) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
-                            end if
-                        case (2) ! Y-face (radial normal, r_cyl)
-                            if (num_dims > 1) then
-                                stress_vector_shear(1) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
-                                stress_vector_shear(2) = (2.0_wp*avg_dvdy_int(2))/Re_s + div_v_term_const
-                                if (num_dims > 2) then
-                                    stress_vector_shear(3) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
-                                end if
-                            else
-                                stress_vector_shear(1) = (2.0_wp*avg_dvdx_int(1))/Re_s + div_v_term_const
-                            end if
-                        case (3) ! Z-face (azimuthal normal, theta_cyl)
-                            if (num_dims > 2) then
-                                stress_vector_shear(1) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
-                                stress_vector_shear(2) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
-                                stress_vector_shear(3) = (2.0_wp*(avg_dvdz_int(3)/r_eff + avg_v_int(2)/r_eff))/Re_s + div_v_term_const
-                            end if
-                        end select
-
-                        do i_vel = 1, num_dims
-                            flux_src_vf(momxb + i_vel - 1)%sf(j, k, l) = flux_src_vf(momxb + i_vel - 1)%sf(j, k, l) - stress_vector_shear(i_vel)
-                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - vel_src_int(i_vel)*stress_vector_shear(i_vel)
-                        end do
-                    end if
-
-                    if (bulk_stress) then
-                        stress_normal_bulk = divergence_cyl/Re_b
-
-                        flux_src_vf(momxb + norm_dir - 1)%sf(j, k, l) = flux_src_vf(momxb + norm_dir - 1)%sf(j, k, l) - stress_normal_bulk
-                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - vel_src_int(norm_dir)*stress_normal_bulk
-                    end if
-
                 end do
             end do
-        end do
-        !$acc end parallel loop
+
+            if (n == 0) return ! No radial extent
+
+            ! Part 2: Radial derivative contributions to axial flux (2D, 3D cylindrical)
+            !$acc parallel loop collapse(3) gang vector default(present) &
+            !$acc private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re, i_loop)
+            do l_idx = iz%beg, iz%end
+                do k_idx = iy%beg, iy%end
+                    do j_idx = ix%beg, ix%end
+
+                        avg_vel(2) = 0.5_wp*(velL_vf(2)%sf(j_idx, k_idx, l_idx) + velR_vf(2)%sf(j_idx + 1, k_idx, l_idx)) ! v_r
+
+                        do i_loop = 1, 2 ! u_axial (1), u_radial (2)
+                            dvel_avg_dy(i_loop) = 0.5_wp*(dvelL_dy_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
+                                                          dvelR_dy_vf(i_loop)%sf(j_idx + 1, k_idx, l_idx)) ! du_i/dr
+                        end do
+                        dvel_avg_dx(2) = 0.5_wp*(dvelL_dx_vf(2)%sf(j_idx, k_idx, l_idx) + &
+                                                 dvelR_dx_vf(2)%sf(j_idx + 1, k_idx, l_idx)) ! du_r/dx_axial (dx_axial is normal here)
+
+                        if (shear_stress) then
+                            ! tau_zz component from radial terms: -(2/3)mu (dv_r/dr + v_r/r)
+                            tau_Re(1, 1) = -(2._wp/3._wp)*(dvel_avg_dy(2) + avg_vel(2)/y_cc(k_idx))/ &
+                                           Re_avg_rsx_vf(j_idx, k_idx, l_idx, 1)
+                            ! tau_zr shear stress: mu (dv_axial/dr + dv_r/dx_axial)
+                            tau_Re(1, 2) = (dvel_avg_dy(1) + dvel_avg_dx(2))/Re_avg_rsx_vf(j_idx, k_idx, l_idx, 1)
+
+                            do i_loop = 1, 2 ! Axial (1) and radial (2) momentum components
+                                flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) = &
+                                    flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) - tau_Re(1, i_loop)
+                                flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) = &
+                                    flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) - &
+                                    vel_src_rsx_vf(j_idx, k_idx, l_idx, i_loop)*tau_Re(1, i_loop)
+                            end do
+                        end if
+
+                        if (bulk_stress) then
+                            ! tau_zz_bulk from radial terms: mu_bulk (dv_r/dr + v_r/r)
+                            tau_Re(1, 1) = (dvel_avg_dy(2) + avg_vel(2)/y_cc(k_idx))/Re_avg_rsx_vf(j_idx, k_idx, l_idx, 2)
+                            flux_src_vf(momxb)%sf(j_idx, k_idx, l_idx) = flux_src_vf(momxb)%sf(j_idx, k_idx, l_idx) - tau_Re(1, 1)
+                            flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) = flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) - &
+                                                                         vel_src_rsx_vf(j_idx, k_idx, l_idx, 1)*tau_Re(1, 1)
+                        end if
+                    end do
+                end do
+            end do
+
+            if (p == 0) return ! No azimuthal extent
+
+            ! Part 3: Azimuthal derivative contributions to axial flux (3D cylindrical)
+            !$acc parallel loop collapse(3) gang vector default(present) &
+            !$acc private(avg_vel, dvel_avg_dx, dvel_avg_dz, tau_Re, i_loop)
+            do l_idx = iz%beg, iz%end
+                do k_idx = iy%beg, iy%end
+                    do j_idx = ix%beg, ix%end
+
+                        do i_loop = 1, 3, 2 ! u_axial (1), u_azimuthal (3)
+                            dvel_avg_dz(i_loop) = 0.5_wp*(dvelL_dz_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
+                                                          dvelR_dz_vf(i_loop)%sf(j_idx + 1, k_idx, l_idx)) ! du_i/(r dtheta)
+                        end do
+                        dvel_avg_dx(3) = 0.5_wp*(dvelL_dx_vf(3)%sf(j_idx, k_idx, l_idx) + &
+                                                 dvelR_dx_vf(3)%sf(j_idx + 1, k_idx, l_idx)) ! du_theta/dx_axial
+
+                        if (shear_stress) then
+                            ! tau_zz component from azimuthal terms: -(2/3)mu (1/r dv_theta/dtheta)
+                            tau_Re(1, 1) = -(2._wp/3._wp)*(dvel_avg_dz(3)/y_cc(k_idx))/Re_avg_rsx_vf(j_idx, k_idx, l_idx, 1)
+                            ! tau_z_theta shear stress: mu ( (1/r)dv_axial/dtheta + dv_theta/dx_axial )
+                            tau_Re(1, 3) = (dvel_avg_dz(1)/y_cc(k_idx) + dvel_avg_dx(3))/Re_avg_rsx_vf(j_idx, k_idx, l_idx, 1)
+
+                            do i_loop = 1, 3, 2 ! Axial (1) and azimuthal (3) momentum components
+                                flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) = &
+                                    flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) - tau_Re(1, i_loop)
+                                flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) = &
+                                    flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) - &
+                                    vel_src_rsx_vf(j_idx, k_idx, l_idx, i_loop)*tau_Re(1, i_loop)
+                            end do
+                        end if
+
+                        if (bulk_stress) then
+                            ! tau_zz_bulk from azimuthal terms: mu_bulk (1/r dv_theta/dtheta)
+                            tau_Re(1, 1) = (dvel_avg_dz(3)/y_cc(k_idx))/Re_avg_rsx_vf(j_idx, k_idx, l_idx, 2)
+                            flux_src_vf(momxb)%sf(j_idx, k_idx, l_idx) = flux_src_vf(momxb)%sf(j_idx, k_idx, l_idx) - tau_Re(1, 1)
+                            flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) = flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) - &
+                                                                         vel_src_rsx_vf(j_idx, k_idx, l_idx, 1)*tau_Re(1, 1)
+                        end if
+                    end do
+                end do
+            end do
+
+            ! norm_dir = 2: Radial direction flux (e.g., r-flux if grid y-axis is solver's r-axis)
+            !               In this block, for derivatives: dy is radial (normal), dx is axial, dz is azimuthal component of gradient.
+        elseif (norm_dir == 2) then
+            ! Part 1: Axial and radial derivative contributions to radial flux
+            !$acc parallel loop collapse(3) gang vector default(present) &
+            !$acc private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re, i_loop)
+            do l_idx = iz%beg, iz%end
+                do k_idx = iy%beg, iy%end ! Radial flux index
+                    do j_idx = ix%beg, ix%end
+
+                        avg_vel(2) = 0.5_wp*(velL_vf(2)%sf(j_idx, k_idx, l_idx) + &
+                                             velR_vf(2)%sf(j_idx, k_idx + 1, l_idx)) ! v_r at interface k_idx+1/2
+
+                        do i_loop = 1, 2 ! u_axial (1), u_radial (2)
+                            dvel_avg_dx(i_loop) = 0.5_wp*(dvelL_dx_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
+                                                          dvelR_dx_vf(i_loop)%sf(j_idx, k_idx + 1, l_idx)) ! du_i/dx_axial
+                            dvel_avg_dy(i_loop) = 0.5_wp*(dvelL_dy_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
+                                                          dvelR_dy_vf(i_loop)%sf(j_idx, k_idx + 1, l_idx)) ! du_i/dr_normal
+                        end do
+
+                        if (shear_stress) then
+                            ! tau_rx_axial shear stress (r normal, x axial)
+                            tau_Re(2, 1) = (dvel_avg_dy(1) + dvel_avg_dx(2))/Re_avg_rsy_vf(k_idx, j_idx, l_idx, 1)
+                            ! tau_rr_shear (normal-normal stress): (4/3)mu dv_r/dr - (2/3)mu (dv_axial/dx_axial + v_r/r + (1/r)dv_theta/dtheta)
+                            ! This specific form is (4/3)mu dv_r/dr - (2/3)mu (dv_axial/dx_axial + v_r/r)
+                            tau_Re(2, 2) = (4._wp*dvel_avg_dy(2) - 2._wp*dvel_avg_dx(1) - &
+                                            2._wp*avg_vel(2)/y_cb(k_idx))/(3._wp*Re_avg_rsy_vf(k_idx, j_idx, l_idx, 1))
+
+                            do i_loop = 1, 2 ! Axial (1) and radial (2) momentum components
+                                flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) = &
+                                    flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) - tau_Re(2, i_loop)
+                                flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) = &
+                                    flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) - &
+                                    vel_src_rsy_vf(k_idx, j_idx, l_idx, i_loop)*tau_Re(2, i_loop)
+                            end do
+                        end if
+
+                        if (bulk_stress) then
+                            ! tau_rr_bulk: mu_bulk (div V) = mu_bulk (dv_axial/dx_axial + dv_r/dr + v_r/r + (1/r)dv_theta/dtheta)
+                            ! This specific form includes axial and radial terms
+                            tau_Re(2, 2) = (dvel_avg_dx(1) + dvel_avg_dy(2) + avg_vel(2)/y_cb(k_idx))/Re_avg_rsy_vf(k_idx, j_idx, l_idx, 2)
+                            flux_src_vf(momxb + 1)%sf(j_idx, k_idx, l_idx) = flux_src_vf(momxb + 1)%sf(j_idx, k_idx, l_idx) - tau_Re(2, 2)
+                            flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) = flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) - &
+                                                                         vel_src_rsy_vf(k_idx, j_idx, l_idx, 2)*tau_Re(2, 2)
+                        end if
+                    end do
+                end do
+            end do
+
+            if (p == 0) return ! No azimuthal extent
+
+            ! Part 2: Azimuthal derivative contributions to radial flux (3D cylindrical)
+            !$acc parallel loop collapse(3) gang vector default(present) &
+            !$acc private(avg_vel, dvel_avg_dy, dvel_avg_dz, tau_Re, i_loop)
+            do l_idx = iz%beg, iz%end
+                do k_idx = iy%beg, iy%end ! Radial flux index
+                    do j_idx = ix%beg, ix%end
+
+                        avg_vel(3) = 0.5_wp*(velL_vf(3)%sf(j_idx, k_idx, l_idx) + &
+                                             velR_vf(3)%sf(j_idx, k_idx + 1, l_idx)) ! v_theta at interface
+
+                        do i_loop = 2, 3 ! u_radial (2), u_azimuthal (3)
+                            dvel_avg_dz(i_loop) = 0.5_wp*(dvelL_dz_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
+                                                          dvelR_dz_vf(i_loop)%sf(j_idx, k_idx + 1, l_idx)) ! du_i/(r dtheta)
+                        end do
+                        dvel_avg_dy(3) = 0.5_wp*(dvelL_dy_vf(3)%sf(j_idx, k_idx, l_idx) + &
+                                                 dvelR_dy_vf(3)%sf(j_idx, k_idx + 1, l_idx)) ! du_theta/dr_normal
+
+                        if (shear_stress) then
+                            ! tau_rr component from azimuthal terms: -(2/3)mu ( (1/r)dv_theta/dtheta )
+                            tau_Re(2, 2) = -(2._wp/3._wp)*(dvel_avg_dz(3)/y_cb(k_idx))/Re_avg_rsy_vf(k_idx, j_idx, l_idx, 1)
+                            ! tau_r_theta shear stress: mu ( (1/r)dv_r/dtheta - v_theta/r + dv_theta/dr )
+                            tau_Re(2, 3) = ((dvel_avg_dz(2) - avg_vel(3))/y_cb(k_idx) + dvel_avg_dy(3))/Re_avg_rsy_vf(k_idx, j_idx, l_idx, 1)
+
+                            do i_loop = 2, 3 ! Radial (2) and azimuthal (3) momentum components
+                                flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) = &
+                                    flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) - tau_Re(2, i_loop)
+                                flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) = &
+                                    flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) - &
+                                    vel_src_rsy_vf(k_idx, j_idx, l_idx, i_loop)*tau_Re(2, i_loop)
+                            end do
+                        end if
+
+                        if (bulk_stress) then
+                            ! tau_rr_bulk from azimuthal terms: mu_bulk ( (1/r)dv_theta/dtheta )
+                            tau_Re(2, 2) = (dvel_avg_dz(3)/y_cb(k_idx))/Re_avg_rsy_vf(k_idx, j_idx, l_idx, 2)
+                            flux_src_vf(momxb + 1)%sf(j_idx, k_idx, l_idx) = flux_src_vf(momxb + 1)%sf(j_idx, k_idx, l_idx) - tau_Re(2, 2)
+                            flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) = flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) - &
+                                                                         vel_src_rsy_vf(k_idx, j_idx, l_idx, 2)*tau_Re(2, 2)
+                        end if
+                    end do
+                end do
+            end do
+
+            ! norm_dir = 3: Azimuthal direction flux (e.g., theta-flux if grid z-axis is solver's theta-axis)
+            !               In this block, for derivatives: dz is azimuthal (normal), dx is axial, dy is radial component of gradient.
+        else
+            !$acc parallel loop collapse(3) gang vector default(present) &
+            !$acc private(avg_vel, dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re, i_loop)
+            do l_idx = iz%beg, iz%end ! Azimuthal flux index
+                do k_idx = iy%beg, iy%end
+                    do j_idx = ix%beg, ix%end
+
+                        do i_loop = 2, 3 ! u_radial (2), u_azimuthal (3)
+                            avg_vel(i_loop) = 0.5_wp*(velL_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
+                                                      velR_vf(i_loop)%sf(j_idx, k_idx, l_idx + 1))
+                        end do
+
+                        do i_loop = 1, 3, 2 ! u_axial (1), u_azimuthal (3)
+                            dvel_avg_dx(i_loop) = 0.5_wp*(dvelL_dx_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
+                                                          dvelR_dx_vf(i_loop)%sf(j_idx, k_idx, l_idx + 1)) ! du_i/dx_axial
+                        end do
+                        do i_loop = 2, 3 ! u_radial (2), u_azimuthal (3)
+                            dvel_avg_dy(i_loop) = 0.5_wp*(dvelL_dy_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
+                                                          dvelR_dy_vf(i_loop)%sf(j_idx, k_idx, l_idx + 1)) ! du_i/dr_radial
+                        end do
+                        do i_loop = 1, 3 ! All components
+                            dvel_avg_dz(i_loop) = 0.5_wp*(dvelL_dz_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
+                                                          dvelR_dz_vf(i_loop)%sf(j_idx, k_idx, l_idx + 1)) ! du_i/(r dtheta)_normal
+                        end do
+
+                        if (shear_stress) then
+                            ! tau_theta_axial shear stress
+                            tau_Re(3, 1) = (dvel_avg_dz(1)/y_cc(k_idx) + dvel_avg_dx(3))/Re_avg_rsz_vf(l_idx, k_idx, j_idx, 1)
+                            ! tau_theta_radial shear stress
+                            tau_Re(3, 2) = ((dvel_avg_dz(2) - avg_vel(3))/y_cc(k_idx) + dvel_avg_dy(3))/Re_avg_rsz_vf(l_idx, k_idx, j_idx, 1)
+                            ! tau_theta_theta_shear (normal-normal stress)
+                            tau_Re(3, 3) = (4._wp*dvel_avg_dz(3)/y_cc(k_idx) - 2._wp*dvel_avg_dx(1) - &
+                                            2._wp*dvel_avg_dy(2) + 4._wp*avg_vel(2)/y_cc(k_idx))/ &
+                                           (3._wp*Re_avg_rsz_vf(l_idx, k_idx, j_idx, 1))
+
+                            ! Final scaling by 1/r for azimuthal flux (original code implies this for tau_Re in this context)
+                            tau_Re(3, 1) = tau_Re(3, 1)/y_cc(k_idx)
+                            tau_Re(3, 2) = tau_Re(3, 2)/y_cc(k_idx)
+                            tau_Re(3, 3) = tau_Re(3, 3)/y_cc(k_idx)
+
+                            do i_loop = 1, 3 ! Axial, radial, azimuthal momentum
+                                flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) = &
+                                    flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) - tau_Re(3, i_loop)
+                                flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) = &
+                                    flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) - &
+                                    vel_src_rsz_vf(l_idx, k_idx, j_idx, i_loop)*tau_Re(3, i_loop)
+                            end do
+                        end if
+
+                        if (bulk_stress) then
+                            ! tau_theta_theta_bulk
+                            tau_Re(3, 3) = (dvel_avg_dx(1) + dvel_avg_dy(2) + dvel_avg_dz(3)/y_cc(k_idx) + avg_vel(2)/y_cc(k_idx))/ &
+                                           Re_avg_rsz_vf(l_idx, k_idx, j_idx, 2)
+
+                            ! Final scaling by 1/r
+                            tau_Re(3, 3) = tau_Re(3, 3)/y_cc(k_idx)
+
+                            flux_src_vf(momxe)%sf(j_idx, k_idx, l_idx) = flux_src_vf(momxe)%sf(j_idx, k_idx, l_idx) - tau_Re(3, 3)
+                            flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) = flux_src_vf(E_idx)%sf(j_idx, k_idx, l_idx) - &
+                                                                         vel_src_rsz_vf(l_idx, k_idx, j_idx, 3)*tau_Re(3, 3)
+                        end if
+                    end do
+                end do
+            end do
+        end if
 
     end subroutine s_compute_cylindrical_viscous_source_flux
 
@@ -4114,9 +4288,6 @@ contains
     !! @param[in] dvelR_dz_vf Right boundary d(vel)/dz (num_dims scalar_field).
     !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
     !! @param[in] norm_dir Interface normal direction (1=x, 2=y, 3=z).
-    !! @param[in] ix X-direction loop bounds (int_bounds_info).
-    !! @param[in] iy Y-direction loop bounds (int_bounds_info).
-    !! @param[in] iz Z-direction loop bounds (int_bounds_info).
     subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
                                                        dvelL_dx_vf, &
                                                        dvelL_dy_vf, &
