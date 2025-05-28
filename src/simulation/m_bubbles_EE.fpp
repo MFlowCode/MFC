@@ -92,10 +92,11 @@ contains
 
     end subroutine s_comp_alpha_from_n
 
-    subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf)
+    pure subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), intent(inout) :: divu !< matrix for div(u)
 
         integer :: j, k, l
 
@@ -152,7 +153,7 @@ contains
         !!      that are needed for the bubble modeling
         !!  @param q_prim_vf Primitive variables
         !!  @param q_cons_vf Conservative variables
-    subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, t_step, rhs_vf)
+    impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, t_step, rhs_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: t_step
@@ -271,8 +272,8 @@ contains
                         if (.not. polytropic) then
                             pb = q_prim_vf(ps(q))%sf(j, k, l)
                             mv = q_prim_vf(ms(q))%sf(j, k, l)
-                            call s_bwproperty(pb, q)
-                            vflux = f_vflux(myR, myV, pb, mv, q)
+                            call s_bwproperty(pb, q, chi_vw, k_mw, rho_mw)
+                            call s_vflux(myR, myV, pb, mv, q, vflux)
                             pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q)
 
                             bub_p_src(j, k, l, q) = nbub*pbdot

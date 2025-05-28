@@ -35,7 +35,7 @@ module m_data_input
 
         !> Subroutine for reading data files
         !!  @param t_step Current time-step to input
-        subroutine s_read_abstract_data_files(t_step)
+        impure subroutine s_read_abstract_data_files(t_step)
 
             implicit none
 

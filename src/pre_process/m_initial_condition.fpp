@@ -173,7 +173,7 @@ contains
         !!              on the grid using the primitive variables included with
         !!              the patch parameters. The subroutine is complete once the
         !!              primitive variables are converted to conservative ones.
-    subroutine s_generate_initial_condition
+    impure subroutine s_generate_initial_condition
 
         integer :: i  !< Generic loop operator
 

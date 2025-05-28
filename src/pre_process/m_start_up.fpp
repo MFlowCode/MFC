@@ -76,13 +76,13 @@ module m_start_up
 
     abstract interface
 
-        subroutine s_read_abstract_grid_data_files
+        impure subroutine s_read_abstract_grid_data_files
 
         end subroutine s_read_abstract_grid_data_files
 
         !! @param q_cons_vf Conservative variables
         !! @param ib_markers track if a cell is within the immersed boundary
-        subroutine s_read_abstract_ic_data_files(q_cons_vf, ib_markers)
+        impure subroutine s_read_abstract_ic_data_files(q_cons_vf, ib_markers)
 
             import :: scalar_field, integer_field, sys_size, pres_field
 

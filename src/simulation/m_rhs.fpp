@@ -838,7 +838,7 @@ contains
             ! RHS additions for sub-grid bubbles_euler
             if (bubbles_euler) then
                 call nvtxStartRange("RHS-BUBBLES-COMPUTE")
-                call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf)
+                call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf, divu)
                 call nvtxEndRange
             end if
 

@@ -35,7 +35,7 @@ module m_grid
 
     abstract interface
 
-        subroutine s_generate_abstract_grid
+        impure subroutine s_generate_abstract_grid
 
         end subroutine s_generate_abstract_grid
 

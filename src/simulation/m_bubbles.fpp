@@ -314,11 +314,13 @@ contains
     !>  Subroutine that computes bubble wall properties for vapor bubbles
         !!  @param pb Internal bubble pressure
         !!  @param iR0 Current bubble size index
-    subroutine s_bwproperty(pb, iR0)
+    pure elemental subroutine s_bwproperty(pb, iR0, chi_vw, k_mw, rho_mw)
         !$acc routine seq
         real(wp), intent(in) :: pb
         integer, intent(in) :: iR0
-
+        real(wp), intent(out) :: chi_vw  !< Bubble wall properties (Ando 2010)
+        real(wp), intent(out) :: k_mw    !< Bubble wall properties (Ando 2010)
+        real(wp), intent(out) :: rho_mw  !< Bubble wall properties (Ando 2010)
         real(wp) :: x_vw
 
         ! mass fraction of vapor
@@ -342,13 +344,14 @@ contains
         !!  @param fbeta_c Mass transfer coefficient (EL)
         !!  @param fR_m Mixture gas constant (EL)
         !!  @param fgamma_m Mixture gamma (EL)
-    function f_vflux(fR, fV, fpb, fmass_v, iR0, fmass_n, fbeta_c, fR_m, fgamma_m)
+    pure elemental subroutine s_vflux(fR, fV, fpb, fmass_v, iR0, vflux, fmass_n, fbeta_c, fR_m, fgamma_m)
         !$acc routine seq
         real(wp), intent(in) :: fR
         real(wp), intent(in) :: fV
         real(wp), intent(in) :: fpb
         real(wp), intent(in) :: fmass_v
         integer, intent(in) :: iR0
+        real(wp), intent(out) :: vflux
         real(wp), intent(in), optional :: fmass_n, fbeta_c
         real(wp), intent(out), optional :: fR_m, fgamma_m
 
@@ -356,7 +359,6 @@ contains
         real(wp) :: rho_mw_lag
         real(wp) :: grad_chi
         real(wp) :: conc_v
-        real(wp) :: f_vflux
 
         if (thermal == 3) then !transfer
             ! constant transfer model
@@ -373,21 +375,21 @@ contains
                 chi_bar = fmass_v/(fmass_v + fmass_n)
                 grad_chi = (chi_bar - conc_v)
                 rho_mw_lag = (fmass_n + fmass_v)/(4._wp/3._wp*pi*fR**3._wp)
-                f_vflux = 0._wp
+                vflux = 0._wp
                 if (lag_params%massTransfer_model) then
-                    f_vflux = -fbeta_c*rho_mw_lag*grad_chi/(1._wp - conc_v)/fR
+                    vflux = -fbeta_c*rho_mw_lag*grad_chi/(1._wp - conc_v)/fR
                 end if
             else
                 chi_bar = fmass_v/(fmass_v + mass_n0(iR0))
                 grad_chi = -Re_trans_c(iR0)*(chi_bar - chi_vw)
-                f_vflux = rho_mw*grad_chi/Pe_c/(1._wp - chi_vw)/fR
+                vflux = rho_mw*grad_chi/Pe_c/(1._wp - chi_vw)/fR
             end if
         else
             ! polytropic
-            f_vflux = pv*fV/(R_v*Tw)
+            vflux = pv*fV/(R_v*Tw)
         end if
 
-    end function f_vflux
+    end subroutine s_vflux
 
     !>  Function that computes the time derivative of
         !!  the internal bubble pressure
@@ -457,7 +459,7 @@ contains
         !!  @param fbeta_t Heat transfer coefficient (EL)
         !!  @param fCson Speed of sound (EL)
         !!  @param adap_dt_stop Fail-safe exit if max iteration count reached
-    subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+    pure subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                               fntait, fBtait, f_bub_adv_src, f_divu, &
                               bub_id, fmass_v, fmass_n, fbeta_c, &
                               fbeta_t, fCson, adap_dt_stop)
@@ -676,7 +678,7 @@ contains
         !!  @param myV_tmp Bubble radial velocity at each stage
         !!  @param myPb_tmp Internal bubble pressure at each stage (EL)
         !!  @param myMv_tmp Mass of vapor in the bubble at each stage (EL)
-    subroutine s_advance_substep(err, fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+    pure subroutine s_advance_substep(err, fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                  fntait, fBtait, f_bub_adv_src, f_divu, &
                                  bub_id, fmass_v, fmass_n, fbeta_c, &
                                  fbeta_t, fCson, h, &
@@ -705,8 +707,8 @@ contains
         if (bubbles_lagrange) then
             myPb_tmp(1) = fpb
             myMv_tmp(1) = fmass_v
-            mydMvdt_tmp(1) = f_advance_EL(myR_tmp(1), myV_tmp(1), myPb_tmp(1), myMv_tmp(1), bub_id, &
-                                          fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(1))
+            call s_advance_EL(myR_tmp(1), myV_tmp(1), myPb_tmp(1), myMv_tmp(1), bub_id, &
+                                          fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(1), mydMvdt_tmp(1))
         end if
         myA_tmp(1) = f_rddot(fRho, fP, myR_tmp(1), myV_tmp(1), fR0, &
                              myPb_tmp(1), mydPbdt_tmp(1), alf, fntait, fBtait, &
@@ -719,8 +721,8 @@ contains
         if (bubbles_lagrange) then
             myPb_tmp(2) = myPb_tmp(1) + h*mydPbdt_tmp(1)
             myMv_tmp(2) = myMv_tmp(1) + h*mydMvdt_tmp(1)
-            mydMvdt_tmp(2) = f_advance_EL(myR_tmp(2), myV_tmp(2), myPb_tmp(2), myMv_tmp(2), &
-                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(2))
+            call s_advance_EL(myR_tmp(2), myV_tmp(2), myPb_tmp(2), myMv_tmp(2), &
+                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(2), mydMvdt_tmp(2))
         end if
         myA_tmp(2) = f_rddot(fRho, fP, myR_tmp(2), myV_tmp(2), fR0, &
                              myPb_tmp(2), mydPbdt_tmp(2), alf, fntait, fBtait, &
@@ -733,8 +735,8 @@ contains
         if (bubbles_lagrange) then
             myPb_tmp(3) = myPb_tmp(1) + (h/4._wp)*(mydPbdt_tmp(1) + mydPbdt_tmp(2))
             myMv_tmp(3) = myMv_tmp(1) + (h/4._wp)*(mydMvdt_tmp(1) + mydMvdt_tmp(2))
-            mydMvdt_tmp(3) = f_advance_EL(myR_tmp(3), myV_tmp(3), myPb_tmp(3), myMv_tmp(3), &
-                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(3))
+            call s_advance_EL(myR_tmp(3), myV_tmp(3), myPb_tmp(3), myMv_tmp(3), &
+                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(3), mydMvdt_tmp(3))
         end if
         myA_tmp(3) = f_rddot(fRho, fP, myR_tmp(3), myV_tmp(3), fR0, &
                              myPb_tmp(3), mydPbdt_tmp(3), alf, fntait, fBtait, &
@@ -747,8 +749,8 @@ contains
         if (bubbles_lagrange) then
             myPb_tmp(4) = myPb_tmp(1) + (h/6._wp)*(mydPbdt_tmp(1) + mydPbdt_tmp(2) + 4._wp*mydPbdt_tmp(3))
             myMv_tmp(4) = myMv_tmp(1) + (h/6._wp)*(mydMvdt_tmp(1) + mydMvdt_tmp(2) + 4._wp*mydMvdt_tmp(3))
-            mydMvdt_tmp(4) = f_advance_EL(myR_tmp(4), myV_tmp(4), myPb_tmp(4), myMv_tmp(4), &
-                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(4))
+            call s_advance_EL(myR_tmp(4), myV_tmp(4), myPb_tmp(4), myMv_tmp(4), &
+                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(4), mydMvdt_tmp(4))
         end if
         myA_tmp(4) = f_rddot(fRho, fP, myR_tmp(4), myV_tmp(4), fR0, &
                              myPb_tmp(4), mydPbdt_tmp(4), alf, fntait, fBtait, &
@@ -780,20 +782,20 @@ contains
         !!  @param fMv_tmp Mass of vapor in the bubble
         !!  @param fdPbdt_tmp Rate of change of the internal bubble pressure
         !!  @param fdMvdt_tmp Rate of change of the mass of vapor in the bubble
-    function f_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, &
-                          fmass_n, fbeta_c, fbeta_t, fdPbdt_tmp)
+    pure elemental subroutine s_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, &
+                          fmass_n, fbeta_c, fbeta_t, fdPbdt_tmp, advance_EL)
         !$acc routine seq
         real(wp), intent(IN) :: fR_tmp, fV_tmp, fPb_tmp, fMv_tmp
         real(wp), intent(IN) :: fmass_n, fbeta_c, fbeta_t
         integer, intent(IN) :: bub_id
         real(wp), intent(INOUT) :: fdPbdt_tmp
+        real(wp), intent(out) :: advance_EL
+        real(wp) :: fVapFlux, myR_m, mygamma_m
 
-        real(wp) :: fVapFlux, f_advance_EL, myR_m, mygamma_m
-
-        fVapFlux = f_vflux(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fmass_n, fbeta_c, myR_m, mygamma_m)
+        call s_vflux(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fVapFlux, fmass_n, fbeta_c, myR_m, mygamma_m)
         fdPbdt_tmp = f_bpres_dot(fVapFlux, fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fbeta_t, myR_m, mygamma_m)
-        f_advance_EL = 4._wp*pi*fR_tmp**2._wp*fVapFlux
+        advance_EL = 4._wp*pi*fR_tmp**2._wp*fVapFlux
 
-    end function f_advance_EL
+    end subroutine s_advance_EL
 
 end module m_bubbles
