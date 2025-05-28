@@ -5,9 +5,8 @@
 !> @details
 !> Reads a sequence of 1D primitive-variable files and maps them onto
 !> a 2D domain along the x-direction. These files are produced when parallel I/O is disabled in `case.py`.
-!> Parameters control file counts, grid resolution, and domain offsets.
+!> Parameters control grid resolution, and domain offsets.
 !>
-!> @param nFiles        Number of primitive-variable files to read
 !> @param nRows         Number of grid points per row
 !> @param init_dir      Directory containing the `prim.*.dat` files
     real(wp) :: eps
@@ -15,16 +14,16 @@
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: factor
 
-    integer, parameter :: nFiles = 14   ! Number of files (variables)
-    integer, parameter :: nRows = 401   ! Number of grid points
+    !integer :: nFiles    ! Number of files (variables)
+    integer, parameter :: nRows = 401    ! Number of grid points
     integer :: f, iter, ios, unit, idx, jump, index_1
     real(wp) :: x_len, x_step
     integer :: global_offset  ! MPI subdomain offset
     real(wp) :: delta_x
-    character(len=100), dimension(nFiles) :: fileNames
+    character(len=100), dimension(sys_size - 1) :: fileNames
     character(len=200) :: errmsg
     ! Arrays to store all data from files
-    real(wp), dimension(nRows, nFiles) :: stored_values  ! Imported Data
+    real(wp), dimension(nRows, sys_size - 1) :: stored_values  ! Imported Data
     real(wp), dimension(nRows) :: x_coords
     logical :: files_loaded = .false.
     real(wp) :: domain_start, domain_end
@@ -33,16 +32,6 @@
     character(len=20) :: zeros_part       ! For the trailing zeros part
     character(len=6), parameter :: zeros_default = "018681"  ! Default zeros (can be changed)
     ! Generate file names in a loop
-    do f = 1, nFiles
-        ! Convert file number to string with proper formatting
-        if (f < 10) then
-            write (file_num_str, '(I1)') f  ! Single digit
-        else
-            write (file_num_str, '(I2)') f  ! Double digit
-            ! For more than 99 files, you might need to adjust this format
-        end if
-        fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat"
-    end do
 
     eps = 1e-9_wp
 
@@ -198,14 +187,27 @@
         end if
 
     case (270)
+
+        do f = 1, sys_size - 1
+            ! Convert file number to string with proper formatting
+            if (f < 10) then
+                write (file_num_str, '(I1)') f  ! Single digit
+            else
+                write (file_num_str, '(I2)') f  ! Double digit
+                ! For more than 99 files, you might need to adjust this format
+            end if
+            fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat"
+        end do
+
         if (.not. files_loaded) then
             ! Print status message
             index_1 = i
-            do f = 1, nFiles
+            do f = 1, sys_size - 1
                 ! Open the file for reading
                 open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
-                if (ios /= 0) then
-                    cycle  ! Skip this file on error
+                if (ios /= 0 .and. proc_rank == 0) then
+                    write (errmsg, '(A,A)') "Error opening file: ", trim(fileNames(f))
+                    call s_mpi_abort(trim(errmsg))
                 end if
                 ! Read all rows at once into memory
                 do iter = 1, nRows
@@ -228,7 +230,7 @@
         end if
         ! Calculate the index in the file data array corresponding to x_cc(i)
         idx = i + 1 + global_offset - index_1
-        do f = 1, nFiles
+        do f = 1, sys_size - 1
             if (f >= momxe) then
                 jump = 1
             else

@@ -245,6 +245,7 @@ specific timestep to be extended uniformly in the transverse direction and used 
 
 case(370) in 3dHardcodedIC.fpp: used to build 3D domains by extruding 2D data along the third dimension.
 
+The variables xRows, yRows, and init_dir must be defined to specify the grid dimensions of the previous simulation and the directory where the input files are located.
 #### Parameter Descriptions
 
 - `num_patches` defines the total number of patches defined in the domain.

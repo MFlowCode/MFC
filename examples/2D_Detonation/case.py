@@ -98,7 +98,7 @@ case = {
     "patch_icpp(2)%alpha(1)": 1,
     "patch_icpp(2)%alpha_rho(1)": sol_L.density,
     "patch_icpp(2)%alter_patch(1)": "T",
-    # Fluids Physical Parameters ===============================================
+    # Fluids Physical Parameters
     "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0,
 }

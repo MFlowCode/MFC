@@ -6,7 +6,6 @@
     !> dimension (z), these files are produced when parallel I/O is disabled in `case.py`.
     !> Parameters control file counts (number of primitive variables) grid resolution, and domain offsets in x, and y.
     !>
-    !> @param nFiles         Number of primitive-variable files to read
     !> @param xRows          Number of grid points in the x-direction
     !> @param yRows          Number of grid points in the y-direction
     !> @param init_dir       Directory containing the `prim.*.dat` files
@@ -16,7 +15,6 @@
 
     real(wp) :: eps
 
-    integer, parameter :: nFiles = 15   ! Number of files (variables)
     integer, parameter :: xRows = 401   ! Number of points in x
     integer, parameter :: yRows = 403   ! Number of points in y
     integer, parameter :: nRows = xRows*yRows
@@ -28,10 +26,10 @@
     real(wp) :: current_x
     real(wp) :: sim_x_step, sim_y_step           ! Simulation grid steps
     integer :: nx_data, ny_data, data_i, data_j, iix, iiy
-    character(len=100), dimension(nFiles) :: fileNames
+    character(len=100), dimension(sys_size - 1) :: fileNames
     character(len=200) :: errmsg
     ! Arrays to store all data from files - read once, use many times
-    real(wp), dimension(xRows, yRows, nFiles) :: stored_values   ! Imported 2D Data
+    real(wp), dimension(xRows, yRows, sys_size - 1) :: stored_values   ! Imported 2D Data
     real(wp), dimension(nRows) :: x_coords, y_coords
     logical :: files_loaded = .false.
     real(wp) :: domain_xstart, domain_xend, domain_ystart, domain_yend
@@ -40,17 +38,6 @@
     character(len=20) :: zeros_part       ! For the trailing zeros part
     character(len=6), parameter :: zeros_default = "000000"  ! Default zeros (can be changed)
 
-    ! Generate file names dynamically in a loop
-    do f = 1, nFiles
-        ! Convert file number to string with proper formatting
-        if (f < 10) then
-            write (file_num_str, '(I1)') f  ! Single digit
-        else
-            write (file_num_str, '(I2)') f  ! Double digit
-            ! For more than 99 files, you might need to adjust this format
-        end if
-        fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat"
-    end do
     eps = 1e-9_wp
 #:enddef
 
@@ -103,13 +90,26 @@
         end if
 
     case (370)
+        ! Generate file names dynamically in a loop
+        do f = 1, sys_size - 1
+            ! Convert file number to string with proper formatting
+            if (f < 10) then
+                write (file_num_str, '(I1)') f  ! Single digit
+            else
+                write (file_num_str, '(I2)') f  ! Double digit
+                ! For more than 99 files, you might need to adjust this format
+            end if
+            fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat"
+        end do
+
         if (.not. files_loaded) then
             ! Print status message
             index_x = i
             index_y = j
             open (newunit=unit, file=trim(fileNames(1)), status='old', action='read', iostat=ios)
-            if (ios /= 0) then
-                return
+            if (ios /= 0 .and. proc_rank == 0) then
+                write (errmsg, '(A,A)') "Error opening file: ", trim(fileNames(f))
+                call s_mpi_abort(trim(errmsg))
             end if
 
             iter = 0
@@ -126,10 +126,11 @@
             end do
             close (unit)
             !Now read only the values from remaining files (skip x,y columns)
-            do f = 2, nFiles
+            do f = 2, sys_size - 1
                 open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
-                if (ios /= 0) then
-                    cycle
+                if (ios /= 0 .and. proc_rank == 0) then
+                    print *, "Error opening file: ", trim(fileNames(f))
+                    cycle  ! Skip this file on error
                 end if
                 do iix = 1, xRows
                     do iiy = 1, yRows
@@ -168,7 +169,7 @@
         data_i = i + 1 + global_offset_x - index_x  ! x-direction index in data grid
         data_j = j + 1 + global_offset_y - index_y  ! y-direction index in data grid
 
-        do f = 1, nFiles
+        do f = 1, sys_size - 1
             if (f >= momxe) then
                 jump = 1
             else

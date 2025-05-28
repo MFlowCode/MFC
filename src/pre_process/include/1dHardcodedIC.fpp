@@ -12,23 +12,20 @@
 !>     `prim.<variable>.00.<timestep>.dat`
 !>     (produced when parallel I/O is disabled in `case.py`).
 !>   - Configurable parameters:
-!>       - @c nFiles: total number of primitive‐variable files.
 !>       - @c nRows: total number of grid points in the 1D profile.
 !>   - Default file directory: `examples/Case_File/D`
 !>
-!> @param nFiles Total number of primitive‐variable files to read.
 !> @param nRows Total number of grid points in the imported 1D profile.
 
     ! Place any declaration of intermediate variables here
-    integer, parameter :: nFiles = 14   ! Number of files (variables) that are being read
     integer, parameter :: nRows = 512   ! Number of grid points
     integer :: f, iter, ios, unit, idx
     real(wp) :: x_len, x_step
     integer :: global_offset            ! MPI subdomain offset
     real(wp) :: delta
-    character(len=100), dimension(nFiles) :: fileNames ! Arrays to store all data from files
+    character(len=100), dimension(sys_size) :: fileNames ! Arrays to store all data from files
     character(len=200) :: errmsg
-    real(wp), dimension(nRows, nFiles) :: stored_values  ! Imported Data
+    real(wp), dimension(nRows, sys_size) :: stored_values  ! Imported Data
     real(wp), dimension(nRows) :: x_coords
     logical :: files_loaded = .false.
     real(wp) :: domain_start, domain_end
@@ -37,31 +34,32 @@
     character(len=20) :: zeros_part       ! For the trailing zeros part
     character(len=6), parameter :: zeros_default = "000000"  ! Default zeros (can be changed)
 
-    ! Generate file names in a loop
-    do f = 1, nFiles
-        ! Convert file number to string with proper formatting
-        if (f < 10) then
-            write (file_num_str, '(I1)') f  ! Single digit
-        else
-            write (file_num_str, '(I2)') f  ! Double digit
-        end if
-        fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat"
-        ! Create the filename with the pattern "prim.X.00.000000.dat"
-    end do
-
 #:enddef
 
 #:def Hardcoded1D()
 
     select case (patch_icpp(patch_id)%hcid)
     case (100)
+
+        ! Generate file names in a loop
+        do f = 1, sys_size
+            ! Convert file number to string with proper formatting
+            if (f < 10) then
+                write (file_num_str, '(I1)') f  ! Single digit
+            else
+                write (file_num_str, '(I2)') f  ! Double digit
+            end if
+            fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat"
+            ! Create the filename with the pattern "prim.X.00.000000.dat"
+        end do
         ! Put your variable assignments here
         if (.not. files_loaded) then
-            do f = 1, nFiles
+            do f = 1, sys_size
                 ! Open the file for reading
                 open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
-                if (ios /= 0) then
-                    cycle  ! Skip this file on error
+                if (ios /= 0 .and. proc_rank == 0) then
+                    write (errmsg, '(A,A)') "Error opening file: ", trim(fileNames(f))
+                    call s_mpi_abort(trim(errmsg))
                 end if
                 ! Read all rows at once into memory
                 do iter = 1, nRows
@@ -85,7 +83,7 @@
         end if
         ! Simple mapping - find the closest index
         idx = i + 1 + global_offset
-        do f = 1, nFiles
+        do f = 1, sys_size
             q_prim_vf(f)%sf(i, 0, 0) = stored_values(idx, f)
         end do
 
