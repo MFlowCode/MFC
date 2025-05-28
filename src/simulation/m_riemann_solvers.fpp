@@ -4035,6 +4035,7 @@ contains
 
                         avg_vel(2) = 0.5_wp*(velL_vf(2)%sf(j_idx, k_idx, l_idx) + velR_vf(2)%sf(j_idx + 1, k_idx, l_idx)) ! v_r
 
+                        !$acc loop seq 
                         do i_loop = 1, 2 ! u_axial (1), u_radial (2)
                             dvel_avg_dy(i_loop) = 0.5_wp*(dvelL_dy_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
                                                           dvelR_dy_vf(i_loop)%sf(j_idx + 1, k_idx, l_idx)) ! du_i/dr
@@ -4049,6 +4050,7 @@ contains
                             ! tau_zr shear stress: mu (dv_axial/dr + dv_r/dx_axial)
                             tau_Re(1, 2) = (dvel_avg_dy(1) + dvel_avg_dx(2))/Re_avg_rsx_vf(j_idx, k_idx, l_idx, 1)
 
+                            !$acc loop seq 
                             do i_loop = 1, 2 ! Axial (1) and radial (2) momentum components
                                 flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) = &
                                     flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) - tau_Re(1, i_loop)
@@ -4078,6 +4080,7 @@ contains
                 do k_idx = iy%beg, iy%end
                     do j_idx = ix%beg, ix%end
 
+                        !$acc loop seq 
                         do i_loop = 1, 3, 2 ! u_axial (1), u_azimuthal (3)
                             dvel_avg_dz(i_loop) = 0.5_wp*(dvelL_dz_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
                                                           dvelR_dz_vf(i_loop)%sf(j_idx + 1, k_idx, l_idx)) ! du_i/(r dtheta)
@@ -4091,6 +4094,7 @@ contains
                             ! tau_z_theta shear stress: mu ( (1/r)dv_axial/dtheta + dv_theta/dx_axial )
                             tau_Re(1, 3) = (dvel_avg_dz(1)/y_cc(k_idx) + dvel_avg_dx(3))/Re_avg_rsx_vf(j_idx, k_idx, l_idx, 1)
 
+                            !$acc loop seq 
                             do i_loop = 1, 3, 2 ! Axial (1) and azimuthal (3) momentum components
                                 flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) = &
                                     flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) - tau_Re(1, i_loop)
@@ -4124,6 +4128,7 @@ contains
                         avg_vel(2) = 0.5_wp*(velL_vf(2)%sf(j_idx, k_idx, l_idx) + &
                                              velR_vf(2)%sf(j_idx, k_idx + 1, l_idx)) ! v_r at interface k_idx+1/2
 
+                        !$acc loop seq 
                         do i_loop = 1, 2 ! u_axial (1), u_radial (2)
                             dvel_avg_dx(i_loop) = 0.5_wp*(dvelL_dx_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
                                                           dvelR_dx_vf(i_loop)%sf(j_idx, k_idx + 1, l_idx)) ! du_i/dx_axial
@@ -4172,6 +4177,7 @@ contains
                         avg_vel(3) = 0.5_wp*(velL_vf(3)%sf(j_idx, k_idx, l_idx) + &
                                              velR_vf(3)%sf(j_idx, k_idx + 1, l_idx)) ! v_theta at interface
 
+                        !$acc loop seq 
                         do i_loop = 2, 3 ! u_radial (2), u_azimuthal (3)
                             dvel_avg_dz(i_loop) = 0.5_wp*(dvelL_dz_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
                                                           dvelR_dz_vf(i_loop)%sf(j_idx, k_idx + 1, l_idx)) ! du_i/(r dtheta)
@@ -4185,6 +4191,7 @@ contains
                             ! tau_r_theta shear stress: mu ( (1/r)dv_r/dtheta - v_theta/r + dv_theta/dr )
                             tau_Re(2, 3) = ((dvel_avg_dz(2) - avg_vel(3))/y_cb(k_idx) + dvel_avg_dy(3))/Re_avg_rsy_vf(k_idx, j_idx, l_idx, 1)
 
+                            !$acc loop seq 
                             do i_loop = 2, 3 ! Radial (2) and azimuthal (3) momentum components
                                 flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) = &
                                     flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) - tau_Re(2, i_loop)
@@ -4214,19 +4221,25 @@ contains
                 do k_idx = iy%beg, iy%end
                     do j_idx = ix%beg, ix%end
 
+                        !$acc loop seq 
                         do i_loop = 2, 3 ! u_radial (2), u_azimuthal (3)
                             avg_vel(i_loop) = 0.5_wp*(velL_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
                                                       velR_vf(i_loop)%sf(j_idx, k_idx, l_idx + 1))
                         end do
 
+                        !$acc loop seq 
                         do i_loop = 1, 3, 2 ! u_axial (1), u_azimuthal (3)
                             dvel_avg_dx(i_loop) = 0.5_wp*(dvelL_dx_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
                                                           dvelR_dx_vf(i_loop)%sf(j_idx, k_idx, l_idx + 1)) ! du_i/dx_axial
                         end do
+
+                        !$acc loop seq 
                         do i_loop = 2, 3 ! u_radial (2), u_azimuthal (3)
                             dvel_avg_dy(i_loop) = 0.5_wp*(dvelL_dy_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
                                                           dvelR_dy_vf(i_loop)%sf(j_idx, k_idx, l_idx + 1)) ! du_i/dr_radial
                         end do
+
+                        !$acc loop seq 
                         do i_loop = 1, 3 ! All components
                             dvel_avg_dz(i_loop) = 0.5_wp*(dvelL_dz_vf(i_loop)%sf(j_idx, k_idx, l_idx) + &
                                                           dvelR_dz_vf(i_loop)%sf(j_idx, k_idx, l_idx + 1)) ! du_i/(r dtheta)_normal
@@ -4247,6 +4260,7 @@ contains
                             tau_Re(3, 2) = tau_Re(3, 2)/y_cc(k_idx)
                             tau_Re(3, 3) = tau_Re(3, 3)/y_cc(k_idx)
 
+                            !$acc loop seq 
                             do i_loop = 1, 3 ! Axial, radial, azimuthal momentum
                                 flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) = &
                                     flux_src_vf(contxe + i_loop)%sf(j_idx, k_idx, l_idx) - tau_Re(3, i_loop)
@@ -4341,6 +4355,8 @@ contains
                     idx_right_phys(norm_dir) = idx_right_phys(norm_dir) + 1
 
                     vel_grad_avg = 0.0_wp
+
+                    !$acc loop seq 
                     do vel_comp_idx = 1, num_dims
                         vel_grad_avg(vel_comp_idx, 1) = 0.5_wp*(dvelL_dx_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
                                                                 dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
@@ -4355,6 +4371,7 @@ contains
                     end do
 
                     divergence_v = 0.0_wp
+                    !$acc loop seq 
                     do i_dim = 1, num_dims
                         divergence_v = divergence_v + vel_grad_avg(i_dim, i_dim)
                     end do
@@ -4363,18 +4380,21 @@ contains
                     if (norm_dir == 1) then
                         Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
                         Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
+                        !$acc loop seq 
                         do i_dim = 1, num_dims
                             vel_src_at_interface(i_dim) = vel_src_rsx_vf(j_loop, k_loop, l_loop, i_dim)
                         end do
                     else if (norm_dir == 2) then
                         Re_shear = Re_avg_rsy_vf(k_loop, j_loop, l_loop, 1)
                         Re_bulk = Re_avg_rsy_vf(k_loop, j_loop, l_loop, 2)
+                        !$acc loop seq 
                         do i_dim = 1, num_dims
                             vel_src_at_interface(i_dim) = vel_src_rsy_vf(k_loop, j_loop, l_loop, i_dim)
                         end do
                     else
                         Re_shear = Re_avg_rsz_vf(l_loop, k_loop, j_loop, 1)
                         Re_bulk = Re_avg_rsz_vf(l_loop, k_loop, j_loop, 2)
+                        !$acc loop seq 
                         do i_dim = 1, num_dims
                             vel_src_at_interface(i_dim) = vel_src_rsz_vf(l_loop, k_loop, j_loop, i_dim)
                         end do
@@ -4384,6 +4404,7 @@ contains
                         current_tau_shear = 0.0_wp
                         call s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, current_tau_shear)
 
+                        !$acc loop seq 
                         do i_dim = 1, num_dims
                             flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) = &
                                 flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) - current_tau_shear(norm_dir, i_dim)
@@ -4398,6 +4419,7 @@ contains
                         current_tau_bulk = 0.0_wp
                         call s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, current_tau_bulk)
 
+                        !$acc loop seq 
                         do i_dim = 1, num_dims
                             flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) = &
                                 flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) - current_tau_bulk(norm_dir, i_dim)
