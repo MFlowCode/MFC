@@ -1465,7 +1465,7 @@ contains
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
         if (bubbles_euler .and. nb > 1 .and. R0_type == 1) then
-            call s_simpson
+            call s_simpson(weight, R0)
         end if
         !Initialize variables for non-polytropic (Preston) model
         if (bubbles_euler .and. .not. polytropic) then

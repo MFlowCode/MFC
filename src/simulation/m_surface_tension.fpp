@@ -40,11 +40,12 @@ module m_surface_tension
     type(int_bounds_info) :: is1, is2, is3, iv
     !$acc declare create(is1, is2, is3, iv)
 
-    integer :: j, k, l, i
 
 contains
 
     impure subroutine s_initialize_surface_tension_module
+
+        integer :: j
 
         @:ALLOCATE(c_divs(1:num_dims + 1))
 
@@ -65,7 +66,7 @@ contains
         end if
     end subroutine s_initialize_surface_tension_module
 
-    subroutine s_compute_capilary_source_flux(q_prim_vf, &
+    pure subroutine s_compute_capilary_source_flux(q_prim_vf, &
                                               vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
                                               flux_src_vf, &
                                               id, isx, isy, isz)
@@ -83,6 +84,8 @@ contains
         real(wp), dimension(num_dims, num_dims) :: Omega
         real(wp) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(wp) :: normWL, normWR, normW
+        integer :: j, k, l, i
+
 
         if (id == 1) then
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
@@ -231,6 +234,8 @@ contains
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
         type(int_bounds_info) :: isx, isy, isz
+        integer :: j, k, l, i
+
 
         isx%beg = -1; isy%beg = 0; isz%beg = 0
 
@@ -377,6 +382,7 @@ contains
     end subroutine s_reconstruct_cell_boundary_values_capillary
 
     impure subroutine s_finalize_surface_tension_module
+        integer :: j
 
         do j = 1, num_dims
             @:DEALLOCATE(c_divs(j)%sf)

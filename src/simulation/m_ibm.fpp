@@ -89,7 +89,7 @@ contains
 
         !$acc update host(ib_markers%sf)
 
-        call s_find_num_ghost_points()
+        call s_find_num_ghost_points(num_gps, num_inner_gps)
 
         !$acc update device(num_gps, num_inner_gps)
         @:ALLOCATE(ghost_points(1:num_gps))
@@ -342,7 +342,7 @@ contains
         !!  @param ghost_points Ghost Points
         !!  @param levelset Closest distance from each grid cell to IB
         !!  @param levelset_norm Vector pointing in the direction of the closest distance
-    subroutine s_compute_image_points(ghost_points, levelset, levelset_norm)
+    impure subroutine s_compute_image_points(ghost_points, levelset, levelset_norm)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
         type(levelset_field), intent(IN) :: levelset
@@ -426,12 +426,17 @@ contains
 
     !> Function that finds the number of ghost points, used for allocating
     !! memory.
-    subroutine s_find_num_ghost_points()
+    pure subroutine s_find_num_ghost_points(num_gps, num_inner_gps)
+
+        integer, intent(out) :: num_gps
+        integer, intent(out) :: num_inner_gps
+
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_3D
         integer :: i, j, k, l, q !< Iterator variables
+
 
         num_gps = 0
         num_inner_gps = 0
@@ -470,7 +475,7 @@ contains
     end subroutine s_find_num_ghost_points
 
     !> Function that finds the ghost points
-    subroutine s_find_ghost_points(ghost_points, inner_points)
+    pure subroutine s_find_ghost_points(ghost_points, inner_points)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
         type(ghost_point), dimension(num_inner_gps), intent(INOUT) :: inner_points
@@ -585,7 +590,7 @@ contains
     end subroutine s_find_ghost_points
 
     !>  Function that computes the interpolation coefficients of image points
-    subroutine s_compute_interpolation_coeffs(ghost_points)
+    pure subroutine s_compute_interpolation_coeffs(ghost_points)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
 

@@ -248,7 +248,10 @@ contains
     end subroutine s_int_to_str
 
     !> Computes the Simpson weights for quadrature
-    subroutine s_simpson
+    subroutine s_simpson(weight, R0)
+
+        real(wp), dimension(:), intent(inout) :: weight
+        real(wp), dimension(:), intent(inout) :: R0
 
         integer :: ir
         real(wp) :: R0mn, R0mx, dphi, tmp, sd

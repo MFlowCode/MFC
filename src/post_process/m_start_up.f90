@@ -676,7 +676,7 @@ contains
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
         if (bubbles_euler .and. nb > 1) then
-            call s_simpson
+            call s_simpson(weight, R0)
         end if
         if (bubbles_euler .and. .not. polytropic) then
             call s_initialize_nonpoly()
