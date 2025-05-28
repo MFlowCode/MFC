@@ -460,9 +460,9 @@ contains
         !!  @param fCson Speed of sound (EL)
         !!  @param adap_dt_stop Fail-safe exit if max iteration count reached
     pure subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                              fntait, fBtait, f_bub_adv_src, f_divu, &
-                              bub_id, fmass_v, fmass_n, fbeta_c, &
-                              fbeta_t, fCson, adap_dt_stop)
+                                   fntait, fBtait, f_bub_adv_src, f_divu, &
+                                   bub_id, fmass_v, fmass_n, fbeta_c, &
+                                   fbeta_t, fCson, adap_dt_stop)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_advance_step
 #else
@@ -679,10 +679,10 @@ contains
         !!  @param myPb_tmp Internal bubble pressure at each stage (EL)
         !!  @param myMv_tmp Mass of vapor in the bubble at each stage (EL)
     pure subroutine s_advance_substep(err, fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                 fntait, fBtait, f_bub_adv_src, f_divu, &
-                                 bub_id, fmass_v, fmass_n, fbeta_c, &
-                                 fbeta_t, fCson, h, &
-                                 myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
+                                      fntait, fBtait, f_bub_adv_src, f_divu, &
+                                      bub_id, fmass_v, fmass_n, fbeta_c, &
+                                      fbeta_t, fCson, h, &
+                                      myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_advance_substep
 #else
@@ -708,7 +708,7 @@ contains
             myPb_tmp(1) = fpb
             myMv_tmp(1) = fmass_v
             call s_advance_EL(myR_tmp(1), myV_tmp(1), myPb_tmp(1), myMv_tmp(1), bub_id, &
-                                          fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(1), mydMvdt_tmp(1))
+                              fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(1), mydMvdt_tmp(1))
         end if
         myA_tmp(1) = f_rddot(fRho, fP, myR_tmp(1), myV_tmp(1), fR0, &
                              myPb_tmp(1), mydPbdt_tmp(1), alf, fntait, fBtait, &
@@ -722,7 +722,7 @@ contains
             myPb_tmp(2) = myPb_tmp(1) + h*mydPbdt_tmp(1)
             myMv_tmp(2) = myMv_tmp(1) + h*mydMvdt_tmp(1)
             call s_advance_EL(myR_tmp(2), myV_tmp(2), myPb_tmp(2), myMv_tmp(2), &
-                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(2), mydMvdt_tmp(2))
+                              bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(2), mydMvdt_tmp(2))
         end if
         myA_tmp(2) = f_rddot(fRho, fP, myR_tmp(2), myV_tmp(2), fR0, &
                              myPb_tmp(2), mydPbdt_tmp(2), alf, fntait, fBtait, &
@@ -736,7 +736,7 @@ contains
             myPb_tmp(3) = myPb_tmp(1) + (h/4._wp)*(mydPbdt_tmp(1) + mydPbdt_tmp(2))
             myMv_tmp(3) = myMv_tmp(1) + (h/4._wp)*(mydMvdt_tmp(1) + mydMvdt_tmp(2))
             call s_advance_EL(myR_tmp(3), myV_tmp(3), myPb_tmp(3), myMv_tmp(3), &
-                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(3), mydMvdt_tmp(3))
+                              bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(3), mydMvdt_tmp(3))
         end if
         myA_tmp(3) = f_rddot(fRho, fP, myR_tmp(3), myV_tmp(3), fR0, &
                              myPb_tmp(3), mydPbdt_tmp(3), alf, fntait, fBtait, &
@@ -750,7 +750,7 @@ contains
             myPb_tmp(4) = myPb_tmp(1) + (h/6._wp)*(mydPbdt_tmp(1) + mydPbdt_tmp(2) + 4._wp*mydPbdt_tmp(3))
             myMv_tmp(4) = myMv_tmp(1) + (h/6._wp)*(mydMvdt_tmp(1) + mydMvdt_tmp(2) + 4._wp*mydMvdt_tmp(3))
             call s_advance_EL(myR_tmp(4), myV_tmp(4), myPb_tmp(4), myMv_tmp(4), &
-                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(4), mydMvdt_tmp(4))
+                              bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(4), mydMvdt_tmp(4))
         end if
         myA_tmp(4) = f_rddot(fRho, fP, myR_tmp(4), myV_tmp(4), fR0, &
                              myPb_tmp(4), mydPbdt_tmp(4), alf, fntait, fBtait, &
@@ -783,7 +783,7 @@ contains
         !!  @param fdPbdt_tmp Rate of change of the internal bubble pressure
         !!  @param fdMvdt_tmp Rate of change of the mass of vapor in the bubble
     pure elemental subroutine s_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, &
-                          fmass_n, fbeta_c, fbeta_t, fdPbdt_tmp, advance_EL)
+                                           fmass_n, fbeta_c, fbeta_t, fdPbdt_tmp, advance_EL)
         !$acc routine seq
         real(wp), intent(IN) :: fR_tmp, fV_tmp, fPb_tmp, fMv_tmp
         real(wp), intent(IN) :: fmass_n, fbeta_c, fbeta_t

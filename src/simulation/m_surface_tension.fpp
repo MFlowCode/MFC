@@ -40,7 +40,6 @@ module m_surface_tension
     type(int_bounds_info) :: is1, is2, is3, iv
     !$acc declare create(is1, is2, is3, iv)
 
-
 contains
 
     impure subroutine s_initialize_surface_tension_module
@@ -67,9 +66,9 @@ contains
     end subroutine s_initialize_surface_tension_module
 
     pure subroutine s_compute_capilary_source_flux(q_prim_vf, &
-                                              vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
-                                              flux_src_vf, &
-                                              id, isx, isy, isz)
+                                                   vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
+                                                   flux_src_vf, &
+                                                   id, isx, isy, isz)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsx_vf
@@ -85,7 +84,6 @@ contains
         real(wp) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(wp) :: normWL, normWR, normW
         integer :: j, k, l, i
-
 
         if (id == 1) then
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
@@ -235,7 +233,6 @@ contains
 
         type(int_bounds_info) :: isx, isy, isz
         integer :: j, k, l, i
-
 
         isx%beg = -1; isy%beg = 0; isz%beg = 0
 

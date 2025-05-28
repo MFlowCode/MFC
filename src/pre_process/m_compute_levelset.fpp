@@ -354,7 +354,7 @@ contains
         real(wp) :: Right, Left, Bottom, Top, Front, Back
         real(wp) :: x, y, z, min_dist
         real(wp) :: side_dists(6)
-        
+
         real(wp) :: x_centroid, y_centroid, z_centroid
         real(wp) :: length_x, length_y, length_z
 

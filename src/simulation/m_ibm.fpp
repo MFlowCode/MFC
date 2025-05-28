@@ -437,7 +437,6 @@ contains
             :: subsection_3D
         integer :: i, j, k, l, q !< Iterator variables
 
-
         num_gps = 0
         num_inner_gps = 0
 
