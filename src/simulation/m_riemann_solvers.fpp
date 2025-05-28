@@ -4004,6 +4004,7 @@ contains
 
                     ! Average velocities and their derivatives at the interface
                     ! For cylindrical: x-dir ~ axial (z_cyl), y-dir ~ radial (r_cyl), z-dir ~ azimuthal (theta_cyl)
+                    !$acc loop seq
                     do i_vel = 1, num_dims
                         avg_v_int(i_vel) = 0.5_wp*(velL_vf(i_vel)%sf(j, k, l) + velR_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
 
@@ -4081,6 +4082,7 @@ contains
                             end if
                         end select
 
+                        !$acc loop seq
                         do i_vel = 1, num_dims
                             flux_src_vf(momxb + i_vel - 1)%sf(j, k, l) = flux_src_vf(momxb + i_vel - 1)%sf(j, k, l) - stress_vector_shear(i_vel)
                             flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - vel_src_int(i_vel)*stress_vector_shear(i_vel)
