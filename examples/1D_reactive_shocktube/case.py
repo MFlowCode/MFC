@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# References:
+# + https://doi.org/10.1016/j.ijhydene.2023.03.190:  Verification of numerical method
+# + https://doi.org/10.1016/j.compfluid.2013.10.014: 4.7. Multi-species reactive shock tube
+
 import json, argparse
 import cantera as ct
 
