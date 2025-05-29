@@ -9,7 +9,8 @@
 module m_chemistry
 
     use m_thermochem, only: &
-        num_species, molecular_weights, get_temperature, get_net_production_rates
+        num_species, molecular_weights, get_temperature, get_net_production_rates, &
+        gas_constant
 
     use m_global_parameters
 
@@ -58,7 +59,7 @@ contains
 
     end subroutine s_compute_q_T_sf
 
-    subroutine s_compute_T_from_primitives(q_T_sf, q_cons_vf, idwint)
+    subroutine s_compute_T_from_primitives(q_T_sf, q_prim_vf, bounds)
 
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf

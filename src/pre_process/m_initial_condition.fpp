@@ -195,7 +195,7 @@ contains
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
-        if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_cons_vf, idwint)
+        if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
 
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
