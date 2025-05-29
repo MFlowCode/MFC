@@ -34,7 +34,7 @@ contains
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out) :: model
 
-        integer :: i, j, iunit, iostat
+        integer :: i, iunit, iostat
 
         character(kind=c_char, len=80) :: header
         integer(kind=c_int32_t) :: nTriangles
@@ -539,7 +539,7 @@ contains
 
         logical :: intersects
 
-        real(wp) :: v0v1(3), v0v2(3), N(3), P(3), C(3), edge(3), vp(3)
+        real(wp) :: N(3), P(3), C(3), edge(3), vp(3)
         real(wp) :: area2, d, t, NdotRayDirection
 
         intersects = .false.
@@ -810,7 +810,6 @@ contains
 
         real(wp) :: edge_length, cell_width
         real(wp), dimension(1:2) :: edge_x, edge_y, edge_del
-        real(wp), allocatable :: temp_boundary_v(:, :)
 
         ! Get the number of boundary edges
         cell_width = minval(spacing(1:2))
@@ -904,7 +903,6 @@ contains
         t_vec3 :: edge_del, cell_area
         t_vec3 :: bary_coord !< Barycentric coordinates
         real(wp) :: edge_length, cell_width, cell_area_min, tri_area
-        real(wp), allocatable :: temp_boundary_v(:, :)
 
         ! Number of triangles in the model
         num_triangles = model%ntrs
@@ -1050,7 +1048,6 @@ contains
         t_vec3, intent(out) :: normals
         real(wp), intent(out) :: distance
 
-        real(wp), dimension(1:model%ntrs, 1:3) :: tri_normals
         real(wp), dimension(1:3, 1:3) :: tri
         real(wp) :: dist_min, dist_t_min
         real(wp) :: dist_min_normal, dist_buffer_normal

@@ -992,7 +992,7 @@ contains
 
         integer, intent(in) :: t_step
         real(wp), dimension(num_fluids, 5), intent(in) :: c_mass
-        integer :: i, j !< Generic loop iterator
+        integer :: i !< Generic loop iterator
         real(wp) :: nondim_time !< Non-dimensional time
 
         ! Non-dimensional time calculation

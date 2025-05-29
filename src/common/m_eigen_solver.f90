@@ -225,7 +225,7 @@ contains
         real(wp), dimension(igh), intent(out) :: ortr, orti
 
         integer :: i, j, ml, ii, jj, la, mp, kp1, mll
-        real(wp) :: f, g, h, fi, fr, scale, c
+        real(wp) :: f, g, h, fi, fr, scale
 
         mll = 6
 
@@ -353,7 +353,7 @@ contains
 
         integer :: i, j, k, l, ml, en, ii, jj, ll, nn, ip1, itn, its, lp1, enm1, iend
         real(wp) :: si, sr, ti, tr, xi, xr, xxi, xxr, yi, yr, zzi, zzr, &
-                    norm, tst1, tst2, c, d
+                    norm, tst1, tst2, c
 !
         ierr = 0
 !     initialize eigenvector matrix

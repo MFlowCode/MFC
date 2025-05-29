@@ -77,7 +77,6 @@ contains
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
-        integer :: bc_loc, bc_dir
         integer :: k, l
 
         ! Population of Buffers in x-direction
@@ -249,7 +248,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, q, i
+        integer :: j, i
 
         if (qbmm .and. .not. polytropic) then
             call s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc, k, l)
@@ -789,7 +788,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, q, i
+        integer :: j, i
 
         if (qbmm .and. .not. polytropic) then
             call s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc, k, l)
@@ -888,7 +887,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, q, i
+        integer :: j, i
 
         if (qbmm .and. .not. polytropic) then
             call s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc, k, l)
@@ -1023,7 +1022,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, i, q
+        integer :: j, i
 
 #ifdef MFC_PRE_PROCESS
         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, -1, k, l)
@@ -1162,7 +1161,7 @@ contains
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
-        integer :: i, j, k, l
+        integer :: k, l
 
         !< x-direction
         if (bcxb >= 0) then
@@ -1290,7 +1289,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, i, q
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
@@ -1348,7 +1347,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, i, q
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
@@ -1430,7 +1429,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, i, q
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
@@ -1485,7 +1484,7 @@ contains
 #ifdef MFC_MPI
         integer :: dir, loc
         integer, dimension(3) :: sf_start_idx, sf_extents_loc
-        integer :: ifile, ierr, data_size
+        integer :: ierr
 
         do dir = 1, num_dims
             do loc = -1, 1, 2
