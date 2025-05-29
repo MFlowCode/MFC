@@ -303,7 +303,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
-            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11,
+            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-10,
             'viscous': 'T'
             })
 
