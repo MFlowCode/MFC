@@ -10,7 +10,7 @@ module m_chemistry
 
     use m_thermochem, only: &
         num_species, molecular_weights, get_temperature, get_net_production_rates, &
-        gas_constant
+        gas_constant, get_mixture_molecular_weight
 
     use m_global_parameters
 
