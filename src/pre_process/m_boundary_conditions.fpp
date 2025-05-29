@@ -35,7 +35,7 @@ contains
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
         integer, intent(in) :: patch_id
 
-        integer :: i, j, k, l
+        integer :: j
 
         ! Patch is a vertical line at x_beg or x_end
         if (patch_bc(patch_id)%dir == 1) then
@@ -86,7 +86,7 @@ contains
 
         integer, intent(in) :: patch_id
 
-        integer :: i, j, k, l
+        integer :: j, k
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
             z_centroid = patch_bc(patch_id)%centroid(3)
@@ -149,7 +149,7 @@ contains
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 
         integer, intent(in) :: patch_id
-        integer :: i, j, k, l
+        integer :: j, k
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
             z_centroid = patch_bc(patch_id)%centroid(3)
@@ -274,7 +274,7 @@ contains
 
         character(LEN=*), intent(in) :: step_dirpath
 
-        integer :: dir, loc, i
+        integer :: dir, loc
         character(len=path_len) :: file_path
 
         character(len=10) :: status
@@ -314,8 +314,6 @@ contains
 
         integer :: dir, loc
         character(len=path_len) :: file_loc, file_path
-
-        character(len=10) :: status
 
 #ifdef MFC_MPI
         integer :: ierr

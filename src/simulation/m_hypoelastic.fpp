@@ -39,7 +39,7 @@ contains
 
     impure subroutine s_initialize_hypoelastic_module
 
-        integer :: i, k, r
+        integer :: i
 
         @:ALLOCATE(Gs(1:num_fluids))
         @:ALLOCATE(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))

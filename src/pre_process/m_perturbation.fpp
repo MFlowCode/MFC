@@ -61,7 +61,7 @@ contains
         integer :: i, j, k, l !< generic loop operators
 
         real(wp) :: perturb_alpha
-        real(wp) :: alpha_unadv
+
         real(wp) :: rand_real
         call random_seed()
 
@@ -90,7 +90,7 @@ contains
 
     impure subroutine s_perturb_surrounding_flow(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        integer :: i, j, k, l !<  generic loop iterators
+        integer :: i, j, k !<  generic loop iterators
 
         real(wp) :: perturb_alpha
         real(wp) :: rand_real
@@ -188,7 +188,7 @@ contains
         real(wp), intent(inout) :: fR
         real(wp) :: f0, f1
         real(wp) :: gam_b
-        integer :: ii, jj
+        integer :: ii
 
         gam_b = 1._wp + 1._wp/fluid_pp(num_fluids + 1)%gamma
 
@@ -238,7 +238,7 @@ contains
         real(wp), dimension(0:nbp - 1, 0:nbp - 1) :: d !< differential operator in y dir
         real(wp) :: gam, pi_inf, mach, c1, adv
         real(wp) :: xratio, uratio
-        integer :: i, j !<  generic loop iterators
+        integer :: j !<  generic loop iterators
 
         xratio = mixlayer_vel_coef
         uratio = 1._wp/patch_icpp(1)%vel(1)
@@ -299,7 +299,7 @@ contains
         real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: fv1, fv2, fv3 !< temporary memory
 
         integer :: ierr
-        integer :: i, j, k, l !<  generic loop iterators
+        integer :: j, k !<  generic loop iterators
         integer :: ii, jj !< block matrix indices
 
         ! Compute y-derivatives of rho and u

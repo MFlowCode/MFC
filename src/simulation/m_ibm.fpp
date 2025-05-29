@@ -435,7 +435,7 @@ contains
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_3D
-        integer :: i, j, k, l, q !< Iterator variables
+        integer :: i, j, k!< Iterator variables
 
         num_gps = 0
         num_inner_gps = 0
@@ -599,7 +599,7 @@ contains
         real(wp) :: buf
         real(wp), dimension(2, 2, 2) :: eta
         type(ghost_point) :: gp
-        integer :: i, j, k, l, q !< Iterator variables
+        integer :: i !< Iterator variables
         integer :: i1, i2, j1, j2, k1, k2 !< Grid indexes
         integer :: patch_id
 

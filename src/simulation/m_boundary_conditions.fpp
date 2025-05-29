@@ -28,8 +28,6 @@ contains
         logical :: file_exist
         character(len=path_len) :: file_path
 
-        character(len=10) :: status
-
         ! Read bc_types
         file_path = trim(step_dirpath)//'/bc_type.dat'
         inquire (FILE=trim(file_path), EXIST=file_exist)
@@ -70,8 +68,6 @@ contains
 
         integer :: dir, loc
         character(len=path_len) :: file_loc, file_path
-
-        character(len=10) :: status
 
 #ifdef MFC_MPI
         integer :: ierr

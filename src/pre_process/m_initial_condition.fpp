@@ -175,8 +175,6 @@ contains
         !!              primitive variables are converted to conservative ones.
     impure subroutine s_generate_initial_condition
 
-        integer :: i  !< Generic loop operator
-
         ! First, compute the temperature field from the conservative variables.
         if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
