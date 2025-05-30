@@ -64,7 +64,7 @@ contains
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
-        
+
         integer :: x, y, z, i
         real(wp), dimension(num_species) :: Ys
         real(wp) :: mix_mol_weight
