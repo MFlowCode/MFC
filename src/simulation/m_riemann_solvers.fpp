@@ -3958,10 +3958,10 @@ contains
         !! @param[in] iy Global Y-direction loop bounds (int_bounds_info).
         !! @param[in] iz Global Z-direction loop bounds (int_bounds_info).
     pure subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, &
-                                                         dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, &
-                                                         velR_vf, &
-                                                         dvelR_dx_vf, dvelR_dy_vf, dvelR_dz_vf, &
-                                                         flux_src_vf, norm_dir, ix, iy, iz)
+                                                              dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, &
+                                                              velR_vf, &
+                                                              dvelR_dx_vf, dvelR_dy_vf, dvelR_dz_vf, &
+                                                              flux_src_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
@@ -4120,16 +4120,16 @@ contains
     !! @param[in] iy Y-direction loop bounds (int_bounds_info).
     !! @param[in] iz Z-direction loop bounds (int_bounds_info).
     pure subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
-                                                       dvelL_dx_vf, &
-                                                       dvelL_dy_vf, &
-                                                       dvelL_dz_vf, &
-                                                       velR_vf, &
-                                                       dvelR_dx_vf, &
-                                                       dvelR_dy_vf, &
-                                                       dvelR_dz_vf, &
-                                                       flux_src_vf, &
-                                                       norm_dir, &
-                                                       ix, iy, iz)
+                                                            dvelL_dx_vf, &
+                                                            dvelL_dy_vf, &
+                                                            dvelL_dz_vf, &
+                                                            velR_vf, &
+                                                            dvelR_dx_vf, &
+                                                            dvelR_dy_vf, &
+                                                            dvelR_dz_vf, &
+                                                            flux_src_vf, &
+                                                            norm_dir, &
+                                                            ix, iy, iz)
 
         ! Arguments
         type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
