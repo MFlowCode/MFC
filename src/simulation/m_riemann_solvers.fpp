@@ -4212,7 +4212,7 @@ contains
                     end if
 
                     if (shear_stress) then
-                        current_tau_shear = 0.0_wp
+                        ! current_tau_shear = 0.0_wp
                         call s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, current_tau_shear)
 
                         do i_dim = 1, num_dims
@@ -4226,7 +4226,7 @@ contains
                     end if
 
                     if (bulk_stress) then
-                        current_tau_bulk = 0.0_wp
+                        ! current_tau_bulk = 0.0_wp
                         call s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, current_tau_bulk)
 
                         do i_dim = 1, num_dims
@@ -4252,7 +4252,7 @@ contains
     !! @param[in] Re_shear Shear Reynolds number.
     !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
     !! @param[out] tau_shear_out Calculated shear stress tensor (stress on i-face, j-direction).
-    subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
+    pure subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
         !$acc routine seq
 
         implicit none
@@ -4286,7 +4286,7 @@ contains
     !! @param[in] Re_bulk Bulk Reynolds number.
     !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
     !! @param[out] tau_bulk_out Calculated bulk stress tensor (stress on i-face, i-direction).
-    subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
+    pure subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
         !$acc routine seq
 
         implicit none
