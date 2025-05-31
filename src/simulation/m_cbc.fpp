@@ -783,9 +783,9 @@ contains
                         end do
 
                         if (bubbles_euler) then
-                            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc, 0, k, r)
+                            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc)
                         else
-                            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc, 0, k, r)
+                            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc)
                         end if
 
                         !$acc loop seq
@@ -1026,8 +1026,7 @@ contains
         ! The reshaping of outputted data and disssociation of the FD and PI
         ! coefficients, or CBC coefficients, respectively, based on selected
         ! CBC coordinate direction.
-        call s_finalize_cbc(flux_vf, flux_src_vf, &
-                            ix, iy, iz)
+        call s_finalize_cbc(flux_vf, flux_src_vf)
     end subroutine s_cbc
 
     !>  The computation of parameters, the allocation of memory,
@@ -1314,17 +1313,11 @@ contains
         !!      are necessary in order to finalize the CBC application
         !!  @param flux_vf Cell-boundary-average fluxes
         !!  @param flux_src_vf Cell-boundary-average flux sources
-        !!  @param ix Index bound in the first coordinate direction
-        !!  @param iy Index bound in the second coordinate direction
-        !!  @param iz Index bound in the third coordinate direction
-    subroutine s_finalize_cbc(flux_vf, flux_src_vf, &
-                              ix, iy, iz)
+    subroutine s_finalize_cbc(flux_vf, flux_src_vf)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: flux_vf, flux_src_vf
-
-        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, r !< Generic loop iterators
 

@@ -589,8 +589,8 @@ contains
                     myalpha(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))
                 end do
                 call s_convert_species_to_mixture_variables_acc(rhol, gamma, pi_inf, qv, myalpha, &
-                                                                myalpha_rho, Re, cell(1), cell(2), cell(3))
-                call s_compute_cson_from_pinf(k, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
+                                                                myalpha_rho, Re)
+                call s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
 
                 ! Velocity correction due to massflux
                 velint = fV - gas_dmvdt(k, stage)/(4._wp*pi*fR**2._wp*rhol)
@@ -629,7 +629,6 @@ contains
     end subroutine s_compute_EL_coupled_solver
 
     !>  This procedure computes the speed of sound from a given driving pressure
-        !! @param bub_id Bubble id
         !! @param q_prim_vf Primitive variables
         !! @param pinf Driving pressure
         !! @param cell Bubble cell
@@ -637,13 +636,12 @@ contains
         !! @param gamma Liquid specific heat ratio
         !! @param pi_inf Liquid stiffness
         !! @param cson Calculated speed of sound
-    subroutine s_compute_cson_from_pinf(bub_id, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
+    subroutine s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_cson_from_pinf
 #else
         !$acc routine seq
 #endif
-        integer, intent(in) :: bub_id
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp), intent(in) :: pinf, rhol, gamma, pi_inf
         integer, dimension(3), intent(in) :: cell

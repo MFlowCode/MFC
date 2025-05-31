@@ -666,8 +666,7 @@ contains
             q_cons_qp%vf, &
             q_T_sf, &
             q_prim_qp%vf, &
-            idwint, &
-            gm_alpha_qp%vf)
+            idwint)
         call nvtxEndRange
 
         call nvtxStartRange("RHS-COMMUNICATION")
@@ -684,7 +683,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, mv, rhs_mv, idwbuff(1), idwbuff(2), idwbuff(3), nbub)
+        if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, mv, rhs_mv, idwbuff(1), idwbuff(2), idwbuff(3))
 
         if (viscous) then
             call nvtxStartRange("RHS-VISCOUS")
@@ -849,9 +848,7 @@ contains
                                         rhs_vf, &
                                         flux_n(id)%vf, &
                                         pb, &
-                                        rhs_pb, &
-                                        mv, &
-                                        rhs_mv)
+                                        rhs_pb)
                 call nvtxEndRange
             end if
             ! END: Additional physics and source terms
@@ -895,7 +892,6 @@ contains
             call s_compute_bubble_EE_source( &
                 q_cons_qp%vf(1:sys_size), &
                 q_prim_qp%vf(1:sys_size), &
-                t_step, &
                 rhs_vf)
             call nvtxEndRange
         end if

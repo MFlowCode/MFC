@@ -2299,8 +2299,7 @@ contains
                             if (interpolate) then
                                 STL_levelset%sf(i, j, k, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
                                                                                              total_vertices, &
-                                                                                             point, &
-                                                                                             (/dx, dy, dz/))
+                                                                                             point)
                             else
                                 STL_levelset%sf(i, j, k, patch_id) = distance
                             end if
@@ -2323,15 +2322,12 @@ contains
                                 ! Get the shortest distance between the cell center and the model boundary
                                 STL_levelset%sf(i, j, 0, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
                                                                                              total_vertices, &
-                                                                                             point, &
-                                                                                             (/dx, dy, dz/))
+                                                                                             point)
                             else
                                 ! Get the shortest distance between the cell center and the interpolated model boundary
                                 STL_levelset%sf(i, j, 0, patch_id) = f_distance(boundary_v, &
-                                                                                boundary_vertex_count, &
                                                                                 boundary_edge_count, &
-                                                                                point, &
-                                                                                (/dx, dy, dz/))
+                                                                                point)
                             end if
 
                             ! Correct the sign of the levelset
@@ -2341,10 +2337,9 @@ contains
 
                             ! Get the boundary normals
                             call f_normals(boundary_v, &
-                                            boundary_vertex_count, &
                                             boundary_edge_count, &
                                             point, &
-                                            & (/dx, dy, dz/), normals)
+                                            normals)
 
                             ! Correct the sign of the levelset_norm
                             if (patch_id_fp(i, j, k) == 0) then

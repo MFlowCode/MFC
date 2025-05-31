@@ -157,9 +157,9 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fCpbw Boundary wall pressure
-    function f_rddot_RP(fCp, fRho, fR, fV, fR0, fCpbw)
+    function f_rddot_RP(fCp, fRho, fR, fV, fCpbw)
         !$acc routine seq
-        real(wp), intent(in) :: fCp, fRho, fR, fV, fR0, fCpbw
+        real(wp), intent(in) :: fCp, fRho, fR, fV, fCpbw
 
         real(wp) :: f_rddot_RP
 

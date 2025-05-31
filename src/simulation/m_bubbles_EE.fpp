@@ -150,10 +150,9 @@ contains
         !!      that are needed for the bubble modeling
         !!  @param q_prim_vf Primitive variables
         !!  @param q_cons_vf Conservative variables
-    subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, t_step, rhs_vf)
+    subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        integer, intent(in) :: t_step
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         real(wp) :: rddot
@@ -569,7 +568,7 @@ contains
         else if (bubble_model == 3) then
             ! Rayleigh-Plesset bubbles
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
-            f_rddot = f_rddot_RP(fP, fRho, fR, fV, fR0, fCpbw)
+            f_rddot = f_rddot_RP(fP, fRho, fR, fV, fCpbw)
         end if
 
     end function f_rddot

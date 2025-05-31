@@ -352,7 +352,7 @@ contains
         call cg(mixlayer_nvar*n - n_bc_skip, mixlayer_nvar*n - n_bc_skip, hr, hi, wr, wi, zr, zi, fv1, fv2, fv3, ierr)
 
         ! Generate instability wave
-        call s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
+        call s_generate_wave(wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
 
     end subroutine s_solve_linear_system
 
@@ -494,8 +494,8 @@ contains
     !>  This subroutine generates an instability wave using the most unstable
         !!              eigenvalue and corresponding eigenvector among the
         !!              given set of eigenvalues and eigenvectors.
-    subroutine s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
-        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: wr, wi !< eigenvalues
+    subroutine s_generate_wave(wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: wi !< eigenvalues
         real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: zr, zi !< eigenvectors
         real(wp), intent(in) :: rho_mean
         real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave

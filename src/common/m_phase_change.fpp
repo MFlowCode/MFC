@@ -143,7 +143,7 @@ contains
 
                     ! Calling pT-equilibrium for either finishing phase-change module, or as an IC for the pTg-equilibrium
                     ! for this case, MFL cannot be either 0 or 1, so I chose it to be 2
-                    call s_infinite_pt_relaxation_k(j, k, l, 2, pS, p_infpT, rM, q_cons_vf, rhoe, TS)
+                    call s_infinite_pt_relaxation_k(j, k, l, 2, pS, p_infpT, q_cons_vf, rhoe, TS)
 
                     ! check if pTg-equilibrium is required
                     ! NOTE that NOTHING else needs to be updated OTHER than the individual partial densities
@@ -164,7 +164,7 @@ contains
                         q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
 
                         ! calling pT-equilibrium for overheated vapor, which is MFL = 0
-                        call s_infinite_pt_relaxation_k(j, k, l, 0, pSOV, p_infOV, rM, q_cons_vf, rhoe, TSOV)
+                        call s_infinite_pt_relaxation_k(j, k, l, 0, pSOV, p_infOV, q_cons_vf, rhoe, TSOV)
 
                         ! calculating Saturation temperature
                         call s_TSat(pSOV, TSatOV, TSOV)
@@ -177,7 +177,7 @@ contains
                         q_cons_vf(vp + contxb - 1)%sf(j, k, l) = mixM*rM
 
                         ! calling pT-equilibrium for subcooled liquid, which is MFL = 1
-                        call s_infinite_pt_relaxation_k(j, k, l, 1, pSSL, p_infSL, rM, q_cons_vf, rhoe, TSSL)
+                        call s_infinite_pt_relaxation_k(j, k, l, 1, pSSL, p_infSL, q_cons_vf, rhoe, TSSL)
 
                         ! calculating Saturation temperature
                         call s_TSat(pSSL, TSatSL, TSSL)
@@ -281,7 +281,7 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param rhoe mixture energy
         !!  @param TS equilibrium temperature at the interface
-    subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, rM, q_cons_vf, rhoe, TS)
+    subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, q_cons_vf, rhoe, TS)
 
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_infinite_pt_relaxation_k
@@ -293,7 +293,6 @@ contains
         integer, intent(in) :: j, k, l, MFL
         real(wp), intent(out) :: pS
         real(wp), dimension(num_fluids), intent(out) :: p_infpT
-        real(wp), intent(in) :: rM
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp), intent(in) :: rhoe
         real(wp), intent(out) :: TS

@@ -966,10 +966,9 @@ contains
             q_cons_ts(1)%vf, &
             q_T_sf, &
             q_prim_vf, &
-            idwint, &
-            gm_alpha_qp%vf)
+            idwint)
 
-        call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+        call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, rhs_vf)
 
         call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
@@ -996,8 +995,7 @@ contains
             q_cons_ts(1)%vf, &
             q_T_sf, &
             q_prim_vf, &
-            idwint, &
-            gm_alpha_qp%vf)
+            idwint)
 
         !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
         do l = 0, p

@@ -142,7 +142,7 @@ contains
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, -1, k, l)
                     case (BC_AXIS)
-                        call s_axis(q_prim_vf, pb, mv, 2, -1, k, l)
+                        call s_axis(q_prim_vf, pb, mv, k, l)
                     case (BC_REFLECTIVE)
                         call s_symmetry(q_prim_vf, pb, mv, 2, -1, k, l)
                     case (BC_PERIODIC)
@@ -713,7 +713,7 @@ contains
 
     end subroutine s_periodic
 
-    subroutine s_axis(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
+    subroutine s_axis(q_prim_vf, pb, mv, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_axis
 #else
@@ -721,7 +721,6 @@ contains
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
-        integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
         integer :: j, q, i

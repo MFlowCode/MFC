@@ -826,12 +826,10 @@ contains
 
     end subroutine s_read_grid
 
-    subroutine s_apply_initial_condition(start, finish, proc_time, time_avg, time_final, file_exists)
+    subroutine s_apply_initial_condition(start, finish)
 
         real(wp), intent(inout) :: start, finish
-        real(wp), dimension(:), intent(inout) :: proc_time
-        real(wp), intent(inout) :: time_avg, time_final
-        logical, intent(inout) :: file_exists
+
 
         ! Setting up the grid and the initial condition. If the grid is read in from
         ! preexisting grid data files, it is checked for consistency. If the grid is

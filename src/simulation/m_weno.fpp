@@ -668,7 +668,7 @@ contains
 
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
-                                   norm_dir, weno_dir)
+                                   weno_dir)
         end if
 
         if (weno_order == 1) then
@@ -1120,11 +1120,10 @@ contains
         !! @param is2_weno Index bounds in second coordinate direction
         !! @param is3_weno Index bounds in third coordinate direction
     subroutine s_initialize_weno(v_vf, &
-                                 norm_dir, weno_dir)
+                                 weno_dir)
 
         type(scalar_field), dimension(:), intent(IN) :: v_vf
 
-        integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
 
         integer :: j, k, l, q
