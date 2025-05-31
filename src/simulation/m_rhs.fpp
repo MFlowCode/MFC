@@ -1200,7 +1200,8 @@ contains
             type(vector_field), intent(in) :: q_cons_vf_arg
             type(vector_field), intent(in) :: q_prim_vf_arg
             type(vector_field), intent(in) :: flux_src_n_vf_arg
-            real(wp), dimension(0:m, 0:n, 0:p), intent(in) :: Kterm_arg
+            ! CORRECTED DECLARATION FOR Kterm_arg:
+            real(wp), allocatable, dimension(:, :, :), intent(in) :: Kterm_arg
 
             integer :: j_adv, k_idx, l_idx, q_idx
             real(wp) :: local_inv_ds, local_term_coeff, local_flux1, local_flux2
@@ -1208,15 +1209,15 @@ contains
             logical :: use_standard_riemann
 
             select case (current_idir)
-            case (1)
+            case (1) ! x-direction
                 use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
                 if (use_standard_riemann) then
                     !$acc parallel loop collapse(4) gang vector default(present) &
                     !$acc private(local_inv_ds, local_term_coeff, local_flux1, local_flux2)
                     do j_adv = advxb, advxe
-                        do q_idx = 0, p
-                            do l_idx = 0, n
-                                do k_idx = 0, m
+                        do q_idx = 0, p ! z_extent
+                            do l_idx = 0, n ! y_extent
+                                do k_idx = 0, m ! x_extent
                                     local_inv_ds = 1._wp/dx(k_idx)
                                     local_term_coeff = q_prim_vf_arg%vf(contxe + current_idir)%sf(k_idx, l_idx, q_idx)
                                     local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(k_idx - 1, l_idx, q_idx)
@@ -1227,7 +1228,7 @@ contains
                             end do
                         end do
                     end do
-                else
+                else ! Other Riemann solvers
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
                             !$acc parallel loop collapse(3) gang vector default(present) &
@@ -1235,7 +1236,7 @@ contains
                             do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
                                         local_inv_ds = 1._wp/dx(k_idx)
                                         local_q_cons_val = q_cons_vf_arg%vf(advxe)%sf(k_idx, l_idx, q_idx)
-                                        local_k_term_val = Kterm_arg(k_idx, l_idx, q_idx)
+                                        local_k_term_val = Kterm_arg(k_idx, l_idx, q_idx) ! Access is safe due to outer alt_soundspeed check
                                         local_term_coeff = local_q_cons_val - local_k_term_val
                                         local_flux1 = flux_src_n_vf_arg%vf(advxe)%sf(k_idx, l_idx, q_idx)
                                         local_flux2 = flux_src_n_vf_arg%vf(advxe)%sf(k_idx - 1, l_idx, q_idx)
@@ -1248,7 +1249,7 @@ contains
                             do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
                                         local_inv_ds = 1._wp/dx(k_idx)
                                         local_q_cons_val = q_cons_vf_arg%vf(advxb)%sf(k_idx, l_idx, q_idx)
-                                        local_k_term_val = Kterm_arg(k_idx, l_idx, q_idx)
+                                        local_k_term_val = Kterm_arg(k_idx, l_idx, q_idx) ! Access is safe
                                         local_term_coeff = local_q_cons_val + local_k_term_val
                                         local_flux1 = flux_src_n_vf_arg%vf(advxb)%sf(k_idx, l_idx, q_idx)
                                         local_flux2 = flux_src_n_vf_arg%vf(advxb)%sf(k_idx - 1, l_idx, q_idx)
@@ -1256,7 +1257,7 @@ contains
                                                                                     local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                     end do; end do; end do
                         end if
-                    else
+                    else ! NOT alt_soundspeed
                         !$acc parallel loop collapse(4) gang vector default(present) &
                         !$acc private(local_inv_ds, local_term_coeff, local_flux1, local_flux2)
                         do j_adv = advxb, advxe
@@ -1272,15 +1273,15 @@ contains
                     end if
                 end if
 
-            case (2)
+            case (2) ! y-direction: loops q_idx (x), k_idx (y), l_idx (z); sf(q_idx, k_idx, l_idx); dy(k_idx); Kterm(q_idx,k_idx,l_idx)
                 use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
                 if (use_standard_riemann) then
                     !$acc parallel loop collapse(4) gang vector default(present) &
                     !$acc private(local_inv_ds, local_term_coeff, local_flux1, local_flux2)
                     do j_adv = advxb, advxe
-                        do l_idx = 0, p
-                            do k_idx = 0, n
-                                do q_idx = 0, m
+                        do l_idx = 0, p ! z_extent
+                            do k_idx = 0, n ! y_extent
+                                do q_idx = 0, m ! x_extent
                                     local_inv_ds = 1._wp/dy(k_idx)
                                     local_term_coeff = q_prim_vf_arg%vf(contxe + current_idir)%sf(q_idx, k_idx, l_idx)
                                     local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(q_idx, k_idx - 1, l_idx)
@@ -1291,7 +1292,7 @@ contains
                             end do
                         end do
                     end do
-                else
+                else ! Other Riemann solvers
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
                             !$acc parallel loop collapse(3) gang vector default(present) &
@@ -1299,7 +1300,7 @@ contains
                             do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
                                         local_inv_ds = 1._wp/dy(k_idx)
                                         local_q_cons_val = q_cons_vf_arg%vf(advxe)%sf(q_idx, k_idx, l_idx)
-                                        local_k_term_val = Kterm_arg(q_idx, k_idx, l_idx)
+                                        local_k_term_val = Kterm_arg(q_idx, k_idx, l_idx) ! Access is safe
                                         local_term_coeff = local_q_cons_val - local_k_term_val
                                         local_flux1 = flux_src_n_vf_arg%vf(advxe)%sf(q_idx, k_idx, l_idx)
                                         local_flux2 = flux_src_n_vf_arg%vf(advxe)%sf(q_idx, k_idx - 1, l_idx)
@@ -1316,7 +1317,7 @@ contains
                             do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
                                         local_inv_ds = 1._wp/dy(k_idx)
                                         local_q_cons_val = q_cons_vf_arg%vf(advxb)%sf(q_idx, k_idx, l_idx)
-                                        local_k_term_val = Kterm_arg(q_idx, k_idx, l_idx)
+                                        local_k_term_val = Kterm_arg(q_idx, k_idx, l_idx) ! Access is safe
                                         local_term_coeff = local_q_cons_val + local_k_term_val
                                         local_flux1 = flux_src_n_vf_arg%vf(advxb)%sf(q_idx, k_idx, l_idx)
                                         local_flux2 = flux_src_n_vf_arg%vf(advxb)%sf(q_idx, k_idx - 1, l_idx)
@@ -1328,7 +1329,7 @@ contains
                                         end if
                                     end do; end do; end do
                         end if
-                    else
+                    else ! NOT alt_soundspeed
                         !$acc parallel loop collapse(4) gang vector default(present) &
                         !$acc private(local_inv_ds, local_term_coeff, local_flux1, local_flux2)
                         do j_adv = advxb, advxe
@@ -1344,7 +1345,7 @@ contains
                     end if
                 end if
 
-            case (3)
+            case (3) ! z-direction: loops l_idx (x), q_idx (y), k_idx (z); sf(l_idx, q_idx, k_idx); dz(k_idx); Kterm(l_idx,q_idx,k_idx)
                 if (grid_geometry == 3) then
                     use_standard_riemann = (riemann_solver == 1)
                 else
@@ -1355,9 +1356,9 @@ contains
                     !$acc parallel loop collapse(4) gang vector default(present) &
                     !$acc private(local_inv_ds, local_term_coeff, local_flux1, local_flux2)
                     do j_adv = advxb, advxe
-                        do k_idx = 0, p
-                            do q_idx = 0, n
-                                do l_idx = 0, m
+                        do k_idx = 0, p ! z_extent
+                            do q_idx = 0, n ! y_extent
+                                do l_idx = 0, m ! x_extent
                                     local_inv_ds = 1._wp/dz(k_idx)
                                     local_term_coeff = q_prim_vf_arg%vf(contxe + current_idir)%sf(l_idx, q_idx, k_idx)
                                     local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx - 1)
@@ -1368,7 +1369,7 @@ contains
                             end do
                         end do
                     end do
-                else
+                else ! Other Riemann solvers
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
                             !$acc parallel loop collapse(3) gang vector default(present) &
@@ -1376,7 +1377,7 @@ contains
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
                                         local_inv_ds = 1._wp/dz(k_idx)
                                         local_q_cons_val = q_cons_vf_arg%vf(advxe)%sf(l_idx, q_idx, k_idx)
-                                        local_k_term_val = Kterm_arg(l_idx, q_idx, k_idx)
+                                        local_k_term_val = Kterm_arg(l_idx, q_idx, k_idx) ! Access is safe
                                         local_term_coeff = local_q_cons_val - local_k_term_val
                                         local_flux1 = flux_src_n_vf_arg%vf(advxe)%sf(l_idx, q_idx, k_idx)
                                         local_flux2 = flux_src_n_vf_arg%vf(advxe)%sf(l_idx, q_idx, k_idx - 1)
@@ -1389,7 +1390,7 @@ contains
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
                                         local_inv_ds = 1._wp/dz(k_idx)
                                         local_q_cons_val = q_cons_vf_arg%vf(advxb)%sf(l_idx, q_idx, k_idx)
-                                        local_k_term_val = Kterm_arg(l_idx, q_idx, k_idx)
+                                        local_k_term_val = Kterm_arg(l_idx, q_idx, k_idx) ! Access is safe
                                         local_term_coeff = local_q_cons_val + local_k_term_val
                                         local_flux1 = flux_src_n_vf_arg%vf(advxb)%sf(l_idx, q_idx, k_idx)
                                         local_flux2 = flux_src_n_vf_arg%vf(advxb)%sf(l_idx, q_idx, k_idx - 1)
@@ -1397,7 +1398,7 @@ contains
                                                                                     local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                     end do; end do; end do
                         end if
-                    else
+                    else ! NOT alt_soundspeed
                         !$acc parallel loop collapse(4) gang vector default(present) &
                         !$acc private(local_inv_ds, local_term_coeff, local_flux1, local_flux2)
                         do j_adv = advxb, advxe
