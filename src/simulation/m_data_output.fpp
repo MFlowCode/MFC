@@ -663,8 +663,6 @@ contains
                             if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                                 .or. &
                                 ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                                .or. &
-                                ((i >= chemxb) .and. (i <= chemxe)) &
                                 ) then
                                 write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
                             else
