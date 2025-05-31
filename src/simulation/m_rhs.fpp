@@ -580,7 +580,7 @@ contains
         !$acc update device(gamma_min, pres_inf)
 
         if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+            @:ALLOCATE(Res(1:2, 1:Re_size_max))
         end if
 
         if (viscous) then

@@ -21,6 +21,8 @@ module m_mpi_proxy
 
     use ieee_arithmetic
 
+    use m_helper_basic, only: s_update_cell_bounds
+
     implicit none
 
     !> @name Buffers of the conservative variables received/sent from/to neighboring
@@ -70,14 +72,14 @@ contains
                                                (m + 2*buff_size + 1)* &
                                                (n + 2*buff_size + 1)* &
                                                (p + 2*buff_size + 1)/ &
-                                               (min(m, n, p) &
+                                               (cells_bounds%mnp_min &
                                                 + 2*buff_size + 1) - 1))
                     allocate (q_cons_buffer_out(0:buff_size* &
                                                 sys_size* &
                                                 (m + 2*buff_size + 1)* &
                                                 (n + 2*buff_size + 1)* &
                                                 (p + 2*buff_size + 1)/ &
-                                                (min(m, n, p) &
+                                                (cells_bounds%mnp_min &
                                                  + 2*buff_size + 1) - 1))
 
                     ! Simulation is 2D
@@ -85,11 +87,11 @@ contains
 
                     allocate (q_cons_buffer_in(0:buff_size* &
                                                sys_size* &
-                                               (max(m, n) &
+                                               (cells_bounds%mn_max &
                                                 + 2*buff_size + 1) - 1))
                     allocate (q_cons_buffer_out(0:buff_size* &
                                                 sys_size* &
-                                                (max(m, n) &
+                                                (cells_bounds%mn_max &
                                                  + 2*buff_size + 1) - 1))
 
                 end if
@@ -598,6 +600,8 @@ contains
                 exit
             end if
         end do
+
+        call s_update_cell_bounds(cells_bounds, m, n, p)
 
         ! Boundary condition at the beginning
         if (proc_coords(1) > 0 .or. bc_x%beg == BC_PERIODIC) then
