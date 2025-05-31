@@ -48,7 +48,7 @@ contains
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_mpi_proxy_module
+    impure subroutine s_initialize_mpi_proxy_module
 
 #ifdef MFC_MPI
 
@@ -144,7 +144,7 @@ contains
         !!      these are not available to the remaining processors. This
         !!      subroutine is then in charge of broadcasting the required
         !!      information.
-    subroutine s_mpi_bcast_user_inputs
+    impure subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
         integer :: i !< Generic loop iterator
@@ -206,7 +206,7 @@ contains
         !!      as well as recomputing some of the global parameters so
         !!      that they reflect the configuration of sub-domain that
         !!      is overseen by the local processor.
-    subroutine s_mpi_decompose_computational_domain
+    impure subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
 
@@ -646,7 +646,7 @@ contains
         !!      cell-boundary locations is communicated.
         !!  @param pbc_loc Processor boundary condition (PBC) location
         !!  @param sweep_coord Coordinate direction normal to the processor boundary
-    subroutine s_mpi_sendrecv_grid_vars_buffer_regions(pbc_loc, sweep_coord)
+    impure subroutine s_mpi_sendrecv_grid_vars_buffer_regions(pbc_loc, sweep_coord)
 
         character(LEN=3), intent(in) :: pbc_loc
         character, intent(in) :: sweep_coord
@@ -846,8 +846,8 @@ contains
         !!  @param pbc_loc Processor boundary condition (PBC) location
         !!  @param sweep_coord Coordinate direction normal to the processor boundary
         !!  @param q_particle Projection of the lagrangian particles in the Eulerian framework
-    subroutine s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, pbc_loc, &
-                                                       sweep_coord, q_particle)
+    impure subroutine s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, pbc_loc, &
+                                                              sweep_coord, q_particle)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -1496,7 +1496,7 @@ contains
         !!  @param spatial_extents Spatial extents for each processor's sub-domain. First dimension
         !!  corresponds to the minimum and maximum values, respectively, while
         !!  the second dimension corresponds to the processor rank.
-    subroutine s_mpi_gather_spatial_extents(spatial_extents)
+    impure subroutine s_mpi_gather_spatial_extents(spatial_extents)
 
         real(wp), dimension(1:, 0:), intent(INOUT) :: spatial_extents
 
@@ -1615,7 +1615,7 @@ contains
         !!      puts back together the grid of the entire computational
         !!      domain on the rank 0 processor. This is only done for 1D
         !!      simulations.
-    subroutine s_mpi_defragment_1d_grid_variable
+    impure subroutine s_mpi_defragment_1d_grid_variable
 
 #ifdef MFC_MPI
 
@@ -1651,7 +1651,7 @@ contains
         !!   First dimension of array corresponds to the former's minimum and
         !!  maximum values, respectively, while second dimension corresponds
         !!  to each processor's rank.
-    subroutine s_mpi_gather_data_extents(q_sf, data_extents)
+    impure subroutine s_mpi_gather_data_extents(q_sf, data_extents)
 
         real(wp), dimension(:, :, :), intent(in) :: q_sf
 
@@ -1681,7 +1681,7 @@ contains
         !!      This is only done for 1D simulations.
         !!  @param q_sf Flow variable defined on a single computational sub-domain
         !!  @param q_root_sf Flow variable defined on the entire computational domain
-    subroutine s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
+    impure subroutine s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
 
         real(wp), &
             dimension(0:m), &
@@ -1705,7 +1705,7 @@ contains
     end subroutine s_mpi_defragment_1d_flow_variable
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_mpi_proxy_module
+    impure subroutine s_finalize_mpi_proxy_module
 
 #ifdef MFC_MPI
 

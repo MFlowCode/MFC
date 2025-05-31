@@ -30,7 +30,7 @@ module m_perturbation
 
 contains
 
-    subroutine s_initialize_perturbation_module()
+    impure subroutine s_initialize_perturbation_module()
 
         bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
 
@@ -56,7 +56,7 @@ contains
 
     end subroutine s_initialize_perturbation_module
 
-    subroutine s_perturb_sphere(q_prim_vf)
+    impure subroutine s_perturb_sphere(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !< generic loop operators
 
@@ -88,7 +88,7 @@ contains
 
     end subroutine s_perturb_sphere
 
-    subroutine s_perturb_surrounding_flow(q_prim_vf)
+    impure subroutine s_perturb_surrounding_flow(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k !<  generic loop iterators
 
@@ -120,7 +120,7 @@ contains
         !!              instability waves with spatial wavenumbers, (4,0), (2,0),
         !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4),
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
-    subroutine s_superposition_instability_wave(q_prim_vf)
+    impure subroutine s_superposition_instability_wave(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
         real(wp) :: uratio, Ldomain
@@ -183,7 +183,7 @@ contains
     end subroutine s_superposition_instability_wave
 
     !>  This subroutine computes equilibrium bubble radius of the perturbed pressure field
-    subroutine s_compute_equilibrium_state(fP, fR0, fR)
+    impure subroutine s_compute_equilibrium_state(fP, fR0, fR)
         real(wp), intent(in) :: fP, fR0
         real(wp), intent(inout) :: fR
         real(wp) :: f0, f1
@@ -229,7 +229,7 @@ contains
         !!              The eigenvalue problem is derived from the linearized
         !!              Euler equations with parallel mean flow assumption
         !!              (See Sandham 1989 PhD thesis for details).
-    subroutine s_instability_wave(alpha, beta, wave, shift)
+    pure subroutine s_instability_wave(alpha, beta, wave, shift)
         real(wp), intent(in) :: alpha, beta !<  spatial wavenumbers
         real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave !< instability wave
         real(wp), intent(in) :: shift !< phase shift
@@ -281,7 +281,7 @@ contains
     !> This subroutine solves linear system from linear stability analysis and
         !!              generate instability waves for the given set of spatial
         !!              wave numbers and phase shift.
-    subroutine s_solve_linear_system(alpha, beta, u_mean, rho_mean, p_mean, d, gam, pi_inf, mach, wave, shift)
+    pure subroutine s_solve_linear_system(alpha, beta, u_mean, rho_mean, p_mean, d, gam, pi_inf, mach, wave, shift)
         real(wp), intent(in) :: alpha, beta !<  spatial wavenumbers
         real(wp), dimension(0:nbp - 1), intent(in) :: u_mean !<  mean velocity profiles
         real(wp), intent(in) :: rho_mean, p_mean !< mean density and pressure
@@ -358,7 +358,7 @@ contains
 
     !> This subroutine applies non-reflecting subsonic buffer boundary condition
         !!              to the linear system of equations (i.e. matrix A).
-    subroutine s_instability_nonreflecting_subsonic_buffer_bc(ar, ai, hr, hi, rho_mean, mach)
+    pure subroutine s_instability_nonreflecting_subsonic_buffer_bc(ar, ai, hr, hi, rho_mean, mach)
         real(wp), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1), intent(inout) :: ar, ai    !< matrices for eigenvalue problem
         real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(out) :: hr, hi    !< matrices for eigenvalue problem
         real(wp), intent(in) :: rho_mean !<  mean density profiles
@@ -494,7 +494,7 @@ contains
     !>  This subroutine generates an instability wave using the most unstable
         !!              eigenvalue and corresponding eigenvector among the
         !!              given set of eigenvalues and eigenvectors.
-    subroutine s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
+    pure subroutine s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
         real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: wr, wi !< eigenvalues
         real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: zr, zi !< eigenvectors
         real(wp), intent(in) :: rho_mean
@@ -615,7 +615,7 @@ contains
 
     end subroutine s_generate_wave
 
-    subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
+    impure subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
@@ -676,7 +676,7 @@ contains
 
     end subroutine s_elliptic_smoothing
 
-    subroutine s_finalize_perturbation_module()
+    impure subroutine s_finalize_perturbation_module()
 
         if (elliptic_smoothing) then
             deallocate (q_prim_temp)

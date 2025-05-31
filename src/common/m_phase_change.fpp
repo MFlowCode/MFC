@@ -47,7 +47,7 @@ contains
     !> This subroutine should dispatch to the correct relaxation solver based
         !!      some parameter. It replaces the procedure pointer, which CCE
         !!      is breaking on.
-    subroutine s_relaxation_solver(q_cons_vf)
+    impure subroutine s_relaxation_solver(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         ! This is empty because in current master the procedure pointer
         ! was never assigned
@@ -58,7 +58,7 @@ contains
         !!      by setting the parameters needed for phase change and
         !!      selecting the phase change module that will be used
         !!      (pT- or pTg-equilibrium)
-    subroutine s_initialize_phasechange_module
+    impure subroutine s_initialize_phasechange_module
         ! variables used in the calculation of the saturation curves for fluids 1 and 2
         A = (gs_min(lp)*cvs(lp) - gs_min(vp)*cvs(vp) &
              + qvps(vp) - qvps(lp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
@@ -78,7 +78,7 @@ contains
         !!      model, also considering mass depletion, depending on the incoming
         !!      state conditions.
         !!  @param q_cons_vf Cell-average conservative variables
-    subroutine s_infinite_relaxation_k(q_cons_vf)
+    pure subroutine s_infinite_relaxation_k(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp) :: pS, pSOV, pSSL !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
@@ -281,7 +281,7 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param rhoe mixture energy
         !!  @param TS equilibrium temperature at the interface
-    subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, rM, q_cons_vf, rhoe, TS)
+    pure subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, rM, q_cons_vf, rhoe, TS)
 
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_infinite_pt_relaxation_k
@@ -386,7 +386,7 @@ contains
         !!  @param rhoe mixture energy
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param TS equilibrium temperature at the interface
-    subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, p_infpT, rhoe, q_cons_vf, TS)
+    pure subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, p_infpT, rhoe, q_cons_vf, TS)
 
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_infinite_ptg_relaxation_k
@@ -511,7 +511,7 @@ contains
         !!  @param j generic loop iterator for x direction
         !!  @param k generic loop iterator for y direction
         !!  @param l generic loop iterator for z direction
-    subroutine s_correct_partial_densities(MCT, q_cons_vf, rM, j, k, l)
+    pure subroutine s_correct_partial_densities(MCT, q_cons_vf, rM, j, k, l)
 
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_correct_partial_densities
@@ -574,7 +574,7 @@ contains
         !!  @param pS equilibrium pressure at the interface
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param TJac Transpose of the Jacobian Matrix
-    subroutine s_compute_jacobian_matrix(InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2, pS, q_cons_vf, TJac)
+    pure subroutine s_compute_jacobian_matrix(InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2, pS, q_cons_vf, TJac)
 
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_jacobian_matrix
@@ -681,7 +681,7 @@ contains
         !!  @param pS equilibrium pressure at the interface
         !!  @param rhoe mixture energy
         !!  @param R2D (2D) residue array
-    subroutine s_compute_pTg_residue(j, k, l, mCPD, mCVGP, mQD, q_cons_vf, pS, rhoe, R2D)
+    pure subroutine s_compute_pTg_residue(j, k, l, mCPD, mCVGP, mQD, q_cons_vf, pS, rhoe, R2D)
 
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_pTg_residue
@@ -732,7 +732,7 @@ contains
         !!  @param pSat Saturation Pressure
         !!  @param TSat Saturation Temperature
         !!  @param TSIn equilibrium Temperature
-    subroutine s_TSat(pSat, TSat, TSIn)
+    pure elemental subroutine s_TSat(pSat, TSat, TSIn)
 
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_TSat
@@ -793,7 +793,7 @@ contains
     end subroutine s_TSat
 
     !>  This subroutine finalizes the phase change module
-    subroutine s_finalize_relaxation_solver_module
+    impure subroutine s_finalize_relaxation_solver_module
     end subroutine s_finalize_relaxation_solver_module
 
 #endif

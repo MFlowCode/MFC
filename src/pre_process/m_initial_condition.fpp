@@ -68,7 +68,7 @@ contains
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_initial_condition_module
+    impure subroutine s_initialize_initial_condition_module
 
         integer :: i, j, k, l !< generic loop iterators
 
@@ -173,7 +173,7 @@ contains
         !!              on the grid using the primitive variables included with
         !!              the patch parameters. The subroutine is complete once the
         !!              primitive variables are converted to conservative ones.
-    subroutine s_generate_initial_condition
+    impure subroutine s_generate_initial_condition
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
@@ -206,7 +206,7 @@ contains
     end subroutine s_generate_initial_condition
 
     !>  Deallocation procedures for the module
-    subroutine s_finalize_initial_condition_module
+    impure subroutine s_finalize_initial_condition_module
 
         integer :: i !< Generic loop iterator
 

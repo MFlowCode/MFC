@@ -59,7 +59,7 @@ contains
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_derived_variables_module
+    impure subroutine s_initialize_derived_variables_module
 
         ! Allocating the gradient magnitude of the density variable provided
         ! that numerical Schlieren function is outputted during post-process
@@ -115,7 +115,7 @@ contains
         !!      ratio. The latter is stored in the derived flow quantity
         !!      storage variable, q_sf.
         !!  @param q_sf Specific heat ratio
-    subroutine s_derive_specific_heat_ratio(q_sf)
+    pure subroutine s_derive_specific_heat_ratio(q_sf)
 
         real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
@@ -142,7 +142,7 @@ contains
         !!      values of the liquid stiffness, which are stored in the
         !!      derived flow quantity storage variable, q_sf.
         !!  @param q_sf Liquid stiffness
-    subroutine s_derive_liquid_stiffness(q_sf)
+    pure subroutine s_derive_liquid_stiffness(q_sf)
 
         real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
@@ -171,7 +171,7 @@ contains
         !!      derived flow quantity storage variable, q_sf.
         !! @param q_prim_vf Primitive variables
         !! @param q_sf Speed of sound
-    subroutine s_derive_sound_speed(q_prim_vf, q_sf)
+    pure subroutine s_derive_sound_speed(q_prim_vf, q_sf)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -228,7 +228,7 @@ contains
         !!  @param i Component indicator
         !!  @param q_prim_vf Primitive variables
         !!  @param q_sf Flux limiter
-    subroutine s_derive_flux_limiter(i, q_prim_vf, q_sf)
+    pure subroutine s_derive_flux_limiter(i, q_prim_vf, q_sf)
 
         integer, intent(in) :: i
 
@@ -322,7 +322,7 @@ contains
         !!  @param b right-hane-side
         !!  @param sol Solution
         !!  @param ndim Problem size
-    subroutine s_solve_linear_system(A, b, sol, ndim)
+    pure subroutine s_solve_linear_system(A, b, sol, ndim)
 
         integer, intent(in) :: ndim
         real(wp), dimension(ndim, ndim), intent(inout) :: A
@@ -372,7 +372,7 @@ contains
         !!  @param i Vorticity component indicator
         !!  @param q_prim_vf Primitive variables
         !!  @param q_sf Vorticity component
-    subroutine s_derive_vorticity_component(i, q_prim_vf, q_sf)
+    pure subroutine s_derive_vorticity_component(i, q_prim_vf, q_sf)
 
         integer, intent(in) :: i
 
@@ -474,7 +474,7 @@ contains
         !!      quantity storage variable, q_sf.
         !!  @param q_prim_vf Primitive variables
         !!  @param q_sf Q_M
-    subroutine s_derive_qm(q_prim_vf, q_sf)
+    pure subroutine s_derive_qm(q_prim_vf, q_sf)
         type(scalar_field), &
             dimension(sys_size), &
             intent(in) :: q_prim_vf
@@ -561,7 +561,7 @@ contains
         !!      variable, q_sf.
         !!  @param q_cons_vf Conservative variables
         !!  @param q_sf Numerical Schlieren function
-    subroutine s_derive_numerical_schlieren_function(q_cons_vf, q_sf)
+    impure subroutine s_derive_numerical_schlieren_function(q_cons_vf, q_sf)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -686,7 +686,7 @@ contains
     end subroutine s_derive_numerical_schlieren_function
 
     !>  Deallocation procedures for the module
-    subroutine s_finalize_derived_variables_module
+    impure subroutine s_finalize_derived_variables_module
 
         ! Deallocating the variable containing the gradient magnitude of the
         ! density field provided that the numerical Schlieren function was

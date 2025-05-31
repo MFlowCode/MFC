@@ -53,7 +53,7 @@ contains
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_derived_variables_module
+    impure subroutine s_initialize_derived_variables_module
 
         ! Allocating the variables which will store the coefficients of the
         ! centered family of finite-difference schemes. Note that sufficient
@@ -86,7 +86,7 @@ contains
     end subroutine s_initialize_derived_variables_module
 
     !> Allocate and open derived variables. Computing FD coefficients.
-    subroutine s_initialize_derived_variables
+    impure subroutine s_initialize_derived_variables
 
         if (probe_wrt) then
             ! Opening and writing header of flow probe files
@@ -175,8 +175,8 @@ contains
         !!  @param q_prim_vf2 Primitive variables
         !!  @param q_prim_vf3 Primitive variables
         !!  @param q_sf Acceleration component
-    subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, &
-                                               q_prim_vf2, q_prim_vf3, q_sf)
+    pure subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, &
+                                                    q_prim_vf2, q_prim_vf3, q_sf)
         !DIR$ INLINEALWAYS s_derive_acceleration_component
         integer, intent(in) :: i
 
@@ -321,7 +321,7 @@ contains
     !!      is then written to a formatted data file by the root process.
     !!  @param q_prim_vf Primitive variables
     !!  @param c_m Mass,x-location,y-location,z-location
-    subroutine s_derive_center_of_mass(q_vf, c_m)
+    impure subroutine s_derive_center_of_mass(q_vf, c_m)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
         real(wp), dimension(1:num_fluids, 1:5), intent(INOUT) :: c_m
         integer :: i, j, k, l !< Generic loop iterators
@@ -457,7 +457,7 @@ contains
     end subroutine s_derive_center_of_mass
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_derived_variables_module
+    impure subroutine s_finalize_derived_variables_module
 
         ! Closing CoM and flow probe files
         if (proc_rank == 0) then

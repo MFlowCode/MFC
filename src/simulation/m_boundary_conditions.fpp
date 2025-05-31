@@ -18,7 +18,7 @@ module m_boundary_conditions
 
 contains
 
-    subroutine s_read_serial_boundary_condition_files(step_dirpath, bc_type)
+    impure subroutine s_read_serial_boundary_condition_files(step_dirpath, bc_type)
 
         character(LEN=*), intent(in) :: step_dirpath
 
@@ -62,7 +62,7 @@ contains
 
     end subroutine s_read_serial_boundary_condition_files
 
-    subroutine s_read_parallel_boundary_condition_files(bc_type)
+    impure subroutine s_read_parallel_boundary_condition_files(bc_type)
 
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 

@@ -35,7 +35,7 @@ module m_data_input
 
         !> Subroutine for reading data files
         !!  @param t_step Current time-step to input
-        subroutine s_read_abstract_data_files(t_step)
+        impure subroutine s_read_abstract_data_files(t_step)
 
             implicit none
 
@@ -69,7 +69,7 @@ contains
         !!      present in the corresponding time-step directory and to
         !!      populate the associated grid and conservative variables.
         !!  @param t_step Current time-step
-    subroutine s_read_serial_data_files(t_step)
+    impure subroutine s_read_serial_data_files(t_step)
 
         integer, intent(in) :: t_step
 
@@ -268,7 +268,7 @@ contains
         !!      present in the corresponding time-step directory and to
         !!      populate the associated grid and conservative variables.
         !!  @param t_step Current time-step
-    subroutine s_read_parallel_data_files(t_step)
+    impure subroutine s_read_parallel_data_files(t_step)
 
         integer, intent(in) :: t_step
 
@@ -556,7 +556,7 @@ contains
         !!      are used in aiding the multidimensional visualization of
         !!      Silo database files, in VisIt, when processor boundary
         !!      conditions are present.
-    subroutine s_populate_grid_variables_buffer_regions
+    impure subroutine s_populate_grid_variables_buffer_regions
 
         integer :: i !< Generic loop iterator
 
@@ -801,7 +801,7 @@ contains
     !>  The purpose of this procedure is to populate the buffers
         !!      of the cell-average conservative variables, depending on
         !!      the boundary conditions.
-    subroutine s_populate_conservative_variables_buffer_regions(q_particle)
+    impure subroutine s_populate_conservative_variables_buffer_regions(q_particle)
 
         type(scalar_field), intent(inout), optional :: q_particle
 
@@ -1304,7 +1304,7 @@ contains
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_data_input_module
+    impure subroutine s_initialize_data_input_module
 
         integer :: i !< Generic loop iterator
 
@@ -1418,7 +1418,7 @@ contains
     end subroutine s_initialize_data_input_module
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_data_input_module
+    impure subroutine s_finalize_data_input_module
 
         integer :: i !< Generic loop iterator
 

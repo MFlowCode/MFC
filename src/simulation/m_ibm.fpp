@@ -48,7 +48,7 @@ module m_ibm
 contains
 
     !>  Allocates memory for the variables in the IBM module
-    subroutine s_initialize_ibm_module()
+    impure subroutine s_initialize_ibm_module()
 
         if (p > 0) then
             @:ALLOCATE(ib_markers%sf(-gp_layers:m+gp_layers, &
@@ -76,7 +76,7 @@ contains
 
     !> Initializes the values of various IBM variables, such as ghost points and
     !! image points.
-    subroutine s_ibm_setup()
+    impure subroutine s_ibm_setup()
 
         integer :: i, j, k
 
@@ -89,7 +89,7 @@ contains
 
         !$acc update host(ib_markers%sf)
 
-        call s_find_num_ghost_points()
+        call s_find_num_ghost_points(num_gps, num_inner_gps)
 
         !$acc update device(num_gps, num_inner_gps)
         @:ALLOCATE(ghost_points(1:num_gps))
@@ -113,7 +113,7 @@ contains
         !!  @param q_prim_vf Primitive variables
         !!  @param pb Internal bubble pressure
         !!  @param mv Mass of vapor in bubble
-    subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb, mv)
+    pure subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb, mv)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -342,7 +342,7 @@ contains
         !!  @param ghost_points Ghost Points
         !!  @param levelset Closest distance from each grid cell to IB
         !!  @param levelset_norm Vector pointing in the direction of the closest distance
-    subroutine s_compute_image_points(ghost_points, levelset, levelset_norm)
+    impure subroutine s_compute_image_points(ghost_points, levelset, levelset_norm)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
         type(levelset_field), intent(IN) :: levelset
@@ -426,7 +426,11 @@ contains
 
     !> Function that finds the number of ghost points, used for allocating
     !! memory.
-    subroutine s_find_num_ghost_points()
+    pure subroutine s_find_num_ghost_points(num_gps, num_inner_gps)
+
+        integer, intent(out) :: num_gps
+        integer, intent(out) :: num_inner_gps
+
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
@@ -470,7 +474,7 @@ contains
     end subroutine s_find_num_ghost_points
 
     !> Function that finds the ghost points
-    subroutine s_find_ghost_points(ghost_points, inner_points)
+    pure subroutine s_find_ghost_points(ghost_points, inner_points)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
         type(ghost_point), dimension(num_inner_gps), intent(INOUT) :: inner_points
@@ -585,7 +589,7 @@ contains
     end subroutine s_find_ghost_points
 
     !>  Function that computes the interpolation coefficients of image points
-    subroutine s_compute_interpolation_coeffs(ghost_points)
+    pure subroutine s_compute_interpolation_coeffs(ghost_points)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
 
@@ -739,7 +743,7 @@ contains
 
     !> Function that uses the interpolation coefficients and the current state
     !! at the cell centers in order to estimate the state at the image point
-    subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
+    pure subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
         !$acc routine seq
         type(scalar_field), &
             dimension(sys_size), &
@@ -860,7 +864,7 @@ contains
     end subroutine s_interpolate_image_point
 
     !> Subroutine to deallocate memory reserved for the IBM module
-    subroutine s_finalize_ibm_module()
+    impure subroutine s_finalize_ibm_module()
 
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(levelset%sf)

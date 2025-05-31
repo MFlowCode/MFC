@@ -22,7 +22,7 @@ contains
 
     !> Checks compatibility of parameters in the input file.
         !! Used by the simulation stage
-    subroutine s_check_inputs
+    impure subroutine s_check_inputs
 
         call s_check_inputs_compilers
 
@@ -47,7 +47,7 @@ contains
     end subroutine s_check_inputs
 
     !> Checks constraints on compiler options
-    subroutine s_check_inputs_compilers
+    impure subroutine s_check_inputs_compilers
 #if !defined(MFC_OpenACC) && !(defined(__PGI) || defined(_CRAYFTN))
         @:PROHIBIT(rdma_mpi, "Unsupported value of rdma_mpi for the current compiler")
 #endif
@@ -59,7 +59,7 @@ contains
     end subroutine s_check_inputs_compilers
 
     !> Checks constraints on WENO scheme parameters
-    subroutine s_check_inputs_weno
+    impure subroutine s_check_inputs_weno
         character(len=5) :: numStr !< for int to string conversion
 
         call s_int_to_str(num_stcls_min*weno_order, numStr)
@@ -89,7 +89,7 @@ contains
     end subroutine s_check_inputs_weno
 
     !> Checks constraints on Riemann solver parameters
-    subroutine s_check_inputs_riemann_solver
+    impure subroutine s_check_inputs_riemann_solver
         @:PROHIBIT(riemann_solver /= 2 .and. model_eqns == 3, "6-equation model (model_eqns = 3) requires riemann_solver = 2")
         @:PROHIBIT(riemann_solver < 1 .or. riemann_solver > 4, "riemann_solver must be 1, 2, 3, or 4")
         @:PROHIBIT(all(wave_speeds /= (/dflt_int, 1, 2/)), "wave_speeds must be 1 or 2")
@@ -103,7 +103,7 @@ contains
     end subroutine s_check_inputs_riemann_solver
 
     !> Checks constraints on geometry and precision
-    subroutine s_check_inputs_geometry_precision
+    impure subroutine s_check_inputs_geometry_precision
         ! Prevent spherical geometry in single precision
 #ifdef MFC_SINGLE_PRECISION
         @:PROHIBIT(.not. (cyl_coord .neqv. .true. .or. (cyl_coord .and. p == 0)), "Fully 3D cylindrical grid (geometry = 3) is not supported in single precision.")
@@ -111,7 +111,7 @@ contains
     end subroutine s_check_inputs_geometry_precision
 
     !> Checks constraints on time stepping parameters
-    subroutine s_check_inputs_time_stepping
+    impure subroutine s_check_inputs_time_stepping
         if (.not. cfl_dt) then
             @:PROHIBIT(dt <= 0)
         end if
@@ -119,13 +119,13 @@ contains
     end subroutine s_check_inputs_time_stepping
 
     !> Checks constraints on parameters related to 6-equation model
-    subroutine s_check_inputs_model_eqns
+    impure subroutine s_check_inputs_model_eqns
         @:PROHIBIT(model_eqns == 3 .and. avg_state /= 2, "6-equation model (model_eqns = 3) requires avg_state = 2")
         @:PROHIBIT(model_eqns == 3 .and. wave_speeds /= 1, "6-equation model (model_eqns = 3) requires wave_speeds = 1")
     end subroutine s_check_inputs_model_eqns
 
     !> Checks constraints for GRCBC
-    subroutine s_check_inputs_grcbc
+    impure subroutine s_check_inputs_grcbc
         #:for DIR in ['x', 'y', 'z']
             @:PROHIBIT(bc_${DIR}$%grcbc_in .and. (bc_${DIR}$%beg /= -7 .and. bc_${DIR}$%end /= -7), "Subsonic Inflow requires bc = -7")
             @:PROHIBIT(bc_${DIR}$%grcbc_out .and. (bc_${DIR}$%beg /= -8 .and. bc_${DIR}$%end /= -8), "Subsonic Outflow requires bc = -8")
@@ -134,7 +134,7 @@ contains
     end subroutine s_check_inputs_grcbc
 
     !> Checks constraints on acoustic_source parameters
-    subroutine s_check_inputs_acoustic_src
+    impure subroutine s_check_inputs_acoustic_src
 
         integer :: j, dim
         character(len=5) :: jStr
@@ -261,12 +261,12 @@ contains
     end subroutine s_check_inputs_acoustic_src
 
     !> Checks constraints on hypoelasticity parameters
-    subroutine s_check_inputs_hypoelasticity
+    impure subroutine s_check_inputs_hypoelasticity
         @:PROHIBIT(hypoelasticity .and. riemann_solver /= 1, "hypoelasticity requires HLL Riemann solver (riemann_solver = 1)")
     end subroutine
 
     !> Checks constraints on bubble parameters
-    subroutine s_check_inputs_bubbles_euler
+    impure subroutine s_check_inputs_bubbles_euler
         @:PROHIBIT(bubbles_euler .and. bubbles_lagrange, "Activate only one of the bubble subgrid models")
         @:PROHIBIT(bubbles_euler .and. riemann_solver /= 2, "Bubble modeling requires HLLC Riemann solver (riemann_solver = 2)")
         @:PROHIBIT(bubbles_euler .and. avg_state /= 2, "Bubble modeling requires arithmetic average (avg_state = 2)")
@@ -275,7 +275,7 @@ contains
     end subroutine s_check_inputs_bubbles_euler
 
     !> Checks constraints on adaptive time stepping parameters (adap_dt)
-    subroutine s_check_inputs_adapt_dt
+    impure subroutine s_check_inputs_adapt_dt
         @:PROHIBIT(adap_dt .and. time_stepper /= 3, "adapt_dt requires Runge-Kutta 3 (time_stepper = 3)")
         @:PROHIBIT(adap_dt .and. qbmm)
         @:PROHIBIT(adap_dt .and. (.not. polytropic) .and. (.not. bubbles_lagrange))
@@ -283,7 +283,7 @@ contains
     end subroutine s_check_inputs_adapt_dt
 
     !> Checks constraints on alternative sound speed parameters (alt_soundspeed)
-    subroutine s_check_inputs_alt_soundspeed
+    impure subroutine s_check_inputs_alt_soundspeed
         @:PROHIBIT(alt_soundspeed .and. model_eqns /= 2, "5-equation model (model_eqns = 2) is required for alt_soundspeed")
         @:PROHIBIT(alt_soundspeed .and. riemann_solver /= 2, "alt_soundspeed requires HLLC Riemann solver (riemann_solver = 2)")
         @:PROHIBIT(alt_soundspeed .and. num_fluids /= 2 .and. num_fluids /= 3)
@@ -291,7 +291,7 @@ contains
 
     !> Checks constraints on viscosity parameters (fluid_pp(i)%Re(1:2))
         !! of the stiffened gas equation of state
-    subroutine s_check_inputs_stiffened_eos_viscosity
+    impure subroutine s_check_inputs_stiffened_eos_viscosity
         character(len=5) :: iStr, jStr
         integer :: i, j
 
@@ -318,7 +318,7 @@ contains
     end subroutine s_check_inputs_stiffened_eos_viscosity
 
     !> Checks constraints on body forces parameters (bf_x[y,z], etc.)
-    subroutine s_check_inputs_body_forces
+    impure subroutine s_check_inputs_body_forces
         #:for DIR in ['x', 'y', 'z']
             @:PROHIBIT(bf_${DIR}$ .and. f_is_default(k_${DIR}$), "k_${DIR}$ must be specified if bf_${DIR}$ is true")
             @:PROHIBIT(bf_${DIR}$ .and. f_is_default(w_${DIR}$), "w_${DIR}$ must be specified if bf_${DIR}$ is true")
@@ -328,7 +328,7 @@ contains
     end subroutine s_check_inputs_body_forces
 
     !> Checks constraints on lagrangian bubble parameters
-    subroutine s_check_inputs_bubbles_lagrange
+    impure subroutine s_check_inputs_bubbles_lagrange
         @:PROHIBIT(bubbles_lagrange .and. file_per_process, "file_per_process must be false for bubbles_lagrange")
         @:PROHIBIT(bubbles_lagrange .and. n==0, "bubbles_lagrange accepts 2D and 3D simulations only")
         @:PROHIBIT(bubbles_lagrange .and. model_eqns==3, "The 6-equation flow model does not support bubbles_lagrange")
@@ -336,7 +336,7 @@ contains
     end subroutine s_check_inputs_bubbles_lagrange
 
     !> Checks constraints on continuum damage model parameters
-    subroutine s_check_inputs_continuum_damage
+    impure subroutine s_check_inputs_continuum_damage
         @:PROHIBIT(cont_damage .and. f_is_default(tau_star))
         @:PROHIBIT(cont_damage .and. f_is_default(cont_damage_s))
         @:PROHIBIT(cont_damage .and. f_is_default(alpha_bar))
@@ -344,12 +344,12 @@ contains
 
     !> Checks miscellaneous constraints,
         !! including constraints on probe_wrt and integral_wrt
-    subroutine s_check_inputs_misc
+    impure subroutine s_check_inputs_misc
         @:PROHIBIT(probe_wrt .and. fd_order == dflt_int, "fd_order must be specified for probe_wrt")
         @:PROHIBIT(integral_wrt .and. (.not. bubbles_euler))
     end subroutine s_check_inputs_misc
 
-    subroutine s_check_inputs_mhd
+    impure subroutine s_check_inputs_mhd
         @:PROHIBIT(mhd .and. (riemann_solver /= 1 .and. riemann_solver /= 4), &
             "MHD simulations require riemann_solver = 1 (HLL) or riemann_solver = 4 (HLLD)")
         @:PROHIBIT(riemann_solver == 4 .and. .not. mhd, "HLLD is only available for MHD simulations")

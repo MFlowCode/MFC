@@ -29,7 +29,7 @@ module m_boundary_conditions
  s_write_parallel_boundary_condition_files
 
 contains
-    subroutine s_line_segment_bc(patch_id, q_prim_vf, bc_type)
+    impure subroutine s_line_segment_bc(patch_id, q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
@@ -79,7 +79,7 @@ contains
 
     end subroutine s_line_segment_bc
 
-    subroutine s_circle_bc(patch_id, q_prim_vf, bc_type)
+    impure subroutine s_circle_bc(patch_id, q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
@@ -143,7 +143,7 @@ contains
 
     end subroutine s_circle_bc
 
-    subroutine s_rectangle_bc(patch_id, q_prim_vf, bc_type)
+    impure subroutine s_rectangle_bc(patch_id, q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
@@ -233,7 +233,7 @@ contains
 
     end subroutine s_rectangle_bc
 
-    subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
+    impure subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
@@ -267,7 +267,7 @@ contains
 
     end subroutine s_apply_boundary_patches
 
-    subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath)
+    impure subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
@@ -307,7 +307,7 @@ contains
 
     end subroutine s_write_serial_boundary_condition_files
 
-    subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
+    impure subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
@@ -367,9 +367,9 @@ contains
 
     end subroutine s_write_parallel_boundary_condition_files
 
-    subroutine s_pack_boundary_condition_buffers(q_prim_vf)
+    impure subroutine s_pack_boundary_condition_buffers(q_prim_vf)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer :: i, j, k
 
         do k = 0, p

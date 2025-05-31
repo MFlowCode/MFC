@@ -31,7 +31,7 @@ module m_viscous
 
 contains
 
-    subroutine s_initialize_viscous_module
+    impure subroutine s_initialize_viscous_module
 
         integer :: i, j !< generic loop iterators
 
@@ -1455,7 +1455,7 @@ contains
 
     end subroutine s_compute_fd_gradient
 
-    subroutine s_finalize_viscous_module()
+    impure subroutine s_finalize_viscous_module()
 
         @:DEALLOCATE(Res_viscous)
 
