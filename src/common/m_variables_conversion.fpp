@@ -216,7 +216,6 @@ contains
         real(wp), intent(out), target :: pi_inf
         real(wp), intent(out), target :: qv
 
-
         ! Transferring the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
         rho = q_vf(1)%sf(i, j, k)
@@ -473,7 +472,6 @@ contains
 
         real(wp), optional, intent(out) :: G_K
         real(wp), optional, dimension(num_fluids), intent(in) :: G
-
 
         integer :: i, j !< Generic loop iterators
         real(wp) :: alpha_K_sum
@@ -817,7 +815,6 @@ contains
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: ibounds
-
 
         real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(wp), dimension(2) :: Re_K

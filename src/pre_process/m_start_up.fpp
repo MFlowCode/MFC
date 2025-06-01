@@ -830,7 +830,6 @@ contains
 
         real(wp), intent(inout) :: start, finish
 
-
         ! Setting up the grid and the initial condition. If the grid is read in from
         ! preexisting grid data files, it is checked for consistency. If the grid is
         ! not read in, it is generated from scratch according to the inputs provided

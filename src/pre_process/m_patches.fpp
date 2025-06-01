@@ -2337,9 +2337,9 @@ contains
 
                             ! Get the boundary normals
                             call f_normals(boundary_v, &
-                                            boundary_edge_count, &
-                                            point, &
-                                            normals)
+                                           boundary_edge_count, &
+                                           point, &
+                                           normals)
 
                             ! Correct the sign of the levelset_norm
                             if (patch_id_fp(i, j, k) == 0) then

@@ -3042,9 +3042,9 @@ contains
 
         call s_populate_riemann_states_variables_buffers( &
             qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-            dqL_prim_dy_vf, dqL_prim_dz_vf,&
+            dqL_prim_dy_vf, dqL_prim_dz_vf, &
             qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
-            dqR_prim_dy_vf, dqR_prim_dz_vf,&
+            dqR_prim_dy_vf, dqR_prim_dz_vf, &
             norm_dir, ix, iy, iz)
 
         call s_initialize_riemann_solver( &

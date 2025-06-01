@@ -65,10 +65,10 @@ contains
         end if
     end subroutine s_initialize_surface_tension_module
 
-    subroutine s_compute_capilary_source_flux(&
-                                              vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
-                                              flux_src_vf, &
-                                              id, isx, isy, isz)
+    subroutine s_compute_capilary_source_flux( &
+        vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
+        flux_src_vf, &
+        id, isx, isy, isz)
 
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsx_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsy_vf
