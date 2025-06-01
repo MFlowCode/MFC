@@ -9,7 +9,8 @@
 module m_chemistry
 
     use m_thermochem, only: &
-        num_species, molecular_weights, get_temperature, get_net_production_rates
+        num_species, molecular_weights, get_temperature, get_net_production_rates, &
+        gas_constant, get_mixture_molecular_weight
 
     use m_global_parameters
 
@@ -57,6 +58,32 @@ contains
         end do
 
     end subroutine s_compute_q_T_sf
+
+    subroutine s_compute_T_from_primitives(q_T_sf, q_prim_vf, bounds)
+
+        type(scalar_field), intent(inout) :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(int_bounds_info), dimension(1:3), intent(in) :: bounds
+
+        integer :: x, y, z, i
+        real(wp), dimension(num_species) :: Ys
+        real(wp) :: mix_mol_weight
+
+        do z = bounds(3)%beg, bounds(3)%end
+            do y = bounds(2)%beg, bounds(2)%end
+                do x = bounds(1)%beg, bounds(1)%end
+                    !$acc loop seq
+                    do i = chemxb, chemxe
+                        Ys(i - chemxb + 1) = q_prim_vf(i)%sf(x, y, z)
+                    end do
+
+                    call get_mixture_molecular_weight(Ys, mix_mol_weight)
+                    q_T_sf%sf(x, y, z) = q_prim_vf(E_idx)%sf(x, y, z)*mix_mol_weight/(gas_constant*q_prim_vf(1)%sf(x, y, z))
+                end do
+            end do
+        end do
+
+    end subroutine s_compute_T_from_primitives
 
     subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_T_sf, q_prim_qp, bounds)
 
