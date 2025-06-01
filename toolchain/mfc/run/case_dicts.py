@@ -307,7 +307,7 @@ for var in [ 'solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb',
     SIMULATION[f'lag_params%{var}'] = ParamType.INT
 
 for var in [ 'epsilonb', 'valmaxvoid', 'charwidth', 'diffcoefvap',
-            'c0', 'rho0', 'T0', 'x0', 'Thost' ]:
+            'c0', 'rho0', 'T0', 'x0', 'Thost', 'c_d' ]:
     SIMULATION[f'lag_params%{var}'] = ParamType.REAL
 
 for var in [ 'diffusion', 'reactions' ]:

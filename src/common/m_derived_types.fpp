@@ -434,6 +434,7 @@ module m_derived_types
         integer :: nBubs_glb                !< Global number of bubbles
         integer :: vel_model                !< Particle velocity model
         integer :: drag_model               !< Particle drag model
+        real(wp) :: c_d                     !< Drag coefficient
         real(wp) :: epsilonb         !< Standard deviation scaling for the gaussian function
         real(wp) :: charwidth        !< Domain virtual depth (z direction, for 2D simulations)
         real(wp) :: valmaxvoid       !< Maximum void fraction permitted

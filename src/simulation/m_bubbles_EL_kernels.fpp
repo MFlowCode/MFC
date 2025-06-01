@@ -453,16 +453,13 @@ contains
             y2 = q_prim_vf(momxb + 1)%sf(cell(1), cell(2)    , cell(3))
             x3 = y_cc(cell(2) + 1)
             y3 = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 1, cell(3))
-        elseif (i == 3 .and. p > 0) then
+        elseif (i == 3) then
             x1 = z_cc(cell(3) - 1)
             y1 = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 1)
             x2 = z_cc(cell(3))
             y1 = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3)    )
             x3 = z_cc(cell(3) + 1)
             y1 = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 1)
-        else
-            x1 = 0._wp; x2 = 0._wp; x3 = 0._wp
-            y1 = 0._wp; y2 = 0._wp; y3 = 0._wp
         endif
 
         L1 = ((pos - x2)*(pos - x3)) / ((x1 - x2)*(x1 - x3))
@@ -473,13 +470,13 @@ contains
 
     end function f_interpolate_velocity
 
-    function f_get_acceleration(pos,rad,vel,mg,mv,Re,cell,i,q_prim_vf) result(a)
+    function f_get_acceleration(pos,rad,vel,mg,mv,Re,rho,cell,i,q_prim_vf) result(a)
 !$acc routine seq
         integer, dimension(3) :: cell
         integer :: i
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(wp) :: a, vol, mass, force, vel
-        real(wp) :: pos, rad, dp, v_rel, mg, mv, Re
+        real(wp) :: a, vol, mass, force, vel, area
+        real(wp) :: pos, rad, dp, v_rel, mg, mv, Re, rho, c_d
 
         if (i == 1) then
             dp = (q_prim_vf(E_idx)%sf(cell(1) + 1,cell(2),cell(3)) - &
@@ -489,24 +486,42 @@ contains
             dp = (q_prim_vf(E_idx)%sf(cell(1),cell(2) + 1,cell(3)) - &
                   q_prim_vf(E_idx)%sf(cell(1),cell(2) - 1,cell(3))) / &
                   (y_cc(cell(2) + 1) - y_cc(cell(2) - 1))
-        elseif (i == 3 .and. p > 0) then
+        elseif (i == 3) then
             dp = (q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3) + 1) - &
                   q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3) - 1)) / &
                   (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
-        else
-            dp = 0._wp
         end if
 
         vol = (4._wp/3._wp) * pi * rad**3._wp
         force = -1._wp * vol * dp
 
-        if (lag_params%drag_model == 1) then ! Stokes drag
-            v_rel = vel - f_interpolate_velocity(pos,cell,i,q_prim_vf)
+        v_rel = vel - f_interpolate_velocity(pos,cell,i,q_prim_vf)
+
+        if (lag_params%drag_model == 1) then ! Free slip Stokes drag
+            force = force - (4._wp * pi * rad * v_rel) / Re
+        else if (lag_params%drag_model == 2) then ! No slip Stokes drag
             force = force - (6._wp * pi * rad * v_rel) / Re
+        elseif (lag_params%drag_model == 3) then ! Clift and Gauvin (1971) Cd fit
+            area = pi * rad**2._wp
+            c_d = f_get_clift_gauvin_drag_coeff(v_rel, Re, rho, rad)
+            force = force - 0.5_wp * sign(1._wp, v_rel) * rho * (v_rel ** 2._wp) * c_d * area
         end if
 
         a = force / (mg + mv)
 
     end function f_get_acceleration
+
+    function f_get_clift_gauvin_drag_coeff(v_rel, mu_inv, rho, rad) result(c_d)
+!$acc routine seq
+        real(wp) :: v_rel, mu_inv, rho, rad
+        real(wp) :: c_d
+        real(wp) :: Re_b ! Bubble Reynolds number
+
+        Re_b = max(2._wp * rho * abs(v_rel) * rad * mu_inv, Re_b_min)
+
+        C_d = 24._wp * (1 + 0.15_wp * Re_b ** (0.687_wp)) / Re_b
+        !C_d = C_d + 0.42_wp / (1 + (42500 / (Re_b ** 1.16_wp)))
+
+    end function f_get_clift_gauvin_drag_coeff
 
 end module m_bubbles_EL_kernels

@@ -751,6 +751,7 @@ contains
         lag_params%nBubs_glb = dflt_int
         lag_params%vel_model = dflt_int
         lag_params%drag_model = dflt_int
+        lag_params%c_d = dflt_real
         lag_params%epsilonb = 1._wp
         lag_params%charwidth = dflt_real
         lag_params%valmaxvoid = dflt_real
