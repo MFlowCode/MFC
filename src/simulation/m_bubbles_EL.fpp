@@ -608,17 +608,17 @@ contains
 
             end if
 
-            do l = 1, 3
+            do l = 1, num_dims
                 if (lag_params%vel_model == 1) then
                     mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,1), &
                                                 cell, l, q_prim_vf)
                     mtn_dveldt(k, l, stage) = 0._wp
                 elseif (lag_params%vel_model == 2) then
-                    mtn_dposdt(k, l, stage) = mtn_vel(k,l,1)
-                    mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,1), &
-                                                intfc_rad(k,1), mtn_vel(k,l,1), &
-                                                gas_mg(k), gas_mv(k, 1), &
-                                                Re(1), cell, l, q_prim_vf)
+                    mtn_dposdt(k, l, stage) = mtn_vel(k,l,2)
+                    mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,2), &
+                                                intfc_rad(k,1), mtn_vel(k,l,2), &
+                                                gas_mg(k), gas_mv(k, 2), &
+                                                Re(1), myRho, cell, l, q_prim_vf)
                 else
                     mtn_dposdt(k, l, stage) = 0._wp
                     mtn_dveldt(k, l, stage) = 0._wp
@@ -834,11 +834,17 @@ contains
         integer :: smearGrid, smearGridz
         logical :: celloutside
 
-        scoord = mtn_s(bub_id, 1:3, 2)
         f_pinfl = 0._wp
 
-        !< Find current bubble cell
-        cell(:) = int(scoord(:))
+        if (lag_params%vel_model > 0) then
+            cell = -buff_size
+            call s_locate_cell(mtn_pos(bub_id, 1:3, 1), cell, mtn_s(bub_id, 1:3, 1))
+            scoord = mtn_s(bub_id, 1:3, 2)
+        else
+            scoord = mtn_s(bub_id, 1:3, 2)
+            cell(:) = int(scoord(:))
+        end if
+
         !$acc loop seq
         do i = 1, num_dims
             if (scoord(i) < 0._wp) cell(i) = cell(i) - 1
