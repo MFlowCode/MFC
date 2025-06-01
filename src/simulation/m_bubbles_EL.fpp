@@ -25,6 +25,8 @@ module m_bubbles_EL
 
     use m_helper
 
+    use m_ibm
+
     implicit none
 
     !(nBub)
@@ -1163,6 +1165,8 @@ contains
         integer :: dest
         integer :: k
 
+        integer, dimension(3) :: cell
+
         !$acc parallel loop gang vector default(present)
         do k = 1, nBubs
 
@@ -1189,6 +1193,15 @@ contains
                 else if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                     .and. mtn_pos(k,3,dest) > z_cb(p) - intfc_rad(k,dest)) then
                     mtn_pos(k, 3, dest) = z_cb(p) - intfc_rad(k,dest)
+                end if
+            end if
+
+            if (ib) then
+                cell = -buff_size
+                call s_locate_cell(mtn_pos(k, 1:3, 1), cell, mtn_s(k, 1:3, 1))
+
+                if (ib_markers%sf(cell(1), cell(2), cell(3)) == 1) then
+                    print*, "In IB"
                 end if
             end if
 
