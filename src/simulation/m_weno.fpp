@@ -639,13 +639,12 @@ contains
     end subroutine s_compute_weno_coefficients
 
     subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
-                      norm_dir, weno_dir, &
+                      weno_dir, &
                       is1_weno_d, is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
-        integer, intent(in) :: norm_dir
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
 

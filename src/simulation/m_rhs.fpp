@@ -35,6 +35,8 @@ module m_rhs
 
     use m_bubbles_EE           !< Ensemble-averaged bubble dynamics routines
 
+    use m_bubbles_EL           !< Volume-averaged bubble dynamics routines
+
     use m_qbmm                 !< Moment inversion
 
     use m_hypoelastic
@@ -609,7 +611,7 @@ contains
 
     end subroutine s_initialize_rhs_module
 
-    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
+    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
@@ -620,6 +622,7 @@ contains
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
+        integer, intent(in) :: stage
 
         real(wp), dimension(0:m, 0:n, 0:p) :: nbub
         real(wp) :: t_start, t_finish
@@ -807,8 +810,7 @@ contains
             call s_compute_advection_source_term(id, &
                                                  rhs_vf, &
                                                  q_cons_qp, &
-                                                 q_prim_qp, &
-                                                 flux_src_n(id))
+                                                 q_prim_qp)
             call nvtxEndRange
 
             ! RHS additions for hypoelasticity
@@ -896,6 +898,24 @@ contains
             call nvtxEndRange
         end if
 
+        if (bubbles_lagrange) then
+            ! RHS additions for sub-grid bubbles_lagrange
+            call nvtxStartRange("RHS-EL-BUBBLES-SRC")
+            call s_compute_bubbles_EL_source( &
+                q_cons_qp%vf(1:sys_size), &
+                q_prim_qp%vf(1:sys_size), &
+                rhs_vf)
+            call nvtxEndRange
+            ! Compute bubble dynamics
+            if (.not. adap_dt) then
+                call nvtxStartRange("RHS-EL-BUBBLES-DYN")
+                call s_compute_bubble_EL_dynamics( &
+                    q_prim_qp%vf(1:sys_size), &
+                    stage)
+                call nvtxEndRange
+            end if
+        end if
+
         if (chemistry .and. chem_params%reactions) then
             call nvtxStartRange("RHS-CHEM-REACTIONS")
             call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
@@ -931,13 +951,12 @@ contains
 
     end subroutine s_compute_rhs
 
-    subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
+    subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(vector_field), intent(inout) :: q_cons_vf
         type(vector_field), intent(inout) :: q_prim_vf
-        type(vector_field), intent(inout) :: flux_src_n_vf
 
         integer :: i, j, k, l, q
 
@@ -2012,19 +2031,19 @@ contains
 
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                            norm_dir, weno_dir, &
+                            weno_dir, &
                             is1, is2, is3)
             else
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                            norm_dir, weno_dir, &
+                            weno_dir, &
                             is1, is2, is3)
             end if
         else
 
             call s_weno(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                        norm_dir, weno_dir, &
+                        weno_dir, &
                         is1, is2, is3)
         end if
 

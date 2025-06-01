@@ -165,13 +165,12 @@ contains
             & 'alt_soundspeed', 'hypoelasticity', 'mhd', 'parallel_io',        &
             & 'rho_wrt', 'E_wrt', 'pres_wrt', 'gamma_wrt', 'sim_data',         &
             & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', &
-            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt',              &
+            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt','chem_wrt_T', &
             & 'bubbles_euler', 'qbmm', 'polytropic', 'polydisperse',           &
             & 'file_per_process', 'relax', 'cf_wrt',                           &
             & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',          &
             & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange',        &
-            & 'rkck_adap_dt', 'output_partial_domain', 'relativity',           &
-            & 'cont_damage' ]
+            & 'output_partial_domain', 'relativity', 'cont_damage' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

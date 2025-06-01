@@ -147,7 +147,7 @@ contains
             palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
             sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
             n_start_old, surface_tension, hyperelasticity, pre_stress, &
-            rkck_adap_dt, elliptic_smoothing, elliptic_smoothing_iters, &
+            elliptic_smoothing, elliptic_smoothing_iters, &
             viscous, bubbles_lagrange, bc_x, bc_y, bc_z, num_bc_patches, &
             patch_bc, Bx0, relativity, cont_damage
 
@@ -176,7 +176,7 @@ contains
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
 
-            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_DIRICHLET) .or. &
                 num_bc_patches > 0) then
@@ -910,7 +910,7 @@ contains
             call s_read_input_file()
             call s_check_input_file()
 
-            print '(" Pre-processing a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
+            print '(" Pre-processing a ", I0, "x", I0, "x", I0, " case on ", I0, " rank(s)")', m, n, p, num_procs
         end if
 
         ! Broadcasting the user inputs to all of the processors and performing the
