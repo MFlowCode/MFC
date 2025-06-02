@@ -1724,7 +1724,7 @@ contains
     subroutine s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
                                     c_L, c_R, c_avg, c_fast, G_L, G_R, &
                                     tau_e_L, tau_e_R, &
-                                    s_L, s_R, s_S)
+                                    s_L, s_R, s_S, s_M, s_P)
 
         ! Computes the wave speeds for the Riemann solver
 #ifdef _CRAYFTN
@@ -1747,7 +1747,7 @@ contains
     real(wp) :: pres_SL, pres_SR, Ms_L, Ms_R
 
     ! Output parameters
-    real(wp), intent(out) :: s_L, s_R, s_S
+    real(wp), intent(out) :: s_L, s_R, s_S, s_M, s_P
 
         if (wave_speeds == 1) then
             if (mhd) then
@@ -1798,6 +1798,10 @@ contains
                             (pres_L - pres_R)/ &
                             (rho_avg*c_avg))
         end if
+
+        ! follows Einfeldt et al.
+        ! s_M/P = min/max(0.,s_L/R)
+        s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
 #ifdef DEBUG
         ! Check for potential issues in wave speed calculation

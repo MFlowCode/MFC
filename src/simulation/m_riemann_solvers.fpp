@@ -687,62 +687,10 @@ contains
                                 end do
                             end if
 
-                            if (wave_speeds == 1) then
-                                if (mhd) then
-                                    s_L = min(vel_L(dir_idx(1)) - c_fast%L, vel_R(dir_idx(1)) - c_fast%R)
-                                    s_R = max(vel_R(dir_idx(1)) + c_fast%R, vel_L(dir_idx(1)) + c_fast%L)
-                                elseif (hypoelasticity) then
-                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
-                                                                       (((4._wp*G_L)/3._wp) + &
-                                                                        tau_e_L(dir_idx_tau(1)))/rho_L) &
-                                              , vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                                                                         (((4._wp*G_R)/3._wp) + &
-                                                                          tau_e_R(dir_idx_tau(1)))/rho_R))
-                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
-                                                                       (((4._wp*G_R)/3._wp) + &
-                                                                        tau_e_R(dir_idx_tau(1)))/rho_R) &
-                                              , vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                                                                         (((4._wp*G_L)/3._wp) + &
-                                                                          tau_e_L(dir_idx_tau(1)))/rho_L))
-                                else if (hyperelasticity) then
-                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4_wp*G_L/3_wp)/rho_L) &
-                                              , vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4_wp*G_R/3_wp)/rho_R))
-                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4_wp*G_R/3_wp)/rho_R) &
-                                              , vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4_wp*G_L/3_wp)/rho_L))
-                                else
-                                    s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
-                                    s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
-                                end if
-
-                                s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))* &
-                                       (s_L - vel_L(dir_idx(1))) - &
-                                       rho_R*vel_R(dir_idx(1))* &
-                                       (s_R - vel_R(dir_idx(1)))) &
-                                      /(rho_L*(s_L - vel_L(dir_idx(1))) - &
-                                        rho_R*(s_R - vel_R(dir_idx(1))))
-                            elseif (wave_speeds == 2) then
-                                pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                   (vel_L(dir_idx(1)) - &
-                                                    vel_R(dir_idx(1))))
-
-                                pres_SR = pres_SL
-
-                                Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
-                                                       (pres_SL/pres_L - 1._wp)*pres_L/ &
-                                                       ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
-                                                       (pres_SR/pres_R - 1._wp)*pres_R/ &
-                                                       ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
-
-                                s_L = vel_L(dir_idx(1)) - c_L*Ms_L
-                                s_R = vel_R(dir_idx(1)) + c_R*Ms_R
-
-                                s_S = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                                               (pres_L - pres_R)/ &
-                                               (rho_avg*c_avg))
-                            end if
-
-                            s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
+                            call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
+                                                    c_L, c_R, c_avg, c_fast, G_L, G_R, &
+                                                    tau_e_L, tau_e_R, &
+                                                    s_L, s_R, s_S)
 
                             xi_M = (5e-1_wp + sign(5e-1_wp, s_L)) &
                                    + (5e-1_wp - sign(5e-1_wp, s_L)) &
@@ -1497,51 +1445,10 @@ contains
                                 end if
 
                                 ! COMPUTING THE DIRECT WAVE SPEEDS
-                                if (wave_speeds == 1) then
-                                    if (elasticity) then
-                                        s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
-                                                                           (((4_wp*G_L)/3_wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                                                                                                                                                          (((4_wp*G_R)/3_wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
-                                        s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
-                                                                           (((4_wp*G_R)/3_wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                                                                                                                                                          (((4_wp*G_L)/3_wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
-                                        s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + &
-                                               tau_e_L(dir_idx_tau(1)) + rho_L*vel_L(idx1)*(s_L - vel_L(idx1)) - &
-                                               rho_R*vel_R(idx1)*(s_R - vel_R(idx1)))/(rho_L*(s_L - vel_L(idx1)) - &
-                                                                                       rho_R*(s_R - vel_R(idx1)))
-                                    else
-                                        s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
-                                        s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
-                                        s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))* &
-                                               (s_L - vel_L(dir_idx(1))) - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1)))) &
-                                              /(rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R - vel_R(dir_idx(1))))
-
-                                    end if
-                                elseif (wave_speeds == 2) then
-                                    pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                       (vel_L(dir_idx(1)) - &
-                                                        vel_R(dir_idx(1))))
-
-                                    pres_SR = pres_SL
-
-                                    Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
-                                                           (pres_SL/pres_L - 1._wp)*pres_L/ &
-                                                           ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                    Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
-                                                           (pres_SR/pres_R - 1._wp)*pres_R/ &
-                                                           ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
-
-                                    s_L = vel_L(dir_idx(1)) - c_L*Ms_L
-                                    s_R = vel_R(dir_idx(1)) + c_R*Ms_R
-
-                                    s_S = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                                                   (pres_L - pres_R)/ &
-                                                   (rho_avg*c_avg))
-                                end if
-
-                                ! follows Einfeldt et al.
-                                ! s_M/P = min/max(0.,s_L/R)
-                                s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
+                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
+                                                        c_L, c_R, c_avg, c_fast, G_L, G_R, &
+                                                        tau_e_L, tau_e_R, &
+                                                        s_L, s_R, s_S)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
@@ -1807,41 +1714,10 @@ contains
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
                                                               vel_avg_rms, 0._wp, c_avg)
 
-                                if (wave_speeds == 1) then
-                                    s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
-                                    s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
-
-                                    s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))* &
-                                           (s_L - vel_L(dir_idx(1))) - &
-                                           rho_R*vel_R(dir_idx(1))* &
-                                           (s_R - vel_R(dir_idx(1)))) &
-                                          /(rho_L*(s_L - vel_L(dir_idx(1))) - &
-                                            rho_R*(s_R - vel_R(dir_idx(1))))
-                                elseif (wave_speeds == 2) then
-                                    pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                       (vel_L(dir_idx(1)) - &
-                                                        vel_R(dir_idx(1))))
-
-                                    pres_SR = pres_SL
-
-                                    Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
-                                                           (pres_SL/pres_L - 1._wp)*pres_L/ &
-                                                           ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                    Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
-                                                           (pres_SR/pres_R - 1._wp)*pres_R/ &
-                                                           ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
-
-                                    s_L = vel_L(dir_idx(1)) - c_L*Ms_L
-                                    s_R = vel_R(dir_idx(1)) + c_R*Ms_R
-
-                                    s_S = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                                                   (pres_L - pres_R)/ &
-                                                   (rho_avg*c_avg))
-                                end if
-
-                                ! follows Einfeldt et al.
-                                ! s_M/P = min/max(0.,s_L/R)
-                                s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
+                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
+                                                        c_L, c_R, c_avg, c_fast, G_L, G_R, &
+                                                        tau_e_L, tau_e_R, &
+                                                        s_L, s_R, s_S, s_M, s_P)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
@@ -2236,41 +2112,10 @@ contains
                                     @:compute_low_Mach_correction()
                                 end if
 
-                                if (wave_speeds == 1) then
-                                    s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
-                                    s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
-
-                                    s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))* &
-                                           (s_L - vel_L(dir_idx(1))) - &
-                                           rho_R*vel_R(dir_idx(1))* &
-                                           (s_R - vel_R(dir_idx(1)))) &
-                                          /(rho_L*(s_L - vel_L(dir_idx(1))) - &
-                                            rho_R*(s_R - vel_R(dir_idx(1))))
-                                elseif (wave_speeds == 2) then
-                                    pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                       (vel_L(dir_idx(1)) - &
-                                                        vel_R(dir_idx(1))))
-
-                                    pres_SR = pres_SL
-
-                                    Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
-                                                           (pres_SL/pres_L - 1._wp)*pres_L/ &
-                                                           ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                    Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
-                                                           (pres_SR/pres_R - 1._wp)*pres_R/ &
-                                                           ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
-
-                                    s_L = vel_L(dir_idx(1)) - c_L*Ms_L
-                                    s_R = vel_R(dir_idx(1)) + c_R*Ms_R
-
-                                    s_S = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                                                   (pres_L - pres_R)/ &
-                                                   (rho_avg*c_avg))
-                                end if
-
-                                ! follows Einfeldt et al.
-                                ! s_M/P = min/max(0.,s_L/R)
-                                s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
+                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
+                                                        c_L, c_R, c_avg, c_fast, G_L, G_R, &
+                                                        tau_e_L, tau_e_R, &
+                                                        s_L, s_R, s_S, s_M, s_P)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
@@ -2705,51 +2550,10 @@ contains
                                     @:compute_low_Mach_correction()
                                 end if
 
-                                if (wave_speeds == 1) then
-                                    if (elasticity) then
-                                        s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
-                                                                           (((4_wp*G_L)/3_wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                                                                                                                                                          (((4_wp*G_R)/3_wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
-                                        s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
-                                                                           (((4_wp*G_R)/3_wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                                                                                                                                                          (((4_wp*G_L)/3_wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
-                                        s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + &
-                                               tau_e_L(dir_idx_tau(1)) + rho_L*vel_L(idx1)*(s_L - vel_L(idx1)) - &
-                                               rho_R*vel_R(idx1)*(s_R - vel_R(idx1)))/(rho_L*(s_L - vel_L(idx1)) - &
-                                                                                       rho_R*(s_R - vel_R(idx1)))
-                                    else
-                                        s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
-                                        s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
-                                        s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))* &
-                                               (s_L - vel_L(dir_idx(1))) - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1)))) &
-                                              /(rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R - vel_R(dir_idx(1))))
-
-                                    end if
-                                elseif (wave_speeds == 2) then
-                                    pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                       (vel_L(idx1) - &
-                                                        vel_R(idx1)))
-
-                                    pres_SR = pres_SL
-
-                                    Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
-                                                           (pres_SL/pres_L - 1._wp)*pres_L/ &
-                                                           ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                    Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
-                                                           (pres_SR/pres_R - 1._wp)*pres_R/ &
-                                                           ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
-
-                                    s_L = vel_L(idx1) - c_L*Ms_L
-                                    s_R = vel_R(idx1) + c_R*Ms_R
-
-                                    s_S = 5e-1_wp*((vel_L(idx1) + vel_R(idx1)) + &
-                                                   (pres_L - pres_R)/ &
-                                                   (rho_avg*c_avg))
-                                end if
-
-                                ! follows Einfeldt et al.
-                                ! s_M/P = min/max(0.,s_L/R)
-                                s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
+                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
+                                                        c_L, c_R, c_avg, c_fast, G_L, G_R, &
+                                                        tau_e_L, tau_e_R, &
+                                                        s_L, s_R, s_S, s_M, s_P)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
