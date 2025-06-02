@@ -1162,8 +1162,8 @@ contains
     !> This subroutine enforces reflective and wall boundary conditions for EL bubbles
     subroutine s_enforce_EL_bubbles_boundary_conditions(dest)
 
-        integer :: dest
-        integer :: k
+        integer, intent(in) :: dest
+        integer :: k, i, patch_id
 
         integer, dimension(3) :: cell
 
@@ -1200,8 +1200,15 @@ contains
                 cell = -buff_size
                 call s_locate_cell(mtn_pos(k, 1:3, 1), cell, mtn_s(k, 1:3, 1))
 
-                if (ib_markers%sf(cell(1), cell(2), cell(3)) == 1) then
-                    print*, "In IB"
+                if (ib_markers%sf(cell(1), cell(2), cell(3)) /= 0) then
+                    patch_id = ib_markers%sf(cell(1), cell(2), cell(3))
+
+                    !$acc routine seq
+                    do i = 1, num_dims
+                        mtn_pos(k, i, dest) = mtn_pos(k, i, dest) - &
+                                              levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
+                                              * levelset%sf(cell(1), cell(2), cell(3), 1)
+                    end do
                 end if
             end if
 
