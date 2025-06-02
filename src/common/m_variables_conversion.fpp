@@ -1721,8 +1721,8 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-    subroutine s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
-                                    c_L, c_R, c_avg, c_fast, G_L, G_R, &
+    subroutine s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
+                                    c_L, c_R, c_avg, c_fast_L, c_fast_R, G_L, G_R, &
                                     tau_e_L, tau_e_R, &
                                     s_L, s_R, s_S, s_M, s_P)
 
@@ -1739,7 +1739,7 @@ contains
     real(wp), dimension(:), intent(in) :: vel_L, vel_R
     real(wp), intent(in) :: pres_L, pres_R, c_L, c_R
     real(wp), intent(in) :: gamma_L, gamma_R, pi_inf_L, pi_inf_R
-    real(wp), intent(in) :: rho_avg, c_avg, c_fast
+    real(wp), intent(in) :: rho_avg, c_avg, c_fast_L, c_fast_R
     real(wp), intent(in) :: G_L, G_R
     real(wp), dimension(:), intent(in) :: tau_e_L, tau_e_R
 
@@ -1751,8 +1751,8 @@ contains
 
         if (wave_speeds == 1) then
             if (mhd) then
-                s_L = min(vel_L(dir_idx(1)) - c_fast%L, vel_R(dir_idx(1)) - c_fast%R)
-                s_R = max(vel_R(dir_idx(1)) + c_fast%R, vel_L(dir_idx(1)) + c_fast%L)
+                s_L = min(vel_L(dir_idx(1)) - c_fast_L, vel_R(dir_idx(1)) - c_fast_R)
+                s_R = max(vel_R(dir_idx(1)) + c_fast_R, vel_L(dir_idx(1)) + c_fast_L)
             elseif (hypoelasticity .or. elasticity) then
                 s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                     (((4._wp*G_L)/3._wp) + &
