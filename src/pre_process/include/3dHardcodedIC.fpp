@@ -3,7 +3,7 @@
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
 
     real(wp) :: eps
-
+    eps = 1e-9_wp
 #:enddef
 
 #:def Hardcoded3D()

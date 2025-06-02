@@ -1300,7 +1300,6 @@ contains
         ! Generic loop iterators
         integer :: i
         ! Placeholders for the cell boundary values
-        real(wp) :: a, b, c, d, pi_inf, gamma, lit_gamma
         real(wp) :: pi_inf, gamma, lit_gamma
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
