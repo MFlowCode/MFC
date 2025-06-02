@@ -1751,40 +1751,40 @@ contains
 
         if (wave_speeds == 1) then
             if (mhd) then
-                s_L = min(vel_L(dir_idx(1)) - c_fast_L, vel_R(dir_idx(1)) - c_fast_R)
-                s_R = max(vel_R(dir_idx(1)) + c_fast_R, vel_L(dir_idx(1)) + c_fast_L)
+                s_L = min(vel_L - c_fast_L, vel_R - c_fast_R)
+                s_R = max(vel_R + c_fast_R, vel_L + c_fast_L)
             elseif (hypoelasticity .or. elasticity) then
-                s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
+                s_L = min(vel_L - sqrt(c_L*c_L + &
                                                     (((4._wp*G_L)/3._wp) + &
-                                                    tau_e_L(dir_idx_tau(1)))/rho_L) &
-                            , vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
+                                                    tau_e_L)/rho_L) &
+                            , vel_R - sqrt(c_R*c_R + &
                                                         (((4._wp*G_R)/3._wp) + &
-                                                        tau_e_R(dir_idx_tau(1)))/rho_R))
-                s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
+                                                        tau_e_R)/rho_R))
+                s_R = max(vel_R + sqrt(c_R*c_R + &
                                                     (((4._wp*G_R)/3._wp) + &
-                                                    tau_e_R(dir_idx_tau(1)))/rho_R) &
-                            , vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
+                                                    tau_e_R)/rho_R) &
+                            , vel_L + sqrt(c_L*c_L + &
                                                         (((4._wp*G_L)/3._wp) + &
-                                                        tau_e_L(dir_idx_tau(1)))/rho_L))
+                                                        tau_e_L)/rho_L))
             else if (hyperelasticity) then
-                s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L) &
-                            , vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R))
-                s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R) &
-                            , vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L))
+                s_L = min(vel_L - sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L) &
+                            , vel_R - sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R))
+                s_R = max(vel_R + sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R) &
+                            , vel_L + sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L))
             else
-                s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
-                s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
+                s_L = min(vel_L - c_L, vel_R - c_R)
+                s_R = max(vel_R + c_R, vel_L + c_L)
             end if
-            s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))* &
-                    (s_L - vel_L(dir_idx(1))) - &
-                    rho_R*vel_R(dir_idx(1))* &
-                    (s_R - vel_R(dir_idx(1)))) &
-                    /(rho_L*(s_L - vel_L(dir_idx(1))) - &
-                    rho_R*(s_R - vel_R(dir_idx(1))))
+            s_S = (pres_R - pres_L + rho_L*vel_L* &
+                    (s_L - vel_L) - &
+                    rho_R*vel_R* &
+                    (s_R - vel_R)) &
+                    /(rho_L*(s_L - vel_L) - &
+                    rho_R*(s_R - vel_R))
         elseif (wave_speeds == 2) then
             pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                (vel_L(dir_idx(1)) - &
-                                vel_R(dir_idx(1))))
+                                (vel_L - &
+                                vel_R))
             pres_SR = pres_SL
             Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
                                     (pres_SL/pres_L - 1._wp)*pres_L/ &
@@ -1792,9 +1792,9 @@ contains
             Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
                                     (pres_SR/pres_R - 1._wp)*pres_R/ &
                                     ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
-            s_L = vel_L(dir_idx(1)) - c_L*Ms_L
-            s_R = vel_R(dir_idx(1)) + c_R*Ms_R
-            s_S = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
+            s_L = vel_L - c_L*Ms_L
+            s_R = vel_R + c_R*Ms_R
+            s_S = 5e-1_wp*((vel_L + vel_R) + &
                             (pres_L - pres_R)/ &
                             (rho_avg*c_avg))
         end if
@@ -1808,7 +1808,7 @@ contains
         if (s_R <= s_L) then
             print *, 'WARNING: Wave speed issue detected in s_compute_wave_speed'
             print *, 'Left wave speed >= Right wave speed:', s_L, s_R
-            print *, 'Input velocities (dir_idx(1)):', vel_L(dir_idx(1)), vel_R(dir_idx(1))
+            print *, 'Input velocities :', vel_L, vel_R
             print *, 'Sound speeds:', c_L, c_R
             print *, 'Densities:', rho_L, rho_R
             print *, 'Pressures:', pres_L, pres_R
