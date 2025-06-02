@@ -1,40 +1,11 @@
 #:def Hardcoded2DVariables()
-!> @file  2DHardcodedIC.fpp
-!> @brief Initialize a 2D grid by projecting a 1D profile.
-!>
-!> @details
-!> Reads a sequence of 1D primitive-variable files and maps them onto
-!> a 2D domain along the x-direction. These files are produced when parallel I/O is disabled in `case.py`.
-!> Parameters control grid resolution, and domain offsets.
-!>
-!> @param nRows         Number of grid points per row
-!> @param init_dir      Directory containing the `prim.*.dat` files
+    ! Place any declaration of intermediate variables here
     real(wp) :: eps
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: factor
 
-    !integer :: nFiles    ! Number of files (variables)
-    integer, parameter :: nRows = 401    ! Number of grid points
-    integer :: f, iter, ios, unit, idx, jump, index_1
-    real(wp) :: x_len, x_step
-    integer :: global_offset  ! MPI subdomain offset
-    real(wp) :: delta_x
-    character(len=100), dimension(sys_size - 1) :: fileNames
-    character(len=200) :: errmsg
-    ! Arrays to store all data from files
-    real(wp), dimension(nRows, sys_size - 1) :: stored_values  ! Imported Data
-    real(wp), dimension(nRows) :: x_coords
-    logical :: files_loaded = .false.
-    real(wp) :: domain_start, domain_end
-    character(len=*), parameter :: init_dir = "/home/pain/MFC-Adam/examples/1D_reactive_shocktube/D/"
-    character(len=20) :: file_num_str     ! For storing the file number as a string
-    character(len=20) :: zeros_part       ! For the trailing zeros part
-    character(len=6), parameter :: zeros_default = "018681"  ! Default zeros (can be changed)
-    ! Generate file names in a loop
-
     eps = 1e-9_wp
-
 #:enddef
 
 #:def Hardcoded2D()
@@ -196,12 +167,28 @@
                 write (file_num_str, '(I2)') f  ! Double digit
                 ! For more than 99 files, you might need to adjust this format
             end if
-            fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat"
+            fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat" 
         end do
 
         if (.not. files_loaded) then
-            ! Print status message
-            index_1 = i
+            ! Calculating the number of grid points in the x direction in the file.
+            line_count = 0
+            open(newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
+                if (ios2 /= 0) then
+                    write(errmsg, '(A,A)') "Error opening file: ", trim(fileNames(1))
+                    call s_mpi_abort(trim(errmsg))
+                end if
+                do
+                    read(unit2, *, iostat=ios2) dummy_x, dummy_y
+                    if (ios2 /= 0) exit ! Exit since files has been read
+                    line_count = line_count + 1
+                end do
+            close(unit2)
+            
+            index_x = i
+            xRows = line_count
+            allocate(x_coords(xRows))
+            allocate(stored_values(xRows, 1, sys_size))
             do f = 1, sys_size - 1
                 ! Open the file for reading
                 open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
@@ -210,8 +197,8 @@
                     call s_mpi_abort(trim(errmsg))
                 end if
                 ! Read all rows at once into memory
-                do iter = 1, nRows
-                    read (unit, *, iostat=ios) x_coords(iter), stored_values(iter, f)
+                do iter = 1, xRows
+                    read (unit, *, iostat=ios) x_coords(iter), stored_values(iter, 1, f)
                     if (ios /= 0) then
                         write (errmsg, '(A,A,A,I0,A)') 'Error reading "', trim(fileNames(f)), &
                             '" at index (', iter, ')'
@@ -221,26 +208,26 @@
                 close (unit)
             end do
             ! Calculate domain information for mapping
-            domain_start = x_coords(1)
-            domain_end = x_coords(nRows)
+            domain_xstart = x_coords(1)
+            domain_xend = x_coords(xRows)
             x_step = x_cc(1) - x_cc(0)
-            delta_x = x_cc(index_1) - domain_start + x_step/2
-            global_offset = nint(abs(delta_x)/x_step)
+            delta_x = x_cc(index_x) - domain_xstart + x_step/2
+            global_offset_x = nint(abs(delta_x)/x_step)
             files_loaded = .true.
         end if
         ! Calculate the index in the file data array corresponding to x_cc(i)
-        idx = i + 1 + global_offset - index_1
+        idx = i + 1 + global_offset_x - index_x
         do f = 1, sys_size - 1
             if (f >= momxe) then
                 jump = 1
             else
                 jump = 0
             end if
-            q_prim_vf(f + jump)%sf(i, j, 0) = stored_values(idx, f)
+            q_prim_vf(f + jump)%sf(i, j, 0) = stored_values(idx, 1, f)
         end do
         ! Set element the velocity paraller to y explicitly to zero
         q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
-
+        
     case default
         if (proc_rank == 0) then
             call s_int_to_str(patch_id, iStr)
@@ -248,5 +235,8 @@
         end if
 
     end select
+
+
+
 
 #:enddef

@@ -238,14 +238,9 @@ As a convention, any hard coded patches that are part of the MFC master branch s
 
 Also Several custom hard-coded patches are already defined to support common workflows. These include:
 
-case(100) in 1dHardcodedIC.fpp: used to initialize the domain with data from a previous 1D simulation or external source (e.g. Cantera), allowing reuse of existing 1D profiles.
-
-case(270) in 2dHardcodedIC.fpp: used to create 2D fields by extruding a 1D profile along the second spatial dimensions, This allows the solution of a 1D case at a
-specific timestep to be extended uniformly in the transverse direction and used as a full 2D initial condition.
-
-case(370) in 3dHardcodedIC.fpp: used to build 3D domains by extruding 2D data along the third dimension.
-
-The variables xRows, yRows, and init_dir must be defined to specify the grid dimensions of the previous simulation and the directory where the input files are located.
+By convention, patch ID `case(170)` load a 1D profile, ID `case(270)` extrude that 1D data into 2D, and ID `case(370)` extrude 2D data into 3D. 
+You only need to supply `init_dir` (and the filename‐pattern via `zeros_default`). All related variables (including init_dir, zeros_default, and the “files_loaded” flag) 
+live in `src/pre_process/include/HardcodedExtrusion.fpp`, and no manual grid‐size settings are required.
 #### Parameter Descriptions
 
 - `num_patches` defines the total number of patches defined in the domain.

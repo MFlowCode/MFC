@@ -1,44 +1,9 @@
 #:def Hardcoded3DVariables()
-    !> @brief Initialize a 3D grid by projecting a 2D profile along the z-direction.
-    !>
-    !> @details
-    !> Reads a 2D primitive-variable dataset and replicates it across the third
-    !> dimension (z), these files are produced when parallel I/O is disabled in `case.py`.
-    !> Parameters control file counts (number of primitive variables) grid resolution, and domain offsets in x, and y.
-    !>
-    !> @param xRows          Number of grid points in the x-direction
-    !> @param yRows          Number of grid points in the y-direction
-    !> @param init_dir       Directory containing the `prim.*.dat` files
-
     ! Place any declaration of intermediate variables here
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
 
     real(wp) :: eps
 
-    integer, parameter :: xRows = 401   ! Number of points in x
-    integer, parameter :: yRows = 403   ! Number of points in y
-    integer, parameter :: nRows = xRows*yRows
-    integer :: f, iter, ios, unit, idx, idy, jump, index_x, index_y
-    real(wp) :: x_len, x_step, y_len, y_step
-    integer :: global_offset_x, global_offset_y  ! MPI subdomain offsets
-    real(wp) :: delta_x, delta_y
-    real(wp) :: dummy_x, dummy_y
-    real(wp) :: current_x
-    real(wp) :: sim_x_step, sim_y_step           ! Simulation grid steps
-    integer :: nx_data, ny_data, data_i, data_j, iix, iiy
-    character(len=100), dimension(sys_size - 1) :: fileNames
-    character(len=200) :: errmsg
-    ! Arrays to store all data from files - read once, use many times
-    real(wp), dimension(xRows, yRows, sys_size - 1) :: stored_values   ! Imported 2D Data
-    real(wp), dimension(nRows) :: x_coords, y_coords
-    logical :: files_loaded = .false.
-    real(wp) :: domain_xstart, domain_xend, domain_ystart, domain_yend
-    character(len=*), parameter :: init_dir = "/home/YourDirectory"
-    character(len=20) :: file_num_str     ! For storing the file number as a string
-    character(len=20) :: zeros_part       ! For the trailing zeros part
-    character(len=6), parameter :: zeros_default = "000000"  ! Default zeros (can be changed)
-
-    eps = 1e-9_wp
 #:enddef
 
 #:def Hardcoded3D()
@@ -103,11 +68,65 @@
         end do
 
         if (.not. files_loaded) then
-            ! Print status message
+          ! 1) Discover yRows by reading fileNames(1)  until x changes from the first line’s x.
+          open(newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
+          if (ios2 /= 0 ) then
+            write(errmsg, '(A,A)') "Error opening file for yRows detection: ", trim(fileNames(1))
+            call s_mpi_abort(trim(errmsg))
+          end if
+
+          ! Read the very first line to get (x₀, y₀)
+          read(unit2, *, iostat=ios2) x0, y0, dummy_z
+          if (ios2 /= 0 ) then
+            write(errmsg, '(A,A)') "Error reading first line of: ", trim(fileNames(1))
+            call s_mpi_abort(trim(errmsg))
+          end if
+
+          ycount = 1
+          do
+            read(unit2, *, iostat=ios2) dummy_x, dummy_y, dummy_z
+            if (ios2 /= 0) exit         ! End of File : stop counting
+            if (dummy_x == x0 .and. dummy_y /= y0) then
+              ! As soon as x or y changes from the first line’s (x0,y0),
+              ! we know we have counted all the (x0, y1) rows.
+              ycount = ycount + 1
+            else
+              exit
+            end if
+          end do
+          yRows = ycount
+          close(unit2)
+          ! 2) Count total rows (nrows) to get xRows
+          open(newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
+          if (ios2 /= 0 ) then
+            write(errmsg, '(A,A)') "Error re‐opening file to count rows: ", trim(fileNames(1))
+            call s_mpi_abort(trim(errmsg))
+          end if
+
+          nrows = 0
+          do
+            read(unit2, *, iostat=ios2) dummy_x, dummy_y, dummy_z
+            if (ios2 /= 0) exit
+            nrows = nrows + 1
+          end do
+          close(unit2)
+
+          if (mod(nrows, yRows) /= 0) then
+              write(errmsg, '(A,A,I0,A,I0)') &
+                "File ’", trim(fileNames(1)), &
+                "’ has total lines=", nrows, &
+                " which is not a multiple of yRows=", yRows
+              call s_mpi_abort(trim(errmsg))
+          end if
+            xRows = nrows / yRows
+            allocate(x_coords(nRows))
+            allocate(y_coords(nRows))
+            allocate(stored_values(xRows, yRows, sys_size))
             index_x = i
             index_y = j
+ 
             open (newunit=unit, file=trim(fileNames(1)), status='old', action='read', iostat=ios)
-            if (ios /= 0 .and. proc_rank == 0) then
+            if (ios /= 0) then
                 write (errmsg, '(A,A)') "Error opening file: ", trim(fileNames(f))
                 call s_mpi_abort(trim(errmsg))
             end if
@@ -125,10 +144,11 @@
                 end do
             end do
             close (unit)
+
             !Now read only the values from remaining files (skip x,y columns)
             do f = 2, sys_size - 1
                 open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
-                if (ios /= 0 .and. proc_rank == 0) then
+                if (ios /= 0) then
                     print *, "Error opening file: ", trim(fileNames(f))
                     cycle  ! Skip this file on error
                 end if
@@ -145,29 +165,28 @@
                 end do
             end do
             close (unit)
+           
 
             domain_xstart = x_coords(1)  ! First x value
             domain_ystart = y_coords(1)  ! First y value
-            ny_data = yRows
-            nx_data = xRows
             ! Calculate actual domain end values
             domain_xend = x_coords(nRows - yRows + 1)  ! Last x value
             domain_yend = y_coords(yRows)              ! Last y value in first x-slice
             ! Calculate simulation grid steps
-            sim_x_step = x_cc(1) - x_cc(0)
-            sim_y_step = y_cc(1) - y_cc(0)
+            x_step = x_cc(1) - x_cc(0)
+            y_step = y_cc(1) - y_cc(0)
             ! Calculate offsets
-            delta_x = x_cc(index_x) - domain_xstart + sim_x_step/2.0_wp
-            delta_y = y_cc(index_y) - domain_ystart + sim_y_step/2.0_wp
+            delta_x = x_cc(index_x) - domain_xstart + x_step/2.0_wp
+            delta_y = y_cc(index_y) - domain_ystart + y_step/2.0_wp
             ! Global offsets in case of multiple ranks
-            global_offset_x = nint(abs(delta_x)/sim_x_step)
-            global_offset_y = nint(abs(delta_y)/sim_y_step)
+            global_offset_x = nint(abs(delta_x)/x_step)
+            global_offset_y = nint(abs(delta_y)/y_step)
 
             files_loaded = .true.
         end if
 
-        data_i = i + 1 + global_offset_x - index_x  ! x-direction index in data grid
-        data_j = j + 1 + global_offset_y - index_y  ! y-direction index in data grid
+        idx = i + 1 + global_offset_x - index_x  ! x-direction index in data grid
+        idy = j + 1 + global_offset_y - index_y  ! y-direction index in data grid
 
         do f = 1, sys_size - 1
             if (f >= momxe) then
@@ -175,7 +194,7 @@
             else
                 jump = 0
             end if
-            q_prim_vf(f + jump)%sf(i, j, k) = stored_values(data_i, data_j, f)
+            q_prim_vf(f + jump)%sf(i, j, k) = stored_values(idx, idy, f)
         end do
         ! Set z velocity to zero
         q_prim_vf(momxe)%sf(i, j, k) = 0.0_wp

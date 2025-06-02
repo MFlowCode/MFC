@@ -3,6 +3,7 @@
 !! @brief Contains module m_patches
 
 #:include 'case.fpp'
+#:include 'ExtrusionHardcodedIC.fpp'
 #:include '1dHardcodedIC.fpp'
 #:include '2dHardcodedIC.fpp'
 #:include '3dHardcodedIC.fpp'
@@ -1300,8 +1301,9 @@ contains
         integer :: i, j, k
         ! Placeholders for the cell boundary values
         real(wp) :: a, b, c, d, pi_inf, gamma, lit_gamma
-
+        @:HardcodedDimensionsExtension()
         @:Hardcoded1DVariables()
+      
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -1341,6 +1343,8 @@ contains
 
             end if
         end do
+
+        @:HardcodedDellacation()
 
     end subroutine s_1D_analytical
 
@@ -1414,8 +1418,9 @@ contains
         real(wp) :: a, b, c, d !< placeholderrs for the cell boundary values
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
         real(wp) :: l, U0 !< Taylor Green Vortex parameters
-
+        @:HardcodedDimensionsExtension()
         @:Hardcoded2DVariables()
+
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -1466,6 +1471,8 @@ contains
             end do
         end do
 
+        @:HardcodedDellacation()
+
     end subroutine s_2D_analytical
 
     !> This patch assigns the primitive variables as analytical
@@ -1481,7 +1488,7 @@ contains
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
-
+        @:HardcodedDimensionsExtension()
         @:Hardcoded3DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
@@ -1549,7 +1556,8 @@ contains
                 end do
             end do
         end do
-
+        
+        @:HardcodedDellacation()
     end subroutine s_3D_analytical
 
     !> This patch generates the shape of the spherical harmonics
