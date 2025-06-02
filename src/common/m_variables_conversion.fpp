@@ -1723,7 +1723,7 @@ contains
 #ifndef MFC_PRE_PROCESS
     subroutine s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
                                     c_L, c_R, c_avg, c_fast_L, c_fast_R, G_L, G_R, &
-                                    tau_e_L, tau_e_R, &
+                                    tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
                                     s_L, s_R, s_S, s_M, s_P)
 
         ! Computes the wave speeds for the Riemann solver
@@ -1736,10 +1736,11 @@ contains
     ! Input parameters
     integer, intent(in) :: wave_speeds
     real(wp), intent(in) :: rho_L, rho_R
-    real(wp), dimension (:), intent(in) :: vel_L, vel_R, tau_e_L, tau_e_R
+    real(wp), dimension(:), intent(in) :: vel_L, vel_R, tau_e_L, tau_e_R
     real(wp), intent(in) :: pres_L, pres_R, c_L, c_R
     real(wp), intent(in) :: gamma_L, gamma_R, pi_inf_L, pi_inf_R
-    real(wp), intent(in) :: rho_avg, c_avg, c_fast_L, c_fast_R
+    real(wp), intent(in) :: rho_avg, c_avg
+    real(wp), intent(in) :: c_fast_L, c_fast_R
     real(wp), intent(in) :: G_L, G_R
 
     ! Local variables
@@ -1787,9 +1788,10 @@ contains
             s_S = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + (pres_L - pres_R)/(rho_avg*c_avg))
         end if
 
-        ! follows Einfeldt et al.
+        ! ! follows Einfeldt et al.
         ! s_M/P = min/max(0.,s_L/R)
-        s_M = min(0._wp, s_L), s_P = max(0._wp, s_R)
+        s_M = min(0._wp, s_L)
+        s_P = max(0._wp, s_R)
 
 #ifdef DEBUG
         ! Check for potential issues in wave speed calculation
