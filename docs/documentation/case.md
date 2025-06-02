@@ -379,6 +379,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `mixture_err`          | Logical | Mixture properties correction |
 | `time_stepper`         | Integer | Runge--Kutta order [1-3] |
 | `adap_dt`              | Logical | Strang splitting scheme with adaptive time stepping |
+| `recon_type`           | Integer | Reconstruction Type: [1] WENO; [2] MUSCL |
 | `weno_order`	         | Integer | WENO order [1,3,5] |
 | `weno_eps`	         | Real    | WENO perturbation (avoid division by zero) |
 | `mapped_weno`	         | Logical | WENO-M (WENO with mapping of nonlinear weights) |
@@ -388,6 +389,11 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `teno_CT`              | Real    | TENO threshold for smoothness detection |
 | `null_weights`         | Logical | Null WENO weights at boundaries |
 | `mp_weno`              | Logical | Monotonicity preserving WENO |
+| `muscl_order`          | Integer | MUSCL order [1,2] |
+| `muscl_lim`            | Integer | MUSCL Slope Limiter: [1] minmod; [2] monotonized central; [3] Van Albada; [4] Van Leer; [5] SUPERBEE |
+| `int_comp`             | Logical | THINC Interface Compression |
+| `ic_eps`               | Real | Interface compression threshold (default: 1e-4) |
+| `ic_beta`              | Real | Interface compression sharpness parameter (default: 1.6) |
 | `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD	(only for MHD) |
 | `low_Mach`             | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (Chen et al. 2022); [2] Velocity (Thornber et al. 2008)	 |
 | `avg_state`	         | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
@@ -474,7 +480,14 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 
 - `mp_weno` activates monotonicity preservation in the WENO reconstruction (MPWENO) such that the values of reconstructed variables do not reside outside the range spanned by WENO stencil ([Balsara and Shu, 2000](references.md); [Suresh and Huynh, 1997](references.md)).
 
-- `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 3.
+- `muscl_order` specifies the order of the MUSCL scheme that is used for spatial reconstruction of variables by an integer of 1, or 2, that corresponds to the 1st, and 2nd order respectively. When using `muscl_order = 2`, `muscl_lim` must be defined. 
+
+- `muscl_lim` specifies the slope limiter that is used in 2nd order MUSCL Reconstruction by an integer from 1 through 5. 
+`muscl_lim = 1`, `2`, `3`, `4`, and `5` correspond to minmod, monotonized central, Van Albada, Van Leer, and SUPERBEE, respectively.
+
+- `int_comp` activates interface compression using THINC used in MUSCL Reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
+
+- `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 4.
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively ([Toro, 2013](references.md)).
 `riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations ([Miyoshi and Kusano, 2005](references.md)).
 

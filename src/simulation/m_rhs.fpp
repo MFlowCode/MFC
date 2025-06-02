@@ -1752,7 +1752,6 @@ contains
                     recon_dir = 3; is1%beg = is1%beg + ${SCHEME}$_polyn
                     is1%end = is1%end - ${SCHEME}$_polyn
                 end if
-
                 if (n > 0) then
                     if (p > 0) then
                         call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
