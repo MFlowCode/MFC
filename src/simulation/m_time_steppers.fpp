@@ -82,7 +82,7 @@ contains
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_time_steppers_module
+    impure subroutine s_initialize_time_steppers_module
 
         integer :: i, j !< Generic loop iterators
 
@@ -341,7 +341,7 @@ contains
 
     !> 1st order TVD RK time-stepping algorithm
         !! @param t_step Current time step
-    subroutine s_1st_order_tvd_rk(t_step, time_avg)
+    impure subroutine s_1st_order_tvd_rk(t_step, time_avg)
 
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
@@ -447,7 +447,7 @@ contains
 
     !> 2nd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_2nd_order_tvd_rk(t_step, time_avg)
+    impure subroutine s_2nd_order_tvd_rk(t_step, time_avg)
 
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
@@ -627,7 +627,7 @@ contains
 
     !> 3rd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_3rd_order_tvd_rk(t_step, time_avg)
+    impure subroutine s_3rd_order_tvd_rk(t_step, time_avg)
 
         integer, intent(IN) :: t_step
         real(wp), intent(INOUT) :: time_avg
@@ -920,7 +920,7 @@ contains
 
     !> Bubble source part in Strang operator splitting scheme
         !! @param t_step Current time-step
-    subroutine s_adaptive_dt_bubble(t_step, stage)
+    impure subroutine s_adaptive_dt_bubble(t_step, stage)
 
         integer, intent(in) :: t_step, stage
 
@@ -957,7 +957,7 @@ contains
 
     end subroutine s_adaptive_dt_bubble
 
-    subroutine s_compute_dt()
+    impure subroutine s_compute_dt()
 
         real(wp) :: rho        !< Cell-avg. density
         real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
@@ -1081,7 +1081,7 @@ contains
     end subroutine s_time_step_cycling
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_time_steppers_module
+    impure subroutine s_finalize_time_steppers_module
 
         integer :: i, j !< Generic loop iterators
 

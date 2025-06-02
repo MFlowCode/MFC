@@ -127,7 +127,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_cbc_module
+    impure subroutine s_initialize_cbc_module
 
         integer :: i
         logical :: is_cbc
@@ -655,7 +655,6 @@ contains
         real(wp), dimension(num_fluids) :: adv, dadv_ds
         real(wp), dimension(sys_size) :: L
         real(wp), dimension(3) :: lambda
-        real(wp), dimension(num_species) :: Y_s
 
         real(wp) :: rho         !< Cell averaged density
         real(wp) :: pres        !< Cell averaged pressure
@@ -672,9 +671,7 @@ contains
 
         real(wp) :: vel_K_sum, vel_dv_dt_sum
 
-        integer :: i, j, k, r, q !< Generic loop iterators
-
-        real(wp) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
+        integer :: i, j, k, r !< Generic loop iterators
 
         ! Reshaping of inputted data and association of the FD and PI
         ! coefficients, or CBC coefficients, respectively, hinging on
@@ -1581,7 +1578,7 @@ contains
     end subroutine s_finalize_cbc
 
     ! Detext if the problem has any characteristic boundary conditions
-    subroutine s_any_cbc_boundaries(toggle)
+    pure elemental subroutine s_any_cbc_boundaries(toggle)
 
         logical, intent(inout) :: toggle
 
@@ -1596,7 +1593,7 @@ contains
     end subroutine s_any_cbc_boundaries
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_cbc_module
+    impure subroutine s_finalize_cbc_module
 
         logical :: is_cbc
 

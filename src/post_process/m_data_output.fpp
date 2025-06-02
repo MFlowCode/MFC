@@ -109,7 +109,7 @@ module m_data_output
 
 contains
 
-    subroutine s_initialize_data_output_module()
+    impure subroutine s_initialize_data_output_module()
         ! Description: Computation of parameters, allocation procedures, and/or
         !              any other tasks needed to properly setup the module
 
@@ -423,7 +423,7 @@ contains
 
     end subroutine s_initialize_data_output_module
 
-    subroutine s_define_output_region
+    impure subroutine s_define_output_region
 
         integer :: i
         integer :: lower_bound, upper_bound
@@ -459,7 +459,7 @@ contains
 
     end subroutine s_define_output_region
 
-    subroutine s_open_formatted_database_file(t_step)
+    impure subroutine s_open_formatted_database_file(t_step)
         ! Description: This subroutine opens a new formatted database file, or
         !              replaces an old one, and readies it for the data storage
         !              of the grid and the flow variable(s) associated with the
@@ -585,7 +585,7 @@ contains
 
     end subroutine s_open_formatted_database_file
 
-    subroutine s_open_intf_data_file()
+    impure subroutine s_open_intf_data_file()
 
         character(LEN=path_len + 3*name_len) :: file_path !<
               !! Relative path to a file in the case directory
@@ -601,7 +601,7 @@ contains
 
     end subroutine s_open_intf_data_file
 
-    subroutine s_open_energy_data_file()
+    impure subroutine s_open_energy_data_file()
 
         character(LEN=path_len + 3*name_len) :: file_path !<
               !! Relative path to a file in the case directory
@@ -617,7 +617,7 @@ contains
 
     end subroutine s_open_energy_data_file
 
-    subroutine s_write_grid_to_formatted_database_file(t_step)
+    impure subroutine s_write_grid_to_formatted_database_file(t_step)
         ! Description: The general objective of this subroutine is to write the
         !              necessary grid data to the formatted database file, for
         !              the current time-step, t_step. The local processor will
@@ -826,7 +826,7 @@ contains
 
     end subroutine s_write_grid_to_formatted_database_file
 
-    subroutine s_write_variable_to_formatted_database_file(varname, t_step)
+    impure subroutine s_write_variable_to_formatted_database_file(varname, t_step)
         ! Description: The goal of this subroutine is to write to the formatted
         !              database file the flow variable at the current time-step,
         !              t_step. The local process(es) write the part of the flow
@@ -859,7 +859,6 @@ contains
 
         ! Generic loop iterator
         integer :: i, j, k
-        real(wp) :: start, finish
 
         ! Silo-HDF5 Database Format
 
@@ -1089,26 +1088,25 @@ contains
 
     !>  Subroutine that writes the post processed results in the folder 'lag_bubbles_data'
             !!  @param t_step Current time step
-    subroutine s_write_lag_bubbles_results(t_step)
+    impure subroutine s_write_lag_bubbles_results(t_step)
 
         integer, intent(in) :: t_step
-        character(len=len_trim(case_dir) + 2*name_len) :: t_step_dir
+
         character(len=len_trim(case_dir) + 3*name_len) :: file_loc
-        logical :: dir_check
-        integer :: id, nlg_bubs
+
+        integer :: id
 
 #ifdef MFC_MPI
         real(wp), dimension(20) :: inputvals
-        real(wp) :: id_real, time_real
+        real(wp) :: time_real
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(KIND=MPI_OFFSET_KIND) :: disp
         integer :: view
 
-        integer, dimension(3) :: cell
-        logical :: indomain, lg_bub_file, lg_bub_data, file_exist
+        logical :: lg_bub_file, file_exist
 
         integer, dimension(2) :: gsizes, lsizes, start_idx_part
-        integer :: ifile, ireq, ierr, data_size, tot_data
+        integer :: ifile, ierr, tot_data
         integer :: i
 
         write (file_loc, '(A,I0,A)') 'lag_bubbles_mpi_io_', t_step, '.dat'
@@ -1193,15 +1191,14 @@ contains
 #endif
 
     end subroutine s_write_lag_bubbles_results
-    subroutine s_write_intf_data_file(q_prim_vf)
+    impure subroutine s_write_intf_data_file(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        integer :: i, j, k, l, w, cent !< Generic loop iterators
-        integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
-        real(wp), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
+        integer :: i, j, k, l, cent !< Generic loop iterators
+        integer :: counter, root !< number of data points extracted to fit shape to SH perturbations
         real(wp), parameter :: pi = 4._wp*tan(1._wp)
         real(wp), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
-        real(wp) :: axp, axm, ayp, aym, azm, azp, tgp, euc_d, thres, maxalph_loc, maxalph_glb
+        real(wp) :: axp, axm, ayp, aym, tgp, euc_d, thres, maxalph_loc, maxalph_glb
 
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
@@ -1285,14 +1282,13 @@ contains
 
     end subroutine s_write_intf_data_file
 
-    subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
+    impure subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
         real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
         real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H
         real(wp), dimension(num_vels) :: vel
-        real(wp), dimension(num_fluids) :: gammas, pi_infs, adv
+        real(wp), dimension(num_fluids) :: adv
         integer :: i, j, k, l, s !looping indices
-        integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
 
         Egk = 0_wp
         Elp = 0_wp
@@ -1384,7 +1380,7 @@ contains
 
     end subroutine s_write_energy_data_file
 
-    subroutine s_close_formatted_database_file()
+    impure subroutine s_close_formatted_database_file()
         ! Description: The purpose of this subroutine is to close any formatted
         !              database file(s) that may be opened at the time-step that
         !              is currently being post-processed. The root process must
@@ -1411,19 +1407,19 @@ contains
 
     end subroutine s_close_formatted_database_file
 
-    subroutine s_close_intf_data_file()
+    impure subroutine s_close_intf_data_file()
 
         close (211)
 
     end subroutine s_close_intf_data_file
 
-    subroutine s_close_energy_data_file()
+    impure subroutine s_close_energy_data_file()
 
         close (251)
 
     end subroutine s_close_energy_data_file
 
-    subroutine s_finalize_data_output_module()
+    impure subroutine s_finalize_data_output_module()
         ! Description: Deallocation procedures for the module
 
         ! Deallocating the generic storage employed for the flow variable(s)

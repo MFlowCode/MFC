@@ -23,7 +23,7 @@ contains
         !!      Thompson (1990). At the slip wall (frictionless wall),
         !!      the normal component of velocity is zero at all times,
         !!      while the transverse velocities may be nonzero.
-    subroutine s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    pure subroutine s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_slip_wall_L
 #else
@@ -53,7 +53,7 @@ contains
         !!      see pg. 13 of Thompson (1987). The nonreflecting subsonic
         !!      buffer reduces the amplitude of any reflections caused by
         !!      outgoing waves.
-    subroutine s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
+    pure subroutine s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_buffer_L
 #else
@@ -103,7 +103,7 @@ contains
         !!      see pg. 455, Thompson (1990). This nonreflecting subsonic
         !!      CBC assumes an incoming flow and reduces the amplitude of
         !!      any reflections caused by outgoing waves.
-    subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    pure subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_inflow_L
 #else
@@ -137,7 +137,7 @@ contains
         !!      CBC see pg. 454 of Thompson (1990). This nonreflecting
         !!      subsonic CBC presumes an outgoing flow and reduces the
         !!      amplitude of any reflections caused by outgoing waves.
-    subroutine s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
+    pure subroutine s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_outflow_L
 #else
@@ -186,7 +186,7 @@ contains
         !!      direction to the boundary. As a result, a fluid element
         !!      at the boundary is simply advected outward at the fluid
         !!      velocity.
-    subroutine s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    pure subroutine s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_force_free_subsonic_outflow_L
 #else
@@ -224,7 +224,7 @@ contains
         !!      CBC see pg. 455 Thompson (1990). The constant pressure
         !!      subsonic outflow maintains a fixed pressure at the CBC
         !!      boundary in absence of any transverse effects.
-    subroutine s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    pure subroutine s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_constant_pressure_subsonic_outflow_L
 #else
@@ -263,7 +263,7 @@ contains
         !!      state, or nearly a steady state, CBC in which only the
         !!      transverse terms may generate a time dependence at the
         !!      inflow boundary.
-    subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    pure subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_supersonic_inflow_L
 #else
@@ -294,7 +294,7 @@ contains
         !!      of Thompson (1990). For the supersonic outflow CBC, the
         !!      flow evolution at the boundary is determined completely
         !!      by the interior data.
-    subroutine s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
+    pure subroutine s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_supersonic_outflow_L
 #else

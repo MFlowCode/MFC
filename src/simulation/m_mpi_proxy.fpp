@@ -55,7 +55,7 @@ contains
         !!      available to the other processors. Then, the purpose of
         !!      this subroutine is to distribute the user inputs to the
         !!      remaining processors in the communicator.
-    subroutine s_mpi_bcast_user_inputs()
+    impure subroutine s_mpi_bcast_user_inputs()
 
 #ifdef MFC_MPI
 
@@ -213,7 +213,7 @@ contains
         !!      in each of the coordinate directions, approximately the
         !!      same number of cells, and then recomputing the affected
         !!      global parameters.
-    subroutine s_mpi_decompose_computational_domain
+    impure subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
 
@@ -586,12 +586,10 @@ contains
         !!      directly from those of the cell-width distributions.
         !!  @param mpi_dir MPI communication coordinate direction
         !!  @param pbc_loc Processor boundary condition (PBC) location
-    subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
+    impure subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
 
         integer, intent(in) :: mpi_dir
         integer, intent(in) :: pbc_loc
-
-        integer :: dst_proc(1:3)
 
 #ifdef MFC_MPI
 
@@ -766,12 +764,12 @@ contains
     !>  The goal of this procedure is to populate the buffers of
         !!      the cell-average conservative variables by communicating
         !!      with the neighboring processors.
-    subroutine s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
+    impure subroutine s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
 
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in) :: gp_layers
 
-        integer :: i, j, k, l, r !< Generic loop iterators
+        integer :: j, k, l, r !< Generic loop iterators
         integer, pointer, dimension(:) :: p_i_send, p_i_recv
 
 #ifdef MFC_MPI
@@ -1612,7 +1610,7 @@ contains
 
     end subroutine s_mpi_sendrecv_ib_buffers
 
-    subroutine s_mpi_send_random_number(phi_rn, num_freq)
+    impure subroutine s_mpi_send_random_number(phi_rn, num_freq)
         integer, intent(in) :: num_freq
         real(wp), intent(inout), dimension(1:num_freq) :: phi_rn
 #ifdef MFC_MPI
