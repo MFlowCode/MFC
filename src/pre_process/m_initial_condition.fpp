@@ -68,7 +68,7 @@ contains
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_initial_condition_module
+    impure subroutine s_initialize_initial_condition_module
 
         integer :: i, j, k, l !< generic loop iterators
 
@@ -173,10 +173,7 @@ contains
         !!              on the grid using the primitive variables included with
         !!              the patch parameters. The subroutine is complete once the
         !!              primitive variables are converted to conservative ones.
-    subroutine s_generate_initial_condition
-
-        ! First, compute the temperature field from the conservative variables.
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+    impure subroutine s_generate_initial_condition
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
@@ -198,7 +195,7 @@ contains
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+        if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
 
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
@@ -209,7 +206,7 @@ contains
     end subroutine s_generate_initial_condition
 
     !>  Deallocation procedures for the module
-    subroutine s_finalize_initial_condition_module
+    impure subroutine s_finalize_initial_condition_module
 
         integer :: i !< Generic loop iterator
 

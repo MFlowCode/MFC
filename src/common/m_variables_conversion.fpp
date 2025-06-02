@@ -461,10 +461,10 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables
 
-    subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
-                                                          gamma_K, pi_inf_K, qv_K, &
-                                                          alpha_K, alpha_rho_K, Re_K, k, l, r, &
-                                                          G_K, G)
+    pure subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
+                                                               gamma_K, pi_inf_K, qv_K, &
+                                                               alpha_K, alpha_rho_K, Re_K, k, l, r, &
+                                                               G_K, G)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_acc
 #else
@@ -545,9 +545,9 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables_acc
 
-    subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
-                                                                  gamma_K, pi_inf_K, qv_K, &
-                                                                  alpha_K, alpha_rho_K, Re_K, k, l, r)
+    pure subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
+                                                                       gamma_K, pi_inf_K, qv_K, &
+                                                                       alpha_K, alpha_rho_K, Re_K, k, l, r)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_bubbles_acc
 #else
@@ -616,7 +616,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_variables_conversion_module
+    impure subroutine s_initialize_variables_conversion_module
 
         integer :: i, j
 
@@ -743,7 +743,7 @@ contains
     end subroutine s_initialize_variables_conversion_module
 
     !Initialize mv at the quadrature nodes based on the initialized moments and sigma
-    subroutine s_initialize_mv(qK_cons_vf, mv)
+    pure subroutine s_initialize_mv(qK_cons_vf, mv)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
@@ -776,7 +776,7 @@ contains
     end subroutine s_initialize_mv
 
     !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
-    subroutine s_initialize_pb(qK_cons_vf, mv, pb)
+    pure subroutine s_initialize_pb(qK_cons_vf, mv, pb)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
@@ -1167,8 +1167,8 @@ contains
         !!  @param ix Index bounds in the first coordinate direction
         !!  @param iy Index bounds in the second coordinate direction
         !!  @param iz Index bounds in the third coordinate direction
-    subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, &
-                                                             q_cons_vf)
+    impure subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, &
+                                                                    q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -1589,7 +1589,7 @@ contains
 #endif
     end subroutine s_convert_primitive_to_flux_variables
 
-    subroutine s_finalize_variables_conversion_module()
+    impure subroutine s_finalize_variables_conversion_module()
 
         ! Deallocating the density, the specific heat ratio function and the
         ! liquid stiffness function
@@ -1682,7 +1682,7 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-    subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
+    pure subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_fast_magnetosonic_speed
 #else
