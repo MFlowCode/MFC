@@ -51,7 +51,7 @@ module m_data_output
         !! @param ib_markers track if a cell is within the immersed boundary
         !! @param levelset closest distance from every cell to the IB
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-        subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
+        impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
 
             import :: scalar_field, integer_field, sys_size, m, n, p, &
                 pres_field, levelset_field, levelset_norm_field, num_dims
@@ -96,7 +96,7 @@ contains
         !! @param ib_markers track if a cell is within the immersed boundary
         !! @param levelset closest distance from every cell to the IB
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
+    impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
         type(scalar_field), &
             dimension(sys_size), &
             intent(in) :: q_cons_vf, q_prim_vf
@@ -553,7 +553,7 @@ contains
         !! @param ib_markers track if a cell is within the immersed boundary
         !! @param levelset closest distance from every cell to the IB
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
 
         ! Conservative variables
         type(scalar_field), &
@@ -869,7 +869,7 @@ contains
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_data_output_module
+    impure subroutine s_initialize_data_output_module
         ! Generic string used to store the address of a particular file
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
         character(len=15) :: temp
@@ -963,7 +963,7 @@ contains
     end subroutine s_initialize_data_output_module
 
     !> Resets s_write_data_files pointer
-    subroutine s_finalize_data_output_module
+    impure subroutine s_finalize_data_output_module
 
         s_write_data_files => null()
 

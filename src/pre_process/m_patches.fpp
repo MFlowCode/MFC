@@ -64,7 +64,7 @@ module m_patches
 
 contains
 
-    subroutine s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
+    impure subroutine s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp, ib_markers_sf
@@ -305,7 +305,7 @@ contains
         !! @param patch_id patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    subroutine s_spiral(patch_id, patch_id_fp, q_prim_vf)
+    impure subroutine s_spiral(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -2395,7 +2395,7 @@ contains
 
     end subroutine s_convert_cylindrical_to_cartesian_coord
 
-    function f_convert_cyl_to_cart(cyl) result(cart)
+    pure function f_convert_cyl_to_cart(cyl) result(cart)
 
         !$acc routine seq
 
@@ -2421,7 +2421,7 @@ contains
     !! @param myth Angle
     !! @param offset Thickness
     !! @param a Starting position
-    function f_r(myth, offset, a)
+    pure elemental function f_r(myth, offset, a)
         !$acc routine seq
         real(wp), intent(in) :: myth, offset, a
         real(wp) :: b

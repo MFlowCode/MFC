@@ -22,7 +22,7 @@ contains
             !! @param lbk_s Computational coordinates of the bubbles
             !! @param lbk_pos Spatial coordinates of the bubbles
             !! @param updatedvar Eulerian variable to be updated
-    subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+    pure subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
@@ -40,7 +40,7 @@ contains
 
     !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the bubbles.
             !!      The effect of the bubbles only affects the cell where the bubble is located.
-    subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
+    pure subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
 
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s
@@ -95,7 +95,7 @@ contains
 
     !> The purpose of this procedure contains the algorithm to use the gaussian kernel function to map the effect of the bubbles.
             !!      The effect of the bubbles affects the 3X3x3 cells that surround the bubble.
-    subroutine s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+    pure subroutine s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
@@ -199,7 +199,7 @@ contains
     end subroutine s_gaussian
 
     !> The purpose of this subroutine is to apply the gaussian kernel function for each bubble (Maeda and Colonius, 2018)).
-    subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
+    pure subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_applygaussian
 #else
@@ -269,7 +269,7 @@ contains
     !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost cells).
             !! @param cellaux Tested cell to smear the bubble effect in.
             !! @param celloutside If true, then cellaux is outside the computational domain.
-    subroutine s_check_celloutside(cellaux, celloutside)
+    pure subroutine s_check_celloutside(cellaux, celloutside)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_check_celloutside
 #else
@@ -305,7 +305,7 @@ contains
     !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
             !! @param cell Cell of the current bubble
             !! @param cellaux Cell to map the bubble effect in.
-    subroutine s_shift_cell_symmetric_bc(cellaux, cell)
+    pure subroutine s_shift_cell_symmetric_bc(cellaux, cell)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_shift_cell_symmetric_bc
 #else
@@ -346,7 +346,7 @@ contains
             !! @param cell Cell where the bubble is located
             !! @param volpart Volume of the bubble
             !! @param stddsv Standard deviaton
-    subroutine s_compute_stddsv(cell, volpart, stddsv)
+    pure subroutine s_compute_stddsv(cell, volpart, stddsv)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_stddsv
 #else
@@ -387,7 +387,7 @@ contains
     !> The purpose of this procedure is to calculate the characteristic cell volume
             !! @param cell Computational coordinates (x, y, z)
             !! @param Charvol Characteristic volume
-    subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
+    pure elemental subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_get_char_vol
 #else
@@ -412,7 +412,7 @@ contains
             !!      real type into integer.
             !! @param s Computational coordinates of the bubble, real type
             !! @param get_cell Computational coordinates of the bubble, integer type
-    subroutine s_get_cell(s_cell, get_cell)
+    pure subroutine s_get_cell(s_cell, get_cell)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_get_cell
 #else

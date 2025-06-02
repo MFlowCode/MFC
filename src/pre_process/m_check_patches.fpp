@@ -35,7 +35,7 @@ module m_check_patches
 
 contains
 
-    subroutine s_check_patches
+    impure subroutine s_check_patches
 
         integer :: i
         character(len=10) :: num_patches_str
@@ -149,7 +149,7 @@ contains
 
     !> This subroutine checks the line segment patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_line_segment_patch_geometry(patch_id)
+    impure subroutine s_check_line_segment_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -163,7 +163,7 @@ contains
 
     !>  This subroutine checks the circle patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_circle_patch_geometry(patch_id)
+    impure subroutine s_check_circle_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -178,7 +178,7 @@ contains
 
     !>  This subroutine checks the rectangle patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_rectangle_patch_geometry(patch_id)
+    impure subroutine s_check_rectangle_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -194,7 +194,7 @@ contains
 
     !> This subroutine checks the line sweep patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_line_sweep_patch_geometry(patch_id)
+    impure subroutine s_check_line_sweep_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -211,7 +211,7 @@ contains
 
     !>  This subroutine checks the ellipse patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_ellipse_patch_geometry(patch_id)
+    impure subroutine s_check_ellipse_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -228,7 +228,7 @@ contains
 
     !>  This subroutine checks the model patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_2D_TaylorGreen_vortex_patch_geometry(patch_id)
+    impure subroutine s_check_2D_TaylorGreen_vortex_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -245,7 +245,7 @@ contains
 
     !>  This subroutine checks the model patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_1D_analytical_patch_geometry(patch_id)
+    impure subroutine s_check_1D_analytical_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -260,7 +260,7 @@ contains
 
     !>  This subroutine checks the model patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_2D_analytical_patch_geometry(patch_id)
+    impure subroutine s_check_2D_analytical_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -276,7 +276,7 @@ contains
 
     !>  This subroutine checks the model patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_3D_analytical_patch_geometry(patch_id)
+    impure subroutine s_check_3D_analytical_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -293,7 +293,7 @@ contains
 
     !> This subroutine checks the model patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_sphere_patch_geometry(patch_id)
+    impure subroutine s_check_sphere_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -308,7 +308,7 @@ contains
 
     !>  This subroutine checks the model patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_spherical_harmonic_patch_geometry(patch_id)
+    impure subroutine s_check_spherical_harmonic_patch_geometry(patch_id)
         integer, intent(in) :: patch_id
 
         call s_int_to_str(patch_id, iStr)
@@ -329,7 +329,7 @@ contains
 
     !>  This subroutine checks the model patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_cuboid_patch_geometry(patch_id)
+    impure subroutine s_check_cuboid_patch_geometry(patch_id)
 
         ! Patch identifier
         integer, intent(in) :: patch_id
@@ -347,7 +347,7 @@ contains
 
     !>  This subroutine checks the model patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_cylinder_patch_geometry(patch_id)
+    impure subroutine s_check_cylinder_patch_geometry(patch_id)
 
         ! Patch identifier
         integer, intent(in) :: patch_id
@@ -377,7 +377,7 @@ contains
 
     !>  This subroutine checks the model patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_plane_sweep_patch_geometry(patch_id)
+    impure subroutine s_check_plane_sweep_patch_geometry(patch_id)
 
         ! Patch identifier
         integer, intent(in) :: patch_id
@@ -395,7 +395,7 @@ contains
 
     !> This subroutine checks the model patch input
         !!  @param patch_id Patch identifier
-    subroutine s_check_ellipsoid_patch_geometry(patch_id)
+    impure subroutine s_check_ellipsoid_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -413,7 +413,7 @@ contains
     !!>  This subroutine verifies that the geometric parameters of
         !!      the inactive patch remain unaltered by the user inputs.
         !!  @param patch_id Patch identifier
-    subroutine s_check_inactive_patch_geometry(patch_id)
+    impure subroutine s_check_inactive_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -438,7 +438,7 @@ contains
 
     !>  This subroutine verifies the active patch's right to overwrite the preceding patches
         !!  @param patch_id Patch identifier
-    subroutine s_check_active_patch_alteration_rights(patch_id)
+    impure subroutine s_check_active_patch_alteration_rights(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -451,7 +451,7 @@ contains
 
     !>  This subroutine verifies that inactive patches cannot overwrite other patches
         !!  @param patch_id Patch identifier
-    subroutine s_check_inactive_patch_alteration_rights(patch_id)
+    impure subroutine s_check_inactive_patch_alteration_rights(patch_id)
 
         ! Patch identifier
         integer, intent(in) :: patch_id
@@ -464,7 +464,7 @@ contains
 
     !> This subroutine checks the smoothing parameters
         !!  @param patch_id Patch identifier
-    subroutine s_check_supported_patch_smoothing(patch_id)
+    impure subroutine s_check_supported_patch_smoothing(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -487,7 +487,7 @@ contains
 
     !> This subroutine verifies that inactive patches cannot be smoothed
         !!  @param patch_id Patch identifier
-    subroutine s_check_unsupported_patch_smoothing(patch_id)
+    impure subroutine s_check_unsupported_patch_smoothing(patch_id)
 
         ! Patch identifier
         integer, intent(in) :: patch_id
@@ -504,7 +504,7 @@ contains
 
     !>  This subroutine checks the primitive variables
         !!  @param patch_id Patch identifier
-    subroutine s_check_active_patch_primitive_variables(patch_id)
+    impure subroutine s_check_active_patch_primitive_variables(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -565,7 +565,7 @@ contains
         !!      associated with the given inactive patch remain unaltered
         !!      by the user inputs.
         !!  @param patch_id Patch identifier
-    subroutine s_check_inactive_patch_primitive_variables(patch_id)
+    impure subroutine s_check_inactive_patch_primitive_variables(patch_id)
 
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
@@ -587,7 +587,7 @@ contains
 
     end subroutine s_check_inactive_patch_primitive_variables
 
-    subroutine s_check_model_geometry(patch_id)
+    impure subroutine s_check_model_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 

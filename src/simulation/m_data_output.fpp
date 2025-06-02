@@ -76,7 +76,7 @@ contains
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
-    subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
+    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -108,7 +108,7 @@ contains
         !!      In general, this requires generating a table header for
         !!      those stability criteria which will be written at every
         !!      time-step.
-    subroutine s_open_run_time_information_file
+    impure subroutine s_open_run_time_information_file
 
         character(LEN=name_len), parameter :: file_name = 'run_time.inf' !<
             !! Name of the run-time information file
@@ -169,7 +169,7 @@ contains
 
     !>  This opens a formatted data file where the root processor
         !!      can write out the CoM information
-    subroutine s_open_com_files()
+    impure subroutine s_open_com_files()
 
         character(len=path_len + 3*name_len) :: file_path !<
             !! Relative path to the CoM file in the case directory
@@ -209,7 +209,7 @@ contains
 
     !>  This opens a formatted data file where the root processor
         !!      can write out flow probe information
-    subroutine s_open_probe_files
+    impure subroutine s_open_probe_files
 
         character(LEN=path_len + 3*name_len) :: file_path !<
             !! Relative path to the probe data file in the case directory
@@ -259,7 +259,7 @@ contains
         !!      these stability criteria extrema over all time-steps.
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time step
-    subroutine s_write_run_time_information(q_prim_vf, t_step)
+    impure subroutine s_write_run_time_information(q_prim_vf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: t_step
@@ -388,7 +388,7 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
+    impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
@@ -786,7 +786,7 @@ contains
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
         !!  @param beta Eulerian void fraction from lagrangian bubbles
-    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -990,7 +990,7 @@ contains
     !!  @param t_step Current time-step
     !!  @param q_com Center of mass information
     !!  @param moments Higher moment information
-    subroutine s_write_com_files(t_step, c_mass)
+    impure subroutine s_write_com_files(t_step, c_mass)
 
         integer, intent(in) :: t_step
         real(wp), dimension(num_fluids, 5), intent(in) :: c_mass
@@ -1041,7 +1041,7 @@ contains
         !!  @param t_step Current time-step
         !!  @param q_cons_vf Conservative variables
         !!  @param accel_mag Acceleration magnitude information
-    subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
+    impure subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
 
         integer, intent(in) :: t_step
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -1707,7 +1707,7 @@ contains
         !!      the current computation and to close the file when done.
         !!      The footer contains the stability criteria extrema over
         !!      all of the time-steps and the simulation run-time.
-    subroutine s_close_run_time_information_file
+    impure subroutine s_close_run_time_information_file
 
         real(wp) :: run_time !< Run-time of the simulation
 
@@ -1729,7 +1729,7 @@ contains
     end subroutine s_close_run_time_information_file
 
     !> Closes communication files
-    subroutine s_close_com_files()
+    impure subroutine s_close_com_files()
 
         integer :: i !< Generic loop iterator
         do i = 1, num_fluids
@@ -1739,7 +1739,7 @@ contains
     end subroutine s_close_com_files
 
     !> Closes probe files
-    subroutine s_close_probe_files
+    impure subroutine s_close_probe_files
 
         integer :: i !< Generic loop iterator
 
@@ -1752,7 +1752,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_data_output_module
+    impure subroutine s_initialize_data_output_module
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
@@ -1773,7 +1773,7 @@ contains
     end subroutine s_initialize_data_output_module
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_data_output_module
+    impure subroutine s_finalize_data_output_module
 
         if (probe_wrt) then
             @:DEALLOCATE(c_mass)
