@@ -668,9 +668,9 @@ contains
                                 end do
                             end if
 
-                            call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
+                            call s_compute_wave_speed(wave_speeds, vel_L(dir_idx(1)), vel_R(dir_idx(1)), pres_L, pres_R, rho_L, rho_R, rho_avg, &
                                                     c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
-                                                    tau_e_L, tau_e_R, &
+                                                    tau_e_L(dir_idx_tau(1)), tau_e_R(dir_idx_tau(1)), &
                                                     s_L, s_R, s_S)
 
                             xi_M = (5e-1_wp + sign(5e-1_wp, s_L)) &
@@ -1402,9 +1402,9 @@ contains
                                 end if
 
                                 ! COMPUTING THE DIRECT WAVE SPEEDS
-                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
+                                call s_compute_wave_speed(wave_speeds, vel_L(dir_idx(1)), vel_R(dir_idx(1)), pres_L, pres_R, rho_L, rho_R, rho_avg, &
                                                         c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
-                                                        tau_e_L, tau_e_R, &
+                                                        tau_e_L(dir_idx_tau(1)), tau_e_R(dir_idx_tau(1)), &
                                                         s_L, s_R, s_S)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
@@ -1637,10 +1637,10 @@ contains
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
                                                               vel_avg_rms, 0._wp, c_avg)
 
-                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
+                                call s_compute_wave_speed(wave_speeds, vel_L(dir_idx(1)), vel_R(dir_idx(1)), pres_L, pres_R, rho_L, rho_R, rho_avg, &
                                                         c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
-                                                        tau_e_L, tau_e_R, &
-                                                        s_L, s_R, s_S, s_M, s_P)
+                                                        tau_e_L(dir_idx_tau(1)), tau_e_R(dir_idx_tau(1)), &
+                                                        s_L, s_R, s_S)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
@@ -1963,10 +1963,10 @@ contains
                                     @:compute_low_Mach_correction()
                                 end if
 
-                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
+                                call s_compute_wave_speed(wave_speeds, vel_L(dir_idx(1)), vel_R(dir_idx(1)), pres_L, pres_R, rho_L, rho_R, rho_avg, &
                                                         c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
-                                                        tau_e_L, tau_e_R, &
-                                                        s_L, s_R, s_S, s_M, s_P)
+                                                        tau_e_L(dir_idx_tau(1)), tau_e_R(dir_idx_tau(1)), &
+                                                        s_L, s_R, s_S)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
@@ -2329,10 +2329,10 @@ contains
                                     @:compute_low_Mach_correction()
                                 end if
 
-                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
+                                call s_compute_wave_speed(wave_speeds, vel_L(dir_idx(1)), vel_R(dir_idx(1)), pres_L, pres_R, rho_L, rho_R, rho_avg, &
                                                         c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
-                                                        tau_e_L, tau_e_R, &
-                                                        s_L, s_R, s_S, s_M, s_P)
+                                                        tau_e_L(dir_idx_tau(1)), tau_e_R(dir_idx_tau(1)), &
+                                                        s_L, s_R, s_S)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
