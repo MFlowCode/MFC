@@ -2849,7 +2849,7 @@ contains
 
         real(wp), dimension(7) :: U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR
         real(wp), dimension(7) :: F_L, F_R, F_starL, F_starR, F_hlld
-
+        real
         ! Indices for U and F: (rho, rho*vel(1), rho*vel(2), rho*vel(3), By, Bz, E)
         !   Note: vel and B are permutated, so vel(1) is the normal velocity, and x is the normal direction
         !   Note: Bx is omitted as the magnetic flux is always zero in the normal direction
@@ -2859,6 +2859,50 @@ contains
         real(wp) :: v_double, w_double, By_double, Bz_double, E_doubleL, E_doubleR, E_double
 
         integer :: i, j, k, l
+        contains
+            function s_compute_U_double(rho_star, s_M, v_double, w_double, By_double, Bz_double, E_double) result(U_double)
+                implicit none
+                real(wp), intent(in) :: rho_star, s_M, v_double, w_double, By_double, Bz_double, E_double
+                real(wp) :: U_double(7)
+
+                U_double(1) = rho_star
+                U_double(2) = rho_star*s_M
+                U_double(3) = rho_star*v_double
+                U_double(4) = rho_star*w_double
+                U_double(5) = By_double
+                U_double(6) = Bz_double
+                U_double(7) = E_double
+            end function s_compute_U_double
+
+            subroutine s_compute_hlld_state_variables (side, rho, vel, B, E, pTot, rho_star, s_M, E_star, s_wave, &
+                                                        U, F, U_star, F_star, sqrt_rho_star, v_star, w_star)
+                    implicit none
+                    ! Input parameters
+                    character(len=1), intent(in) :: side     ! dummy 'L' for left or 'R' for right
+                    real(wp), intent(in) :: rho, pTot, rho_star, s_M, E_star, s_wave, E
+                    real(wp), dimension(:), intent(in) :: vel, B
+                    ! Output parameters
+                    real(wp), dimension(7), intent(out) :: U, F, U_star
+                    real(wp), intent(out) :: sqrt_rho_star, v_star, w_star
+                    real(wp), dimension(7), intent(out) :: F_star
+                    ! Compute the base state vector
+                    U(1) = rho,  U(2) = rho*vel(1), U(3) = rho*vel(2), U(4) = rho*vel(3)
+                    U(5) = B(2), U(6) = B(3),       U(7) = E
+                    ! Compute the flux vector
+                    F(1) = U(2), F(2) = U(2)*vel(1) - B(1)*B(1) + pTot, F(3) = U(2)*vel(2) - B(1)*B(2)
+                    F(4) = U(2)*vel(3) - B(1)*B(3), F(5) = vel(1)*B(2) - vel(2)*B(1)
+                    F(6) = vel(1)*B(3) - vel(3)*B(1), F(7) = (E + pTot)*vel(1) - B(1)*(vel(1)*B(1) + vel(2)*B(2) + vel(3)*B(3))
+                    ! Compute the star state
+                    U_star(1) = rho_star,        U_star(2) = rho_star*s_M, U_star(3) = rho_star*vel(2)
+                    U_star(4) = rho_star*vel(3), U_star(5) = B(2),         U_star(6) = B(3)
+                    U_star(7) = E_star
+                    ! Compute the star flux using HLL relation
+                    F_star = F + s_wave*(U_star - U)
+                    ! Compute additional parameters needed for double-star states
+                    sqrt_rho_star = sqrt(rho_star)
+                    v_star = vel(2)
+                    w_star = vel(3)
+            end subroutine s_compute_hlld_state_variables
 
         call s_populate_riemann_states_variables_buffers( &
             qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
@@ -2969,74 +3013,15 @@ contains
                             E_starL = ((s_L - vel%L(1))*E%L - pTot_L*vel%L(1) + p_star*s_M)/(s_L - s_M)
                             E_starR = ((s_R - vel%R(1))*E%R - pTot_R*vel%R(1) + p_star*s_M)/(s_R - s_M)
 
-                            ! (5) Compute the left/right conserved state vectors
-                            U_L(1) = rho%L
-                            U_L(2) = rho%L*vel%L(1)
-                            U_L(3) = rho%L*vel%L(2)
-                            U_L(4) = rho%L*vel%L(3)
-                            U_L(5) = B%L(2)
-                            U_L(6) = B%L(3)
-                            U_L(7) = E%L
+                            ! (5) Compute left/right state vectors and fluxes
+                            call s_compute_hlld_state_variables('L', rho%L, vel%L, B%L, E%L, pTot_L, rhoL_star, s_M, E_starL, s_L, &
+                                                        U_L, F_L, U_starL, F_starL, sqrt_rhoL_star, vL_star, wL_star)
+                            call s_compute_hlld_state_variables('R', rho%R, vel%R, B%R, E%R, pTot_R, rhoR_star, s_M, E_starR, s_R, &
+                                                        U_R, F_R, U_starR, F_starR, sqrt_rhoR_star, vR_star, wR_star)
 
-                            U_R(1) = rho%R
-                            U_R(2) = rho%R*vel%R(1)
-                            U_R(3) = rho%R*vel%R(2)
-                            U_R(4) = rho%R*vel%R(3)
-                            U_R(5) = B%R(2)
-                            U_R(6) = B%R(3)
-                            U_R(7) = E%R
-
-                            ! (6) Compute the left/right star state vectors
-                            U_starL(1) = rhoL_star
-                            U_starL(2) = rhoL_star*s_M
-                            U_starL(3) = rhoL_star*vel%L(2)
-                            U_starL(4) = rhoL_star*vel%L(3)
-                            U_starL(5) = B%L(2)
-                            U_starL(6) = B%L(3)
-                            U_starL(7) = E_starL
-
-                            U_starR(1) = rhoR_star
-                            U_starR(2) = rhoR_star*s_M
-                            U_starR(3) = rhoR_star*vel%R(2)
-                            U_starR(4) = rhoR_star*vel%R(3)
-                            U_starR(5) = B%R(2)
-                            U_starR(6) = B%R(3)
-                            U_starR(7) = E_starR
-
-                            ! (7) Compute the left/right fluxes
-                            F_L(1) = rho%L*vel%L(1)
-                            F_L(2) = rho%L*vel%L(1)*vel%L(1) - B%L(1)*B%L(1) + pTot_L
-                            F_L(3) = rho%L*vel%L(1)*vel%L(2) - B%L(1)*B%L(2)
-                            F_L(4) = rho%L*vel%L(1)*vel%L(3) - B%L(1)*B%L(3)
-                            F_L(5) = vel%L(1)*B%L(2) - vel%L(2)*B%L(1)
-                            F_L(6) = vel%L(1)*B%L(3) - vel%L(3)*B%L(1)
-                            F_L(7) = (E%L + pTot_L)*vel%L(1) - B%L(1)*(vel%L(1)*B%L(1) + vel%L(2)*B%L(2) + vel%L(3)*B%L(3))
-
-                            F_R(1) = rho%R*vel%R(1)
-                            F_R(2) = rho%R*vel%R(1)*vel%R(1) - B%R(1)*B%R(1) + pTot_R
-                            F_R(3) = rho%R*vel%R(1)*vel%R(2) - B%R(1)*B%R(2)
-                            F_R(4) = rho%R*vel%R(1)*vel%R(3) - B%R(1)*B%R(3)
-                            F_R(5) = vel%R(1)*B%R(2) - vel%R(2)*B%R(1)
-                            F_R(6) = vel%R(1)*B%R(3) - vel%R(3)*B%R(1)
-                            F_R(7) = (E%R + pTot_R)*vel%R(1) - B%R(1)*(vel%R(1)*B%R(1) + vel%R(2)*B%R(2) + vel%R(3)*B%R(3))
-
-                            ! (8) Compute the left/right star fluxes (note array operations)
-                            F_starL = F_L + s_L*(U_starL - U_L)
-                            F_starR = F_R + s_R*(U_starR - U_R)
-
-                            ! (9) Compute the rotational (Alfvén) speeds
-                            s_starL = s_M - abs(B%L(1))/sqrt(rhoL_star)
-                            s_starR = s_M + abs(B%L(1))/sqrt(rhoR_star)
-
-                            ! (10) Compute the double–star states [Miyoshi Eqns. (59)-(62)]
-                            sqrt_rhoL_star = sqrt(rhoL_star)
-                            sqrt_rhoR_star = sqrt(rhoR_star)
+                            ! (6) Compute the double–star states [Miyoshi Eqns. (59)-(62)]
                             denom_ds = sqrt_rhoL_star + sqrt_rhoR_star
                             sign_Bx = sign(1._wp, B%L(1))
-                            vL_star = vel%L(2)
-                            wL_star = vel%L(3)
-                            vR_star = vel%R(2)
-                            wR_star = vel%R(3)
                             v_double = (sqrt_rhoL_star*vL_star + sqrt_rhoR_star*vR_star + (B%R(2) - B%L(2))*sign_Bx)/denom_ds
                             w_double = (sqrt_rhoL_star*wL_star + sqrt_rhoR_star*wR_star + (B%R(3) - B%L(3))*sign_Bx)/denom_ds
                             By_double = (sqrt_rhoL_star*B%R(2) + sqrt_rhoR_star*B%L(2) + sqrt_rhoL_star*sqrt_rhoR_star*(vR_star - vL_star)*sign_Bx)/denom_ds
@@ -3046,23 +3031,14 @@ contains
                             E_doubleR = E_starR + sqrt_rhoR_star*((vR_star*B%R(2) + wR_star*B%R(3)) - (v_double*By_double + w_double*Bz_double))*sign_Bx
                             E_double = 0.5_wp*(E_doubleL + E_doubleR)
 
-                            U_doubleL(1) = rhoL_star
-                            U_doubleL(2) = rhoL_star*s_M
-                            U_doubleL(3) = rhoL_star*v_double
-                            U_doubleL(4) = rhoL_star*w_double
-                            U_doubleL(5) = By_double
-                            U_doubleL(6) = Bz_double
-                            U_doubleL(7) = E_double
+                            U_doubleL = s_compute_U_double(rhoL_star, s_M, v_double, w_double, By_double, Bz_double, E_double)
+                            U_doubleR = s_compute_U_double(rhoR_star, s_M, v_double, w_double, By_double, Bz_double, E_double)
+                            
+                            ! (7) Compute the rotational (Alfvén) speeds
+                            s_starL = s_M - abs(B%L(1))/sqrt(rhoL_star)
+                            s_starR = s_M + abs(B%L(1))/sqrt(rhoR_star)
 
-                            U_doubleR(1) = rhoR_star
-                            U_doubleR(2) = rhoR_star*s_M
-                            U_doubleR(3) = rhoR_star*v_double
-                            U_doubleR(4) = rhoR_star*w_double
-                            U_doubleR(5) = By_double
-                            U_doubleR(6) = Bz_double
-                            U_doubleR(7) = E_double
-
-                            ! (11) Choose HLLD flux based on wave-speed regions
+                            ! (8) Choose HLLD flux based on wave-speed regions
                             if (0.0_wp <= s_L) then
                                 F_hlld = F_L
                             else if (0.0_wp <= s_starL) then
@@ -3077,7 +3053,7 @@ contains
                                 F_hlld = F_R
                             end if
 
-                            ! (12) Reorder and write temporary variables to the flux array
+                            ! (9) Reorder and write temporary variables to the flux array
                             ! Mass
                             flux_rs${XYZ}$_vf(j, k, l, 1) = F_hlld(1) ! TODO multi-component
                             ! Momentum
