@@ -538,6 +538,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
+        !DIR$ FORCEINLINE
         call s_evolve_q_pb_mv(2, 1._wp, 0._wp, 1._wp, 1._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
@@ -564,6 +565,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
+        !DIR$ FORCEINLINE
         call s_evolve_q_pb_mv(1, 1._wp, 1._wp, 1._wp, 2._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
@@ -626,6 +628,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
+        !DIR$ FORCEINLINE
         call s_evolve_q_pb_mv(2, 1._wp, 0._wp, 1._wp, 1._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
@@ -652,6 +655,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
+        !DIR$ FORCEINLINE
         call s_evolve_q_pb_mv(2, 3._wp, 1._wp, 1._wp, 4._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
@@ -677,6 +681,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
+        !DIR$ FORCEINLINE
         call s_evolve_q_pb_mv(1, 1._wp, 2._wp, 2._wp, 3._wp)
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
