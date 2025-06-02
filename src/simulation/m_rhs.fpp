@@ -810,7 +810,8 @@ contains
             call s_compute_advection_source_term(id, &
                                                  rhs_vf, &
                                                  q_cons_qp, &
-                                                 q_prim_qp)
+                                                 q_prim_qp, &
+                                                 flux_src_n(id))
             call nvtxEndRange
 
             ! RHS additions for hypoelasticity
@@ -951,12 +952,13 @@ contains
 
     end subroutine s_compute_rhs
 
-    subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf)
+    subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(vector_field), intent(inout) :: q_cons_vf
         type(vector_field), intent(inout) :: q_prim_vf
+        type(vector_field), intent(inout) :: flux_src_n_vf
 
         integer :: j, k, l, q ! Loop iterators from original, meaning varies
         integer :: k_loop, l_loop, q_loop ! Standardized spatial loop iterators 0:m, 0:n, 0:p

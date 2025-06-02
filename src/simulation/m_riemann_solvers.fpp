@@ -211,7 +211,8 @@ contains
                                              dvelR_dy_vf, &
                                              dvelR_dz_vf, &
                                              flux_src_vf, &
-                                             norm_dir)
+                                             norm_dir, &
+                                             ix, iy, iz)
 
         type(scalar_field), &
             dimension(num_vels), &
@@ -226,6 +227,8 @@ contains
 
         integer, intent(IN) :: norm_dir
 
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
+
         if (grid_geometry == 3) then
             call s_compute_cylindrical_viscous_source_flux(velL_vf, &
                                                            dvelL_dx_vf, &
@@ -236,7 +239,8 @@ contains
                                                            dvelR_dy_vf, &
                                                            dvelR_dz_vf, &
                                                            flux_src_vf, &
-                                                           norm_dir)
+                                                           norm_dir, &
+                                                           ix, iy, iz)
         else
             call s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, &
                                                          dvelL_dy_vf, &
@@ -1111,7 +1115,7 @@ contains
                     dqR_prim_dx_vf(momxb:momxe), &
                     dqR_prim_dy_vf(momxb:momxe), &
                     dqR_prim_dz_vf(momxb:momxe), &
-                    flux_src_vf, norm_dir)
+                    flux_src_vf, norm_dir, ix, iy, iz)
             else
                 call s_compute_viscous_source_flux( &
                     q_prim_vf(momxb:momxe), &
@@ -1122,7 +1126,7 @@ contains
                     dqR_prim_dx_vf(momxb:momxe), &
                     dqR_prim_dy_vf(momxb:momxe), &
                     dqR_prim_dz_vf(momxb:momxe), &
-                    flux_src_vf, norm_dir)
+                    flux_src_vf, norm_dir, ix, iy, iz)
             end if
         end if
 
@@ -2956,7 +2960,7 @@ contains
                     dqR_prim_dx_vf(momxb:momxe), &
                     dqR_prim_dy_vf(momxb:momxe), &
                     dqR_prim_dz_vf(momxb:momxe), &
-                    flux_src_vf, norm_dir)
+                    flux_src_vf, norm_dir, ix, iy, iz)
             else
                 call s_compute_viscous_source_flux( &
                     q_prim_vf(momxb:momxe), &
@@ -2967,7 +2971,7 @@ contains
                     dqR_prim_dx_vf(momxb:momxe), &
                     dqR_prim_dy_vf(momxb:momxe), &
                     dqR_prim_dz_vf(momxb:momxe), &
-                    flux_src_vf, norm_dir)
+                    flux_src_vf, norm_dir, ix, iy, iz)
             end if
         end if
 
@@ -4096,8 +4100,7 @@ contains
     !! @param[in] ix X-direction loop bounds (int_bounds_info).
     !! @param[in] iy Y-direction loop bounds (int_bounds_info).
     !! @param[in] iz Z-direction loop bounds (int_bounds_info).
-    subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
-                                                       dvelL_dx_vf, &
+    subroutine s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, &
                                                        dvelL_dy_vf, &
                                                        dvelL_dz_vf, &
                                                        dvelR_dx_vf, &
@@ -4107,13 +4110,11 @@ contains
                                                        norm_dir)
 
         ! Arguments
-        type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dy_vf, dvelR_dy_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         integer, intent(in) :: norm_dir
-        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! Local variables
         real(wp), dimension(num_dims, num_dims) :: vel_grad_avg        !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
