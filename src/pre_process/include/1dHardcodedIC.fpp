@@ -18,25 +18,25 @@
             fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat"
             ! Create the filename with the pattern "prim.X.00.000000.dat"
         end do
-        
+
         if (.not. files_loaded) then
             !Reading the first file to calculate the number of grid points in the x direction
             line_count = 0
-            open(newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
-                if (ios2 /= 0) then
-                    write(errmsg, '(A,A)') "Error opening file: ", trim(fileNames(1))
-                    call s_mpi_abort(trim(errmsg))
-                end if
-                do
-                    read(unit2, *, iostat=ios2) dummy_x, dummy_y
-                    if (ios2 /= 0) exit  ! Exit since the file has been read
-                    line_count = line_count + 1
-                end do
-            close(unit2)
-            
+            open (newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
+            if (ios2 /= 0) then
+                write (errmsg, '(A,A)') "Error opening file: ", trim(fileNames(1))
+                call s_mpi_abort(trim(errmsg))
+            end if
+            do
+                read (unit2, *, iostat=ios2) dummy_x, dummy_y
+                if (ios2 /= 0) exit  ! Exit since the file has been read
+                line_count = line_count + 1
+            end do
+            close (unit2)
+
             xRows = line_count
-            allocate(x_coords(xRows))
-            allocate(stored_values(xRows, 1, sys_size))
+            allocate (x_coords(xRows))
+            allocate (stored_values(xRows, 1, sys_size))
             do f = 1, sys_size
                 ! Open the file for reading
                 open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
@@ -74,6 +74,5 @@
         call s_int_to_str(patch_id, iStr)
         call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))
     end select
-     
 
 #:enddef

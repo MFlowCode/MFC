@@ -68,63 +68,63 @@
         end do
 
         if (.not. files_loaded) then
-          ! 1) Discover yRows by reading fileNames(1)  until x changes from the first line’s x.
-          open(newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
-          if (ios2 /= 0 ) then
-            write(errmsg, '(A,A)') "Error opening file for yRows detection: ", trim(fileNames(1))
-            call s_mpi_abort(trim(errmsg))
-          end if
-
-          ! Read the very first line to get (x₀, y₀)
-          read(unit2, *, iostat=ios2) x0, y0, dummy_z
-          if (ios2 /= 0 ) then
-            write(errmsg, '(A,A)') "Error reading first line of: ", trim(fileNames(1))
-            call s_mpi_abort(trim(errmsg))
-          end if
-
-          ycount = 1
-          do
-            read(unit2, *, iostat=ios2) dummy_x, dummy_y, dummy_z
-            if (ios2 /= 0) exit         ! End of File : stop counting
-            if (dummy_x == x0 .and. dummy_y /= y0) then
-              ! As soon as x or y changes from the first line’s (x0,y0),
-              ! we know we have counted all the (x0, y1) rows.
-              ycount = ycount + 1
-            else
-              exit
+            ! 1) Discover yRows by reading fileNames(1)  until x changes from the first line’s x.
+            open (newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
+            if (ios2 /= 0) then
+                write (errmsg, '(A,A)') "Error opening file for yRows detection: ", trim(fileNames(1))
+                call s_mpi_abort(trim(errmsg))
             end if
-          end do
-          yRows = ycount
-          close(unit2)
-          ! 2) Count total rows (nrows) to get xRows
-          open(newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
-          if (ios2 /= 0 ) then
-            write(errmsg, '(A,A)') "Error re‐opening file to count rows: ", trim(fileNames(1))
-            call s_mpi_abort(trim(errmsg))
-          end if
 
-          nrows = 0
-          do
-            read(unit2, *, iostat=ios2) dummy_x, dummy_y, dummy_z
-            if (ios2 /= 0) exit
-            nrows = nrows + 1
-          end do
-          close(unit2)
+            ! Read the very first line to get (x₀, y₀)
+            read (unit2, *, iostat=ios2) x0, y0, dummy_z
+            if (ios2 /= 0) then
+                write (errmsg, '(A,A)') "Error reading first line of: ", trim(fileNames(1))
+                call s_mpi_abort(trim(errmsg))
+            end if
 
-          if (mod(nrows, yRows) /= 0) then
-              write(errmsg, '(A,A,I0,A,I0)') &
-                "File ’", trim(fileNames(1)), &
-                "’ has total lines=", nrows, &
-                " which is not a multiple of yRows=", yRows
-              call s_mpi_abort(trim(errmsg))
-          end if
-            xRows = nrows / yRows
-            allocate(x_coords(nRows))
-            allocate(y_coords(nRows))
-            allocate(stored_values(xRows, yRows, sys_size))
+            ycount = 1
+            do
+                read (unit2, *, iostat=ios2) dummy_x, dummy_y, dummy_z
+                if (ios2 /= 0) exit         ! End of File : stop counting
+                if (dummy_x == x0 .and. dummy_y /= y0) then
+                    ! As soon as x or y changes from the first line’s (x0,y0),
+                    ! we know we have counted all the (x0, y1) rows.
+                    ycount = ycount + 1
+                else
+                    exit
+                end if
+            end do
+            yRows = ycount
+            close (unit2)
+            ! 2) Count total rows (nrows) to get xRows
+            open (newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
+            if (ios2 /= 0) then
+                write (errmsg, '(A,A)') "Error re‐opening file to count rows: ", trim(fileNames(1))
+                call s_mpi_abort(trim(errmsg))
+            end if
+
+            nrows = 0
+            do
+                read (unit2, *, iostat=ios2) dummy_x, dummy_y, dummy_z
+                if (ios2 /= 0) exit
+                nrows = nrows + 1
+            end do
+            close (unit2)
+
+            if (mod(nrows, yRows) /= 0) then
+                write (errmsg, '(A,A,I0,A,I0)') &
+                    "File ’", trim(fileNames(1)), &
+                    "’ has total lines=", nrows, &
+                    " which is not a multiple of yRows=", yRows
+                call s_mpi_abort(trim(errmsg))
+            end if
+            xRows = nrows/yRows
+            allocate (x_coords(nRows))
+            allocate (y_coords(nRows))
+            allocate (stored_values(xRows, yRows, sys_size))
             index_x = i
             index_y = j
- 
+
             open (newunit=unit, file=trim(fileNames(1)), status='old', action='read', iostat=ios)
             if (ios /= 0) then
                 write (errmsg, '(A,A)') "Error opening file: ", trim(fileNames(f))
@@ -165,7 +165,6 @@
                 end do
             end do
             close (unit)
-           
 
             domain_xstart = x_coords(1)  ! First x value
             domain_ystart = y_coords(1)  ! First y value

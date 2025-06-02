@@ -1302,9 +1302,8 @@ contains
         ! Placeholders for the cell boundary values
         real(wp) :: a, b, c, d, pi_inf, gamma, lit_gamma
         real(wp) :: pi_inf, gamma, lit_gamma
-        @:HardcodedDimensionsExtension()
+        @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
-      
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -1419,9 +1418,8 @@ contains
 
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
         real(wp) :: l, U0 !< Taylor Green Vortex parameters
-        @:HardcodedDimensionsExtension()
+        @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
-
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -1489,7 +1487,7 @@ contains
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
-        @:HardcodedDimensionsExtension()
+        @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
@@ -1557,7 +1555,7 @@ contains
                 end do
             end do
         end do
-        
+
         @:HardcodedDellacation()
     end subroutine s_3D_analytical
 

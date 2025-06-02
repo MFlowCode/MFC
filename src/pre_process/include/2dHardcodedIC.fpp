@@ -167,28 +167,28 @@
                 write (file_num_str, '(I2)') f  ! Double digit
                 ! For more than 99 files, you might need to adjust this format
             end if
-            fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat" 
+            fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat"
         end do
 
         if (.not. files_loaded) then
             ! Calculating the number of grid points in the x direction in the file.
             line_count = 0
-            open(newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
-                if (ios2 /= 0) then
-                    write(errmsg, '(A,A)') "Error opening file: ", trim(fileNames(1))
-                    call s_mpi_abort(trim(errmsg))
-                end if
-                do
-                    read(unit2, *, iostat=ios2) dummy_x, dummy_y
-                    if (ios2 /= 0) exit ! Exit since files has been read
-                    line_count = line_count + 1
-                end do
-            close(unit2)
-            
+            open (newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
+            if (ios2 /= 0) then
+                write (errmsg, '(A,A)') "Error opening file: ", trim(fileNames(1))
+                call s_mpi_abort(trim(errmsg))
+            end if
+            do
+                read (unit2, *, iostat=ios2) dummy_x, dummy_y
+                if (ios2 /= 0) exit ! Exit since files has been read
+                line_count = line_count + 1
+            end do
+            close (unit2)
+
             index_x = i
             xRows = line_count
-            allocate(x_coords(xRows))
-            allocate(stored_values(xRows, 1, sys_size))
+            allocate (x_coords(xRows))
+            allocate (stored_values(xRows, 1, sys_size))
             do f = 1, sys_size - 1
                 ! Open the file for reading
                 open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
@@ -227,7 +227,7 @@
         end do
         ! Set element the velocity paraller to y explicitly to zero
         q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
-        
+
     case default
         if (proc_rank == 0) then
             call s_int_to_str(patch_id, iStr)
@@ -235,8 +235,5 @@
         end if
 
     end select
-
-
-
 
 #:enddef
