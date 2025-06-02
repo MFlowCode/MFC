@@ -44,6 +44,7 @@ module m_variables_conversion
 #ifndef MFC_PRE_PROCESS
               s_compute_speed_of_sound, &
               s_compute_fast_magnetosonic_speed, &
+              s_compute_wave_speed, &
 #endif
               s_finalize_variables_conversion_module
 
@@ -1717,6 +1718,105 @@ contains
         c_fast = sqrt(0.5_wp*(term + sqrt(disc)))
 
     end subroutine s_compute_fast_magnetosonic_speed
+#endif
+
+#ifndef MFC_PRE_PROCESS
+    subroutine s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
+                                    c_L, c_R, c_avg, c_fast, G_L, G_R, &
+                                    tau_e_L, tau_e_R, &
+                                    s_L, s_R, s_S)
+
+        ! Computes the wave speeds for the Riemann solver
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_compute_wave_speed
+#else
+        !$acc routine seq
+#endif
+
+    ! Input parameters
+    integer, intent(in) :: wave_speeds
+    real(wp), intent(in) :: rho_L, rho_R
+    real(wp), dimension(:), intent(in) :: vel_L, vel_R
+    real(wp), intent(in) :: pres_L, pres_R, c_L, c_R
+    real(wp), intent(in) :: gamma_L, gamma_R, pi_inf_L, pi_inf_R
+    real(wp), intent(in) :: rho_avg, c_avg, c_fast
+    real(wp), intent(in) :: G_L, G_R
+    real(wp), dimension(:), intent(in) :: tau_e_L, tau_e_R
+
+    ! Local variables
+    real(wp) :: pres_SL, pres_SR, Ms_L, Ms_R
+
+    ! Output parameters
+    real(wp), intent(out) :: s_L, s_R, s_S
+
+        if (wave_speeds == 1) then
+            if (mhd) then
+                s_L = min(vel_L(dir_idx(1)) - c_fast%L, vel_R(dir_idx(1)) - c_fast%R)
+                s_R = max(vel_R(dir_idx(1)) + c_fast%R, vel_L(dir_idx(1)) + c_fast%L)
+            elseif (hypoelasticity .or. elasticity) then
+                s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
+                                                    (((4._wp*G_L)/3._wp) + &
+                                                    tau_e_L(dir_idx_tau(1)))/rho_L) &
+                            , vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
+                                                        (((4._wp*G_R)/3._wp) + &
+                                                        tau_e_R(dir_idx_tau(1)))/rho_R))
+                s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
+                                                    (((4._wp*G_R)/3._wp) + &
+                                                    tau_e_R(dir_idx_tau(1)))/rho_R) &
+                            , vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
+                                                        (((4._wp*G_L)/3._wp) + &
+                                                        tau_e_L(dir_idx_tau(1)))/rho_L))
+            else if (hyperelasticity) then
+                s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L) &
+                            , vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R))
+                s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R) &
+                            , vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L))
+            else
+                s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
+                s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
+            end if
+            s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))* &
+                    (s_L - vel_L(dir_idx(1))) - &
+                    rho_R*vel_R(dir_idx(1))* &
+                    (s_R - vel_R(dir_idx(1)))) &
+                    /(rho_L*(s_L - vel_L(dir_idx(1))) - &
+                    rho_R*(s_R - vel_R(dir_idx(1))))
+        elseif (wave_speeds == 2) then
+            pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
+                                (vel_L(dir_idx(1)) - &
+                                vel_R(dir_idx(1))))
+            pres_SR = pres_SL
+            Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
+                                    (pres_SL/pres_L - 1._wp)*pres_L/ &
+                                    ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+            Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
+                                    (pres_SR/pres_R - 1._wp)*pres_R/ &
+                                    ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+            s_L = vel_L(dir_idx(1)) - c_L*Ms_L
+            s_R = vel_R(dir_idx(1)) + c_R*Ms_R
+            s_S = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
+                            (pres_L - pres_R)/ &
+                            (rho_avg*c_avg))
+        end if
+
+#ifdef DEBUG
+        ! Check for potential issues in wave speed calculation
+        if (s_R <= s_L) then
+            print *, 'WARNING: Wave speed issue detected in s_compute_wave_speed'
+            print *, 'Left wave speed >= Right wave speed:', s_L, s_R
+            print *, 'Input velocities (dir_idx(1)):', vel_L(dir_idx(1)), vel_R(dir_idx(1))
+            print *, 'Sound speeds:', c_L, c_R
+            print *, 'Densities:', rho_L, rho_R
+            print *, 'Pressures:', pres_L, pres_R
+            print *, 'Wave speeds method:', wave_speeds
+            if (elasticity .or. hypoelasticity .or. hyperelasticity) then
+                print *, 'Shear moduli:', G_L, G_R
+            end if
+            call s_mpi_abort('Error: Invalid wave speeds in s_compute_wave_speed')
+        end if
+#endif
+
+    end subroutine s_compute_wave_speed
 #endif
 
 end module m_variables_conversion
