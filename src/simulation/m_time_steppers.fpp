@@ -1020,7 +1020,7 @@ contains
         integer :: i, j, k, l
 
         call nvtxStartRange("RHS-BODYFORCES")
-        call s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
+        call s_compute_body_forces_rhs(q_cons_vf, q_prim_vf, rhs_vf)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = momxb, E_idx

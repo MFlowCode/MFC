@@ -571,6 +571,8 @@ contains
             ! Obtaining driving pressure
             call s_get_pinf(k, q_prim_vf, 1, myPinf, cell, aux1, aux2)
 
+            !if (k == 14) print*, k, cell(1), cell(2), cell(3)
+
             ! Obtain liquid density and computing speed of sound from pinf
             !$acc loop seq
             do i = 1, num_fluids
@@ -840,8 +842,13 @@ contains
 
         if (lag_params%vel_model > 0) then
             cell = -buff_size
-            call s_locate_cell(mtn_pos(bub_id, 1:3, 1), cell, mtn_s(bub_id, 1:3, 1))
+            call s_locate_cell(mtn_pos(bub_id, 1:3, 2), cell, mtn_s(bub_id, 1:3, 2))
+            !print*, mtn_pos(bub_id, 1, 2), mtn_pos(bub_id, 2, 2)
             scoord = mtn_s(bub_id, 1:3, 2)
+
+            !if (k == 14) print*, "pinf cell", cell
+            !if (k == 14) print*, "pinf scoord", scoord
+            !if (k == 14) print*, "pinf pos", mtn_pos(bub_id,:,2)
         else
             scoord = mtn_s(bub_id, 1:3, 2)
             cell(:) = int(scoord(:))
@@ -1164,10 +1171,9 @@ contains
 
         integer, intent(in) :: dest
         integer :: k, i, patch_id
-
         integer, dimension(3) :: cell
 
-        !$acc parallel loop gang vector default(present)
+        !$acc parallel loop gang vector default(present) private(cell)
         do k = 1, nBubs
 
             if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
@@ -1198,17 +1204,19 @@ contains
 
             if (ib) then
                 cell = -buff_size
-                call s_locate_cell(mtn_pos(k, 1:3, 1), cell, mtn_s(k, 1:3, 1))
-
+                call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
+                !if (k == 14) print*, "IB", mtn_pos(k, 1:3, dest), cell
                 if (ib_markers%sf(cell(1), cell(2), cell(3)) /= 0) then
                     patch_id = ib_markers%sf(cell(1), cell(2), cell(3))
-
-                    !$acc routine seq
+                    if (k == 14) print*, "IB", mtn_pos(k, 1:3, dest), cell
                     do i = 1, num_dims
                         mtn_pos(k, i, dest) = mtn_pos(k, i, dest) - &
                                               levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
-                                              * levelset%sf(cell(1), cell(2), cell(3), 1)
+                                              * levelset%sf(cell(1), cell(2), cell(3), patch_id)
                     end do
+                    cell = -buff_size
+                    call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
+                    if (k == 14) print*, "IB", mtn_pos(k, 1:3, dest), cell
                 end if
             end if
 
