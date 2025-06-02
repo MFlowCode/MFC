@@ -668,8 +668,8 @@ contains
                                 end do
                             end if
 
-                            call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
-                                                    c_L, c_R, c_avg, c_fast, G_L, G_R, &
+                            call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
+                                                    c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
                                                     tau_e_L, tau_e_R, &
                                                     s_L, s_R, s_S)
 
@@ -1402,8 +1402,8 @@ contains
                                 end if
 
                                 ! COMPUTING THE DIRECT WAVE SPEEDS
-                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
-                                                        c_L, c_R, c_avg, c_fast, G_L, G_R, &
+                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
+                                                        c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
                                                         tau_e_L, tau_e_R, &
                                                         s_L, s_R, s_S)
 
@@ -1637,8 +1637,8 @@ contains
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
                                                               vel_avg_rms, 0._wp, c_avg)
 
-                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
-                                                        c_L, c_R, c_avg, c_fast, G_L, G_R, &
+                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
+                                                        c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
                                                         tau_e_L, tau_e_R, &
                                                         s_L, s_R, s_S, s_M, s_P)
 
@@ -1963,8 +1963,8 @@ contains
                                     @:compute_low_Mach_correction()
                                 end if
 
-                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
-                                                        c_L, c_R, c_avg, c_fast, G_L, G_R, &
+                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
+                                                        c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
                                                         tau_e_L, tau_e_R, &
                                                         s_L, s_R, s_S, s_M, s_P)
 
@@ -2329,8 +2329,8 @@ contains
                                     @:compute_low_Mach_correction()
                                 end if
 
-                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg &
-                                                        c_L, c_R, c_avg, c_fast, G_L, G_R, &
+                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
+                                                        c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
                                                         tau_e_L, tau_e_R, &
                                                         s_L, s_R, s_S, s_M, s_P)
 
