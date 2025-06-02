@@ -1671,50 +1671,29 @@ contains
                     is1%end = is1%end - ${SCHEME}$_polyn
 
                 end if
-
-<<<<<<< HEAD
-                call s_weno(v_vf(iv%beg:iv%end), &
-                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                            weno_dir, &
-                            is1, is2, is3)
-            else
-                call s_weno(v_vf(iv%beg:iv%end), &
-                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                            weno_dir, &
-                            is1, is2, is3)
-            end if
-        else
-
-            call s_weno(v_vf(iv%beg:iv%end), &
-                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                        weno_dir, &
-                        is1, is2, is3)
-        end if
-
-=======
+!$acc update device(is1, is2, is3, iv)
                 if (n > 0) then
                     if (p > 0) then
 
                         call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
                                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                                           norm_dir, recon_dir, &
+                                           recon_dir, &
                                            is1, is2, is3)
                     else
                         call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
                                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                                           norm_dir, recon_dir, &
+                                           recon_dir, &
                                            is1, is2, is3)
                     end if
                 else
 
                     call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
                                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                                       norm_dir, recon_dir, &
+                                       recon_dir, &
                                        is1, is2, is3)
                 end if
             end if
         #:endfor
->>>>>>> f7ae0377 (muscl finished -- needs testing)
     end subroutine s_reconstruct_cell_boundary_values
 
     subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
@@ -1749,9 +1728,7 @@ contains
 
                 end if
 
-#ifndef _CRAYFTN
 !$acc update device(is1, is2, is3, iv)
-#endif
 
                 if (recon_dir == 1) then
                     !$acc parallel loop collapse(4) default(present)

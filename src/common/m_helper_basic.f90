@@ -107,8 +107,8 @@ contains
         res = f_approx_equal(var, real(nint(var), wp))
     end function f_is_integer
 
-    pure subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, buff_size, idwint, idwbuff, &
-                                                  viscous, bubbles_lagrange, m, n, p, num_dims)
+    pure subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, buff_size, idwint, &
+                                                  idwbuff, viscous, bubbles_lagrange, m, n, p, num_dims)
         integer, intent(in) :: recon_type, weno_polyn, muscl_polyn, m, n, p, num_dims
         integer, intent(inout) :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
@@ -125,7 +125,7 @@ contains
                 buff_size = weno_polyn + 2
             end if
         elseif (recon_type == MUSCL_TYPE) then
-            buff_size = muscl_polyn + 2
+            buff_size = muscl_polyn + 2 
         end if
 
         ! Correction for smearing function in the lagrangian subgrid bubble model

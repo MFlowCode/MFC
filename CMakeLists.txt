@@ -8,8 +8,6 @@
 
 cmake_minimum_required(VERSION 3.20)
 
-set(CMAKE_Fortran_STANDARD 2008)
-
 # We include C as a language because - for some reason -
 # FIND_LIBRARY_USE_LIB64_PATHS is otherwise ignored.
 

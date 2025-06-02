@@ -279,9 +279,9 @@ contains
             idx2%end = weno_order - 3
         else if (recon_type == MUSCL_TYPE) then
             idx1%beg = 0
-            idx1%end = muscl_polyn
+            idx1%end = 0 
             idx2%beg = 0
-            idx2%end = muscl_order - 1
+            idx2%end = 0 
         end if
         ! Allocating/Computing CBC Coefficients in x-direction
         if (all((/bc_x%beg, bc_x%end/) <= -5) .and. all((/bc_x%beg, bc_x%end/) >= -13)) then
@@ -480,14 +480,14 @@ contains
         ! Computing CBC1 Coefficients
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir_in == ${CBC_DIR}$) then
-                if (weno_order == 1) then
+                if (weno_order == 1 .or. muscl_order > 1) then
 
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
                     fd_coef_${XYZ}$ (0, cbc_loc_in) = -2._wp/(ds(0) + ds(1))
                     fd_coef_${XYZ}$ (1, cbc_loc_in) = -fd_coef_${XYZ}$ (0, cbc_loc_in)
 
                     ! Computing CBC2 Coefficients
-                elseif (weno_order == 3 .or. muscl_order > 1) then
+                elseif (weno_order == 3 ) then
 
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
                     fd_coef_${XYZ}$ (0, cbc_loc_in) = -6._wp/(3._wp*ds(0) + 2._wp*ds(1) - ds(2))
@@ -697,7 +697,7 @@ contains
             if (cbc_dir == ${CBC_DIR}$) then
 
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
-                if (weno_order == 3 .or. muscl_order > 1) then
+                if (weno_order == 3 ) then
 
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
@@ -729,7 +729,7 @@ contains
                     end do
 
                     ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
-                else
+                else if (weno_order > 3) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
                                                                F_src_rs${XYZ}$_vf, &
@@ -1602,21 +1602,21 @@ contains
 
         ! Deallocating the cell-average primitive variables
         @:DEALLOCATE(q_prim_rsx_vf)
-        if (weno_order > 1) then
+        if (weno_order > 1 .or. muscl_order > 1) then
             @:DEALLOCATE(F_rsx_vf, F_src_rsx_vf)
         end if
         @:DEALLOCATE(flux_rsx_vf_l, flux_src_rsx_vf_l)
 
         if (n > 0) then
             @:DEALLOCATE(q_prim_rsy_vf)
-            if (weno_order > 1) then
+            if (weno_order > 1 .or. muscl_order > 1) then
                 @:DEALLOCATE(F_rsy_vf, F_src_rsy_vf)
             end if
             @:DEALLOCATE(flux_rsy_vf_l, flux_src_rsy_vf_l)
         end if
         if (p > 0) then
             @:DEALLOCATE(q_prim_rsz_vf)
-            if (weno_order > 1) then
+            if (weno_order > 1 .or. muscl_order > 1) then
                 @:DEALLOCATE(F_rsz_vf, F_src_rsz_vf)
             end if
             @:DEALLOCATE(flux_rsz_vf_l, flux_src_rsz_vf_l)
@@ -1631,7 +1631,7 @@ contains
         ! Deallocating CBC Coefficients in x-direction
         if (any((/bc_x%beg, bc_x%end/) <= -5) .and. any((/bc_x%beg, bc_x%end/) >= -13)) then
             @:DEALLOCATE(fd_coef_x)
-            if (weno_order > 1) then
+            if (weno_order > 1 .or. muscl_order > 1) then
                 @:DEALLOCATE(pi_coef_x)
             end if
         end if
@@ -1640,7 +1640,7 @@ contains
         if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5) .and. &
             any((/bc_y%beg, bc_y%end/) >= -13 .and. bc_y%beg /= -14)) then
             @:DEALLOCATE(fd_coef_y)
-            if (weno_order > 1) then
+            if (weno_order > 1 .or. muscl_order > 1) then
                 @:DEALLOCATE(pi_coef_y)
             end if
         end if
@@ -1648,7 +1648,7 @@ contains
         ! Deallocating CBC Coefficients in z-direction
         if (p > 0 .and. any((/bc_z%beg, bc_z%end/) <= -5) .and. any((/bc_z%beg, bc_z%end/) >= -13)) then
             @:DEALLOCATE(fd_coef_z)
-            if (weno_order > 1) then
+            if (weno_order > 1 .or. muscl_order > 1) then
                 @:DEALLOCATE(pi_coef_z)
             end if
         end if

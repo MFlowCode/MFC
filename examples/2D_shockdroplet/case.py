@@ -16,8 +16,8 @@ c_l = math.sqrt(1.4 * ps / rho)
 eps = 1e-9
 
 D = 0.048
-Ny = 299.0
-Nx = 1199.0
+Ny = 99.0
+Nx = 399.0
 dx = 0.25 / Nx  # 8.3e-6
 
 time_end = 0.005  # 50us
@@ -47,7 +47,7 @@ print(
             "dt": dt,
             "t_step_start": 0,
             "t_step_stop": Nt,
-            "t_step_save": Nt,  # math.ceil(Nt/100),
+            "t_step_save": math.ceil(Nt/100),
             # Simulation Algorithm Parameters
             "num_patches": 3,
             "model_eqns": 2,
@@ -56,7 +56,7 @@ print(
             "mpp_lim": "T",
             "mixture_err": "T",
             "time_stepper": 3,
-            "weno_order": 5,
+            "weno_order": 3,
             "weno_eps": 1.0e-16,
             "weno_Re_flux": "F",
             "weno_avg": "F",

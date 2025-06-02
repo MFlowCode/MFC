@@ -154,6 +154,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
+    def alter_muscl():
+        for muscl_order in [1, 2]:
+            stack.push(f"muscl_order={muscl_order}", {'muscl_order': muscl_order})
+
+            if muscl_order == 1:
+                for int_comp in ["T", "F"]:
+                    cases.append(define_case_d(stack, f"int_comp={int_comp}", {'int_comp': int_comp}))
+            elif muscl_order == 2:
+                for int_comp in ["T", "F"]:
+                    stack.push(f"int_comp={int_comp}", {'int_comp': int_comp})
+                    for muscl_lim in [1,2,3,4,5]:
+                        cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {'muscl_lim': muscl_lim}))
+                    stack.pop()
+            stack.pop()
+
     def alter_riemann_solvers(num_fluids):
         for riemann_solver in [1, 2]:
             stack.push(f"riemann_solver={riemann_solver}", {'riemann_solver': riemann_solver})
@@ -910,6 +925,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_bcs(dimInfo)
             alter_grcbc(dimInfo)
             alter_weno(dimInfo)
+            alter_muscl()
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
@@ -945,13 +961,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 continue
             def modify_example_case(case: dict):
                 case['parallel_io'] = 'F'
-                # temp muscl tests
-                case['muscl_order'] = 2
-                case['recon_type'] = 2
-                case['mapped_weno'] = 'F'
-                case['wenoz'] = 'F'
-                case['teno'] = 'F'
-                case['mp_weno'] = 'F'
                 if 't_step_stop' in case and case['t_step_stop'] >= 50:
                     case['t_step_start'] = 0
                     case['t_step_stop'] = 50

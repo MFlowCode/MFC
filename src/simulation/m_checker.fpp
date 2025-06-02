@@ -28,7 +28,12 @@ contains
 
         call s_check_inputs_compilers
 
-        !        call s_check_inputs_weno
+        if (recon_type == WENO_TYPE) then
+            call s_check_inputs_weno
+        else if (recon_type == MUSCL_TYPE) then
+            call s_check_inputs_muscl
+        end if
+
         call s_check_inputs_riemann_solver
         call s_check_inputs_time_stepping
         call s_check_inputs_model_eqns
@@ -89,6 +94,21 @@ contains
         @:PROHIBIT(weno_order /= 5 .and. mp_weno)
         @:PROHIBIT(model_eqns == 1 .and. weno_avg)
     end subroutine s_check_inputs_weno
+
+    impure subroutine s_check_inputs_muscl
+        character(len=5) :: numStr !< for int to string conversion
+
+        call s_int_to_str(num_stcls_min*muscl_order, numStr)
+        @:PROHIBIT(m + 1 < num_stcls_min*muscl_order, &
+            "m must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
+        @:PROHIBIT(n + 1 < min(1, n)*num_stcls_min*muscl_order, &
+            "For 2D simulation, n must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
+        @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*muscl_order, &
+            "For 3D simulation, p must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
+        @:PROHIBIT(muscl_order == 2 .and. muscl_lim == dflt_int, "muscl_lim must be defined if using muscl_order = 2")
+        @:PROHIBIT(muscl_lim < 1 .or. muscl_lim > 5, "muscl_lim must be 1,2,3,4, or 5")
+
+    end subroutine s_check_inputs_muscl
 
     !> Checks constraints on Riemann solver parameters
     impure subroutine s_check_inputs_riemann_solver

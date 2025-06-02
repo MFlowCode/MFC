@@ -163,6 +163,7 @@ contains
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
             nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, mhd, relativity, &
+            recon_type, muscl_order, muscl_lim, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
@@ -180,9 +181,8 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
-            cont_damage, tau_star, cont_damage_s, alpha_bar, &
-            recon_type, muscl_order, muscl_lim
-
+            cont_damage, tau_star, cont_damage_s, alpha_bar, int_comp, &
+            ic_eps, ic_beta 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
         inquire (FILE=trim(file_path), EXIST=file_exist)
