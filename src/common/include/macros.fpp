@@ -103,7 +103,7 @@
     end if
 #:enddef
 
-#:def parallel_loop(collapse=None, private=None, parallelism=["gang", "vector"], default="present", firstprivate=None, copy=None, copyin=None, copyinReadOnly=False, copyout=None, create=None)
+#:def parallel_loop(collapse=None, private=None, parallelism=["gang", "vector"], default="present", firstprivate=None, reduction=None, reductionOp=None, copy=None, copyin=None, copyinReadOnly=False, copyout=None, create=None)
     #:if collapse is not None
         #:assert isinstance(collapse, int)
         #:assert collapse > 0
@@ -148,6 +148,18 @@
         #:set firstprivate_val = ""
     #:endif
 
+    #:if reduction is not None and reductionOp is not None
+        #:assert isinstance(reduction, list)
+        #:assert len(reduction) != 0
+        #:assert all(type(element) == str for element in reduction)
+        #:assert isintance(reductionOp, str)
+        #:set reduction_val = 'reduction(' + reductionOp + ':' + ', '.join(reduction) + ') '
+    #:elif reduction is not None or reductionOp is not None
+        #:stop "Cannot set the reduction list or reduction operation without setting the other"
+    #:else
+        #:set reduction_val = ""
+    #:endif
+
     #:if copy is not None
         #:assert isinstance(copy, list)
         #:assert len(copy) != 0
@@ -189,8 +201,7 @@
         #:set create_val = ""
     #:endif
 
-
-    #:set clause_val = collapse_val + parallelism_val + default_val + private_val + firstprivate_val + copy_val + copyin_val + copyout_val + create_val
+    #:set clause_val = collapse_val + parallelism_val + default_val + private_val + firstprivate_val + reduction_val + copy_val + copyin_val + copyout_val + create_val
     !$acc parallel loop ${clause_val}$
 
 #:enddef

@@ -76,7 +76,7 @@ contains
         real(wp) :: nR3bar
         integer(wp) :: i, j, k, l
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -103,7 +103,7 @@ contains
         if (idir == 1) then
 
             if (.not. qbmm) then
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -119,7 +119,7 @@ contains
 
         elseif (idir == 2) then
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -133,7 +133,7 @@ contains
 
         elseif (idir == 3) then
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -173,7 +173,7 @@ contains
         integer :: dmBub_id !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m

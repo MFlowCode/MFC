@@ -312,7 +312,7 @@ contains
         end do
 
         ! Update the rhs variables
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
