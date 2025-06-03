@@ -3163,97 +3163,45 @@ contains
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, l ! Generic loop iterators
-
         ! Reshaping Inputted Data in x-direction
 
-        if (norm_dir == 1) then
-
-            if (viscous .or. (surface_tension)) then
-
+        if (viscous .or. (surface_tension)) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
-                                flux_src_vf(i)%sf(j, k, l) = 0._wp
+                                if (norm_dir == 1) then
+                                    flux_src_vf(i)%sf(j, k, l) = 0._wp
+                                else if (norm_dir == 2) then
+                                    flux_src_vf(i)%sf(k, j, l) = 0._wp
+                                else if (norm_dir == 3) then
+                                    flux_src_vf(i)%sf(l, k, j) = 0._wp
+                                end if
                             end do
                         end do
                     end do
                 end do
             end if
 
-            if (qbmm) then
-
+        if (qbmm) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end + 1
-                                mom_sp_rsx_vf(j, k, l, i) = mom_sp(i)%sf(j, k, l)
+                                if (norm_dir == 1) then
+                                    mom_sp_rsx_vf(j, k, l, i) = mom_sp(i)%sf(j, k, l)
+                                else if (norm_dir == 2) then
+                                    mom_sp_rsy_vf(j, k, l, i) = mom_sp(i)%sf(k, j, l)
+                                else if (norm_dir == 3) then
+                                    mom_sp_rsz_vf(j, k, l, i) = mom_sp(i)%sf(l, k, j)
+                                end if
                             end do
                         end do
                     end do
                 end do
             end if
-
-            ! Reshaping Inputted Data in y-direction
-        elseif (norm_dir == 2) then
-
-            if (viscous .or. (surface_tension)) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = momxb, E_idx
-                    do l = is3%beg, is3%end
-                        do j = is1%beg, is1%end
-                            do k = is2%beg, is2%end
-                                flux_src_vf(i)%sf(k, j, l) = 0._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-
-            if (qbmm) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, 4
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end + 1
-                                mom_sp_rsy_vf(j, k, l, i) = mom_sp(i)%sf(k, j, l)
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-
-            ! Reshaping Inputted Data in z-direction
-        else
-
-            if (viscous .or. (surface_tension)) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = momxb, E_idx
-                    do j = is1%beg, is1%end
-                        do k = is2%beg, is2%end
-                            do l = is3%beg, is3%end
-                                flux_src_vf(i)%sf(l, k, j) = 0._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-
-            if (qbmm) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, 4
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end + 1
-                                mom_sp_rsz_vf(j, k, l, i) = mom_sp(i)%sf(l, k, j)
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-
         end if
 
     end subroutine s_initialize_riemann_solver
