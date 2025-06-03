@@ -405,7 +405,7 @@ contains
             end do
         elseif (p == 0) then
             q = 0
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = 0, n
                 do k = 0, m
                     ! Maximum principal stress

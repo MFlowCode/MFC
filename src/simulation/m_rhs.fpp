@@ -1496,7 +1496,7 @@ contains
                                                              idwbuff(1), idwbuff(2), idwbuff(3))
                     end if
 
-                    !$acc parallel loop collapse(2) gang vector default(present)
+                    $:parallel_loop(collapse=2)
                     do l = 0, p
                         do j = 0, m
                             !$acc loop seq
@@ -1564,7 +1564,7 @@ contains
                     end do
 
                     if (viscous) then
-                        !$acc parallel loop collapse(2) gang vector default(present)
+                        $:parallel_loop(collapse=2)
                         do l = 0, p
                             do j = 0, m
                                 !$acc loop seq

@@ -83,7 +83,7 @@ contains
         if (bcxb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 1, -1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (int(bc_type(1, -1)%sf(0, k, l)))
@@ -107,7 +107,7 @@ contains
         if (bcxe >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 1, 1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (int(bc_type(1, 1)%sf(0, k, l)))
@@ -135,7 +135,7 @@ contains
         if (bcyb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 2, -1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(2, -1)%sf(k, 0, l)))
@@ -161,7 +161,7 @@ contains
         if (bcye >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 2, 1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(2, 1)%sf(k, 0, l)))
@@ -189,7 +189,7 @@ contains
         if (bczb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 3, -1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(3, -1)%sf(k, l, 0)))
@@ -213,7 +213,7 @@ contains
         if (bcze >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 3, 1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(3, 1)%sf(k, l, 0)))
@@ -1167,7 +1167,7 @@ contains
         if (bcxb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, -1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (bc_type(1, -1)%sf(0, k, l))
@@ -1185,7 +1185,7 @@ contains
         if (bcxe >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, 1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (bc_type(1, 1)%sf(0, k, l))
@@ -1206,7 +1206,7 @@ contains
         if (bcyb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, -1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (bc_type(2, -1)%sf(k, 0, l))
@@ -1224,7 +1224,7 @@ contains
         if (bcye >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, 1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (bc_type(2, 1)%sf(k, 0, l))
@@ -1245,7 +1245,7 @@ contains
         if (bczb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, -1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (bc_type(3, -1)%sf(k, l, 0))
@@ -1263,7 +1263,7 @@ contains
         if (bcze >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, 1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (bc_type(3, 1)%sf(k, l, 0))

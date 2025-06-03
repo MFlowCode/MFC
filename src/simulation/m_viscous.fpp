@@ -1354,7 +1354,7 @@ contains
             end do
         end if
 
-        !$acc parallel loop collapse(2) gang vector default(present)
+        $:parallel_loop(collapse=2)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 grad_x%sf(idwbuff(1)%beg, k, l) = &
@@ -1366,7 +1366,7 @@ contains
             end do
         end do
         if (n > 0) then
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
                     grad_y%sf(j, idwbuff(2)%beg, l) = &
@@ -1378,7 +1378,7 @@ contains
                 end do
             end do
             if (p > 0) then
-                !$acc parallel loop collapse(2) gang vector default(present)
+                $:parallel_loop(collapse=2)
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_z%sf(j, k, idwbuff(3)%beg) = &
@@ -1393,7 +1393,7 @@ contains
         end if
 
         if (bc_x%beg <= BC_GHOST_EXTRAPOLATION) then
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     grad_x%sf(0, k, l) = (-3._wp*var%sf(0, k, l) + 4._wp*var%sf(1, k, l) - var%sf(2, k, l))/ &
@@ -1402,7 +1402,7 @@ contains
             end do
         end if
         if (bc_x%end <= BC_GHOST_EXTRAPOLATION) then
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:parallel_loop(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     grad_x%sf(m, k, l) = (3._wp*var%sf(m, k, l) - 4._wp*var%sf(m - 1, k, l) + var%sf(m - 2, k, l))/ &
@@ -1412,7 +1412,7 @@ contains
         end if
         if (n > 0) then
             if (bc_y%beg <= BC_GHOST_EXTRAPOLATION .and. bc_y%beg /= BC_NULL) then
-                !$acc parallel loop collapse(2) gang vector default(present)
+                $:parallel_loop(collapse=2)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_y%sf(j, 0, l) = (-3._wp*var%sf(j, 0, l) + 4._wp*var%sf(j, 1, l) - var%sf(j, 2, l))/ &
@@ -1421,7 +1421,7 @@ contains
                 end do
             end if
             if (bc_y%end <= BC_GHOST_EXTRAPOLATION) then
-                !$acc parallel loop collapse(2) gang vector default(present)
+                $:parallel_loop(collapse=2)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_y%sf(j, n, l) = (3._wp*var%sf(j, n, l) - 4._wp*var%sf(j, n - 1, l) + var%sf(j, n - 2, l))/ &
@@ -1431,7 +1431,7 @@ contains
             end if
             if (p > 0) then
                 if (bc_z%beg <= BC_GHOST_EXTRAPOLATION) then
-                    !$acc parallel loop collapse(2) gang vector default(present)
+                    $:parallel_loop(collapse=2)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
                             grad_z%sf(j, k, 0) = &
@@ -1441,7 +1441,7 @@ contains
                     end do
                 end if
                 if (bc_z%end <= BC_GHOST_EXTRAPOLATION) then
-                    !$acc parallel loop collapse(2) gang vector default(present)
+                    $:parallel_loop(collapse=2)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
                             grad_z%sf(j, k, p) = &

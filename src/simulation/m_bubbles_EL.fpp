@@ -614,7 +614,7 @@ contains
         if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         ! Bubbles remain in a fixed position
-        !$acc parallel loop collapse(2) gang vector default(present) private(k) copyin(stage)
+        $:parallel_loop(collapse=2, private=["k"], copyin=["stage"])
         do k = 1, nBubs
             do l = 1, 3
                 mtn_dposdt(k, l, stage) = 0._wp

@@ -103,7 +103,7 @@
     end if
 #:enddef
 
-#:def parallel_loop(collapse=None, private=None, parallelism=["gang", "vector"], default="present", firstprivate=None)
+#:def parallel_loop(collapse=None, private=None, parallelism=["gang", "vector"], default="present", firstprivate=None, copy=None, copyin=None, copyinReadOnly=False, copyout=None, create=None)
     #:if collapse is not None
         #:assert isinstance(collapse, int)
         #:assert collapse > 0
@@ -133,6 +133,7 @@
         #:assert isinstance(parallelism, list)
         #:assert len(parallelism) != 0
         #:assert all(type(element) == str for element in parallelism)
+        #:assert all((element == "gang" or element == "worker" or element == "vector") for element in parallelism)
         #:set parallelism_val = " ".join(parallelism) + " "
     #:else
         #:set parallelism_val = ""
@@ -147,7 +148,49 @@
         #:set firstprivate_val = ""
     #:endif
 
-    #:set clause_val = collapse_val + parallelism_val + default_val + private_val + firstprivate_val
+    #:if copy is not None
+        #:assert isinstance(copy, list)
+        #:assert len(copy) != 0
+        #:assert all(type(element) == str for element in copy)
+        #:set copy_val = 'copy(' + ', '.join(copy) + ') '
+    #:else
+        #:set copy_val = ""
+    #:endif
+    
+    #:if copyin is not None
+        #:assert isinstance(copyin, list)
+        #:assert len(copyin) != 0
+        #:assert all(type(element) == str for element in copyin)
+        #:assert isinstance(copyinReadOnly, bool)
+        #:if copyinReadOnly == True
+            #:set copyin_val = 'copyin(readonly:' + ', '.join(copyin) + ') '
+        #:else
+            #:set copyin_val = 'copyin(' + ', '.join(copyin) + ') '
+        #:endif
+    #:else
+        #:set copyin_val = ""
+    #:endif
+
+    #:if copyout is not None
+        #:assert isinstance(copyout, list)
+        #:assert len(copyout) != 0
+        #:assert all(type(element) == str for element in copyout)
+        #:set copyout_val = 'copyout(' + ', '.join(copyout) + ') '
+    #:else
+        #:set copyout_val = ""
+    #:endif
+
+    #:if create is not None
+        #:assert isinstance(create, list)
+        #:assert len(create) != 0
+        #:assert all(type(element) == str for element in create)
+        #:set create_val = 'create(' + ', '.join(create) + ') '
+    #:else
+        #:set create_val = ""
+    #:endif
+
+
+    #:set clause_val = collapse_val + parallelism_val + default_val + private_val + firstprivate_val + copy_val + copyin_val + copyout_val + create_val
     !$acc parallel loop ${clause_val}$
 
 #:enddef
