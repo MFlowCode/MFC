@@ -3000,15 +3000,31 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterator
 
+        pointer :: qL_prim_rs_vf, dqL_prim_d_vf
+        pointer :: qR_prim_rs_vf, dqR_prim_d_vf
+        integer :: end_val, bc_beg, bc_end
+
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
             dir_idx = (/1, 2, 3/); dir_flg = (/1._wp, 0._wp, 0._wp/)
+            bc_beg = bc_x%beg; bc_end = bc_x%end
+            end_val = m
+            qL_prim_rs_vf => qL_prim_rsx_vf; qR_prim_rs_vf => qR_prim_rsx_vf
+            dqL_prim_d_vf => dqL_prim_dx_vf; dqR_prim_d_vf => dqR_prim_dx_vf
         elseif (norm_dir == 2) then
             is1 = iy; is2 = ix; is3 = iz
             dir_idx = (/2, 1, 3/); dir_flg = (/0._wp, 1._wp, 0._wp/)
+            bc_beg = bc_y%beg; bc_end = bc_y%end
+            qL_prim_rs_vf => qL_prim_rsy_vf; qR_prim_rs_vf => qR_prim_rsy_vf
+            dqL_prim_d_vf => dqL_prim_dy_vf; dqR_prim_d_vf => dqR_prim_dy_vf
+            end_val = n
         else
             is1 = iz; is2 = iy; is3 = ix
             dir_idx = (/3, 1, 2/); dir_flg = (/0._wp, 0._wp, 1._wp/)
+            bc_beg = bc_z%beg; bc_end = bc_z%end
+            qL_prim_rs_vf => qL_prim_rsz_vf; qR_prim_rs_vf => qR_prim_rsz_vf
+            dqL_prim_d_vf => dqL_prim_dz_vf; dqR_prim_d_vf => dqR_prim_dz_vf
+            end_val = p
         end if
 
         !$acc update device(is1, is2, is3)
@@ -3027,317 +3043,84 @@ contains
         !$acc update device(isx, isy, isz) ! for stuff in the same module
         !$acc update device(dir_idx, dir_flg,  dir_idx_tau) ! for stuff in different modules
 
-        ! Population of Buffers in x-direction
-        if (norm_dir == 1) then
-
-            if (bc_x%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, sys_size
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            qL_prim_rsx_vf(-1, k, l, i) = &
-                                qR_prim_rsx_vf(0, k, l, i)
-                        end do
+        ! Population of Buffers in x/y/z-direction
+        if (bc_beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do i = 1, sys_size
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        qL_prim_rs_vf(-1, k, l, i) = qR_prim_rs_vf(0, k, l, i)
                     end do
                 end do
-
-                if (viscous) then
+            end do
+            if (viscous) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do k = isy%beg, isy%end
-
-                                dqL_prim_dx_vf(i)%sf(-1, k, l) = &
-                                    dqR_prim_dx_vf(i)%sf(0, k, l)
+                                if (norm_dir == 1) then
+                                    dqL_prim_dx_vf(i)%sf(-1, k, l) = dqR_prim_dx_vf(i)%sf(0, k, l)
+                                    if (n > 0) then
+                                        dqL_prim_dy_vf(i)%sf(-1, k, l) = dqR_prim_dy_vf(i)%sf(0, k, l)
+                                        if (p > 0) then
+                                            dqL_prim_dz_vf(i)%sf(-1, k, l) = dqR_prim_dz_vf(i)%sf(0, k, l)
+                                        end if
+                                    end if
+                                else if (norm_dir == 2) then
+                                    dqL_prim_dx_vf(i)%sf(j, -1, l) = dqR_prim_dx_vf(i)%sf(j, 0, l)
+                                    dqL_prim_dy_vf(i)%sf(j, -1, l) = dqR_prim_dy_vf(i)%sf(j, 0, l)
+                                    if (p > 0) then
+                                        dqL_prim_dz_vf(i)%sf(j, -1, l) = dqR_prim_dz_vf(i)%sf(j, 0, l)
+                                    end if
+                                else
+                                    dqL_prim_dx_vf(i)%sf(j, k, -1) = dqR_prim_dx_vf(i)%sf(j, k, 0)
+                                    dqL_prim_dy_vf(i)%sf(j, k, -1) = dqR_prim_dy_vf(i)%sf(j, k, 0)
+                                    dqL_prim_dz_vf(i)%sf(j, k, -1) = dqR_prim_dz_vf(i)%sf(j, k, 0)
+                                end if
                             end do
                         end do
                     end do
-
-                    if (n > 0) then
-                        !$acc parallel loop collapse(3) gang vector default(present)
-                        do i = momxb, momxe
-                            do l = isz%beg, isz%end
-                                do k = isy%beg, isy%end
-
-                                    dqL_prim_dy_vf(i)%sf(-1, k, l) = &
-                                        dqR_prim_dy_vf(i)%sf(0, k, l)
-                                end do
-                            end do
-                        end do
-
-                        if (p > 0) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
-                            do i = momxb, momxe
-                                do l = isz%beg, isz%end
-                                    do k = isy%beg, isy%end
-
-                                        dqL_prim_dz_vf(i)%sf(-1, k, l) = &
-                                            dqR_prim_dz_vf(i)%sf(0, k, l)
-                                    end do
-                                end do
-                            end do
-                        end if
-
-                    end if
-
-                end if
-
             end if
-
-            if (bc_x%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
-
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, sys_size
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            qR_prim_rsx_vf(m + 1, k, l, i) = &
-                                qL_prim_rsx_vf(m, k, l, i)
-                        end do
-                    end do
-                end do
-
-                if (viscous) then
-
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = momxb, momxe
-                        do l = isz%beg, isz%end
-                            do k = isy%beg, isy%end
-
-                                dqR_prim_dx_vf(i)%sf(m + 1, k, l) = &
-                                    dqL_prim_dx_vf(i)%sf(m, k, l)
-                            end do
-                        end do
-                    end do
-
-                    if (n > 0) then
-                        !$acc parallel loop collapse(3) gang vector default(present)
-                        do i = momxb, momxe
-                            do l = isz%beg, isz%end
-                                do k = isy%beg, isy%end
-
-                                    dqR_prim_dy_vf(i)%sf(m + 1, k, l) = &
-                                        dqL_prim_dy_vf(i)%sf(m, k, l)
-                                end do
-                            end do
-                        end do
-
-                        if (p > 0) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
-                            do i = momxb, momxe
-                                do l = isz%beg, isz%end
-                                    do k = isy%beg, isy%end
-
-                                        dqR_prim_dz_vf(i)%sf(m + 1, k, l) = &
-                                            dqL_prim_dz_vf(i)%sf(m, k, l)
-                                    end do
-                                end do
-                            end do
-                        end if
-
-                    end if
-
-                end if
-
-            end if
-            ! END: Population of Buffers in x-direction
-
-            ! Population of Buffers in y-direction
-        elseif (norm_dir == 2) then
-
-            if (bc_y%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, sys_size
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            qL_prim_rsy_vf(-1, k, l, i) = &
-                                qR_prim_rsy_vf(0, k, l, i)
-                        end do
-                    end do
-                end do
-
-                if (viscous) then
-
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = momxb, momxe
-                        do l = isz%beg, isz%end
-                            do j = isx%beg, isx%end
-                                dqL_prim_dx_vf(i)%sf(j, -1, l) = &
-                                    dqR_prim_dx_vf(i)%sf(j, 0, l)
-                            end do
-                        end do
-                    end do
-
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = momxb, momxe
-                        do l = isz%beg, isz%end
-                            do j = isx%beg, isx%end
-                                dqL_prim_dy_vf(i)%sf(j, -1, l) = &
-                                    dqR_prim_dy_vf(i)%sf(j, 0, l)
-                            end do
-                        end do
-                    end do
-
-                    if (p > 0) then
-                        !$acc parallel loop collapse(3) gang vector default(present)
-                        do i = momxb, momxe
-                            do l = isz%beg, isz%end
-                                do j = isx%beg, isx%end
-                                    dqL_prim_dz_vf(i)%sf(j, -1, l) = &
-                                        dqR_prim_dz_vf(i)%sf(j, 0, l)
-                                end do
-                            end do
-                        end do
-                    end if
-
-                end if
-
-            end if
-
-            if (bc_y%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
-
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, sys_size
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            qR_prim_rsy_vf(n + 1, k, l, i) = &
-                                qL_prim_rsy_vf(n, k, l, i)
-                        end do
-                    end do
-                end do
-
-                if (viscous) then
-
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = momxb, momxe
-                        do l = isz%beg, isz%end
-                            do j = isx%beg, isx%end
-                                dqR_prim_dx_vf(i)%sf(j, n + 1, l) = &
-                                    dqL_prim_dx_vf(i)%sf(j, n, l)
-                            end do
-                        end do
-                    end do
-
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = momxb, momxe
-                        do l = isz%beg, isz%end
-                            do j = isx%beg, isx%end
-                                dqR_prim_dy_vf(i)%sf(j, n + 1, l) = &
-                                    dqL_prim_dy_vf(i)%sf(j, n, l)
-                            end do
-                        end do
-                    end do
-
-                    if (p > 0) then
-                        !$acc parallel loop collapse(3) gang vector default(present)
-                        do i = momxb, momxe
-                            do l = isz%beg, isz%end
-                                do j = isx%beg, isx%end
-                                    dqR_prim_dz_vf(i)%sf(j, n + 1, l) = &
-                                        dqL_prim_dz_vf(i)%sf(j, n, l)
-                                end do
-                            end do
-                        end do
-                    end if
-
-                end if
-
-            end if
-            ! END: Population of Buffers in y-direction
-
-            ! Population of Buffers in z-direction
-        else
-
-            if (bc_z%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, sys_size
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            qL_prim_rsz_vf(-1, k, l, i) = &
-                                qR_prim_rsz_vf(0, k, l, i)
-                        end do
-                    end do
-                end do
-
-                if (viscous) then
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = momxb, momxe
-                        do k = isy%beg, isy%end
-                            do j = isx%beg, isx%end
-                                dqL_prim_dx_vf(i)%sf(j, k, -1) = &
-                                    dqR_prim_dx_vf(i)%sf(j, k, 0)
-                            end do
-                        end do
-                    end do
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = momxb, momxe
-                        do k = isy%beg, isy%end
-                            do j = isx%beg, isx%end
-                                dqL_prim_dy_vf(i)%sf(j, k, -1) = &
-                                    dqR_prim_dy_vf(i)%sf(j, k, 0)
-                            end do
-                        end do
-                    end do
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = momxb, momxe
-                        do k = isy%beg, isy%end
-                            do j = isx%beg, isx%end
-                                dqL_prim_dz_vf(i)%sf(j, k, -1) = &
-                                    dqR_prim_dz_vf(i)%sf(j, k, 0)
-                            end do
-                        end do
-                    end do
-                end if
-
-            end if
-
-            if (bc_z%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
-
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, sys_size
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            qR_prim_rsz_vf(p + 1, k, l, i) = &
-                                qL_prim_rsz_vf(p, k, l, i)
-                        end do
-                    end do
-                end do
-
-                if (viscous) then
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = momxb, momxe
-                        do k = isy%beg, isy%end
-                            do j = isx%beg, isx%end
-                                dqR_prim_dx_vf(i)%sf(j, k, p + 1) = &
-                                    dqL_prim_dx_vf(i)%sf(j, k, p)
-                            end do
-                        end do
-                    end do
-
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = momxb, momxe
-                        do k = isy%beg, isy%end
-                            do j = isx%beg, isx%end
-                                dqR_prim_dy_vf(i)%sf(j, k, p + 1) = &
-                                    dqL_prim_dy_vf(i)%sf(j, k, p)
-                            end do
-                        end do
-                    end do
-
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = momxb, momxe
-                        do k = isy%beg, isy%end
-                            do j = isx%beg, isx%end
-                                dqR_prim_dz_vf(i)%sf(j, k, p + 1) = &
-                                    dqL_prim_dz_vf(i)%sf(j, k, p)
-                            end do
-                        end do
-                    end do
-                end if
-
-            end if
-
         end if
-        ! END: Population of Buffers in z-direction
+        
+        if (bc_end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do i = 1, sys_size
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        qR_prim_rs_vf(end_val + 1, k, l, i) = qL_prim_rs_vf(end_val, k, l, i)
+                    end do
+                end do
+            end do
+            if (viscous) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do i = momxb, momxe
+                    do l = isz%beg, isz%end
+                        do k = isy%beg, isy%end
+                            if (norm_dir == 1) then
+                                dqR_prim_dx_vf(i)%sf(end_val + 1, k, l) = dqL_prim_dx_vf(i)%sf(end_val, k, l)
+                                if (n > 0) then
+                                    dqR_prim_dy_vf(i)%sf(end_val + 1, k, l) = dqL_prim_dy_vf(i)%sf(end_val, k, l)
+                                    if (p > 0) then
+                                        dqR_prim_dz_vf(i)%sf(end_val + 1, k, l) = dqL_prim_dz_vf(i)%sf(end_val, k, l)
+                                    end if
+                                end if
+                            else if (norm_dir == 2) then
+                                dqR_prim_dx_vf(i)%sf(j, end_val + 1, l) = dqL_prim_dx_vf(i)%sf(j, end_val, l)
+                                dqR_prim_dy_vf(i)%sf(j, end_val + 1, l) = dqL_prim_dy_vf(i)%sf(j, end_val, l)
+                                if (p > 0) then
+                                    dqR_prim_dz_vf(i)%sf(j, end_val + 1, l) = dqL_prim_dz_vf(i)%sf(j, end_val, l)
+                                end if
+                            else
+                                dqR_prim_dx_vf(i)%sf(j, k, end_val + 1) = dqL_prim_dx_vf(i)%sf(j, k, end_val)
+                                dqR_prim_dy_vf(i)%sf(j, k, end_val + 1) = dqL_prim_dy_vf(i)%sf(j, k, end_val)
+                                dqR_prim_dz_vf(i)%sf(j, k, end_val + 1) = dqL_prim_dz_vf(i)%sf(j, k, end_val)
+                            end if
+                        end do
+                    end do
+                end do
+            end if
+        end if
 
     end subroutine s_populate_riemann_states_variables_buffers
 
