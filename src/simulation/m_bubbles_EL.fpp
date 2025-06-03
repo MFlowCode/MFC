@@ -680,7 +680,7 @@ contains
 
                 call s_gradient_dir(q_prim_vf(E_idx), q_beta%vf(3), l)
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -695,7 +695,7 @@ contains
                 end do
 
                 !source in energy
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do k = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(2)%beg, idwbuff(2)%end
                         do i = idwbuff(1)%beg, idwbuff(1)%end
@@ -706,7 +706,7 @@ contains
 
                 call s_gradient_dir(q_beta%vf(3), q_beta%vf(4), l)
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -781,7 +781,7 @@ contains
                               mtn_s, mtn_pos, q_beta)
 
         !Store 1-beta
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -1290,7 +1290,7 @@ contains
 
         if (dir == 1) then
             ! Gradient in x dir.
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
@@ -1305,7 +1305,7 @@ contains
         else
             if (dir == 2) then
                 ! Gradient in y dir.
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -1319,7 +1319,7 @@ contains
                 end do
             else
                 ! Gradient in z dir.
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -1413,8 +1413,9 @@ contains
         lag_void_max = 0._wp
         lag_void_avg = 0._wp
         lag_vol = 0._wp
-        !$acc parallel loop collapse(3) gang vector default(present) reduction(+:lag_vol,lag_void_avg) &
-        !$acc reduction(MAX:lag_void_max) copy(lag_vol, lag_void_avg, lag_void_max)
+        $:parallel_loop(collapse=3, reduction=[["lag_vol", "lag_void_avg"], &
+                        ["lag_void_max"]], reductionOp=["+", "MAX"], &
+                        copy=["lag_vol", "lag_void_avg", "lag_void_max"])
         do k = 0, p
             do j = 0, n
                 do i = 0, m

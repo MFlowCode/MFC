@@ -191,8 +191,9 @@ contains
         end do
 
         adap_dt_stop_max = 0
-        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp, myalpha_rho, myalpha)  &
-        !$acc reduction(MAX:adap_dt_stop_max) copy(adap_dt_stop_max)
+        $:parallel_loop(collapse=3, private=["Rtmp", "Vtmp", "myalpha_rho", "myalpha"], &
+                        reduction=["adap_dt_stop_max"], reductionOp="MAX", &
+                        copy=["adap_dt_stop_max"])
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -324,7 +325,7 @@ contains
         if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         if (.not. adap_dt) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = 0, p
                 do q = 0, n
                     do i = 0, m

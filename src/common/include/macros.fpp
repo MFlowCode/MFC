@@ -149,11 +149,27 @@
     #:endif
 
     #:if reduction is not None and reductionOp is not None
-        #:assert isinstance(reduction, list)
-        #:assert len(reduction) != 0
-        #:assert all(type(element) == str for element in reduction)
-        #:assert isintance(reductionOp, str)
-        #:set reduction_val = 'reduction(' + reductionOp + ':' + ', '.join(reduction) + ') '
+        #:if isinstance(reduction, list) and isinstance(reductionOp, list)
+            #:assert isinstance(reduction, list)
+            #:assert len(reduction) != 0
+            #:assert all(type(element) == list for element in reduction)
+            #:assert all(len(element) != 0 for element in reduction)
+            #:assert all(type(element) == str for sublist in reduction for element in sublist)
+            #:assert isinstance(reductionOp, list)
+            #:assert len(reductionOp) != 0
+            #:assert all(type(element) == str for element in reductionOp)
+            #:assert len(reduction) == len(reductionOp)
+            #:set reduction_list = ['reduction(' + op + ':' + ', '.join(red) + ') ' for (red, op) in zip(reduction, reductionOp)]
+            #:set reduction_val = " ". join(reduction_list) + " "
+        #:elif isinstance(reduction, list) and isinstance(reductionOp, str)
+            #:assert isinstance(reduction, list)
+            #:assert len(reduction) != 0
+            #:assert all(type(element) == str for element in reduction)
+            #:assert isinstance(reductionOp, str)
+            #:set reduction_val = 'reduction(' + reductionOp + ':' + ', '.join(reduction) + ') '
+        #:else
+            #:stop "Invalid datatypes for reduction or reductionOp. Must be list of lists and lists or list and str respectively"
+        #:endif
     #:elif reduction is not None or reductionOp is not None
         #:stop "Cannot set the reduction list or reduction operation without setting the other"
     #:else
