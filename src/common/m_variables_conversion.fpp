@@ -1733,22 +1733,22 @@ contains
         !$acc routine seq
 #endif
 
-    ! Input parameters
-    integer, intent(in) :: wave_speeds
-    integer, intent(in) :: idx, idx_tau
-    real(wp), intent(in) :: rho_L, rho_R
-    real(wp), dimension(:), intent(in) :: vel_L, vel_R, tau_e_L, tau_e_R
-    real(wp), intent(in) :: pres_L, pres_R, c_L, c_R
-    real(wp), intent(in) :: gamma_L, gamma_R, pi_inf_L, pi_inf_R
-    real(wp), intent(in) :: rho_avg, c_avg
-    real(wp), intent(in) :: c_fast_L, c_fast_R
-    real(wp), intent(in) :: G_L, G_R
+        ! Input parameters
+        integer, intent(in) :: wave_speeds
+        integer, intent(in) :: idx, idx_tau
+        real(wp), intent(in) :: rho_L, rho_R
+        real(wp), dimension(:), intent(in) :: vel_L, vel_R, tau_e_L, tau_e_R
+        real(wp), intent(in) :: pres_L, pres_R, c_L, c_R
+        real(wp), intent(in) :: gamma_L, gamma_R, pi_inf_L, pi_inf_R
+        real(wp), intent(in) :: rho_avg, c_avg
+        real(wp), intent(in) :: c_fast_L, c_fast_R
+        real(wp), intent(in) :: G_L, G_R
 
-    ! Local variables
-    real(wp) :: pres_SL, pres_SR, Ms_L, Ms_R
+        ! Local variables
+        real(wp) :: pres_SL, pres_SR, Ms_L, Ms_R
 
-    ! Output parameters
-    real(wp), intent(out) :: s_L, s_R, s_S, s_M, s_P
+        ! Output parameters
+        real(wp), intent(out) :: s_L, s_R, s_S, s_M, s_P
 
         if (wave_speeds == 1) then
             if (mhd) then
@@ -1756,34 +1756,34 @@ contains
                 s_R = max(vel_R(idx) + c_fast_R, vel_L(idx) + c_fast_L)
             elseif (hypoelasticity .or. elasticity) then
                 s_L = min(vel_L(idx) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + &
-                                                    tau_e_L(idx_tau))/rho_L) &
-                            , vel_R(idx) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + &
-                                                    tau_e_R(idx_tau))/rho_R))
+                                                       tau_e_L(idx_tau))/rho_L) &
+                          , vel_R(idx) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + &
+                                                         tau_e_R(idx_tau))/rho_R))
                 s_R = max(vel_R(idx) + sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + &
-                                                    tau_e_R(idx_tau))/rho_R) &
-                            , vel_L(idx) + sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + &
-                                                    tau_e_L(idx_tau))/rho_L))
+                                                       tau_e_R(idx_tau))/rho_R) &
+                          , vel_L(idx) + sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + &
+                                                         tau_e_L(idx_tau))/rho_L))
             else if (hyperelasticity) then
                 s_L = min(vel_L(idx) - sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L) &
-                            , vel_R(idx) - sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R))
+                          , vel_R(idx) - sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R))
                 s_R = max(vel_R(idx) + sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R) &
-                            , vel_L(idx) + sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L))
+                          , vel_L(idx) + sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L))
             else
                 s_L = min(vel_L(idx) - c_L, vel_R(idx) - c_R)
                 s_R = max(vel_R(idx) + c_R, vel_L(idx) + c_L)
             end if
             s_S = (pres_R - pres_L + rho_L*vel_L(idx)* &
-                    (s_L - vel_L(idx)) - rho_R*vel_R(idx)*(s_R - vel_R(idx))) &
-                    /(rho_L*(s_L - vel_L(idx)) - rho_R*(s_R - vel_R(idx)))
+                   (s_L - vel_L(idx)) - rho_R*vel_R(idx)*(s_R - vel_R(idx))) &
+                  /(rho_L*(s_L - vel_L(idx)) - rho_R*(s_R - vel_R(idx)))
         elseif (wave_speeds == 2) then
-            pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* (vel_L(idx) - vel_R(idx)))
+            pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(idx) - vel_R(idx)))
             pres_SR = pres_SL
             Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
-                                    (pres_SL/pres_L - 1._wp)*pres_L/ &
-                                    ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+                                   (pres_SL/pres_L - 1._wp)*pres_L/ &
+                                   ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
             Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
-                                    (pres_SR/pres_R - 1._wp)*pres_R/ &
-                                    ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+                                   (pres_SR/pres_R - 1._wp)*pres_R/ &
+                                   ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
             s_L = vel_L(idx) - c_L*Ms_L
             s_R = vel_R(idx) + c_R*Ms_R
             s_S = 5e-1_wp*((vel_L(idx) + vel_R(idx)) + (pres_L - pres_R)/(rho_avg*c_avg))
