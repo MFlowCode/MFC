@@ -2986,45 +2986,53 @@ contains
         qR_prim_vf, &
         norm_dir, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), target, intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(:,:,:,:), pointer :: qL_prim_rs_vf, qR_prim_rs_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
-            intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+            target, intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf, &
                              qL_prim_vf, qR_prim_vf
+        type(scalar_field), &
+            dimension(:), &
+            pointer :: dqL_prim_d_vf, dqR_prim_d_vf
+
+        integer :: end_val, bc_beg, bc_end
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, l !< Generic loop iterator
 
-        pointer :: qL_prim_rs_vf, dqL_prim_d_vf
-        pointer :: qR_prim_rs_vf, dqR_prim_d_vf
-        integer :: end_val, bc_beg, bc_end
-
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
             dir_idx = (/1, 2, 3/); dir_flg = (/1._wp, 0._wp, 0._wp/)
             bc_beg = bc_x%beg; bc_end = bc_x%end
             end_val = m
-            qL_prim_rs_vf => qL_prim_rsx_vf; qR_prim_rs_vf => qR_prim_rsx_vf
-            dqL_prim_d_vf => dqL_prim_dx_vf; dqR_prim_d_vf => dqR_prim_dx_vf
-        elseif (norm_dir == 2) then
+            qL_prim_rs_vf => qL_prim_rsx_vf
+            qR_prim_rs_vf => qR_prim_rsx_vf
+            dqL_prim_d_vf => dqL_prim_dx_vf
+            dqR_prim_d_vf => dqR_prim_dx_vf
+        else if (norm_dir == 2) then
             is1 = iy; is2 = ix; is3 = iz
             dir_idx = (/2, 1, 3/); dir_flg = (/0._wp, 1._wp, 0._wp/)
             bc_beg = bc_y%beg; bc_end = bc_y%end
-            qL_prim_rs_vf => qL_prim_rsy_vf; qR_prim_rs_vf => qR_prim_rsy_vf
-            dqL_prim_d_vf => dqL_prim_dy_vf; dqR_prim_d_vf => dqR_prim_dy_vf
             end_val = n
+            qL_prim_rs_vf => qL_prim_rsy_vf
+            qR_prim_rs_vf => qR_prim_rsy_vf
+            dqL_prim_d_vf => dqL_prim_dy_vf
+            dqR_prim_d_vf => dqR_prim_dy_vf
         else
             is1 = iz; is2 = iy; is3 = ix
             dir_idx = (/3, 1, 2/); dir_flg = (/0._wp, 0._wp, 1._wp/)
             bc_beg = bc_z%beg; bc_end = bc_z%end
-            qL_prim_rs_vf => qL_prim_rsz_vf; qR_prim_rs_vf => qR_prim_rsz_vf
-            dqL_prim_d_vf => dqL_prim_dz_vf; dqR_prim_d_vf => dqR_prim_dz_vf
             end_val = p
+            qL_prim_rs_vf => qL_prim_rsz_vf
+            qR_prim_rs_vf => qR_prim_rsz_vf
+            dqL_prim_d_vf => dqL_prim_dz_vf
+            dqR_prim_d_vf => dqR_prim_dz_vf
         end if
 
         !$acc update device(is1, is2, is3)
