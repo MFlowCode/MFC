@@ -102,3 +102,52 @@
                          //${message or '"No error description."'}$)
     end if
 #:enddef
+
+#:def parallel_loop(collapse=None, private=None, parallelism=["gang", "vector"], default="present", firstprivate=None)
+    #:if collapse is not None
+        #:assert isinstance(collapse, int)
+        #:assert collapse > 0
+        #:set collapse_val = 'collapse(' + str(collapse) + ') '
+    #:else
+        #:set collapse_val = ""
+    #:endif
+
+    #:if private is not None
+        #:assert isinstance(private, list)
+        #:assert len(private) != 0
+        #:assert all(type(element) == str for element in private)
+        #:set private_val = 'private(' + ', '.join(private) + ') '
+    #:else
+        #:set private_val = ""
+    #:endif
+
+    #:if default is not None
+        #:assert isinstance(default, str)
+        #:assert (default == "present" or default == "none")
+        #:set default_val = 'default(' + default + ') '
+    #:else
+        #:set default_val = ""
+    #:endif
+
+    #:if parallelism is not None
+        #:assert isinstance(parallelism, list)
+        #:assert len(parallelism) != 0
+        #:assert all(type(element) == str for element in parallelism)
+        #:set parallelism_val = " ".join(parallelism) + " "
+    #:else
+        #:set parallelism_val = ""
+    #:endif
+
+    #:if firstprivate is not None
+        #:assert isinstance(firstprivate, list)
+        #:assert len(firstprivate) != 0
+        #:assert all(type(element) == str for element in firstprivate)
+        #:set firstprivate_val = 'firstprivate(' + ', '.join(firstprivate) + ') '
+    #:else
+        #:set firstprivate_val = ""
+    #:endif
+
+    #:set clause_val = collapse_val + parallelism_val + default_val + private_val + firstprivate_val
+    !$acc parallel loop ${clause_val}$
+
+#:enddef
