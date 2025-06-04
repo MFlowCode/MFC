@@ -3202,11 +3202,10 @@ contains
                 end do
             end do
         end if
-        end if
 
-        end subroutine s_initialize_riemann_solver
+    end subroutine s_initialize_riemann_solver
 
-        !> @brief Computes cylindrical viscous source flux contributions for momentum and energy.
+    !> @brief Computes cylindrical viscous source flux contributions for momentum and energy.
         !! Calculates Cartesian components of the stress tensor using averaged velocity derivatives
         !! and cylindrical geometric factors, then updates `flux_src_vf`.
         !! Assumes x-dir is axial (z_cyl), y-dir is radial (r_cyl), z-dir is azimuthal (theta_cyl for derivatives).
@@ -3223,357 +3222,357 @@ contains
         !! @param[in] ix Global X-direction loop bounds (int_bounds_info).
         !! @param[in] iy Global Y-direction loop bounds (int_bounds_info).
         !! @param[in] iz Global Z-direction loop bounds (int_bounds_info).
-        subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, &
-                                                             dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, &
-                                                             velR_vf, &
-                                                             dvelR_dx_vf, dvelR_dy_vf, dvelR_dz_vf, &
-                                                             flux_src_vf, norm_dir, ix, iy, iz)
+    subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, &
+                                                         dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, &
+                                                         velR_vf, &
+                                                         dvelR_dx_vf, dvelR_dy_vf, dvelR_dz_vf, &
+                                                         flux_src_vf, norm_dir, ix, iy, iz)
 
-            type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
-            type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
-            type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dy_vf, dvelR_dy_vf
-            type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
-            type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-            integer, intent(in) :: norm_dir
-            type(int_bounds_info), intent(in) :: ix, iy, iz
+        type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dy_vf, dvelR_dy_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
-            ! Local variables
-            real(wp), dimension(num_dims) :: avg_v_int       !!< Averaged interface velocity $(v_x, v_y, v_z)$ (grid directions).
-            real(wp), dimension(num_dims) :: avg_dvdx_int    !!< Averaged interface $\partial v_i/\partial x$ (grid dir 1).
-            real(wp), dimension(num_dims) :: avg_dvdy_int    !!< Averaged interface $\partial v_i/\partial y$ (grid dir 2).
-            real(wp), dimension(num_dims) :: avg_dvdz_int    !!< Averaged interface $\partial v_i/\partial z$ (grid dir 3).
+        ! Local variables
+        real(wp), dimension(num_dims) :: avg_v_int       !!< Averaged interface velocity $(v_x, v_y, v_z)$ (grid directions).
+        real(wp), dimension(num_dims) :: avg_dvdx_int    !!< Averaged interface $\partial v_i/\partial x$ (grid dir 1).
+        real(wp), dimension(num_dims) :: avg_dvdy_int    !!< Averaged interface $\partial v_i/\partial y$ (grid dir 2).
+        real(wp), dimension(num_dims) :: avg_dvdz_int    !!< Averaged interface $\partial v_i/\partial z$ (grid dir 3).
 
-            real(wp), dimension(num_dims) :: stress_vector_shear !!< Shear stress vector $(\sigma_{N1}, \sigma_{N2}, \sigma_{N3})$ on N-face (grid directions).
-            real(wp) :: stress_normal_bulk  !!< Normal bulk stress component $\sigma_{NN}$ on N-face.
+        real(wp), dimension(num_dims) :: stress_vector_shear !!< Shear stress vector $(\sigma_{N1}, \sigma_{N2}, \sigma_{N3})$ on N-face (grid directions).
+        real(wp) :: stress_normal_bulk  !!< Normal bulk stress component $\sigma_{NN}$ on N-face.
 
-            real(wp) :: Re_s, Re_b        !!< Effective interface shear and bulk Reynolds numbers.
-            real(wp), dimension(num_dims) :: vel_src_int !!< Interface velocity $(v_1,v_2,v_3)$ (grid directions) for viscous work.
-            real(wp) :: r_eff             !!< Effective radius at interface for cylindrical terms.
-            real(wp) :: div_v_term_const  !!< Common term $-(2/3)(\nabla \cdot \mathbf{v}) / \text{Re}_s$ for shear stress diagonal.
-            real(wp) :: divergence_cyl    !!< Full divergence $\nabla \cdot \mathbf{v}$ in cylindrical coordinates.
+        real(wp) :: Re_s, Re_b        !!< Effective interface shear and bulk Reynolds numbers.
+        real(wp), dimension(num_dims) :: vel_src_int !!< Interface velocity $(v_1,v_2,v_3)$ (grid directions) for viscous work.
+        real(wp) :: r_eff             !!< Effective radius at interface for cylindrical terms.
+        real(wp) :: div_v_term_const  !!< Common term $-(2/3)(\nabla \cdot \mathbf{v}) / \text{Re}_s$ for shear stress diagonal.
+        real(wp) :: divergence_cyl    !!< Full divergence $\nabla \cdot \mathbf{v}$ in cylindrical coordinates.
 
-            integer :: j, k, l           !!< Loop iterators for $x, y, z$ grid directions.
-            integer :: i_vel             !!< Loop iterator for velocity components.
-            integer :: idx_rp(3)         !!< Indices $(j,k,l)$ of 'right' point for averaging.
+        integer :: j, k, l           !!< Loop iterators for $x, y, z$ grid directions.
+        integer :: i_vel             !!< Loop iterator for velocity components.
+        integer :: idx_rp(3)         !!< Indices $(j,k,l)$ of 'right' point for averaging.
 
-            !$acc parallel loop collapse(3) gang vector default(present) &
-            !$acc private(idx_rp, avg_v_int, avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, &
-            !$acc         Re_s, Re_b, vel_src_int, r_eff, divergence_cyl, &
-            !$acc         stress_vector_shear, stress_normal_bulk, div_v_term_const)
-            do l = iz%beg, iz%end
-                do k = iy%beg, iy%end
-                    do j = ix%beg, ix%end
+        !$acc parallel loop collapse(3) gang vector default(present) &
+        !$acc private(idx_rp, avg_v_int, avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, &
+        !$acc         Re_s, Re_b, vel_src_int, r_eff, divergence_cyl, &
+        !$acc         stress_vector_shear, stress_normal_bulk, div_v_term_const)
+        do l = iz%beg, iz%end
+            do k = iy%beg, iy%end
+                do j = ix%beg, ix%end
 
-                        ! Determine indices for the 'right' state for averaging across the interface
-                        idx_rp = [j, k, l]
-                        idx_rp(norm_dir) = idx_rp(norm_dir) + 1
+                    ! Determine indices for the 'right' state for averaging across the interface
+                    idx_rp = [j, k, l]
+                    idx_rp(norm_dir) = idx_rp(norm_dir) + 1
 
-                        ! Average velocities and their derivatives at the interface
-                        ! For cylindrical: x-dir ~ axial (z_cyl), y-dir ~ radial (r_cyl), z-dir ~ azimuthal (theta_cyl)
-                        !$acc loop seq
-                        do i_vel = 1, num_dims
-                            avg_v_int(i_vel) = 0.5_wp*(velL_vf(i_vel)%sf(j, k, l) + velR_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
+                    ! Average velocities and their derivatives at the interface
+                    ! For cylindrical: x-dir ~ axial (z_cyl), y-dir ~ radial (r_cyl), z-dir ~ azimuthal (theta_cyl)
+                    !$acc loop seq
+                    do i_vel = 1, num_dims
+                        avg_v_int(i_vel) = 0.5_wp*(velL_vf(i_vel)%sf(j, k, l) + velR_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
 
-                            avg_dvdx_int(i_vel) = 0.5_wp*(dvelL_dx_vf(i_vel)%sf(j, k, l) + &
-                                                          dvelR_dx_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
+                        avg_dvdx_int(i_vel) = 0.5_wp*(dvelL_dx_vf(i_vel)%sf(j, k, l) + &
+                                                      dvelR_dx_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
+                        if (num_dims > 1) then
+                            avg_dvdy_int(i_vel) = 0.5_wp*(dvelL_dy_vf(i_vel)%sf(j, k, l) + &
+                                                          dvelR_dy_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
+                        else
+                            avg_dvdy_int(i_vel) = 0.0_wp
+                        end if
+                        if (num_dims > 2) then
+                            avg_dvdz_int(i_vel) = 0.5_wp*(dvelL_dz_vf(i_vel)%sf(j, k, l) + &
+                                                          dvelR_dz_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
+                        else
+                            avg_dvdz_int(i_vel) = 0.0_wp
+                        end if
+                    end do
+
+                    ! Get Re numbers and interface velocity for viscous work
+                    select case (norm_dir)
+                    case (1) ! x-face (axial face in z_cyl direction)
+                        Re_s = Re_avg_rsx_vf(j, k, l, 1)
+                        Re_b = Re_avg_rsx_vf(j, k, l, 2)
+                        vel_src_int = vel_src_rsx_vf(j, k, l, 1:num_dims)
+                        r_eff = y_cc(k)
+                    case (2) ! y-face (radial face in r_cyl direction)
+                        Re_s = Re_avg_rsy_vf(k, j, l, 1)
+                        Re_b = Re_avg_rsy_vf(k, j, l, 2)
+                        vel_src_int = vel_src_rsy_vf(k, j, l, 1:num_dims)
+                        r_eff = y_cb(k)
+                    case (3) ! z-face (azimuthal face in theta_cyl direction)
+                        Re_s = Re_avg_rsz_vf(l, k, j, 1)
+                        Re_b = Re_avg_rsz_vf(l, k, j, 2)
+                        vel_src_int = vel_src_rsz_vf(l, k, j, 1:num_dims)
+                        r_eff = y_cc(k)
+                    end select
+
+                    ! Divergence in cylindrical coordinates (vx=vz_cyl, vy=vr_cyl, vz=vtheta_cyl)
+                    divergence_cyl = avg_dvdx_int(1) + avg_dvdy_int(2) + avg_v_int(2)/r_eff
+                    if (num_dims > 2) then
+                        divergence_cyl = divergence_cyl + avg_dvdz_int(3)/r_eff
+                    end if
+
+                    stress_vector_shear = 0.0_wp
+                    stress_normal_bulk = 0.0_wp
+
+                    if (shear_stress) then
+                        div_v_term_const = -(2.0_wp/3.0_wp)*divergence_cyl/Re_s
+
+                        select case (norm_dir)
+                        case (1) ! X-face (axial normal, z_cyl)
+                            stress_vector_shear(1) = (2.0_wp*avg_dvdx_int(1))/Re_s + div_v_term_const
                             if (num_dims > 1) then
-                                avg_dvdy_int(i_vel) = 0.5_wp*(dvelL_dy_vf(i_vel)%sf(j, k, l) + &
-                                                              dvelR_dy_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
-                            else
-                                avg_dvdy_int(i_vel) = 0.0_wp
+                                stress_vector_shear(2) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
                             end if
                             if (num_dims > 2) then
-                                avg_dvdz_int(i_vel) = 0.5_wp*(dvelL_dz_vf(i_vel)%sf(j, k, l) + &
-                                                              dvelR_dz_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
-                            else
-                                avg_dvdz_int(i_vel) = 0.0_wp
+                                stress_vector_shear(3) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
                             end if
-                        end do
-
-                        ! Get Re numbers and interface velocity for viscous work
-                        select case (norm_dir)
-                        case (1) ! x-face (axial face in z_cyl direction)
-                            Re_s = Re_avg_rsx_vf(j, k, l, 1)
-                            Re_b = Re_avg_rsx_vf(j, k, l, 2)
-                            vel_src_int = vel_src_rsx_vf(j, k, l, 1:num_dims)
-                            r_eff = y_cc(k)
-                        case (2) ! y-face (radial face in r_cyl direction)
-                            Re_s = Re_avg_rsy_vf(k, j, l, 1)
-                            Re_b = Re_avg_rsy_vf(k, j, l, 2)
-                            vel_src_int = vel_src_rsy_vf(k, j, l, 1:num_dims)
-                            r_eff = y_cb(k)
-                        case (3) ! z-face (azimuthal face in theta_cyl direction)
-                            Re_s = Re_avg_rsz_vf(l, k, j, 1)
-                            Re_b = Re_avg_rsz_vf(l, k, j, 2)
-                            vel_src_int = vel_src_rsz_vf(l, k, j, 1:num_dims)
-                            r_eff = y_cc(k)
+                        case (2) ! Y-face (radial normal, r_cyl)
+                            if (num_dims > 1) then
+                                stress_vector_shear(1) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
+                                stress_vector_shear(2) = (2.0_wp*avg_dvdy_int(2))/Re_s + div_v_term_const
+                                if (num_dims > 2) then
+                                    stress_vector_shear(3) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
+                                end if
+                            else
+                                stress_vector_shear(1) = (2.0_wp*avg_dvdx_int(1))/Re_s + div_v_term_const
+                            end if
+                        case (3) ! Z-face (azimuthal normal, theta_cyl)
+                            if (num_dims > 2) then
+                                stress_vector_shear(1) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
+                                stress_vector_shear(2) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
+                                stress_vector_shear(3) = (2.0_wp*(avg_dvdz_int(3)/r_eff + avg_v_int(2)/r_eff))/Re_s + div_v_term_const
+                            end if
                         end select
 
-                        ! Divergence in cylindrical coordinates (vx=vz_cyl, vy=vr_cyl, vz=vtheta_cyl)
-                        divergence_cyl = avg_dvdx_int(1) + avg_dvdy_int(2) + avg_v_int(2)/r_eff
-                        if (num_dims > 2) then
-                            divergence_cyl = divergence_cyl + avg_dvdz_int(3)/r_eff
-                        end if
-
-                        stress_vector_shear = 0.0_wp
-                        stress_normal_bulk = 0.0_wp
-
-                        if (shear_stress) then
-                            div_v_term_const = -(2.0_wp/3.0_wp)*divergence_cyl/Re_s
-
-                            select case (norm_dir)
-                            case (1) ! X-face (axial normal, z_cyl)
-                                stress_vector_shear(1) = (2.0_wp*avg_dvdx_int(1))/Re_s + div_v_term_const
-                                if (num_dims > 1) then
-                                    stress_vector_shear(2) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
-                                end if
-                                if (num_dims > 2) then
-                                    stress_vector_shear(3) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
-                                end if
-                            case (2) ! Y-face (radial normal, r_cyl)
-                                if (num_dims > 1) then
-                                    stress_vector_shear(1) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
-                                    stress_vector_shear(2) = (2.0_wp*avg_dvdy_int(2))/Re_s + div_v_term_const
-                                    if (num_dims > 2) then
-                                        stress_vector_shear(3) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
-                                    end if
-                                else
-                                    stress_vector_shear(1) = (2.0_wp*avg_dvdx_int(1))/Re_s + div_v_term_const
-                                end if
-                            case (3) ! Z-face (azimuthal normal, theta_cyl)
-                                if (num_dims > 2) then
-                                    stress_vector_shear(1) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
-                                    stress_vector_shear(2) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
-                                    stress_vector_shear(3) = (2.0_wp*(avg_dvdz_int(3)/r_eff + avg_v_int(2)/r_eff))/Re_s + div_v_term_const
-                                end if
-                            end select
-
-                            !$acc loop seq
-                            do i_vel = 1, num_dims
-                                flux_src_vf(momxb + i_vel - 1)%sf(j, k, l) = flux_src_vf(momxb + i_vel - 1)%sf(j, k, l) - stress_vector_shear(i_vel)
-                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - vel_src_int(i_vel)*stress_vector_shear(i_vel)
-                            end do
-                        end if
-
-                        if (bulk_stress) then
-                            stress_normal_bulk = divergence_cyl/Re_b
-
-                            flux_src_vf(momxb + norm_dir - 1)%sf(j, k, l) = flux_src_vf(momxb + norm_dir - 1)%sf(j, k, l) - stress_normal_bulk
-                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - vel_src_int(norm_dir)*stress_normal_bulk
-                        end if
-
-                    end do
-                end do
-            end do
-            !$acc end parallel loop
-
-        end subroutine s_compute_cylindrical_viscous_source_flux
-
-        !> @brief Computes Cartesian viscous source flux contributions for momentum and energy.
-    !! Calculates averaged velocity gradients, gets Re and interface velocities,
-    !! calls helpers for shear/bulk stress, then updates `flux_src_vf`.
-    !! @param[in] velL_vf Left boundary velocity (num_dims scalar_field).
-    !! @param[in] dvelL_dx_vf Left boundary d(vel)/dx (num_dims scalar_field).
-    !! @param[in] dvelL_dy_vf Left boundary d(vel)/dy (num_dims scalar_field).
-    !! @param[in] dvelL_dz_vf Left boundary d(vel)/dz (num_dims scalar_field).
-    !! @param[in] velR_vf Right boundary velocity (num_dims scalar_field).
-    !! @param[in] dvelR_dx_vf Right boundary d(vel)/dx (num_dims scalar_field).
-    !! @param[in] dvelR_dy_vf Right boundary d(vel)/dy (num_dims scalar_field).
-    !! @param[in] dvelR_dz_vf Right boundary d(vel)/dz (num_dims scalar_field).
-    !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
-    !! @param[in] norm_dir Interface normal direction (1=x, 2=y, 3=z).
-    !! @param[in] ix X-direction loop bounds (int_bounds_info).
-    !! @param[in] iy Y-direction loop bounds (int_bounds_info).
-    !! @param[in] iz Z-direction loop bounds (int_bounds_info).
-        subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
-                                                           dvelL_dx_vf, &
-                                                           dvelL_dy_vf, &
-                                                           dvelL_dz_vf, &
-                                                           velR_vf, &
-                                                           dvelR_dx_vf, &
-                                                           dvelR_dy_vf, &
-                                                           dvelR_dz_vf, &
-                                                           flux_src_vf, &
-                                                           norm_dir, &
-                                                           ix, iy, iz)
-
-            ! Arguments
-            type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
-            type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
-            type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dy_vf, dvelR_dy_vf
-            type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
-            type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-            integer, intent(in) :: norm_dir
-            type(int_bounds_info), intent(in) :: ix, iy, iz
-
-            ! Local variables
-            real(wp), dimension(num_dims, num_dims) :: vel_grad_avg        !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
-            real(wp), dimension(num_dims, num_dims) :: current_tau_shear   !< Current shear stress tensor.
-            real(wp), dimension(num_dims, num_dims) :: current_tau_bulk    !< Current bulk stress tensor.
-            real(wp), dimension(num_dims) :: vel_src_at_interface         !< Interface velocities (u,v,w) for viscous work.
-            integer, dimension(3) :: idx_right_phys                     !< Physical (j,k,l) indices for right state.
-
-            real(wp) :: Re_shear !< Interface shear Reynolds number.
-            real(wp) :: Re_bulk  !< Interface bulk Reynolds number.
-
-            integer :: j_loop         !< Physical x-index loop iterator.
-            integer :: k_loop         !< Physical y-index loop iterator.
-            integer :: l_loop         !< Physical z-index loop iterator.
-            integer :: i_dim          !< Generic dimension/component iterator.
-            integer :: vel_comp_idx   !< Velocity component iterator (1=u, 2=v, 3=w).
-
-            real(wp) :: divergence_v   !< Velocity divergence at interface.
-
-            !$acc parallel loop collapse(3) gang vector default(present) &
-            !$acc private(idx_right_phys, vel_grad_avg, &
-            !$acc current_tau_shear, current_tau_bulk, vel_src_at_interface, &
-            !$acc Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx)
-            do l_loop = isz%beg, isz%end
-                do k_loop = isy%beg, isy%end
-                    do j_loop = isx%beg, isx%end
-
-                        idx_right_phys(1) = j_loop
-                        idx_right_phys(2) = k_loop
-                        idx_right_phys(3) = l_loop
-                        idx_right_phys(norm_dir) = idx_right_phys(norm_dir) + 1
-
-                        vel_grad_avg = 0.0_wp
-                        do vel_comp_idx = 1, num_dims
-                            vel_grad_avg(vel_comp_idx, 1) = 0.5_wp*(dvelL_dx_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
-                                                                    dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
-                            if (num_dims > 1) then
-                                vel_grad_avg(vel_comp_idx, 2) = 0.5_wp*(dvelL_dy_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
-                                                                        dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
-                            end if
-                            if (num_dims > 2) then
-                                vel_grad_avg(vel_comp_idx, 3) = 0.5_wp*(dvelL_dz_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
-                                                                        dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
-                            end if
+                        !$acc loop seq
+                        do i_vel = 1, num_dims
+                            flux_src_vf(momxb + i_vel - 1)%sf(j, k, l) = flux_src_vf(momxb + i_vel - 1)%sf(j, k, l) - stress_vector_shear(i_vel)
+                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - vel_src_int(i_vel)*stress_vector_shear(i_vel)
                         end do
-
-                        divergence_v = 0.0_wp
-                        do i_dim = 1, num_dims
-                            divergence_v = divergence_v + vel_grad_avg(i_dim, i_dim)
-                        end do
-
-                        vel_src_at_interface = 0.0_wp
-                        if (norm_dir == 1) then
-                            Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
-                            Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
-                            do i_dim = 1, num_dims
-                                vel_src_at_interface(i_dim) = vel_src_rsx_vf(j_loop, k_loop, l_loop, i_dim)
-                            end do
-                        else if (norm_dir == 2) then
-                            Re_shear = Re_avg_rsy_vf(k_loop, j_loop, l_loop, 1)
-                            Re_bulk = Re_avg_rsy_vf(k_loop, j_loop, l_loop, 2)
-                            do i_dim = 1, num_dims
-                                vel_src_at_interface(i_dim) = vel_src_rsy_vf(k_loop, j_loop, l_loop, i_dim)
-                            end do
-                        else
-                            Re_shear = Re_avg_rsz_vf(l_loop, k_loop, j_loop, 1)
-                            Re_bulk = Re_avg_rsz_vf(l_loop, k_loop, j_loop, 2)
-                            do i_dim = 1, num_dims
-                                vel_src_at_interface(i_dim) = vel_src_rsz_vf(l_loop, k_loop, j_loop, i_dim)
-                            end do
-                        end if
-
-                        if (shear_stress) then
-                            current_tau_shear = 0.0_wp
-                            call s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, current_tau_shear)
-
-                            do i_dim = 1, num_dims
-                                flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) = &
-                                    flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) - current_tau_shear(norm_dir, i_dim)
-
-                                flux_src_vf(E_idx)%sf(j_loop, k_loop, l_loop) = &
-                                    flux_src_vf(E_idx)%sf(j_loop, k_loop, l_loop) - &
-                                    vel_src_at_interface(i_dim)*current_tau_shear(norm_dir, i_dim)
-                            end do
-                        end if
-
-                        if (bulk_stress) then
-                            current_tau_bulk = 0.0_wp
-                            call s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, current_tau_bulk)
-
-                            do i_dim = 1, num_dims
-                                flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) = &
-                                    flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) - current_tau_bulk(norm_dir, i_dim)
-
-                                flux_src_vf(E_idx)%sf(j_loop, k_loop, l_loop) = &
-                                    flux_src_vf(E_idx)%sf(j_loop, k_loop, l_loop) - &
-                                    vel_src_at_interface(i_dim)*current_tau_bulk(norm_dir, i_dim)
-                            end do
-                        end if
-
-                    end do
-                end do
-            end do
-            !$acc end parallel loop
-
-        end subroutine s_compute_cartesian_viscous_source_flux
-
-        !> @brief Calculates shear stress tensor components.
-    !! tau_ij_shear = ( (dui/dxj + duj/dxi) - (2/3)*(div_v)*delta_ij ) / Re_shear
-    !! @param[in] vel_grad_avg Averaged velocity gradient tensor (d(vel_i)/d(coord_j)).
-    !! @param[in] Re_shear Shear Reynolds number.
-    !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
-    !! @param[out] tau_shear_out Calculated shear stress tensor (stress on i-face, j-direction).
-        subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
-            !$acc routine seq
-
-            implicit none
-
-            ! Arguments
-            real(wp), dimension(num_dims, num_dims), intent(in) :: vel_grad_avg
-            real(wp), intent(in) :: Re_shear
-            real(wp), intent(in) :: divergence_v
-            real(wp), dimension(num_dims, num_dims), intent(out) :: tau_shear_out
-
-            ! Local variables
-            integer :: i_dim !< Loop iterator for face normal.
-            integer :: j_dim !< Loop iterator for force component direction.
-
-            tau_shear_out = 0.0_wp
-
-            do i_dim = 1, num_dims
-                do j_dim = 1, num_dims
-                    tau_shear_out(i_dim, j_dim) = (vel_grad_avg(j_dim, i_dim) + vel_grad_avg(i_dim, j_dim))/Re_shear
-                    if (i_dim == j_dim) then
-                        tau_shear_out(i_dim, j_dim) = tau_shear_out(i_dim, j_dim) - &
-                                                      (2.0_wp/3.0_wp)*divergence_v/Re_shear
                     end if
+
+                    if (bulk_stress) then
+                        stress_normal_bulk = divergence_cyl/Re_b
+
+                        flux_src_vf(momxb + norm_dir - 1)%sf(j, k, l) = flux_src_vf(momxb + norm_dir - 1)%sf(j, k, l) - stress_normal_bulk
+                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - vel_src_int(norm_dir)*stress_normal_bulk
+                    end if
+
                 end do
             end do
+        end do
+        !$acc end parallel loop
 
-        end subroutine s_calculate_shear_stress_tensor
+    end subroutine s_compute_cylindrical_viscous_source_flux
 
-        !> @brief Calculates bulk stress tensor components (diagonal only).
-    !! tau_ii_bulk = (div_v) / Re_bulk. Off-diagonals are zero.
-    !! @param[in] Re_bulk Bulk Reynolds number.
-    !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
-    !! @param[out] tau_bulk_out Calculated bulk stress tensor (stress on i-face, i-direction).
-        subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
-            !$acc routine seq
+    !> @brief Computes Cartesian viscous source flux contributions for momentum and energy.
+        !! Calculates averaged velocity gradients, gets Re and interface velocities,
+        !! calls helpers for shear/bulk stress, then updates `flux_src_vf`.
+        !! @param[in] velL_vf Left boundary velocity (num_dims scalar_field).
+        !! @param[in] dvelL_dx_vf Left boundary d(vel)/dx (num_dims scalar_field).
+        !! @param[in] dvelL_dy_vf Left boundary d(vel)/dy (num_dims scalar_field).
+        !! @param[in] dvelL_dz_vf Left boundary d(vel)/dz (num_dims scalar_field).
+        !! @param[in] velR_vf Right boundary velocity (num_dims scalar_field).
+        !! @param[in] dvelR_dx_vf Right boundary d(vel)/dx (num_dims scalar_field).
+        !! @param[in] dvelR_dy_vf Right boundary d(vel)/dy (num_dims scalar_field).
+        !! @param[in] dvelR_dz_vf Right boundary d(vel)/dz (num_dims scalar_field).
+        !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
+        !! @param[in] norm_dir Interface normal direction (1=x, 2=y, 3=z).
+        !! @param[in] ix X-direction loop bounds (int_bounds_info).
+        !! @param[in] iy Y-direction loop bounds (int_bounds_info).
+        !! @param[in] iz Z-direction loop bounds (int_bounds_info).
+    subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
+                                                       dvelL_dx_vf, &
+                                                       dvelL_dy_vf, &
+                                                       dvelL_dz_vf, &
+                                                       velR_vf, &
+                                                       dvelR_dx_vf, &
+                                                       dvelR_dy_vf, &
+                                                       dvelR_dz_vf, &
+                                                       flux_src_vf, &
+                                                       norm_dir, &
+                                                       ix, iy, iz)
 
-            implicit none
+        ! Arguments
+        type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dy_vf, dvelR_dy_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
-            ! Arguments
-            real(wp), intent(in) :: Re_bulk
-            real(wp), intent(in) :: divergence_v
-            real(wp), dimension(num_dims, num_dims), intent(out) :: tau_bulk_out
+        ! Local variables
+        real(wp), dimension(num_dims, num_dims) :: vel_grad_avg        !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+        real(wp), dimension(num_dims, num_dims) :: current_tau_shear   !< Current shear stress tensor.
+        real(wp), dimension(num_dims, num_dims) :: current_tau_bulk    !< Current bulk stress tensor.
+        real(wp), dimension(num_dims) :: vel_src_at_interface         !< Interface velocities (u,v,w) for viscous work.
+        integer, dimension(3) :: idx_right_phys                     !< Physical (j,k,l) indices for right state.
 
-            ! Local variables
-            integer :: i_dim !< Loop iterator for diagonal components.
+        real(wp) :: Re_shear !< Interface shear Reynolds number.
+        real(wp) :: Re_bulk  !< Interface bulk Reynolds number.
 
-            tau_bulk_out = 0.0_wp
+        integer :: j_loop         !< Physical x-index loop iterator.
+        integer :: k_loop         !< Physical y-index loop iterator.
+        integer :: l_loop         !< Physical z-index loop iterator.
+        integer :: i_dim          !< Generic dimension/component iterator.
+        integer :: vel_comp_idx   !< Velocity component iterator (1=u, 2=v, 3=w).
 
-            do i_dim = 1, num_dims
-                tau_bulk_out(i_dim, i_dim) = divergence_v/Re_bulk
+        real(wp) :: divergence_v   !< Velocity divergence at interface.
+
+        !$acc parallel loop collapse(3) gang vector default(present) &
+        !$acc private(idx_right_phys, vel_grad_avg, &
+        !$acc current_tau_shear, current_tau_bulk, vel_src_at_interface, &
+        !$acc Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx)
+        do l_loop = isz%beg, isz%end
+            do k_loop = isy%beg, isy%end
+                do j_loop = isx%beg, isx%end
+
+                    idx_right_phys(1) = j_loop
+                    idx_right_phys(2) = k_loop
+                    idx_right_phys(3) = l_loop
+                    idx_right_phys(norm_dir) = idx_right_phys(norm_dir) + 1
+
+                    vel_grad_avg = 0.0_wp
+                    do vel_comp_idx = 1, num_dims
+                        vel_grad_avg(vel_comp_idx, 1) = 0.5_wp*(dvelL_dx_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
+                                                                dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
+                        if (num_dims > 1) then
+                            vel_grad_avg(vel_comp_idx, 2) = 0.5_wp*(dvelL_dy_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
+                                                                    dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
+                        end if
+                        if (num_dims > 2) then
+                            vel_grad_avg(vel_comp_idx, 3) = 0.5_wp*(dvelL_dz_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
+                                                                    dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
+                        end if
+                    end do
+
+                    divergence_v = 0.0_wp
+                    do i_dim = 1, num_dims
+                        divergence_v = divergence_v + vel_grad_avg(i_dim, i_dim)
+                    end do
+
+                    vel_src_at_interface = 0.0_wp
+                    if (norm_dir == 1) then
+                        Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
+                        Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
+                        do i_dim = 1, num_dims
+                            vel_src_at_interface(i_dim) = vel_src_rsx_vf(j_loop, k_loop, l_loop, i_dim)
+                        end do
+                    else if (norm_dir == 2) then
+                        Re_shear = Re_avg_rsy_vf(k_loop, j_loop, l_loop, 1)
+                        Re_bulk = Re_avg_rsy_vf(k_loop, j_loop, l_loop, 2)
+                        do i_dim = 1, num_dims
+                            vel_src_at_interface(i_dim) = vel_src_rsy_vf(k_loop, j_loop, l_loop, i_dim)
+                        end do
+                    else
+                        Re_shear = Re_avg_rsz_vf(l_loop, k_loop, j_loop, 1)
+                        Re_bulk = Re_avg_rsz_vf(l_loop, k_loop, j_loop, 2)
+                        do i_dim = 1, num_dims
+                            vel_src_at_interface(i_dim) = vel_src_rsz_vf(l_loop, k_loop, j_loop, i_dim)
+                        end do
+                    end if
+
+                    if (shear_stress) then
+                        current_tau_shear = 0.0_wp
+                        call s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, current_tau_shear)
+
+                        do i_dim = 1, num_dims
+                            flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) = &
+                                flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) - current_tau_shear(norm_dir, i_dim)
+
+                            flux_src_vf(E_idx)%sf(j_loop, k_loop, l_loop) = &
+                                flux_src_vf(E_idx)%sf(j_loop, k_loop, l_loop) - &
+                                vel_src_at_interface(i_dim)*current_tau_shear(norm_dir, i_dim)
+                        end do
+                    end if
+
+                    if (bulk_stress) then
+                        current_tau_bulk = 0.0_wp
+                        call s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, current_tau_bulk)
+
+                        do i_dim = 1, num_dims
+                            flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) = &
+                                flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) - current_tau_bulk(norm_dir, i_dim)
+
+                            flux_src_vf(E_idx)%sf(j_loop, k_loop, l_loop) = &
+                                flux_src_vf(E_idx)%sf(j_loop, k_loop, l_loop) - &
+                                vel_src_at_interface(i_dim)*current_tau_bulk(norm_dir, i_dim)
+                        end do
+                    end if
+
+                end do
             end do
+        end do
+        !$acc end parallel loop
 
-        end subroutine s_calculate_bulk_stress_tensor
+    end subroutine s_compute_cartesian_viscous_source_flux
 
-        !>  Deallocation and/or disassociation procedures that are
+    !> @brief Calculates shear stress tensor components.
+        !! tau_ij_shear = ( (dui/dxj + duj/dxi) - (2/3)*(div_v)*delta_ij ) / Re_shear
+        !! @param[in] vel_grad_avg Averaged velocity gradient tensor (d(vel_i)/d(coord_j)).
+        !! @param[in] Re_shear Shear Reynolds number.
+        !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
+        !! @param[out] tau_shear_out Calculated shear stress tensor (stress on i-face, j-direction).
+    subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
+        !$acc routine seq
+
+        implicit none
+
+        ! Arguments
+        real(wp), dimension(num_dims, num_dims), intent(in) :: vel_grad_avg
+        real(wp), intent(in) :: Re_shear
+        real(wp), intent(in) :: divergence_v
+        real(wp), dimension(num_dims, num_dims), intent(out) :: tau_shear_out
+
+        ! Local variables
+        integer :: i_dim !< Loop iterator for face normal.
+        integer :: j_dim !< Loop iterator for force component direction.
+
+        tau_shear_out = 0.0_wp
+
+        do i_dim = 1, num_dims
+            do j_dim = 1, num_dims
+                tau_shear_out(i_dim, j_dim) = (vel_grad_avg(j_dim, i_dim) + vel_grad_avg(i_dim, j_dim))/Re_shear
+                if (i_dim == j_dim) then
+                    tau_shear_out(i_dim, j_dim) = tau_shear_out(i_dim, j_dim) - &
+                                                  (2.0_wp/3.0_wp)*divergence_v/Re_shear
+                end if
+            end do
+        end do
+
+    end subroutine s_calculate_shear_stress_tensor
+
+    !> @brief Calculates bulk stress tensor components (diagonal only).
+        !! tau_ii_bulk = (div_v) / Re_bulk. Off-diagonals are zero.
+        !! @param[in] Re_bulk Bulk Reynolds number.
+        !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
+        !! @param[out] tau_bulk_out Calculated bulk stress tensor (stress on i-face, i-direction).
+    subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
+        !$acc routine seq
+
+        implicit none
+
+        ! Arguments
+        real(wp), intent(in) :: Re_bulk
+        real(wp), intent(in) :: divergence_v
+        real(wp), dimension(num_dims, num_dims), intent(out) :: tau_bulk_out
+
+        ! Local variables
+        integer :: i_dim !< Loop iterator for diagonal components.
+
+        tau_bulk_out = 0.0_wp
+
+        do i_dim = 1, num_dims
+            tau_bulk_out(i_dim, i_dim) = divergence_v/Re_bulk
+        end do
+
+    end subroutine s_calculate_bulk_stress_tensor
+
+    !>  Deallocation and/or disassociation procedures that are
         !!      needed to finalize the selected Riemann problem solver
         !!  @param flux_vf       Intercell fluxes
         !!  @param flux_src_vf   Intercell source fluxes
@@ -3582,137 +3581,139 @@ contains
         !!  @param ix   Index bounds in  first coordinate direction
         !!  @param iy   Index bounds in second coordinate direction
         !!  @param iz   Index bounds in  third coordinate direction
-        subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, &
-                                             flux_gsrc_vf, &
-                                             norm_dir, ix, iy, iz)
+    subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, &
+                                         flux_gsrc_vf, &
+                                         norm_dir, ix, iy, iz)
 
-            type(scalar_field), &
-                dimension(sys_size), &
-                intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
-            integer, intent(in) :: norm_dir
-            type(int_bounds_info), intent(in) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
-            integer :: i, j, k, l !< Generic loop iterators
+        integer :: i, j, k, l !< Generic loop iterators
 
-            ! Reshaping Outputted Data in y-direction
-            if (norm_dir == 2) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+        ! Reshaping Outputted Data in y-direction
+        if (norm_dir == 2) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do l = is3%beg, is3%end
+                do j = is1%beg, is1%end
+                    do k = is2%beg, is2%end
+                        flux_src_vf(advxb)%sf(k, j, l) = &
+                            flux_src_rsy_vf(j, k, l, advxb)
+                        do i = 1, sys_size
+                            flux_vf(i)%sf(k, j, l) = &
+                                flux_rsy_vf(j, k, l, i)
+                            if (cyl_coord) then
+                                flux_gsrc_vf(i)%sf(k, j, l) = &
+                                    flux_gsrc_rsy_vf(j, k, l, i)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+            ! Reshaping Outputted Data in z-direction
+        elseif (norm_dir == 3) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do j = is1%beg, is1%end
+                do k = is2%beg, is2%end
+                    do l = is3%beg, is3%end
+                        flux_src_vf(advxb)%sf(l, k, j) = &
+                            flux_src_rsz_vf(j, k, l, advxb)
+                        do i = 1, sys_size
+                            flux_vf(i)%sf(l, k, j) = &
+                                flux_rsz_vf(j, k, l, i)
+                            if (grid_geometry == 3) then
+                                flux_gsrc_vf(i)%sf(l, k, j) = &
+                                    flux_gsrc_rsz_vf(j, k, l, i)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (norm_dir == 1) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do l = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = is1%beg, is1%end
+                        flux_src_vf(advxb)%sf(j, k, l) = &
+                            flux_src_rsx_vf(j, k, l, advxb)
+                        do i = 1, sys_size
+                            flux_vf(i)%sf(j, k, l) = &
+                                flux_rsx_vf(j, k, l, i)
+                        end do
+                    end do
+                end do
+            end do
+        end if
+
+        if (riemann_solver == 1 .or. riemann_solver == 4) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = advxb + 1, advxe
                 do l = is3%beg, is3%end
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
-                            flux_src_vf(advxb)%sf(k, j, l) = &
-                                flux_src_rsy_vf(j, k, l, advxb)
-                            do i = 1, sys_size
-                                flux_vf(i)%sf(k, j, l) = &
-                                    flux_rsy_vf(j, k, l, i)
-                                if (cyl_coord) then
-                                    flux_gsrc_vf(i)%sf(k, j, l) = &
-                                        flux_gsrc_rsy_vf(j, k, l, i)
-                                end if
-                            end do
-                        end do
-                    end do
-                end do
-
-                ! Reshaping Outputted Data in z-direction
-            elseif (norm_dir == 3) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do j = is1%beg, is1%end
-                    do k = is2%beg, is2%end
-                        do l = is3%beg, is3%end
-                            flux_src_vf(advxb)%sf(l, k, j) = &
-                                flux_src_rsz_vf(j, k, l, advxb)
-                            do i = 1, sys_size
-                                flux_vf(i)%sf(l, k, j) = &
-                                    flux_rsz_vf(j, k, l, i)
-                                if (grid_geometry == 3) then
-                                    flux_gsrc_vf(i)%sf(l, k, j) = &
-                                        flux_gsrc_rsz_vf(j, k, l, i)
-                                end if
-                            end do
-                        end do
-                    end do
-                end do
-
-            elseif (norm_dir == 1) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            flux_src_vf(advxb)%sf(j, k, l) = &
-                                flux_src_rsx_vf(j, k, l, advxb)
-                            do i = 1, sys_size
-                                flux_vf(i)%sf(j, k, l) = &
-                                    flux_rsx_vf(j, k, l, i)
-                            end do
-                        end do
-                    end do
-                end do
-
-                if (riemann_solver == 1 .or. riemann_solver == 4) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = advxb + 1, advxe
-                        do l = is3%beg, is3%end
-                            do j = is1%beg, is1%end
-                                do k = is2%beg, is2%end
-                                    if (norm_dir == 2) then
-                                        flux_src_vf(i)%sf(k, j, l) = &
-                                            flux_src_rsy_vf(j, k, l, i)
-                                    else if (norm_dir == 3) then
-                                        flux_src_vf(i)%sf(l, k, j) = &
-                                            flux_src_rsz_vf(j, k, l, i)
-                                    else if (norm_dir == 1) then
-                                        flux_src_vf(i)%sf(j, k, l) = &
-                                            flux_src_rsx_vf(j, k, l, i)
-                                        end do
-                                    end do
-                                end do
-                            end do
+                            if (norm_dir == 2) then
+                                flux_src_vf(i)%sf(k, j, l) = &
+                                    flux_src_rsy_vf(j, k, l, i)
+                            else if (norm_dir == 3) then
+                                flux_src_vf(i)%sf(l, k, j) = &
+                                    flux_src_rsz_vf(j, k, l, i)
+                            else if (norm_dir == 1) then
+                                flux_src_vf(i)%sf(j, k, l) = &
+                                    flux_src_rsx_vf(j, k, l, i)
                             end if
+                        end do
+                    end do
+                end do
+            end do
+        end if
 
-                            end subroutine s_finalize_riemann_solver
+    end subroutine s_finalize_riemann_solver
 
-                            !> Module deallocation and/or disassociation procedures
-                            subroutine s_finalize_riemann_solvers_module
+    !> Module deallocation and/or disassociation procedures
+    subroutine s_finalize_riemann_solvers_module
 
-                                if (viscous) then
-                                    @:DEALLOCATE(Re_avg_rsx_vf)
-                                end if
-                                @:DEALLOCATE(vel_src_rsx_vf)
-                                @:DEALLOCATE(flux_rsx_vf)
-                                @:DEALLOCATE(flux_src_rsx_vf)
-                                @:DEALLOCATE(flux_gsrc_rsx_vf)
-                                if (qbmm) then
-                                    @:DEALLOCATE(mom_sp_rsx_vf)
-                                end if
+        if (viscous) then
+            @:DEALLOCATE(Re_avg_rsx_vf)
+        end if
+        @:DEALLOCATE(vel_src_rsx_vf)
+        @:DEALLOCATE(flux_rsx_vf)
+        @:DEALLOCATE(flux_src_rsx_vf)
+        @:DEALLOCATE(flux_gsrc_rsx_vf)
+        if (qbmm) then
+            @:DEALLOCATE(mom_sp_rsx_vf)
+        end if
 
-                                if (n == 0) return
+        if (n == 0) return
 
-                                if (viscous) then
-                                    @:DEALLOCATE(Re_avg_rsy_vf)
-                                end if
-                                @:DEALLOCATE(vel_src_rsy_vf)
-                                @:DEALLOCATE(flux_rsy_vf)
-                                @:DEALLOCATE(flux_src_rsy_vf)
-                                @:DEALLOCATE(flux_gsrc_rsy_vf)
-                                if (qbmm) then
-                                    @:DEALLOCATE(mom_sp_rsy_vf)
-                                end if
+        if (viscous) then
+            @:DEALLOCATE(Re_avg_rsy_vf)
+        end if
+        @:DEALLOCATE(vel_src_rsy_vf)
+        @:DEALLOCATE(flux_rsy_vf)
+        @:DEALLOCATE(flux_src_rsy_vf)
+        @:DEALLOCATE(flux_gsrc_rsy_vf)
+        if (qbmm) then
+            @:DEALLOCATE(mom_sp_rsy_vf)
+        end if
 
-                                if (p == 0) return
+        if (p == 0) return
 
-                                if (viscous) then
-                                    @:DEALLOCATE(Re_avg_rsz_vf)
-                                end if
-                                @:DEALLOCATE(vel_src_rsz_vf)
-                                @:DEALLOCATE(flux_rsz_vf)
-                                @:DEALLOCATE(flux_src_rsz_vf)
-                                @:DEALLOCATE(flux_gsrc_rsz_vf)
-                                if (qbmm) then
-                                    @:DEALLOCATE(mom_sp_rsz_vf)
-                                end if
+        if (viscous) then
+            @:DEALLOCATE(Re_avg_rsz_vf)
+        end if
+        @:DEALLOCATE(vel_src_rsz_vf)
+        @:DEALLOCATE(flux_rsz_vf)
+        @:DEALLOCATE(flux_src_rsz_vf)
+        @:DEALLOCATE(flux_gsrc_rsz_vf)
+        if (qbmm) then
+            @:DEALLOCATE(mom_sp_rsz_vf)
+        end if
 
-                            end subroutine s_finalize_riemann_solvers_module
+    end subroutine s_finalize_riemann_solvers_module
 
-                            end module m_riemann_solvers
+end module m_riemann_solvers
