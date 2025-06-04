@@ -189,6 +189,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Minline=reshape>
 	    $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
     )
