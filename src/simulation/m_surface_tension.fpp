@@ -86,8 +86,9 @@ contains
         integer :: j, k, l, i
 
         if (id == 1) then
-            !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
+            $:parallel_loop(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
+                "w1R", "w2R", "w3R", "w1", "w2", "w3", "normWL", &
+                "normWR", "normW"])
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -132,8 +133,9 @@ contains
 
         elseif (id == 2) then
 
-            !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
+            $:parallel_loop(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
+                "w1R", "w2R", "w3R", "w1", "w2", "w3", "normWL", "normWR", &
+                "normW"])
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -178,8 +180,9 @@ contains
 
         elseif (id == 3) then
 
-            !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
+            $:parallel_loop(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
+                "w1R", "w2R", "w3R", "w1", "w2", "w3", "normWL", "normWR", &
+                "normW"])
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end

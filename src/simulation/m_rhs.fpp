@@ -1695,7 +1695,8 @@ contains
         integer :: i, j, k, l, q, iter !< Generic loop iterators
         integer :: relax !< Relaxation procedure determination variable
 
-        !$acc parallel loop collapse(3) gang vector private(pres_K_init, rho_K_s, alpha_rho, alpha, Re, pres_relax)
+        $:parallel_loop(collapse=3, private=["pres_K_init", "rho_K_s", &
+            "alpha_rho", "alpha", "Re", "pres_relax"])
         do l = 0, p
             do k = 0, n
                 do j = 0, m

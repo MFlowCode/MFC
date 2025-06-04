@@ -89,7 +89,8 @@ contains
             end do
         end do
         if (shear_stress) then    ! Shear stresses
-            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            $:parallel_loop(collapse=3, private=["alpha_visc", &
+                "alpha_rho_visc", "Re_visc", "tau_Re"])
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -196,7 +197,8 @@ contains
         end if
 
         if (bulk_stress) then    ! Bulk stresses
-            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            $:parallel_loop(collapse=3, private=["alpha_visc", &
+                "alpha_rho_visc", "Re_visc", "tau_Re"])
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -300,7 +302,8 @@ contains
         if (p == 0) return
 
         if (shear_stress) then    ! Shear stresses
-            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            $:parallel_loop(collapse=3, private=["alpha_visc", &
+                "alpha_rho_visc", "Re_visc", "tau_Re"])
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -408,7 +411,8 @@ contains
         end if
 
         if (bulk_stress) then    ! Bulk stresses
-            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            $:parallel_loop(collapse=3, private=["alpha_visc", &
+                "alpha_rho_visc", "Re_visc", "tau_Re"])
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
