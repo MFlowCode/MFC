@@ -453,27 +453,27 @@ contains
                                 end if
                                 select case (idir)
                                 case (1)
-                                    nb_dot  = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                    nR_dot  = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                    nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
                                     nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
                                     rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2)* &
                                                             (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                 case (2)
-                                    nb_dot  = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                    nR_dot  = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                    nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
                                     nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
                                     rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2)* &
                                                             (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                 case (3)
                                     if (is_axisym) then
-                                        nb_dot  = q_prim_vf(contxe + idir)%sf(j, k, l) * (flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l))
-                                        nR_dot  = q_prim_vf(contxe + idir)%sf(j, k, l) * (flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))
-                                        nR2_dot = q_prim_vf(contxe + idir)%sf(j, k, l) * (flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l))
+                                        nb_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l))
+                                        nR_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))
+                                        nR2_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l))
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2)* &
                                                                 (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                     else
-                                        nb_dot  = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                        nR_dot  = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
                                         nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2)* &
                                                                 (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
@@ -483,50 +483,50 @@ contains
                                     select case (idir)
                                     case (1)
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                    (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                                                (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                     case (2)
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                    (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                                                (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                     case (3)
                                         if (is_axisym) then
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                        (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                                                    (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                         else
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                        (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                                                    (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                         end if
                                     end select
                                 else
                                     select case (idir)
                                     case (1)
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                    (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                                                (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                     case (2)
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                    (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                                                (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                     case (3)
                                         if (is_axisym) then
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                        (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                                                    (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                         else
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                        (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                                                    (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                         end if
                                     end select
                                 end if
@@ -763,7 +763,7 @@ contains
                                     rho_mw = pv/(chi_vw*R_v*Tw)
                                     rhs_mv(id1, id2, id3, j, q) = -Re_trans_c(q)*((mv(id1, id2, id3, j, q)/(mv(id1, id2, id3, j, q) + mass_n0(q))) - chi_vw)
                                     rhs_mv(id1, id2, id3, j, q) = rho_mw*rhs_mv(id1, id2, id3, j, q)/Pe_c/(1._wp - chi_vw)/abscX(j, q)
-                                    T_bar = Tw*(pb(id1, id2, id3, j, q)/pb0(q))*(abscX(j, q)/R0(q))**3 * (mass_n0(q) + mass_v0(q))/(mass_n0(q) + mv(id1, id2, id3, j, q))
+                                    T_bar = Tw*(pb(id1, id2, id3, j, q)/pb0(q))*(abscX(j, q)/R0(q))**3*(mass_n0(q) + mass_v0(q))/(mass_n0(q) + mv(id1, id2, id3, j, q))
                                     grad_T = -Re_trans_T(q)*(T_bar - Tw)
                                     ht(j, q) = pb0(q)*k_mw*grad_T/Pe_T(q)/abscX(j, q)
                                     wght_pb(j, q) = wght(j, q)*(pb(id1, id2, id3, j, q))
@@ -785,19 +785,19 @@ contains
                                             select case (bubble_model)
                                             case (3)
                                                 if (j == 3) then
-                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) * f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
+                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
                                                 else
-                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) * f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
+                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
                                                 end if
                                             case (2)
                                                 if ((j >= 7 .and. j <= 9) .or. (j >= 22 .and. j <= 23) .or. (j >= 10 .and. j <= 11) .or. (j == 26)) then
-                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) * f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
+                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
                                                 else if ((j >= 27 .and. j <= 29) .and. (.not. polytropic)) then
-                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) * f_quad2D(abscX(:, q), abscY(:, q), wght_mv(:, q), momrhs(:, i1, i2, j, q))
+                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght_mv(:, q), momrhs(:, i1, i2, j, q))
                                                 else if ((j >= 30 .and. j <= 32) .and. (.not. polytropic)) then
-                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) * f_quad2D(abscX(:, q), abscY(:, q), wght_ht(:, q), momrhs(:, i1, i2, j, q))
+                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght_ht(:, q), momrhs(:, i1, i2, j, q))
                                                 else
-                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) * f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
+                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
                                                 end if
                                             end select
                                         end do
@@ -813,8 +813,8 @@ contains
                                 !$acc loop seq
                                 do j = 1, nnode
                                     drdt = msum(2)
-                                    drdt2 = merge(-1._wp, 1._wp, j == 1 .or. j == 2) / (2._wp * sqrt(merge(moms(4) - moms(2)**2._wp, verysmall, moms(4) - moms(2)**2._wp > 0._wp)))
-                                    drdt2 = drdt2 * (msum(3) - 2._wp*moms(2)*msum(2))
+                                    drdt2 = merge(-1._wp, 1._wp, j == 1 .or. j == 2)/(2._wp*sqrt(merge(moms(4) - moms(2)**2._wp, verysmall, moms(4) - moms(2)**2._wp > 0._wp)))
+                                    drdt2 = drdt2*(msum(3) - 2._wp*moms(2)*msum(2))
                                     drdt = drdt + drdt2
                                     rhs_pb(id1, id2, id3, j, q) = (-3._wp*gam*drdt/abscX(j, q))*(pb(id1, id2, id3, j, q))
                                     rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q) + (3._wp*gam/abscX(j, q))*rhs_mv(id1, id2, id3, j, q)*R_v*Tw
@@ -858,130 +858,130 @@ contains
         end do
 
     contains
-    ! Helper to select the correct coefficient routine
-    subroutine s_coeff_selector(pres, rho, c, coeff, polytropic)
+        ! Helper to select the correct coefficient routine
+        subroutine s_coeff_selector(pres, rho, c, coeff, polytropic)
 #ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_chyqmom
+            !DIR$ INLINEALWAYS s_chyqmom
 #else
-        !$acc routine seq
+            !$acc routine seq
 #endif
-        real(wp), intent(in) :: pres, rho, c
-        real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
-        logical, intent(in) :: polytropic
-        if (polytropic) then
-            call s_coeff(pres, rho, c, coeff)
-        else
-            call s_coeff_nonpoly(pres, rho, c, coeff)
-        end if
-    end subroutine s_coeff_selector
+            real(wp), intent(in) :: pres, rho, c
+            real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
+            logical, intent(in) :: polytropic
+            if (polytropic) then
+                call s_coeff(pres, rho, c, coeff)
+            else
+                call s_coeff_nonpoly(pres, rho, c, coeff)
+            end if
+        end subroutine s_coeff_selector
 
-    pure subroutine s_chyqmom(momin, wght, abscX, abscY)
+        pure subroutine s_chyqmom(momin, wght, abscX, abscY)
 #ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_chyqmom
+            !DIR$ INLINEALWAYS s_chyqmom
 #else
-        !$acc routine seq
+            !$acc routine seq
 #endif
-        real(wp), dimension(nmom), intent(in) :: momin
-        real(wp), dimension(nnode), intent(inout) :: wght, abscX, abscY
+            real(wp), dimension(nmom), intent(in) :: momin
+            real(wp), dimension(nnode), intent(inout) :: wght, abscX, abscY
 
-        ! Local variables
-        real(wp), dimension(0:2, 0:2) :: moms
-        real(wp), dimension(3) :: M1, M3
-        real(wp), dimension(2) :: myrho, myrho3, up, up3, Vf
-        real(wp) :: bu, bv, d20, d11, d_02, c20, c11, c02
-        real(wp) :: mu2, vp21, vp22, rho21, rho22
+            ! Local variables
+            real(wp), dimension(0:2, 0:2) :: moms
+            real(wp), dimension(3) :: M1, M3
+            real(wp), dimension(2) :: myrho, myrho3, up, up3, Vf
+            real(wp) :: bu, bv, d20, d11, d_02, c20, c11, c02
+            real(wp) :: mu2, vp21, vp22, rho21, rho22
 
-        ! Assign moments to 2D array for clarity
-        moms(0, 0) = momin(1)
-        moms(1, 0) = momin(2)
-        moms(0, 1) = momin(3)
-        moms(2, 0) = momin(4)
-        moms(1, 1) = momin(5)
-        moms(0, 2) = momin(6)
+            ! Assign moments to 2D array for clarity
+            moms(0, 0) = momin(1)
+            moms(1, 0) = momin(2)
+            moms(0, 1) = momin(3)
+            moms(2, 0) = momin(4)
+            moms(1, 1) = momin(5)
+            moms(0, 2) = momin(6)
 
-        ! Compute means and central moments
-        bu = moms(1, 0) / moms(0, 0)
-        bv = moms(0, 1) / moms(0, 0)
-        d20 = moms(2, 0) / moms(0, 0)
-        d11 = moms(1, 1) / moms(0, 0)
-        d_02 = moms(0, 2) / moms(0, 0)
+            ! Compute means and central moments
+            bu = moms(1, 0)/moms(0, 0)
+            bv = moms(0, 1)/moms(0, 0)
+            d20 = moms(2, 0)/moms(0, 0)
+            d11 = moms(1, 1)/moms(0, 0)
+            d_02 = moms(0, 2)/moms(0, 0)
 
-        c20 = d20 - bu**2._wp
-        c11 = d11 - bu * bv
-        c02 = d_02 - bv**2._wp
+            c20 = d20 - bu**2._wp
+            c11 = d11 - bu*bv
+            c02 = d_02 - bv**2._wp
 
-        ! First 1D quadrature (X direction)
-        M1 = (/1._wp, 0._wp, c20/)
-        call s_hyqmom(myrho, up, M1)
-        Vf = c11 * up / c20
+            ! First 1D quadrature (X direction)
+            M1 = (/1._wp, 0._wp, c20/)
+            call s_hyqmom(myrho, up, M1)
+            Vf = c11*up/c20
 
-        ! Second 1D quadrature (Y direction, conditional on X)
-        mu2 = max(0._wp, c02 - sum(myrho * (Vf**2._wp)))
-        M3 = (/1._wp, 0._wp, mu2/)
-        call s_hyqmom(myrho3, up3, M3)
+            ! Second 1D quadrature (Y direction, conditional on X)
+            mu2 = max(0._wp, c02 - sum(myrho*(Vf**2._wp)))
+            M3 = (/1._wp, 0._wp, mu2/)
+            call s_hyqmom(myrho3, up3, M3)
 
-        ! Assign roots and weights for 2D quadrature
-        vp21 = up3(1)
-        vp22 = up3(2)
-        rho21 = myrho3(1)
-        rho22 = myrho3(2)
+            ! Assign roots and weights for 2D quadrature
+            vp21 = up3(1)
+            vp22 = up3(2)
+            rho21 = myrho3(1)
+            rho22 = myrho3(2)
 
-        ! Compute weights (vectorized)
-        wght = moms(0, 0) * [myrho(1)*rho21, myrho(1)*rho22, myrho(2)*rho21, myrho(2)*rho22]
+            ! Compute weights (vectorized)
+            wght = moms(0, 0)*[myrho(1)*rho21, myrho(1)*rho22, myrho(2)*rho21, myrho(2)*rho22]
 
-        ! Compute abscissas (vectorized)
-        abscX = bu + [up(1), up(1), up(2), up(2)]
-        abscY = bv + [Vf(1) + vp21, Vf(1) + vp22, Vf(2) + vp21, Vf(2) + vp22]
+            ! Compute abscissas (vectorized)
+            abscX = bu + [up(1), up(1), up(2), up(2)]
+            abscY = bv + [Vf(1) + vp21, Vf(1) + vp22, Vf(2) + vp21, Vf(2) + vp22]
 
-    end subroutine s_chyqmom
+        end subroutine s_chyqmom
 
-    pure subroutine s_hyqmom(frho, fup, fmom)
+        pure subroutine s_hyqmom(frho, fup, fmom)
 #ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_hyqmom
+            !DIR$ INLINEALWAYS s_hyqmom
 #else
-        !$acc routine seq
+            !$acc routine seq
 #endif
-        real(wp), dimension(2), intent(inout) :: frho, fup
-        real(wp), dimension(3), intent(in) :: fmom
+            real(wp), dimension(2), intent(inout) :: frho, fup
+            real(wp), dimension(3), intent(in) :: fmom
 
-        real(wp) :: bu, d2, c2
+            real(wp) :: bu, d2, c2
 
-        bu = fmom(2)/fmom(1)
-        d2 = fmom(3)/fmom(1)
-        c2 = d2 - bu**2._wp
-        frho(1) = fmom(1)/2._wp; 
-        frho(2) = fmom(1)/2._wp; 
-        c2 = maxval((/c2, verysmall/))
-        fup(1) = bu - sqrt(c2)
-        fup(2) = bu + sqrt(c2)
+            bu = fmom(2)/fmom(1)
+            d2 = fmom(3)/fmom(1)
+            c2 = d2 - bu**2._wp
+            frho(1) = fmom(1)/2._wp; 
+            frho(2) = fmom(1)/2._wp; 
+            c2 = maxval((/c2, verysmall/))
+            fup(1) = bu - sqrt(c2)
+            fup(2) = bu + sqrt(c2)
 
-    end subroutine s_hyqmom
+        end subroutine s_hyqmom
 
-    pure function f_quad(abscX, abscY, wght_in, q, r, s)
-        !$acc routine seq
-        real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
-        real(wp), intent(in) :: q, r, s
+        pure function f_quad(abscX, abscY, wght_in, q, r, s)
+            !$acc routine seq
+            real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
+            real(wp), intent(in) :: q, r, s
 
-        real(wp) :: f_quad_RV, f_quad
-        integer :: i
+            real(wp) :: f_quad_RV, f_quad
+            integer :: i
 
-        f_quad = 0._wp
-        do i = 1, nb
-            f_quad_RV = sum(wght_in(:, i)*(abscX(:, i)**q)*(abscY(:, i)**r))
-            f_quad = f_quad + weight(i)*(R0(i)**s)*f_quad_RV
-        end do
+            f_quad = 0._wp
+            do i = 1, nb
+                f_quad_RV = sum(wght_in(:, i)*(abscX(:, i)**q)*(abscY(:, i)**r))
+                f_quad = f_quad + weight(i)*(R0(i)**s)*f_quad_RV
+            end do
 
-    end function f_quad
+        end function f_quad
 
-    pure function f_quad2D(abscX, abscY, wght_in, pow)
-        !$acc routine seq
-        real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
-        real(wp), dimension(3), intent(in) :: pow
+        pure function f_quad2D(abscX, abscY, wght_in, pow)
+            !$acc routine seq
+            real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
+            real(wp), dimension(3), intent(in) :: pow
 
-        real(wp) :: f_quad2D
+            real(wp) :: f_quad2D
 
-        f_quad2D = sum(wght_in(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))
-    end function f_quad2D
+            f_quad2D = sum(wght_in(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))
+        end function f_quad2D
 
     end subroutine s_mom_inv
 
