@@ -172,7 +172,7 @@ contains
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_rhs_module
+    impure subroutine s_initialize_rhs_module
 
         integer :: i, j, k, l, id !< Generic loop iterators
 
@@ -611,7 +611,7 @@ contains
 
     end subroutine s_initialize_rhs_module
 
-    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, stage)
+    impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
@@ -838,7 +838,7 @@ contains
             ! RHS additions for sub-grid bubbles_euler
             if (bubbles_euler) then
                 call nvtxStartRange("RHS-BUBBLES-COMPUTE")
-                call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf)
+                call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf, divu)
                 call nvtxEndRange
             end if
 
@@ -1657,7 +1657,7 @@ contains
         !!      purpose, this pressure is finally corrected using the
         !!      mixture-total-energy equation.
         !!  @param q_cons_vf Cell-average conservative variables
-    subroutine s_pressure_relaxation_procedure(q_cons_vf)
+    pure subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
@@ -2038,7 +2038,7 @@ contains
     end subroutine s_reconstruct_cell_boundary_values_first_order
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_rhs_module
+    impure subroutine s_finalize_rhs_module
 
         integer :: i, j, l
 

@@ -35,7 +35,7 @@ module m_grid
 
     abstract interface
 
-        subroutine s_generate_abstract_grid
+        impure subroutine s_generate_abstract_grid
 
         end subroutine s_generate_abstract_grid
 
@@ -50,7 +50,7 @@ contains
         !!              inputted by the user. The grid information is stored in
         !!              the grid variables containing coordinates of the cell-
         !!              centers and cell-boundaries.
-    subroutine s_generate_serial_grid
+    impure subroutine s_generate_serial_grid
 
         ! Generic loop iterator
         integer :: i, j             !< generic loop operators
@@ -189,7 +189,7 @@ contains
         !!              inputted by the user. The grid information is stored in
         !!              the grid variables containing coordinates of the cell-
         !!              centers and cell-boundaries.
-    subroutine s_generate_parallel_grid
+    impure subroutine s_generate_parallel_grid
 
 #ifdef MFC_MPI
 
@@ -338,7 +338,7 @@ contains
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_grid_module
+    impure subroutine s_initialize_grid_module
 
         if (parallel_io .neqv. .true.) then
             s_generate_grid => s_generate_serial_grid
@@ -349,7 +349,7 @@ contains
     end subroutine s_initialize_grid_module
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_grid_module
+    impure subroutine s_finalize_grid_module
 
         s_generate_grid => null()
 

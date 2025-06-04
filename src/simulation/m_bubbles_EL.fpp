@@ -73,7 +73,7 @@ contains
 
     !> Initializes the lagrangian subgrid bubble solver
         !! @param q_cons_vf Initial conservative variables
-    subroutine s_initialize_bubbles_EL_module(q_cons_vf)
+    impure subroutine s_initialize_bubbles_EL_module(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
@@ -144,7 +144,7 @@ contains
     end subroutine s_initialize_bubbles_EL_module
 
     !> The purpose of this procedure is to start lagrange bubble parameters applying nondimensionalization if needed
-    subroutine s_start_lagrange_inputs()
+    impure subroutine s_start_lagrange_inputs()
 
         integer :: id_bubbles, id_host
         real(wp) :: rho0, c0, T0, x0, p0
@@ -188,7 +188,7 @@ contains
 
     !> The purpose of this procedure is to obtain the initial bubbles' information
         !! @param q_cons_vf Conservative variables
-    subroutine s_read_input_bubbles(q_cons_vf)
+    impure subroutine s_read_input_bubbles(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
@@ -278,7 +278,7 @@ contains
         !! @param inputBubble Bubble information
         !! @param q_cons_vf Conservative variables
         !! @param bub_id Local id of the bubble
-    subroutine s_add_bubbles(inputBubble, q_cons_vf, bub_id)
+    impure subroutine s_add_bubbles(inputBubble, q_cons_vf, bub_id)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp), dimension(8), intent(in) :: inputBubble
@@ -393,7 +393,7 @@ contains
     !> The purpose of this procedure is to obtain the information of the bubbles from a restart point.
         !! @param bub_id Local ID of the particle
         !! @param save_count File identifier
-    subroutine s_restart_bubbles(bub_id, save_count)
+    impure subroutine s_restart_bubbles(bub_id, save_count)
 
         integer, intent(inout) :: bub_id, save_count
 
@@ -561,7 +561,7 @@ contains
             myR0 = bub_R0(k)
 
             ! Vapor and heat fluxes
-            myVapFlux = f_vflux(myR, myV, myPb, myMass_v, k, myMass_n, myBeta_c, myR_m, mygamma_m)
+            call s_vflux(myR, myV, myPb, myMass_v, k, myVapFlux, myMass_n, myBeta_c, myR_m, mygamma_m)
             myPbdot = f_bpres_dot(myVapFlux, myR, myV, myPb, myMass_v, k, myBeta_t, myR_m, mygamma_m)
             myMvdot = 4._wp*pi*myR**2._wp*myVapFlux
 
@@ -733,7 +733,7 @@ contains
         !! @param gamma Liquid specific heat ratio
         !! @param pi_inf Liquid stiffness
         !! @param cson Calculated speed of sound
-    subroutine s_compute_cson_from_pinf(bub_id, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
+    pure subroutine s_compute_cson_from_pinf(bub_id, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_cson_from_pinf
 #else
@@ -804,7 +804,7 @@ contains
         !! @param f_pinfl Driving pressure
         !! @param cell Bubble cell
         !! @param Romega Control volume radius
-    subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
+    pure subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_get_pinf
 #else
@@ -1017,7 +1017,7 @@ contains
     !>  This subroutine updates the Lagrange variables using the tvd RK time steppers.
         !!      The time derivative of the bubble variables must be stored at every stage to avoid precision errors.
         !! @param stage Current tvd RK stage
-    subroutine s_update_lagrange_tdv_rk(stage)
+    impure subroutine s_update_lagrange_tdv_rk(stage)
 
         integer, intent(in) :: stage
 
@@ -1135,7 +1135,7 @@ contains
           !! @param pos Input coordinates
           !! @param cell Computational coordinate of the cell
           !! @param scoord Calculated particle coordinates
-    subroutine s_locate_cell(pos, cell, scoord)
+    pure subroutine s_locate_cell(pos, cell, scoord)
 
         real(wp), dimension(3), intent(in) :: pos
         real(wp), dimension(3), intent(out) :: scoord
@@ -1187,7 +1187,7 @@ contains
     end subroutine s_locate_cell
 
     !> This subroutine transfer data into the temporal variables.
-    subroutine s_transfer_data_to_tmp()
+    impure subroutine s_transfer_data_to_tmp()
 
         integer :: k
 
@@ -1208,7 +1208,7 @@ contains
     !> The purpose of this procedure is to determine if the global coordinates of the bubbles
         !!      are present in the current MPI processor (including ghost cells).
         !! @param pos_part Spatial coordinates of the bubble
-    function particle_in_domain(pos_part)
+    pure function particle_in_domain(pos_part)
 
         logical :: particle_in_domain
         real(wp), dimension(3), intent(in) :: pos_part
@@ -1261,7 +1261,7 @@ contains
     !> The purpose of this procedure is to determine if the lagrangian bubble is located in the
         !!       physical domain. The ghost cells are not part of the physical domain.
         !! @param pos_part Spatial coordinates of the bubble
-    function particle_in_domain_physical(pos_part)
+    pure function particle_in_domain_physical(pos_part)
 
         logical :: particle_in_domain_physical
         real(wp), dimension(3), intent(in) :: pos_part
@@ -1280,7 +1280,7 @@ contains
         !! @param q Input scalar field
         !! @param dq Output gradient of q
         !! @param dir Gradient spatial direction
-    subroutine s_gradient_dir(q, dq, dir)
+    pure subroutine s_gradient_dir(q, dq, dir)
 
         type(scalar_field), intent(inout) :: q
         type(scalar_field), intent(inout) :: dq
@@ -1338,7 +1338,7 @@ contains
 
     !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
         !!  @param q_time Current time
-    subroutine s_write_lag_particles(qtime)
+    impure subroutine s_write_lag_particles(qtime)
 
         real(wp), intent(in) :: qtime
         integer :: k
@@ -1382,7 +1382,7 @@ contains
             !!       of the particles (void fraction) in the computatioational domain
             !!       on each time step.
             !!  @param q_time Current time
-    subroutine s_write_void_evol(qtime)
+    impure subroutine s_write_void_evol(qtime)
 
         real(wp), intent(in) :: qtime
         real(wp) :: volcell, voltot
@@ -1456,7 +1456,7 @@ contains
 
     !>  Subroutine that writes the restarting files for the particles in the lagrangian solver.
         !!  @param t_step Current time step
-    subroutine s_write_restart_lag_bubbles(t_step)
+    impure subroutine s_write_restart_lag_bubbles(t_step)
 
         ! Generic string used to store the address of a particular file
         integer, intent(in) :: t_step
@@ -1610,7 +1610,7 @@ contains
     end subroutine s_calculate_lag_bubble_stats
 
     !>  Subroutine that writes the maximum and minimum radius of each bubble.
-    subroutine s_write_lag_bubble_stats()
+    impure subroutine s_write_lag_bubble_stats()
 
         integer :: k
         character(LEN=path_len + 2*name_len) :: file_loc
@@ -1640,7 +1640,7 @@ contains
 
     !> The purpose of this subroutine is to remove one specific particle if dt is too small.
           !! @param bub_id Particle id
-    subroutine s_remove_lag_bubble(bub_id)
+    impure subroutine s_remove_lag_bubble(bub_id)
 
         integer, intent(in) :: bub_id
 
@@ -1676,7 +1676,7 @@ contains
     end subroutine s_remove_lag_bubble
 
     !> The purpose of this subroutine is to deallocate variables
-    subroutine s_finalize_lagrangian_solver()
+    impure subroutine s_finalize_lagrangian_solver()
 
         integer :: i
 

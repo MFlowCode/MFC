@@ -42,7 +42,7 @@ contains
         !! @param vftmp is the void fraction
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
+    pure subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
         !$acc routine seq
         real(wp), intent(in) :: vftmp
         real(wp), dimension(nb), intent(in) :: Rtmp
@@ -56,7 +56,7 @@ contains
 
     end subroutine s_comp_n_from_prim
 
-    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
+    pure subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
         !$acc routine seq
         real(wp), intent(in) :: vftmp
         real(wp), dimension(nb), intent(in) :: nRtmp
@@ -70,7 +70,7 @@ contains
 
     end subroutine s_comp_n_from_cons
 
-    subroutine s_print_2D_array(A, div)
+    impure subroutine s_print_2D_array(A, div)
 
         real(wp), dimension(:, :), intent(in) :: A
         real(wp), optional, intent(in) :: div
@@ -101,7 +101,7 @@ contains
     end subroutine s_print_2D_array
 
     !> Initializes non-polydisperse bubble modeling
-    subroutine s_initialize_nonpoly
+    impure subroutine s_initialize_nonpoly
 
         integer :: ir
         real(wp) :: rhol0, pl0, uu, D_m, temp, omega_ref
@@ -219,7 +219,7 @@ contains
         !! @param peclet Peclet number
         !! @param Re_trans Real part of the transport coefficients
         !! @param Im_trans Imaginary part of the transport coefficients
-    subroutine s_transcoeff(omega, peclet, Re_trans, Im_trans)
+    pure elemental subroutine s_transcoeff(omega, peclet, Re_trans, Im_trans)
 
         real(wp), intent(in) :: omega, peclet
         real(wp), intent(out) :: Re_trans, Im_trans
@@ -238,7 +238,7 @@ contains
 
     end subroutine s_transcoeff
 
-    subroutine s_int_to_str(i, res)
+    pure elemental subroutine s_int_to_str(i, res)
 
         integer, intent(in) :: i
         character(len=*), intent(inout) :: res
@@ -248,7 +248,10 @@ contains
     end subroutine s_int_to_str
 
     !> Computes the Simpson weights for quadrature
-    subroutine s_simpson
+    subroutine s_simpson(weight, R0)
+
+        real(wp), dimension(:), intent(inout) :: weight
+        real(wp), dimension(:), intent(inout) :: R0
 
         integer :: ir
         real(wp) :: R0mn, R0mx, dphi, tmp, sd
@@ -286,7 +289,7 @@ contains
     !! @param a First vector.
     !! @param b Second vector.
     !! @return The cross product of the two vectors.
-    function f_cross(a, b) result(c)
+    pure function f_cross(a, b) result(c)
 
         real(wp), dimension(3), intent(in) :: a, b
         real(wp), dimension(3) :: c
@@ -299,7 +302,7 @@ contains
     !> This procedure swaps two real numbers.
     !! @param lhs Left-hand side.
     !! @param rhs Right-hand side.
-    subroutine s_swap(lhs, rhs)
+    pure elemental subroutine s_swap(lhs, rhs)
 
         real(wp), intent(inout) :: lhs, rhs
         real(wp) :: ltemp
@@ -312,7 +315,7 @@ contains
     !> This procedure creates a transformation matrix.
     !! @param  p Parameters for the transformation.
     !! @return Transformation matrix.
-    function f_create_transform_matrix(p, center) result(out_matrix)
+    pure function f_create_transform_matrix(p, center) result(out_matrix)
 
         type(ic_model_parameters), intent(in) :: p
         t_vec3, optional, intent(in) :: center
@@ -373,7 +376,7 @@ contains
     !> This procedure transforms a vector by a matrix.
     !! @param vec Vector to transform.
     !! @param matrix Transformation matrix.
-    subroutine s_transform_vec(vec, matrix)
+    pure subroutine s_transform_vec(vec, matrix)
 
         t_vec3, intent(inout) :: vec
         t_mat4x4, intent(in) :: matrix
@@ -388,7 +391,7 @@ contains
     !> This procedure transforms a triangle by a matrix, one vertex at a time.
     !! @param triangle Triangle to transform.
     !! @param matrix   Transformation matrix.
-    subroutine s_transform_triangle(triangle, matrix, matrix_n)
+    pure subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
         type(t_triangle), intent(inout) :: triangle
         t_mat4x4, intent(in) :: matrix, matrix_n
@@ -406,7 +409,7 @@ contains
     !> This procedure transforms a model by a matrix, one triangle at a time.
     !! @param model  Model to transform.
     !! @param matrix Transformation matrix.
-    subroutine s_transform_model(model, matrix, matrix_n)
+    pure subroutine s_transform_model(model, matrix, matrix_n)
 
         type(t_model), intent(inout) :: model
         t_mat4x4, intent(in) :: matrix, matrix_n
@@ -422,7 +425,7 @@ contains
     !> This procedure creates a bounding box for a model.
     !! @param model Model to create bounding box for.
     !! @return Bounding box.
-    function f_create_bbox(model) result(bbox)
+    pure function f_create_bbox(model) result(bbox)
 
         type(t_model), intent(in) :: model
         type(t_bbox) :: bbox
@@ -447,7 +450,11 @@ contains
 
     end function f_create_bbox
 
-    function f_xor(lhs, rhs) result(res)
+    !> This procedure performs xor on lhs and rhs.
+    !! @param lhs logical input.
+    !! @param rhs other logical input.
+    !! @return xored result.
+    pure elemental function f_xor(lhs, rhs) result(res)
 
         logical, intent(in) :: lhs, rhs
         logical :: res
@@ -455,7 +462,10 @@ contains
         res = (lhs .and. .not. rhs) .or. (.not. lhs .and. rhs)
     end function f_xor
 
-    function f_logical_to_int(predicate) result(int)
+    !> This procedure converts logical to 1 or 0.
+    !! @param perdicate A Logical argument.
+    !! @return 1 if .true., 0 if .false..
+    pure elemental function f_logical_to_int(predicate) result(int)
 
         logical, intent(in) :: predicate
         integer :: int
@@ -471,7 +481,7 @@ contains
     !! @param x is the input value
     !! @param l is the degree
     !! @return P is the unassociated legendre polynomial evaluated at x
-    recursive function unassociated_legendre(x, l) result(P)
+    pure recursive function unassociated_legendre(x, l) result(P)
 
         integer, intent(in) :: l
         real(wp), intent(in) :: x
@@ -493,7 +503,7 @@ contains
     !! @param l is the degree
     !! @param m is the order
     !! @return Y is the spherical harmonic function evaluated at x and phi
-    recursive function spherical_harmonic_func(x, phi, l, m) result(Y)
+    pure recursive function spherical_harmonic_func(x, phi, l, m) result(Y)
 
         integer, intent(in) :: l, m
         real(wp), intent(in) :: x, phi
@@ -515,7 +525,7 @@ contains
     !! @param l is the degree
     !! @param m is the order
     !! @return P is the associated legendre polynomial evaluated at x
-    recursive function associated_legendre(x, l, m) result(P)
+    pure recursive function associated_legendre(x, l, m) result(P)
 
         integer, intent(in) :: l, m
         real(wp), intent(in) :: x
@@ -540,36 +550,29 @@ contains
     !> This function calculates the double factorial value of an integer
     !! @param n is the input integer
     !! @return R is the double factorial value of n
-    recursive function double_factorial(n) result(R)
+    pure elemental function double_factorial(n) result(R)
 
         integer, intent(in) :: n
         integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
         integer(kind=int64_kind) :: R
+        integer :: i
 
-        if (n <= 0) then
-            R = 1
-        else if (n == 1) then
-            R = 1
-        else
-            R = n*double_factorial(n - 2)
-        end if
+        R = product((/(i, i=n, 1, -2)/))
 
     end function double_factorial
 
     !> The following function calculates the factorial value of an integer
     !! @param n is the input integer
     !! @return R is the factorial value of n
-    recursive function factorial(n) result(R)
+    pure elemental function factorial(n) result(R)
 
         integer, intent(in) :: n
         integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
         integer(kind=int64_kind) :: R
 
-        if (n == 0) then
-            R = 1
-        else
-            R = n*factorial(n - 1)
-        end if
+        integer :: i
+
+        R = product((/(i, i=n, 1, -1)/))
 
     end function factorial
 

@@ -127,7 +127,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_cbc_module
+    impure subroutine s_initialize_cbc_module
 
         integer :: i
         logical :: is_cbc
@@ -1578,7 +1578,7 @@ contains
     end subroutine s_finalize_cbc
 
     ! Detext if the problem has any characteristic boundary conditions
-    subroutine s_any_cbc_boundaries(toggle)
+    pure elemental subroutine s_any_cbc_boundaries(toggle)
 
         logical, intent(inout) :: toggle
 
@@ -1593,7 +1593,7 @@ contains
     end subroutine s_any_cbc_boundaries
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_cbc_module
+    impure subroutine s_finalize_cbc_module
 
         logical :: is_cbc
 

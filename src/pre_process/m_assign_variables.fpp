@@ -66,7 +66,7 @@ module m_assign_variables
 
 contains
 
-    subroutine s_initialize_assign_variables_module
+    impure subroutine s_initialize_assign_variables_module
 
         allocate (alf_sum%sf(0:m, 0:n, 0:p))
 
@@ -101,8 +101,8 @@ contains
         !! @param eta pseudo volume fraction
         !! @param q_prim_vf Primitive variables
         !! @param patch_id_fp Array to track patch ids
-    subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
-                                                          eta, q_prim_vf, patch_id_fp)
+    pure subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
+                                                               eta, q_prim_vf, patch_id_fp)
         !$acc routine seq
 
         integer, intent(in) :: patch_id
@@ -190,7 +190,7 @@ contains
     !! @param k the y-dir node index
     !! @param l the z-dir node index
     !! @param q_prim_vf Primitive variables
-    subroutine s_perturb_primitive(j, k, l, q_prim_vf)
+    pure subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
         integer, intent(in) :: j, k, l
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
@@ -274,8 +274,8 @@ contains
         !! @param eta pseudo volume fraction
         !! @param q_prim_vf Primitive variables
         !! @param patch_id_fp Array to track patch ids
-    subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, &
-                                                          eta, q_prim_vf, patch_id_fp)
+    impure subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, &
+                                                                 eta, q_prim_vf, patch_id_fp)
         !$acc routine seq
 
         integer, intent(in) :: patch_id
@@ -691,7 +691,7 @@ contains
 
     end subroutine s_assign_patch_species_primitive_variables
 
-    subroutine s_finalize_assign_variables_module
+    impure subroutine s_finalize_assign_variables_module
 
         ! Nullifying procedure pointer to the subroutine assigning either
         ! the patch mixture or species primitive variables to a cell in the
