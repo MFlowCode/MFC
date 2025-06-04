@@ -139,7 +139,7 @@ contains
         if (bc_y%beg >= 0) return
 #if defined(MFC_OpenACC)
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, cmplx_size
@@ -148,7 +148,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do k = 1, sys_size
             do j = 0, m
                 do l = 0, p
@@ -173,7 +173,7 @@ contains
         Nfq = 3
         !$acc update device(Nfq)
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, Nfq
@@ -191,7 +191,7 @@ contains
 #endif
         !$acc end host_data
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do k = 1, sys_size
             do j = 0, m
                 do l = 0, p
@@ -203,7 +203,7 @@ contains
 
         do i = 1, fourier_rings
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, cmplx_size
@@ -233,7 +233,7 @@ contains
             Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
             !$acc update device(Nfq)
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, Nfq

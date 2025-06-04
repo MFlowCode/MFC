@@ -104,7 +104,7 @@ contains
             ! calculate velocity gradients + rho_K and G_K
             ! TODO: re-organize these loops one by one for GPU efficiency if possible?
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -114,7 +114,7 @@ contains
             end do
             !$acc end parallel loop
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -130,7 +130,7 @@ contains
             !$acc end parallel loop
 
             if (ndirs > 1) then
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -140,7 +140,7 @@ contains
                 end do
                 !$acc end parallel loop
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -161,7 +161,7 @@ contains
                 ! 3D
                 if (ndirs == 3) then
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
@@ -172,7 +172,7 @@ contains
                     end do
                     !$acc end parallel loop
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
@@ -196,7 +196,7 @@ contains
                 end if
             end if
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -220,7 +220,7 @@ contains
             end do
 
             ! apply rhs source term to elastic stress equation
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -234,7 +234,7 @@ contains
             end do
 
         elseif (idir == 2) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -269,7 +269,7 @@ contains
             end do
 
         elseif (idir == 3) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -337,7 +337,7 @@ contains
 
         if (cyl_coord .and. idir == 2) then
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -419,7 +419,7 @@ contains
                 end do
             end do
         else
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m

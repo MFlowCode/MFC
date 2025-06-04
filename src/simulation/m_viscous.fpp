@@ -77,7 +77,7 @@ contains
 
         !$acc update device(is1_viscous, is2_viscous, is3_viscous)
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
@@ -589,7 +589,7 @@ contains
 
             !$acc update device(is1_viscous, is2_viscous, is3_viscous)
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = iy%beg, iy%end
                     do j = is1_viscous%beg + 1, is1_viscous%end
@@ -604,7 +604,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end - 1
@@ -621,7 +621,7 @@ contains
 
             if (n > 0) then
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg + 1, is2_viscous%end
                         do k = is1_viscous%beg, is1_viscous%end
@@ -636,7 +636,7 @@ contains
                     end do
                 end do
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg, is2_viscous%end - 1
                         do k = is1_viscous%beg, is1_viscous%end
@@ -651,7 +651,7 @@ contains
                     end do
                 end do
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg + 1, is2_viscous%end
                         do k = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -670,7 +670,7 @@ contains
                     end do
                 end do
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg, is2_viscous%end - 1
                         do k = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -690,7 +690,7 @@ contains
                     end do
                 end do
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = is2_viscous%beg + 1, is2_viscous%end - 1
                         do j = is1_viscous%beg + 1, is1_viscous%end
@@ -710,7 +710,7 @@ contains
                     end do
                 end do
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = is2_viscous%beg + 1, is2_viscous%end - 1
                         do j = is1_viscous%beg, is1_viscous%end - 1
@@ -732,7 +732,7 @@ contains
 
                 if (p > 0) then
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do j = is3_viscous%beg + 1, is3_viscous%end
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg, is1_viscous%end
@@ -748,7 +748,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do j = is3_viscous%beg, is3_viscous%end - 1
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg, is1_viscous%end
@@ -764,7 +764,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do k = is2_viscous%beg, is2_viscous%end
                             do j = is1_viscous%beg + 1, is1_viscous%end
@@ -785,7 +785,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do k = is2_viscous%beg, is2_viscous%end
                             do j = is1_viscous%beg, is1_viscous%end - 1
@@ -806,7 +806,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do j = is2_viscous%beg + 1, is2_viscous%end
                             do k = is1_viscous%beg, is1_viscous%end
@@ -827,7 +827,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do j = is2_viscous%beg, is2_viscous%end - 1
                             do k = is1_viscous%beg, is1_viscous%end
@@ -848,7 +848,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do j = is3_viscous%beg + 1, is3_viscous%end
                         do l = is2_viscous%beg + 1, is2_viscous%end - 1
                             do k = is1_viscous%beg, is1_viscous%end
@@ -869,7 +869,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do j = is3_viscous%beg, is3_viscous%end - 1
                         do l = is2_viscous%beg + 1, is2_viscous%end - 1
                             do k = is1_viscous%beg, is1_viscous%end
@@ -889,7 +889,7 @@ contains
                             end do
                         end do
                     end do
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do j = is3_viscous%beg + 1, is3_viscous%end
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -909,7 +909,7 @@ contains
                             end do
                         end do
                     end do
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do j = is3_viscous%beg, is3_viscous%end - 1
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -1206,7 +1206,7 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -1234,7 +1234,7 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg + 1, is2_viscous%end - 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -1262,7 +1262,7 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = is3_viscous%beg + 1, is3_viscous%end - 1
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
@@ -1317,7 +1317,7 @@ contains
 
         !$acc update device(is1_viscous, is2_viscous, is3_viscous)
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end

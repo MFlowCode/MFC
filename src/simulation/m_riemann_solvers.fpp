@@ -3504,7 +3504,7 @@ contains
         if (norm_dir == 1) then
 
             if (bc_x%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3515,7 +3515,7 @@ contains
                 end do
 
                 if (viscous) then
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do k = isy%beg, isy%end
@@ -3527,7 +3527,7 @@ contains
                     end do
 
                     if (n > 0) then
-                        !$acc parallel loop collapse(3) gang vector default(present)
+                        $:parallel_loop(collapse=3)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do k = isy%beg, isy%end
@@ -3539,7 +3539,7 @@ contains
                         end do
 
                         if (p > 0) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
+                            $:parallel_loop(collapse=3)
                             do i = momxb, momxe
                                 do l = isz%beg, isz%end
                                     do k = isy%beg, isy%end
@@ -3559,7 +3559,7 @@ contains
 
             if (bc_x%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3571,7 +3571,7 @@ contains
 
                 if (viscous) then
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do k = isy%beg, isy%end
@@ -3583,7 +3583,7 @@ contains
                     end do
 
                     if (n > 0) then
-                        !$acc parallel loop collapse(3) gang vector default(present)
+                        $:parallel_loop(collapse=3)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do k = isy%beg, isy%end
@@ -3595,7 +3595,7 @@ contains
                         end do
 
                         if (p > 0) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
+                            $:parallel_loop(collapse=3)
                             do i = momxb, momxe
                                 do l = isz%beg, isz%end
                                     do k = isy%beg, isy%end
@@ -3618,7 +3618,7 @@ contains
         elseif (norm_dir == 2) then
 
             if (bc_y%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3630,7 +3630,7 @@ contains
 
                 if (viscous) then
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -3640,7 +3640,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -3651,7 +3651,7 @@ contains
                     end do
 
                     if (p > 0) then
-                        !$acc parallel loop collapse(3) gang vector default(present)
+                        $:parallel_loop(collapse=3)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do j = isx%beg, isx%end
@@ -3668,7 +3668,7 @@ contains
 
             if (bc_y%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3680,7 +3680,7 @@ contains
 
                 if (viscous) then
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -3690,7 +3690,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -3701,7 +3701,7 @@ contains
                     end do
 
                     if (p > 0) then
-                        !$acc parallel loop collapse(3) gang vector default(present)
+                        $:parallel_loop(collapse=3)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do j = isx%beg, isx%end
@@ -3721,7 +3721,7 @@ contains
         else
 
             if (bc_z%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3732,7 +3732,7 @@ contains
                 end do
 
                 if (viscous) then
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -3741,7 +3741,7 @@ contains
                             end do
                         end do
                     end do
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -3750,7 +3750,7 @@ contains
                             end do
                         end do
                     end do
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -3765,7 +3765,7 @@ contains
 
             if (bc_z%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3776,7 +3776,7 @@ contains
                 end do
 
                 if (viscous) then
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -3786,7 +3786,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -3796,7 +3796,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -4357,7 +4357,7 @@ contains
                 end do
             end if
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = is3%beg, is3%end
                 do j = is1%beg, is1%end
                     do k = is2%beg, is2%end
@@ -4410,7 +4410,7 @@ contains
                 end do
             end if
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do j = is1%beg, is1%end
                 do k = is2%beg, is2%end
                     do l = is3%beg, is3%end
@@ -4447,7 +4447,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = is1%beg, is1%end

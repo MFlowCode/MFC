@@ -241,7 +241,7 @@ contains
         isx%end = m; isy%end = n; isz%end = p
 
         ! compute gradient components
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -251,7 +251,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -262,7 +262,7 @@ contains
         end do
 
         if (p > 0) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -273,7 +273,7 @@ contains
             end do
         end if
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:parallel_loop(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m

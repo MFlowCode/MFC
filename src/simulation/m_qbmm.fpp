@@ -480,7 +480,7 @@ contains
                 end do
             end if
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = 0, p
                 do q = 0, n
                     do i = 0, m

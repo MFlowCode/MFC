@@ -646,7 +646,7 @@ contains
         ! Converting Conservative to Primitive Variables
 
         if (mpp_lim .and. bubbles_euler) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -867,7 +867,7 @@ contains
         ! END: Dimensional Splitting Loop
 
         if (ib) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -975,7 +975,7 @@ contains
         real(wp) :: advected_qty_val, pressure_val, velocity_val
 
         if (alt_soundspeed) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do q_loop = 0, p
                 do l_loop = 0, n
                     do k_loop = 0, m
@@ -1432,7 +1432,7 @@ contains
         if (idir == 1) then ! x-direction
 
             if (surface_tension) then
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -1446,7 +1446,7 @@ contains
                 end do
             end if
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -1464,7 +1464,7 @@ contains
         elseif (idir == 2) then ! y-direction
 
             if (surface_tension) then
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -1511,7 +1511,7 @@ contains
 
                 end if
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = 0, p
                     do k = 1, n
                         do j = 0, m
@@ -1527,7 +1527,7 @@ contains
                 end do
 
             else
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -1548,7 +1548,7 @@ contains
             if (cyl_coord) then
                 if ((bc_y%beg == BC_REFLECTIVE) .or. (bc_y%beg == BC_AXIS)) then
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do l = 0, p
                         do k = 1, n
                             do j = 0, m
@@ -1578,7 +1578,7 @@ contains
                     end if
                 else
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -1599,7 +1599,7 @@ contains
         elseif (idir == 3) then ! z-direction
 
             if (surface_tension) then
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -1613,7 +1613,7 @@ contains
                 end do
             end if
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -1629,7 +1629,7 @@ contains
             end do
 
             if (grid_geometry == 3) then
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m

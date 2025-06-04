@@ -698,7 +698,7 @@ contains
                                                                F_src_rs${XYZ}$_vf, &
                                                                is1, is2, is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = 1, flux_cbc_index
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
@@ -710,7 +710,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:parallel_loop(collapse=3)
                     do i = advxb, advxe
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
@@ -1181,7 +1181,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = 0, buff_size
@@ -1205,7 +1205,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
@@ -1228,7 +1228,7 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1257,7 +1257,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = 0, buff_size
@@ -1281,7 +1281,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
@@ -1304,7 +1304,7 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1333,7 +1333,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = 0, buff_size
@@ -1357,7 +1357,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
@@ -1380,7 +1380,7 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1437,7 +1437,7 @@ contains
                     end do
                 end do
             end do
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
@@ -1460,7 +1460,7 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1489,7 +1489,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
@@ -1512,7 +1512,7 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1542,7 +1542,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:parallel_loop(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
@@ -1565,7 +1565,7 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:parallel_loop(collapse=3)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
