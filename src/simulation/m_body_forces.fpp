@@ -109,7 +109,7 @@ contains
         call s_compute_acceleration(mytime)
         call s_compute_mixture_density(q_cons_vf)
 
-        !$acc parallel loop collapse(4) gang vector default(present)
+        $:parallel_loop(collapse=4)
         do i = momxb, E_idx
             do l = 0, p
                 do k = 0, n

@@ -592,7 +592,7 @@ contains
             !$acc update device(Res, Re_idx, Re_size)
         end if
 
-        !$acc parallel loop collapse(4) gang vector default(present)
+        $:parallel_loop(collapse=4)
         do id = 1, num_dims
             do i = 1, sys_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -632,7 +632,7 @@ contains
 
         call cpu_time(t_start)
         ! Association/Population of Working Variables
-        !$acc parallel loop collapse(4) gang vector default(present)
+        $:parallel_loop(collapse=4)
         do i = 1, sys_size
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -935,7 +935,7 @@ contains
         ! END: Additional physics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, sys_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do k = idwbuff(2)%beg, idwbuff(2)%end

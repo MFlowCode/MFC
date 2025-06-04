@@ -729,7 +729,7 @@ contains
                                                                F_src_rs${XYZ}$_vf, &
                                                                is1, is2, is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
-                    !$acc parallel loop collapse(4) gang vector default(present)
+                    $:parallel_loop(collapse=4)
                     do i = 1, flux_cbc_index
                         do j = 0, 1
                             do r = is3%beg, is3%end
@@ -749,7 +749,7 @@ contains
                         end do
                     end do
 
-                    !$acc parallel loop collapse(4) gang vector default(present)
+                    $:parallel_loop(collapse=4)
                     do i = advxb, advxe
                         do j = 0, 1
                             do r = is3%beg, is3%end
@@ -1169,7 +1169,7 @@ contains
         ! Reshaping Inputted Data in x-direction
         if (cbc_dir == 1) then
 
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1192,7 +1192,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1216,7 +1216,7 @@ contains
             end do
 
             if (riemann_solver == 1) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1245,7 +1245,7 @@ contains
             ! Reshaping Inputted Data in y-direction
         elseif (cbc_dir == 2) then
 
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1268,7 +1268,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1292,7 +1292,7 @@ contains
             end do
 
             if (riemann_solver == 1) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1321,7 +1321,7 @@ contains
             ! Reshaping Inputted Data in z-direction
         else
 
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1344,7 +1344,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1368,7 +1368,7 @@ contains
             end do
 
             if (riemann_solver == 1) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1425,7 +1425,7 @@ contains
         ! Reshaping Outputted Data in x-direction
         if (cbc_dir == 1) then
 
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1448,7 +1448,7 @@ contains
             end do
 
             if (riemann_solver == 1) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1476,7 +1476,7 @@ contains
             ! Reshaping Outputted Data in y-direction
         elseif (cbc_dir == 2) then
 
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1500,7 +1500,7 @@ contains
             end do
 
             if (riemann_solver == 1) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1529,7 +1529,7 @@ contains
             ! Reshaping Outputted Data in z-direction
         else
 
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1553,7 +1553,7 @@ contains
             end do
 
             if (riemann_solver == 1) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end

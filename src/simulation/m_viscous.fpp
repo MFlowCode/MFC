@@ -1019,7 +1019,7 @@ contains
         if (viscous) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
+                    $:parallel_loop(collapse=4)
                     do i = iv%beg, iv%end
                         do l = is3_viscous%beg, is3_viscous%end
                             do j = is1_viscous%beg, is1_viscous%end
@@ -1031,7 +1031,7 @@ contains
                         end do
                     end do
                 elseif (norm_dir == 3) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
+                    $:parallel_loop(collapse=4)
                     do i = iv%beg, iv%end
                         do j = is1_viscous%beg, is1_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
@@ -1043,7 +1043,7 @@ contains
                         end do
                     end do
                 elseif (norm_dir == 1) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
+                    $:parallel_loop(collapse=4)
                     do i = iv%beg, iv%end
                         do l = is3_viscous%beg, is3_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
@@ -1118,7 +1118,7 @@ contains
         if (viscous) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
+                    $:parallel_loop(collapse=4)
                     do i = iv%beg, iv%end
                         do l = is3_viscous%beg, is3_viscous%end
                             do j = is1_viscous%beg, is1_viscous%end
@@ -1130,7 +1130,7 @@ contains
                         end do
                     end do
                 elseif (norm_dir == 3) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
+                    $:parallel_loop(collapse=4)
                     do i = iv%beg, iv%end
                         do j = is1_viscous%beg, is1_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
@@ -1142,7 +1142,7 @@ contains
                         end do
                     end do
                 elseif (norm_dir == 1) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
+                    $:parallel_loop(collapse=4)
                     do i = iv%beg, iv%end
                         do l = is3_viscous%beg, is3_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end

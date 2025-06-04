@@ -1138,7 +1138,7 @@ contains
         !$acc update device(v_size)
 
         if (weno_dir == 1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do j = 1, v_size
                 do q = is3_weno%beg, is3_weno%end
                     do l = is2_weno%beg, is2_weno%end
@@ -1176,7 +1176,7 @@ contains
                 end if
             else
 #endif
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do j = 1, v_size
                     do q = is3_weno%beg, is3_weno%end
                         do l = is2_weno%beg, is2_weno%end
@@ -1206,7 +1206,7 @@ contains
                 end block
             else
 #endif
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do j = 1, v_size
                     do q = is3_weno%beg, is3_weno%end
                         do l = is2_weno%beg, is2_weno%end

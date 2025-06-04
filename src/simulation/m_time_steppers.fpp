@@ -377,7 +377,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-        !$acc parallel loop collapse(4) gang vector default(present)
+        $:parallel_loop(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -479,7 +479,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-        !$acc parallel loop collapse(4) gang vector default(present)
+        $:parallel_loop(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -551,7 +551,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
-        !$acc parallel loop collapse(4) gang vector default(present)
+        $:parallel_loop(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -661,7 +661,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-        !$acc parallel loop collapse(4) gang vector default(present)
+        $:parallel_loop(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -733,7 +733,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
-        !$acc parallel loop collapse(4) gang vector default(present)
+        $:parallel_loop(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -806,7 +806,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
-        !$acc parallel loop collapse(4) gang vector default(present)
+        $:parallel_loop(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -1024,7 +1024,7 @@ contains
         call nvtxStartRange("RHS-BODYFORCES")
         call s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
 
-        !$acc parallel loop collapse(4) gang vector default(present)
+        $:parallel_loop(collapse=4)
         do i = momxb, E_idx
             do l = 0, p
                 do k = 0, n

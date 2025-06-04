@@ -644,7 +644,7 @@ contains
         if (lag_params%solver_approach == 2) then
 
             if (p == 0) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -660,7 +660,7 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -766,7 +766,7 @@ contains
 
         call nvtxStartRange("BUBBLES-LAGRANGE-KERNELS")
 
-        !$acc parallel loop collapse(4) gang vector default(present)
+        $:parallel_loop(collapse=4)
         do i = 1, q_beta_idx
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end

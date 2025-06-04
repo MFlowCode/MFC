@@ -3852,7 +3852,7 @@ contains
 
             if (viscous .or. (surface_tension)) then
 
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3866,7 +3866,7 @@ contains
 
             if (qbmm) then
 
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3882,7 +3882,7 @@ contains
         elseif (norm_dir == 2) then
 
             if (viscous .or. (surface_tension)) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
@@ -3895,7 +3895,7 @@ contains
             end if
 
             if (qbmm) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3911,7 +3911,7 @@ contains
         else
 
             if (viscous .or. (surface_tension)) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
@@ -3924,7 +3924,7 @@ contains
             end if
 
             if (qbmm) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -4331,7 +4331,7 @@ contains
 
         ! Reshaping Outputted Data in y-direction
         if (norm_dir == 2) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, sys_size
                 do l = is3%beg, is3%end
                     do j = is1%beg, is1%end
@@ -4344,7 +4344,7 @@ contains
             end do
 
             if (cyl_coord) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
@@ -4368,7 +4368,7 @@ contains
             end do
 
             if (riemann_solver == 1 .or. riemann_solver == 4) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
@@ -4383,7 +4383,7 @@ contains
             end if
             ! Reshaping Outputted Data in z-direction
         elseif (norm_dir == 3) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, sys_size
                 do j = is1%beg, is1%end
                     do k = is2%beg, is2%end
@@ -4396,7 +4396,7 @@ contains
                 end do
             end do
             if (grid_geometry == 3) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = 1, sys_size
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
@@ -4421,7 +4421,7 @@ contains
             end do
 
             if (riemann_solver == 1 .or. riemann_solver == 4) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = advxb + 1, advxe
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
@@ -4435,7 +4435,7 @@ contains
 
             end if
         elseif (norm_dir == 1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:parallel_loop(collapse=4)
             do i = 1, sys_size
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -4458,7 +4458,7 @@ contains
             end do
 
             if (riemann_solver == 1 .or. riemann_solver == 4) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:parallel_loop(collapse=4)
                 do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
