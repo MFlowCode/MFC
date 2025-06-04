@@ -1070,7 +1070,7 @@ contains
 
         if (cfl_dt) then
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" ["I3"%] Time "ES16.6" dt = "ES16.6" @ Time Step = "I8"")', &
+                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8, "")', &
                     int(ceiling(100._wp*(mytime/t_stop))), &
                     mytime, &
                     dt, &
@@ -1078,7 +1078,7 @@ contains
             end if
         else
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
+                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I0, "")', &
                    int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                     t_step - t_step_start + 1, &
                     t_step_stop - t_step_start + 1, &
