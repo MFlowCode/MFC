@@ -673,7 +673,7 @@ contains
 
         if (weno_order == 1) then
             if (weno_dir == 1) then
-                !$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -686,7 +686,7 @@ contains
                 end do
                 !$acc end parallel loop
             else if (weno_dir == 2) then
-                !$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -699,7 +699,7 @@ contains
                 end do
                 !$acc end parallel loop
             else if (weno_dir == 3) then
-                !$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
