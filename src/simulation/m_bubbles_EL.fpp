@@ -1414,8 +1414,8 @@ contains
         lag_void_avg = 0._wp
         lag_vol = 0._wp
         $:parallel_loop(collapse=3, reduction=[["lag_vol", "lag_void_avg"], &
-                        ["lag_void_max"]], reductionOp=["+", "MAX"], &
-                        copy=["lag_vol", "lag_void_avg", "lag_void_max"])
+            ["lag_void_max"]], reductionOp=["+", "MAX"], &
+            copy=["lag_vol", "lag_void_avg", "lag_void_max"])
         do k = 0, p
             do j = 0, n
                 do i = 0, m

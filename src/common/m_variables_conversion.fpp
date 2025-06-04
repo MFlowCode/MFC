@@ -883,10 +883,9 @@ contains
             end if
         #:endif
 
-        
         $:parallel_loop(collapse=3, private=["alpha_K", "alpha_rho_K", "Re_K", &
-                        "nRtmp", "rho_K", "gamma_K", "pi_inf_K", "qv_K", &
-                        "dyn_pres_K", "rhoYks", "B"])
+            "nRtmp", "rho_K", "gamma_K", "pi_inf_K", "qv_K", &
+        "dyn_pres_K", "rhoYks", "B"])
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -1482,7 +1481,7 @@ contains
         ! accounting for the contribution of either viscosity or capillarity
 #ifdef MFC_SIMULATION
         $:parallel_loop(collapse=3, private=["alpha_rho_K", "vel_K", &
-                        "alpha_K", "Re_K", "Y_K"])
+            "alpha_K", "Re_K", "Y_K"])
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e

@@ -277,7 +277,7 @@ contains
         integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step
-        !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
+        $:parallel_loop(collapse=3, private=["vel", "alpha", "Re"])
         do l = 0, p
             do k = 0, n
                 do j = 0, m

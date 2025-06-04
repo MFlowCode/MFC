@@ -76,8 +76,7 @@ contains
         real(wp), dimension(3) :: v, B
         real(wp) :: divB, vdotB
 
-        !$acc parallel loop collapse(3) gang vector default(present) &
-        !$acc private(v, B)
+        $:parallel_loop(collapse=3, private=["v", "B"])
         do q = 0, p
             do l = 0, n
                 do k = 0, m

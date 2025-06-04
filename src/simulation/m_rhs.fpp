@@ -1231,8 +1231,9 @@ contains
                 else ! Other Riemann solvers
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
-                            !$acc parallel loop collapse(3) gang vector default(present) &
-                            !$acc private(local_inv_ds, local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2)
+                            $:parallel_loop(collapse=3, private=["local_inv_ds", &
+                                "local_q_cons_val", "local_k_term_val", &
+                                "local_term_coeff", "local_flux1", "local_flux2"])
                             do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
                                         local_inv_ds = 1._wp/dx(k_idx)
                                         local_q_cons_val = q_cons_vf_arg%vf(advxe)%sf(k_idx, l_idx, q_idx)
@@ -1244,8 +1245,10 @@ contains
                                                                                     local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                     end do; end do; end do
 
-                            !$acc parallel loop collapse(3) gang vector default(present) &
-                            !$acc private(local_inv_ds, local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2)
+                            $:parallel_loop(collapse=3, private=["local_inv_ds",&
+                                "local_q_cons_val", "local_k_term_val", &
+                                "local_term_coeff", "local_flux1", &
+                                "local_flux2"])
                             do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
                                         local_inv_ds = 1._wp/dx(k_idx)
                                         local_q_cons_val = q_cons_vf_arg%vf(advxb)%sf(k_idx, l_idx, q_idx)
@@ -1295,8 +1298,10 @@ contains
                 else ! Other Riemann solvers
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
-                            !$acc parallel loop collapse(3) gang vector default(present) &
-                            !$acc private(local_inv_ds, local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2)
+                            $:parallel_loop(collapse=3, private=["local_inv_ds", &
+                                "local_q_cons_val", "local_k_term_val", &
+                                "local_term_coeff", "local_flux1", &
+                                "local_flux2"])
                             do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
                                         local_inv_ds = 1._wp/dy(k_idx)
                                         local_q_cons_val = q_cons_vf_arg%vf(advxe)%sf(q_idx, k_idx, l_idx)
@@ -1312,8 +1317,10 @@ contains
                                         end if
                                     end do; end do; end do
 
-                            !$acc parallel loop collapse(3) gang vector default(present) &
-                            !$acc private(local_inv_ds, local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2)
+                            $:parallel_loop(collapse=3, private=["local_inv_ds", &
+                                "local_q_cons_val", "local_k_term_val", &
+                                "local_term_coeff", "local_flux1", &
+                                "local_flux2"])
                             do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
                                         local_inv_ds = 1._wp/dy(k_idx)
                                         local_q_cons_val = q_cons_vf_arg%vf(advxb)%sf(q_idx, k_idx, l_idx)
@@ -1372,8 +1379,10 @@ contains
                 else ! Other Riemann solvers
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
-                            !$acc parallel loop collapse(3) gang vector default(present) &
-                            !$acc private(local_inv_ds, local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2)
+                            $:parallel_loop(collapse=3, private=["local_inv_ds", &
+                                "local_q_cons_val", "local_k_term_val", &
+                                "local_term_coeff", "local_flux1", &
+                                "local_flux2"])
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
                                         local_inv_ds = 1._wp/dz(k_idx)
                                         local_q_cons_val = q_cons_vf_arg%vf(advxe)%sf(l_idx, q_idx, k_idx)
@@ -1385,8 +1394,10 @@ contains
                                                                                     local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                     end do; end do; end do
 
-                            !$acc parallel loop collapse(3) gang vector default(present) &
-                            !$acc private(local_inv_ds, local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2)
+                            $:parallel_loop(collapse=3, private=["local_inv_ds", &
+                                "local_q_cons_val", "local_k_term_val", &
+                                "local_term_coeff", "local_flux1", &
+                                "local_flux2"])
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
                                         local_inv_ds = 1._wp/dz(k_idx)
                                         local_q_cons_val = q_cons_vf_arg%vf(advxb)%sf(l_idx, q_idx, k_idx)

@@ -192,8 +192,8 @@ contains
 
         adap_dt_stop_max = 0
         $:parallel_loop(collapse=3, private=["Rtmp", "Vtmp", "myalpha_rho", "myalpha"], &
-                        reduction=["adap_dt_stop_max"], reductionOp="MAX", &
-                        copy=["adap_dt_stop_max"])
+            reduction=["adap_dt_stop_max"], reductionOp="MAX", &
+            copy=["adap_dt_stop_max"])
         do l = 0, p
             do k = 0, n
                 do j = 0, m

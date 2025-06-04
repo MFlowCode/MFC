@@ -798,7 +798,7 @@ contains
             if (bc_x%end >= 0) then      ! PBC at the beginning and end
 
                 ! Packing buffer to be sent to bc_x%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                $:parallel_loop(collapse=3, private=["r"])
                 do l = 0, p
                     do k = 0, n
                         do j = m - gp_layers + 1, m
@@ -853,7 +853,7 @@ contains
             else                        ! PBC at the beginning only
 
                 ! Packing buffer to be sent to bc_x%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                $:parallel_loop(collapse=3, private=["r"])
                 do l = 0, p
                     do k = 0, n
                         do j = 0, gp_layers - 1
@@ -913,7 +913,7 @@ contains
 #endif
 
             ! Unpacking buffer received from bc_x%beg
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
+            $:parallel_loop(collapse=3, private=["r"])
             do l = 0, p
                 do k = 0, n
                     do j = -gp_layers, -1
@@ -929,7 +929,7 @@ contains
 
             if (bc_x%beg >= 0) then      ! PBC at the end and beginning
 
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                $:parallel_loop(collapse=3, private=["r"])
                 ! Packing buffer to be sent to bc_x%beg
                 do l = 0, p
                     do k = 0, n
@@ -983,7 +983,7 @@ contains
             else                        ! PBC at the end only
 
                 ! Packing buffer to be sent to bc_x%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                $:parallel_loop(collapse=3, private=["r"])
                 do l = 0, p
                     do k = 0, n
                         do j = m - gp_layers + 1, m
@@ -1041,7 +1041,7 @@ contains
             end if
 
             ! Unpacking buffer received from bc_x%end
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
+            $:parallel_loop(collapse=3, private=["r"])
             do l = 0, p
                 do k = 0, n
                     do j = m + 1, m + gp_layers
@@ -1061,7 +1061,7 @@ contains
             if (bc_y%end >= 0) then      ! PBC at the beginning and end
 
                 ! Packing buffer to be sent to bc_y%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                $:parallel_loop(collapse=3, private=["r"])
                 do l = 0, p
                     do k = n - gp_layers + 1, n
                         do j = -gp_layers, m + gp_layers
@@ -1117,7 +1117,7 @@ contains
             else                        ! PBC at the beginning only
 
                 ! Packing buffer to be sent to bc_y%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                $:parallel_loop(collapse=3, private=["r"])
                 do l = 0, p
                     do k = 0, gp_layers - 1
                         do j = -gp_layers, m + gp_layers
@@ -1179,7 +1179,7 @@ contains
 #endif
 
             ! Unpacking buffer received from bc_y%beg
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
+            $:parallel_loop(collapse=3, private=["r"])
             do l = 0, p
                 do k = -gp_layers, -1
                     do j = -gp_layers, m + gp_layers
@@ -1197,7 +1197,7 @@ contains
             if (bc_y%beg >= 0) then      ! PBC at the end and beginning
 
                 ! Packing buffer to be sent to bc_y%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                $:parallel_loop(collapse=3, private=["r"])
                 do l = 0, p
                     do k = 0, gp_layers - 1
                         do j = -gp_layers, m + gp_layers
@@ -1253,7 +1253,7 @@ contains
             else                        ! PBC at the end only
 
                 ! Packing buffer to be sent to bc_y%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                $:parallel_loop(collapse=3, private=["r"])
                 do l = 0, p
                     do k = n - gp_layers + 1, n
                         do j = -gp_layers, m + gp_layers
@@ -1315,7 +1315,7 @@ contains
 #endif
 
             ! Unpacking buffer received form bc_y%end
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
+            $:parallel_loop(collapse=3, private=["r"])
             do l = 0, p
                 do k = n + 1, n + gp_layers
                     do j = -gp_layers, m + gp_layers
@@ -1335,7 +1335,7 @@ contains
             if (bc_z%end >= 0) then      ! PBC at the beginning and end
 
                 ! Packing buffer to be sent to bc_z%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                $:parallel_loop(collapse=3, private=["r"])
                 do l = p - gp_layers + 1, p
                     do k = -gp_layers, n + gp_layers
                         do j = -gp_layers, m + gp_layers
@@ -1392,7 +1392,7 @@ contains
             else                        ! PBC at the beginning only
 
                 ! Packing buffer to be sent to bc_z%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                $:parallel_loop(collapse=3, private=["r"])
                 do l = 0, gp_layers - 1
                     do k = -gp_layers, n + gp_layers
                         do j = -gp_layers, m + gp_layers
@@ -1454,7 +1454,7 @@ contains
 #endif
 
             ! Unpacking buffer from bc_z%beg
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
+            $:parallel_loop(collapse=3, private=["r"])
             do l = -gp_layers, -1
                 do k = -gp_layers, n + gp_layers
                     do j = -gp_layers, m + gp_layers
@@ -1473,7 +1473,7 @@ contains
             if (bc_z%beg >= 0) then      ! PBC at the end and beginning
 
                 ! Packing buffer to be sent to bc_z%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                $:parallel_loop(collapse=3, private=["r"])
                 do l = 0, gp_layers - 1
                     do k = -gp_layers, n + gp_layers
                         do j = -gp_layers, m + gp_layers
@@ -1528,7 +1528,7 @@ contains
             else                        ! PBC at the end only
 
                 ! Packing buffer to be sent to bc_z%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                $:parallel_loop(collapse=3, private=["r"])
                 do l = p - gp_layers + 1, p
                     do k = -gp_layers, n + gp_layers
                         do j = -gp_layers, m + gp_layers
@@ -1590,7 +1590,7 @@ contains
 #endif
 
             ! Unpacking buffer received from bc_z%end
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
+            $:parallel_loop(collapse=3, private=["r"])
             do l = p + 1, p + gp_layers
                 do k = -gp_layers, n + gp_layers
                     do j = -gp_layers, m + gp_layers

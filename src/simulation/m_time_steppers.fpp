@@ -392,7 +392,7 @@ contains
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
+            $:parallel_loop(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -409,7 +409,7 @@ contains
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
+            $:parallel_loop(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -494,7 +494,7 @@ contains
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
+            $:parallel_loop(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -511,7 +511,7 @@ contains
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
+            $:parallel_loop(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -566,7 +566,7 @@ contains
         end do
 
         if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
+            $:parallel_loop(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -584,7 +584,7 @@ contains
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
+            $:parallel_loop(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -676,7 +676,7 @@ contains
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
+            $:parallel_loop(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -693,7 +693,7 @@ contains
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
+            $:parallel_loop(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -748,7 +748,7 @@ contains
         end do
 
         if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
+            $:parallel_loop(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -766,7 +766,7 @@ contains
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
+            $:parallel_loop(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -821,7 +821,7 @@ contains
         end do
 
         if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
+            $:parallel_loop(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -839,7 +839,7 @@ contains
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            !$acc parallel loop collapse(5) gang vector default(present)
+            $:parallel_loop(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n

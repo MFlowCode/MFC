@@ -184,7 +184,7 @@
     #:else
         #:set copy_val = ""
     #:endif
-    
+
     #:if copyin is not None
         #:assert isinstance(copyin, list)
         #:assert len(copyin) != 0
@@ -219,5 +219,4 @@
 
     #:set clause_val = collapse_val + parallelism_val + default_val + private_val + firstprivate_val + reduction_val + copy_val + copyin_val + copyout_val + create_val
     !$acc parallel loop ${clause_val}$
-
 #:enddef

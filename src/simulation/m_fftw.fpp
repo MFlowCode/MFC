@@ -212,7 +212,7 @@ contains
                 end do
             end do
 
-            !$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
+            $:parallel_loop(collapse=3, firstprivate=["i"])
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
@@ -251,7 +251,7 @@ contains
 #endif
             !$acc end host_data
 
-            !$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
+            $:parallel_loop(collapse=3, firstprivate=["i"])
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
