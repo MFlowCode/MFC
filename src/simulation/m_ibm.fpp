@@ -765,7 +765,7 @@ contains
 
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(INOUT) :: pb, mv
 
-        type(ghost_point), intent(IN) :: gp
+        type(ghost_point), intent(INOUT) :: gp
 
         integer :: i, j, k, l, q !< Iterator variables
         integer :: i1, i2, j1, j2, k1, k2 !< Iterator variables
