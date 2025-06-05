@@ -474,31 +474,19 @@ contains
                                 !$acc loop seq
                                 do i = 1, 2
                                     Re_L(i) = dflt_real
-
-                                    if (Re_size(i) > 0) Re_L(i) = 0._wp
-
+                                    Re_R(i) = dflt_real
+                                    if (Re_size(i) > 0) then
+                                        Re_L(i) = 0._wp
+                                        Re_R(i) = 0._wp
+                                    end if
                                     !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_L(i) = alpha_L(Re_idx(i, q))/Res(i, q) &
                                                   + Re_L(i)
-                                    end do
-
-                                    Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-
-                                end do
-
-                                !$acc loop seq
-                                do i = 1, 2
-                                    Re_R(i) = dflt_real
-
-                                    if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                                    !$acc loop seq
-                                    do q = 1, Re_size(i)
                                         Re_R(i) = alpha_R(Re_idx(i, q))/Res(i, q) &
                                                   + Re_R(i)
                                     end do
-
+                                    Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
                                     Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
                                 end do
                             end if
@@ -552,44 +540,41 @@ contains
                                 E_R = rho_R*E_R + 5e-1*rho_R*vel_R_rms
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
-                            elseif (mhd .and. relativity) then
-                                Ga%L = 1._wp/sqrt(1._wp - vel_L_rms)
-                                Ga%R = 1._wp/sqrt(1._wp - vel_R_rms)
-                                vdotB%L = vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3)
-                                vdotB%R = vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3)
+                            elseif (mhd) then
+                                if (relativity) then
+                                    Ga%L = 1._wp/sqrt(1._wp - vel_L_rms)
+                                    Ga%R = 1._wp/sqrt(1._wp - vel_R_rms)
+                                    vdotB%L = vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3)
+                                    vdotB%R = vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3)
 
-                                b4%L(1) = B%L(1)/Ga%L + Ga%L*vel_L(1)*vdotB%L
-                                b4%L(2) = B%L(2)/Ga%L + Ga%L*vel_L(2)*vdotB%L
-                                b4%L(3) = B%L(3)/Ga%L + Ga%L*vel_L(3)*vdotB%L
-                                b4%R(1) = B%R(1)/Ga%R + Ga%R*vel_R(1)*vdotB%R
-                                b4%R(2) = B%R(2)/Ga%R + Ga%R*vel_R(2)*vdotB%R
-                                b4%R(3) = B%R(3)/Ga%R + Ga%R*vel_R(3)*vdotB%R
-                                B2%L = B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp
-                                B2%R = B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp
+                                    !acc loop seq
+                                    do i = 1, 3
+                                        b4%L(i) = B%L(i)/Ga%L + Ga%L*vel_L(i)*vdotB%L
+                                        b4%R(i) = B%R(i)/Ga%R + Ga%R*vel_R(i)*vdotB%R
+                                    end do
 
-                                pres_mag%L = 0.5_wp*(B2%L/Ga%L**2._wp + vdotB%L**2._wp)
-                                pres_mag%R = 0.5_wp*(B2%R/Ga%R**2._wp + vdotB%R**2._wp)
-
-                                ! Hard-coded EOS
-                                H_L = 1._wp + (gamma_L + 1)*pres_L/rho_L
-                                H_R = 1._wp + (gamma_R + 1)*pres_R/rho_R
-
-                                cm%L(1) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(1) - vdotB%L*B%L(1)
-                                cm%L(2) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(2) - vdotB%L*B%L(2)
-                                cm%L(3) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(3) - vdotB%L*B%L(3)
-                                cm%R(1) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(1) - vdotB%R*B%R(1)
-                                cm%R(2) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(2) - vdotB%R*B%R(2)
-                                cm%R(3) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(3) - vdotB%R*B%R(3)
-
-                                E_L = rho_L*H_L*Ga%L**2 - pres_L + 0.5_wp*(B2%L + vel_L_rms*B2%L - vdotB%L**2._wp) - rho_L*Ga%L
-                                E_R = rho_R*H_R*Ga%R**2 - pres_R + 0.5_wp*(B2%R + vel_R_rms*B2%R - vdotB%R**2._wp) - rho_R*Ga%R
-                            elseif (mhd .and. .not. relativity) then
-                                pres_mag%L = 0.5_wp*(B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp)
-                                pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
-                                E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag%L
-                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag%R ! includes magnetic energy
-                                H_L = (E_L + pres_L - pres_mag%L)/rho_L
-                                H_R = (E_R + pres_R - pres_mag%R)/rho_R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                    B2%L = sum(B%L**2._wp)
+                                    B2%R = sum(B%R**2._wp)
+                                    pres_mag%L = 0.5_wp*(B2%L/Ga%L**2._wp + vdotB%L**2._wp)
+                                    pres_mag%R = 0.5_wp*(B2%R/Ga%R**2._wp + vdotB%R**2._wp)
+                                    ! Hard-coded EOS
+                                    H_L = 1._wp + (gamma_L + 1)*pres_L/rho_L
+                                    H_R = 1._wp + (gamma_R + 1)*pres_R/rho_R
+                                    !acc loop seq
+                                    do i = 1, 3
+                                        cm%L(i) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(i) - vdotB%L*B%L(i)
+                                        cm%R(i) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(i) - vdotB%R*B%R(i)
+                                    end do
+                                    E_L = rho_L*H_L*Ga%L**2 - pres_L + 0.5_wp*(B2%L + vel_L_rms*B2%L - vdotB%L**2._wp) - rho_L*Ga%L
+                                    E_R = rho_R*H_R*Ga%R**2 - pres_R + 0.5_wp*(B2%R + vel_R_rms*B2%R - vdotB%R**2._wp) - rho_R*Ga%R
+                                elseif (.not. relativity) then
+                                    pres_mag%L = 0.5_wp*sum(B%L**2._wp)
+                                    pres_mag%R = 0.5_wp*sum(B%R**2._wp)
+                                    E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag%L
+                                    E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag%R ! includes magnetic energy
+                                    H_L = (E_L + pres_L - pres_mag%L)/rho_L
+                                    H_R = (E_R + pres_R - pres_mag%R)/rho_R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                end if
                             else
                                 E_L = gamma_L*pres_L + pi_inf_L + 5e-1*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5e-1*rho_R*vel_R_rms + qv_R
