@@ -455,9 +455,9 @@ contains
     end subroutine s_convert_species_to_mixture_variables
 
     pure subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
-                                                          gamma_K, pi_inf_K, qv_K, &
-                                                          alpha_K, alpha_rho_K, Re_K, &
-                                                          G_K, G)
+                                                               gamma_K, pi_inf_K, qv_K, &
+                                                               alpha_K, alpha_rho_K, Re_K, &
+                                                               G_K, G)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_acc
 #else
@@ -537,8 +537,8 @@ contains
     end subroutine s_convert_species_to_mixture_variables_acc
 
     pure subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
-                                                                  gamma_K, pi_inf_K, qv_K, &
-                                                                  alpha_K, alpha_rho_K, Re_K)
+                                                                       gamma_K, pi_inf_K, qv_K, &
+                                                                       alpha_K, alpha_rho_K, Re_K)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_bubbles_acc
 #else

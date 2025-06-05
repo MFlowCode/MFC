@@ -4101,13 +4101,13 @@ contains
     !! @param[in] iy Y-direction loop bounds (int_bounds_info).
     !! @param[in] iz Z-direction loop bounds (int_bounds_info).
     pure subroutine s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, &
-                                                       dvelL_dy_vf, &
-                                                       dvelL_dz_vf, &
-                                                       dvelR_dx_vf, &
-                                                       dvelR_dy_vf, &
-                                                       dvelR_dz_vf, &
-                                                       flux_src_vf, &
-                                                       norm_dir)
+                                                            dvelL_dy_vf, &
+                                                            dvelL_dz_vf, &
+                                                            dvelR_dx_vf, &
+                                                            dvelR_dy_vf, &
+                                                            dvelR_dz_vf, &
+                                                            flux_src_vf, &
+                                                            norm_dir)
 
         ! Arguments
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
@@ -4290,8 +4290,8 @@ contains
         !!  @param flux_gsrc_vf  Intercell geometric source fluxes
         !!  @param norm_dir Dimensional splitting coordinate direction
     pure subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, &
-                                         flux_gsrc_vf, &
-                                         norm_dir)
+                                              flux_gsrc_vf, &
+                                              norm_dir)
 
         type(scalar_field), &
             dimension(sys_size), &
