@@ -79,7 +79,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer :: i, j, k, l !< standard iterators
 
-        $:parallel_loop(collapse=3)
+        $:PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -109,7 +109,7 @@ contains
         call s_compute_acceleration(mytime)
         call s_compute_mixture_density(q_cons_vf)
 
-        $:parallel_loop(collapse=4)
+        $:PARALLEL_LOOP(collapse=4)
         do i = momxb, E_idx
             do l = 0, p
                 do k = 0, n
@@ -122,7 +122,7 @@ contains
 
         if (bf_x) then ! x-direction body forces
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -137,7 +137,7 @@ contains
 
         if (bf_y) then ! y-direction body forces
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -152,7 +152,7 @@ contains
 
         if (bf_z) then ! z-direction body forces
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m

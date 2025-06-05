@@ -86,7 +86,7 @@ contains
         integer :: j, k, l, i
 
         if (id == 1) then
-            $:parallel_loop(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
+            $:PARALLEL_LOOP(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
                 "w1R", "w2R", "w3R", "w1", "w2", "w3", "normWL", &
                 "normWR", "normW"])
             do l = isz%beg, isz%end
@@ -133,7 +133,7 @@ contains
 
         elseif (id == 2) then
 
-            $:parallel_loop(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
+            $:PARALLEL_LOOP(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
                 "w1R", "w2R", "w3R", "w1", "w2", "w3", "normWL", "normWR", &
                 "normW"])
             do l = isz%beg, isz%end
@@ -180,7 +180,7 @@ contains
 
         elseif (id == 3) then
 
-            $:parallel_loop(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
+            $:PARALLEL_LOOP(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
                 "w1R", "w2R", "w3R", "w1", "w2", "w3", "normWL", "normWR", &
                 "normW"])
             do l = isz%beg, isz%end
@@ -244,7 +244,7 @@ contains
         isx%end = m; isy%end = n; isz%end = p
 
         ! compute gradient components
-        $:parallel_loop(collapse=3)
+        $:PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -254,7 +254,7 @@ contains
             end do
         end do
 
-        $:parallel_loop(collapse=3)
+        $:PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -265,7 +265,7 @@ contains
         end do
 
         if (p > 0) then
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -276,7 +276,7 @@ contains
             end do
         end if
 
-        $:parallel_loop(collapse=3)
+        $:PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m

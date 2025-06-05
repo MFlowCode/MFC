@@ -77,7 +77,7 @@ contains
 
         !$acc update device(is1_viscous, is2_viscous, is3_viscous)
 
-        $:parallel_loop(collapse=3)
+        $:PARALLEL_LOOP(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
@@ -89,7 +89,7 @@ contains
             end do
         end do
         if (shear_stress) then    ! Shear stresses
-            $:parallel_loop(collapse=3, private=["alpha_visc", &
+            $:PARALLEL_LOOP(collapse=3, private=["alpha_visc", &
                 "alpha_rho_visc", "Re_visc", "tau_Re"])
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
@@ -197,7 +197,7 @@ contains
         end if
 
         if (bulk_stress) then    ! Bulk stresses
-            $:parallel_loop(collapse=3, private=["alpha_visc", &
+            $:PARALLEL_LOOP(collapse=3, private=["alpha_visc", &
                 "alpha_rho_visc", "Re_visc", "tau_Re"])
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
@@ -302,7 +302,7 @@ contains
         if (p == 0) return
 
         if (shear_stress) then    ! Shear stresses
-            $:parallel_loop(collapse=3, private=["alpha_visc", &
+            $:PARALLEL_LOOP(collapse=3, private=["alpha_visc", &
                 "alpha_rho_visc", "Re_visc", "tau_Re"])
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
@@ -411,7 +411,7 @@ contains
         end if
 
         if (bulk_stress) then    ! Bulk stresses
-            $:parallel_loop(collapse=3, private=["alpha_visc", &
+            $:PARALLEL_LOOP(collapse=3, private=["alpha_visc", &
                 "alpha_rho_visc", "Re_visc", "tau_Re"])
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
@@ -593,7 +593,7 @@ contains
 
             !$acc update device(is1_viscous, is2_viscous, is3_viscous)
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = iy%beg, iy%end
                     do j = is1_viscous%beg + 1, is1_viscous%end
@@ -608,7 +608,7 @@ contains
                 end do
             end do
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end - 1
@@ -625,7 +625,7 @@ contains
 
             if (n > 0) then
 
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg + 1, is2_viscous%end
                         do k = is1_viscous%beg, is1_viscous%end
@@ -640,7 +640,7 @@ contains
                     end do
                 end do
 
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg, is2_viscous%end - 1
                         do k = is1_viscous%beg, is1_viscous%end
@@ -655,7 +655,7 @@ contains
                     end do
                 end do
 
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg + 1, is2_viscous%end
                         do k = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -674,7 +674,7 @@ contains
                     end do
                 end do
 
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg, is2_viscous%end - 1
                         do k = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -694,7 +694,7 @@ contains
                     end do
                 end do
 
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = is2_viscous%beg + 1, is2_viscous%end - 1
                         do j = is1_viscous%beg + 1, is1_viscous%end
@@ -714,7 +714,7 @@ contains
                     end do
                 end do
 
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = is2_viscous%beg + 1, is2_viscous%end - 1
                         do j = is1_viscous%beg, is1_viscous%end - 1
@@ -736,7 +736,7 @@ contains
 
                 if (p > 0) then
 
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do j = is3_viscous%beg + 1, is3_viscous%end
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg, is1_viscous%end
@@ -752,7 +752,7 @@ contains
                         end do
                     end do
 
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do j = is3_viscous%beg, is3_viscous%end - 1
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg, is1_viscous%end
@@ -768,7 +768,7 @@ contains
                         end do
                     end do
 
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do k = is2_viscous%beg, is2_viscous%end
                             do j = is1_viscous%beg + 1, is1_viscous%end
@@ -789,7 +789,7 @@ contains
                         end do
                     end do
 
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do k = is2_viscous%beg, is2_viscous%end
                             do j = is1_viscous%beg, is1_viscous%end - 1
@@ -810,7 +810,7 @@ contains
                         end do
                     end do
 
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do j = is2_viscous%beg + 1, is2_viscous%end
                             do k = is1_viscous%beg, is1_viscous%end
@@ -831,7 +831,7 @@ contains
                         end do
                     end do
 
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do j = is2_viscous%beg, is2_viscous%end - 1
                             do k = is1_viscous%beg, is1_viscous%end
@@ -852,7 +852,7 @@ contains
                         end do
                     end do
 
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do j = is3_viscous%beg + 1, is3_viscous%end
                         do l = is2_viscous%beg + 1, is2_viscous%end - 1
                             do k = is1_viscous%beg, is1_viscous%end
@@ -873,7 +873,7 @@ contains
                         end do
                     end do
 
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do j = is3_viscous%beg, is3_viscous%end - 1
                         do l = is2_viscous%beg + 1, is2_viscous%end - 1
                             do k = is1_viscous%beg, is1_viscous%end
@@ -893,7 +893,7 @@ contains
                             end do
                         end do
                     end do
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do j = is3_viscous%beg + 1, is3_viscous%end
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -913,7 +913,7 @@ contains
                             end do
                         end do
                     end do
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do j = is3_viscous%beg, is3_viscous%end - 1
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -1023,7 +1023,7 @@ contains
         if (viscous) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
-                    $:parallel_loop(collapse=4)
+                    $:PARALLEL_LOOP(collapse=4)
                     do i = iv%beg, iv%end
                         do l = is3_viscous%beg, is3_viscous%end
                             do j = is1_viscous%beg, is1_viscous%end
@@ -1035,7 +1035,7 @@ contains
                         end do
                     end do
                 elseif (norm_dir == 3) then
-                    $:parallel_loop(collapse=4)
+                    $:PARALLEL_LOOP(collapse=4)
                     do i = iv%beg, iv%end
                         do j = is1_viscous%beg, is1_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
@@ -1047,7 +1047,7 @@ contains
                         end do
                     end do
                 elseif (norm_dir == 1) then
-                    $:parallel_loop(collapse=4)
+                    $:PARALLEL_LOOP(collapse=4)
                     do i = iv%beg, iv%end
                         do l = is3_viscous%beg, is3_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
@@ -1122,7 +1122,7 @@ contains
         if (viscous) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
-                    $:parallel_loop(collapse=4)
+                    $:PARALLEL_LOOP(collapse=4)
                     do i = iv%beg, iv%end
                         do l = is3_viscous%beg, is3_viscous%end
                             do j = is1_viscous%beg, is1_viscous%end
@@ -1134,7 +1134,7 @@ contains
                         end do
                     end do
                 elseif (norm_dir == 3) then
-                    $:parallel_loop(collapse=4)
+                    $:PARALLEL_LOOP(collapse=4)
                     do i = iv%beg, iv%end
                         do j = is1_viscous%beg, is1_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
@@ -1146,7 +1146,7 @@ contains
                         end do
                     end do
                 elseif (norm_dir == 1) then
-                    $:parallel_loop(collapse=4)
+                    $:PARALLEL_LOOP(collapse=4)
                     do i = iv%beg, iv%end
                         do l = is3_viscous%beg, is3_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
@@ -1210,7 +1210,7 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -1238,7 +1238,7 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg + 1, is2_viscous%end - 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -1266,7 +1266,7 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg + 1, is3_viscous%end - 1
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
@@ -1321,7 +1321,7 @@ contains
 
         !$acc update device(is1_viscous, is2_viscous, is3_viscous)
 
-        $:parallel_loop(collapse=3)
+        $:PARALLEL_LOOP(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
@@ -1358,7 +1358,7 @@ contains
             end do
         end if
 
-        $:parallel_loop(collapse=2)
+        $:PARALLEL_LOOP(collapse=2)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 grad_x%sf(idwbuff(1)%beg, k, l) = &
@@ -1370,7 +1370,7 @@ contains
             end do
         end do
         if (n > 0) then
-            $:parallel_loop(collapse=2)
+            $:PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
                     grad_y%sf(j, idwbuff(2)%beg, l) = &
@@ -1382,7 +1382,7 @@ contains
                 end do
             end do
             if (p > 0) then
-                $:parallel_loop(collapse=2)
+                $:PARALLEL_LOOP(collapse=2)
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_z%sf(j, k, idwbuff(3)%beg) = &
@@ -1397,7 +1397,7 @@ contains
         end if
 
         if (bc_x%beg <= BC_GHOST_EXTRAPOLATION) then
-            $:parallel_loop(collapse=2)
+            $:PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     grad_x%sf(0, k, l) = (-3._wp*var%sf(0, k, l) + 4._wp*var%sf(1, k, l) - var%sf(2, k, l))/ &
@@ -1406,7 +1406,7 @@ contains
             end do
         end if
         if (bc_x%end <= BC_GHOST_EXTRAPOLATION) then
-            $:parallel_loop(collapse=2)
+            $:PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     grad_x%sf(m, k, l) = (3._wp*var%sf(m, k, l) - 4._wp*var%sf(m - 1, k, l) + var%sf(m - 2, k, l))/ &
@@ -1416,7 +1416,7 @@ contains
         end if
         if (n > 0) then
             if (bc_y%beg <= BC_GHOST_EXTRAPOLATION .and. bc_y%beg /= BC_NULL) then
-                $:parallel_loop(collapse=2)
+                $:PARALLEL_LOOP(collapse=2)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_y%sf(j, 0, l) = (-3._wp*var%sf(j, 0, l) + 4._wp*var%sf(j, 1, l) - var%sf(j, 2, l))/ &
@@ -1425,7 +1425,7 @@ contains
                 end do
             end if
             if (bc_y%end <= BC_GHOST_EXTRAPOLATION) then
-                $:parallel_loop(collapse=2)
+                $:PARALLEL_LOOP(collapse=2)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_y%sf(j, n, l) = (3._wp*var%sf(j, n, l) - 4._wp*var%sf(j, n - 1, l) + var%sf(j, n - 2, l))/ &
@@ -1435,7 +1435,7 @@ contains
             end if
             if (p > 0) then
                 if (bc_z%beg <= BC_GHOST_EXTRAPOLATION) then
-                    $:parallel_loop(collapse=2)
+                    $:PARALLEL_LOOP(collapse=2)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
                             grad_z%sf(j, k, 0) = &
@@ -1445,7 +1445,7 @@ contains
                     end do
                 end if
                 if (bc_z%end <= BC_GHOST_EXTRAPOLATION) then
-                    $:parallel_loop(collapse=2)
+                    $:PARALLEL_LOOP(collapse=2)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
                             grad_z%sf(j, k, p) = &

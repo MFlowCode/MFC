@@ -103,23 +103,85 @@
     end if
 #:enddef
 
-#:def parallel_loop(collapse=None, private=None, parallelism=["gang", "vector"], default="present", firstprivate=None, reduction=None, reductionOp=None, copy=None, copyin=None, copyinReadOnly=False, copyout=None, create=None)
+#:def ASSERT_LIST(data, datatype)
+    #:assert data is not None
+    #:assert isinstance(data, list)
+    #:assert len(data) != 0
+    #:assert all(isinstance(element, datatype) for element in data)
+#:enddef
+
+#:def GEN_PARENTHESES_CLAUSE(clause_name, clause_list)
+    #:assert isinstance(clause_name, str)
+    #:if clause_list is not None
+        $:ASSERT_LIST(clause_list, str)
+        #:set clause_str = clause_name + '(' + ', '.join(clause_list) + ') '
+    #:else
+        #:set clause_str = ""
+    #:endif
+    $:clause_str
+#:enddef
+
+#:def GEN_COPY_STR(copy)
+    #:set copy_val = GEN_PARENTHESES_CLAUSE("copy", copy)
+    $:copy_val
+#:enddef
+
+#:def GEN_COPYIN_STR(copyin, copyinReadOnly)
+    #:if copyin is not None
+        $:ASSERT_LIST(copyin, str)
+        #:assert isinstance(copyinReadOnly, bool)
+        #:if copyinReadOnly == True
+            #:set copyin_val = 'copyin(readonly:' + ', '.join(copyin) + ') '
+        #:else
+            #:set copyin_val = 'copyin(' + ', '.join(copyin) + ') '
+        #:endif
+    #:else
+        #:set copyin_val = ""
+    #:endif
+    $:copyin_val
+#:enddef
+
+#:def GEN_COPYOUT_STR(copyout)
+    #:set copyout_val = GEN_PARENTHESES_CLAUSE("copyout", copyout)
+    $:copyout_val
+#:enddef
+
+#:def GEN_CREATE_STR(create)
+    #:set create_val = GEN_PARENTHESES_CLAUSE("create", create)
+    $:create_val
+#:enddef
+
+#:def GEN_EXTRA_ARGS_STR(extraArgs)
+    #:if extraArgs is not None
+        #:assert isinstance(extraArgs, str)
+        #:set extraArgs_val = extraArgs
+    #:else
+        #:set extraArgs_val = ""
+    #:endif
+    $:extraArgs_val
+#:enddef
+
+#:def GEN_PARALLELISM_STR(parallelism)
+    #:if parallelism is not None
+        $:ASSERT_LIST(parallelism, str)
+        #:assert all((element == "gang" or element == "worker" or element == "vector" or element == "seq") for element in parallelism)
+        #:set parallelism_val = " ".join(parallelism) + " "
+    #:else
+        #:set parallelism_val = ""
+    #:endif
+    $:parallelism_val
+#:enddef
+
+#:def PARALLEL_LOOP(collapse=None, private=None, parallelism=["gang", "vector"], default="present", firstprivate=None, reduction=None, reductionOp=None, copy=None, copyin=None, copyinReadOnly=False, copyout=None, create=None, extraAccArgs=None)
     #:if collapse is not None
         #:assert isinstance(collapse, int)
-        #:assert collapse > 0
+        #:assert collapse > 1
         #:set collapse_val = 'collapse(' + str(collapse) + ') '
     #:else
         #:set collapse_val = ""
     #:endif
 
-    #:if private is not None
-        #:assert isinstance(private, list)
-        #:assert len(private) != 0
-        #:assert all(type(element) == str for element in private)
-        #:set private_val = 'private(' + ', '.join(private) + ') '
-    #:else
-        #:set private_val = ""
-    #:endif
+    #:set private_val = GEN_PARENTHESES_CLAUSE("private", private)
 
     #:if default is not None
         #:assert isinstance(default, str)
@@ -129,42 +191,21 @@
         #:set default_val = ""
     #:endif
 
-    #:if parallelism is not None
-        #:assert isinstance(parallelism, list)
-        #:assert len(parallelism) != 0
-        #:assert all(type(element) == str for element in parallelism)
-        #:assert all((element == "gang" or element == "worker" or element == "vector") for element in parallelism)
-        #:set parallelism_val = " ".join(parallelism) + " "
-    #:else
-        #:set parallelism_val = ""
-    #:endif
+    #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
 
-    #:if firstprivate is not None
-        #:assert isinstance(firstprivate, list)
-        #:assert len(firstprivate) != 0
-        #:assert all(type(element) == str for element in firstprivate)
-        #:set firstprivate_val = 'firstprivate(' + ', '.join(firstprivate) + ') '
-    #:else
-        #:set firstprivate_val = ""
-    #:endif
+    #:set firstprivate_val = GEN_PARENTHESES_CLAUSE("firstprivate", firstprivate)
 
     #:if reduction is not None and reductionOp is not None
         #:if isinstance(reduction, list) and isinstance(reductionOp, list)
-            #:assert isinstance(reduction, list)
-            #:assert len(reduction) != 0
-            #:assert all(type(element) == list for element in reduction)
+            $:ASSERT_LIST(reduction, list)
+            $:ASSERT_LIST(reductionOp, str)
             #:assert all(len(element) != 0 for element in reduction)
             #:assert all(type(element) == str for sublist in reduction for element in sublist)
-            #:assert isinstance(reductionOp, list)
-            #:assert len(reductionOp) != 0
-            #:assert all(type(element) == str for element in reductionOp)
             #:assert len(reduction) == len(reductionOp)
             #:set reduction_list = ['reduction(' + op + ':' + ', '.join(red) + ') ' for (red, op) in zip(reduction, reductionOp)]
             #:set reduction_val = " ". join(reduction_list) + " "
         #:elif isinstance(reduction, list) and isinstance(reductionOp, str)
-            #:assert isinstance(reduction, list)
-            #:assert len(reduction) != 0
-            #:assert all(type(element) == str for element in reduction)
+            $:ASSERT_LIST(reduction, str)
             #:assert isinstance(reductionOp, str)
             #:set reduction_val = 'reduction(' + reductionOp + ':' + ', '.join(reduction) + ') '
         #:else
@@ -176,47 +217,58 @@
         #:set reduction_val = ""
     #:endif
 
-    #:if copy is not None
-        #:assert isinstance(copy, list)
-        #:assert len(copy) != 0
-        #:assert all(type(element) == str for element in copy)
-        #:set copy_val = 'copy(' + ', '.join(copy) + ') '
-    #:else
-        #:set copy_val = ""
-    #:endif
+    #:set copy_val = GEN_COPY_STR(copy)
 
-    #:if copyin is not None
-        #:assert isinstance(copyin, list)
-        #:assert len(copyin) != 0
-        #:assert all(type(element) == str for element in copyin)
-        #:assert isinstance(copyinReadOnly, bool)
-        #:if copyinReadOnly == True
-            #:set copyin_val = 'copyin(readonly:' + ', '.join(copyin) + ') '
-        #:else
-            #:set copyin_val = 'copyin(' + ', '.join(copyin) + ') '
-        #:endif
-    #:else
-        #:set copyin_val = ""
-    #:endif
+    #:set copyin_val = GEN_COPYIN_STR(copyin, copyinReadOnly)
 
-    #:if copyout is not None
-        #:assert isinstance(copyout, list)
-        #:assert len(copyout) != 0
-        #:assert all(type(element) == str for element in copyout)
-        #:set copyout_val = 'copyout(' + ', '.join(copyout) + ') '
-    #:else
-        #:set copyout_val = ""
-    #:endif
+    #:set copyout_val = GEN_COPYOUT_STR(copyout)
 
-    #:if create is not None
-        #:assert isinstance(create, list)
-        #:assert len(create) != 0
-        #:assert all(type(element) == str for element in create)
-        #:set create_val = 'create(' + ', '.join(create) + ') '
-    #:else
-        #:set create_val = ""
-    #:endif
+    #:set create_val = GEN_CREATE_STR(create)
+
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
 
     #:set clause_val = collapse_val + parallelism_val + default_val + private_val + firstprivate_val + reduction_val + copy_val + copyin_val + copyout_val + create_val
-    !$acc parallel loop ${clause_val}$
+    #:set acc_directive = '!$acc parallel loop ' + clause_val + extraAccArgs_val
+    $:acc_directive
+#:enddef
+
+#:def routine(parallelism=["seq"], nohost=False, extraAccArgs=None)
+    #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
+
+    #:assert isinstance(nohost, bool)
+    #:if nohost == True
+        #:set nohost_val = "nohost"
+    #:else
+        #:set nohost_val = ""
+    #:endif
+
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+
+    #:set clause_val = parallelism_val + nohost_val
+    #:set acc_directive = '!$acc routine ' + clause_val + extraAccArgs_val
+    $:acc_directive
+#:enddef
+
+
+
+#:def declare(copy=None, copyin=None, copyinReadOnly=False, copyout=None, create=None, present=None, deviceptr=None, link=None, extraAccArgs=None)
+    #:set copy_val = GEN_COPY_STR(copy)
+
+    #:set copyin_val = GEN_COPYIN_STR(copyin, copyinReadOnly)
+
+    #:set copyout_val = GEN_COPYOUT_STR(copyout)
+
+    #:set create_val = GEN_CREATE_STR(create)
+
+    #:set present_val = GEN_PARENTHESES_CLAUSE("present", present)
+
+    #:set deviceptr_val = GEN_PARENTHESES_CLAUSE("deviceptr", deviceptr)
+
+    #:set link_val = GEN_PARENTHESES_CLAUSE("link", link)
+
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+
+    #:set clause_val = copy_val + copyin_val + copyout_val + create_val + present_val + deviceptr_val + link_val
+    #:set acc_directive = '!$acc declare ' + clause_val + extraAccArgs_val
+    $:acc_directive
 #:enddef

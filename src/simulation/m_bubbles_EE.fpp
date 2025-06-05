@@ -76,7 +76,7 @@ contains
         real(wp) :: nR3bar
         integer(wp) :: i, j, k, l
 
-        $:parallel_loop(collapse=3)
+        $:PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -103,7 +103,7 @@ contains
         if (idir == 1) then
 
             if (.not. qbmm) then
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -119,7 +119,7 @@ contains
 
         elseif (idir == 2) then
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -133,7 +133,7 @@ contains
 
         elseif (idir == 3) then
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -173,7 +173,7 @@ contains
         integer :: dmBub_id !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
-        $:parallel_loop(collapse=3)
+        $:PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -191,7 +191,7 @@ contains
         end do
 
         adap_dt_stop_max = 0
-        $:parallel_loop(collapse=3, private=["Rtmp", "Vtmp", "myalpha_rho", "myalpha"], &
+        $:PARALLEL_LOOP(collapse=3, private=["Rtmp", "Vtmp", "myalpha_rho", "myalpha"], &
             reduction=["adap_dt_stop_max"], reductionOp="MAX", &
             copy=["adap_dt_stop_max"])
         do l = 0, p
@@ -325,7 +325,7 @@ contains
         if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         if (.not. adap_dt) then
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do q = 0, n
                     do i = 0, m

@@ -698,7 +698,7 @@ contains
                                                                F_src_rs${XYZ}$_vf, &
                                                                is1, is2, is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do i = 1, flux_cbc_index
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
@@ -710,7 +710,7 @@ contains
                         end do
                     end do
 
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do i = advxb, advxe
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
@@ -729,7 +729,7 @@ contains
                                                                F_src_rs${XYZ}$_vf, &
                                                                is1, is2, is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
-                    $:parallel_loop(collapse=4)
+                    $:PARALLEL_LOOP(collapse=4)
                     do i = 1, flux_cbc_index
                         do j = 0, 1
                             do r = is3%beg, is3%end
@@ -749,7 +749,7 @@ contains
                         end do
                     end do
 
-                    $:parallel_loop(collapse=4)
+                    $:PARALLEL_LOOP(collapse=4)
                     do i = advxb, advxe
                         do j = 0, 1
                             do r = is3%beg, is3%end
@@ -772,7 +772,7 @@ contains
                 end if
 
                 ! FD2 or FD4 of RHS at j = 0
-                $:parallel_loop(collapse=2, private=["alpha_rho", "vel", "adv", &
+                $:PARALLEL_LOOP(collapse=2, private=["alpha_rho", "vel", "adv", &
                     "mf", "dvel_ds", "dadv_ds", "Re_cbc", "dalpha_rho_ds","dvel_dt", &
                     "dadv_dt", "dalpha_rho_dt", "L", "lambda", "Ys", "dYs_dt", & 
                     "dYs_ds", "h_k", "Cp_i", "Gamma_i", "Xs"])
@@ -1167,7 +1167,7 @@ contains
         ! Reshaping Inputted Data in x-direction
         if (cbc_dir == 1) then
 
-            $:parallel_loop(collapse=4)
+            $:PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1179,7 +1179,7 @@ contains
                 end do
             end do
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = 0, buff_size
@@ -1190,7 +1190,7 @@ contains
                 end do
             end do
 
-            $:parallel_loop(collapse=4)
+            $:PARALLEL_LOOP(collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1203,7 +1203,7 @@ contains
                 end do
             end do
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
@@ -1214,7 +1214,7 @@ contains
             end do
 
             if (riemann_solver == 1) then
-                $:parallel_loop(collapse=4)
+                $:PARALLEL_LOOP(collapse=4)
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1226,7 +1226,7 @@ contains
                     end do
                 end do
             else
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1243,7 +1243,7 @@ contains
             ! Reshaping Inputted Data in y-direction
         elseif (cbc_dir == 2) then
 
-            $:parallel_loop(collapse=4)
+            $:PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1255,7 +1255,7 @@ contains
                 end do
             end do
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = 0, buff_size
@@ -1266,7 +1266,7 @@ contains
                 end do
             end do
 
-            $:parallel_loop(collapse=4)
+            $:PARALLEL_LOOP(collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1279,7 +1279,7 @@ contains
                 end do
             end do
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
@@ -1290,7 +1290,7 @@ contains
             end do
 
             if (riemann_solver == 1) then
-                $:parallel_loop(collapse=4)
+                $:PARALLEL_LOOP(collapse=4)
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1302,7 +1302,7 @@ contains
                     end do
                 end do
             else
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1319,7 +1319,7 @@ contains
             ! Reshaping Inputted Data in z-direction
         else
 
-            $:parallel_loop(collapse=4)
+            $:PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1331,7 +1331,7 @@ contains
                 end do
             end do
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = 0, buff_size
@@ -1342,7 +1342,7 @@ contains
                 end do
             end do
 
-            $:parallel_loop(collapse=4)
+            $:PARALLEL_LOOP(collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1355,7 +1355,7 @@ contains
                 end do
             end do
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
@@ -1366,7 +1366,7 @@ contains
             end do
 
             if (riemann_solver == 1) then
-                $:parallel_loop(collapse=4)
+                $:PARALLEL_LOOP(collapse=4)
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1378,7 +1378,7 @@ contains
                     end do
                 end do
             else
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1423,7 +1423,7 @@ contains
         ! Reshaping Outputted Data in x-direction
         if (cbc_dir == 1) then
 
-            $:parallel_loop(collapse=4)
+            $:PARALLEL_LOOP(collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1435,7 +1435,7 @@ contains
                     end do
                 end do
             end do
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
@@ -1446,7 +1446,7 @@ contains
             end do
 
             if (riemann_solver == 1) then
-                $:parallel_loop(collapse=4)
+                $:PARALLEL_LOOP(collapse=4)
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1458,7 +1458,7 @@ contains
                     end do
                 end do
             else
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1474,7 +1474,7 @@ contains
             ! Reshaping Outputted Data in y-direction
         elseif (cbc_dir == 2) then
 
-            $:parallel_loop(collapse=4)
+            $:PARALLEL_LOOP(collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1487,7 +1487,7 @@ contains
                 end do
             end do
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
@@ -1498,7 +1498,7 @@ contains
             end do
 
             if (riemann_solver == 1) then
-                $:parallel_loop(collapse=4)
+                $:PARALLEL_LOOP(collapse=4)
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1510,7 +1510,7 @@ contains
                     end do
                 end do
             else
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1527,7 +1527,7 @@ contains
             ! Reshaping Outputted Data in z-direction
         else
 
-            $:parallel_loop(collapse=4)
+            $:PARALLEL_LOOP(collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1540,7 +1540,7 @@ contains
                 end do
             end do
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
@@ -1551,7 +1551,7 @@ contains
             end do
 
             if (riemann_solver == 1) then
-                $:parallel_loop(collapse=4)
+                $:PARALLEL_LOOP(collapse=4)
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1563,7 +1563,7 @@ contains
                     end do
                 end do
             else
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size

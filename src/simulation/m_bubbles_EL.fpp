@@ -614,7 +614,7 @@ contains
         if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         ! Bubbles remain in a fixed position
-        $:parallel_loop(collapse=2, private=["k"], copyin=["stage"])
+        $:PARALLEL_LOOP(collapse=2, private=["k"], copyin=["stage"])
         do k = 1, nBubs
             do l = 1, 3
                 mtn_dposdt(k, l, stage) = 0._wp
@@ -644,7 +644,7 @@ contains
         if (lag_params%solver_approach == 2) then
 
             if (p == 0) then
-                $:parallel_loop(collapse=4)
+                $:PARALLEL_LOOP(collapse=4)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -660,7 +660,7 @@ contains
                     end do
                 end do
             else
-                $:parallel_loop(collapse=4)
+                $:PARALLEL_LOOP(collapse=4)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -680,7 +680,7 @@ contains
 
                 call s_gradient_dir(q_prim_vf(E_idx), q_beta%vf(3), l)
 
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -695,7 +695,7 @@ contains
                 end do
 
                 !source in energy
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do k = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(2)%beg, idwbuff(2)%end
                         do i = idwbuff(1)%beg, idwbuff(1)%end
@@ -706,7 +706,7 @@ contains
 
                 call s_gradient_dir(q_beta%vf(3), q_beta%vf(4), l)
 
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -766,7 +766,7 @@ contains
 
         call nvtxStartRange("BUBBLES-LAGRANGE-KERNELS")
 
-        $:parallel_loop(collapse=4)
+        $:PARALLEL_LOOP(collapse=4)
         do i = 1, q_beta_idx
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -781,7 +781,7 @@ contains
                               mtn_s, mtn_pos, q_beta)
 
         !Store 1-beta
-        $:parallel_loop(collapse=3)
+        $:PARALLEL_LOOP(collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -1290,7 +1290,7 @@ contains
 
         if (dir == 1) then
             ! Gradient in x dir.
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
@@ -1305,7 +1305,7 @@ contains
         else
             if (dir == 2) then
                 ! Gradient in y dir.
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -1319,7 +1319,7 @@ contains
                 end do
             else
                 ! Gradient in z dir.
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -1413,7 +1413,7 @@ contains
         lag_void_max = 0._wp
         lag_void_avg = 0._wp
         lag_vol = 0._wp
-        $:parallel_loop(collapse=3, reduction=[["lag_vol", "lag_void_avg"], &
+        $:PARALLEL_LOOP(collapse=3, reduction=[["lag_vol", "lag_void_avg"], &
             ["lag_void_max"]], reductionOp=["+", "MAX"], &
             copy=["lag_vol", "lag_void_avg", "lag_void_max"])
         do k = 0, p

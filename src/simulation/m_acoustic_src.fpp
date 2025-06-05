@@ -159,7 +159,7 @@ contains
 
         sim_time = t_step*dt
 
-        $:parallel_loop(collapse=3)
+        $:PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -312,7 +312,7 @@ contains
         end do
 
         ! Update the rhs variables
-        $:parallel_loop(collapse=3)
+        $:PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m

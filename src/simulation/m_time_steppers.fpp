@@ -377,7 +377,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-        $:parallel_loop(collapse=4)
+        $:PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -392,7 +392,7 @@ contains
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
-            $:parallel_loop(collapse=5)
+            $:PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -409,7 +409,7 @@ contains
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:parallel_loop(collapse=5)
+            $:PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -479,7 +479,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-        $:parallel_loop(collapse=4)
+        $:PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -494,7 +494,7 @@ contains
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
-            $:parallel_loop(collapse=5)
+            $:PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -511,7 +511,7 @@ contains
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:parallel_loop(collapse=5)
+            $:PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -551,7 +551,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
-        $:parallel_loop(collapse=4)
+        $:PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -566,7 +566,7 @@ contains
         end do
 
         if (qbmm .and. (.not. polytropic)) then
-            $:parallel_loop(collapse=5)
+            $:PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -584,7 +584,7 @@ contains
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:parallel_loop(collapse=5)
+            $:PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -661,7 +661,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-        $:parallel_loop(collapse=4)
+        $:PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -676,7 +676,7 @@ contains
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
-            $:parallel_loop(collapse=5)
+            $:PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -693,7 +693,7 @@ contains
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:parallel_loop(collapse=5)
+            $:PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -733,7 +733,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
-        $:parallel_loop(collapse=4)
+        $:PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -748,7 +748,7 @@ contains
         end do
 
         if (qbmm .and. (.not. polytropic)) then
-            $:parallel_loop(collapse=5)
+            $:PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -766,7 +766,7 @@ contains
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:parallel_loop(collapse=5)
+            $:PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -806,7 +806,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
-        $:parallel_loop(collapse=4)
+        $:PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -821,7 +821,7 @@ contains
         end do
 
         if (qbmm .and. (.not. polytropic)) then
-            $:parallel_loop(collapse=5)
+            $:PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -839,7 +839,7 @@ contains
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:parallel_loop(collapse=5)
+            $:PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -981,7 +981,7 @@ contains
             idwint, &
             gm_alpha_qp%vf)
 
-        $:parallel_loop(collapse=3, private=["vel", "alpha", "Re"])
+        $:PARALLEL_LOOP(collapse=3, private=["vel", "alpha", "Re"])
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -1024,7 +1024,7 @@ contains
         call nvtxStartRange("RHS-BODYFORCES")
         call s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
 
-        $:parallel_loop(collapse=4)
+        $:PARALLEL_LOOP(collapse=4)
         do i = momxb, E_idx
             do l = 0, p
                 do k = 0, n

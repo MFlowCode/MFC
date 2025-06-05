@@ -480,7 +480,7 @@ contains
                 end do
             end if
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do q = 0, n
                     do i = 0, m
@@ -839,7 +839,7 @@ contains
 
         !$acc update device(is1_qbmm, is2_qbmm, is3_qbmm)
 
-        $:parallel_loop(collapse=3, private=["moms", "msum", "wght", "abscX", &
+        $:PARALLEL_LOOP(collapse=3, private=["moms", "msum", "wght", "abscX", &
             "abscY", "wght_pb", "wght_mv", "wght_ht", "coeff", "ht", "r", "q", &
             "n_tait", "B_tait", "pres", "rho", "nbub", "c", "alf", "momsum", &
             "drdt", "drdt2", "chi_vw", "x_vw", "rho_mw", "k_mw", "T_bar", "grad_T"])

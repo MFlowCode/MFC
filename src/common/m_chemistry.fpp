@@ -99,7 +99,7 @@ contains
         real(wp), dimension(num_species) :: Ys
         real(wp), dimension(num_species) :: omega
 
-        $:parallel_loop(collapse=3, private=["Ys", "omega"])
+        $:PARALLEL_LOOP(collapse=3, private=["Ys", "omega"])
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end

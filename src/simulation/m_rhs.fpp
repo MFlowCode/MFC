@@ -592,7 +592,7 @@ contains
             !$acc update device(Res, Re_idx, Re_size)
         end if
 
-        $:parallel_loop(collapse=4)
+        $:PARALLEL_LOOP(collapse=4)
         do id = 1, num_dims
             do i = 1, sys_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -632,7 +632,7 @@ contains
 
         call cpu_time(t_start)
         ! Association/Population of Working Variables
-        $:parallel_loop(collapse=4)
+        $:PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -646,7 +646,7 @@ contains
         ! Converting Conservative to Primitive Variables
 
         if (mpp_lim .and. bubbles_euler) then
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -867,7 +867,7 @@ contains
         ! END: Dimensional Splitting Loop
 
         if (ib) then
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -935,7 +935,7 @@ contains
         ! END: Additional physics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
-            $:parallel_loop(collapse=4)
+            $:PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -975,7 +975,7 @@ contains
         real(wp) :: advected_qty_val, pressure_val, velocity_val
 
         if (alt_soundspeed) then
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do q_loop = 0, p
                 do l_loop = 0, n
                     do k_loop = 0, m
@@ -1231,7 +1231,7 @@ contains
                 else ! Other Riemann solvers
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
-                            $:parallel_loop(collapse=3, private=["local_inv_ds", &
+                            $:PARALLEL_LOOP(collapse=3, private=["local_inv_ds", &
                                 "local_q_cons_val", "local_k_term_val", &
                                 "local_term_coeff", "local_flux1", "local_flux2"])
                             do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
@@ -1245,7 +1245,7 @@ contains
                                                                                     local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                     end do; end do; end do
 
-                            $:parallel_loop(collapse=3, private=["local_inv_ds",&
+                            $:PARALLEL_LOOP(collapse=3, private=["local_inv_ds",&
                                 "local_q_cons_val", "local_k_term_val", &
                                 "local_term_coeff", "local_flux1", &
                                 "local_flux2"])
@@ -1298,7 +1298,7 @@ contains
                 else ! Other Riemann solvers
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
-                            $:parallel_loop(collapse=3, private=["local_inv_ds", &
+                            $:PARALLEL_LOOP(collapse=3, private=["local_inv_ds", &
                                 "local_q_cons_val", "local_k_term_val", &
                                 "local_term_coeff", "local_flux1", &
                                 "local_flux2"])
@@ -1317,7 +1317,7 @@ contains
                                         end if
                                     end do; end do; end do
 
-                            $:parallel_loop(collapse=3, private=["local_inv_ds", &
+                            $:PARALLEL_LOOP(collapse=3, private=["local_inv_ds", &
                                 "local_q_cons_val", "local_k_term_val", &
                                 "local_term_coeff", "local_flux1", &
                                 "local_flux2"])
@@ -1379,7 +1379,7 @@ contains
                 else ! Other Riemann solvers
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
-                            $:parallel_loop(collapse=3, private=["local_inv_ds", &
+                            $:PARALLEL_LOOP(collapse=3, private=["local_inv_ds", &
                                 "local_q_cons_val", "local_k_term_val", &
                                 "local_term_coeff", "local_flux1", &
                                 "local_flux2"])
@@ -1394,7 +1394,7 @@ contains
                                                                                     local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                     end do; end do; end do
 
-                            $:parallel_loop(collapse=3, private=["local_inv_ds", &
+                            $:PARALLEL_LOOP(collapse=3, private=["local_inv_ds", &
                                 "local_q_cons_val", "local_k_term_val", &
                                 "local_term_coeff", "local_flux1", &
                                 "local_flux2"])
@@ -1443,7 +1443,7 @@ contains
         if (idir == 1) then ! x-direction
 
             if (surface_tension) then
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -1457,7 +1457,7 @@ contains
                 end do
             end if
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -1475,7 +1475,7 @@ contains
         elseif (idir == 2) then ! y-direction
 
             if (surface_tension) then
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -1507,7 +1507,7 @@ contains
                                                              idwbuff(1), idwbuff(2), idwbuff(3))
                     end if
 
-                    $:parallel_loop(collapse=2)
+                    $:PARALLEL_LOOP(collapse=2)
                     do l = 0, p
                         do j = 0, m
                             !$acc loop seq
@@ -1522,7 +1522,7 @@ contains
 
                 end if
 
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = 0, p
                     do k = 1, n
                         do j = 0, m
@@ -1538,7 +1538,7 @@ contains
                 end do
 
             else
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -1559,7 +1559,7 @@ contains
             if (cyl_coord) then
                 if ((bc_y%beg == BC_REFLECTIVE) .or. (bc_y%beg == BC_AXIS)) then
 
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do l = 0, p
                         do k = 1, n
                             do j = 0, m
@@ -1575,7 +1575,7 @@ contains
                     end do
 
                     if (viscous) then
-                        $:parallel_loop(collapse=2)
+                        $:PARALLEL_LOOP(collapse=2)
                         do l = 0, p
                             do j = 0, m
                                 !$acc loop seq
@@ -1589,7 +1589,7 @@ contains
                     end if
                 else
 
-                    $:parallel_loop(collapse=3)
+                    $:PARALLEL_LOOP(collapse=3)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -1610,7 +1610,7 @@ contains
         elseif (idir == 3) then ! z-direction
 
             if (surface_tension) then
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -1624,7 +1624,7 @@ contains
                 end do
             end if
 
-            $:parallel_loop(collapse=3)
+            $:PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -1640,7 +1640,7 @@ contains
             end do
 
             if (grid_geometry == 3) then
-                $:parallel_loop(collapse=3)
+                $:PARALLEL_LOOP(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -1695,7 +1695,7 @@ contains
         integer :: i, j, k, l, q, iter !< Generic loop iterators
         integer :: relax !< Relaxation procedure determination variable
 
-        $:parallel_loop(collapse=3, private=["pres_K_init", "rho_K_s", &
+        $:PARALLEL_LOOP(collapse=3, private=["pres_K_init", "rho_K_s", &
             "alpha_rho", "alpha", "Re", "pres_relax"])
         do l = 0, p
             do k = 0, n

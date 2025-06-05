@@ -106,7 +106,7 @@ contains
         real(wp) :: G
         integer :: j, k, l, i, r
 
-        $:parallel_loop(collapse=3, private=["alpha_K", "alpha_rho_K", "rho", &
+        $:PARALLEL_LOOP(collapse=3, private=["alpha_K", "alpha_rho_K", "rho", &
             "gamma", "pi_inf", "qv", "G", "Re", "tensora", "tensorb"])
         do l = 0, p
             do k = 0, n

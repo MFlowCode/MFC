@@ -97,7 +97,7 @@ contains
         !$acc declare create(p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok)
 
         ! starting equilibrium solver
-        $:parallel_loop(collapse=3, private=["p_infOV", "p_infpT", "p_infSL", &
+        $:PARALLEL_LOOP(collapse=3, private=["p_infOV", "p_infpT", "p_infSL", &
             "sk", "hk", "gk", "ek", "rhok", "pS", "pSOV", "pSSL", &
             "TS", "TSOV", "TSatOV", "TSatSL", "TSSL", "rhoe", &
             "dynE", "rhos", "rho", "rM", "m1", "m2", "MCT", "TvF"])
