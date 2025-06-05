@@ -774,7 +774,7 @@ contains
                 ! FD2 or FD4 of RHS at j = 0
                 $:PARALLEL_LOOP(collapse=2, private=["alpha_rho", "vel", "adv", &
                     "mf", "dvel_ds", "dadv_ds", "Re_cbc", "dalpha_rho_ds","dvel_dt", &
-                    "dadv_dt", "dalpha_rho_dt", "L", "lambda", "Ys", "dYs_dt", & 
+                    "dadv_dt", "dalpha_rho_dt", "L", "lambda", "Ys", "dYs_dt", &
                     "dYs_ds", "h_k", "Cp_i", "Gamma_i", "Xs"])
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end

@@ -116,13 +116,13 @@
         $:ASSERT_LIST(clause_list, str)
         #:set clause_str = clause_name + '(' + ', '.join(clause_list) + ') '
     #:else
-        #:set clause_str = ""
+        #:set clause_str = ''
     #:endif
     $:clause_str
 #:enddef
 
 #:def GEN_COPY_STR(copy)
-    #:set copy_val = GEN_PARENTHESES_CLAUSE("copy", copy)
+    #:set copy_val = GEN_PARENTHESES_CLAUSE('copy', copy)
     $:copy_val
 #:enddef
 
@@ -136,18 +136,18 @@
             #:set copyin_val = 'copyin(' + ', '.join(copyin) + ') '
         #:endif
     #:else
-        #:set copyin_val = ""
+        #:set copyin_val = ''
     #:endif
     $:copyin_val
 #:enddef
 
 #:def GEN_COPYOUT_STR(copyout)
-    #:set copyout_val = GEN_PARENTHESES_CLAUSE("copyout", copyout)
+    #:set copyout_val = GEN_PARENTHESES_CLAUSE('copyout', copyout)
     $:copyout_val
 #:enddef
 
 #:def GEN_CREATE_STR(create)
-    #:set create_val = GEN_PARENTHESES_CLAUSE("create", create)
+    #:set create_val = GEN_PARENTHESES_CLAUSE('create', create)
     $:create_val
 #:enddef
 
@@ -156,7 +156,7 @@
         #:assert isinstance(extraArgs, str)
         #:set extraArgs_val = extraArgs
     #:else
-        #:set extraArgs_val = ""
+        #:set extraArgs_val = ''
     #:endif
     $:extraArgs_val
 #:enddef
@@ -164,36 +164,41 @@
 #:def GEN_PARALLELISM_STR(parallelism)
     #:if parallelism is not None
         $:ASSERT_LIST(parallelism, str)
-        #:assert all((element == "gang" or element == "worker" or element == "vector" or element == "seq") for element in parallelism)
-        #:set parallelism_val = " ".join(parallelism) + " "
+        #:assert all((element == 'gang' or element == 'worker' or &
+            & element == 'vector' or element == 'seq') for element in parallelism)
+        #:set parallelism_val = ' '.join(parallelism) + ' '
     #:else
-        #:set parallelism_val = ""
+        #:set parallelism_val = ''
     #:endif
+    #:set parallelism_val = parallelism_val.strip('\n')
     $:parallelism_val
 #:enddef
 
-#:def PARALLEL_LOOP(collapse=None, private=None, parallelism=["gang", "vector"], default="present", firstprivate=None, reduction=None, reductionOp=None, copy=None, copyin=None, copyinReadOnly=False, copyout=None, create=None, extraAccArgs=None)
+#:def PARALLEL_LOOP(collapse=None, private=None, parallelism=['gang', 'vector'], &
+    & default='present', firstprivate=None, reduction=None, reductionOp=None, &
+    & copy=None, copyin=None, copyinReadOnly=False, copyout=None, create=None, &
+    & extraAccArgs=None)
     #:if collapse is not None
         #:assert isinstance(collapse, int)
         #:assert collapse > 1
         #:set collapse_val = 'collapse(' + str(collapse) + ') '
     #:else
-        #:set collapse_val = ""
+        #:set collapse_val = ''
     #:endif
 
-    #:set private_val = GEN_PARENTHESES_CLAUSE("private", private)
+    #:set private_val = GEN_PARENTHESES_CLAUSE('private', private)
 
     #:if default is not None
         #:assert isinstance(default, str)
-        #:assert (default == "present" or default == "none")
+        #:assert (default == 'present' or default == 'none')
         #:set default_val = 'default(' + default + ') '
     #:else
-        #:set default_val = ""
+        #:set default_val = ''
     #:endif
 
     #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
 
-    #:set firstprivate_val = GEN_PARENTHESES_CLAUSE("firstprivate", firstprivate)
+    #:set firstprivate_val = GEN_PARENTHESES_CLAUSE('firstprivate', firstprivate)
 
     #:if reduction is not None and reductionOp is not None
         #:if isinstance(reduction, list) and isinstance(reductionOp, list)
@@ -203,18 +208,18 @@
             #:assert all(type(element) == str for sublist in reduction for element in sublist)
             #:assert len(reduction) == len(reductionOp)
             #:set reduction_list = ['reduction(' + op + ':' + ', '.join(red) + ') ' for (red, op) in zip(reduction, reductionOp)]
-            #:set reduction_val = " ". join(reduction_list) + " "
+            #:set reduction_val = ' '. join(reduction_list) + ' '
         #:elif isinstance(reduction, list) and isinstance(reductionOp, str)
             $:ASSERT_LIST(reduction, str)
             #:assert isinstance(reductionOp, str)
             #:set reduction_val = 'reduction(' + reductionOp + ':' + ', '.join(reduction) + ') '
         #:else
-            #:stop "Invalid datatypes for reduction or reductionOp. Must be list of lists and lists or list and str respectively"
+            #:stop 'Invalid datatypes for reduction or reductionOp. Must be list of lists and lists or list and str respectively'
         #:endif
     #:elif reduction is not None or reductionOp is not None
-        #:stop "Cannot set the reduction list or reduction operation without setting the other"
+        #:stop 'Cannot set the reduction list or reduction operation without setting the other'
     #:else
-        #:set reduction_val = ""
+        #:set reduction_val = ''
     #:endif
 
     #:set copy_val = GEN_COPY_STR(copy)
@@ -227,25 +232,31 @@
 
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
 
-    #:set clause_val = collapse_val + parallelism_val + default_val + private_val + firstprivate_val + reduction_val + copy_val + copyin_val + copyout_val + create_val
-    #:set acc_directive = '!$acc parallel loop ' + clause_val + extraAccArgs_val
+    #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
+        & default_val.strip('\n') + private_val.strip('\n') + &
+        & firstprivate_val.strip('\n') + reduction_val.strip('\n') + &
+        & copy_val.strip('\n') + copyin_val.strip('\n') + &
+        & copyout_val.strip('\n') + create_val.strip('\n')
+    #:set acc_directive = '!$acc parallel loop ' + &
+        & clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
 #:enddef
 
-#:def routine(parallelism=["seq"], nohost=False, extraAccArgs=None)
+#:def routine(parallelism=['seq'], nohost=False, extraAccArgs=None)
     #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
 
     #:assert isinstance(nohost, bool)
     #:if nohost == True
-        #:set nohost_val = "nohost"
+        #:set nohost_val = 'nohost'
     #:else
-        #:set nohost_val = ""
+        #:set nohost_val = ''
     #:endif
 
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
 
-    #:set clause_val = parallelism_val + nohost_val
-    #:set acc_directive = '!$acc routine ' + clause_val + extraAccArgs_val
+    #:set clause_val = parallelism_val.strip('\n') + nohost_val.strip('\n')
+    #:set acc_directive = '!$acc routine ' + &
+        clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
 #:enddef
 
@@ -260,15 +271,18 @@
 
     #:set create_val = GEN_CREATE_STR(create)
 
-    #:set present_val = GEN_PARENTHESES_CLAUSE("present", present)
+    #:set present_val = GEN_PARENTHESES_CLAUSE('present', present)
 
-    #:set deviceptr_val = GEN_PARENTHESES_CLAUSE("deviceptr", deviceptr)
+    #:set deviceptr_val = GEN_PARENTHESES_CLAUSE('deviceptr', deviceptr)
 
-    #:set link_val = GEN_PARENTHESES_CLAUSE("link", link)
+    #:set link_val = GEN_PARENTHESES_CLAUSE('link', link)
 
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
 
-    #:set clause_val = copy_val + copyin_val + copyout_val + create_val + present_val + deviceptr_val + link_val
-    #:set acc_directive = '!$acc declare ' + clause_val + extraAccArgs_val
+    #:set clause_val = copy_val.strip('\n') + copyin_val.strip('\n') + &
+        & copyout_val.strip('\n') + create_val.strip('\n') + &
+        & present_val.strip('\n') + deviceptr_val.strip('\n') + &
+        & link_val.strip('\n')
+    #:set acc_directive = '!$acc declare ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
 #:enddef

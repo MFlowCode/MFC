@@ -885,7 +885,7 @@ contains
 
         $:PARALLEL_LOOP(collapse=3, private=["alpha_K", "alpha_rho_K", "Re_K", &
             "nRtmp", "rho_K", "gamma_K", "pi_inf_K", "qv_K", &
-        "dyn_pres_K", "rhoYks", "B"])
+            "dyn_pres_K", "rhoYks", "B"])
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
