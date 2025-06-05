@@ -1751,6 +1751,7 @@ contains
         real(wp), intent(out) :: s_L, s_R, s_S, s_M, s_P
 
         if (wave_speeds == 1) then
+<<<<<<< HEAD
             if (mhd) then
                 s_L = min(vel_L(idx) - c_fast_L, vel_R(idx) - c_fast_R)
                 s_R = max(vel_R(idx) + c_fast_R, vel_L(idx) + c_fast_L)
@@ -1776,6 +1777,53 @@ contains
                    (s_L - vel_L(idx)) - rho_R*vel_R(idx)*(s_R - vel_R(idx))) &
                   /(rho_L*(s_L - vel_L(idx)) - rho_R*(s_R - vel_R(idx)))
         elseif (wave_speeds == 2) then
+=======
+            if (elasticity) then
+                s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
+                        (((4_wp*G_L)/3_wp) + tau_e_L(idx_tau))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
+                        (((4_wp*G_R)/3_wp) + tau_e_R(idx_tau))/rho_R))
+                s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
+                        (((4_wp*G_R)/3_wp) + tau_e_R(idx_tau))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
+                        (((4_wp*G_L)/3_wp) + tau_e_L(idx_tau))/rho_L))
+                s_S = (pres_R - tau_e_R(idx_tau) - pres_L + &
+                        tau_e_L(idx_tau) + rho_L*vel_L(idx)*(s_L - vel_L(idx)) - &
+                        rho_R*vel_R(idx)*(s_R - vel_R(idx)))/(rho_L*(s_L - vel_L(idx)) - &
+                        rho_R*(s_R - vel_R(idx)))
+            else if (mhd) then
+                s_L = min(vel_L(idx) - c_fast_L, vel_R(idx) - c_fast_R)
+                s_R = max(vel_R(idx) + c_fast_R, vel_L(idx) + c_fast_L)
+                s_S = (pres_R - pres_L + rho_L*vel_L(idx)* &
+                (s_L - vel_L(idx)) - rho_R*vel_R(idx)*(s_R - vel_R(idx))) &
+                /(rho_L*(s_L - vel_L(idx)) - rho_R*(s_R - vel_R(idx)))
+            else if (hypoelasticity) then
+                s_L = min(vel_L(idx) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + &
+                                                    tau_e_L(idx_tau))/rho_L) &
+                        , vel_R(idx) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + &
+                                                        tau_e_R(idx_tau))/rho_R))
+                s_R = max(vel_R(idx) + sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + &
+                                                    tau_e_R(idx_tau))/rho_R) &
+                        , vel_L(idx) + sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + &
+                                                        tau_e_L(idx_tau))/rho_L))
+                s_S = (pres_R - pres_L + rho_L*vel_L(idx)* &
+                (s_L - vel_L(idx)) - rho_R*vel_R(idx)*(s_R - vel_R(idx))) &
+                /(rho_L*(s_L - vel_L(idx)) - rho_R*(s_R - vel_R(idx)))
+            else if (hyperelasticity) then
+                s_L = min(vel_L(idx) - sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L) &
+                        , vel_R(idx) - sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R))
+                s_R = max(vel_R(idx) + sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R) &
+                        , vel_L(idx) + sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L))
+                s_S = (pres_R - pres_L + rho_L*vel_L(idx)* &
+                (s_L - vel_L(idx)) - rho_R*vel_R(idx)*(s_R - vel_R(idx))) &
+                /(rho_L*(s_L - vel_L(idx)) - rho_R*(s_R - vel_R(idx)))
+            else
+                s_L = min(vel_L(idx) - c_L, vel_R(idx) - c_R)
+                s_R = max(vel_R(idx) + c_R, vel_L(idx) + c_L)
+                s_S = (pres_R - pres_L + rho_L*vel_L(idx)* &
+                (s_L - vel_L(idx)) - rho_R*vel_R(idx)*(s_R - vel_R(idx))) &
+                /(rho_L*(s_L - vel_L(idx)) - rho_R*(s_R - vel_R(idx)))
+            end if
+        else if (wave_speeds == 2) then
+>>>>>>> refactor-dev
             pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(idx) - vel_R(idx)))
             pres_SR = pres_SL
             Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
@@ -1810,7 +1858,10 @@ contains
             call s_mpi_abort('Error: Invalid wave speeds in s_compute_wave_speed')
         end if
 #endif
+<<<<<<< HEAD
 
+=======
+>>>>>>> refactor-dev
     end subroutine s_compute_wave_speed
 #endif
 
