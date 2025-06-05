@@ -29,7 +29,7 @@ contains
         !! @param j x index
         !! @param k y index
         !! @param l z index
-    subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+    pure subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_enthalpy
 #else
@@ -97,7 +97,7 @@ contains
         !! @param icfl_sf cell centered inviscid cfl number
         !! @param vcfl_sf (optional) cell centered viscous cfl number
         !! @param Rc_sf (optional) cell centered Rc
-    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
+    pure subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         !$acc routine seq
         real(wp), intent(in), dimension(num_vels) :: vel
         real(wp), intent(in) :: c, rho
@@ -194,7 +194,7 @@ contains
         !! @param j x coordinate
         !! @param k y coordinate
         !! @param l z coordinate
-    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
+    pure subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
         !$acc routine seq
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in) :: c, rho
@@ -268,9 +268,9 @@ contains
 
     end subroutine s_compute_dt_from_cfl
 
-    subroutine s_assign_default_bc_type(bc_type)
+    pure subroutine s_assign_default_bc_type(bc_type)
 
-        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 
         bc_type(1, -1)%sf(:, :, :) = bc_x%beg
         bc_type(1, 1)%sf(:, :, :) = bc_x%end

@@ -43,7 +43,7 @@ module m_qbmm
 
 contains
 
-    subroutine s_initialize_qbmm_module
+    impure subroutine s_initialize_qbmm_module
 
         integer :: i1, i2, q, i, j
 
@@ -411,7 +411,7 @@ contains
 
     end subroutine s_initialize_qbmm_module
 
-    subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
+    pure subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
@@ -678,7 +678,7 @@ contains
 
 !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
 
-    subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
+    pure subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff_nonpoly
 #else
@@ -751,7 +751,7 @@ contains
     end subroutine s_coeff_nonpoly
 
 !Coefficient array for polytropic model (pb for each R0 bin accounted for in wght_pb)
-    subroutine s_coeff(pres, rho, c, coeffs)
+    pure subroutine s_coeff(pres, rho, c, coeffs)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff
 #else
@@ -1028,7 +1028,7 @@ contains
 
     end subroutine s_mom_inv
 
-    subroutine s_chyqmom(momin, wght, abscX, abscY)
+    pure subroutine s_chyqmom(momin, wght, abscX, abscY)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_chyqmom
 #else
@@ -1095,7 +1095,7 @@ contains
 
     end subroutine s_chyqmom
 
-    subroutine s_hyqmom(frho, fup, fmom)
+    pure subroutine s_hyqmom(frho, fup, fmom)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_hyqmom
 #else
@@ -1117,7 +1117,7 @@ contains
 
     end subroutine s_hyqmom
 
-    function f_quad(abscX, abscY, wght_in, q, r, s)
+    pure function f_quad(abscX, abscY, wght_in, q, r, s)
         !$acc routine seq
         real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
         real(wp), intent(in) :: q, r, s
@@ -1133,7 +1133,7 @@ contains
 
     end function f_quad
 
-    function f_quad2D(abscX, abscY, wght_in, pow)
+    pure function f_quad2D(abscX, abscY, wght_in, pow)
         !$acc routine seq
         real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
         real(wp), dimension(3), intent(in) :: pow
