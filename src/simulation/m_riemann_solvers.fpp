@@ -202,17 +202,17 @@ contains
         !! For more information please refer to:
         !!      1) s_compute_cartesian_viscous_source_flux
         !!      2) s_compute_cylindrical_viscous_source_flux
-    subroutine s_compute_viscous_source_flux(velL_vf, &
-                                             dvelL_dx_vf, &
-                                             dvelL_dy_vf, &
-                                             dvelL_dz_vf, &
-                                             velR_vf, &
-                                             dvelR_dx_vf, &
-                                             dvelR_dy_vf, &
-                                             dvelR_dz_vf, &
-                                             flux_src_vf, &
-                                             norm_dir, &
-                                             ix, iy, iz)
+    pure subroutine s_compute_viscous_source_flux(velL_vf, &
+                                                  dvelL_dx_vf, &
+                                                  dvelL_dy_vf, &
+                                                  dvelL_dz_vf, &
+                                                  velR_vf, &
+                                                  dvelR_dx_vf, &
+                                                  dvelR_dy_vf, &
+                                                  dvelR_dz_vf, &
+                                                  flux_src_vf, &
+                                                  norm_dir, &
+                                                  ix, iy, iz)
 
         type(scalar_field), &
             dimension(num_vels), &
@@ -284,7 +284,6 @@ contains
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
-        real(wp) :: flux_tau_L = 0._wp, flux_tau_R = 0._wp
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
@@ -331,7 +330,7 @@ contains
         real(wp) :: alpha_L_sum, alpha_R_sum
         real(wp) :: zcoef, pcorr !< low Mach number correction
 
-        type(riemann_states) :: c_fast, pres_mag, vel
+        type(riemann_states) :: c_fast, pres_mag
         type(riemann_states_vec3) :: B
 
         type(riemann_states) :: Ga ! Gamma (Lorentz factor)
@@ -501,11 +500,13 @@ contains
 
                                 call get_mixture_molecular_weight(Ys_L, MW_L)
                                 call get_mixture_molecular_weight(Ys_R, MW_R)
+
                                 Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
                                 Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
 
                                 R_gas_L = gas_constant/MW_L
                                 R_gas_R = gas_constant/MW_R
+
                                 T_L = pres_L/rho_L/R_gas_L
                                 T_R = pres_R/rho_R/R_gas_R
 
@@ -713,52 +714,75 @@ contains
                                 end do
                             end if
 
-                            ! Momentum and Energy fluxes
-                            if (mhd) then
-                                if (.not. relativity) then
-                                    ! Flux of rho*v_x in the ${XYZ}$ direction
-                                    ! = rho * v_x * v_${XYZ}$ - B_x * B_${XYZ}$ + delta_(${XYZ}$,x) * p_tot
-                                    !acc loop seq
-                                    do i = 1, 3
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + i) = &
-                                            (s_M*(rho_R*vel_R(i)*vel_R(norm_dir) &
-                                                  - B%R(i)*B%R(norm_dir) &
-                                                  + dir_flg(i)*(pres_R + pres_mag%R)) &
-                                             - s_P*(rho_L*vel_L(i)*vel_L(norm_dir) &
-                                                    - B%L(i)*B%L(norm_dir) &
-                                                    + dir_flg(i)*(pres_L + pres_mag%L)) &
-                                             + s_M*s_P*(rho_L*vel_L(i) - rho_R*vel_R(i))) &
-                                            /(s_M - s_P)
-                                    end do
-                                    ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                        (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) - B%R(norm_dir)*(vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3))) &
-                                         - s_P*(vel_L(norm_dir)*(E_L + pres_L + pres_mag%L) - B%L(norm_dir)*(vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3))) &
-                                         + s_M*s_P*(E_L - E_R)) &
-                                        /(s_M - s_P)
-
-                                elseif (relativity) then
-                                    do i = 1, 3
-                                        ! Flux of m_x in the ${XYZ}$ direction
-                                        ! = m_x * v_${XYZ}$ - b_x/Gamma * B_${XYZ}$ + delta_(${XYZ}$,x) * p_tot
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + i) = &
-                                            (s_M*(cm%R(i)*vel_R(norm_dir) &
-                                                  - b4%R(i)/Ga%R*B%R(norm_dir) &
-                                                  + dir_flg(i)*(pres_R + pres_mag%R)) &
-                                             - s_P*(cm%L(i)*vel_L(norm_dir) &
-                                                    - b4%L(i)/Ga%L*B%L(norm_dir) &
-                                                    + dir_flg(i)*(pres_L + pres_mag%L)) &
-                                             + s_M*s_P*(cm%L(i) - cm%R(i))) &
-                                            /(s_M - s_P)
-                                    end do
-                                    ! energy flux = m_${XYZ}$ - mass flux
-                                    ! Hard-coded for single-component for now
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                        (s_M*(cm%R(norm_dir) - Ga%R*alpha_rho_R(1)*vel_R(norm_dir)) &
-                                         - s_P*(cm%L(norm_dir) - Ga%L*alpha_rho_L(1)*vel_L(norm_dir)) &
-                                         + s_M*s_P*(E_L - E_R)) &
-                                        /(s_M - s_P)
-                                end if
+                            ! Momentum
+                            if (mhd .and. (.not. relativity)) then
+                                ! Flux of rho*v_x in the ${XYZ}$ direction
+                                ! = rho * v_x * v_${XYZ}$ - B_x * B_${XYZ}$ + delta_(${XYZ}$,x) * p_tot
+                                flux_rs${XYZ}$_vf(j, k, l, contxe + 1) = &
+                                    (s_M*(rho_R*vel_R(1)*vel_R(norm_dir) &
+                                          - B%R(1)*B%R(norm_dir) &
+                                          + dir_flg(1)*(pres_R + pres_mag%R)) &
+                                     - s_P*(rho_L*vel_L(1)*vel_L(norm_dir) &
+                                            - B%L(1)*B%L(norm_dir) &
+                                            + dir_flg(1)*(pres_L + pres_mag%L)) &
+                                     + s_M*s_P*(rho_L*vel_L(1) - rho_R*vel_R(1))) &
+                                    /(s_M - s_P)
+                                ! Flux of rho*v_y in the ${XYZ}$ direction
+                                ! = rho * v_y * v_${XYZ}$ - B_y * B_${XYZ}$ + delta_(${XYZ}$,y) * p_tot
+                                flux_rs${XYZ}$_vf(j, k, l, contxe + 2) = &
+                                    (s_M*(rho_R*vel_R(2)*vel_R(norm_dir) &
+                                          - B%R(2)*B%R(norm_dir) &
+                                          + dir_flg(2)*(pres_R + pres_mag%R)) &
+                                     - s_P*(rho_L*vel_L(2)*vel_L(norm_dir) &
+                                            - B%L(2)*B%L(norm_dir) &
+                                            + dir_flg(2)*(pres_L + pres_mag%L)) &
+                                     + s_M*s_P*(rho_L*vel_L(2) - rho_R*vel_R(2))) &
+                                    /(s_M - s_P)
+                                ! Flux of rho*v_z in the ${XYZ}$ direction
+                                ! = rho * v_z * v_${XYZ}$ - B_z * B_${XYZ}$ + delta_(${XYZ}$,z) * p_tot
+                                flux_rs${XYZ}$_vf(j, k, l, contxe + 3) = &
+                                    (s_M*(rho_R*vel_R(3)*vel_R(norm_dir) &
+                                          - B%R(3)*B%R(norm_dir) &
+                                          + dir_flg(3)*(pres_R + pres_mag%R)) &
+                                     - s_P*(rho_L*vel_L(3)*vel_L(norm_dir) &
+                                            - B%L(3)*B%L(norm_dir) &
+                                            + dir_flg(3)*(pres_L + pres_mag%L)) &
+                                     + s_M*s_P*(rho_L*vel_L(3) - rho_R*vel_R(3))) &
+                                    /(s_M - s_P)
+                            elseif (mhd .and. relativity) then
+                                ! Flux of m_x in the ${XYZ}$ direction
+                                ! = m_x * v_${XYZ}$ - b_x/Gamma * B_${XYZ}$ + delta_(${XYZ}$,x) * p_tot
+                                flux_rs${XYZ}$_vf(j, k, l, contxe + 1) = &
+                                    (s_M*(cm%R(1)*vel_R(norm_dir) &
+                                          - b4%R(1)/Ga%R*B%R(norm_dir) &
+                                          + dir_flg(1)*(pres_R + pres_mag%R)) &
+                                     - s_P*(cm%L(1)*vel_L(norm_dir) &
+                                            - b4%L(1)/Ga%L*B%L(norm_dir) &
+                                            + dir_flg(1)*(pres_L + pres_mag%L)) &
+                                     + s_M*s_P*(cm%L(1) - cm%R(1))) &
+                                    /(s_M - s_P)
+                                ! Flux of m_y in the ${XYZ}$ direction
+                                ! = rho * v_y * v_${XYZ}$ - B_y * B_${XYZ}$ + delta_(${XYZ}$,y) * p_tot
+                                flux_rs${XYZ}$_vf(j, k, l, contxe + 2) = &
+                                    (s_M*(cm%R(2)*vel_R(norm_dir) &
+                                          - b4%R(2)/Ga%R*B%R(norm_dir) &
+                                          + dir_flg(2)*(pres_R + pres_mag%R)) &
+                                     - s_P*(cm%L(2)*vel_L(norm_dir) &
+                                            - b4%L(2)/Ga%L*B%L(norm_dir) &
+                                            + dir_flg(2)*(pres_L + pres_mag%L)) &
+                                     + s_M*s_P*(cm%L(2) - cm%R(2))) &
+                                    /(s_M - s_P)
+                                ! Flux of m_z in the ${XYZ}$ direction
+                                ! = rho * v_z * v_${XYZ}$ - B_z * B_${XYZ}$ + delta_(${XYZ}$,z) * p_tot
+                                flux_rs${XYZ}$_vf(j, k, l, contxe + 3) = &
+                                    (s_M*(cm%R(3)*vel_R(norm_dir) &
+                                          - b4%R(3)/Ga%R*B%R(norm_dir) &
+                                          + dir_flg(3)*(pres_R + pres_mag%R)) &
+                                     - s_P*(cm%L(3)*vel_L(norm_dir) &
+                                            - b4%L(3)/Ga%L*B%L(norm_dir) &
+                                            + dir_flg(3)*(pres_L + pres_mag%L)) &
+                                     + s_M*s_P*(cm%L(3) - cm%R(3))) &
+                                    /(s_M - s_P)
                             elseif (bubbles_euler) then
                                 !$acc loop seq
                                 do i = 1, num_vels
@@ -774,13 +798,6 @@ contains
                                         /(s_M - s_P) &
                                         + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R(dir_idx(i)) - vel_L(dir_idx(i)))
                                 end do
-                                ! energy flux
-                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                    (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
-                                     - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
-                                     + s_M*s_P*(E_L - E_R)) &
-                                    /(s_M - s_P) &
-                                    + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R_rms - vel_L_rms)/2._wp
                             else if (hypoelasticity) then
                                 !$acc loop seq
                                 do i = 1, num_vels
@@ -797,17 +814,6 @@ contains
                                                     - rho_R*vel_R(dir_idx(i)))) &
                                         /(s_M - s_P)
                                 end do
-                                ! energy flux
-                                !acc loop seq
-                                do i = 1, num_dims
-                                    flux_tau_L = flux_tau_L + tau_e_L(dir_idx_tau(i))*vel_L(dir_idx(i))
-                                    flux_tau_R = flux_tau_R + tau_e_R(dir_idx_tau(i))*vel_R(dir_idx(i))
-                                end do
-                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                    (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) - flux_tau_R) &
-                                     - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) - flux_tau_L) &
-                                     + s_M*s_P*(E_L - E_R)) &
-                                    /(s_M - s_P)
                             else
                                 !$acc loop seq
                                 do i = 1, num_vels
@@ -823,7 +829,65 @@ contains
                                         /(s_M - s_P) &
                                         + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R(dir_idx(i)) - vel_L(dir_idx(i)))
                                 end do
-                                ! energy flux
+                            end if
+
+                            ! Energy
+                            if (mhd .and. (.not. relativity)) then
+                                ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                    (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) - B%R(norm_dir)*(vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3))) &
+                                     - s_P*(vel_L(norm_dir)*(E_L + pres_L + pres_mag%L) - B%L(norm_dir)*(vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3))) &
+                                     + s_M*s_P*(E_L - E_R)) &
+                                    /(s_M - s_P)
+                            elseif (mhd .and. relativity) then
+                                ! energy flux = m_${XYZ}$ - mass flux
+                                ! Hard-coded for single-component for now
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                    (s_M*(cm%R(norm_dir) - Ga%R*alpha_rho_R(1)*vel_R(norm_dir)) &
+                                     - s_P*(cm%L(norm_dir) - Ga%L*alpha_rho_L(1)*vel_L(norm_dir)) &
+                                     + s_M*s_P*(E_L - E_R)) &
+                                    /(s_M - s_P)
+                            else if (bubbles_euler) then
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                    (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
+                                     - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
+                                     + s_M*s_P*(E_L - E_R)) &
+                                    /(s_M - s_P) &
+                                    + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R_rms - vel_L_rms)/2._wp
+                            else if (hypoelasticity) then
+                                !TODO: simplify this so it's not split into 3
+                                if (num_dims == 1) then
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                        (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) &
+                                              - (tau_e_R(dir_idx_tau(1))*vel_R(dir_idx(1)))) &
+                                         - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) &
+                                                - (tau_e_L(dir_idx_tau(1))*vel_L(dir_idx(1)))) &
+                                         + s_M*s_P*(E_L - E_R)) &
+                                        /(s_M - s_P)
+                                else if (num_dims == 2) then
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                        (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) &
+                                              - (tau_e_R(dir_idx_tau(1))*vel_R(dir_idx(1))) &
+                                              - (tau_e_R(dir_idx_tau(2))*vel_R(dir_idx(2)))) &
+                                         - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) &
+                                                - (tau_e_L(dir_idx_tau(1))*vel_L(dir_idx(1))) &
+                                                - (tau_e_L(dir_idx_tau(2))*vel_L(dir_idx(2)))) &
+                                         + s_M*s_P*(E_L - E_R)) &
+                                        /(s_M - s_P)
+                                else if (num_dims == 3) then
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                        (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) &
+                                              - (tau_e_R(dir_idx_tau(1))*vel_R(dir_idx(1))) &
+                                              - (tau_e_R(dir_idx_tau(2))*vel_R(dir_idx(2))) &
+                                              - (tau_e_R(dir_idx_tau(3))*vel_R(dir_idx(3)))) &
+                                         - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) &
+                                                - (tau_e_L(dir_idx_tau(1))*vel_L(dir_idx(1))) &
+                                                - (tau_e_L(dir_idx_tau(2))*vel_L(dir_idx(2))) &
+                                                - (tau_e_L(dir_idx_tau(3))*vel_L(dir_idx(3)))) &
+                                         + s_M*s_P*(E_L - E_R)) &
+                                        /(s_M - s_P)
+                                end if
+                            else
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     (s_M*vel_R(dir_idx(1))*(E_R + pres_R) &
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L) &
@@ -909,25 +973,34 @@ contains
                             if (mhd) then
                                 if (n == 0) then ! 1D: d/dx flux only & Bx = Bx0 = const.
                                     ! B_y flux = v_x * B_y - v_y * Bx0
+                                    flux_rsx_vf(j, k, l, B_idx%beg) = (s_M*(vel_R(1)*B%R(2) - vel_R(2)*Bx0) &
+                                                                       - s_P*(vel_L(1)*B%L(2) - vel_L(2)*Bx0) + s_M*s_P*(B%L(2) - B%R(2)))/(s_M - s_P)
+
                                     ! B_z flux = v_x * B_z - v_z * Bx0
-                                    !acc loop seq
-                                    do i = 0, 1
-                                        flux_rsx_vf(j, k, l, B_idx%beg + i) = (s_M*(vel_R(1)*B%R(2 + i) - vel_R(2 + i)*Bx0) &
-                                                                               - s_P*(vel_L(1)*B%L(2 + i) - vel_L(2 + i)*Bx0) &
-                                                                               + s_M*s_P*(B%L(2 + i) - B%R(2 + i)))/(s_M - s_P)
-                                    end do
+                                    flux_rsx_vf(j, k, l, B_idx%beg + 1) = (s_M*(vel_R(1)*B%R(3) - vel_R(3)*Bx0) &
+                                                                           - s_P*(vel_L(1)*B%L(3) - vel_L(3)*Bx0) + s_M*s_P*(B%L(3) - B%R(3)))/(s_M - s_P)
+
                                 else ! 2D/3D: Bx, By, Bz /= const. but zero flux component in the same direction
                                     ! B_x d/d${XYZ}$ flux = (1 - delta(x,${XYZ}$)) * (v_${XYZ}$ * B_x - v_x * B_${XYZ}$)
+                                    flux_rs${XYZ}$_vf(j, k, l, B_idx%beg) = (1 - dir_flg(1))*( &
+                                                                            s_M*(vel_R(dir_idx(1))*B%R(1) - vel_R(1)*B%R(norm_dir)) - &
+                                                                            s_P*(vel_L(dir_idx(1))*B%L(1) - vel_L(1)*B%L(norm_dir)) + &
+                                                                            s_M*s_P*(B%L(1) - B%R(1)))/(s_M - s_P)
+
                                     ! B_y d/d${XYZ}$ flux = (1 - delta(y,${XYZ}$)) * (v_${XYZ}$ * B_y - v_y * B_${XYZ}$)
+                                    flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1) = (1 - dir_flg(2))*( &
+                                                                                s_M*(vel_R(dir_idx(1))*B%R(2) - vel_R(2)*B%R(norm_dir)) - &
+                                                                                s_P*(vel_L(dir_idx(1))*B%L(2) - vel_L(2)*B%L(norm_dir)) + &
+                                                                                s_M*s_P*(B%L(2) - B%R(2)))/(s_M - s_P)
+
                                     ! B_z d/d${XYZ}$ flux = (1 - delta(z,${XYZ}$)) * (v_${XYZ}$ * B_z - v_z * B_${XYZ}$)
-                                    !$acc loop seq
-                                    do i = 0, 2
-                                        flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + i) = (1 - dir_flg(i + 1))*( &
-                                                                                    s_M*(vel_R(dir_idx(1))*B%R(i + 1) - vel_R(i + 1)*B%R(norm_dir)) - &
-                                                                                    s_P*(vel_L(dir_idx(1))*B%L(i + 1) - vel_L(i + 1)*B%L(norm_dir)) + &
-                                                                                    s_M*s_P*(B%L(i + 1) - B%R(i + 1)))/(s_M - s_P)
-                                    end do
+                                    flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 2) = (1 - dir_flg(3))*( &
+                                                                                s_M*(vel_R(dir_idx(1))*B%R(3) - vel_R(3)*B%R(norm_dir)) - &
+                                                                                s_P*(vel_L(dir_idx(1))*B%L(3) - vel_L(3)*B%L(norm_dir)) + &
+                                                                                s_M*s_P*(B%L(3) - B%R(3)))/(s_M - s_P)
+
                                 end if
+
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
                             end if
 
@@ -962,6 +1035,7 @@ contains
                                     end do
                                 end if
                             #:endif
+
                         end do
                     end do
                 end do
@@ -1124,6 +1198,9 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
         type(riemann_states) :: c_fast, vel
+
+        ! Populating the buffers of the left and right Riemann problem
+        ! states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers( &
             qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
@@ -1331,9 +1408,9 @@ contains
 
                                 ! COMPUTING THE DIRECT WAVE SPEEDS
                                 call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
-                                                          c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
-                                                          tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
-                                                          s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
+                                                        c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
+                                                        tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
+                                                        s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
@@ -1480,7 +1557,40 @@ contains
                                 end if
 
                                 ! Geometrical source flux for cylindrical coordinates
-                                call s_compute_cylindrical_geometry_source_flux()
+                                #:if (NORM_DIR == 2)
+                                    if (cyl_coord) then
+                                        !Substituting the advective flux into the inviscid geometrical source flux
+                                        !$acc loop seq
+                                        do i = 1, E_idx
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                        end do
+                                        !$acc loop seq
+                                        do i = intxb, intxe
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                        end do
+                                        ! Recalculating the radial momentum geometric source flux
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) = &
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
+                                        ! Geometrical source of the void fraction(s) is zero
+                                        !$acc loop seq
+                                        do i = advxb, advxe
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0_wp
+                                        end do
+                                    end if
+                                #:endif
+                                #:if (NORM_DIR == 3)
+                                    if (grid_geometry == 3) then
+                                        !$acc loop seq
+                                        do i = 1, sys_size
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0_wp
+                                        end do
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) = &
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
+
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
+                                    end if
+                                #:endif
+
                             end do
                         end do
                     end do
@@ -1525,20 +1635,17 @@ contains
                                 gamma_L = 0._wp
                                 pi_inf_L = 0._wp
                                 qv_L = 0._wp
+                                rho_R = 0._wp
+                                gamma_R = 0._wp
+                                pi_inf_R = 0._wp
+                                qv_R = 0._wp
+
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     rho_L = rho_L + alpha_rho_L(i)
                                     gamma_L = gamma_L + alpha_L(i)*gammas(i)
                                     pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
                                     qv_L = qv_L + alpha_rho_L(i)*qvs(i)
-                                end do
-
-                                rho_R = 0._wp
-                                gamma_R = 0._wp
-                                pi_inf_R = 0._wp
-                                qv_R = 0._wp
-                                !$acc loop seq
-                                do i = 1, num_fluids
                                     rho_R = rho_R + alpha_rho_R(i)
                                     gamma_R = gamma_R + alpha_R(i)*gammas(i)
                                     pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
@@ -1566,9 +1673,9 @@ contains
                                                               vel_avg_rms, 0._wp, c_avg)
 
                                 call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
-                                                          c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
-                                                          tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
-                                                          s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
+                                                        c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
+                                                        tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
+                                                        s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
@@ -1633,6 +1740,7 @@ contains
                                 ! Source for volume fraction advection equation
                                 !$acc loop seq
                                 do i = 1, num_dims
+
                                     vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = 0._wp
                                     !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0._wp
                                 end do
@@ -1652,7 +1760,52 @@ contains
                                 end if
 
                                 ! Geometrical source flux for cylindrical coordinates
-                                call s_compute_cylindrical_geometry_source_flux()
+                                #:if (NORM_DIR == 2)
+                                    if (cyl_coord) then
+                                        ! Substituting the advective flux into the inviscid geometrical source flux
+                                        !$acc loop seq
+                                        do i = 1, E_idx
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                        end do
+                                        ! Recalculating the radial momentum geometric source flux
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
+                                            xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                                         vel_L(dir_idx(1)) + &
+                                                         s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
+                                                                    (1._wp - dir_flg(dir_idx(1)))* &
+                                                                    vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
+                                            + xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                                           vel_R(dir_idx(1)) + &
+                                                           s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
+                                                                      (1._wp - dir_flg(dir_idx(1)))* &
+                                                                      vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                                        ! Geometrical source of the void fraction(s) is zero
+                                        !$acc loop seq
+                                        do i = advxb, advxe
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                        end do
+                                    end if
+                                #:endif
+                                #:if (NORM_DIR == 3)
+                                    if (grid_geometry == 3) then
+                                        !$acc loop seq
+                                        do i = 1, sys_size
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                        end do
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
+                                            -xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                                          vel_L(dir_idx(1)) + &
+                                                          s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
+                                                                     (1._wp - dir_flg(dir_idx(1)))* &
+                                                                     vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
+                                            - xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                                           vel_R(dir_idx(1)) + &
+                                                           s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
+                                                                      (1._wp - dir_flg(dir_idx(1)))* &
+                                                                      vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
+                                    end if
+                                #:endif
                             end do
                         end do
                     end do
@@ -1892,9 +2045,9 @@ contains
                                 end if
 
                                 call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
-                                                          c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
-                                                          tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
-                                                          s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
+                                                        c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
+                                                        tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
+                                                        s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
@@ -2016,7 +2169,54 @@ contains
                                 end if
 
                                 ! Geometrical source flux for cylindrical coordinates
-                                call s_compute_cylindrical_geometry_source_flux()
+                                #:if (NORM_DIR == 2)
+                                    if (cyl_coord) then
+                                        ! Substituting the advective flux into the inviscid geometrical source flux
+                                        !$acc loop seq
+                                        do i = 1, E_idx
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                        end do
+                                        ! Recalculating the radial momentum geometric source flux
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
+                                            xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                                         vel_L(dir_idx(1)) + &
+                                                         s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
+                                                                    (1._wp - dir_flg(dir_idx(1)))* &
+                                                                    vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
+                                            + xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                                           vel_R(dir_idx(1)) + &
+                                                           s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
+                                                                      (1._wp - dir_flg(dir_idx(1)))* &
+                                                                      vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                                        ! Geometrical source of the void fraction(s) is zero
+                                        !$acc loop seq
+                                        do i = advxb, advxe
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                        end do
+                                    end if
+                                #:endif
+                                #:if (NORM_DIR == 3)
+                                    if (grid_geometry == 3) then
+                                        !$acc loop seq
+                                        do i = 1, sys_size
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                        end do
+
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
+                                            -xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                                          vel_L(dir_idx(1)) + &
+                                                          s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
+                                                                     (1._wp - dir_flg(dir_idx(1)))* &
+                                                                     vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
+                                            - xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                                           vel_R(dir_idx(1)) + &
+                                                           s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
+                                                                      (1._wp - dir_flg(dir_idx(1)))* &
+                                                                      vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
+
+                                    end if
+                                #:endif
                             end do
                         end do
                     end do
@@ -2257,10 +2457,10 @@ contains
                                     @:compute_low_Mach_correction()
                                 end if
 
-                                call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
-                                                          c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
-                                                          tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
-                                                          s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
+                            call s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
+                                                      c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
+                                                      tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
+                                                      s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
@@ -2413,7 +2613,55 @@ contains
                                 end if
 
                                 ! Geometrical source flux for cylindrical coordinates
-                                call s_compute_cylindrical_geometry_source_flux()
+                                #:if (NORM_DIR == 2)
+                                    if (cyl_coord) then
+                                        !Substituting the advective flux into the inviscid geometrical source flux
+                                        !$acc loop seq
+                                        do i = 1, E_idx
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                        end do
+                                        ! Recalculating the radial momentum geometric source flux
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + idx1) = &
+                                            xi_M*(rho_L*(vel_L(idx1)* &
+                                                         vel_L(idx1) + &
+                                                         s_M*(xi_L*(dir_flg(idx1)*s_S + &
+                                                                    (1._wp - dir_flg(idx1))* &
+                                                                    vel_L(idx1)) - vel_L(idx1)))) &
+                                            + xi_P*(rho_R*(vel_R(idx1)* &
+                                                           vel_R(idx1) + &
+                                                           s_P*(xi_R*(dir_flg(idx1)*s_S + &
+                                                                      (1._wp - dir_flg(idx1))* &
+                                                                      vel_R(idx1)) - vel_R(idx1))))
+                                        ! Geometrical source of the void fraction(s) is zero
+                                        !$acc loop seq
+                                        do i = advxb, advxe
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                        end do
+                                    end if
+                                #:endif
+                                #:if (NORM_DIR == 3)
+                                    if (grid_geometry == 3) then
+                                        !$acc loop seq
+                                        do i = 1, sys_size
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                        end do
+
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
+                                            -xi_M*(rho_L*(vel_L(idx1)* &
+                                                          vel_L(idx1) + &
+                                                          s_M*(xi_L*(dir_flg(idx1)*s_S + &
+                                                                     (1._wp - dir_flg(idx1))* &
+                                                                     vel_L(idx1)) - vel_L(idx1)))) &
+                                            - xi_P*(rho_R*(vel_R(idx1)* &
+                                                           vel_R(idx1) + &
+                                                           s_P*(xi_R*(dir_flg(idx1)*s_S + &
+                                                                      (1._wp - dir_flg(idx1))* &
+                                                                      vel_R(idx1)) - vel_R(idx1))))
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
+
+                                    end if
+                                #:endif
+
                             end do
                         end do
                     end do
@@ -2462,81 +2710,6 @@ contains
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                        flux_gsrc_vf, &
                                        norm_dir, ix, iy, iz)
-    contains
-        subroutine s_compute_cylindrical_geometry_source_flux()
-            !$acc routine seq
-            ! This subroutine computes the cylindrical geometry source fluxes
-            #:if (NORM_DIR == 2)
-                if (cyl_coord) then
-                    if (model_eqns == 3) then
-                        !Substituting the advective flux into the inviscid geometrical source flux
-                        !$acc loop seq
-                        do i = 1, E_idx
-                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
-                        end do
-                        !$acc loop seq
-                        do i = intxb, intxe
-                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
-                        end do
-                        ! Recalculating the radial momentum geometric source flux
-                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) = &
-                            flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
-                    else
-                        ! Substituting the advective flux into the inviscid geometrical source flux
-                        !$acc loop seq
-                        do i = 1, E_idx
-                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
-                        end do
-                        ! Recalculating the radial momentum geometric source flux
-                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
-                            xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                         vel_L(dir_idx(1)) + &
-                                         s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
-                                                    (1._wp - dir_flg(dir_idx(1)))* &
-                                                    vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
-                            + xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                           vel_R(dir_idx(1)) + &
-                                           s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
-                                                      (1._wp - dir_flg(dir_idx(1)))* &
-                                                      vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
-                    end if
-                    ! Geometrical source of the void fraction(s) is zero
-                    !$acc loop seq
-                    do i = advxb, advxe
-                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
-                    end do
-                end if
-            #:endif
-            #:if (NORM_DIR == 3)
-                if (grid_geometry == 3) then
-                    !$acc loop seq
-                    do i = 1, sys_size
-                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
-                    end do
-                    if (model_eqns == 3) then
-                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) = &
-                            flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
-                    else
-                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
-                            -xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                          vel_L(dir_idx(1)) + &
-                                          s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
-                                                     (1._wp - dir_flg(dir_idx(1)))* &
-                                                     vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
-                            - xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                           vel_R(dir_idx(1)) + &
-                                           s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
-                                                      (1._wp - dir_flg(dir_idx(1)))* &
-                                                      vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
-                    end if
-                    flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
-                end if
-            #:endif
-        end subroutine s_compute_cylindrical_geometry_source_flux
-        ! end contains
-        ! Populating the buffers of the left and right Riemann problem
-        ! states variables, based on the choice of boundary conditions
-
     end subroutine s_hllc_riemann_solver
 
     !> HLLD Riemann solver resolves 5 of the 7 waves of MHD equations:
@@ -2838,7 +3011,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_riemann_solvers_module
+    impure subroutine s_initialize_riemann_solvers_module
 
         ! Allocating the variables that will be utilized to formulate the
         ! left, right, and average states of the Riemann problem, as well
@@ -3222,11 +3395,11 @@ contains
         !! @param[in] ix Global X-direction loop bounds (int_bounds_info).
         !! @param[in] iy Global Y-direction loop bounds (int_bounds_info).
         !! @param[in] iz Global Z-direction loop bounds (int_bounds_info).
-    subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, &
-                                                         dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, &
-                                                         velR_vf, &
-                                                         dvelR_dx_vf, dvelR_dy_vf, dvelR_dz_vf, &
-                                                         flux_src_vf, norm_dir, ix, iy, iz)
+    pure subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, &
+                                                              dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, &
+                                                              velR_vf, &
+                                                              dvelR_dx_vf, dvelR_dy_vf, dvelR_dz_vf, &
+                                                              flux_src_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
@@ -3369,32 +3542,32 @@ contains
     end subroutine s_compute_cylindrical_viscous_source_flux
 
     !> @brief Computes Cartesian viscous source flux contributions for momentum and energy.
-        !! Calculates averaged velocity gradients, gets Re and interface velocities,
-        !! calls helpers for shear/bulk stress, then updates `flux_src_vf`.
-        !! @param[in] velL_vf Left boundary velocity (num_dims scalar_field).
-        !! @param[in] dvelL_dx_vf Left boundary d(vel)/dx (num_dims scalar_field).
-        !! @param[in] dvelL_dy_vf Left boundary d(vel)/dy (num_dims scalar_field).
-        !! @param[in] dvelL_dz_vf Left boundary d(vel)/dz (num_dims scalar_field).
-        !! @param[in] velR_vf Right boundary velocity (num_dims scalar_field).
-        !! @param[in] dvelR_dx_vf Right boundary d(vel)/dx (num_dims scalar_field).
-        !! @param[in] dvelR_dy_vf Right boundary d(vel)/dy (num_dims scalar_field).
-        !! @param[in] dvelR_dz_vf Right boundary d(vel)/dz (num_dims scalar_field).
-        !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
-        !! @param[in] norm_dir Interface normal direction (1=x, 2=y, 3=z).
-        !! @param[in] ix X-direction loop bounds (int_bounds_info).
-        !! @param[in] iy Y-direction loop bounds (int_bounds_info).
-        !! @param[in] iz Z-direction loop bounds (int_bounds_info).
-    subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
-                                                       dvelL_dx_vf, &
-                                                       dvelL_dy_vf, &
-                                                       dvelL_dz_vf, &
-                                                       velR_vf, &
-                                                       dvelR_dx_vf, &
-                                                       dvelR_dy_vf, &
-                                                       dvelR_dz_vf, &
-                                                       flux_src_vf, &
-                                                       norm_dir, &
-                                                       ix, iy, iz)
+    !! Calculates averaged velocity gradients, gets Re and interface velocities,
+    !! calls helpers for shear/bulk stress, then updates `flux_src_vf`.
+    !! @param[in] velL_vf Left boundary velocity (num_dims scalar_field).
+    !! @param[in] dvelL_dx_vf Left boundary d(vel)/dx (num_dims scalar_field).
+    !! @param[in] dvelL_dy_vf Left boundary d(vel)/dy (num_dims scalar_field).
+    !! @param[in] dvelL_dz_vf Left boundary d(vel)/dz (num_dims scalar_field).
+    !! @param[in] velR_vf Right boundary velocity (num_dims scalar_field).
+    !! @param[in] dvelR_dx_vf Right boundary d(vel)/dx (num_dims scalar_field).
+    !! @param[in] dvelR_dy_vf Right boundary d(vel)/dy (num_dims scalar_field).
+    !! @param[in] dvelR_dz_vf Right boundary d(vel)/dz (num_dims scalar_field).
+    !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
+    !! @param[in] norm_dir Interface normal direction (1=x, 2=y, 3=z).
+    !! @param[in] ix X-direction loop bounds (int_bounds_info).
+    !! @param[in] iy Y-direction loop bounds (int_bounds_info).
+    !! @param[in] iz Z-direction loop bounds (int_bounds_info).
+    pure subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
+                                                            dvelL_dx_vf, &
+                                                            dvelL_dy_vf, &
+                                                            dvelL_dz_vf, &
+                                                            velR_vf, &
+                                                            dvelR_dx_vf, &
+                                                            dvelR_dy_vf, &
+                                                            dvelR_dz_vf, &
+                                                            flux_src_vf, &
+                                                            norm_dir, &
+                                                            ix, iy, iz)
 
         ! Arguments
         type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
@@ -3477,7 +3650,7 @@ contains
                     end if
 
                     if (shear_stress) then
-                        current_tau_shear = 0.0_wp
+                        ! current_tau_shear = 0.0_wp
                         call s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, current_tau_shear)
 
                         do i_dim = 1, num_dims
@@ -3491,7 +3664,7 @@ contains
                     end if
 
                     if (bulk_stress) then
-                        current_tau_bulk = 0.0_wp
+                        ! current_tau_bulk = 0.0_wp
                         call s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, current_tau_bulk)
 
                         do i_dim = 1, num_dims
@@ -3512,12 +3685,12 @@ contains
     end subroutine s_compute_cartesian_viscous_source_flux
 
     !> @brief Calculates shear stress tensor components.
-        !! tau_ij_shear = ( (dui/dxj + duj/dxi) - (2/3)*(div_v)*delta_ij ) / Re_shear
-        !! @param[in] vel_grad_avg Averaged velocity gradient tensor (d(vel_i)/d(coord_j)).
-        !! @param[in] Re_shear Shear Reynolds number.
-        !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
-        !! @param[out] tau_shear_out Calculated shear stress tensor (stress on i-face, j-direction).
-    subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
+    !! tau_ij_shear = ( (dui/dxj + duj/dxi) - (2/3)*(div_v)*delta_ij ) / Re_shear
+    !! @param[in] vel_grad_avg Averaged velocity gradient tensor (d(vel_i)/d(coord_j)).
+    !! @param[in] Re_shear Shear Reynolds number.
+    !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
+    !! @param[out] tau_shear_out Calculated shear stress tensor (stress on i-face, j-direction).
+    pure subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
         !$acc routine seq
 
         implicit none
@@ -3547,11 +3720,11 @@ contains
     end subroutine s_calculate_shear_stress_tensor
 
     !> @brief Calculates bulk stress tensor components (diagonal only).
-        !! tau_ii_bulk = (div_v) / Re_bulk. Off-diagonals are zero.
-        !! @param[in] Re_bulk Bulk Reynolds number.
-        !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
-        !! @param[out] tau_bulk_out Calculated bulk stress tensor (stress on i-face, i-direction).
-    subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
+    !! tau_ii_bulk = (div_v) / Re_bulk. Off-diagonals are zero.
+    !! @param[in] Re_bulk Bulk Reynolds number.
+    !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
+    !! @param[out] tau_bulk_out Calculated bulk stress tensor (stress on i-face, i-direction).
+    pure subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
         !$acc routine seq
 
         implicit none
@@ -3581,9 +3754,9 @@ contains
         !!  @param ix   Index bounds in  first coordinate direction
         !!  @param iy   Index bounds in second coordinate direction
         !!  @param iz   Index bounds in  third coordinate direction
-    subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, &
-                                         flux_gsrc_vf, &
-                                         norm_dir, ix, iy, iz)
+    pure subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, &
+                                              flux_gsrc_vf, &
+                                              norm_dir, ix, iy, iz)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -3675,7 +3848,7 @@ contains
     end subroutine s_finalize_riemann_solver
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_riemann_solvers_module
+    impure subroutine s_finalize_riemann_solvers_module
 
         if (viscous) then
             @:DEALLOCATE(Re_avg_rsx_vf)
