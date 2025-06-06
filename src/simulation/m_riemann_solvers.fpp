@@ -3829,7 +3829,7 @@ contains
 
         ! Reshaping Outputted Data in y-direction
         if (norm_dir == 2) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = is3%beg, is3%end
                 do j = is1%beg, is1%end
                     do k = is2%beg, is2%end
@@ -3849,7 +3849,7 @@ contains
 
             ! Reshaping Outputted Data in z-direction
         elseif (norm_dir == 3) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do j = is1%beg, is1%end
                 do k = is2%beg, is2%end
                     do l = is3%beg, is3%end
@@ -3868,7 +3868,7 @@ contains
             end do
 
         elseif (norm_dir == 1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = is1%beg, is1%end
