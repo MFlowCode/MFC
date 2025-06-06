@@ -32,7 +32,7 @@ contains
             !!       these are not available to the remaining processors. This
             !!       subroutine is then in charge of broadcasting the required
             !!       information.
-    subroutine s_mpi_bcast_user_inputs
+    impure subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
 
@@ -116,6 +116,9 @@ contains
 
             call MPI_BCAST(patch_icpp(i)%model_spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
+            if (chemistry) then
+                call MPI_BCAST(patch_icpp(i)%Y, size(patch_icpp(i)%Y), mpi_p, 0, MPI_COMM_WORLD, ierr)
+            end if
             ! Broadcast IB variables
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%model_filepath, len(patch_ib(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)

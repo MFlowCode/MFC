@@ -62,7 +62,7 @@ module m_acoustic_src
 contains
 
     !> This subroutine initializes the acoustic source module
-    subroutine s_initialize_acoustic_src
+    impure subroutine s_initialize_acoustic_src
         integer :: i, j !< generic loop variables
 
         @:ALLOCATE(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), bb_lowest_freq(1:num_source))
@@ -121,7 +121,7 @@ contains
     !! @param q_prim_vf Primitive variables
     !! @param t_step Current time step
     !! @param rhs_vf rhs variables
-    subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, t_step, rhs_vf)
+    impure subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, t_step, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !<
         !! This variable contains the WENO-reconstructed values of the cell-average
@@ -338,7 +338,7 @@ contains
     !! @param frequency_local Frequency at the spatial location for sine and square waves
     !! @param gauss_sigma_time_local sigma in time for Gaussian pulse
     !! @param source Source term amplitude
-    subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source, sum_BB)
+    pure elemental subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source, sum_BB)
         !$acc routine seq
         integer, intent(in) :: ai, term_index
         real(wp), intent(in) :: sim_time, c, sum_BB
@@ -398,7 +398,7 @@ contains
     end subroutine s_source_temporal
 
     !> This subroutine identifies and precalculates the non-zero acoustic spatial sources before time-stepping
-    subroutine s_precalculate_acoustic_spatial_sources
+    impure subroutine s_precalculate_acoustic_spatial_sources
         integer :: j, k, l, ai
         integer :: count
         integer :: dim
@@ -497,7 +497,7 @@ contains
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
-    subroutine s_source_spatial(j, k, l, loc, ai, source, angle, xyz_to_r_ratios)
+    pure subroutine s_source_spatial(j, k, l, loc, ai, source, angle, xyz_to_r_ratios)
         integer, intent(in) :: j, k, l, ai
         real(wp), dimension(3), intent(in) :: loc
         real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
@@ -533,7 +533,7 @@ contains
     !! @param sig Sigma value for the Gaussian distribution
     !! @param r Displacement from source to current point
     !! @param source Source term amplitude
-    subroutine s_source_spatial_planar(ai, sig, r, source)
+    pure subroutine s_source_spatial_planar(ai, sig, r, source)
         integer, intent(in) :: ai
         real(wp), intent(in) :: sig, r(3)
         real(wp), intent(out) :: source
@@ -563,7 +563,7 @@ contains
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
-    subroutine s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
+    pure subroutine s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
         integer, intent(in) :: ai
         real(wp), intent(in) :: sig, r(3)
         real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
@@ -608,7 +608,7 @@ contains
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
-    subroutine s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
+    pure subroutine s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
         integer, intent(in) :: ai
         real(wp), intent(in) :: sig, r(3)
         real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
@@ -690,7 +690,7 @@ contains
     !! @param ai Acoustic source index
     !! @param c Speed of sound
     !! @return frequency_local Converted frequency
-    function f_frequency_local(freq_conv_flag, ai, c)
+    pure elemental function f_frequency_local(freq_conv_flag, ai, c)
         !$acc routine seq
         logical, intent(in) :: freq_conv_flag
         integer, intent(in) :: ai
@@ -709,7 +709,7 @@ contains
     !! @param c Speed of sound
     !! @param ai Acoustic source index
     !! @return gauss_sigma_time_local Converted Gaussian sigma time
-    function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
+    pure elemental function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
         !$acc routine seq
         logical, intent(in) :: gauss_conv_flag
         integer, intent(in) :: ai

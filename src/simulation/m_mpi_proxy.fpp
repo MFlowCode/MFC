@@ -83,7 +83,7 @@ contains
         !!      available to the other processors. Then, the purpose of
         !!      this subroutine is to distribute the user inputs to the
         !!      remaining processors in the communicator.
-    subroutine s_mpi_bcast_user_inputs()
+    impure subroutine s_mpi_bcast_user_inputs()
 
 #ifdef MFC_MPI
 
@@ -417,7 +417,7 @@ contains
 
     end subroutine s_mpi_sendrecv_ib_buffers
 
-    subroutine s_mpi_send_random_number(phi_rn, num_freq)
+    impure subroutine s_mpi_send_random_number(phi_rn, num_freq)
         integer, intent(in) :: num_freq
         real(wp), intent(inout), dimension(1:num_freq) :: phi_rn
 

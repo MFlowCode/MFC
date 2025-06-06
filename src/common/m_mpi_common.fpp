@@ -48,7 +48,7 @@ contains
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_mpi_common_module
+    impure subroutine s_initialize_mpi_common_module
 
 #ifdef MFC_MPI
         ! Allocating buff_send/recv and. Please note that for the sake of
@@ -86,7 +86,7 @@ contains
     !> The subroutine initializes the MPI execution environment
         !!      and queries both the number of processors which will be
         !!      available for the job and the local processor rank.
-    subroutine s_mpi_initialize
+    impure subroutine s_mpi_initialize
 
 #ifndef MFC_MPI
 
@@ -121,7 +121,7 @@ contains
     !! @param levelset closest distance from every cell to the IB
     !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     !! @param beta Eulerian void fraction from lagrangian bubbles
-    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta)
+    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(integer_field), optional, intent(in) :: ib_markers
@@ -135,7 +135,7 @@ contains
 #ifdef MFC_MPI
 
         ! Generic loop iterator
-        integer :: i, j, q, k, l
+        integer :: i, j
 
         !Altered system size for the lagrangian subgrid bubble model
         integer :: alt_sys
@@ -277,14 +277,14 @@ contains
 
     end subroutine s_initialize_mpi_data
 
-    subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
+    impure subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
 
         integer, intent(in) :: counts          ! Array of vector lengths for each process
         real(wp), intent(in), dimension(counts) :: my_vector   ! Input vector on each process
         integer, intent(in) :: root               ! Rank of the root process
         real(wp), allocatable, intent(out) :: gathered_vector(:) ! Gathered vector on the root process
 
-        integer :: i, offset, ierr
+        integer :: i, ierr
         integer, allocatable :: recounts(:), displs(:)
 
 #ifdef MFC_MPI
@@ -308,7 +308,7 @@ contains
 #endif
     end subroutine s_mpi_gather_data
 
-    subroutine mpi_bcast_time_step_values(proc_time, time_avg)
+    impure subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
         real(wp), dimension(0:num_procs - 1), intent(inout) :: proc_time
         real(wp), intent(inout) :: time_avg
@@ -321,7 +321,7 @@ contains
 
     end subroutine mpi_bcast_time_step_values
 
-    subroutine s_prohibit_abort(condition, message)
+    impure subroutine s_prohibit_abort(condition, message)
         character(len=*), intent(in) :: condition, message
 
         print *, ""
@@ -348,14 +348,14 @@ contains
         !!  @param icfl_max_glb Global maximum ICFL stability criterion
         !!  @param vcfl_max_glb Global maximum VCFL stability criterion
         !!  @param Rc_min_glb Global minimum Rc stability criterion
-    subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
-                                                       vcfl_max_loc, &
-                                                       ccfl_max_loc, &
-                                                       Rc_min_loc, &
-                                                       icfl_max_glb, &
-                                                       vcfl_max_glb, &
-                                                       ccfl_max_glb, &
-                                                       Rc_min_glb)
+    impure subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
+                                                              vcfl_max_loc, &
+                                                              ccfl_max_loc, &
+                                                              Rc_min_loc, &
+                                                              icfl_max_glb, &
+                                                              vcfl_max_glb, &
+                                                              ccfl_max_glb, &
+                                                              Rc_min_glb)
 
         real(wp), intent(in) :: icfl_max_loc
         real(wp), intent(in) :: vcfl_max_loc
@@ -406,7 +406,7 @@ contains
         !!  @param var_loc Some variable containing the local value which should be
         !!  reduced amongst all the processors in the communicator.
         !!  @param var_glb The globally reduced value
-    subroutine s_mpi_allreduce_sum(var_loc, var_glb)
+    impure subroutine s_mpi_allreduce_sum(var_loc, var_glb)
 
         real(wp), intent(in) :: var_loc
         real(wp), intent(out) :: var_glb
@@ -428,7 +428,7 @@ contains
         !!  @param var_loc Some variable containing the local value which should be
         !!  reduced amongst all the processors in the communicator.
         !!  @param var_glb The globally reduced value
-    subroutine s_mpi_allreduce_min(var_loc, var_glb)
+    impure subroutine s_mpi_allreduce_min(var_loc, var_glb)
 
         real(wp), intent(in) :: var_loc
         real(wp), intent(out) :: var_glb
@@ -450,7 +450,7 @@ contains
         !!  @param var_loc Some variable containing the local value which should be
         !!  reduced amongst all the processors in the communicator.
         !!  @param var_glb The globally reduced value
-    subroutine s_mpi_allreduce_max(var_loc, var_glb)
+    impure subroutine s_mpi_allreduce_max(var_loc, var_glb)
 
         real(wp), intent(in) :: var_loc
         real(wp), intent(out) :: var_glb
@@ -471,7 +471,7 @@ contains
         !!  @param var_loc holds the local value to be reduced among
         !!      all the processors in communicator. On output, the variable holds
         !!      the minimum value, reduced amongst all of the local values.
-    subroutine s_mpi_reduce_min(var_loc)
+    impure subroutine s_mpi_reduce_min(var_loc)
 
         real(wp), intent(inout) :: var_loc
 
@@ -506,7 +506,7 @@ contains
         !!  On output, this variable holds the maximum value, reduced amongst
         !!  all of the local values, and the process rank to which the value
         !!  belongs.
-    subroutine s_mpi_reduce_maxloc(var_loc)
+    impure subroutine s_mpi_reduce_maxloc(var_loc)
 
         real(wp), dimension(2), intent(inout) :: var_loc
 
@@ -532,7 +532,7 @@ contains
 
     !> The subroutine terminates the MPI execution environment.
         !! @param prnt error message to be printed
-    subroutine s_mpi_abort(prnt, code)
+    impure subroutine s_mpi_abort(prnt, code)
 
         character(len=*), intent(in), optional :: prnt
         integer, intent(in), optional :: code
@@ -561,7 +561,7 @@ contains
     end subroutine s_mpi_abort
 
     !>Halts all processes until all have reached barrier.
-    subroutine s_mpi_barrier
+    impure subroutine s_mpi_barrier
 
 #ifdef MFC_MPI
 
@@ -573,7 +573,7 @@ contains
     end subroutine s_mpi_barrier
 
     !> The subroutine finalizes the MPI execution environment.
-    subroutine s_mpi_finalize
+    impure subroutine s_mpi_finalize
 
 #ifdef MFC_MPI
 
@@ -1698,7 +1698,7 @@ contains
 #endif
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_mpi_common_module
+    impure subroutine s_finalize_mpi_common_module
 
 #ifdef MFC_MPI
         deallocate (buff_send, buff_recv)

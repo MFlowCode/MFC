@@ -64,7 +64,7 @@ module m_patches
 
 contains
 
-    subroutine s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
+    impure subroutine s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp, ib_markers_sf
@@ -305,7 +305,7 @@ contains
         !! @param patch_id patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    subroutine s_spiral(patch_id, patch_id_fp, q_prim_vf)
+    impure subroutine s_spiral(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -455,8 +455,8 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib
 
-        real(wp) :: x0, y0, f, x_act, y_act, ca, pa, ma, ta, theta, xa, ya, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
-        integer :: i, j, k, l
+        real(wp) :: x0, y0, f, x_act, y_act, ca, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
+        integer :: i, j, k
         integer :: Np1, Np2
 
         if (.not. present(ib)) return
@@ -617,7 +617,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib
 
-        real(wp) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca, pa, ma, ta, theta, xa, ya, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
+        real(wp) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k, l
         integer :: Np1, Np2
 
@@ -1297,9 +1297,9 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
-        integer :: i, j, k
+        integer :: i
         ! Placeholders for the cell boundary values
-        real(wp) :: a, b, c, d, pi_inf, gamma, lit_gamma
+        real(wp) :: pi_inf, gamma, lit_gamma
 
         @:Hardcoded1DVariables()
 
@@ -1359,7 +1359,7 @@ contains
         ! Generic loop iterators
         integer :: i, j, k
         ! Placeholders for the cell boundary values
-        real(wp) :: fac, a, b, c, d, pi_inf, gamma, lit_gamma
+        real(wp) :: pi_inf, gamma, lit_gamma
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -1410,8 +1410,8 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        integer :: i, j, k !< generic loop iterators
-        real(wp) :: a, b, c, d !< placeholderrs for the cell boundary values
+        integer :: i, j !< generic loop iterators
+
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
         real(wp) :: l, U0 !< Taylor Green Vortex parameters
 
@@ -1570,9 +1570,7 @@ contains
 
         integer :: i, j, k !< generic loop iterators
 
-        real(wp) :: epsilon, beta
         complex(wp), parameter :: cmplx_i = (0._wp, 1._wp)
-        complex(wp) :: H
 
         ! Transferring the patch's centroid and radius information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1720,8 +1718,7 @@ contains
         integer :: i, j, k !< generic loop iterators
         real(wp) :: radius
 
-        real(wp) :: radius_pressure, pressure_bubble, pressure_inf !<
-            !! Variables to initialize the pressure field that corresponds to the
+        !! Variables to initialize the pressure field that corresponds to the
             !! bubble-collapse test case found in Tiwari et al. (2013)
 
         ! Transferring spherical patch's radius, centroid, smoothing patch
@@ -2398,7 +2395,7 @@ contains
 
     end subroutine s_convert_cylindrical_to_cartesian_coord
 
-    function f_convert_cyl_to_cart(cyl) result(cart)
+    pure function f_convert_cyl_to_cart(cyl) result(cart)
 
         !$acc routine seq
 
@@ -2424,7 +2421,7 @@ contains
     !! @param myth Angle
     !! @param offset Thickness
     !! @param a Starting position
-    function f_r(myth, offset, a)
+    pure elemental function f_r(myth, offset, a)
         !$acc routine seq
         real(wp), intent(in) :: myth, offset, a
         real(wp) :: b

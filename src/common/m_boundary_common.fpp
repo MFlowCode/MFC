@@ -50,7 +50,7 @@ module m_boundary_common
 
 contains
 
-    subroutine s_initialize_boundary_common_module()
+    impure subroutine s_initialize_boundary_common_module()
 
         @:ALLOCATE(bc_buffers(1:num_dims, -1:1))
 
@@ -75,13 +75,12 @@ contains
     !>  The purpose of this procedure is to populate the buffers
     !!      of the primitive variables, depending on the selected
     !!      boundary conditions.
-    subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb, mv)
+    impure subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb, mv)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
-        integer :: bc_loc, bc_dir
         integer :: k, l
 
         ! Population of Buffers in x-direction
@@ -273,7 +272,7 @@ contains
 
     end subroutine s_populate_variables_buffers
 
-    subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l)
+    pure subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_ghost_cell_extrapolation
 #else
@@ -283,7 +282,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, q, i
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
@@ -337,7 +336,7 @@ contains
 
     end subroutine s_ghost_cell_extrapolation
 
-    subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
+    pure subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -597,7 +596,7 @@ contains
 
     end subroutine s_symmetry
 
-    subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
+    pure subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -736,7 +735,7 @@ contains
 
     end subroutine s_periodic
 
-    subroutine s_axis(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
+    pure subroutine s_axis(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -796,7 +795,7 @@ contains
 
     end subroutine s_axis
 
-    subroutine s_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
+    pure subroutine s_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_slip_wall
 #else
@@ -806,7 +805,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, q, i
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !< bc_x%beg
@@ -890,7 +889,7 @@ contains
 
     end subroutine s_slip_wall
 
-    subroutine s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
+    pure subroutine s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_no_slip_wall
 #else
@@ -900,7 +899,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, q, i
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !< bc_x%beg
@@ -1020,7 +1019,7 @@ contains
 
     end subroutine s_no_slip_wall
 
-    subroutine s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l)
+    pure subroutine s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_dirichlet
 #else
@@ -1030,7 +1029,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, i, q
+        integer :: j, i
 
 #ifdef MFC_SIMULATION
         if (bc_dir == 1) then !< x-direction
@@ -1088,7 +1087,10 @@ contains
 
     end subroutine s_dirichlet
 
-    subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb, mv)
+    pure subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb, mv)
+#ifdef _CRAYFTN
+    !DIR$ INLINEALWAYS s_qbmm_extrapolation
+#else
         !$acc routine seq
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
@@ -1160,12 +1162,12 @@ contains
 
     end subroutine s_qbmm_extrapolation
 
-    subroutine s_populate_capillary_buffers(c_divs, bc_type)
+    impure subroutine s_populate_capillary_buffers(c_divs, bc_type)
 
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
-        integer :: i, j, k, l
+        integer :: k, l
 
         !< x-direction
         if (bc_x%beg >= 0) then
@@ -1283,7 +1285,7 @@ contains
         end if
     end subroutine s_populate_capillary_buffers
 
-    subroutine s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)
+    pure subroutine s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_periodic
 #else
@@ -1293,7 +1295,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, i, q
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
@@ -1341,7 +1343,7 @@ contains
 
     end subroutine s_color_function_periodic
 
-    subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
+    pure subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_reflective
 #else
@@ -1351,7 +1353,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, i, q
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
@@ -1423,7 +1425,7 @@ contains
 
     end subroutine s_color_function_reflective
 
-    subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
+    pure subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_ghost_cell_extrapolation
 #else
@@ -1433,7 +1435,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, i, q
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
@@ -1481,14 +1483,14 @@ contains
 
     end subroutine s_color_function_ghost_cell_extrapolation
 
-    subroutine s_create_mpi_types(bc_type)
+    impure subroutine s_create_mpi_types(bc_type)
 
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
 
 #ifdef MFC_MPI
         integer :: dir, loc
         integer, dimension(3) :: sf_start_idx, sf_extents_loc
-        integer :: ifile, ierr, data_size
+        integer :: ierr
 
         do dir = 1, num_dims
             do loc = -1, 1, 2
