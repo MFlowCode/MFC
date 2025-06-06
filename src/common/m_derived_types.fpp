@@ -346,9 +346,9 @@ module m_derived_types
     end type mpi_io_airfoil_ib_var
 
     !> Derived type for boundary flags
-    type boundary_flags
+    type boundary_bounds
         real(wp) :: xb, xe, yb, ye, zb, ze
-    end type boundary_flags
+    end type boundary_bounds
 
     !> Derived type annexing integral regions
     type integral_parameters

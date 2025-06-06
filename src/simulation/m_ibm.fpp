@@ -97,8 +97,8 @@ contains
 
         ! Initialize the ip component of each ghost point
         do i = 1, num_gps
-            allocate (ghost_points(i)%ip%alpha_rho(num_fluids))
-            allocate (ghost_points(i)%ip%alpha(num_fluids))
+            @:ALLOCATE(ghost_points(i)%ip%alpha_rho(num_fluids))
+            @:ALLOCATE(ghost_points(i)%ip%alpha(num_fluids))
             ghost_points(i)%ip%vel = 0.0_wp
             ghost_points(i)%ip%pressure = 0.0_wp
 
@@ -107,19 +107,19 @@ contains
             end if
 
             if (bubbles_euler) then
-                allocate (ghost_points(i)%ip%r(nb))
-                allocate (ghost_points(i)%ip%v(nb))
+                @:ALLOCATE(ghost_points(i)%ip%r(nb))
+                @:ALLOCATE(ghost_points(i)%ip%v(nb))
                 if (.not. polytropic) then
-                    allocate (ghost_points(i)%ip%pb(nb))
-                    allocate (ghost_points(i)%ip%mv(nb))
+                    @:ALLOCATE(ghost_points(i)%ip%pb(nb))
+                    @:ALLOCATE(ghost_points(i)%ip%mv(nb))
                 end if
             end if
 
             if (qbmm) then
-                allocate (ghost_points(i)%ip%nmom(nb*nmom))
+                @:ALLOCATE(ghost_points(i)%ip%nmom(nb*nmom))
                 if (.not. polytropic) then
-                    allocate (ghost_points(i)%ip%presb(nb*nnode))
-                    allocate (ghost_points(i)%ip%massv(nb*nnode))
+                    @:ALLOCATE(ghost_points(i)%ip%presb(nb*nnode))
+                    @:ALLOCATE(ghost_points(i)%ip%massv(nb*nnode))
                 end if
             end if
         end do
@@ -872,21 +872,8 @@ contains
 
     !> Subroutine to deallocate memory reserved for the IBM module
     impure subroutine s_finalize_ibm_module()
-        integer :: i
 
-        if (allocated(ghost_points)) then
-            do i = 1, size(ghost_points)
-                if (allocated(ghost_points(i)%ip%alpha_rho)) deallocate (ghost_points(i)%ip%alpha_rho)
-                if (allocated(ghost_points(i)%ip%alpha)) deallocate (ghost_points(i)%ip%alpha)
-                if (allocated(ghost_points(i)%ip%r)) deallocate (ghost_points(i)%ip%r)
-                if (allocated(ghost_points(i)%ip%v)) deallocate (ghost_points(i)%ip%v)
-                if (allocated(ghost_points(i)%ip%pb)) deallocate (ghost_points(i)%ip%pb)
-                if (allocated(ghost_points(i)%ip%mv)) deallocate (ghost_points(i)%ip%mv)
-                if (allocated(ghost_points(i)%ip%nmom)) deallocate (ghost_points(i)%ip%nmom)
-                if (allocated(ghost_points(i)%ip%presb)) deallocate (ghost_points(i)%ip%presb)
-                if (allocated(ghost_points(i)%ip%massv)) deallocate (ghost_points(i)%ip%massv)
-            end do
-        end if
+        if (allocated(ghost_points)) deallocate(ghost_points)
 
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(levelset%sf)
