@@ -1187,6 +1187,7 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
         type(riemann_states) :: c_fast, vel
+        integer :: loop_end
 
         call s_populate_riemann_states_variables_buffers( &
             qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
@@ -1414,9 +1415,9 @@ contains
                                 xi_PP = max(0._wp, sign(1._wp, s_R))
 
                                 E_star = xi_M*(E_L + xi_MP*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
-                                                                  (rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) - E_L)) + &
+                                        (rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) - E_L)) + &
                                          xi_P*(E_R + xi_PP*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
-                                                                  (rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1))))) - E_R))
+                                        (rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1))))) - E_R))
                                 p_Star = xi_M*(pres_L + xi_MP*(rho_L*(s_L - vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1))))) + &
                                          xi_P*(pres_R + xi_PP*(rho_R*(s_R - vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1)))))
 
@@ -1588,6 +1589,13 @@ contains
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
 
+                                ! Initialize all variables
+                                vel_L_rms = 0._wp; vel_R_rms = 0._wp
+                                rho_L = 0._wp; rho_R = 0._wp;
+                                gamma_L = 0._wp; gamma_R = 0._wp;
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp;
+                                qv_L = 0._wp; qv_R = 0._wp;
+
                                 !$acc loop seq
                                 do i = 1, contxe
                                     alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
@@ -1598,11 +1606,6 @@ contains
                                 do i = 1, num_dims
                                     vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
                                     vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
-                                end do
-
-                                vel_L_rms = 0._wp; vel_R_rms = 0._wp
-                                !$acc loop seq
-                                do i = 1, num_dims
                                     vel_L_rms = vel_L_rms + vel_L(i)**2._wp
                                     vel_R_rms = vel_R_rms + vel_R(i)**2._wp
                                 end do
@@ -1611,34 +1614,18 @@ contains
                                 do i = 1, num_fluids
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
+                                    rho_L = rho_L + alpha_rho_L(i)
+                                    rho_R = rho_R + alpha_rho_R(i)
+                                    gamma_L = gamma_L + alpha_L(i)*gammas(i)
+                                    gamma_R = gamma_R + alpha_R(i)*gammas(i)
+                                    pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
+                                    pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                    qv_L = qv_L + alpha_rho_L(i)*qvs(i)
+                                    qv_R = qv_R + alpha_rho_R(i)*qvs(i)
                                 end do
 
                                 pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
                                 pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
-
-                                rho_L = 0._wp
-                                gamma_L = 0._wp
-                                pi_inf_L = 0._wp
-                                qv_L = 0._wp
-                                !$acc loop seq
-                                do i = 1, num_fluids
-                                    rho_L = rho_L + alpha_rho_L(i)
-                                    gamma_L = gamma_L + alpha_L(i)*gammas(i)
-                                    pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
-                                    qv_L = qv_L + alpha_rho_L(i)*qvs(i)
-                                end do
-
-                                rho_R = 0._wp
-                                gamma_R = 0._wp
-                                pi_inf_R = 0._wp
-                                qv_R = 0._wp
-                                !$acc loop seq
-                                do i = 1, num_fluids
-                                    rho_R = rho_R + alpha_rho_R(i)
-                                    gamma_R = gamma_R + alpha_R(i)*gammas(i)
-                                    pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
-                                    qv_R = qv_R + alpha_rho_R(i)*qvs(i)
-                                end do
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5e-1_wp*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5e-1_wp*rho_R*vel_R_rms + qv_R
@@ -1701,18 +1688,13 @@ contains
                                                                   (1._wp - dir_flg(dir_idx(i)))* &
                                                                   vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
                                                 dir_flg(dir_idx(i))*pres_R)
-                                end do
-
-                                if (bubbles_euler) then
-                                    ! Put p_tilde in
-                                    !$acc loop seq
-                                    do i = 1, num_dims
+                                    if (bubbles_euler) then
+                                        ! Put p_tilde in
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) + &
-                                            xi_M*(dir_flg(dir_idx(i))*(-1._wp*ptilde_L)) &
-                                            + xi_P*(dir_flg(dir_idx(i))*(-1._wp*ptilde_R))
-                                    end do
-                                end if
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) - &
+                                        dir_flg(dir_idx(i))*(xi_M*ptilde_L + xi_P*ptilde_R)
+                                    end if
+                                end do
 
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = 0._wp
 
@@ -1805,13 +1787,18 @@ contains
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
 
+                                ! Initialize all variables
+                                vel_L_rms = 0._wp; vel_R_rms = 0._wp
+                                rho_L = 0._wp; rho_R = 0._wp;
+                                gamma_L = 0._wp; gamma_R = 0._wp;
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp;
+                                qv_L = 0._wp; qv_R = 0._wp;
+
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                 end do
-
-                                vel_L_rms = 0._wp; vel_R_rms = 0._wp
 
                                 !$acc loop seq
                                 do i = 1, num_dims
@@ -1824,31 +1811,13 @@ contains
                                 pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
                                 pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
-                                rho_L = 0._wp
-                                gamma_L = 0._wp
-                                pi_inf_L = 0._wp
-                                qv_L = 0._wp
-                                rho_R = 0._wp
-                                gamma_R = 0._wp
-                                pi_inf_R = 0._wp
-                                qv_R = 0._wp
+                                loop_end = num_fluids
+                                if (.not. mpp_lim .and. num_fluids > 2) loop_end = num_fluids - 1
 
                                 ! Retain this in the refactor
                                 if (mpp_lim .and. (num_fluids > 2)) then
                                     !$acc loop seq
-                                    do i = 1, num_fluids
-                                        rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
-                                        gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
-                                        pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
-                                        qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
-                                        rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
-                                        gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
-                                        pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
-                                        qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
-                                    end do
-                                else if (num_fluids > 2) then
-                                    !$acc loop seq
-                                    do i = 1, num_fluids - 1
+                                    do i = 1, loop_end
                                         rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                         gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
                                         pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
@@ -2221,15 +2190,17 @@ contains
 
                                 !idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
 
+                                vel_L_rms = 0._wp; vel_R_rms = 0._wp
+                                rho_L = 0._wp; rho_R = 0._wp
+                                gamma_L = 0._wp; gamma_R = 0._wp
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp
+                                qv_L = 0._wp; qv_R = 0._wp
+                                alpha_L_sum = 0._wp; alpha_R_sum = 0._wp
+
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
-                                end do
-
-                                vel_L_rms = 0._wp; vel_R_rms = 0._wp
-                                !$acc loop seq
-                                do i = 1, num_dims
                                     vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
                                     vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
                                     vel_L_rms = vel_L_rms + vel_L(i)**2._wp
@@ -2238,19 +2209,6 @@ contains
 
                                 pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
                                 pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
-
-                                rho_L = 0._wp
-                                gamma_L = 0._wp
-                                pi_inf_L = 0._wp
-                                qv_L = 0._wp
-
-                                rho_R = 0._wp
-                                gamma_R = 0._wp
-                                pi_inf_R = 0._wp
-                                qv_R = 0._wp
-
-                                alpha_L_sum = 0._wp
-                                alpha_R_sum = 0._wp
 
                                 ! Change this by splitting it into the cases
                                 ! present in the bubbles_euler
@@ -2277,7 +2235,6 @@ contains
                                     gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
                                     pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
                                     qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
-
                                     rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                     gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                     pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
