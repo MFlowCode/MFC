@@ -1091,7 +1091,8 @@ contains
 #ifdef _CRAYFTN
     !DIR$ INLINEALWAYS s_qbmm_extrapolation
 #else
-        !$acc routine seq
+    !$acc routine seq
+#endif
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
