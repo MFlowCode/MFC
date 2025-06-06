@@ -2872,19 +2872,15 @@ contains
                             ! NOTE: unlike HLL, Bx, By, Bz are permutated by dir_idx for simpler logic
                             if (mhd) then
                                 if (n == 0) then ! 1D: constant Bx; By, Bz as variables; only in x so not permutated
-                                    B%L(1) = Bx0
-                                    B%R(1) = Bx0
-                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
-                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
-                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
-                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)
+                                    B%L = [Bx0, qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg), qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)]
+                                    B%R = [Bx0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg), qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)]
                                 else ! 2D/3D: Bx, By, Bz as variables
-                                    B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(1) - 1)
-                                    B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(1) - 1)
-                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(2) - 1)
-                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(2) - 1)
-                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(3) - 1)
-                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(3) - 1)
+                                    B%L = [qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(1) - 1), &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(2) - 1), &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(3) - 1)]
+                                    B%R = [qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(1) - 1), &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(2) - 1), &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(3) - 1)]
                                 end if
                             end if
 
@@ -2936,9 +2932,9 @@ contains
                             E_starR = ((s_R - vel%R(1))*E%R - pTot_R*vel%R(1) + p_star*s_M)/(s_R - s_M)
 
                             ! (5) Compute left/right state vectors and fluxes
-                            call s_compute_hlld_state_variables('L', rho%L, vel%L, B%L, E%L, pTot_L, rhoL_star, s_M, E_starL, s_L, &
+                            call s_compute_hlld_state_variables(rho%L, vel%L, B%L, E%L, pTot_L, rhoL_star, s_M, E_starL, s_L, &
                                                                 U_L, F_L, U_starL, F_starL, sqrt_rhoL_star, vL_star, wL_star)
-                            call s_compute_hlld_state_variables('R', rho%R, vel%R, B%R, E%R, pTot_R, rhoR_star, s_M, E_starR, s_R, &
+                            call s_compute_hlld_state_variables(rho%R, vel%R, B%R, E%R, pTot_R, rhoR_star, s_M, E_starR, s_R, &
                                                                 U_R, F_R, U_starR, F_starR, sqrt_rhoR_star, vR_star, wR_star)
 
                             ! (6) Compute the double–star states [Miyoshi Eqns. (59)-(62)]
@@ -2953,9 +2949,9 @@ contains
                             E_doubleR = E_starR + sqrt_rhoR_star*((vR_star*B%R(2) + wR_star*B%R(3)) - (v_double*By_double + w_double*Bz_double))*sign_Bx
                             E_double = 0.5_wp*(E_doubleL + E_doubleR)
 
-                            U_doubleL = s_compute_U_double(rhoL_star, s_M, v_double, w_double, By_double, Bz_double, E_double)
-                            U_doubleR = s_compute_U_double(rhoR_star, s_M, v_double, w_double, By_double, Bz_double, E_double)
-
+                            U_doubleL = [rhoL_star, rhoL_star*s_M, rhoL_star*v_double, rhoL_star*w_double, By_double, Bz_double, E_double]
+                            U_doubleR = [rhoR_star, rhoR_star*s_M, rhoR_star*w_double, rhoR_star*w_double, By_double, Bz_double, E_double]
+                            
                             ! (7) Compute the rotational (Alfvén) speeds
                             s_starL = s_M - abs(B%L(1))/sqrt(rhoL_star)
                             s_starR = s_M + abs(B%L(1))/sqrt(rhoR_star)
@@ -2979,16 +2975,12 @@ contains
                             ! Mass
                             flux_rs${XYZ}$_vf(j, k, l, 1) = F_hlld(1) ! TODO multi-component
                             ! Momentum
-                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = F_hlld(2)
-                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(2)) = F_hlld(3)
-                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(3)) = F_hlld(4)
+                            flux_rs${XYZ}$_vf(j, k, l, [contxe + dir_idx(1), contxe + dir_idx(2), contxe + dir_idx(3)]) = F_hlld([2, 3, 4])
                             ! Magnetic field
                             if (n == 0) then
-                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg) = F_hlld(5)
-                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1) = F_hlld(6)
+                                flux_rs${XYZ}$_vf(j, k, l, [B_idx%beg, B_idx%beg + 1]) = F_hlld([5, 6])
                             else
-                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(2) - 1) = F_hlld(5)
-                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(3) - 1) = F_hlld(6)
+                                flux_rs${XYZ}$_vf(j, k, l, [B_idx%beg + dir_idx(2) - 1, B_idx%beg + dir_idx(3) - 1]) = F_hlld([5, 6])
                             end if
                             ! Energy
                             flux_rs${XYZ}$_vf(j, k, l, E_idx) = F_hlld(7)
@@ -2997,7 +2989,6 @@ contains
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf(j, k, l, i) = 0._wp ! TODO multi-component (zero for now)
                             end do
-
                             flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
                         end do
                     end do
@@ -3010,55 +3001,24 @@ contains
                                        norm_dir, ix, iy, iz)
 
     contains
-        function s_compute_U_double(rho_star, s_M, v_double, w_double, By_double, Bz_double, E_double) result(U_double)
-            implicit none
-            real(wp), intent(in) :: rho_star, s_M, v_double, w_double, By_double, Bz_double, E_double
-            real(wp) :: U_double(7)
-
-            U_double(1) = rho_star
-            U_double(2) = rho_star*s_M
-            U_double(3) = rho_star*v_double
-            U_double(4) = rho_star*w_double
-            U_double(5) = By_double
-            U_double(6) = Bz_double
-            U_double(7) = E_double
-        end function s_compute_U_double
-
-        subroutine s_compute_hlld_state_variables(side, rho, vel, B, E, pTot, rho_star, s_M, E_star, s_wave, &
+        subroutine s_compute_hlld_state_variables(rho, vel, B, E, pTot, rho_star, s_M, E_star, s_wave, &
                                                   U, F, U_star, F_star, sqrt_rho_star, v_star, w_star)
             implicit none
             ! Input parameters
-            character(len=1), intent(in) :: side     ! dummy 'L' for left or 'R' for right
             real(wp), intent(in) :: rho, pTot, rho_star, s_M, E_star, s_wave, E
             real(wp), dimension(:), intent(in) :: vel, B
             ! Output parameters
-            real(wp), dimension(7), intent(out) :: U, F, U_star
+            real(wp), dimension(7), intent(out) :: U, F, U_star, F_star
             real(wp), intent(out) :: sqrt_rho_star, v_star, w_star
-            real(wp), dimension(7), intent(out) :: F_star
-            ! Compute the base state vector
-            U(1) = rho
-            U(2) = rho*vel(1)
-            U(3) = rho*vel(2)
-            U(4) = rho*vel(3)
-            U(5) = B(2)
-            U(6) = B(3)
-            U(7) = E
+            ! Compute the base/star state vector
+            U = [rho, rho*vel(1:3), B(2:3), E]
+            U_star = [rho_star, rho_star*s_M, rho_star*vel(2:3), B(2:3), E_star]
             ! Compute the flux vector
             F(1) = U(2)
             F(2) = U(2)*vel(1) - B(1)*B(1) + pTot
-            F(3) = U(2)*vel(2) - B(1)*B(2)
-            F(4) = U(2)*vel(3) - B(1)*B(3)
-            F(5) = vel(1)*B(2) - vel(2)*B(1)
-            F(6) = vel(1)*B(3) - vel(3)*B(1)
+            F(3:4) = U(2)*vel(2:3) - B(1)*B(2:3)
+            F(5:6) = vel(1)*B(2:3) - vel(2:3)*B(1)
             F(7) = (E + pTot)*vel(1) - B(1)*(vel(1)*B(1) + vel(2)*B(2) + vel(3)*B(3))
-            ! Compute the star state
-            U_star(1) = rho_star
-            U_star(2) = rho_star*s_M
-            U_star(3) = rho_star*vel(2)
-            U_star(4) = rho_star*vel(3)
-            U_star(5) = B(2)
-            U_star(6) = B(3)
-            U_star(7) = E_star
             ! Compute the star flux using HLL relation
             F_star = F + s_wave*(U_star - U)
             ! Compute additional parameters needed for double-star states
