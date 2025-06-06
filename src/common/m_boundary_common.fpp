@@ -1088,11 +1088,7 @@ contains
     end subroutine s_dirichlet
 
     pure subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb, mv)
-#ifdef _CRAYFTN
-    !DIR$ INLINEALWAYS s_qbmm_extrapolation
-#else
-    !$acc routine seq
-#endif
+!$acc routine seq
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
