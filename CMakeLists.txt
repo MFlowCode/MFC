@@ -135,6 +135,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             -Wall
+            -Wextra	
             -fcheck=all,no-array-temps
             -fbacktrace
             -fimplicit-none
@@ -142,6 +143,10 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             -fsignaling-nans
             -finit-real=snan
             -finit-integer=-99999999
+            -Wintrinsic-shadow	
+            -Wunderflow	
+            -Wrealloc-lhs	
+            -Wsurprising	
 	    )
     endif()
 
