@@ -345,6 +345,11 @@ module m_derived_types
         type(vec3_dt), allocatable, dimension(:) :: var
     end type mpi_io_airfoil_ib_var
 
+    !> Derived type for boundary flags
+    type boundary_flags
+        real(wp) :: xb, xe, yb, ye, zb, ze
+    end type boundary_flags
+
     !> Derived type annexing integral regions
     type integral_parameters
         real(wp) :: xmin !< Min. boundary first coordinate direction
@@ -392,19 +397,19 @@ module m_derived_types
     end type source_spatial_type
 
     !> @brief Type for storing point data
-    type :: point_data
-    real(wp), dimension(:), allocatable :: alpha_rho  !< Partial densities
-    real(wp), dimension(:), allocatable :: alpha      !< Volume fractions
-    real(wp) :: pressure                              !< Pressure
-    real(wp), dimension(3) :: vel                     !< Velocity
-    real(wp) :: c                                     !< Color function (for surface tension)
-    real(wp), dimension(:), allocatable :: r          !< Bubble radii
-    real(wp), dimension(:), allocatable :: v          !< Bubble radial velocities
-    real(wp), dimension(:), allocatable :: pb         !< Bubble pressures
-    real(wp), dimension(:), allocatable :: mv         !< Mass of vapor
-    real(wp), dimension(:), allocatable :: nmom       !< Moments for QBMM
-    real(wp), dimension(:), allocatable :: presb      !< Node pressures for bubbles
-    real(wp), dimension(:), allocatable :: massv      !< Node masses for bubbles
+    type point_data
+        real(wp), dimension(:), allocatable :: alpha_rho  !< Partial densities
+        real(wp), dimension(:), allocatable :: alpha      !< Volume fractions
+        real(wp) :: pressure                              !< Pressure
+        real(wp), dimension(3) :: vel                     !< Velocity
+        real(wp) :: c                                     !< Color function (for surface tension)
+        real(wp), dimension(:), allocatable :: r          !< Bubble radii
+        real(wp), dimension(:), allocatable :: v          !< Bubble radial velocities
+        real(wp), dimension(:), allocatable :: pb         !< Bubble pressures
+        real(wp), dimension(:), allocatable :: mv         !< Mass of vapor
+        real(wp), dimension(:), allocatable :: nmom       !< Moments for QBMM
+        real(wp), dimension(:), allocatable :: presb      !< Node pressures for bubbles
+        real(wp), dimension(:), allocatable :: massv      !< Node masses for bubbles
     end type point_data
 
     !> Ghost Point for Immersed Boundaries

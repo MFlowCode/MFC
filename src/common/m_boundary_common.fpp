@@ -22,7 +22,7 @@ module m_boundary_common
     type(scalar_field), dimension(:, :), allocatable :: bc_buffers
     !$acc declare create(bc_buffers)
 
-    real(wp) :: bcxb, bcxe, bcyb, bcye, bczb, bcze
+    type(boundary_flags) :: bc_flag
 
 #ifdef MFC_MPI
     integer, dimension(1:3, -1:1) :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
@@ -34,7 +34,7 @@ module m_boundary_common
  s_populate_capillary_buffers, &
  s_finalize_boundary_common_module
 
-    public :: bc_buffers, bcxb, bcxe, bcyb, bcye, bczb, bcze
+    public :: bc_buffers, bc_flag
 
 #ifdef MFC_MPI
     public :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
@@ -44,7 +44,7 @@ contains
 
     impure subroutine s_initialize_boundary_common_module()
 
-        bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
+        bc_flag%xb = bc_x%beg; bc_flag%xe = bc_x%end; bc_flag%yb = bc_y%beg; bc_flag%ye = bc_y%end; bc_flag%zb = bc_z%beg; bc_flag%ze = bc_z%end
 
         @:ALLOCATE(bc_buffers(1:num_dims, -1:1))
 
@@ -71,16 +71,17 @@ contains
     !>  The purpose of this procedure is to populate the buffers
     !!      of the primitive variables, depending on the selected
     !!      boundary conditions.
-    impure subroutine s_populate_variables_buffers(q_prim_vf, pb, mv, bc_type)
+    impure subroutine s_populate_variables_buffers(q_prim_vf, pb, mv, bc_type, bc_flag)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(boundary_flags), intent(in) :: bc_flag
 
         integer :: k, l
 
         ! Population of Buffers in x-direction
-        if (bcxb >= 0) then
+        if (bc_flag%xb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 1, -1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -104,7 +105,7 @@ contains
             end do
         end if
 
-        if (bcxe >= 0) then
+        if (bc_flag%xe >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 1, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -132,7 +133,7 @@ contains
 
         if (n == 0) return
 
-        if (bcyb >= 0) then
+        if (bc_flag%yb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 2, -1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -158,7 +159,7 @@ contains
             end do
         end if
 
-        if (bcye >= 0) then
+        if (bc_flag%ye >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 2, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -186,7 +187,7 @@ contains
 
         if (p == 0) return
 
-        if (bczb >= 0) then
+        if (bc_flag%zb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 3, -1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -210,7 +211,7 @@ contains
             end do
         end if
 
-        if (bcze >= 0) then
+        if (bc_flag%ze >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 3, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1156,15 +1157,16 @@ contains
 
     end subroutine s_qbmm_extrapolation
 
-    impure subroutine s_populate_capillary_buffers(c_divs, bc_type)
+    impure subroutine s_populate_capillary_buffers(c_divs, bc_type, bc_flag)
 
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(boundary_flags), intent(in) :: bc_flag
 
         integer :: k, l
 
         !< x-direction
-        if (bcxb >= 0) then
+        if (bc_flag%xb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, -1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1182,7 +1184,7 @@ contains
             end do
         end if
 
-        if (bcxe >= 0) then
+        if (bc_flag%xe >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1203,7 +1205,7 @@ contains
         if (n == 0) return
 
         !< y-direction
-        if (bcyb >= 0) then
+        if (bc_flag%yb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, -1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1221,7 +1223,7 @@ contains
             end do
         end if
 
-        if (bcye >= 0) then
+        if (bc_flag%ye >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1242,7 +1244,7 @@ contains
         if (p == 0) return
 
         !< z-direction
-        if (bczb >= 0) then
+        if (bc_flag%zb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, -1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1260,7 +1262,7 @@ contains
             end do
         end if
 
-        if (bcze >= 0) then
+        if (bc_flag%ze >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
