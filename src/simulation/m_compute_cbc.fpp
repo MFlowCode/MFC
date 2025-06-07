@@ -30,7 +30,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -60,7 +60,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -83,7 +83,7 @@ contains
                    *(dvel_ds(dir_idx(i - contxe)))
         end do
 
-        do i = E_idx, advxe - 1
+        do i = eqn_idx%E, advxe - 1
             L(i) = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(2)))*lambda(2) &
                    *(dadv_ds(i - momxe))
         end do
@@ -110,7 +110,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -144,7 +144,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -164,7 +164,7 @@ contains
             L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
         end do
 
-        do i = E_idx, advxe - 1
+        do i = eqn_idx%E, advxe - 1
             L(i) = lambda(2)*(dadv_ds(i - momxe))
         end do
 
@@ -193,7 +193,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -212,7 +212,7 @@ contains
             L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
         end do
 
-        do i = E_idx, advxe - 1
+        do i = eqn_idx%E, advxe - 1
             L(i) = lambda(2)*(dadv_ds(i - momxe))
         end do
 
@@ -231,7 +231,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -250,7 +250,7 @@ contains
             L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
         end do
 
-        do i = E_idx, advxe - 1
+        do i = eqn_idx%E, advxe - 1
             L(i) = lambda(2)*(dadv_ds(i - momxe))
         end do
 
@@ -270,7 +270,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -301,7 +301,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -320,7 +320,7 @@ contains
             L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
         end do
 
-        do i = E_idx, advxe - 1
+        do i = eqn_idx%E, advxe - 1
             L(i) = lambda(2)*(dadv_ds(i - momxe))
         end do
 

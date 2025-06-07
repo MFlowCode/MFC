@@ -69,8 +69,8 @@ contains
         !!  @param rhs_vf     rhs variables
     pure subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
 
         integer :: k, l, q, r
         real(wp), dimension(3) :: v, B
@@ -121,7 +121,7 @@ contains
                     rhs_vf(momxb + 1)%sf(k, l, q) = rhs_vf(momxb + 1)%sf(k, l, q) - divB*B(2)
                     rhs_vf(momxb + 2)%sf(k, l, q) = rhs_vf(momxb + 2)%sf(k, l, q) - divB*B(3)
 
-                    rhs_vf(E_idx)%sf(k, l, q) = rhs_vf(E_idx)%sf(k, l, q) - divB*vdotB
+                    rhs_vf(eqn_idx%E)%sf(k, l, q) = rhs_vf(eqn_idx%E)%sf(k, l, q) - divB*vdotB
 
                     rhs_vf(B_idx%beg)%sf(k, l, q) = rhs_vf(B_idx%beg)%sf(k, l, q) - divB*v(1)
                     rhs_vf(B_idx%beg + 1)%sf(k, l, q) = rhs_vf(B_idx%beg + 1)%sf(k, l, q) - divB*v(2)

@@ -53,12 +53,12 @@ module m_data_output
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
         impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
 
-            import :: scalar_field, integer_field, sys_size, m, n, p, &
+            import :: scalar_field, integer_field, eqn_idx%sys_size, m, n, p, &
                 pres_field, levelset_field, levelset_norm_field, num_dims
 
             ! Conservative variables
             type(scalar_field), &
-                dimension(sys_size), &
+                dimension(eqn_idx%sys_size), &
                 intent(in) :: q_cons_vf, q_prim_vf
 
             type(integer_field), &
@@ -98,7 +98,7 @@ contains
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: q_cons_vf, q_prim_vf
 
         ! BC types
@@ -124,7 +124,7 @@ contains
         character(LEN=3) :: status
 
         character(LEN= &
-                  int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !< Used to store
+                  int(floor(log10(real(eqn_idx%sys_size, wp)))) + 1) :: file_num !< Used to store
             !! the number, in character form, of the currently
             !! manipulated conservative variable data file
 
@@ -227,7 +227,7 @@ contains
         close (1)
 
         ! Outputting Conservative Variables
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             write (file_num, '(I0)') i
             file_loc = trim(t_step_dir)//'/q_cons_vf'//trim(file_num) &
                        //'.dat'
@@ -241,7 +241,7 @@ contains
         if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do r = 1, nnode
-                    write (file_num, '(I0)') r + (i - 1)*nnode + sys_size
+                    write (file_num, '(I0)') r + (i - 1)*nnode + eqn_idx%sys_size
                     file_loc = trim(t_step_dir)//'/pb'//trim(file_num) &
                                //'.dat'
                     open (1, FILE=trim(file_loc), FORM='unformatted', &
@@ -253,7 +253,7 @@ contains
 
             do i = 1, nb
                 do r = 1, nnode
-                    write (file_num, '(I0)') r + (i - 1)*nnode + sys_size
+                    write (file_num, '(I0)') r + (i - 1)*nnode + eqn_idx%sys_size
                     file_loc = trim(t_step_dir)//'/mv'//trim(file_num) &
                                //'.dat'
                     open (1, FILE=trim(file_loc), FORM='unformatted', &
@@ -287,7 +287,7 @@ contains
         !1D
         if (n == 0 .and. p == 0) then
             if (model_eqns == 2) then
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
                     open (2, FILE=trim(file_loc))
@@ -305,57 +305,57 @@ contains
 
                         if ((i >= chemxb) .and. (i <= chemxe)) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
-                        else if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
+                        else if (((i >= eqn_idx%cont%beg) .and. (i <= eqn_idx%cont%end)) &
                                  .or. &
-                                 ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
+                                 ((i >= eqn_idx%adv%beg) .and. (i <= eqn_idx%adv%end)) &
                                  .or. &
                                  ((i >= chemxb) .and. (i <= chemxe)) &
                                  ) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i == mom_idx%beg) then !u
-                            write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i == stress_idx%beg) then !tau_e
-                            write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i == E_idx) then !p
+                        else if (i == eqn_idx%mom%beg) then !u
+                            write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)/rho
+                        else if (i == eqn_idx%stress%beg) then !tau_e
+                            write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%stress%beg)%sf(j, 0, 0)/rho
+                        else if (i == eqn_idx%E) then !p
                             if (mhd) then
                                 pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(B_idx%beg)%sf(j, 0, 0)**2 + q_cons_vf(B_idx%beg + 1)%sf(j, 0, 0)**2)
                             end if
 
                             call s_compute_pressure( &
-                                q_cons_vf(E_idx)%sf(j, 0, 0), &
-                                q_cons_vf(alf_idx)%sf(j, 0, 0), &
-                                0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2._wp)/rho, &
+                                q_cons_vf(eqn_idx%E)%sf(j, 0, 0), &
+                                q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), &
+                                0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)**2._wp)/rho, &
                                 pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
                             write (2, FMT) x_cb(j), pres
                         else if (mhd) then
-                            if (i == mom_idx%beg + 1) then ! v
-                                write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg + 1)%sf(j, 0, 0)/rho
-                            else if (i == mom_idx%beg + 2) then ! w
-                                write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg + 2)%sf(j, 0, 0)/rho
+                            if (i == eqn_idx%mom%beg + 1) then ! v
+                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, 0, 0)/rho
+                            else if (i == eqn_idx%mom%beg + 2) then ! w
+                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg + 2)%sf(j, 0, 0)/rho
                             else if (i == B_idx%beg) then ! By
                                 write (2, FMT) x_cb(j), q_cons_vf(B_idx%beg)%sf(j, 0, 0)/rho
                             else if (i == B_idx%beg + 1) then ! Bz
                                 write (2, FMT) x_cb(j), q_cons_vf(B_idx%beg + 1)%sf(j, 0, 0)/rho
                             end if
-                        else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles_euler) then
+                        else if ((i >= eqn_idx%bub%beg) .and. (i <= eqn_idx%bub%end) .and. bubbles_euler) then
 
                             if (qbmm) then
                                 nbub = q_cons_vf(bubxb)%sf(j, 0, 0)
                             else
                                 if (adv_n) then
-                                    nbub = q_cons_vf(n_idx)%sf(j, 0, 0)
+                                    nbub = q_cons_vf(eqn_idx%n)%sf(j, 0, 0)
                                 else
                                     do k = 1, nb
-                                        nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
+                                        nRtmp(k) = q_cons_vf(eqn_idx%bub%rs(k))%sf(j, 0, 0)
                                     end do
 
-                                    call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
+                                    call s_comp_n_from_cons(q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), nRtmp, nbub, weight)
                                 end if
                             end if
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
-                        else if (i == n_idx .and. adv_n .and. bubbles_euler) then
+                        else if (i == eqn_idx%n .and. adv_n .and. bubbles_euler) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i == damage_idx) then
+                        else if (i == eqn_idx%damage) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         end if
                     end do
@@ -363,7 +363,7 @@ contains
                 end do
             end if
 
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
 
                 open (2, FILE=trim(file_loc))
@@ -407,7 +407,7 @@ contains
 
         ! 2D
         if ((n > 0) .and. (p == 0)) then
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
                 open (2, FILE=trim(file_loc))
                 do j = 0, m
@@ -456,7 +456,7 @@ contains
 
         ! 3D
         if (p > 0) then
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
                 open (2, FILE=trim(file_loc))
                 do j = 0, m
@@ -557,7 +557,7 @@ contains
 
         ! Conservative variables
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: q_cons_vf, q_prim_vf
 
         type(integer_field), &
@@ -637,11 +637,11 @@ contains
             WP_MOK = int(8._wp, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            NVARS_MOK = int(eqn_idx%sys_size, MPI_OFFSET_KIND)
 
             ! Write the data for each variable
             if (bubbles_euler) then
-                do i = 1, sys_size! adv_idx%end
+                do i = 1, eqn_idx%sys_size! eqn_idx%adv%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -649,7 +649,7 @@ contains
                 end do
                 !Additional variables pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
-                    do i = sys_size + 1, sys_size + 2*nb*nnode
+                    do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -657,8 +657,8 @@ contains
                     end do
                 end if
             else
-                do i = 1, sys_size !TODO: check if this is right
-                    !            do i = 1, adv_idx%end
+                do i = 1, eqn_idx%sys_size !TODO: check if this is right
+                    !            do i = 1, eqn_idx%adv%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -701,11 +701,11 @@ contains
             WP_MOK = int(8._wp, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            NVARS_MOK = int(eqn_idx%sys_size, MPI_OFFSET_KIND)
 
             ! Write the data for each variable
             if (bubbles_euler) then
-                do i = 1, sys_size! adv_idx%end
+                do i = 1, eqn_idx%sys_size! eqn_idx%adv%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
@@ -718,7 +718,7 @@ contains
                 end do
                 !Additional variables pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
-                    do i = sys_size + 1, sys_size + 2*nb*nnode
+                    do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         ! Initial displacement to skip at beginning of file
@@ -731,8 +731,8 @@ contains
                     end do
                 end if
             else
-                do i = 1, sys_size !TODO: check if this is right
-                    !            do i = 1, adv_idx%end
+                do i = 1, eqn_idx%sys_size !TODO: check if this is right
+                    !            do i = 1, eqn_idx%adv%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
@@ -935,7 +935,7 @@ contains
         do i = momxb, momxe
             write (1, '(I3,A20,A20)') i, "\rho u_"//coord(i - momxb + 1), "u_"//coord(i - momxb + 1)
         end do
-        do i = E_idx, E_idx
+        do i = eqn_idx%E, eqn_idx%E
             write (1, '(I3,A20,A20)') i, "\rho U", "p"
         end do
         do i = advxb, advxe
@@ -950,7 +950,7 @@ contains
 
         write (1, '(A)') ""
         if (momxb /= 0) write (1, '("[",I2,",",I2,"]",A)') momxb, momxe, " Momentum"
-        if (E_idx /= 0) write (1, '("[",I2,",",I2,"]",A)') E_idx, E_idx, " Energy/Pressure"
+        if (eqn_idx%E /= 0) write (1, '("[",I2,",",I2,"]",A)') eqn_idx%E, eqn_idx%E, " Energy/Pressure"
         if (advxb /= 0) write (1, '("[",I2,",",I2,"]",A)') advxb, advxe, " Advection"
         if (contxb /= 0) write (1, '("[",I2,",",I2,"]",A)') contxb, contxe, " Continuity"
         if (bubxb /= 0) write (1, '("[",I2,",",I2,"]",A)') bubxb, bubxe, " Bubbles_euler"

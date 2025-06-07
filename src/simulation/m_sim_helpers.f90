@@ -36,7 +36,7 @@ contains
         !$acc routine seq
 #endif
 
-        type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
+        type(scalar_field), intent(in), dimension(eqn_idx%sys_size) :: q_prim_vf
         real(wp), intent(inout), dimension(num_fluids) :: alpha
         real(wp), intent(inout), dimension(num_vels) :: vel
         real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres
@@ -51,7 +51,7 @@ contains
         !$acc loop seq
         do i = 1, num_fluids
             alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-            alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+            alpha(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
         end do
 
         if (elasticity) then
@@ -74,7 +74,7 @@ contains
             vel_sum = vel_sum + vel(i)**2._wp
         end do
 
-        pres = q_prim_vf(E_idx)%sf(j, k, l)
+        pres = q_prim_vf(eqn_idx%E)%sf(j, k, l)
 
         E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_sum + qv
 

@@ -180,10 +180,10 @@ contains
         !DIR$ INLINEALWAYS s_derive_acceleration_component
         integer, intent(in) :: i
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf0
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf1
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf2
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf3
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf0
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf1
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf2
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf3
 
         real(wp), dimension(0:m, 0:n, 0:p), intent(out) :: q_sf
 
@@ -194,39 +194,39 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        q_sf(j, k, l) = (11._wp*q_prim_vf0(mom_idx%beg)%sf(j, k, l) &
-                                         - 18._wp*q_prim_vf1(mom_idx%beg)%sf(j, k, l) &
-                                         + 9._wp*q_prim_vf2(mom_idx%beg)%sf(j, k, l) &
-                                         - 2._wp*q_prim_vf3(mom_idx%beg)%sf(j, k, l))/(6._wp*dt)
+                        q_sf(j, k, l) = (11._wp*q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, l) &
+                                         - 18._wp*q_prim_vf1(eqn_idx%mom%beg)%sf(j, k, l) &
+                                         + 9._wp*q_prim_vf2(eqn_idx%mom%beg)%sf(j, k, l) &
+                                         - 2._wp*q_prim_vf3(eqn_idx%mom%beg)%sf(j, k, l))/(6._wp*dt)
 
                         do r = -fd_number, fd_number
                             if (n == 0) then ! 1D simulation
                                 q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf0(mom_idx%beg)%sf(r + j, k, l)
+                                                + q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                q_prim_vf0(eqn_idx%mom%beg)%sf(r + j, k, l)
                             elseif (p == 0) then ! 2D simulation
                                 q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf0(mom_idx%beg)%sf(r + j, k, l) &
-                                                + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                q_prim_vf0(mom_idx%beg)%sf(j, r + k, l)
+                                                + q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                q_prim_vf0(eqn_idx%mom%beg)%sf(r + j, k, l) &
+                                                + q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                q_prim_vf0(eqn_idx%mom%beg)%sf(j, r + k, l)
                             else ! 3D simulation
                                 if (grid_geometry == 3) then
                                     q_sf(j, k, l) = q_sf(j, k, l) &
-                                                    + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                    q_prim_vf0(mom_idx%beg)%sf(r + j, k, l) &
-                                                    + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                    q_prim_vf0(mom_idx%beg)%sf(j, r + k, l) &
-                                                    + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                    q_prim_vf0(mom_idx%beg)%sf(j, k, r + l)/y_cc(k)
+                                                    + q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(eqn_idx%mom%beg)%sf(r + j, k, l) &
+                                                    + q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                    q_prim_vf0(eqn_idx%mom%beg)%sf(j, r + k, l) &
+                                                    + q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                    q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, r + l)/y_cc(k)
                                 else
                                     q_sf(j, k, l) = q_sf(j, k, l) &
-                                                    + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                    q_prim_vf0(mom_idx%beg)%sf(r + j, k, l) &
-                                                    + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                    q_prim_vf0(mom_idx%beg)%sf(j, r + k, l) &
-                                                    + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                    q_prim_vf0(mom_idx%beg)%sf(j, k, r + l)
+                                                    + q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(eqn_idx%mom%beg)%sf(r + j, k, l) &
+                                                    + q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                    q_prim_vf0(eqn_idx%mom%beg)%sf(j, r + k, l) &
+                                                    + q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                    q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, r + l)
                                 end if
                             end if
                         end do
@@ -239,36 +239,36 @@ contains
                 do k = 0, n
                     do j = 0, m
 
-                        q_sf(j, k, l) = (11._wp*q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l) &
-                                         - 18._wp*q_prim_vf1(mom_idx%beg + 1)%sf(j, k, l) &
-                                         + 9._wp*q_prim_vf2(mom_idx%beg + 1)%sf(j, k, l) &
-                                         - 2._wp*q_prim_vf3(mom_idx%beg + 1)%sf(j, k, l))/(6._wp*dt)
+                        q_sf(j, k, l) = (11._wp*q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l) &
+                                         - 18._wp*q_prim_vf1(eqn_idx%mom%beg + 1)%sf(j, k, l) &
+                                         + 9._wp*q_prim_vf2(eqn_idx%mom%beg + 1)%sf(j, k, l) &
+                                         - 2._wp*q_prim_vf3(eqn_idx%mom%beg + 1)%sf(j, k, l))/(6._wp*dt)
 
                         do r = -fd_number, fd_number
                             if (p == 0) then ! 2D simulation
                                 q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf0(mom_idx%beg + 1)%sf(r + j, k, l) &
-                                                + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                q_prim_vf0(mom_idx%beg + 1)%sf(j, r + k, l)
+                                                + q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                q_prim_vf0(eqn_idx%mom%beg + 1)%sf(r + j, k, l) &
+                                                + q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, r + k, l)
                             else ! 3D simulation
                                 if (grid_geometry == 3) then
                                     q_sf(j, k, l) = q_sf(j, k, l) &
-                                                    + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                    q_prim_vf0(mom_idx%beg + 1)%sf(r + j, k, l) &
-                                                    + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                    q_prim_vf0(mom_idx%beg + 1)%sf(j, r + k, l) &
-                                                    + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                    q_prim_vf0(mom_idx%beg + 1)%sf(j, k, r + l)/y_cc(k) &
-                                                    - (q_prim_vf0(mom_idx%end)%sf(j, k, l)**2._wp)/y_cc(k)
+                                                    + q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(eqn_idx%mom%beg + 1)%sf(r + j, k, l) &
+                                                    + q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                    q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, r + k, l) &
+                                                    + q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                    q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, r + l)/y_cc(k) &
+                                                    - (q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l)**2._wp)/y_cc(k)
                                 else
                                     q_sf(j, k, l) = q_sf(j, k, l) &
-                                                    + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                    q_prim_vf0(mom_idx%beg + 1)%sf(r + j, k, l) &
-                                                    + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                    q_prim_vf0(mom_idx%beg + 1)%sf(j, r + k, l) &
-                                                    + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                    q_prim_vf0(mom_idx%beg + 1)%sf(j, k, r + l)
+                                                    + q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(eqn_idx%mom%beg + 1)%sf(r + j, k, l) &
+                                                    + q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                    q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, r + k, l) &
+                                                    + q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                    q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, r + l)
                                 end if
                             end if
                         end do
@@ -281,30 +281,30 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        q_sf(j, k, l) = (11._wp*q_prim_vf0(mom_idx%end)%sf(j, k, l) &
-                                         - 18._wp*q_prim_vf1(mom_idx%end)%sf(j, k, l) &
-                                         + 9._wp*q_prim_vf2(mom_idx%end)%sf(j, k, l) &
-                                         - 2._wp*q_prim_vf3(mom_idx%end)%sf(j, k, l))/(6._wp*dt)
+                        q_sf(j, k, l) = (11._wp*q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l) &
+                                         - 18._wp*q_prim_vf1(eqn_idx%mom%end)%sf(j, k, l) &
+                                         + 9._wp*q_prim_vf2(eqn_idx%mom%end)%sf(j, k, l) &
+                                         - 2._wp*q_prim_vf3(eqn_idx%mom%end)%sf(j, k, l))/(6._wp*dt)
 
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
                                 q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf0(mom_idx%end)%sf(r + j, k, l) &
-                                                + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                q_prim_vf0(mom_idx%end)%sf(j, r + k, l) &
-                                                + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                q_prim_vf0(mom_idx%end)%sf(j, k, r + l)/y_cc(k) &
-                                                + (q_prim_vf0(mom_idx%end)%sf(j, k, l)* &
-                                                   q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l))/y_cc(k)
+                                                + q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                q_prim_vf0(eqn_idx%mom%end)%sf(r + j, k, l) &
+                                                + q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                q_prim_vf0(eqn_idx%mom%end)%sf(j, r + k, l) &
+                                                + q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                q_prim_vf0(eqn_idx%mom%end)%sf(j, k, r + l)/y_cc(k) &
+                                                + (q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l)* &
+                                                   q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l))/y_cc(k)
                             else
                                 q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf0(mom_idx%end)%sf(r + j, k, l) &
-                                                + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                q_prim_vf0(mom_idx%end)%sf(j, r + k, l) &
-                                                + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                q_prim_vf0(mom_idx%end)%sf(j, k, r + l)
+                                                + q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                q_prim_vf0(eqn_idx%mom%end)%sf(r + j, k, l) &
+                                                + q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                q_prim_vf0(eqn_idx%mom%end)%sf(j, r + k, l) &
+                                                + q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                q_prim_vf0(eqn_idx%mom%end)%sf(j, k, r + l)
                             end if
                         end do
                     end do
@@ -322,7 +322,7 @@ contains
     !!  @param q_prim_vf Primitive variables
     !!  @param c_m Mass,x-location,y-location,z-location
     impure subroutine s_derive_center_of_mass(q_vf, c_m)
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(IN) :: q_vf
         real(wp), dimension(1:num_fluids, 1:5), intent(INOUT) :: c_m
         integer :: i, j, k, l !< Generic loop iterators
         real(wp) :: tmp, tmp_out !< Temporary variable to store quantity for mpi_allreduce
@@ -345,7 +345,7 @@ contains
                             ! x-location weighted
                             c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
                             ! Volume fraction
-                            c_m(i, 5) = c_m(i, 5) + q_vf(i + adv_idx%beg - 1)%sf(j, k, l)*dV
+                            c_m(i, 5) = c_m(i, 5) + q_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)*dV
                         end do
                     end do
                 end do
@@ -363,7 +363,7 @@ contains
                             ! y-location weighted
                             c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
                             ! Volume fraction
-                            c_m(i, 5) = c_m(i, 5) + q_vf(i + adv_idx%beg - 1)%sf(j, k, l)*dV
+                            c_m(i, 5) = c_m(i, 5) + q_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)*dV
                         end do
                     end do
                 end do
@@ -383,7 +383,7 @@ contains
                             ! z-location weighted
                             c_m(i, 4) = c_m(i, 4) + q_vf(i)%sf(j, k, l)*dV*z_cc(l)
                             ! Volume fraction
-                            c_m(i, 5) = c_m(i, 5) + q_vf(i + adv_idx%beg - 1)%sf(j, k, l)*dV
+                            c_m(i, 5) = c_m(i, 5) + q_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)*dV
                         end do
                     end do
                 end do

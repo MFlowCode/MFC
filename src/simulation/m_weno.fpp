@@ -147,7 +147,7 @@ contains
         call s_compute_weno_coefficients(1, is1_weno)
 
         @:ALLOCATE(v_rs_ws_x(is1_weno%beg:is1_weno%end, &
-            is2_weno%beg:is2_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
+            is2_weno%beg:is2_weno%end, is3_weno%beg:is3_weno%end, 1:eqn_idx%sys_size))
 
         ! Allocating/Computing WENO Coefficients in y-direction
         if (n == 0) return
@@ -177,7 +177,7 @@ contains
         call s_compute_weno_coefficients(2, is2_weno)
 
         @:ALLOCATE(v_rs_ws_y(is2_weno%beg:is2_weno%end, &
-            is1_weno%beg:is1_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
+            is1_weno%beg:is1_weno%end, is3_weno%beg:is3_weno%end, 1:eqn_idx%sys_size))
 
         ! Allocating/Computing WENO Coefficients in z-direction
         if (p == 0) return
@@ -200,7 +200,7 @@ contains
         call s_compute_weno_coefficients(3, is3_weno)
 
         @:ALLOCATE(v_rs_ws_z(is3_weno%beg:is3_weno%end, &
-            is2_weno%beg:is2_weno%end, is1_weno%beg:is1_weno%end, 1:sys_size))
+            is2_weno%beg:is2_weno%end, is1_weno%beg:is1_weno%end, 1:eqn_idx%sys_size))
 
     end subroutine s_initialize_weno_module
 
@@ -1162,7 +1162,7 @@ contains
                         use CuTensorEx
 
                         !$acc host_data use_device(v_rs_ws_x, v_rs_ws_y)
-                        v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1, sys_size], order=[2, 1, 3, 4])
+                        v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1, eqn_idx%sys_size], order=[2, 1, 3, 4])
                         !$acc end host_data
                     end block
                 else
@@ -1170,7 +1170,7 @@ contains
                         use CuTensorEx
 
                         !$acc host_data use_device(v_rs_ws_x, v_rs_ws_y)
-                        v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1 + 2*buff_size, sys_size], order=[2, 1, 3, 4])
+                        v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1 + 2*buff_size, eqn_idx%sys_size], order=[2, 1, 3, 4])
                         !$acc end host_data
                     end block
                 end if
@@ -1201,7 +1201,7 @@ contains
                     use CuTensorEx
 
                     !$acc host_data use_device(v_rs_ws_x, v_rs_ws_z)
-                    v_rs_ws_z = reshape(v_rs_ws_x, shape=[p + 1 + 2*buff_size, n + 2*buff_size + 1, m + 2*buff_size + 1, sys_size], order=[3, 2, 1, 4])
+                    v_rs_ws_z = reshape(v_rs_ws_x, shape=[p + 1 + 2*buff_size, n + 2*buff_size + 1, m + 2*buff_size + 1, eqn_idx%sys_size], order=[3, 2, 1, 4])
                     !$acc end host_data
                 end block
             else

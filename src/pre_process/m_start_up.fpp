@@ -84,10 +84,10 @@ module m_start_up
         !! @param ib_markers track if a cell is within the immersed boundary
         impure subroutine s_read_abstract_ic_data_files(q_cons_vf, ib_markers)
 
-            import :: scalar_field, integer_field, sys_size, pres_field
+            import :: scalar_field, integer_field, eqn_idx%sys_size, pres_field
 
             type(scalar_field), &
-                dimension(sys_size), &
+                dimension(eqn_idx%sys_size), &
                 intent(inout) :: q_cons_vf
 
             type(integer_field), &
@@ -409,7 +409,7 @@ contains
     impure subroutine s_read_serial_ic_data_files(q_cons_vf, ib_markers)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: q_cons_vf
 
         type(integer_field), &
@@ -419,7 +419,7 @@ contains
         ! Generic string used to store the address of a particular file
 
         character(LEN= &
-                  int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !<
+                  int(floor(log10(real(eqn_idx%sys_size, wp)))) + 1) :: file_num !<
             !! Used to store the variable position, in character form, of the
             !! currently manipulated conservative variable file
 
@@ -430,7 +430,7 @@ contains
         integer :: i, r !< Generic loop iterator
 
         ! Reading the Conservative Variables Data Files
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
 
             ! Checking whether data file associated with variable position
             ! of the currently manipulated conservative variable exists
@@ -459,7 +459,7 @@ contains
                 do r = 1, nnode
                     ! Checking whether data file associated with variable position
                     ! of the currently manipulated bubble variable exists
-                    write (file_num, '(I0)') sys_size + r + (i - 1)*nnode
+                    write (file_num, '(I0)') eqn_idx%sys_size + r + (i - 1)*nnode
                     file_loc = trim(t_step_dir)//'/pb'// &
                                trim(file_num)//'.dat'
                     inquire (FILE=trim(file_loc), EXIST=file_check)
@@ -483,7 +483,7 @@ contains
                 do r = 1, 4
                     ! Checking whether data file associated with variable position
                     ! of the currently manipulated bubble variable exists
-                    write (file_num, '(I0)') sys_size + r + (i - 1)*4
+                    write (file_num, '(I0)') eqn_idx%sys_size + r + (i - 1)*4
                     file_loc = trim(t_step_dir)//'/mv'// &
                                trim(file_num)//'.dat'
                     inquire (FILE=trim(file_loc), EXIST=file_check)
@@ -645,7 +645,7 @@ contains
     impure subroutine s_read_parallel_ic_data_files(q_cons_vf, ib_markers)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: q_cons_vf
 
         type(integer_field), &
@@ -695,10 +695,10 @@ contains
             WP_MOK = int(8._wp, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            NVARS_MOK = int(eqn_idx%sys_size, MPI_OFFSET_KIND)
 
             ! Read the data for each variable
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 var_MOK = int(i, MPI_OFFSET_KIND)
 
                 ! Initial displacement to skip at beginning of file
@@ -711,7 +711,7 @@ contains
             end do
 
             if (qbmm .and. .not. polytropic) then
-                do i = sys_size + 1, sys_size + 2*nb*4
+                do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 2*nb*4
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file

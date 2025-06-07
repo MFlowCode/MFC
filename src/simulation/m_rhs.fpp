@@ -181,26 +181,26 @@ contains
         !$acc enter data copyin(idwbuff, idwbuff)
         !$acc update device(idwbuff, idwbuff)
 
-        @:ALLOCATE(q_cons_qp%vf(1:sys_size))
-        @:ALLOCATE(q_prim_qp%vf(1:sys_size))
+        @:ALLOCATE(q_cons_qp%vf(1:eqn_idx%sys_size))
+        @:ALLOCATE(q_prim_qp%vf(1:eqn_idx%sys_size))
 
-        do l = 1, sys_size
+        do l = 1, eqn_idx%sys_size
             @:ALLOCATE(q_cons_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
-        do l = mom_idx%beg, E_idx
+        do l = eqn_idx%mom%beg, eqn_idx%E
             @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
         num_eqns_after_adv = count((/surface_tension, cont_damage/))
 
-        do l = adv_idx%end + 1, sys_size - num_eqns_after_adv
+        do l = eqn_idx%adv%end + 1, eqn_idx%sys_size - num_eqns_after_adv
             @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
         @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 
-        do l = 1, cont_idx%end
+        do l = 1, eqn_idx%cont%end
             if (relativity) then
                 ! Cons and Prim densities are different for relativity
                 @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
@@ -211,38 +211,38 @@ contains
             end if
         end do
 
-        do l = adv_idx%beg, adv_idx%end
+        do l = eqn_idx%adv%beg, eqn_idx%adv%end
             q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
             !$acc enter data copyin(q_prim_qp%vf(l)%sf)
             !$acc enter data attach(q_prim_qp%vf(l)%sf)
         end do
 
         if (surface_tension) then
-            q_prim_qp%vf(c_idx)%sf => &
-                q_cons_qp%vf(c_idx)%sf
-            !$acc enter data copyin(q_prim_qp%vf(c_idx)%sf)
-            !$acc enter data attach(q_prim_qp%vf(c_idx)%sf)
+            q_prim_qp%vf(eqn_idx%c)%sf => &
+                q_cons_qp%vf(eqn_idx%c)%sf
+            !$acc enter data copyin(q_prim_qp%vf(eqn_idx%c)%sf)
+            !$acc enter data attach(q_prim_qp%vf(eqn_idx%c)%sf)
         end if
 
         if (cont_damage) then
-            q_prim_qp%vf(damage_idx)%sf => &
-                q_cons_qp%vf(damage_idx)%sf
-            !$acc enter data copyin(q_prim_qp%vf(damage_idx)%sf)
-            !$acc enter data attach(q_prim_qp%vf(damage_idx)%sf)
+            q_prim_qp%vf(eqn_idx%damage)%sf => &
+                q_cons_qp%vf(eqn_idx%damage)%sf
+            !$acc enter data copyin(q_prim_qp%vf(eqn_idx%damage)%sf)
+            !$acc enter data attach(q_prim_qp%vf(eqn_idx%damage)%sf)
         end if
 
         if (viscous) then
-            @:ALLOCATE(tau_Re_vf(1:sys_size))
+            @:ALLOCATE(tau_Re_vf(1:eqn_idx%sys_size))
             do i = 1, num_dims
-                @:ALLOCATE(tau_Re_vf(cont_idx%end + i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                @:ALLOCATE(tau_Re_vf(eqn_idx%cont%end + i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                                     &  idwbuff(2)%beg:idwbuff(2)%end, &
                                                     &  idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(tau_Re_vf(cont_idx%end + i))
+                @:ACC_SETUP_SFs(tau_Re_vf(eqn_idx%cont%end + i))
             end do
-            @:ALLOCATE(tau_Re_vf(E_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(tau_Re_vf(eqn_idx%E)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                         & idwbuff(2)%beg:idwbuff(2)%end, &
                                         & idwbuff(3)%beg:idwbuff(3)%end))
-            @:ACC_SETUP_SFs(tau_Re_vf(E_idx))
+            @:ACC_SETUP_SFs(tau_Re_vf(eqn_idx%E))
         end if
 
         if (qbmm) then
@@ -274,9 +274,9 @@ contains
         @:ALLOCATE(qR_prim(1:num_dims))
 
         do i = 1, num_dims
-            @:ALLOCATE(qL_prim(i)%vf(1:sys_size))
-            @:ALLOCATE(qR_prim(i)%vf(1:sys_size))
-            do l = mom_idx%beg, mom_idx%end
+            @:ALLOCATE(qL_prim(i)%vf(1:eqn_idx%sys_size))
+            @:ALLOCATE(qR_prim(i)%vf(1:eqn_idx%sys_size))
+            do l = eqn_idx%mom%beg, eqn_idx%mom%end
                 @:ALLOCATE(qL_prim(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
                 @:ALLOCATE(qR_prim(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             end do
@@ -289,33 +289,33 @@ contains
         ! END: Allocation/Association of qK_cons_n and qK_prim_n
 
         @:ALLOCATE(qL_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-            idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
+            idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:eqn_idx%sys_size))
         @:ALLOCATE(qR_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-            idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
+            idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:eqn_idx%sys_size))
 
         if (n > 0) then
 
             @:ALLOCATE(qL_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
-                idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
+                idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:eqn_idx%sys_size))
             @:ALLOCATE(qR_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
-                idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
+                idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:eqn_idx%sys_size))
         else
             @:ALLOCATE(qL_rsy_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
+                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:eqn_idx%sys_size))
             @:ALLOCATE(qR_rsy_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
+                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:eqn_idx%sys_size))
         end if
 
         if (p > 0) then
             @:ALLOCATE(qL_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
-                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, 1:sys_size))
+                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, 1:eqn_idx%sys_size))
             @:ALLOCATE(qR_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
-                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, 1:sys_size))
+                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, 1:eqn_idx%sys_size))
         else
             @:ALLOCATE(qL_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
+                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:eqn_idx%sys_size))
             @:ALLOCATE(qR_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
+                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:eqn_idx%sys_size))
 
         end if
 
@@ -326,11 +326,11 @@ contains
         @:ALLOCATE(dq_prim_dz_qp(1:1))
 
         if (viscous) then
-            @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:sys_size))
-            @:ALLOCATE(dq_prim_dy_qp(1)%vf(1:sys_size))
-            @:ALLOCATE(dq_prim_dz_qp(1)%vf(1:sys_size))
+            @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:eqn_idx%sys_size))
+            @:ALLOCATE(dq_prim_dy_qp(1)%vf(1:eqn_idx%sys_size))
+            @:ALLOCATE(dq_prim_dz_qp(1)%vf(1:eqn_idx%sys_size))
 
-            do l = mom_idx%beg, mom_idx%end
+            do l = eqn_idx%mom%beg, eqn_idx%mom%end
                 @:ALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf( &
                           & idwbuff(1)%beg:idwbuff(1)%end, &
                           & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -341,7 +341,7 @@ contains
 
             if (n > 0) then
 
-                do l = mom_idx%beg, mom_idx%end
+                do l = eqn_idx%mom%beg, eqn_idx%mom%end
                     @:ALLOCATE(dq_prim_dy_qp(1)%vf(l)%sf( &
                              & idwbuff(1)%beg:idwbuff(1)%end, &
                              & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -352,7 +352,7 @@ contains
 
                 if (p > 0) then
 
-                    do l = mom_idx%beg, mom_idx%end
+                    do l = eqn_idx%mom%beg, eqn_idx%mom%end
                         @:ALLOCATE(dq_prim_dz_qp(1)%vf(l)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
                                  & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -364,9 +364,9 @@ contains
             end if
 
         else
-            @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:sys_size))
-            @:ALLOCATE(dq_prim_dy_qp(1)%vf(1:sys_size))
-            @:ALLOCATE(dq_prim_dz_qp(1)%vf(1:sys_size))
+            @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:eqn_idx%sys_size))
+            @:ALLOCATE(dq_prim_dy_qp(1)%vf(1:eqn_idx%sys_size))
+            @:ALLOCATE(dq_prim_dz_qp(1)%vf(1:eqn_idx%sys_size))
 
             do l = momxb, momxe
                 @:ALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf(0, 0, 0))
@@ -393,14 +393,14 @@ contains
 
         if (viscous) then
             do i = 1, num_dims
-                @:ALLOCATE(dqL_prim_dx_n(i)%vf(1:sys_size))
-                @:ALLOCATE(dqL_prim_dy_n(i)%vf(1:sys_size))
-                @:ALLOCATE(dqL_prim_dz_n(i)%vf(1:sys_size))
-                @:ALLOCATE(dqR_prim_dx_n(i)%vf(1:sys_size))
-                @:ALLOCATE(dqR_prim_dy_n(i)%vf(1:sys_size))
-                @:ALLOCATE(dqR_prim_dz_n(i)%vf(1:sys_size))
+                @:ALLOCATE(dqL_prim_dx_n(i)%vf(1:eqn_idx%sys_size))
+                @:ALLOCATE(dqL_prim_dy_n(i)%vf(1:eqn_idx%sys_size))
+                @:ALLOCATE(dqL_prim_dz_n(i)%vf(1:eqn_idx%sys_size))
+                @:ALLOCATE(dqR_prim_dx_n(i)%vf(1:eqn_idx%sys_size))
+                @:ALLOCATE(dqR_prim_dy_n(i)%vf(1:eqn_idx%sys_size))
+                @:ALLOCATE(dqR_prim_dz_n(i)%vf(1:eqn_idx%sys_size))
 
-                do l = mom_idx%beg, mom_idx%end
+                do l = eqn_idx%mom%beg, eqn_idx%mom%end
                     @:ALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf( &
                              & idwbuff(1)%beg:idwbuff(1)%end, &
                              & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -412,7 +412,7 @@ contains
                 end do
 
                 if (n > 0) then
-                    do l = mom_idx%beg, mom_idx%end
+                    do l = eqn_idx%mom%beg, eqn_idx%mom%end
                         @:ALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
                                  & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -425,7 +425,7 @@ contains
                 end if
 
                 if (p > 0) then
-                    do l = mom_idx%beg, mom_idx%end
+                    do l = eqn_idx%mom%beg, eqn_idx%mom%end
                         @:ALLOCATE(dqL_prim_dz_n(i)%vf(l)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
                                  & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -446,34 +446,34 @@ contains
         if (viscous) then
             if (weno_Re_flux) then
                 @:ALLOCATE(dqL_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
+                    idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
                 @:ALLOCATE(dqR_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
+                    idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
 
                 if (n > 0) then
 
                     @:ALLOCATE(dqL_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
-                        idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
+                        idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
                     @:ALLOCATE(dqR_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
-                        idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
+                        idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
                 else
                     @:ALLOCATE(dqL_rsy_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-                        idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
+                        idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
                     @:ALLOCATE(dqR_rsy_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-                        idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
+                        idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
 
                 end if
 
                 if (p > 0) then
                     @:ALLOCATE(dqL_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
-                        idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, mom_idx%beg:mom_idx%end))
+                        idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
                     @:ALLOCATE(dqR_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
-                        idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, mom_idx%beg:mom_idx%end))
+                        idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
                 else
                     @:ALLOCATE(dqL_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-                        idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
+                        idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
                     @:ALLOCATE(dqR_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-                        idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
+                        idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
 
                 end if
             end if
@@ -490,12 +490,12 @@ contains
 
         do i = 1, num_dims
 
-            @:ALLOCATE(flux_n(i)%vf(1:sys_size))
-            @:ALLOCATE(flux_src_n(i)%vf(1:sys_size))
-            @:ALLOCATE(flux_gsrc_n(i)%vf(1:sys_size))
+            @:ALLOCATE(flux_n(i)%vf(1:eqn_idx%sys_size))
+            @:ALLOCATE(flux_src_n(i)%vf(1:eqn_idx%sys_size))
+            @:ALLOCATE(flux_gsrc_n(i)%vf(1:eqn_idx%sys_size))
 
             if (i == 1) then
-                do l = 1, sys_size
+                do l = 1, eqn_idx%sys_size
                     @:ALLOCATE(flux_n(i)%vf(l)%sf( &
                              & idwbuff(1)%beg:idwbuff(1)%end, &
                              & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -507,7 +507,7 @@ contains
                 end do
 
                 if (viscous .or. surface_tension) then
-                    do l = mom_idx%beg, E_idx
+                    do l = eqn_idx%mom%beg, eqn_idx%E
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
                                  & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -515,13 +515,13 @@ contains
                     end do
                 end if
 
-                @:ALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf( &
+                @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%adv%beg)%sf( &
                          & idwbuff(1)%beg:idwbuff(1)%end, &
                          & idwbuff(2)%beg:idwbuff(2)%end, &
                          & idwbuff(3)%beg:idwbuff(3)%end))
 
                 if (riemann_solver == 1 .or. riemann_solver == 4) then
-                    do l = adv_idx%beg + 1, adv_idx%end
+                    do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
                                  & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -539,7 +539,7 @@ contains
                 end if
 
             else
-                do l = 1, sys_size
+                do l = 1, eqn_idx%sys_size
                     @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
                         idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, &
@@ -551,13 +551,13 @@ contains
 
             if (i == 1) then
                 if (riemann_solver /= 1 .and. riemann_solver /= 4) then
-                    do l = adv_idx%beg + 1, adv_idx%end
-                        flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
+                    do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
+                        flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(eqn_idx%adv%beg)%sf
                         !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
                     end do
                 end if
             else
-                do l = 1, sys_size
+                do l = 1, eqn_idx%sys_size
                     flux_n(i)%vf(l)%sf => flux_n(1)%vf(l)%sf
                     flux_src_n(i)%vf(l)%sf => flux_src_n(1)%vf(l)%sf
                     !$acc enter data attach(flux_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf)
@@ -586,15 +586,15 @@ contains
         if (viscous) then
             do i = 1, 2
                 do j = 1, Re_size(i)
-                    Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
+                    Res(i, j) = fluid_pp(Reqn_idx%E(i, j))%Re(i)
                 end do
             end do
-            !$acc update device(Res, Re_idx, Re_size)
+            !$acc update device(Res, Reqn_idx%E, Re_size)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do id = 1, num_dims
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -613,11 +613,11 @@ contains
 
     impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, stage)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
         integer, intent(in) :: t_step
@@ -633,7 +633,7 @@ contains
         call cpu_time(t_start)
         ! Association/Population of Working Variables
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -657,7 +657,7 @@ contains
                         end do
                         !$acc loop seq
                         do i = advxb, advxe - 1
-                            q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1._wp - q_cons_qp%vf(alf_idx)%sf(j, k, l)) &
+                            q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1._wp - q_cons_qp%vf(eqn_idx%alf)%sf(j, k, l)) &
                                                           /alf_sum%sf(j, k, l)
                         end do
                     end do
@@ -718,28 +718,28 @@ contains
 
             if (.not. surface_tension) then
                 ! Reconstruct densitiess
-                iv%beg = 1; iv%end = sys_size
+                iv%beg = 1; iv%end = eqn_idx%sys_size
                 call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(1:sys_size), &
+                    q_prim_qp%vf(1:eqn_idx%sys_size), &
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
             else
-                iv%beg = 1; iv%end = E_idx - 1
+                iv%beg = 1; iv%end = eqn_idx%E - 1
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
 
-                iv%beg = E_idx; iv%end = E_idx
+                iv%beg = eqn_idx%E; iv%end = eqn_idx%E
                 call s_reconstruct_cell_boundary_values_first_order( &
-                    q_prim_qp%vf(E_idx), &
+                    q_prim_qp%vf(eqn_idx%E), &
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
 
-                iv%beg = E_idx + 1; iv%end = sys_size
+                iv%beg = eqn_idx%E + 1; iv%end = eqn_idx%sys_size
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
@@ -872,7 +872,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         if (ib_markers%sf(j, k, l) /= 0) then
-                            do i = 1, sys_size
+                            do i = 1, eqn_idx%sys_size
                                 rhs_vf(i)%sf(j, k, l) = 0._wp
                             end do
                         end if
@@ -885,8 +885,8 @@ contains
         ! Additions for acoustic_source
         if (acoustic_source) then
             call nvtxStartRange("RHS-ACOUSTIC-SRC")
-            call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
-                                             q_prim_qp%vf(1:sys_size), &
+            call s_acoustic_src_calculations(q_cons_qp%vf(1:eqn_idx%sys_size), &
+                                             q_prim_qp%vf(1:eqn_idx%sys_size), &
                                              t_step, &
                                              rhs_vf)
             call nvtxEndRange
@@ -896,8 +896,8 @@ contains
         if (bubbles_euler .and. (.not. adap_dt) .and. (.not. qbmm)) then
             call nvtxStartRange("RHS-BUBBLES-SRC")
             call s_compute_bubble_EE_source( &
-                q_cons_qp%vf(1:sys_size), &
-                q_prim_qp%vf(1:sys_size), &
+                q_cons_qp%vf(1:eqn_idx%sys_size), &
+                q_prim_qp%vf(1:eqn_idx%sys_size), &
                 t_step, &
                 rhs_vf)
             call nvtxEndRange
@@ -907,16 +907,16 @@ contains
             ! RHS additions for sub-grid bubbles_lagrange
             call nvtxStartRange("RHS-EL-BUBBLES-SRC")
             call s_compute_bubbles_EL_source( &
-                q_cons_qp%vf(1:sys_size), &
-                q_prim_qp%vf(1:sys_size), &
+                q_cons_qp%vf(1:eqn_idx%sys_size), &
+                q_prim_qp%vf(1:eqn_idx%sys_size), &
                 rhs_vf)
             call nvtxEndRange
             ! Compute bubble dynamics
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
                 call s_compute_bubble_EL_dynamics( &
-                    q_cons_qp%vf(1:sys_size), &
-                    q_prim_qp%vf(1:sys_size), &
+                    q_cons_qp%vf(1:eqn_idx%sys_size), &
+                    q_prim_qp%vf(1:eqn_idx%sys_size), &
                     t_step, &
                     rhs_vf, &
                     stage)
@@ -936,7 +936,7 @@ contains
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -962,7 +962,7 @@ contains
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
 
         integer, intent(in) :: idir
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
         type(vector_field), intent(inout) :: q_cons_vf
         type(vector_field), intent(inout) :: q_prim_vf
         type(vector_field), intent(inout) :: flux_src_n_vf
@@ -979,14 +979,14 @@ contains
             do q_loop = 0, p
                 do l_loop = 0, n
                     do k_loop = 0, m
-                        blkmod1(k_loop, l_loop, q_loop) = ((gammas(1) + 1._wp)*q_prim_vf%vf(E_idx)%sf(k_loop, l_loop, q_loop) + &
+                        blkmod1(k_loop, l_loop, q_loop) = ((gammas(1) + 1._wp)*q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop) + &
                                                            pi_infs(1))/gammas(1)
-                        blkmod2(k_loop, l_loop, q_loop) = ((gammas(2) + 1._wp)*q_prim_vf%vf(E_idx)%sf(k_loop, l_loop, q_loop) + &
+                        blkmod2(k_loop, l_loop, q_loop) = ((gammas(2) + 1._wp)*q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop) + &
                                                            pi_infs(2))/gammas(2)
                         alpha1(k_loop, l_loop, q_loop) = q_cons_vf%vf(advxb)%sf(k_loop, l_loop, q_loop)
 
                         if (bubbles_euler) then
-                            alpha2(k_loop, l_loop, q_loop) = q_cons_vf%vf(alf_idx - 1)%sf(k_loop, l_loop, q_loop)
+                            alpha2(k_loop, l_loop, q_loop) = q_cons_vf%vf(eqn_idx%alf - 1)%sf(k_loop, l_loop, q_loop)
                         else
                             alpha2(k_loop, l_loop, q_loop) = q_cons_vf%vf(advxe)%sf(k_loop, l_loop, q_loop)
                         end if
@@ -1010,7 +1010,7 @@ contains
             end if
 
             !$acc parallel loop collapse(4) gang vector default(present) private(inv_ds, flux_face1, flux_face2)
-            do j = 1, sys_size
+            do j = 1, eqn_idx%sys_size
                 do q_loop = 0, p
                     do l_loop = 0, n
                         do k_loop = 0, m
@@ -1032,7 +1032,7 @@ contains
                             do i_fluid_loop = 1, num_fluids
                                 inv_ds = 1._wp/dx(k_loop)
                                 advected_qty_val = q_cons_vf%vf(i_fluid_loop + advxb - 1)%sf(k_loop, l_loop, q_loop)
-                                pressure_val = q_prim_vf%vf(E_idx)%sf(k_loop, l_loop, q_loop)
+                                pressure_val = q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop)
                                 flux_face1 = flux_src_n_vf%vf(advxb)%sf(k_loop, l_loop, q_loop)
                                 flux_face2 = flux_src_n_vf%vf(advxb)%sf(k_loop - 1, l_loop, q_loop)
                                 rhs_vf(i_fluid_loop + intxb - 1)%sf(k_loop, l_loop, q_loop) = &
@@ -1055,7 +1055,7 @@ contains
             end if
 
             !$acc parallel loop collapse(4) gang vector default(present) private(inv_ds, flux_face1, flux_face2)
-            do j = 1, sys_size
+            do j = 1, eqn_idx%sys_size
                 do l = 0, p
                     do k = 0, n
                         do q = 0, m
@@ -1077,7 +1077,7 @@ contains
                             do i_fluid_loop = 1, num_fluids
                                 inv_ds = 1._wp/dy(k)
                                 advected_qty_val = q_cons_vf%vf(i_fluid_loop + advxb - 1)%sf(q, k, l)
-                                pressure_val = q_prim_vf%vf(E_idx)%sf(q, k, l)
+                                pressure_val = q_prim_vf%vf(eqn_idx%E)%sf(q, k, l)
                                 flux_face1 = flux_src_n_vf%vf(advxb)%sf(q, k, l)
                                 flux_face2 = flux_src_n_vf%vf(advxb)%sf(q, k - 1, l)
                                 rhs_vf(i_fluid_loop + intxb - 1)%sf(q, k, l) = &
@@ -1096,7 +1096,7 @@ contains
 
             if (cyl_coord) then
                 !$acc parallel loop collapse(4) gang vector default(present) private(flux_face1, flux_face2)
-                do j = 1, sys_size
+                do j = 1, eqn_idx%sys_size
                     do l = 0, p
                         do k = 0, n
                             do q = 0, m
@@ -1123,7 +1123,7 @@ contains
             if (grid_geometry == 3) then ! Cylindrical Coordinates
                 !$acc parallel loop collapse(4) gang vector default(present) &
                 !$acc private(inv_ds, velocity_val, flux_face1, flux_face2)
-                do j = 1, sys_size
+                do j = 1, eqn_idx%sys_size
                     do k = 0, p
                         do q = 0, n
                             do l = 0, m
@@ -1138,7 +1138,7 @@ contains
                     end do
                 end do
                 !$acc parallel loop collapse(4) gang vector default(present) private(flux_face1, flux_face2)
-                do j = 1, sys_size
+                do j = 1, eqn_idx%sys_size
                     do k = 0, p
                         do q = 0, n
                             do l = 0, m
@@ -1152,7 +1152,7 @@ contains
                 end do
             else ! Cartesian Coordinates
                 !$acc parallel loop collapse(4) gang vector default(present) private(inv_ds, flux_face1, flux_face2)
-                do j = 1, sys_size
+                do j = 1, eqn_idx%sys_size
                     do k = 0, p
                         do q = 0, n
                             do l = 0, m
@@ -1175,7 +1175,7 @@ contains
                             do i_fluid_loop = 1, num_fluids
                                 inv_ds = 1._wp/dz(k)
                                 advected_qty_val = q_cons_vf%vf(i_fluid_loop + advxb - 1)%sf(l, q, k)
-                                pressure_val = q_prim_vf%vf(E_idx)%sf(l, q, k)
+                                pressure_val = q_prim_vf%vf(eqn_idx%E)%sf(l, q, k)
                                 flux_face1 = flux_src_n_vf%vf(advxb)%sf(l, q, k)
                                 flux_face2 = flux_src_n_vf%vf(advxb)%sf(l, q, k - 1)
                                 rhs_vf(i_fluid_loop + intxb - 1)%sf(l, q, k) = &
@@ -1196,7 +1196,7 @@ contains
         subroutine s_add_directional_advection_source_terms(current_idir, rhs_vf_arg, q_cons_vf_arg, &
                                                             q_prim_vf_arg, flux_src_n_vf_arg, Kterm_arg)
             integer, intent(in) :: current_idir
-            type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf_arg
+            type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf_arg
             type(vector_field), intent(in) :: q_cons_vf_arg
             type(vector_field), intent(in) :: q_prim_vf_arg
             type(vector_field), intent(in) :: flux_src_n_vf_arg
@@ -1422,10 +1422,10 @@ contains
                                                 dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf)
 
         integer, intent(in) :: idir
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), dimension(sys_size), intent(in) :: flux_src_n
-        type(scalar_field), dimension(sys_size), intent(in) :: dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: flux_src_n
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf
 
         integer :: i, j, k, l
 
@@ -1436,9 +1436,9 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(c_idx)%sf(j, k, l) = &
-                                rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dx(j)* &
-                                q_prim_vf(c_idx)%sf(j, k, l)* &
+                            rhs_vf(eqn_idx%c)%sf(j, k, l) = &
+                                rhs_vf(eqn_idx%c)%sf(j, k, l) + 1._wp/dx(j)* &
+                                q_prim_vf(eqn_idx%c)%sf(j, k, l)* &
                                 (flux_src_n(advxb)%sf(j, k, l) - &
                                  flux_src_n(advxb)%sf(j - 1, k, l))
                         end do
@@ -1451,7 +1451,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         !$acc loop seq
-                        do i = momxb, E_idx
+                        do i = momxb, eqn_idx%E
                             rhs_vf(i)%sf(j, k, l) = &
                                 rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
                                 (flux_src_n(i)%sf(j - 1, k, l) &
@@ -1468,9 +1468,9 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(c_idx)%sf(j, k, l) = &
-                                rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dy(k)* &
-                                q_prim_vf(c_idx)%sf(j, k, l)* &
+                            rhs_vf(eqn_idx%c)%sf(j, k, l) = &
+                                rhs_vf(eqn_idx%c)%sf(j, k, l) + 1._wp/dy(k)* &
+                                q_prim_vf(eqn_idx%c)%sf(j, k, l)* &
                                 (flux_src_n(advxb)%sf(j, k, l) - &
                                  flux_src_n(advxb)%sf(j, k - 1, l))
                         end do
@@ -1482,16 +1482,16 @@ contains
                 if (viscous) then
                     if (p > 0) then
                         call s_compute_viscous_stress_tensor(q_prim_vf, &
-                                                             dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
-                                                             dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
-                                                             dq_prim_dz_vf(mom_idx%beg:mom_idx%end), &
+                                                             dq_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                             dq_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                             dq_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                              tau_Re_vf, &
                                                              idwbuff(1), idwbuff(2), idwbuff(3))
                     else
                         call s_compute_viscous_stress_tensor(q_prim_vf, &
-                                                             dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
-                                                             dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
-                                                             dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                             dq_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                             dq_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                             dq_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                              tau_Re_vf, &
                                                              idwbuff(1), idwbuff(2), idwbuff(3))
                     end if
@@ -1500,7 +1500,7 @@ contains
                     do l = 0, p
                         do j = 0, m
                             !$acc loop seq
-                            do i = momxb, E_idx
+                            do i = momxb, eqn_idx%E
                                 rhs_vf(i)%sf(j, 0, l) = &
                                     rhs_vf(i)%sf(j, 0, l) + 1._wp/(y_cc(1) - y_cc(-1))* &
                                     (tau_Re_vf(i)%sf(j, -1, l) &
@@ -1516,7 +1516,7 @@ contains
                     do k = 1, n
                         do j = 0, m
                             !$acc loop seq
-                            do i = momxb, E_idx
+                            do i = momxb, eqn_idx%E
                                 rhs_vf(i)%sf(j, k, l) = &
                                     rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
                                     (flux_src_n(i)%sf(j, k - 1, l) &
@@ -1532,7 +1532,7 @@ contains
                     do k = 0, n
                         do j = 0, m
                             !$acc loop seq
-                            do i = momxb, E_idx
+                            do i = momxb, eqn_idx%E
                                 rhs_vf(i)%sf(j, k, l) = &
                                     rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
                                     (flux_src_n(i)%sf(j, k - 1, l) &
@@ -1553,7 +1553,7 @@ contains
                         do k = 1, n
                             do j = 0, m
                                 !$acc loop seq
-                                do i = momxb, E_idx
+                                do i = momxb, eqn_idx%E
                                     rhs_vf(i)%sf(j, k, l) = &
                                         rhs_vf(i)%sf(j, k, l) - 5e-1_wp/y_cc(k)* &
                                         (flux_src_n(i)%sf(j, k - 1, l) &
@@ -1568,7 +1568,7 @@ contains
                         do l = 0, p
                             do j = 0, m
                                 !$acc loop seq
-                                do i = momxb, E_idx
+                                do i = momxb, eqn_idx%E
                                     rhs_vf(i)%sf(j, 0, l) = &
                                         rhs_vf(i)%sf(j, 0, l) - 1._wp/y_cc(0)* &
                                         tau_Re_vf(i)%sf(j, 0, l)
@@ -1583,7 +1583,7 @@ contains
                         do k = 0, n
                             do j = 0, m
                                 !$acc loop seq
-                                do i = momxb, E_idx
+                                do i = momxb, eqn_idx%E
                                     rhs_vf(i)%sf(j, k, l) = &
                                         rhs_vf(i)%sf(j, k, l) - 5e-1_wp/y_cc(k)* &
                                         (flux_src_n(i)%sf(j, k - 1, l) &
@@ -1603,9 +1603,9 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(c_idx)%sf(j, k, l) = &
-                                rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dz(l)* &
-                                q_prim_vf(c_idx)%sf(j, k, l)* &
+                            rhs_vf(eqn_idx%c)%sf(j, k, l) = &
+                                rhs_vf(eqn_idx%c)%sf(j, k, l) + 1._wp/dz(l)* &
+                                q_prim_vf(eqn_idx%c)%sf(j, k, l)* &
                                 (flux_src_n(advxb)%sf(j, k, l) - &
                                  flux_src_n(advxb)%sf(j, k, l - 1))
                         end do
@@ -1618,7 +1618,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         !$acc loop seq
-                        do i = momxb, E_idx
+                        do i = momxb, eqn_idx%E
                             rhs_vf(i)%sf(j, k, l) = &
                                 rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
                                 (flux_src_n(i)%sf(j, k, l - 1) &
@@ -1659,7 +1659,7 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
     pure subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
 
         !> @name Relaxed pressure, initial partial pressures, function f(p) and its partial
             !! derivative df(p), isentropic partial density, sum of volume fractions,
@@ -1807,7 +1807,7 @@ contains
                     !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho(i) = q_cons_vf(i)%sf(j, k, l)
-                        alpha(i) = q_cons_vf(E_idx + i)%sf(j, k, l)
+                        alpha(i) = q_cons_vf(eqn_idx%E + i)%sf(j, k, l)
                     end do
 
                     if (bubbles_euler) then
@@ -1868,7 +1868,7 @@ contains
                                 if (Re_size(i) > 0) Re(i) = 0._wp
                                 !$acc loop seq
                                 do q = 1, Re_size(i)
-                                    Re(i) = alpha(Re_idx(i, q))/Res(i, q) &
+                                    Re(i) = alpha(Reqn_idx%E(i, q))/Res(i, q) &
                                             + Re(i)
                                 end do
 
@@ -1886,7 +1886,7 @@ contains
                                    q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
                     end do
 
-                    pres_relax = (q_cons_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
+                    pres_relax = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
 
                     !$acc loop seq
                     do i = 1, num_fluids
@@ -2042,7 +2042,7 @@ contains
 
         integer :: i, j, l
 
-        do j = cont_idx%beg, cont_idx%end
+        do j = eqn_idx%cont%beg, eqn_idx%cont%end
             if (relativity) then
                 ! Cons and Prim densities are different for relativity
                 @:DEALLOCATE(q_cons_qp%vf(j)%sf)
@@ -2053,12 +2053,12 @@ contains
             end if
         end do
 
-        do j = adv_idx%beg, adv_idx%end
+        do j = eqn_idx%adv%beg, eqn_idx%adv%end
             !$acc exit data detach(q_prim_qp%vf(j)%sf)
             nullify (q_prim_qp%vf(j)%sf)
         end do
 
-        do j = mom_idx%beg, E_idx
+        do j = eqn_idx%mom%beg, eqn_idx%E
             @:DEALLOCATE(q_cons_qp%vf(j)%sf)
             @:DEALLOCATE(q_prim_qp%vf(j)%sf)
         end do
@@ -2092,18 +2092,18 @@ contains
         end if
 
         if (viscous) then
-            do l = mom_idx%beg, mom_idx%end
+            do l = eqn_idx%mom%beg, eqn_idx%mom%end
                 @:DEALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf)
             end do
 
             if (n > 0) then
 
-                do l = mom_idx%beg, mom_idx%end
+                do l = eqn_idx%mom%beg, eqn_idx%mom%end
                     @:DEALLOCATE(dq_prim_dy_qp(1)%vf(l)%sf)
                 end do
 
                 if (p > 0) then
-                    do l = mom_idx%beg, mom_idx%end
+                    do l = eqn_idx%mom%beg, eqn_idx%mom%end
                         @:DEALLOCATE(dq_prim_dz_qp(1)%vf(l)%sf)
                     end do
                 end if
@@ -2118,20 +2118,20 @@ contains
         if (viscous) then
             do i = num_dims, 1, -1
 
-                do l = mom_idx%beg, mom_idx%end
+                do l = eqn_idx%mom%beg, eqn_idx%mom%end
                     @:DEALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf)
                     @:DEALLOCATE(dqR_prim_dx_n(i)%vf(l)%sf)
                 end do
 
                 if (n > 0) then
-                    do l = mom_idx%beg, mom_idx%end
+                    do l = eqn_idx%mom%beg, eqn_idx%mom%end
                         @:DEALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf)
                         @:DEALLOCATE(dqR_prim_dy_n(i)%vf(l)%sf)
                     end do
                 end if
 
                 if (p > 0) then
-                    do l = mom_idx%beg, mom_idx%end
+                    do l = eqn_idx%mom%beg, eqn_idx%mom%end
                         @:DEALLOCATE(dqL_prim_dz_n(i)%vf(l)%sf)
                         @:DEALLOCATE(dqR_prim_dz_n(i)%vf(l)%sf)
                     end do
@@ -2151,34 +2151,34 @@ contains
 
         do i = num_dims, 1, -1
             if (i /= 1) then
-                do l = 1, sys_size
+                do l = 1, eqn_idx%sys_size
                     nullify (flux_n(i)%vf(l)%sf)
                     nullify (flux_src_n(i)%vf(l)%sf)
                     @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
                 end do
             else
-                do l = 1, sys_size
+                do l = 1, eqn_idx%sys_size
                     @:DEALLOCATE(flux_n(i)%vf(l)%sf)
                     @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
                 end do
 
                 if (viscous) then
-                    do l = mom_idx%beg, E_idx
+                    do l = eqn_idx%mom%beg, eqn_idx%E
                         @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                     end do
                 end if
 
                 if (riemann_solver == 1 .or. riemann_solver == 4) then
-                    do l = adv_idx%beg + 1, adv_idx%end
+                    do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                         @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                     end do
                 else
-                    do l = adv_idx%beg + 1, adv_idx%end
+                    do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                         nullify (flux_src_n(i)%vf(l)%sf)
                     end do
                 end if
 
-                @:DEALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf)
+                @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%adv%beg)%sf)
             end if
 
             @:DEALLOCATE(flux_n(i)%vf, flux_src_n(i)%vf, flux_gsrc_n(i)%vf)
@@ -2188,9 +2188,9 @@ contains
 
         if (viscous .and. cyl_coord) then
             do i = 1, num_dims
-                @:DEALLOCATE(tau_re_vf(cont_idx%end + i)%sf)
+                @:DEALLOCATE(tau_re_vf(eqn_idx%cont%end + i)%sf)
             end do
-            @:DEALLOCATE(tau_re_vf(e_idx)%sf)
+            @:DEALLOCATE(tau_re_vf(eqn_idx%E)%sf)
             @:DEALLOCATE(tau_re_vf)
         end if
 

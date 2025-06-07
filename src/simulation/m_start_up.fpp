@@ -115,7 +115,7 @@ contains
     impure subroutine s_read_data_files(q_cons_vf)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: q_cons_vf
 
 
@@ -258,7 +258,7 @@ contains
         !! @param q_cons_vf Cell-averaged conservative variables
     impure subroutine s_read_serial_data_files(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(INOUT) :: q_cons_vf
         
             
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
@@ -365,7 +365,7 @@ contains
 
         end if
 
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             write (file_path, '(A,I0,A)') &
                 trim(t_step_dir)//'/q_cons_vf', i, '.dat'
             inquire (FILE=trim(file_path), EXIST=file_exist)
@@ -386,7 +386,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_path, '(A,I0,A)') &
-                            trim(t_step_dir)//'/pb', sys_size + (i - 1)*nnode + r, '.dat'
+                            trim(t_step_dir)//'/pb', eqn_idx%sys_size + (i - 1)*nnode + r, '.dat'
                         inquire (FILE=trim(file_path), EXIST=file_exist)
                         if (file_exist) then
                             open (2, FILE=trim(file_path), &
@@ -402,7 +402,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_path, '(A,I0,A)') &
-                            trim(t_step_dir)//'/mv', sys_size + (i - 1)*nnode + r, '.dat'
+                            trim(t_step_dir)//'/mv', eqn_idx%sys_size + (i - 1)*nnode + r, '.dat'
                         inquire (FILE=trim(file_path), EXIST=file_exist)
                         if (file_exist) then
                             open (2, FILE=trim(file_path), &
@@ -504,7 +504,7 @@ contains
     impure subroutine s_read_parallel_data_files(q_cons_vf)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(INOUT) :: q_cons_vf
 
 #ifdef MFC_MPI
@@ -638,12 +638,12 @@ contains
                 WP_MOK = int(8._wp, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                NVARS_MOK = int(eqn_idx%sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
 
-                    do i = 1, sys_size!adv_idx%end
+                    do i = 1, eqn_idx%sys_size!eqn_idx%adv%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -651,7 +651,7 @@ contains
                     end do
                     !Read pb and mv for non-polytropic qbmm
                     if (qbmm .and. .not. polytropic) then
-                        do i = sys_size + 1, sys_size + 2*nb*nnode
+                        do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 2*nb*nnode
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
                             call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -659,7 +659,7 @@ contains
                         end do
                     end if
                 else
-                    do i = 1, adv_idx%end
+                    do i = 1, eqn_idx%adv%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -774,11 +774,11 @@ contains
                 WP_MOK = int(8._wp, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                NVARS_MOK = int(eqn_idx%sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size !adv_idx%end
+                    do i = 1, eqn_idx%sys_size !eqn_idx%adv%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
@@ -790,7 +790,7 @@ contains
                     end do
                     !Read pb and mv for non-polytropic qbmm
                     if (qbmm .and. .not. polytropic) then
-                        do i = sys_size + 1, sys_size + 2*nb*nnode
+                        do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 2*nb*nnode
                             var_MOK = int(i, MPI_OFFSET_KIND)
                             ! Initial displacement to skip at beginning of file
                             disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
@@ -802,7 +802,7 @@ contains
                         end do
                     end if
                 else
-                    do i = 1, sys_size
+                    do i = 1, eqn_idx%sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         ! Initial displacement to skip at beginning of file
@@ -1178,7 +1178,7 @@ contains
         !! @param v_vf conservative variables
     subroutine s_initialize_internal_energy_equations(v_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: v_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: v_vf
 
         real(wp) :: rho
         real(wp) :: dyn_pres
@@ -1205,7 +1205,7 @@ contains
                     call s_convert_to_mixture_variables(v_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
 
                     dyn_pres = 0._wp
-                    do i = mom_idx%beg, mom_idx%end
+                    do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         dyn_pres = dyn_pres + 5e-1_wp*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l) &
                                    /max(rho, sgm_eps)
                     end do
@@ -1224,13 +1224,13 @@ contains
                         end if
                     end if
 
-                    call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._wp, &
+                    call s_compute_pressure(v_vf(eqn_idx%E)%sf(j, k, l), 0._wp, &
                                             dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag = pres_mag)
 
                     do i = 1, num_fluids
-                        v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
+                        v_vf(i + eqn_idx%internalEnergies%beg - 1)%sf(j, k, l) = v_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)* &
                                                                              (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) &
-                                                                             + v_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
+                                                                             + v_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
                     end do
 
                 end do
@@ -1296,7 +1296,7 @@ contains
         end if
 
         if (probe_wrt) then
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 !$acc update host(q_cons_ts(1)%vf(i)%sf)
             end do
         end if
@@ -1361,7 +1361,7 @@ contains
                 io_time_final = maxval(io_proc_time)
             end if
 
-            grind_time = time_final*1.0e9_wp/(sys_size*maxval((/1,m_glb/))*maxval((/1,n_glb/))*maxval((/1,p_glb/)))
+            grind_time = time_final*1.0e9_wp/(eqn_idx%sys_size*maxval((/1,m_glb/))*maxval((/1,n_glb/))*maxval((/1,p_glb/)))
 
             print *, "Performance:", grind_time, "ns/gp/eq/rhs"
             inquire (FILE='time_data.dat', EXIST=file_exists)
@@ -1402,7 +1402,7 @@ contains
 
         call cpu_time(start)
         call nvtxStartRange("SAVE-DATA")
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             !$acc update host(q_cons_ts(1)%vf(i)%sf)
             do l = 0, p
                 do k = 0, n
@@ -1633,7 +1633,7 @@ contains
     subroutine s_initialize_gpu_vars
         integer :: i
         !Update GPU DATA
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             !$acc update device(q_cons_ts(1)%vf(i)%sf)
         end do
 
@@ -1643,7 +1643,7 @@ contains
         if (chemistry) then
             !$acc update device(q_T_sf%sf)
         end if
-        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, n_idx, pi_fac, low_Mach)
+        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, eqn_idx%n, pi_fac, low_Mach)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
         !$acc update device(acoustic_source, num_source)

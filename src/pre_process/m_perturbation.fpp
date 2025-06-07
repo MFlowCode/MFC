@@ -51,13 +51,13 @@ contains
         end if
 
         if (elliptic_smoothing) then
-            allocate (q_prim_temp(0:m, 0:n, 0:p, 1:sys_size))
+            allocate (q_prim_temp(0:m, 0:n, 0:p, 1:eqn_idx%sys_size))
         end if
 
     end subroutine s_initialize_perturbation_module
 
     impure subroutine s_perturb_sphere(q_prim_vf)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !< generic loop operators
 
         real(wp) :: perturb_alpha
@@ -70,7 +70,7 @@ contains
                 do i = 0, m
                     call random_number(rand_real)
 
-                    perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
+                    perturb_alpha = q_prim_vf(eqn_idx%E + perturb_sph_fluid)%sf(i, j, k)
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
                     !    IF ((perturb_alpha >= 25e-2_wp) .AND. (perturb_alpha <= 75e-2_wp)) THEN
@@ -78,7 +78,7 @@ contains
 
                         ! Derive new partial densities
                         do l = 1, num_fluids
-                            q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
+                            q_prim_vf(l)%sf(i, j, k) = q_prim_vf(eqn_idx%E + l)%sf(i, j, k)*fluid_rho(l)
                         end do
 
                     end if
@@ -89,7 +89,7 @@ contains
     end subroutine s_perturb_sphere
 
     impure subroutine s_perturb_surrounding_flow(q_prim_vf)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k !<  generic loop iterators
 
         real(wp) :: perturb_alpha
@@ -100,13 +100,13 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    perturb_alpha = q_prim_vf(E_idx + perturb_flow_fluid)%sf(i, j, k)
+                    perturb_alpha = q_prim_vf(eqn_idx%E + perturb_flow_fluid)%sf(i, j, k)
                     call random_number(rand_real)
                     rand_real = rand_real*perturb_flow_mag
-                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
-                    q_prim_vf(mom_idx%end)%sf(i, j, k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i, j, k)
+                    q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k)
+                    q_prim_vf(eqn_idx%mom%end)%sf(i, j, k) = rand_real*q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k)
                     if (bubbles_euler) then
-                        q_prim_vf(alf_idx)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(alf_idx)%sf(i, j, k)
+                        q_prim_vf(eqn_idx%alf)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(eqn_idx%alf)%sf(i, j, k)
                     end if
                 end do
             end do
@@ -121,7 +121,7 @@ contains
         !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4),
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
     impure subroutine s_superposition_instability_wave(q_prim_vf)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
         real(wp) :: uratio, Ldomain
         integer :: i, j, k, q
@@ -169,11 +169,11 @@ contains
                     if (p > 0) then
                         q_prim_vf(momxb + 2)%sf(i, j, k) = q_prim_vf(momxb + 2)%sf(i, j, k) + wave(mixlayer_var(4), i, j, k)/uratio ! w
                     end if
-                    q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(mixlayer_var(5), i, j, k)/uratio**2 ! p
+                    q_prim_vf(eqn_idx%E)%sf(i, j, k) = q_prim_vf(eqn_idx%E)%sf(i, j, k) + wave(mixlayer_var(5), i, j, k)/uratio**2 ! p
 
                     if (bubbles_euler .and. (.not. qbmm)) then
                         do q = 1, nb
-                            call s_compute_equilibrium_state(q_prim_vf(E_idx)%sf(i, j, k), R0(q), q_prim_vf(bub_idx%rs(q))%sf(i, j, k))
+                            call s_compute_equilibrium_state(q_prim_vf(eqn_idx%E)%sf(i, j, k), R0(q), q_prim_vf(eqn_idx%bub%rs(q))%sf(i, j, k))
                         end do
                     end if
                 end do
@@ -617,7 +617,7 @@ contains
 
     impure subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
         integer :: i, j, k, l, q
 
@@ -629,7 +629,7 @@ contains
             ! Perform smoothing and store in temp array
             if (n == 0) then
                 do j = 0, m
-                    do i = 1, sys_size
+                    do i = 1, eqn_idx%sys_size
                         q_prim_temp(j, 0, 0, i) = (1._wp/4._wp)* &
                                                   (q_prim_vf(i)%sf(j + 1, 0, 0) + q_prim_vf(i)%sf(j - 1, 0, 0) + &
                                                    2._wp*q_prim_vf(i)%sf(j, 0, 0))
@@ -638,7 +638,7 @@ contains
             else if (p == 0) then
                 do k = 0, n
                     do j = 0, m
-                        do i = 1, sys_size
+                        do i = 1, eqn_idx%sys_size
                             q_prim_temp(j, k, 0, i) = (1._wp/8._wp)* &
                                                       (q_prim_vf(i)%sf(j + 1, k, 0) + q_prim_vf(i)%sf(j - 1, k, 0) + &
                                                        q_prim_vf(i)%sf(j, k + 1, 0) + q_prim_vf(i)%sf(j, k - 1, 0) + &
@@ -650,7 +650,7 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            do i = 1, sys_size
+                            do i = 1, eqn_idx%sys_size
                                 q_prim_temp(j, k, l, i) = (1._wp/12._wp)* &
                                                           (q_prim_vf(i)%sf(j + 1, k, l) + q_prim_vf(i)%sf(j - 1, k, l) + &
                                                            q_prim_vf(i)%sf(j, k + 1, l) + q_prim_vf(i)%sf(j, k - 1, l) + &
@@ -666,7 +666,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        do i = 1, sys_size
+                        do i = 1, eqn_idx%sys_size
                             q_prim_vf(i)%sf(j, k, l) = q_prim_temp(j, k, l, i)
                         end do
                     end do

@@ -133,9 +133,9 @@ contains
         logical :: is_cbc
 
         if (chemistry) then
-            flux_cbc_index = sys_size
+            flux_cbc_index = eqn_idx%sys_size
         else
-            flux_cbc_index = adv_idx%end
+            flux_cbc_index = eqn_idx%adv%end
         end if
         !$acc update device(flux_cbc_index)
 
@@ -162,7 +162,7 @@ contains
 
         @:ALLOCATE(q_prim_rsx_vf(0:buff_size, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
+            is3%beg:is3%end, 1:eqn_idx%sys_size))
 
         if (weno_order > 1) then
 
@@ -172,7 +172,7 @@ contains
 
             @:ALLOCATE(F_src_rsx_vf(0:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         end if
 
@@ -182,7 +182,7 @@ contains
 
         @:ALLOCATE(flux_src_rsx_vf_l(-1:buff_size, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+            is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         if (n > 0) then
 
@@ -205,7 +205,7 @@ contains
 
             @:ALLOCATE(q_prim_rsy_vf(0:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, 1:sys_size))
+                is3%beg:is3%end, 1:eqn_idx%sys_size))
 
             if (weno_order > 1) then
 
@@ -215,7 +215,7 @@ contains
 
                 @:ALLOCATE(F_src_rsy_vf(0:buff_size, &
                     is2%beg:is2%end, &
-                    is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                    is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
             end if
 
@@ -225,7 +225,7 @@ contains
 
             @:ALLOCATE(flux_src_rsy_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         end if
 
@@ -250,7 +250,7 @@ contains
 
             @:ALLOCATE(q_prim_rsz_vf(0:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, 1:sys_size))
+                is3%beg:is3%end, 1:eqn_idx%sys_size))
 
             if (weno_order > 1) then
 
@@ -260,7 +260,7 @@ contains
 
                 @:ALLOCATE(F_src_rsz_vf(0:buff_size, &
                     is2%beg:is2%end, &
-                    is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                    is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
             end if
 
@@ -270,7 +270,7 @@ contains
 
             @:ALLOCATE(flux_src_rsz_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         end if
 
@@ -626,11 +626,11 @@ contains
                      ix, iy, iz)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: q_prim_vf
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: flux_vf, flux_src_vf
 
         integer, intent(in) :: cbc_dir_norm, cbc_loc_norm
@@ -653,7 +653,7 @@ contains
         real(wp), dimension(2) :: Re_cbc
         real(wp), dimension(num_vels) :: vel, dvel_ds
         real(wp), dimension(num_fluids) :: adv, dadv_ds
-        real(wp), dimension(sys_size) :: L
+        real(wp), dimension(eqn_idx%sys_size) :: L
         real(wp), dimension(3) :: lambda
 
         real(wp) :: rho         !< Cell averaged density
@@ -793,11 +793,11 @@ contains
                             vel_K_sum = vel_K_sum + vel(i)**2._wp
                         end do
 
-                        pres = q_prim_rs${XYZ}$_vf(0, k, r, E_idx)
+                        pres = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%E)
 
                         !$acc loop seq
-                        do i = 1, advxe - E_idx
-                            adv(i) = q_prim_rs${XYZ}$_vf(0, k, r, E_idx + i)
+                        do i = 1, advxe - eqn_idx%E
+                            adv(i) = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%E + i)
                         end do
 
                         if (bubbles_euler) then
@@ -857,7 +857,7 @@ contains
 
                         dpres_ds = 0._wp
                         !$acc loop seq
-                        do i = 1, advxe - E_idx
+                        do i = 1, advxe - eqn_idx%E
                             dadv_ds(i) = 0._wp
                         end do
 
@@ -884,12 +884,12 @@ contains
                                              dvel_ds(i)
                             end do
 
-                            dpres_ds = q_prim_rs${XYZ}$_vf(j, k, r, E_idx)* &
+                            dpres_ds = q_prim_rs${XYZ}$_vf(j, k, r, eqn_idx%E)* &
                                        fd_coef_${XYZ}$ (j, cbc_loc) + &
                                        dpres_ds
                             !$acc loop seq
-                            do i = 1, advxe - E_idx
-                                dadv_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, E_idx + i)* &
+                            do i = 1, advxe - eqn_idx%E
+                                dadv_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, eqn_idx%E + i)* &
                                              fd_coef_${XYZ}$ (j, cbc_loc) + &
                                              dadv_ds(i)
                             end do
@@ -933,8 +933,8 @@ contains
                                     end if
                                 end if
                                 !$acc loop seq
-                                do i = E_idx, advxe - 1
-                                    L(i) = c*Ma*(adv(i + 1 - E_idx) - alpha_in(i + 1 - E_idx, ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                do i = eqn_idx%E, advxe - 1
+                                    L(i) = c*Ma*(adv(i + 1 - eqn_idx%E) - alpha_in(i + 1 - eqn_idx%E, ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
                                 L(advxe) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
@@ -1002,12 +1002,12 @@ contains
                         ! The treatment of void fraction source is unclear
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
                             !$acc loop seq
-                            do i = 1, advxe - E_idx
+                            do i = 1, advxe - eqn_idx%E
                                 dadv_dt(i) = -L(momxe + i) !+ adv(i) * vel(dir_idx(1))/y_cc(n)
                             end do
                         else
                             !$acc loop seq
-                            do i = 1, advxe - E_idx
+                            do i = 1, advxe - eqn_idx%E
                                 dadv_dt(i) = -L(momxe + i)
                             end do
                         end if
@@ -1051,7 +1051,7 @@ contains
                                 h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
                                 sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
                             end do
-                            flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
+                            flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, eqn_idx%E) &
                                                                    + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2)/(c*c) + sum_Enthalpies)
                             !$acc loop seq
                             do i = 1, num_species
@@ -1059,7 +1059,7 @@ contains
                                                                                 + ds(0)*(drho_dt*Ys(i) + rho*dYs_dt(i))
                             end do
                         else
-                            flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
+                            flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, eqn_idx%E) &
                                                                    + ds(0)*(pres*dgamma_dt &
                                                                             + gamma*dpres_dt &
                                                                             + dpi_inf_dt &
@@ -1082,7 +1082,7 @@ contains
                                     *(flux_rs${XYZ}$_vf_l(0, k, r, i) &
                                       + vel(dir_idx(1)) &
                                       *flux_src_rs${XYZ}$_vf_l(0, k, r, i) &
-                                      + ds(0)*dadv_dt(i - E_idx))
+                                      + ds(0)*dadv_dt(i - eqn_idx%E))
                             end do
 
                         else
@@ -1090,7 +1090,7 @@ contains
                             !$acc loop seq
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) + &
-                                                                   ds(0)*dadv_dt(i - E_idx)
+                                                                   ds(0)*dadv_dt(i - eqn_idx%E)
                             end do
 
                             !$acc loop seq
@@ -1129,11 +1129,11 @@ contains
                                 ix, iy, iz)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: q_prim_vf
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: flux_vf, flux_src_vf
 
         type(int_bounds_info), intent(in) :: ix, iy, iz
@@ -1165,7 +1165,7 @@ contains
         if (cbc_dir == 1) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = 0, buff_size
@@ -1241,7 +1241,7 @@ contains
         elseif (cbc_dir == 2) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = 0, buff_size
@@ -1317,7 +1317,7 @@ contains
         else
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = 0, buff_size
@@ -1406,7 +1406,7 @@ contains
                               ix, iy, iz)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: flux_vf, flux_src_vf
 
         type(int_bounds_info), intent(in) :: ix, iy, iz

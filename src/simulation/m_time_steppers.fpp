@@ -97,11 +97,11 @@ contains
         @:ALLOCATE(q_cons_ts(1:num_ts))
 
         do i = 1, num_ts
-            @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
+            @:ALLOCATE(q_cons_ts(i)%vf(1:eqn_idx%sys_size))
         end do
 
         do i = 1, num_ts
-            do j = 1, sys_size
+            do j = 1, eqn_idx%sys_size
                 @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
@@ -114,11 +114,11 @@ contains
             @:ALLOCATE(q_prim_ts(0:3))
 
             do i = 0, 3
-                @:ALLOCATE(q_prim_ts(i)%vf(1:sys_size))
+                @:ALLOCATE(q_prim_ts(i)%vf(1:eqn_idx%sys_size))
             end do
 
             do i = 0, 3
-                do j = 1, sys_size
+                do j = 1, eqn_idx%sys_size
                     @:ALLOCATE(q_prim_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, &
                         idwbuff(3)%beg:idwbuff(3)%end))
@@ -131,9 +131,9 @@ contains
         end if
 
         ! Allocating the cell-average primitive variables
-        @:ALLOCATE(q_prim_vf(1:sys_size))
+        @:ALLOCATE(q_prim_vf(1:eqn_idx%sys_size))
 
-        do i = 1, adv_idx%end
+        do i = 1, eqn_idx%adv%end
             @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
@@ -141,17 +141,17 @@ contains
         end do
 
         if (bubbles_euler) then
-            do i = bub_idx%beg, bub_idx%end
+            do i = eqn_idx%bub%beg, eqn_idx%bub%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
             if (adv_n) then
-                @:ALLOCATE(q_prim_vf(n_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                @:ALLOCATE(q_prim_vf(eqn_idx%n)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(q_prim_vf(n_idx))
+                @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%n))
             end if
         end if
 
@@ -165,7 +165,7 @@ contains
         end if
 
         if (elasticity) then
-            do i = stress_idx%beg, stress_idx%end
+            do i = eqn_idx%stress%beg, eqn_idx%stress%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
@@ -183,14 +183,14 @@ contains
         end if
 
         if (cont_damage) then
-            @:ALLOCATE(q_prim_vf(damage_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(q_prim_vf(eqn_idx%damage)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
-            @:ACC_SETUP_SFs(q_prim_vf(damage_idx))
+            @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%damage))
         end if
 
         if (model_eqns == 3) then
-            do i = internalEnergies_idx%beg, internalEnergies_idx%end
+            do i = eqn_idx%internalEnergies%beg, eqn_idx%internalEnergies%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
@@ -199,10 +199,10 @@ contains
         end if
 
         if (surface_tension) then
-            @:ALLOCATE(q_prim_vf(c_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(q_prim_vf(eqn_idx%c)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
-            @:ACC_SETUP_SFs(q_prim_vf(c_idx))
+            @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%c))
         end if
 
         if (chemistry) then
@@ -301,9 +301,9 @@ contains
         end if
 
         ! Allocating the cell-average RHS variables
-        @:ALLOCATE(rhs_vf(1:sys_size))
+        @:ALLOCATE(rhs_vf(1:eqn_idx%sys_size))
 
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
             @:ACC_SETUP_SFs(rhs_vf(i))
         end do
@@ -378,7 +378,7 @@ contains
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -480,7 +480,7 @@ contains
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -552,7 +552,7 @@ contains
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -662,7 +662,7 @@ contains
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -734,7 +734,7 @@ contains
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -807,7 +807,7 @@ contains
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -1013,9 +1013,9 @@ contains
         !! Runge-Kutta stage
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf, rhs_vf, ldt)
 
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: rhs_vf
 
         real(wp), intent(in) :: ldt !< local dt
 
@@ -1025,7 +1025,7 @@ contains
         call s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = momxb, E_idx
+        do i = momxb, eqn_idx%E
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -1049,28 +1049,28 @@ contains
 
         integer :: i !< Generic loop iterator
 
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             !$acc update host(q_prim_vf(i)%sf)
         end do
 
         if (t_step == t_step_start) then
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 q_prim_ts(3)%vf(i)%sf(:, :, :) = q_prim_vf(i)%sf(:, :, :)
             end do
         elseif (t_step == t_step_start + 1) then
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 q_prim_ts(2)%vf(i)%sf(:, :, :) = q_prim_vf(i)%sf(:, :, :)
             end do
         elseif (t_step == t_step_start + 2) then
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 q_prim_ts(1)%vf(i)%sf(:, :, :) = q_prim_vf(i)%sf(:, :, :)
             end do
         elseif (t_step == t_step_start + 3) then
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 q_prim_ts(0)%vf(i)%sf(:, :, :) = q_prim_vf(i)%sf(:, :, :)
             end do
         else ! All other timesteps
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 q_prim_ts(3)%vf(i)%sf(:, :, :) = q_prim_ts(2)%vf(i)%sf(:, :, :)
                 q_prim_ts(2)%vf(i)%sf(:, :, :) = q_prim_ts(1)%vf(i)%sf(:, :, :)
                 q_prim_ts(1)%vf(i)%sf(:, :, :) = q_prim_ts(0)%vf(i)%sf(:, :, :)
@@ -1088,7 +1088,7 @@ contains
         ! Deallocating the cell-average conservative variables
         do i = 1, num_ts
 
-            do j = 1, sys_size
+            do j = 1, eqn_idx%sys_size
                 @:DEALLOCATE(q_cons_ts(i)%vf(j)%sf)
             end do
 
@@ -1101,7 +1101,7 @@ contains
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then
             do i = 0, 3
-                do j = 1, sys_size
+                do j = 1, eqn_idx%sys_size
                     @:DEALLOCATE(q_prim_ts(i)%vf(j)%sf)
                 end do
                 @:DEALLOCATE(q_prim_ts(i)%vf)
@@ -1110,7 +1110,7 @@ contains
         end if
 
         ! Deallocating the cell-average primitive variables
-        do i = 1, adv_idx%end
+        do i = 1, eqn_idx%adv%end
             @:DEALLOCATE(q_prim_vf(i)%sf)
         end do
 
@@ -1121,7 +1121,7 @@ contains
         end if
 
         if (elasticity) then
-            do i = stress_idx%beg, stress_idx%end
+            do i = eqn_idx%stress%beg, eqn_idx%stress%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
         end if
@@ -1133,17 +1133,17 @@ contains
         end if
 
         if (cont_damage) then
-            @:DEALLOCATE(q_prim_vf(damage_idx)%sf)
+            @:DEALLOCATE(q_prim_vf(eqn_idx%damage)%sf)
         end if
 
         if (bubbles_euler) then
-            do i = bub_idx%beg, bub_idx%end
+            do i = eqn_idx%bub%beg, eqn_idx%bub%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
         end if
 
         if (model_eqns == 3) then
-            do i = internalEnergies_idx%beg, internalEnergies_idx%end
+            do i = eqn_idx%internalEnergies%beg, eqn_idx%internalEnergies%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
         end if
@@ -1151,7 +1151,7 @@ contains
         @:DEALLOCATE(q_prim_vf)
 
         ! Deallocating the cell-average RHS variables
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             @:DEALLOCATE(rhs_vf(i)%sf)
         end do
 

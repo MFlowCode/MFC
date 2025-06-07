@@ -145,11 +145,11 @@ contains
     pure subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb, mv)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(INOUT) :: q_cons_vf !< Primitive Variables
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(INOUT) :: q_prim_vf !< Primitive Variables
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), optional, intent(INOUT) :: pb, mv
@@ -211,7 +211,7 @@ contains
             end do
 
             if (surface_tension) then
-                q_prim_vf(c_idx)%sf(j, k, l) = gp%ip%c
+                q_prim_vf(eqn_idx%c)%sf(j, k, l) = gp%ip%c
             end if
 
             if (model_eqns /= 4) then
@@ -255,14 +255,14 @@ contains
 
             ! Set color function
             if (surface_tension) then
-                q_cons_vf(c_idx)%sf(j, k, l) = gp%ip%c
+                q_cons_vf(eqn_idx%c)%sf(j, k, l) = gp%ip%c
             end if
 
             ! Set Energy
             if (bubbles_euler) then
-                q_cons_vf(E_idx)%sf(j, k, l) = (1 - gp%ip%alpha(1))*(gamma*gp%ip%pressure + pi_inf + dyn_pres)
+                q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1 - gp%ip%alpha(1))*(gamma*gp%ip%pressure + pi_inf + dyn_pres)
             else
-                q_cons_vf(E_idx)%sf(j, k, l) = gamma*gp%ip%pressure + pi_inf + dyn_pres
+                q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*gp%ip%pressure + pi_inf + dyn_pres
             end if
 
             ! Set bubble vars
@@ -334,7 +334,7 @@ contains
             end do
 
             if (surface_tension) then
-                q_prim_vf(c_idx)%sf(j, k, l) = gp%ip%c
+                q_prim_vf(eqn_idx%c)%sf(j, k, l) = gp%ip%c
             end if
 
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, gp%ip%alpha, &
@@ -760,7 +760,7 @@ contains
     pure subroutine s_interpolate_image_point(q_prim_vf, gp, pb, mv)
         !$acc routine seq
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(IN) :: q_prim_vf !< Primitive Variables
 
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(INOUT) :: pb, mv
@@ -814,7 +814,7 @@ contains
                     coeff = gp%interp_coeffs(i - i1 + 1, j - j1 + 1, k - k1 + 1)
 
                     gp%ip%pressure = gp%ip%pressure + coeff* &
-                                     q_prim_vf(E_idx)%sf(i, j, k)
+                                     q_prim_vf(eqn_idx%E)%sf(i, j, k)
 
                     !$acc loop seq
                     do q = momxb, momxe
@@ -831,7 +831,7 @@ contains
                     end do
 
                     if (surface_tension) then
-                        gp%ip%c = gp%ip%c + coeff*q_prim_vf(c_idx)%sf(i, j, k)
+                        gp%ip%c = gp%ip%c + coeff*q_prim_vf(eqn_idx%c)%sf(i, j, k)
                     end if
 
                     if (bubbles_euler .and. .not. qbmm) then

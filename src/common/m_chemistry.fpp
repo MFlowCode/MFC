@@ -25,7 +25,7 @@ contains
         ! conservative variables.
 
         type(scalar_field), intent(inout) :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
         integer :: x, y, z, eqn
@@ -42,10 +42,10 @@ contains
                     end do
 
                     ! e = E - 1/2*|u|^2
-                    ! cons. E_idx     = \rho E
+                    ! cons. eqn_idx%E     = \rho E
                     ! cons. contxb    = \rho         (1-fluid model)
                     ! cons. momxb + i = \rho u_i
-                    energy = q_cons_vf(E_idx)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
+                    energy = q_cons_vf(eqn_idx%E)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
                     !$acc loop seq
                     do eqn = momxb, momxe
                         energy = energy - &
@@ -62,7 +62,7 @@ contains
     subroutine s_compute_T_from_primitives(q_T_sf, q_prim_vf, bounds)
 
         type(scalar_field), intent(inout) :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
         integer :: x, y, z, i
@@ -78,7 +78,7 @@ contains
                     end do
 
                     call get_mixture_molecular_weight(Ys, mix_mol_weight)
-                    q_T_sf%sf(x, y, z) = q_prim_vf(E_idx)%sf(x, y, z)*mix_mol_weight/(gas_constant*q_prim_vf(1)%sf(x, y, z))
+                    q_T_sf%sf(x, y, z) = q_prim_vf(eqn_idx%E)%sf(x, y, z)*mix_mol_weight/(gas_constant*q_prim_vf(1)%sf(x, y, z))
                 end do
             end do
         end do
@@ -87,9 +87,9 @@ contains
 
     subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_T_sf, q_prim_qp, bounds)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
         type(scalar_field), intent(inout) :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_qp, q_prim_qp
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_qp, q_prim_qp
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
         integer :: x, y, z

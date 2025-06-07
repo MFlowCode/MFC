@@ -75,7 +75,7 @@ contains
         !! @param q_cons_vf Initial conservative variables
     impure subroutine s_initialize_bubbles_EL_module(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
 
         integer :: nBubs_glb, i
 
@@ -190,7 +190,7 @@ contains
         !! @param q_cons_vf Conservative variables
     impure subroutine s_read_input_bubbles(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
 
         real(wp), dimension(8) :: inputBubble
         real(wp) :: qtime
@@ -280,7 +280,7 @@ contains
         !! @param bub_id Local id of the bubble
     impure subroutine s_add_bubbles(inputBubble, q_cons_vf, bub_id)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
         real(wp), dimension(8), intent(in) :: inputBubble
         integer, intent(in) :: bub_id
         integer :: i
@@ -342,9 +342,9 @@ contains
         do i = 1, num_dims
             dynP = dynP + 0.5_wp*q_cons_vf(contxe + i)%sf(cell(1), cell(2), cell(3))**2/rhol
         end do
-        pliq = (q_cons_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf)/gamma
+        pliq = (q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf)/gamma
         if (pliq < 0) print *, "Negative pressure", proc_rank, &
-            q_cons_vf(E_idx)%sf(cell(1), cell(2), cell(3)), pi_inf, gamma, pliq, cell, dynP
+            q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)), pi_inf, gamma, pliq, cell, dynP
 
         ! Initial particle pressure
         gas_p(bub_id, 1) = pliq + 2._wp*(1._wp/Web)/bub_R0(bub_id)
@@ -499,9 +499,9 @@ contains
         !! @param stage Current stage in the time-stepper algorithm
     subroutine s_compute_bubble_EL_dynamics(q_cons_vf, q_prim_vf, t_step, rhs_vf, stage)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
         integer, intent(in) :: t_step, stage
 
         real(wp) :: myVapFlux
@@ -572,7 +572,7 @@ contains
             !$acc loop seq
             do i = 1, num_fluids
                 myalpha_rho(i) = q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
-                myalpha(i) = q_prim_vf(E_idx + i)%sf(cell(1), cell(2), cell(3))
+                myalpha(i) = q_prim_vf(eqn_idx%E + i)%sf(cell(1), cell(2), cell(3))
             end do
             call s_convert_species_to_mixture_variables_acc(myRho, gamma, pi_inf, qv, myalpha, &
                                                             myalpha_rho, Re, cell(1), cell(2), cell(3))
@@ -633,9 +633,9 @@ contains
         !! @param rhs_vf Time derivative of the conservative variables
     subroutine s_compute_bubbles_EL_source(q_cons_vf, q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
 
         integer :: i, j, k, l
 
@@ -648,7 +648,7 @@ contains
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
-                            do l = 1, E_idx
+                            do l = 1, eqn_idx%E
                                 if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
                                     rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
                                                             q_cons_vf(l)%sf(i, j, k)*(q_beta%vf(2)%sf(i, j, k) + &
@@ -664,7 +664,7 @@ contains
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
-                            do l = 1, E_idx
+                            do l = 1, eqn_idx%E
                                 if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
                                     rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
                                                             q_cons_vf(l)%sf(i, j, k)/q_beta%vf(1)%sf(i, j, k)* &
@@ -678,7 +678,7 @@ contains
 
             do l = 1, num_dims
 
-                call s_gradient_dir(q_prim_vf(E_idx), q_beta%vf(3), l)
+                call s_gradient_dir(q_prim_vf(eqn_idx%E), q_beta%vf(3), l)
 
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do k = 0, p
@@ -699,7 +699,7 @@ contains
                 do k = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(2)%beg, idwbuff(2)%end
                         do i = idwbuff(1)%beg, idwbuff(1)%end
-                            q_beta%vf(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
+                            q_beta%vf(3)%sf(i, j, k) = q_prim_vf(eqn_idx%E)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
                         end do
                     end do
                 end do
@@ -711,7 +711,7 @@ contains
                     do j = 0, n
                         do i = 0, m
                             if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) - &
+                                rhs_vf(eqn_idx%E)%sf(i, j, k) = rhs_vf(eqn_idx%E)%sf(i, j, k) - &
                                                             q_beta%vf(4)%sf(i, j, k)*(1._wp - q_beta%vf(1)%sf(i, j, k))/ &
                                                             q_beta%vf(1)%sf(i, j, k)
                             end if
@@ -740,7 +740,7 @@ contains
         !$acc routine seq
 #endif
         integer, intent(in) :: bub_id
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
         real(wp), intent(in) :: pinf, rhol, gamma, pi_inf
         integer, dimension(3), intent(in) :: cell
         real(wp), intent(out) :: cson
@@ -811,7 +811,7 @@ contains
         !$acc routine seq
 #endif
         integer, intent(in) :: bub_id, ptype
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
         real(wp), intent(out) :: f_pinfl
         integer, dimension(3), intent(out) :: cell
         real(wp), intent(out), optional :: preterm1, term2, Romega
@@ -889,19 +889,19 @@ contains
 
             !< Perform bilinear interpolation
             if (p == 0) then  !2D
-                f_pinfl = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)
+                f_pinfl = q_prim_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))
+                f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))
+                f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)
+                f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)
             else              !3D
-                f_pinfl = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1)*(1._wp - psi(1))*(1._wp - psi(2))*psi(3)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3) + 1)*psi(1)*(1._wp - psi(2))*psi(3)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3) + 1)*psi(1)*psi(2)*psi(3)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3) + 1)*(1._wp - psi(1))*psi(2)*psi(3)
+                f_pinfl = q_prim_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))*(1._wp - psi(3))
+                f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))*(1._wp - psi(3))
+                f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)*(1._wp - psi(3))
+                f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)*(1._wp - psi(3))
+                f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3) + 1)*(1._wp - psi(1))*(1._wp - psi(2))*psi(3)
+                f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1) + 1, cell(2), cell(3) + 1)*psi(1)*(1._wp - psi(2))*psi(3)
+                f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1) + 1, cell(2) + 1, cell(3) + 1)*psi(1)*psi(2)*psi(3)
+                f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1), cell(2) + 1, cell(3) + 1)*(1._wp - psi(1))*psi(2)*psi(3)
             end if
 
             !R_Omega
@@ -972,9 +972,9 @@ contains
                             end if
                             !< Update values
                             charvol = charvol + vol
-                            charpres = charpres + q_prim_vf(E_idx)%sf(cellaux(1), cellaux(2), cellaux(3))*vol
+                            charpres = charpres + q_prim_vf(eqn_idx%E)%sf(cellaux(1), cellaux(2), cellaux(3))*vol
                             charvol2 = charvol2 + vol*q_beta%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3))
-                            charpres2 = charpres2 + q_prim_vf(E_idx)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                            charpres2 = charpres2 + q_prim_vf(eqn_idx%E)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                                         *vol*q_beta%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3))
                         end if
 
