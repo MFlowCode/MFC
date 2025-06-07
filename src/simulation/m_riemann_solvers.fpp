@@ -284,7 +284,7 @@ contains
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
-        real(wp) :: flux_tau_L = 0._wp, flux_tau_R = 0._wp
+        real(wp) :: flux_tau_L, flux_tau_R
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
@@ -380,17 +380,13 @@ contains
                                 alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                 alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                             end do
+                            
+                            vel_L_rms = 0._wp; vel_R_rms = 0._wp
 
                             !$acc loop seq
                             do i = 1, num_vels
                                 vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
                                 vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
-                            end do
-
-                            vel_L_rms = 0._wp; vel_R_rms = 0._wp
-
-                            !$acc loop seq
-                            do i = 1, num_vels
                                 vel_L_rms = vel_L_rms + vel_L(i)**2._wp
                                 vel_R_rms = vel_R_rms + vel_R(i)**2._wp
                             end do
@@ -444,17 +440,12 @@ contains
                                     alpha_rho_L(i) = max(0._wp, alpha_rho_L(i))
                                     alpha_L(i) = min(max(0._wp, alpha_L(i)), 1._wp)
                                     alpha_L_sum = alpha_L_sum + alpha_L(i)
-                                end do
-
-                                alpha_L = alpha_L/max(alpha_L_sum, sgm_eps)
-
-                                !$acc loop seq
-                                do i = 1, num_fluids
                                     alpha_rho_R(i) = max(0._wp, alpha_rho_R(i))
                                     alpha_R(i) = min(max(0._wp, alpha_R(i)), 1._wp)
                                     alpha_R_sum = alpha_R_sum + alpha_R(i)
                                 end do
 
+                                alpha_L = alpha_L/max(alpha_L_sum, sgm_eps)
                                 alpha_R = alpha_R/max(alpha_R_sum, sgm_eps)
                             end if
 
@@ -854,38 +845,16 @@ contains
                                     /(s_M - s_P) &
                                     + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R_rms - vel_L_rms)/2._wp
                             else if (hypoelasticity) then
-                                !TODO: simplify this so it's not split into 3
-                                if (num_dims == 1) then
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                        (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) &
-                                              - (tau_e_R(dir_idx_tau(1))*vel_R(dir_idx(1)))) &
-                                         - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) &
-                                                - (tau_e_L(dir_idx_tau(1))*vel_L(dir_idx(1)))) &
-                                         + s_M*s_P*(E_L - E_R)) &
-                                        /(s_M - s_P)
-                                else if (num_dims == 2) then
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                        (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) &
-                                              - (tau_e_R(dir_idx_tau(1))*vel_R(dir_idx(1))) &
-                                              - (tau_e_R(dir_idx_tau(2))*vel_R(dir_idx(2)))) &
-                                         - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) &
-                                                - (tau_e_L(dir_idx_tau(1))*vel_L(dir_idx(1))) &
-                                                - (tau_e_L(dir_idx_tau(2))*vel_L(dir_idx(2)))) &
-                                         + s_M*s_P*(E_L - E_R)) &
-                                        /(s_M - s_P)
-                                else if (num_dims == 3) then
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                        (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) &
-                                              - (tau_e_R(dir_idx_tau(1))*vel_R(dir_idx(1))) &
-                                              - (tau_e_R(dir_idx_tau(2))*vel_R(dir_idx(2))) &
-                                              - (tau_e_R(dir_idx_tau(3))*vel_R(dir_idx(3)))) &
-                                         - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) &
-                                                - (tau_e_L(dir_idx_tau(1))*vel_L(dir_idx(1))) &
-                                                - (tau_e_L(dir_idx_tau(2))*vel_L(dir_idx(2))) &
-                                                - (tau_e_L(dir_idx_tau(3))*vel_L(dir_idx(3)))) &
-                                         + s_M*s_P*(E_L - E_R)) &
-                                        /(s_M - s_P)
-                                end if
+                                flux_tau_L = 0._wp; flux_tau_R = 0._wp
+                                !$acc loop seq
+                                do i = 1, num_dims
+                                    flux_tau_L = flux_tau_L + tau_e_L(dir_idx_tau(i))*vel_L(dir_idx(i))
+                                    flux_tau_R = flux_tau_R + tau_e_R(dir_idx_tau(i))*vel_R(dir_idx(i))
+                                end do
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                    (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) - flux_tau_R) &
+                                    - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) - flux_tau_L) &
+                                    + s_M*s_P*(E_L - E_R))/(s_M - s_P)
                             else
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     (s_M*vel_R(dir_idx(1))*(E_R + pres_R) &
