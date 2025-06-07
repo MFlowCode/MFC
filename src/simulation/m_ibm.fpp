@@ -97,8 +97,8 @@ contains
 
         ! Initialize the ip component of each ghost point
         do i = 1, num_gps
-            @:ALLOCATE(ghost_points(i)%ip%alpha_rho(num_fluids))
-            @:ALLOCATE(ghost_points(i)%ip%alpha(num_fluids))
+            allocate(ghost_points(i)%ip%alpha_rho(num_fluids))
+            allocate(ghost_points(i)%ip%alpha(num_fluids))
             ghost_points(i)%ip%vel = 0.0_wp
             ghost_points(i)%ip%pressure = 0.0_wp
 
@@ -107,19 +107,19 @@ contains
             end if
 
             if (bubbles_euler) then
-                @:ALLOCATE(ghost_points(i)%ip%r(nb))
-                @:ALLOCATE(ghost_points(i)%ip%v(nb))
+                allocate(ghost_points(i)%ip%r(nb))
+                allocate(ghost_points(i)%ip%v(nb))
                 if (.not. polytropic) then
-                    @:ALLOCATE(ghost_points(i)%ip%pb(nb))
-                    @:ALLOCATE(ghost_points(i)%ip%mv(nb))
+                    allocate(ghost_points(i)%ip%pb(nb))
+                    allocate(ghost_points(i)%ip%mv(nb))
                 end if
             end if
 
             if (qbmm) then
-                @:ALLOCATE(ghost_points(i)%ip%nmom(nb*nmom))
+                allocate(ghost_points(i)%ip%nmom(nb*nmom))
                 if (.not. polytropic) then
-                    @:ALLOCATE(ghost_points(i)%ip%presb(nb*nnode))
-                    @:ALLOCATE(ghost_points(i)%ip%massv(nb*nnode))
+                    allocate(ghost_points(i)%ip%presb(nb*nnode))
+                    allocate(ghost_points(i)%ip%massv(nb*nnode))
                 end if
             end if
         end do
@@ -878,7 +878,6 @@ contains
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(levelset%sf)
         @:DEALLOCATE(levelset_norm%sf)
-        @:DEALLOCATE(ghost_points)
         @:DEALLOCATE(inner_points)
 
     end subroutine s_finalize_ibm_module
