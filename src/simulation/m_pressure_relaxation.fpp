@@ -84,7 +84,7 @@ contains
     !> Process pressure relaxation for a single cell
     pure subroutine s_relax_cell_pressure(q_cons_vf, j, k, l)
         !$acc routine seq
-        
+
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: j, k, l
 
@@ -104,7 +104,7 @@ contains
     !> Check if pressure relaxation is needed for this cell
     pure logical function s_needs_pressure_relaxation(q_cons_vf, j, k, l)
         !$acc routine seq
-        
+
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer, intent(in) :: j, k, l
         integer :: i
@@ -123,7 +123,7 @@ contains
     !> Correct volume fractions to physical bounds
     pure subroutine s_correct_volume_fractions(q_cons_vf, j, k, l)
         !$acc routine seq
-        
+
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: j, k, l
         real(wp) :: sum_alpha
@@ -153,10 +153,10 @@ contains
     !> Main pressure equilibration using Newton-Raphson
     pure subroutine s_equilibrate_pressure(q_cons_vf, j, k, l)
         !$acc routine seq
-        
+
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: j, k, l
-        
+
         real(wp) :: pres_relax, f_pres, df_pres
         real(wp), dimension(num_fluids) :: pres_K_init, rho_K_s
         integer, parameter :: MAX_ITER = 50
@@ -169,7 +169,7 @@ contains
         do i = 1, num_fluids
             if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
                 pres_K_init(i) = (q_cons_vf(i + intxb - 1)%sf(j, k, l)/ &
-                                 q_cons_vf(i + advxb - 1)%sf(j, k, l) - pi_infs(i))/gammas(i)
+                                  q_cons_vf(i + advxb - 1)%sf(j, k, l) - pi_infs(i))/gammas(i)
                 if (pres_K_init(i) <= -(1._wp - 1e-8_wp)*pres_inf(i) + 1e-8_wp) &
                     pres_K_init(i) = -(1._wp - 1e-8_wp)*pres_inf(i) + 1e-8_wp
             else
@@ -185,7 +185,7 @@ contains
         do iter = 0, MAX_ITER - 1
             if (abs(f_pres) > TOLERANCE) then
                 pres_relax = pres_relax - f_pres/df_pres
-                
+
                 ! Enforce pressure bounds
                 do i = 1, num_fluids
                     if (pres_relax <= -(1._wp - 1e-8_wp)*pres_inf(i) + 1e-8_wp) &
@@ -199,12 +199,12 @@ contains
                 do i = 1, num_fluids
                     if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
                         rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
-                                   max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
-                                   *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
-                                                                pres_inf(i)))**(1._wp/gamma_min(i))
+                                     max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
+                                     *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
+                                                                   pres_inf(i)))**(1._wp/gamma_min(i))
                         f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l)/rho_K_s(i)
                         df_pres = df_pres - q_cons_vf(i + contxb - 1)%sf(j, k, l) &
-                                 /(gamma_min(i)*rho_K_s(i)*(pres_relax + pres_inf(i)))
+                                  /(gamma_min(i)*rho_K_s(i)*(pres_relax + pres_inf(i)))
                     end if
                 end do
             end if
@@ -222,10 +222,10 @@ contains
     !> Correct internal energies using equilibrated pressure
     pure subroutine s_correct_internal_energies(q_cons_vf, j, k, l)
         !$acc routine seq
-        
+
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: j, k, l
-        
+
         real(wp), dimension(num_fluids) :: alpha_rho, alpha
         real(wp) :: rho, dyn_pres, gamma, pi_inf, pres_relax, sum_alpha
         real(wp), dimension(2) :: Re
@@ -313,4 +313,4 @@ contains
 
     end subroutine s_correct_internal_energies
 
-end module m_pressure_relaxation 
+end module m_pressure_relaxation

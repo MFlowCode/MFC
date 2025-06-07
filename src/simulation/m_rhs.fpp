@@ -159,8 +159,6 @@ module m_rhs
     !$acc declare create(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
     !$acc declare create(dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
 
-
-
     real(wp), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
     !$acc declare create(nbub)
 
@@ -1634,7 +1632,6 @@ contains
         !!      fraction of each phase are recomputed. For conservation
         !!      purpose, this pressure is finally corrected using the
         !!      mixture-total-energy equation.
-
 
     !>  The purpose of this subroutine is to WENO-reconstruct the
         !!      left and the right cell-boundary values, including values
