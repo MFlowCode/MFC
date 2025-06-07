@@ -1,0 +1,90 @@
+######################################################################
+#  .cursorrules  –  project-level instructions for Cursor AI         #
+#  Target repo: github.com/mflowcode/mfc                             #
+#  Format: plain-text "rules for the Agent". One idea per line.      #
+######################################################################
+
+### ───────────────────────────────────────────────────────────────────
+###  1. Global project context (ALWAYS applied)
+### ───────────────────────────────────────────────────────────────────
+
+- You are interacting with **MFC** – an exascale, many-physics, multi-component
+  flow solver written in modern Fortran and generated with the Fypp
+  pre-processor. Most source files use the `.fpp` extension (Fypp templates)
+  and are transpiled to `.F90` during the CMake build. A minority of modules
+  remain as plain `.F90`. The code lives in `src/`, tests in `tests/`,
+  and example input cases in `examples/`.
+
+- Fypp helper macros live in files under any `include/` directory within
+  `src/` (e.g., `src/<module>/include/`). **Scan these macro files first** so
+  that template expansions resolve correctly.
+
+- Always assume free-form Fortran 2008+ (`.fpp` and `.f90`) with `implicit none`,
+  explicit `intent(in|out|inout)`, and modern constructs (`allocate`,
+  `move_alloc`, `iso_fortran_env`, etc.).
+
+- Prefer `module` + `contains` → `subroutine foo()` patterns; avoid COMMON
+  blocks and `include` files.
+
+- **Simulation kernels are accelerated exclusively with OpenACC.** Always
+  include the appropriate `!$acc` pragmas when generating or modifying
+  performance-critical loops.
+
+- **Before suggesting or applying any source-code changes, first read/parse the
+  full codebase *and* the documentation sources listed below, then produce a
+  concise description of how the codebase is structured and functions.**
+
+- Documentation sources:
+  - Primary online docs: <https://mflowcode.github.io/documentation/md_readme.html>
+  - Root-level `README.md` in the repository.
+
+### ───────────────────────────────────────────────────────────────────
+###  2. Style & naming conventions  (AUTO-ATTACH for *.fpp and *.F90 files)
+### ───────────────────────────────────────────────────────────────────
+
+- Indent 2 spaces; continuation lines line up under “&”.
+- No maximum line length is enforced.
+- Prefer shorter, streamlined code—avoid needless verbosity while keeping clarity.
+- Lower-case keywords (`do`, `end subroutine`, etc.).
+- Module names: `m_<feature>` (e.g., `m_transport`).
+- Public procedures: `<verb>_<noun>` (e.g., `compute_flux`).
+- Private helpers start with a leading underscore: `_fill_ghost_cells`.
+
+### ───────────────────────────────────────────────────────────────────
+###  3. Build & test workflow  (MANUAL – invoke when asked to refactor source code and see if it works)
+### ───────────────────────────────────────────────────────────────────
+
+- To run the **test suite** to check for correctness, execute:
+
+  ./mfc.sh test -j $(nproc)
+
+  (There are no separate unit tests; this script drives the integration/verification runs.)
+
+- If the user mentions a specific cluster, prepend:
+
+  ./mfc.sh load
+
+  to set up environment modules.
+
+### ───────────────────────────────────────────────────────────────────
+###  4. OpenACC programming guidelines  (AUTOMATICALLY applied to *.fpp/*.f90)
+### ───────────────────────────────────────────────────────────────────
+
+- **Prefer:**
+
+  !$acc parallel loop gang vector default(present)
+
+  around tight loops over cells or particles; fall back to `!$acc kernels`
+  only when loop dependencies prevent direct parallelization. Always add
+  `reduction` clauses where needed.
+
+- Allocate large arrays with the `managed` attribute or move them to the device
+  at program start using a persistent `!$acc enter data` region.
+
+- Ensure the code compiles with Cray Fortran (`ftn`) and NVIDIA HPC SDK
+  (`nvfortran`) for GPU offloading, and with GNU (`gfortran`) and Intel
+  (`ifx`/`ifort`) for CPU-only builds where OpenACC directives are ignored.
+
+######################################################################
+# End of file
+######################################################################
