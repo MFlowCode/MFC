@@ -16,8 +16,8 @@
     "python.defaultInterpreterPath": "${workspaceFolder}/build/venv/bin/python3",
 
     "files.associations": {
-        "*.f90": "FortranFreeForm",
-        "*.fpp": "FortranFreeForm",
+        "*.f90": "fortran-modern",
+        "*.fpp": "fortran-modern"
     },
 
     "fortran.preferredCase":       "lowercase",

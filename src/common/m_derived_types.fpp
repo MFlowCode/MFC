@@ -345,6 +345,11 @@ module m_derived_types
         type(vec3_dt), allocatable, dimension(:) :: var
     end type mpi_io_airfoil_ib_var
 
+    !> Derived type for boundary flags
+    type boundary_bounds
+        real(wp) :: xb, xe, yb, ye, zb, ze
+    end type boundary_bounds
+
     !> Derived type annexing integral regions
     type integral_parameters
         real(wp) :: xmin !< Min. boundary first coordinate direction
@@ -391,6 +396,22 @@ module m_derived_types
         real(wp), dimension(:, :), allocatable :: xyz_to_r_ratios !< List of [xyz]/r for mom source term vector
     end type source_spatial_type
 
+    !> @brief Type for storing point data
+    type point_data
+        real(wp), dimension(:), allocatable :: alpha_rho  !< Partial densities
+        real(wp), dimension(:), allocatable :: alpha      !< Volume fractions
+        real(wp) :: pressure                              !< Pressure
+        real(wp), dimension(3) :: vel                     !< Velocity
+        real(wp) :: c                                     !< Color function (for surface tension)
+        real(wp), dimension(:), allocatable :: r          !< Bubble radii
+        real(wp), dimension(:), allocatable :: v          !< Bubble radial velocities
+        real(wp), dimension(:), allocatable :: pb         !< Bubble pressures
+        real(wp), dimension(:), allocatable :: mv         !< Mass of vapor
+        real(wp), dimension(:), allocatable :: nmom       !< Moments for QBMM
+        real(wp), dimension(:), allocatable :: presb      !< Node pressures for bubbles
+        real(wp), dimension(:), allocatable :: massv      !< Node masses for bubbles
+    end type point_data
+
     !> Ghost Point for Immersed Boundaries
     type ghost_point
         integer, dimension(3) :: loc !< Physical location of the ghost point
@@ -400,6 +421,7 @@ module m_derived_types
         integer :: ib_patch_id !< ID of the IB Patch the ghost point is part of
         logical :: slip
         integer, dimension(3) :: DB
+        type(point_data) :: ip
     end type ghost_point
 
     !> Species parameters
