@@ -70,7 +70,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer :: j, k, l
 
-        !$acc parallel loop collapse(3) gang vector
+        !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
