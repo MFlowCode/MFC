@@ -124,6 +124,7 @@ module m_global_parameters
     type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
     integer :: E_idx                               !< Index of energy equation
     integer :: n_idx                               !< Index of number density
+    integer :: beta_idx                            !< Index of lagrange bubbles beta
     type(int_bounds_info) :: adv_idx               !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx  !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
@@ -147,6 +148,8 @@ module m_global_parameters
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
 
+    integer :: num_bc_patches
+    logical :: bc_io
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
@@ -370,6 +373,8 @@ contains
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
+        bc_io = .false.
+        num_bc_patches = dflt_int
 
         #:for DIM in ['x', 'y', 'z']
             #:for DIR in [1, 2, 3]
@@ -468,7 +473,7 @@ contains
         integer :: i, j, fac
 
         ! Setting m_root equal to m in the case of a 1D serial simulation
-        if (num_procs == 1 .and. n == 0) m_root = m
+        if (n == 0) m_root = m_glb
 
         ! Gamma/Pi_inf Model
         if (model_eqns == 1) then
@@ -584,6 +589,11 @@ contains
                     pref = 1._wp
                 end if
 
+            end if
+
+            if (bubbles_lagrange) then
+                beta_idx = sys_size + 1
+                sys_size = beta_idx
             end if
 
             if (mhd) then
@@ -762,21 +772,12 @@ contains
         chemxe = species_idx%end
 
 #ifdef MFC_MPI
-        if (bubbles_lagrange) then
-            allocate (MPI_IO_DATA%view(1:sys_size + 1))
-            allocate (MPI_IO_DATA%var(1:sys_size + 1))
-            do i = 1, sys_size + 1
-                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        else
-            allocate (MPI_IO_DATA%view(1:sys_size))
-            allocate (MPI_IO_DATA%var(1:sys_size))
-            do i = 1, sys_size
-                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        end if
+        allocate (MPI_IO_DATA%view(1:sys_size))
+        allocate (MPI_IO_DATA%var(1:sys_size))
+        do i = 1, sys_size
+            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+            MPI_IO_DATA%var(i)%sf => null()
+        end do
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
 #endif
@@ -924,21 +925,18 @@ contains
         integer :: i
 
         ! Deallocating the grid variables for the x-coordinate direction
-        deallocate (x_cb, x_cc, dx)
+        deallocate (x_cc, x_cb, dx)
 
         ! Deallocating grid variables for the y- and z-coordinate directions
         if (n > 0) then
-
-            deallocate (y_cb, y_cc, dy)
-
-            if (p > 0) deallocate (z_cb, z_cc, dz)
-
+            deallocate (y_cc, y_cb, dy)
+            if (p > 0) then
+                deallocate (z_cc, z_cb, dz)
+            end if
+        else
             ! Deallocating the grid variables, only used for the 1D simulations,
             ! and containing the defragmented computational domain grid data
-        else
-
             deallocate (x_root_cb, x_root_cc)
-
         end if
 
         deallocate (proc_coords)
@@ -952,8 +950,6 @@ contains
             do i = 1, sys_size
                 MPI_IO_DATA%var(i)%sf => null()
             end do
-
-            if (bubbles_lagrange) MPI_IO_DATA%var(sys_size + 1)%sf => null()
 
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)
