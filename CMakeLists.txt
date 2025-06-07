@@ -136,17 +136,16 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         add_compile_options(
             -Wall
             -Wextra	
-            -Wintrinsic-shadow	
-            -Wunderflow	
-            -Wrealloc-lhs	
-            -Wsurprising	
             -fcheck=all,no-array-temps
             -fbacktrace
             -fimplicit-none
             -fsignaling-nans
             -finit-real=snan
             -finit-integer=-99999999
-            #-ffpe-trap=invalid,zero,denormal,overflow
+            -Wintrinsic-shadow	
+            -Wunderflow	
+            -Wrealloc-lhs	
+            -Wsurprising	
 	    )
     endif()
 
