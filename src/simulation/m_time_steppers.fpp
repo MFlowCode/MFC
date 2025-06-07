@@ -18,6 +18,8 @@ module m_time_steppers
 
     use m_rhs                  !< Right-hane-side (RHS) evaluation procedures
 
+    use m_pressure_relaxation  !< Pressure relaxation procedures
+
     use m_data_output          !< Run-time info & solution data output procedures
 
     use m_bubbles_EE           !< Ensemble-averaged bubble dynamics routines
