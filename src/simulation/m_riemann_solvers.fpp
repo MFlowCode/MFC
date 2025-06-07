@@ -380,7 +380,7 @@ contains
                                 alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                 alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                             end do
-                            
+
                             vel_L_rms = 0._wp; vel_R_rms = 0._wp
 
                             !$acc loop seq
@@ -853,8 +853,8 @@ contains
                                 end do
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) - flux_tau_R) &
-                                    - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) - flux_tau_L) &
-                                    + s_M*s_P*(E_L - E_R))/(s_M - s_P)
+                                     - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) - flux_tau_L) &
+                                     + s_M*s_P*(E_L - E_R))/(s_M - s_P)
                             else
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     (s_M*vel_R(dir_idx(1))*(E_R + pres_R) &
@@ -863,7 +863,7 @@ contains
                                     /(s_M - s_P) &
                                     + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R_rms - vel_L_rms)/2._wp
                             end if
-                            
+
                             ! Elastic Stresses
                             if (hypoelasticity) then
                                 do i = 1, strxe - strxb + 1 !TODO: this indexing may be slow
@@ -1384,9 +1384,9 @@ contains
                                 xi_PP = max(0._wp, sign(1._wp, s_R))
 
                                 E_star = xi_M*(E_L + xi_MP*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
-                                        (rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) - E_L)) + &
+                                                                  (rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) - E_L)) + &
                                          xi_P*(E_R + xi_PP*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
-                                        (rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1))))) - E_R))
+                                                                  (rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1))))) - E_R))
                                 p_Star = xi_M*(pres_L + xi_MP*(rho_L*(s_L - vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1))))) + &
                                          xi_P*(pres_R + xi_PP*(rho_R*(s_R - vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1)))))
 
@@ -1560,11 +1560,10 @@ contains
 
                                 ! Initialize all variables
                                 vel_L_rms = 0._wp; vel_R_rms = 0._wp
-                                rho_L = 0._wp; rho_R = 0._wp;
-                                gamma_L = 0._wp; gamma_R = 0._wp;
-                                pi_inf_L = 0._wp; pi_inf_R = 0._wp;
-                                qv_L = 0._wp; qv_R = 0._wp;
-
+                                rho_L = 0._wp; rho_R = 0._wp; 
+                                gamma_L = 0._wp; gamma_R = 0._wp; 
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp; 
+                                qv_L = 0._wp; qv_R = 0._wp; 
                                 !$acc loop seq
                                 do i = 1, contxe
                                     alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
@@ -1660,8 +1659,8 @@ contains
                                     if (bubbles_euler) then
                                         ! Put p_tilde in
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) - &
-                                        dir_flg(dir_idx(i))*(xi_M*ptilde_L + xi_P*ptilde_R)
+                                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) - &
+                                            dir_flg(dir_idx(i))*(xi_M*ptilde_L + xi_P*ptilde_R)
                                     end if
                                 end do
 
@@ -1758,11 +1757,10 @@ contains
 
                                 ! Initialize all variables
                                 vel_L_rms = 0._wp; vel_R_rms = 0._wp
-                                rho_L = 0._wp; rho_R = 0._wp;
-                                gamma_L = 0._wp; gamma_R = 0._wp;
-                                pi_inf_L = 0._wp; pi_inf_R = 0._wp;
-                                qv_L = 0._wp; qv_R = 0._wp;
-
+                                rho_L = 0._wp; rho_R = 0._wp; 
+                                gamma_L = 0._wp; gamma_R = 0._wp; 
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp; 
+                                qv_L = 0._wp; qv_R = 0._wp; 
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
@@ -2730,11 +2728,11 @@ contains
                                     B%R = [Bx0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg), qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)]
                                 else ! 2D/3D: Bx, By, Bz as variables
                                     B%L = [qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(1) - 1), &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(2) - 1), &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(3) - 1)]
+                                           qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(2) - 1), &
+                                           qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(3) - 1)]
                                     B%R = [qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(1) - 1), &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(2) - 1), &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(3) - 1)]
+                                           qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(2) - 1), &
+                                           qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(3) - 1)]
                                 end if
                             end if
 
@@ -2805,7 +2803,7 @@ contains
 
                             U_doubleL = [rhoL_star, rhoL_star*s_M, rhoL_star*v_double, rhoL_star*w_double, By_double, Bz_double, E_double]
                             U_doubleR = [rhoR_star, rhoR_star*s_M, rhoR_star*w_double, rhoR_star*w_double, By_double, Bz_double, E_double]
-                            
+
                             ! (7) Compute the rotational (Alfvén) speeds
                             s_starL = s_M - abs(B%L(1))/sqrt(rhoL_star)
                             s_starR = s_M + abs(B%L(1))/sqrt(rhoR_star)
@@ -2857,7 +2855,7 @@ contains
     end subroutine s_hlld_riemann_solver
 
     subroutine s_compute_hlld_state_variables(rho, vel, B, E, pTot, rho_star, s_M, E_star, s_wave, &
-                                                U, F, U_star, F_star, sqrt_rho_star, v_star, w_star)
+                                              U, F, U_star, F_star, sqrt_rho_star, v_star, w_star)
         implicit none
         ! Input parameters
         real(wp), intent(in) :: rho, pTot, rho_star, s_M, E_star, s_wave, E
@@ -3432,16 +3430,16 @@ contains
         !! @param[in] iy Y-direction loop bounds (int_bounds_info).
         !! @param[in] iz Z-direction loop bounds (int_bounds_info).
     pure subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
-                                                       dvelL_dx_vf, &
-                                                       dvelL_dy_vf, &
-                                                       dvelL_dz_vf, &
-                                                       velR_vf, &
-                                                       dvelR_dx_vf, &
-                                                       dvelR_dy_vf, &
-                                                       dvelR_dz_vf, &
-                                                       flux_src_vf, &
-                                                       norm_dir, &
-                                                       ix, iy, iz)
+                                                            dvelL_dx_vf, &
+                                                            dvelL_dy_vf, &
+                                                            dvelL_dz_vf, &
+                                                            velR_vf, &
+                                                            dvelR_dx_vf, &
+                                                            dvelR_dy_vf, &
+                                                            dvelR_dz_vf, &
+                                                            flux_src_vf, &
+                                                            norm_dir, &
+                                                            ix, iy, iz)
         ! Arguments
         type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
