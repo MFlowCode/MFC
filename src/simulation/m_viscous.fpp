@@ -35,7 +35,7 @@ contains
 
         integer :: i, j !< generic loop iterators
 
-        @:ALLOCATE(Res_viscous(1:2, 1:maxval(Re_size)))
+        @:ALLOCATE(Res_viscous(1:2, 1:Re_size_max))
 
         do i = 1, 2
             do j = 1, Re_size(i)

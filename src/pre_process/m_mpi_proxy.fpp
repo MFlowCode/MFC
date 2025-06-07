@@ -21,6 +21,8 @@ module m_mpi_proxy
 
     use m_mpi_common
 
+    use m_helper_basic, only: s_update_cell_bounds
+
     implicit none
 
     integer, private :: err_code, ierr, v_size !<
@@ -570,6 +572,8 @@ contains
                 exit
             end if
         end do
+
+        call s_update_cell_bounds(cells_bounds, m, n, p)
 
         ! Boundary condition at the beginning
         if (proc_coords(1) > 0 .or. (bc_x%beg == BC_PERIODIC .and. num_procs_x > 1)) then

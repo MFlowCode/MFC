@@ -66,6 +66,8 @@ module m_start_up
     use ieee_arithmetic
 
     use m_helper_basic          !< Functions to compare floating point numbers
+    
+
 
 #ifdef MFC_OpenACC
     use openacc
@@ -206,6 +208,8 @@ contains
             if ((bf_x) .or. (bf_y) .or. (bf_z)) then
                 bodyForces = .true.
             endif
+
+            call s_update_cell_bounds(cells_bounds, m, n, p)
 
             ! Store m,n,p into global m,n,p
             m_glb = m

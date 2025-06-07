@@ -43,6 +43,9 @@ module m_global_parameters
     integer :: m, n, p
     !> @}
 
+    !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
+    type(cell_num_bounds) :: cells_bounds
+
     !> @name Global number of cells in each direction
     !> @{
     integer :: m_glb, n_glb, p_glb
@@ -267,6 +270,7 @@ module m_global_parameters
     !! numbers, will be non-negligible.
     !> @{
     integer, dimension(2) :: Re_size
+    integer :: Re_size_max
     integer, allocatable, dimension(:, :) :: Re_idx
     !> @}
 
@@ -515,6 +519,8 @@ contains
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
+
+        call s_update_cell_bounds(cells_bounds, m, n, p)
 
         cyl_coord = .false.
 
@@ -1028,13 +1034,15 @@ contains
             if (Re_size(1) > 0._wp) shear_stress = .true.
             if (Re_size(2) > 0._wp) bulk_stress = .true.
 
+            Re_size_max = maxval(Re_size)
+
             !$acc update device(Re_size, viscous, shear_stress, bulk_stress)
 
             ! Bookkeeping the indexes of any viscous fluids and any pairs of
             ! fluids whose interface will support effects of surface tension
             if (viscous) then
 
-                @:ALLOCATE(Re_idx(1:2, 1:maxval(Re_size)))
+                @:ALLOCATE(Re_idx(1:2, 1:Re_size_max))
 
                 k = 0
                 do i = 1, num_fluids
