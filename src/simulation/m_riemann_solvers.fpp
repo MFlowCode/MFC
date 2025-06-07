@@ -2885,34 +2885,33 @@ contains
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, &
                                        norm_dir, ix, iy, iz)
 
-    contains
-        subroutine s_compute_hlld_state_variables(rho, vel, B, E, pTot, rho_star, s_M, E_star, s_wave, &
-                                                  U, F, U_star, F_star, sqrt_rho_star, v_star, w_star)
-            implicit none
-            ! Input parameters
-            real(wp), intent(in) :: rho, pTot, rho_star, s_M, E_star, s_wave, E
-            real(wp), dimension(:), intent(in) :: vel, B
-            ! Output parameters
-            real(wp), dimension(7), intent(out) :: U, F, U_star, F_star
-            real(wp), intent(out) :: sqrt_rho_star, v_star, w_star
-            ! Compute the base/star state vector
-            U = [rho, rho*vel(1:3), B(2:3), E]
-            U_star = [rho_star, rho_star*s_M, rho_star*vel(2:3), B(2:3), E_star]
-            ! Compute the flux vector
-            F(1) = U(2)
-            F(2) = U(2)*vel(1) - B(1)*B(1) + pTot
-            F(3:4) = U(2)*vel(2:3) - B(1)*B(2:3)
-            F(5:6) = vel(1)*B(2:3) - vel(2:3)*B(1)
-            F(7) = (E + pTot)*vel(1) - B(1)*(vel(1)*B(1) + vel(2)*B(2) + vel(3)*B(3))
-            ! Compute the star flux using HLL relation
-            F_star = F + s_wave*(U_star - U)
-            ! Compute additional parameters needed for double-star states
-            sqrt_rho_star = sqrt(rho_star)
-            v_star = vel(2)
-            w_star = vel(3)
-        end subroutine s_compute_hlld_state_variables
-        ! end contains
     end subroutine s_hlld_riemann_solver
+
+    subroutine s_compute_hlld_state_variables(rho, vel, B, E, pTot, rho_star, s_M, E_star, s_wave, &
+                                                U, F, U_star, F_star, sqrt_rho_star, v_star, w_star)
+        implicit none
+        ! Input parameters
+        real(wp), intent(in) :: rho, pTot, rho_star, s_M, E_star, s_wave, E
+        real(wp), dimension(:), intent(in) :: vel, B
+        ! Output parameters
+        real(wp), dimension(7), intent(out) :: U, F, U_star, F_star
+        real(wp), intent(out) :: sqrt_rho_star, v_star, w_star
+        ! Compute the base/star state vector
+        U = [rho, rho*vel(1:3), B(2:3), E]
+        U_star = [rho_star, rho_star*s_M, rho_star*vel(2:3), B(2:3), E_star]
+        ! Compute the flux vector
+        F(1) = U(2)
+        F(2) = U(2)*vel(1) - B(1)*B(1) + pTot
+        F(3:4) = U(2)*vel(2:3) - B(1)*B(2:3)
+        F(5:6) = vel(1)*B(2:3) - vel(2:3)*B(1)
+        F(7) = (E + pTot)*vel(1) - B(1)*(vel(1)*B(1) + vel(2)*B(2) + vel(3)*B(3))
+        ! Compute the star flux using HLL relation
+        F_star = F + s_wave*(U_star - U)
+        ! Compute additional parameters needed for double-star states
+        sqrt_rho_star = sqrt(rho_star)
+        v_star = vel(2)
+        w_star = vel(3)
+    end subroutine s_compute_hlld_state_variables
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
