@@ -669,8 +669,7 @@ contains
             q_cons_qp%vf, &
             q_T_sf, &
             q_prim_qp%vf, &
-            idwint, &
-            gm_alpha_qp%vf)
+            idwint)
         call nvtxEndRange
 
         call nvtxStartRange("RHS-COMMUNICATION")
@@ -687,7 +686,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, mv, rhs_mv, idwbuff(1), idwbuff(2), idwbuff(3), nbub)
+        if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, mv, rhs_mv, idwbuff(1), idwbuff(2), idwbuff(3))
 
         if (viscous) then
             call nvtxStartRange("RHS-VISCOUS")
@@ -852,9 +851,7 @@ contains
                                         rhs_vf, &
                                         flux_n(id)%vf, &
                                         pb, &
-                                        rhs_pb, &
-                                        mv, &
-                                        rhs_mv)
+                                        rhs_pb)
                 call nvtxEndRange
             end if
             ! END: Additional physics and source terms
@@ -898,7 +895,6 @@ contains
             call s_compute_bubble_EE_source( &
                 q_cons_qp%vf(1:sys_size), &
                 q_prim_qp%vf(1:sys_size), &
-                t_step, &
                 rhs_vf)
             call nvtxEndRange
         end if
@@ -915,10 +911,7 @@ contains
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
                 call s_compute_bubble_EL_dynamics( &
-                    q_cons_qp%vf(1:sys_size), &
                     q_prim_qp%vf(1:sys_size), &
-                    t_step, &
-                    rhs_vf, &
                     stage)
                 call nvtxEndRange
             end if
@@ -1944,19 +1937,19 @@ contains
 
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                            norm_dir, weno_dir, &
+                            weno_dir, &
                             is1, is2, is3)
             else
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                            norm_dir, weno_dir, &
+                            weno_dir, &
                             is1, is2, is3)
             end if
         else
 
             call s_weno(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                        norm_dir, weno_dir, &
+                        weno_dir, &
                         is1, is2, is3)
         end if
 

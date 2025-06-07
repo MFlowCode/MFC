@@ -23,7 +23,7 @@ contains
         !!      Thompson (1990). At the slip wall (frictionless wall),
         !!      the normal component of velocity is zero at all times,
         !!      while the transverse velocities may be nonzero.
-    pure subroutine s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    pure subroutine s_compute_slip_wall_L(lambda, L, rho, c, dpres_ds, dvel_ds)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_slip_wall_L
 #else
@@ -32,10 +32,8 @@ contains
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
-        real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
-        real(wp), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i
 
@@ -103,7 +101,7 @@ contains
         !!      see pg. 455, Thompson (1990). This nonreflecting subsonic
         !!      CBC assumes an incoming flow and reduces the amplitude of
         !!      any reflections caused by outgoing waves.
-    pure subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    pure subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, dpres_ds, dvel_ds)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_inflow_L
 #else
@@ -112,10 +110,8 @@ contains
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
-        real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
-        real(wp), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i
 
@@ -263,19 +259,14 @@ contains
         !!      state, or nearly a steady state, CBC in which only the
         !!      transverse terms may generate a time dependence at the
         !!      inflow boundary.
-    pure subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    pure subroutine s_compute_supersonic_inflow_L(L)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_supersonic_inflow_L
 #else
         !$acc routine seq
 #endif
-        real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
-        real(wp), intent(in) :: rho, c
-        real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
-        real(wp), intent(in) :: dpres_ds
-        real(wp), dimension(num_dims), intent(in) :: dvel_ds
-        real(wp), dimension(num_fluids), intent(in) :: dadv_ds
+
         integer :: i
 
         do i = 1, advxe
