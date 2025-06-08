@@ -1,5 +1,5 @@
 !>
-!! @file m_compute_cbc.fpp
+!! @file m_compute_cbc.f90
 !! @brief CBC computation module
 
 module m_compute_cbc
