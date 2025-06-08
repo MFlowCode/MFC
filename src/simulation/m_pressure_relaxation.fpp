@@ -101,10 +101,10 @@ contains
 
     end subroutine s_relax_cell_pressure
 
-        !> Check if pressure relaxation is needed for this cell
+    !> Check if pressure relaxation is needed for this cell
     pure logical function s_needs_pressure_relaxation(q_cons_vf, j, k, l)
         !$acc routine seq
-        
+
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer, intent(in) :: j, k, l
         integer :: i
