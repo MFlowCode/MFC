@@ -30,6 +30,10 @@
   include the appropriate `!$acc` pragmas when generating or modifying
   performance-critical loops.
 
+- **The codebase is written in Fortran 2008+ with the Fypp pre-processor.**
+  Always use the appropriate Fypp macros when generating or modifying
+  performance-critical loops.
+
 - **Before suggesting or applying any source-code changes, first read/parse the
   full codebase *and* the documentation sources listed below, then produce a
   concise description of how the codebase is structured and functions.**
@@ -47,29 +51,39 @@
 - Prefer shorter, streamlined code—avoid needless verbosity while keeping clarity.
 - Lower-case keywords (`do`, `end subroutine`, etc.).
 - Module names: `m_<feature>` (e.g., `m_transport`).
-- Public procedures: `<verb>_<noun>` (e.g., `compute_flux`).
-- Private helpers start with a leading underscore: `_fill_ghost_cells`.
-
+- Public procedures: `<verb>_<noun>` (e.g., `compute_flux`) with prefixe `s_` or `f_` for subroutines and functions, respectively.
+- Avoid private helper functions within a subroutine or function, and instead make them private to the module (if appropriate)
+- Helper functions or subroutines start with with f_[name here] or s_[name here], respectively
+- Avoid passing arguments to subroutines and functions that need to be reshaped in the subroutine or function, such that the compiler can optimize the code.
 - Avoid common Fortran code smells, such as:
   - Use of `goto` statements (except in legacy interop situations).
   - Omission of `intent(...)` declarations.
   - Use of global state via `COMMON` blocks or `save` variables.
   - Shadowing of variable names (especially loop indices).
   - Non-descriptive or single-letter variable names outside small scopes.
-  - Excessively long procedures (>100 lines); prefer decomposition.
+  - Excessively long helper procedures (>200 lines); prefer decomposition.
+  - Excessively long subroutines (>500 lines); prefer decomposition.
+  - Excessively long functions (>100 lines); prefer decomposition.
+  - Excessively long modules (>1000 lines); prefer decomposition.
+  - Excessively long files (>1000 lines); prefer decomposition.
+  - Subroutines and functions that are too long to be understood at a glance.
+  - Use of `!$acc routine seq` to mark subroutines and functions that are called from OpenACC parallel loops.
   - Mixing I/O logic with computation (separate concerns).
+  - Missing implicit none statements.
+  - Missing `intent(in|out|inout)` declarations.
+  - Missing `dimension` or `allocatable`/`pointer` attributes.
+  - Missing `private` declarations.
+  - Missing `public` declarations.
+  - Missing `module procedure` declarations.
+  - Missing `use` statements.
   - Declaring arrays without `dimension` or `allocatable`/`pointer` attributes.
-  - Use of `stop` for error handling (prefer error codes or `error stop` with messages).
+  - Use of `stop` for error handling (prefer use of the subroutine `s_mpi_abort` with an appropriate string message argument).
 
 ### ───────────────────────────────────────────────────────────────────
-###  3. Test workflow  (MANUAL – invoke when asked to test)
+###  3. Test workflow  (AUTOMATICALLY applied when the code is significantly changed and should be tested)
 ### ───────────────────────────────────────────────────────────────────
 
-- To run the **test suite**, execute:
-
-  ./mfc.sh test -j $(nproc)
-
-- Run the test suite after any meaningful code change to verify correctness.
+- Run the test suite after any meaningful code change to verify correctness, but ask the user to alter the test suite command so that only the relevant tests are run.
 
 ### ───────────────────────────────────────────────────────────────────
 ###  4. OpenACC programming guidelines  (AUTOMATICALLY applied to *.fpp/*.f90)
@@ -89,14 +103,17 @@
 - Use `private(var1, var2, ...)` clauses for all variables that are local
   to a parallel region or loop, especially scalar temporaries and loop counters.
 
+- Use `!$acc routine seq` to mark subroutines and functions that are called from OpenACC parallel loops. 
+
+- When adding `!$acc routine seq` put it on the first line after the declaration of the subroutine or function.
+
 - Allocate large arrays with the `managed` attribute or move them to the device
   at program start using a persistent `!$acc enter data` region.
 
-- Do **not** place `stop` or `error stop` statements inside OpenACC parallel regions or loops,
-  as they are unsupported in device code and will cause runtime failures.
+- Do **not** place `stop` or `error stop` statements inside OpenACC parallel regions or loops, as they are unsupported in device code and will cause runtime failures.
 
 - Ensure the code compiles with Cray Fortran (`ftn`) and NVIDIA HPC SDK
-  (`nvfortran`) for GPU offloading, and with GNU (`gfortran`) and Intel
+  (`nvfortran`) for OpenACC GPU offloading, and with GNU (`gfortran`) and Intel
   (`ifx`/`ifort`) for CPU-only builds where OpenACC directives are ignored.
 
 ######################################################################
