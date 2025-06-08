@@ -1,7 +1,7 @@
 ---
-description: Modifying code
+description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 ---
 description: Full MFC project rules – consolidated for Agent Mode
