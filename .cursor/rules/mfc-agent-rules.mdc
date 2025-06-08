@@ -1,9 +1,4 @@
 ---
-description: 
-globs: 
-alwaysApply: true
----
----
 description: Full MFC project rules – consolidated for Agent Mode
 alwaysApply: true
 ---
