@@ -70,8 +70,9 @@ contains
         !!      S = - (divB) [ 0, Bx, By, Bz, vdotB, vx, vy, vz ]^T
         !!  @param q_prim_vf  Primitive variables
         !!  @param rhs_vf     rhs variables
-    subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)
+    subroutine s_compute_mhd_powell_rhs(idir, q_prim_vf, rhs_vf)
 
+        integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
@@ -86,15 +87,17 @@ contains
                 do k = 0, m
 
                     divB = 0._wp
-                    !$acc loop seq
-                    do r = -fd_number, fd_number
-                        divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
-                    end do
-                    !$acc loop seq
-                    do r = -fd_number, fd_number
-                        divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
-                    end do
-                    if (p > 0) then
+                    if (idir == 1) then
+                        !$acc loop seq
+                        do r = -fd_number, fd_number
+                            divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                        end do
+                    else if (idir == 2) then
+                        !$acc loop seq
+                        do r = -fd_number, fd_number
+                            divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                        end do
+                    else if (idir == 3) then
                         !$acc loop seq
                         do r = -fd_number, fd_number
                             divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
@@ -137,8 +140,9 @@ contains
 
     end subroutine s_compute_mhd_powell_rhs
 
-    subroutine s_compute_mhd_hyper_cleaning_rhs(q_prim_vf, rhs_vf)
+    subroutine s_compute_mhd_hyper_cleaning_rhs(idir, q_prim_vf, rhs_vf)
 
+        integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
@@ -154,15 +158,17 @@ contains
 
                     !— compute ∇·B —
                     divB = 0._wp
-                    !$acc loop seq
-                    do r = -fd_number, fd_number
-                        divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
-                    end do
-                    !$acc loop seq
-                    do r = -fd_number, fd_number
-                        divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
-                    end do
-                    if (p > 0) then
+                    if (idir == 1) then
+                        !$acc loop seq
+                        do r = -fd_number, fd_number
+                            divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                        end do
+                    else if (idir == 2) then
+                        !$acc loop seq
+                        do r = -fd_number, fd_number
+                            divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                        end do
+                    else if (idir == 3) then
                         !$acc loop seq
                         do r = -fd_number, fd_number
                             divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)

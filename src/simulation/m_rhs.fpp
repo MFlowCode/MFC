@@ -863,8 +863,8 @@ contains
             ! END: Additional physics and source terms
 
             call nvtxStartRange("RHS-MHD")
-            if (powell) call s_compute_mhd_powell_rhs(q_prim_qp%vf, rhs_vf)
-            if (hyper_cleaning) call s_compute_mhd_hyper_cleaning_rhs(q_prim_qp%vf, rhs_vf)
+            if (powell) call s_compute_mhd_powell_rhs(id, q_prim_qp%vf, rhs_vf)
+            if (hyper_cleaning) call s_compute_mhd_hyper_cleaning_rhs(id, q_prim_qp%vf, rhs_vf)
             call nvtxEndRange
 
         end do
