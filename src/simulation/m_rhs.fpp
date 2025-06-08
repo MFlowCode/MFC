@@ -63,11 +63,12 @@ module m_rhs
 
     use m_mhd
 
+    use m_pressure_relaxation
+
     implicit none
 
     private; public :: s_initialize_rhs_module, &
  s_compute_rhs, &
- s_pressure_relaxation_procedure, &
  s_finalize_rhs_module
 
     !! This variable contains the WENO-reconstructed values of the cell-average
@@ -157,12 +158,6 @@ module m_rhs
     !$acc declare create(blkmod1, blkmod2, alpha1, alpha2, Kterm)
     !$acc declare create(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
     !$acc declare create(dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
-
-    real(wp), allocatable, dimension(:) :: gamma_min, pres_inf
-    !$acc declare create(gamma_min, pres_inf)
-
-    real(wp), allocatable, dimension(:, :) :: Res
-    !$acc declare create(Res)
 
     real(wp), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
     !$acc declare create(nbub)
@@ -571,26 +566,7 @@ contains
             @:ALLOCATE(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, 0:n, 0:p))
         end if
 
-        @:ALLOCATE(gamma_min(1:num_fluids), pres_inf(1:num_fluids))
-
-        do i = 1, num_fluids
-            gamma_min(i) = 1._wp/fluid_pp(i)%gamma + 1._wp
-            pres_inf(i) = fluid_pp(i)%pi_inf/(1._wp + fluid_pp(i)%gamma)
-        end do
-        !$acc update device(gamma_min, pres_inf)
-
-        if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
-        end if
-
-        if (viscous) then
-            do i = 1, 2
-                do j = 1, Re_size(i)
-                    Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
-                end do
-            end do
-            !$acc update device(Res, Re_idx, Re_size)
-        end if
+        call s_initialize_pressure_relaxation_module
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do id = 1, num_dims
@@ -1649,249 +1625,6 @@ contains
         !!      fraction of each phase are recomputed. For conservation
         !!      purpose, this pressure is finally corrected using the
         !!      mixture-total-energy equation.
-        !!  @param q_cons_vf Cell-average conservative variables
-    pure subroutine s_pressure_relaxation_procedure(q_cons_vf)
-
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-
-        !> @name Relaxed pressure, initial partial pressures, function f(p) and its partial
-            !! derivative df(p), isentropic partial density, sum of volume fractions,
-            !! mixture density, dynamic pressure, surface energy, specific heat ratio
-            !! function, liquid stiffness function (two variations of the last two
-            !! ones), shear and volume Reynolds numbers and the Weber numbers
-        !> @{
-        real(wp) :: pres_relax
-        real(wp), dimension(num_fluids) :: pres_K_init
-        real(wp) :: f_pres
-        real(wp) :: df_pres
-        real(wp), dimension(num_fluids) :: rho_K_s
-        real(wp), dimension(num_fluids) :: alpha_rho
-        real(wp), dimension(num_fluids) :: alpha
-        real(wp) :: sum_alpha
-        real(wp) :: rho
-        real(wp) :: dyn_pres
-        real(wp) :: gamma
-        real(wp) :: pi_inf
-        real(wp), dimension(2) :: Re
-
-        integer :: i, j, k, l, q, iter !< Generic loop iterators
-        integer :: relax !< Relaxation procedure determination variable
-
-        !$acc parallel loop collapse(3) gang vector private(pres_K_init, rho_K_s, alpha_rho, alpha, Re, pres_relax)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-
-                    ! Numerical correction of the volume fractions
-                    if (mpp_lim) then
-                        sum_alpha = 0._wp
-
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            if ((q_cons_vf(i + contxb - 1)%sf(j, k, l) < 0._wp) .or. &
-                                (q_cons_vf(i + advxb - 1)%sf(j, k, l) < 0._wp)) then
-                                q_cons_vf(i + contxb - 1)%sf(j, k, l) = 0._wp
-                                q_cons_vf(i + advxb - 1)%sf(j, k, l) = 0._wp
-                                q_cons_vf(i + intxb - 1)%sf(j, k, l) = 0._wp
-                            end if
-
-                            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > 1._wp) &
-                                q_cons_vf(i + advxb - 1)%sf(j, k, l) = 1._wp
-                            sum_alpha = sum_alpha + q_cons_vf(i + advxb - 1)%sf(j, k, l)
-                        end do
-
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + advxb - 1)%sf(j, k, l)/sum_alpha
-                        end do
-                    end if
-
-                    ! Pressures relaxation procedure
-
-                    ! Is the pressure relaxation procedure necessary?
-                    relax = 1
-
-                    !$acc loop seq
-                    do i = 1, num_fluids
-                        if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > (1._wp - sgm_eps)) relax = 0
-                    end do
-
-                    if (relax == 1) then
-                        ! Initial state
-                        pres_relax = 0._wp
-
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
-                                pres_K_init(i) = &
-                                    (q_cons_vf(i + intxb - 1)%sf(j, k, l)/ &
-                                     q_cons_vf(i + advxb - 1)%sf(j, k, l) &
-                                     - pi_infs(i))/gammas(i)
-
-                                if (pres_K_init(i) <= -(1._wp - 1e-8_wp)*pres_inf(i) + 1e-8_wp) &
-                                    pres_K_init(i) = -(1._wp - 1e-8_wp)*pres_inf(i) + 1e-8_wp
-                            else
-                                pres_K_init(i) = 0._wp
-                            end if
-                            pres_relax = pres_relax + q_cons_vf(i + advxb - 1)%sf(j, k, l)*pres_K_init(i)
-                        end do
-
-                        ! Iterative process for relaxed pressure determination
-                        f_pres = 1e-9_wp
-                        df_pres = 1e9_wp
-
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            rho_K_s(i) = 0._wp
-                        end do
-
-                        !$acc loop seq
-                        do iter = 0, 49
-
-                            if (abs(f_pres) > 1e-10_wp) then
-                                pres_relax = pres_relax - f_pres/df_pres
-
-                                ! Physical pressure
-                                do i = 1, num_fluids
-                                    if (pres_relax <= -(1._wp - 1e-8_wp)*pres_inf(i) + 1e-8_wp) &
-                                        pres_relax = -(1._wp - 1e-8_wp)*pres_inf(i) + 1._wp
-                                end do
-
-                                ! Newton-Raphson method
-                                f_pres = -1._wp
-                                df_pres = 0._wp
-
-                                !$acc loop seq
-                                do i = 1, num_fluids
-                                    if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
-                                        rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
-                                                     max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
-                                                     *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
-                                                                                   pres_inf(i)))**(1._wp/gamma_min(i))
-
-                                        f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l) &
-                                                 /rho_K_s(i)
-
-                                        df_pres = df_pres - q_cons_vf(i + contxb - 1)%sf(j, k, l) &
-                                                  /(gamma_min(i)*rho_K_s(i)*(pres_relax + pres_inf(i)))
-                                    end if
-                                end do
-                            end if
-
-                        end do
-
-                        ! Cell update of the volume fraction
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) &
-                                q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l) &
-                                                                       /rho_K_s(i)
-                        end do
-                    end if
-
-                    ! Mixture-total-energy correction
-
-                    ! The mixture-total-energy correction of the mixture pressure P is not necessary here
-                    ! because the primitive variables are directly recovered later on by the conservative
-                    ! variables (see s_convert_conservative_to_primitive_variables called in s_compute_rhs).
-                    ! However, the internal-energy equations should be reset with the corresponding mixture
-                    ! pressure from the correction. This step is carried out below.
-
-                    !$acc loop seq
-                    do i = 1, num_fluids
-                        alpha_rho(i) = q_cons_vf(i)%sf(j, k, l)
-                        alpha(i) = q_cons_vf(E_idx + i)%sf(j, k, l)
-                    end do
-
-                    if (bubbles_euler) then
-                        rho = 0._wp
-                        gamma = 0._wp
-                        pi_inf = 0._wp
-
-                        if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
-                            !$acc loop seq
-                            do i = 1, num_fluids
-                                rho = rho + alpha_rho(i)
-                                gamma = gamma + alpha(i)*gammas(i)
-                                pi_inf = pi_inf + alpha(i)*pi_infs(i)
-                            end do
-                        else if ((model_eqns == 2) .and. (num_fluids > 2)) then
-                            !$acc loop seq
-                            do i = 1, num_fluids - 1
-                                rho = rho + alpha_rho(i)
-                                gamma = gamma + alpha(i)*gammas(i)
-                                pi_inf = pi_inf + alpha(i)*pi_infs(i)
-                            end do
-                        else
-                            rho = alpha_rho(1)
-                            gamma = gammas(1)
-                            pi_inf = pi_infs(1)
-                        end if
-                    else
-                        rho = 0._wp
-                        gamma = 0._wp
-                        pi_inf = 0._wp
-
-                        sum_alpha = 0._wp
-
-                        if (mpp_lim) then
-                            !$acc loop seq
-                            do i = 1, num_fluids
-                                alpha_rho(i) = max(0._wp, alpha_rho(i))
-                                alpha(i) = min(max(0._wp, alpha(i)), 1._wp)
-                                sum_alpha = sum_alpha + alpha(i)
-                            end do
-
-                            alpha = alpha/max(sum_alpha, sgm_eps)
-
-                        end if
-
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            rho = rho + alpha_rho(i)
-                            gamma = gamma + alpha(i)*gammas(i)
-                            pi_inf = pi_inf + alpha(i)*pi_infs(i)
-                        end do
-
-                        if (viscous) then
-                            !$acc loop seq
-                            do i = 1, 2
-                                Re(i) = dflt_real
-
-                                if (Re_size(i) > 0) Re(i) = 0._wp
-                                !$acc loop seq
-                                do q = 1, Re_size(i)
-                                    Re(i) = alpha(Re_idx(i, q))/Res(i, q) &
-                                            + Re(i)
-                                end do
-
-                                Re(i) = 1._wp/max(Re(i), sgm_eps)
-
-                            end do
-                        end if
-                    end if
-
-                    dyn_pres = 0._wp
-
-                    !$acc loop seq
-                    do i = momxb, momxe
-                        dyn_pres = dyn_pres + 5e-1_wp*q_cons_vf(i)%sf(j, k, l)* &
-                                   q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
-                    end do
-
-                    pres_relax = (q_cons_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
-
-                    !$acc loop seq
-                    do i = 1, num_fluids
-                        q_cons_vf(i + intxb - 1)%sf(j, k, l) = &
-                            q_cons_vf(i + advxb - 1)%sf(j, k, l)* &
-                            (gammas(i)*pres_relax + pi_infs(i))
-                    end do
-                end do
-            end do
-        end do
-
-    end subroutine s_pressure_relaxation_procedure
 
     !>  The purpose of this subroutine is to WENO-reconstruct the
         !!      left and the right cell-boundary values, including values
@@ -2034,6 +1767,8 @@ contains
     impure subroutine s_finalize_rhs_module
 
         integer :: i, j, l
+
+        call s_finalize_pressure_relaxation_module
 
         do j = cont_idx%beg, cont_idx%end
             if (relativity) then
