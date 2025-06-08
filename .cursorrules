@@ -83,7 +83,11 @@
 ###  3. Test workflow  (AUTOMATICALLY applied when the code is significantly changed and should be tested)
 ### ───────────────────────────────────────────────────────────────────
 
-- Run the test suite after any meaningful code change to verify correctness, but ask the user to alter the test suite command so that only the relevant tests are run.
+- Run the test suite after any meaningful code change to verify correctness.
+- Ask the user to alter the test suite command so that only the relevant tests are run.
+- When you think you are done with the code changes, run ./mfc.sh test -j $(nproc) -f EA8FA07E -t 9E2CA336
+- Otherwise, only run specific tests that are relevant to the code changes.
+- Do not run ./mfc.sh test -j $(nproc) without any other arguments (it takes too long to run all tests).
 
 ### ───────────────────────────────────────────────────────────────────
 ###  4. OpenACC programming guidelines  (AUTOMATICALLY applied to *.fpp/*.f90)
