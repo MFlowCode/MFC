@@ -78,6 +78,7 @@
   - Missing `use` statements.
   - Declaring arrays without `dimension` or `allocatable`/`pointer` attributes.
   - Use of `stop` for error handling (prefer use of the subroutine `s_mpi_abort` with an appropriate string message argument).
+  - Do not use many arguments in subroutines and functions (no more than 6), and instead use a struct to pass the arguments.
 
 ### ───────────────────────────────────────────────────────────────────
 ###  3. Test workflow  (AUTOMATICALLY applied when the code is significantly changed and should be tested)
