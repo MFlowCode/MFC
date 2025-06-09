@@ -677,6 +677,11 @@ contains
                                 call s_compute_fast_magnetosonic_speed(rho_R, c_R, B%R, norm_dir, c_fast%R, H_R)
                             end if
 
+                            if (hyper_cleaning) then ! mhd
+                                c_fast%L = min(c_fast%L, -hyper_cleaning_speed)
+                                c_fast%R = max(c_fast%R, hyper_cleaning_speed)
+                            end if
+
                             if (viscous) then
                                 !$acc loop seq
                                 do i = 1, 2
@@ -1035,26 +1040,37 @@ contains
 
                                 else ! 2D/3D: Bx, By, Bz /= const. but zero flux component in the same direction
                                     ! B_x d/d${XYZ}$ flux = (1 - delta(x,${XYZ}$)) * (v_${XYZ}$ * B_x - v_x * B_${XYZ}$)
-                                    flux_rs${XYZ}$_vf(j, k, l, B_idx%beg) = (1 - dir_flg(1))*( &
+                                    flux_rs${XYZ}$_vf(j, k, l, B_idx%beg) = ( &
                                                                             s_M*(vel_R(dir_idx(1))*B%R(1) - vel_R(1)*B%R(norm_dir)) - &
                                                                             s_P*(vel_L(dir_idx(1))*B%L(1) - vel_L(1)*B%L(norm_dir)) + &
                                                                             s_M*s_P*(B%L(1) - B%R(1)))/(s_M - s_P)
 
                                     ! B_y d/d${XYZ}$ flux = (1 - delta(y,${XYZ}$)) * (v_${XYZ}$ * B_y - v_y * B_${XYZ}$)
-                                    flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1) = (1 - dir_flg(2))*( &
+                                    flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1) = ( &
                                                                                 s_M*(vel_R(dir_idx(1))*B%R(2) - vel_R(2)*B%R(norm_dir)) - &
                                                                                 s_P*(vel_L(dir_idx(1))*B%L(2) - vel_L(2)*B%L(norm_dir)) + &
                                                                                 s_M*s_P*(B%L(2) - B%R(2)))/(s_M - s_P)
 
                                     ! B_z d/d${XYZ}$ flux = (1 - delta(z,${XYZ}$)) * (v_${XYZ}$ * B_z - v_z * B_${XYZ}$)
-                                    flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 2) = (1 - dir_flg(3))*( &
+                                    flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 2) = ( &
                                                                                 s_M*(vel_R(dir_idx(1))*B%R(3) - vel_R(3)*B%R(norm_dir)) - &
                                                                                 s_P*(vel_L(dir_idx(1))*B%L(3) - vel_L(3)*B%L(norm_dir)) + &
                                                                                 s_M*s_P*(B%L(3) - B%R(3)))/(s_M - s_P)
 
+                                    if (hyper_cleaning) then
+                                        flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1) = flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1) + &
+                                                                                               ( s_M*qR_prim_rs${XYZ}$_vf(j + 1, k, l, psi_idx) - s_P*qL_prim_rs${XYZ}$_vf(j, k, l, psi_idx) )/(s_M - s_P)
+
+                                        flux_rs${XYZ}$_vf(j, k, l, psi_idx) = (hyper_cleaning_speed**2 * (s_M*B%R(norm_dir) - s_P*B%L(norm_dir)) + s_M*s_P*(qL_prim_rs${XYZ}$_vf(j, k, l, psi_idx) - qR_prim_rs${XYZ}$_vf(j + 1, k, l, psi_idx)))/(s_M - s_P)
+                                    end if
+
                                 end if
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
+                            end if
+
+                            if (powell) then
+                                flux_gsrc_rs${XYZ}$_vf(j, k, l, 1) = flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1)
                             end if
 
                             #:if (NORM_DIR == 2)
@@ -4951,7 +4967,7 @@ contains
                 end do
             end do
 
-            if (cyl_coord) then
+            if (cyl_coord .or. powell) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
@@ -5003,7 +5019,7 @@ contains
                     end do
                 end do
             end do
-            if (grid_geometry == 3) then
+            if (grid_geometry == 3 .or. powell) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size
                     do j = is1%beg, is1%end
@@ -5054,6 +5070,20 @@ contains
                     end do
                 end do
             end do
+
+            if (powell) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, sys_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                flux_gsrc_vf(i)%sf(j, k, l) = &
+                                    flux_gsrc_rsx_vf(j, k, l, i)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
 
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = is3%beg, is3%end

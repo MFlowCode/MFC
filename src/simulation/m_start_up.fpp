@@ -1529,7 +1529,7 @@ contains
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
 
-        if (powell .or. hyper_cleaning) call s_initialize_mhd_clean_module
+        if (powell) call s_initialize_mhd_clean_module
 
     end subroutine s_initialize_modules
 
@@ -1668,7 +1668,7 @@ contains
 
         if (surface_tension)  call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
-        if (powell .or. hyper_cleaning) call s_finalize_mhd_clean_module
+        if (powell) call s_finalize_mhd_clean_module
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

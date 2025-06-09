@@ -428,6 +428,21 @@ contains
             end if
         end if
 
+        if (hyper_cleaning) then
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        ! q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
+                        !     q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) &
+                        !     - dt*q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)/hyper_cleaning_tau
+                        q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) * &
+                            exp(-dt/hyper_cleaning_tau)
+                    end do
+                end do
+            end do
+        end if
+
         call nvtxEndRange
 
     end subroutine s_1st_order_tvd_rk
@@ -723,6 +738,21 @@ contains
             end if
         end if
 
+        if (hyper_cleaning) then
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        ! q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
+                        !     q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) &
+                        !     - dt*q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)/hyper_cleaning_tau
+                        q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) * &
+                            exp(-dt/hyper_cleaning_tau)
+                    end do
+                end do
+            end do
+        end if
+
         ! Stage 2 of 3
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
@@ -798,6 +828,21 @@ contains
             else
                 call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
             end if
+        end if
+
+        if (hyper_cleaning) then
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        ! q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
+                        !     q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) &
+                        !     - dt*q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)/hyper_cleaning_tau
+                        q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) * &
+                            exp(-dt/hyper_cleaning_tau)
+                    end do
+                end do
+            end do
         end if
 
         ! Stage 3 of 3
@@ -878,6 +923,21 @@ contains
             else
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
             end if
+        end if
+
+        if (hyper_cleaning) then
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        ! q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
+                        !     q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) &
+                        !     - dt*q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)/hyper_cleaning_tau
+                        q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) * &
+                            exp(-dt/hyper_cleaning_tau)
+                    end do
+                end do
+            end do
         end if
 
         if (.not. adap_dt) then

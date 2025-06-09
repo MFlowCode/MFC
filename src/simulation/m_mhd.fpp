@@ -19,8 +19,7 @@ module m_mhd
 
     private; public :: s_initialize_mhd_clean_module, &
  s_finalize_mhd_clean_module, &
- s_compute_mhd_powell_rhs, &
- s_compute_mhd_hyper_cleaning_rhs
+ s_compute_mhd_powell_rhs
 
     real(wp), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
     real(wp), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
@@ -70,11 +69,12 @@ contains
         !!      S = - (divB) [ 0, Bx, By, Bz, vdotB, vx, vy, vz ]^T
         !!  @param q_prim_vf  Primitive variables
         !!  @param rhs_vf     rhs variables
-    subroutine s_compute_mhd_powell_rhs(idir, q_prim_vf, rhs_vf)
+    subroutine s_compute_mhd_powell_rhs(idir, q_prim_vf, rhs_vf, flux_gsrc_n)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: flux_gsrc_n
 
         integer :: k, l, q, r
         real(wp), dimension(3) :: v, B
@@ -86,22 +86,15 @@ contains
             do l = 0, n
                 do k = 0, m
 
-                    divB = 0._wp
                     if (idir == 1) then
-                        !$acc loop seq
-                        do r = -fd_number, fd_number
-                            divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
-                        end do
+                        divB = 1._wp/dx(k)* &
+                        (flux_gsrc_n(1)%sf(k, l, q) - flux_gsrc_n(1)%sf(k - 1, l, q))
                     else if (idir == 2) then
-                        !$acc loop seq
-                        do r = -fd_number, fd_number
-                            divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
-                        end do
+                        divB = 1._wp/dy(l)* &
+                        (flux_gsrc_n(1)%sf(k, l, q) - flux_gsrc_n(1)%sf(k, l - 1, q))
                     else if (idir == 3) then
-                        !$acc loop seq
-                        do r = -fd_number, fd_number
-                            divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
-                        end do
+                        divB = 1._wp/dz(l)* &
+                        (flux_gsrc_n(1)%sf(k, l, q) - flux_gsrc_n(1)%sf(k, l, q - 1))
                     end if
 
                     v(1) = q_prim_vf(momxb)%sf(k, l, q)
@@ -139,81 +132,6 @@ contains
         !$acc end parallel loop
 
     end subroutine s_compute_mhd_powell_rhs
-
-    subroutine s_compute_mhd_hyper_cleaning_rhs(idir, q_prim_vf, rhs_vf)
-
-        integer, intent(in) :: idir
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-
-        integer :: k, l, q, r
-        real(wp) :: divB
-        real(wp) :: dpsi_dx, dpsi_dy, dpsi_dz
-
-        !$acc parallel loop collapse(3) gang vector default(present)    &
-        !$acc private(divB,dpsi_dx,dpsi_dy,dpsi_dz)
-        do q = 0, p
-            do l = 0, n
-                do k = 0, m
-
-                    !— compute ∇·B —
-                    divB = 0._wp
-                    if (idir == 1) then
-                        !$acc loop seq
-                        do r = -fd_number, fd_number
-                            divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
-                        end do
-                    else if (idir == 2) then
-                        !$acc loop seq
-                        do r = -fd_number, fd_number
-                            divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
-                        end do
-                    else if (idir == 3) then
-                        !$acc loop seq
-                        do r = -fd_number, fd_number
-                            divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
-                        end do
-                    end if
-
-                    !— compute ∂xψ, ∂yψ, (and ∂zψ if 3D) —
-                    dpsi_dx = 0._wp
-                    !$acc loop seq
-                    do r = -fd_number, fd_number
-                        dpsi_dx = dpsi_dx + q_prim_vf(psi_idx)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
-                    end do
-
-                    dpsi_dy = 0._wp
-                    !$acc loop seq
-                    do r = -fd_number, fd_number
-                        dpsi_dy = dpsi_dy + q_prim_vf(psi_idx)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
-                    end do
-
-                    dpsi_dz = 0._wp
-                    if (p > 0) then
-                        !$acc loop seq
-                        do r = -fd_number, fd_number
-                            dpsi_dz = dpsi_dz + q_prim_vf(psi_idx)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
-                        end do
-                    end if
-
-                    !— inject into B-components: –∇ψ —
-                    rhs_vf(B_idx%beg)%sf(k, l, q) = rhs_vf(B_idx%beg)%sf(k, l, q) - dpsi_dx
-                    rhs_vf(B_idx%beg + 1)%sf(k, l, q) = rhs_vf(B_idx%beg + 1)%sf(k, l, q) - dpsi_dy
-                    if (p > 0) then
-                        rhs_vf(B_idx%beg + 2)%sf(k, l, q) = rhs_vf(B_idx%beg + 2)%sf(k, l, q) - dpsi_dz
-                    end if
-
-                    !— ψ-equation: –c_h^2 ∇·B  and  –ψ/τ —
-                    rhs_vf(psi_idx)%sf(k, l, q) = rhs_vf(psi_idx)%sf(k, l, q) &
-                                                  - hyper_cleaning_speed**2*divB &
-                                                  - q_prim_vf(psi_idx)%sf(k, l, q)/hyper_cleaning_tau
-
-                end do
-            end do
-        end do
-        !$acc end parallel loop
-
-    end subroutine s_compute_mhd_hyper_cleaning_rhs
 
     subroutine s_finalize_mhd_clean_module
 
