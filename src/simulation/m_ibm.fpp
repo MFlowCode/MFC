@@ -218,13 +218,13 @@ contains
                 ! If in simulation, use acc mixture subroutines
                 if (elasticity) then
                     call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, &
-                                                                    gp%ip%alpha, gp%ip%alpha_rho, Re_K, j, k, l, G_K, Gs)
+                                                                    gp%ip%alpha, gp%ip%alpha_rho, Re_K, G_K, Gs)
                 else if (bubbles_euler) then
                     call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv_K, &
-                                                                            gp%ip%alpha, gp%ip%alpha_rho, Re_K, j, k, l)
+                                                                            gp%ip%alpha, gp%ip%alpha_rho, Re_K)
                 else
                     call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, &
-                                                                    gp%ip%alpha, gp%ip%alpha_rho, Re_K, j, k, l)
+                                                                    gp%ip%alpha, gp%ip%alpha_rho, Re_K)
                 end if
             end if
 
