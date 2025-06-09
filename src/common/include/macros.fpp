@@ -242,7 +242,7 @@
     $:acc_directive
 #:enddef
 
-#:def routine(parallelism=['seq'], nohost=False, extraAccArgs=None)
+#:def ROUTINE(parallelism=['seq'], nohost=False, extraAccArgs=None)
     #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
 
     #:assert isinstance(nohost, bool)
@@ -256,13 +256,11 @@
 
     #:set clause_val = parallelism_val.strip('\n') + nohost_val.strip('\n')
     #:set acc_directive = '!$acc routine ' + &
-        clause_val + extraAccArgs_val.strip('\n')
+        & clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
 #:enddef
 
-
-
-#:def declare(copy=None, copyin=None, copyinReadOnly=False, copyout=None, create=None, present=None, deviceptr=None, link=None, extraAccArgs=None)
+#:def DECLARE(copy=None, copyin=None, copyinReadOnly=False, copyout=None, create=None, present=None, deviceptr=None, link=None, extraAccArgs=None)
     #:set copy_val = GEN_COPY_STR(copy)
 
     #:set copyin_val = GEN_COPYIN_STR(copyin, copyinReadOnly)
@@ -284,5 +282,59 @@
         & present_val.strip('\n') + deviceptr_val.strip('\n') + &
         & link_val.strip('\n')
     #:set acc_directive = '!$acc declare ' + clause_val + extraAccArgs_val.strip('\n')
+    $:acc_directive
+#:enddef
+
+#:def LOOP(collapse=None, parallelism=["seq"], data_dependency=None, reduction_list=None, reductionOp=None, private=None, extraAccArgs=None)
+    #:if collapse is not None
+        #:assert isinstance(collapse, int)
+        #:assert collapse > 1
+        #:set collapse_val = 'collapse(' + str(collapse) + ') '
+    #:else
+        #:set collapse_val = ''
+    #:endif
+
+    #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
+
+
+    #:if data_dependency is not None
+        #:assert isinstance(data_dependency, str)
+        #:assert (data_dependency == 'auto' or data_dependency == 'independent')
+        #:set data_dependency_val = data_dependency 
+    #:else
+        #:set data_dependency_val = ''
+    #:endif
+    
+    #:set private_val = GEN_PARENTHESES_CLAUSE('private', private)
+
+    #:if reduction is not None and reductionOp is not None
+        #:if isinstance(reduction, list) and isinstance(reductionOp, list)
+            $:ASSERT_LIST(reduction, list)
+            $:ASSERT_LIST(reductionOp, str)
+            #:assert all(len(element) != 0 for element in reduction)
+            #:assert all(type(element) == str for sublist in reduction for element in sublist)
+            #:assert len(reduction) == len(reductionOp)
+            #:set reduction_list = ['reduction(' + op + ':' + ', '.join(red) + ') ' for (red, op) in zip(reduction, reductionOp)]
+            #:set reduction_val = ' '. join(reduction_list) + ' '
+        #:elif isinstance(reduction, list) and isinstance(reductionOp, str)
+            $:ASSERT_LIST(reduction, str)
+            #:assert isinstance(reductionOp, str)
+            #:set reduction_val = 'reduction(' + reductionOp + ':' + ', '.join(reduction) + ') '
+        #:else
+            #:stop 'Invalid datatypes for reduction or reductionOp. Must be list of lists and lists or list and str respectively'
+        #:endif
+    #:elif reduction is not None or reductionOp is not None
+        #:stop 'Cannot set the reduction list or reduction operation without setting the other'
+    #:else
+        #:set reduction_val = ''
+    #:endif
+
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+
+    #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
+        & data_dependency_val.strip('\n') + private_val.strip('\n') + &
+        & reduction_val.strip('\n')
+    #:set acc_directive = '!$acc serial ' + &
+        & clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
 #:enddef
