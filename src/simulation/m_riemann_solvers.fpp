@@ -2784,10 +2784,32 @@ contains
                             E_starR = ((s_R - vel%R(1))*E%R - pTot_R*vel%R(1) + p_star*s_M)/(s_R - s_M)
 
                             ! (5) Compute left/right state vectors and fluxes
-                            call s_compute_hlld_state_variables(rho%L, vel%L, B%L, E%L, pTot_L, rhoL_star, s_M, E_starL, s_L, &
-                                                                U_L, F_L, U_starL, F_starL, sqrt_rhoL_star, vL_star, wL_star)
-                            call s_compute_hlld_state_variables(rho%R, vel%R, B%R, E%R, pTot_R, rhoR_star, s_M, E_starR, s_R, &
-                                                                U_R, F_R, U_starR, F_starR, sqrt_rhoR_star, vR_star, wR_star)
+                            U_L = [rho%L, rho%L*vel%L(1:3), B%L(2:3), E%L]
+                            U_starL = [rhoL_star, rhoL_star*s_M, rhoL_star*vel%L(2:3), B%L(2:3), E_starL]
+                            U_R = [rho%R, rho%R*vel%R(1:3), B%R(2:3), E%R]
+                            U_starR = [rhoR_star, rhoR_star*s_M, rhoR_star*vel%R(2:3), B%R(2:3), E_starR]
+
+                            F_L(1) = U_L(2)
+                            F_L(2) = U_L(2)*vel%L(1) - B%L(1)*B%L(1) + pTot_L
+                            F_L(3:4) = U_L(2)*vel%L(2:3) - B%L(1)*B%L(2:3)
+                            F_L(5:6) = vel%L(1)*B%L(2:3) - vel%L(2:3)*B%L(1)
+                            F_L(7) = (E%L + pTot_L)*vel%L(1) - B%L(1)*(vel%L(1)*B%L(1) + vel%L(2)*B%L(2) + vel%L(3)*B%L(3))
+                            
+                            F_R(1) = U_R(2)
+                            F_R(2) = U_R(2)*vel%R(1) - B%R(1)*B%R(1) + pTot_R
+                            F_R(3:4) = U_R(2)*vel%R(2:3) - B%R(1)*B%R(2:3)
+                            F_R(5:6) = vel%R(1)*B%R(2:3) - vel%R(2:3)*B%R(1)
+                            F_R(7) = (E%R + pTot_R)*vel%R(1) - B%R(1)*(vel%R(1)*B%R(1) + vel%R(2)*B%R(2) + vel%R(3)*B%R(3))
+                            ! Compute the star flux using HLL relation
+                            F_starL = F_L + s_M*(U_starL - U_L)
+                            F_starR = F_R + s_M*(U_starR - U_R)
+                            ! Compute the rotational (Alfvén) speeds
+                            s_starL = s_M - abs(B%L(1))/sqrt(rhoL_star)
+                            s_starR = s_M + abs(B%L(1))/sqrt(rhoR_star)
+                            ! Compute the double–star states [Miyoshi Eqns. (59)-(62)]
+                            sqrt_rhoL_star = sqrt(rhoL_star); sqrt_rhoR_star = sqrt(rhoR_star)
+                            vL_star = vel%L(2); wL_star = vel%L(3)
+                            vR_star = vel%R(2); wR_star = vel%R(3)
 
                             ! (6) Compute the double–star states [Miyoshi Eqns. (59)-(62)]
                             denom_ds = sqrt_rhoL_star + sqrt_rhoR_star
@@ -2851,34 +2873,8 @@ contains
 
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, &
                                        norm_dir, ix, iy, iz)
-
     end subroutine s_hlld_riemann_solver
 
-    subroutine s_compute_hlld_state_variables(rho, vel, B, E, pTot, rho_star, s_M, E_star, s_wave, &
-                                              U, F, U_star, F_star, sqrt_rho_star, v_star, w_star)
-        implicit none
-        ! Input parameters
-        real(wp), intent(in) :: rho, pTot, rho_star, s_M, E_star, s_wave, E
-        real(wp), dimension(:), intent(in) :: vel, B
-        ! Output parameters
-        real(wp), dimension(7), intent(out) :: U, F, U_star, F_star
-        real(wp), intent(out) :: sqrt_rho_star, v_star, w_star
-        ! Compute the base/star state vector
-        U = [rho, rho*vel(1:3), B(2:3), E]
-        U_star = [rho_star, rho_star*s_M, rho_star*vel(2:3), B(2:3), E_star]
-        ! Compute the flux vector
-        F(1) = U(2)
-        F(2) = U(2)*vel(1) - B(1)*B(1) + pTot
-        F(3:4) = U(2)*vel(2:3) - B(1)*B(2:3)
-        F(5:6) = vel(1)*B(2:3) - vel(2:3)*B(1)
-        F(7) = (E + pTot)*vel(1) - B(1)*(vel(1)*B(1) + vel(2)*B(2) + vel(3)*B(3))
-        ! Compute the star flux using HLL relation
-        F_star = F + s_wave*(U_star - U)
-        ! Compute additional parameters needed for double-star states
-        sqrt_rho_star = sqrt(rho_star)
-        v_star = vel(2)
-        w_star = vel(3)
-    end subroutine s_compute_hlld_state_variables
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
