@@ -135,7 +135,7 @@ contains
         if (chemistry) then
             flux_cbc_index = sys_size
         else
-            flux_cbc_index = adv_idx%end
+            flux_cbc_index = eqn_idx%adv%end
         end if
         !$acc update device(flux_cbc_index)
 
@@ -172,7 +172,7 @@ contains
 
             @:ALLOCATE(F_src_rsx_vf(0:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         end if
 
@@ -182,7 +182,7 @@ contains
 
         @:ALLOCATE(flux_src_rsx_vf_l(-1:buff_size, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+            is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         if (n > 0) then
 
@@ -215,7 +215,7 @@ contains
 
                 @:ALLOCATE(F_src_rsy_vf(0:buff_size, &
                     is2%beg:is2%end, &
-                    is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                    is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
             end if
 
@@ -225,7 +225,7 @@ contains
 
             @:ALLOCATE(flux_src_rsy_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         end if
 
@@ -260,7 +260,7 @@ contains
 
                 @:ALLOCATE(F_src_rsz_vf(0:buff_size, &
                     is2%beg:is2%end, &
-                    is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                    is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
             end if
 
@@ -270,7 +270,7 @@ contains
 
             @:ALLOCATE(flux_src_rsz_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         end if
 
@@ -793,11 +793,11 @@ contains
                             vel_K_sum = vel_K_sum + vel(i)**2._wp
                         end do
 
-                        pres = q_prim_rs${XYZ}$_vf(0, k, r, E_idx)
+                        pres = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%E)
 
                         !$acc loop seq
-                        do i = 1, advxe - E_idx
-                            adv(i) = q_prim_rs${XYZ}$_vf(0, k, r, E_idx + i)
+                        do i = 1, advxe - eqn_idx%E
+                            adv(i) = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%E + i)
                         end do
 
                         if (bubbles_euler) then
@@ -857,7 +857,7 @@ contains
 
                         dpres_ds = 0._wp
                         !$acc loop seq
-                        do i = 1, advxe - E_idx
+                        do i = 1, advxe - eqn_idx%E
                             dadv_ds(i) = 0._wp
                         end do
 
@@ -884,12 +884,12 @@ contains
                                              dvel_ds(i)
                             end do
 
-                            dpres_ds = q_prim_rs${XYZ}$_vf(j, k, r, E_idx)* &
+                            dpres_ds = q_prim_rs${XYZ}$_vf(j, k, r, eqn_idx%E)* &
                                        fd_coef_${XYZ}$ (j, cbc_loc) + &
                                        dpres_ds
                             !$acc loop seq
-                            do i = 1, advxe - E_idx
-                                dadv_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, E_idx + i)* &
+                            do i = 1, advxe - eqn_idx%E
+                                dadv_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, eqn_idx%E + i)* &
                                              fd_coef_${XYZ}$ (j, cbc_loc) + &
                                              dadv_ds(i)
                             end do
@@ -905,11 +905,11 @@ contains
                         end do
 
                         ! First-Order Temporal Derivatives of Primitive Variables
-                        lambda(1) = vel(dir_idx(1)) - c
-                        lambda(2) = vel(dir_idx(1))
-                        lambda(3) = vel(dir_idx(1)) + c
+                        lambda(1) = vel(eqn_idx%dir(1)) - c
+                        lambda(2) = vel(eqn_idx%dir(1))
+                        lambda(3) = vel(eqn_idx%dir(1)) + c
 
-                        Ma = vel(dir_idx(1))/c
+                        Ma = vel(eqn_idx%dir(1))/c
 
                         if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SLIP_WALL) .or. &
                             (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SLIP_WALL)) then
@@ -927,16 +927,16 @@ contains
                                     L(2) = c**3._wp*Ma*(alpha_rho(i - 1) - alpha_rho_in(i - 1, ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
                                 if (n > 0) then
-                                    L(momxb + 1) = c*Ma*(vel(dir_idx(2)) - vel_in(${CBC_DIR}$, dir_idx(2)))/Del_in(${CBC_DIR}$)
+                                    L(momxb + 1) = c*Ma*(vel(eqn_idx%dir(2)) - vel_in(${CBC_DIR}$, eqn_idx%dir(2)))/Del_in(${CBC_DIR}$)
                                     if (p > 0) then
-                                        L(momxb + 2) = c*Ma*(vel(dir_idx(3)) - vel_in(${CBC_DIR}$, dir_idx(3)))/Del_in(${CBC_DIR}$)
+                                        L(momxb + 2) = c*Ma*(vel(eqn_idx%dir(3)) - vel_in(${CBC_DIR}$, eqn_idx%dir(3)))/Del_in(${CBC_DIR}$)
                                     end if
                                 end if
                                 !$acc loop seq
-                                do i = E_idx, advxe - 1
-                                    L(i) = c*Ma*(adv(i + 1 - E_idx) - alpha_in(i + 1 - E_idx, ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                do i = eqn_idx%E, advxe - 1
+                                    L(i) = c*Ma*(adv(i + 1 - eqn_idx%E) - alpha_in(i + 1 - eqn_idx%E, ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
-                                L(advxe) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                L(advxe) = rho*c**2._wp*(1._wp + Ma)*(vel(eqn_idx%dir(1)) + vel_in(${CBC_DIR}$, eqn_idx%dir(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_OUTFLOW) .or. &
                                  (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
@@ -947,7 +947,7 @@ contains
 
                                 ! Add GRCBC for Subsonic Outflow (Normal Velocity)
                                 if (bc_${XYZ}$%grcbc_vel_out) then
-                                    L(advxe) = L(advxe) + rho*c**2._wp*(1._wp - Ma)*(vel(dir_idx(1)) + vel_out(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
+                                    L(advxe) = L(advxe) + rho*c**2._wp*(1._wp - Ma)*(vel(eqn_idx%dir(1)) + vel_out(${CBC_DIR}$, eqn_idx%dir(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
                                 end if
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_FF_SUB_OUTFLOW) .or. &
@@ -966,7 +966,7 @@ contains
 
                         ! Be careful about the cylindrical coordinate!
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                            dpres_dt = -5e-1_wp*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
+                            dpres_dt = -5e-1_wp*(L(advxe) + L(1)) + rho*c*c*vel(eqn_idx%dir(1)) &
                                        /y_cc(n)
                         else
                             dpres_dt = -5e-1_wp*(L(advxe) + L(1))
@@ -980,9 +980,9 @@ contains
 
                         !$acc loop seq
                         do i = 1, num_dims
-                            dvel_dt(dir_idx(i)) = dir_flg(dir_idx(i))* &
+                            dvel_dt(eqn_idx%dir(i)) = eqn_idx%dir_flg(eqn_idx%dir(i))* &
                                                   (L(1) - L(advxe))/(2._wp*rho*c) + &
-                                                  (dir_flg(dir_idx(i)) - 1._wp)* &
+                                                  (eqn_idx%dir_flg(eqn_idx%dir(i)) - 1._wp)* &
                                                   L(momxb + i - 1)
                         end do
 
@@ -1002,12 +1002,12 @@ contains
                         ! The treatment of void fraction source is unclear
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
                             !$acc loop seq
-                            do i = 1, advxe - E_idx
-                                dadv_dt(i) = -L(momxe + i) !+ adv(i) * vel(dir_idx(1))/y_cc(n)
+                            do i = 1, advxe - eqn_idx%E
+                                dadv_dt(i) = -L(momxe + i) !+ adv(i) * vel(eqn_idx%dir(1))/y_cc(n)
                             end do
                         else
                             !$acc loop seq
-                            do i = 1, advxe - E_idx
+                            do i = 1, advxe - eqn_idx%E
                                 dadv_dt(i) = -L(momxe + i)
                             end do
                         end if
@@ -1051,7 +1051,7 @@ contains
                                 h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
                                 sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
                             end do
-                            flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
+                            flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, eqn_idx%E) &
                                                                    + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2)/(c*c) + sum_Enthalpies)
                             !$acc loop seq
                             do i = 1, num_species
@@ -1059,7 +1059,7 @@ contains
                                                                                 + ds(0)*(drho_dt*Ys(i) + rho*dYs_dt(i))
                             end do
                         else
-                            flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
+                            flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, eqn_idx%E) &
                                                                    + ds(0)*(pres*dgamma_dt &
                                                                             + gamma*dpres_dt &
                                                                             + dpi_inf_dt &
@@ -1077,12 +1077,12 @@ contains
                             !$acc loop seq
                             do i = advxb, advxe
                                 flux_src_rs${XYZ}$_vf_l(-1, k, r, i) = &
-                                    1._wp/max(abs(vel(dir_idx(1))), sgm_eps) &
-                                    *sign(1._wp, vel(dir_idx(1))) &
+                                    1._wp/max(abs(vel(eqn_idx%dir(1))), sgm_eps) &
+                                    *sign(1._wp, vel(eqn_idx%dir(1))) &
                                     *(flux_rs${XYZ}$_vf_l(0, k, r, i) &
-                                      + vel(dir_idx(1)) &
+                                      + vel(eqn_idx%dir(1)) &
                                       *flux_src_rs${XYZ}$_vf_l(0, k, r, i) &
-                                      + ds(0)*dadv_dt(i - E_idx))
+                                      + ds(0)*dadv_dt(i - eqn_idx%E))
                             end do
 
                         else
@@ -1090,7 +1090,7 @@ contains
                             !$acc loop seq
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) + &
-                                                                   ds(0)*dadv_dt(i - E_idx)
+                                                                   ds(0)*dadv_dt(i - eqn_idx%E)
                             end do
 
                             !$acc loop seq
@@ -1147,18 +1147,18 @@ contains
 
         if (cbc_dir == 1) then
             is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = iz
-            dir_idx = (/1, 2, 3/); dir_flg = (/1._wp, 0._wp, 0._wp/)
+            eqn_idx%dir = (/1, 2, 3/); eqn_idx%dir_flg = (/1._wp, 0._wp, 0._wp/)
         elseif (cbc_dir == 2) then
             is1%beg = 0; is1%end = buff_size; is2 = ix; is3 = iz
-            dir_idx = (/2, 1, 3/); dir_flg = (/0._wp, 1._wp, 0._wp/)
+            eqn_idx%dir = (/2, 1, 3/); eqn_idx%dir_flg = (/0._wp, 1._wp, 0._wp/)
         else
             is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = ix
-            dir_idx = (/3, 1, 2/); dir_flg = (/0._wp, 0._wp, 1._wp/)
+            eqn_idx%dir = (/3, 1, 2/); eqn_idx%dir_flg = (/0._wp, 0._wp, 1._wp/)
         end if
 
         dj = max(0, cbc_loc)
         !$acc update device(is1, is2, is3, dj)
-        !$acc update device( dir_idx, dir_flg)
+        !$acc update device( eqn_idx%dir, eqn_idx%dir_flg)
 
         ! Reshaping Inputted Data in x-direction
         if (cbc_dir == 1) then

@@ -35,14 +35,14 @@ contains
 
         integer :: i, j !< generic loop iterators
 
-        @:ALLOCATE(Res_viscous(1:2, 1:maxval(Re_size)))
+        @:ALLOCATE(Res_viscous(1:2, 1:maxval(eqn_idx%Re_size)))
 
         do i = 1, 2
-            do j = 1, Re_size(i)
-                Res_viscous(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
+            do j = 1, eqn_idx%Re_size(i)
+                Res_viscous(i, j) = fluid_pp(eqn_idx%Re(i, j))%Re(i)
             end do
         end do
-        !$acc update device(Res_viscous, Re_idx, Re_size)
+        !$acc update device(Res_viscous, eqn_idx%Re, eqn_idx%Re_size)
         !$acc enter data copyin(is1_viscous, is2_viscous, is3_viscous, iv)
 
     end subroutine s_initialize_viscous_module
@@ -82,7 +82,7 @@ contains
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
                     !$acc loop seq
-                    do i = momxb, E_idx
+                    do i = momxb, eqn_idx%E
                         tau_Re_vf(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
@@ -98,9 +98,9 @@ contains
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles_euler .and. num_fluids == 1) then
-                                alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                             else
-                                alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                                alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                             end if
                         end do
 
@@ -159,10 +159,10 @@ contains
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
+                                    if (eqn_idx%Re_size(i) > 0) Re_visc(i) = 0._wp
                                     !$acc loop seq
-                                    do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
+                                    do q = 1, eqn_idx%Re_size(i)
+                                        Re_visc(i) = alpha_visc(eqn_idx%Re(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
                                     end do
 
@@ -186,8 +186,8 @@ contains
                                 tau_Re_vf(contxe + i)%sf(j, k, l) - &
                                 tau_Re(2, i)
 
-                            tau_Re_vf(E_idx)%sf(j, k, l) = &
-                                tau_Re_vf(E_idx)%sf(j, k, l) - &
+                            tau_Re_vf(eqn_idx%E)%sf(j, k, l) = &
+                                tau_Re_vf(eqn_idx%E)%sf(j, k, l) - &
                                 q_prim_vf(contxe + i)%sf(j, k, l)*tau_Re(2, i)
                         end do
                     end do
@@ -205,9 +205,9 @@ contains
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles_euler .and. num_fluids == 1) then
-                                alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                             else
-                                alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                                alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                             end if
                         end do
 
@@ -266,10 +266,10 @@ contains
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
+                                    if (eqn_idx%Re_size(i) > 0) Re_visc(i) = 0._wp
                                     !$acc loop seq
-                                    do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
+                                    do q = 1, eqn_idx%Re_size(i)
+                                        Re_visc(i) = alpha_visc(eqn_idx%Re(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
                                     end do
 
@@ -288,8 +288,8 @@ contains
                             tau_Re_vf(momxb + 1)%sf(j, k, l) - &
                             tau_Re(2, 2)
 
-                        tau_Re_vf(E_idx)%sf(j, k, l) = &
-                            tau_Re_vf(E_idx)%sf(j, k, l) - &
+                        tau_Re_vf(eqn_idx%E)%sf(j, k, l) = &
+                            tau_Re_vf(eqn_idx%E)%sf(j, k, l) - &
                             q_prim_vf(momxb + 1)%sf(j, k, l)*tau_Re(2, 2)
 
                     end do
@@ -309,9 +309,9 @@ contains
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles_euler .and. num_fluids == 1) then
-                                alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                             else
-                                alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                                alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                             end if
                         end do
 
@@ -370,10 +370,10 @@ contains
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
+                                    if (eqn_idx%Re_size(i) > 0) Re_visc(i) = 0._wp
                                     !$acc loop seq
-                                    do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
+                                    do q = 1, eqn_idx%Re_size(i)
+                                        Re_visc(i) = alpha_visc(eqn_idx%Re(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
                                     end do
 
@@ -397,8 +397,8 @@ contains
                                 tau_Re_vf(contxe + i)%sf(j, k, l) - &
                                 tau_Re(2, i)
 
-                            tau_Re_vf(E_idx)%sf(j, k, l) = &
-                                tau_Re_vf(E_idx)%sf(j, k, l) - &
+                            tau_Re_vf(eqn_idx%E)%sf(j, k, l) = &
+                                tau_Re_vf(eqn_idx%E)%sf(j, k, l) - &
                                 q_prim_vf(contxe + i)%sf(j, k, l)*tau_Re(2, i)
                         end do
 
@@ -417,9 +417,9 @@ contains
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles_euler .and. num_fluids == 1) then
-                                alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                             else
-                                alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                                alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                             end if
                         end do
 
@@ -478,10 +478,10 @@ contains
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
+                                    if (eqn_idx%Re_size(i) > 0) Re_visc(i) = 0._wp
                                     !$acc loop seq
-                                    do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
+                                    do q = 1, eqn_idx%Re_size(i)
+                                        Re_visc(i) = alpha_visc(eqn_idx%Re(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
                                     end do
 
@@ -498,8 +498,8 @@ contains
                             tau_Re_vf(momxb + 1)%sf(j, k, l) - &
                             tau_Re(2, 2)
 
-                        tau_Re_vf(E_idx)%sf(j, k, l) = &
-                            tau_Re_vf(E_idx)%sf(j, k, l) - &
+                        tau_Re_vf(eqn_idx%E)%sf(j, k, l) = &
+                            tau_Re_vf(eqn_idx%E)%sf(j, k, l) - &
                             q_prim_vf(momxb + 1)%sf(j, k, l)*tau_Re(2, 2)
 
                     end do
@@ -543,7 +543,7 @@ contains
 
         do i = 1, num_dims
 
-            iv%beg = mom_idx%beg; iv%end = mom_idx%end
+            iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
 
             !$acc update device(iv)
 
@@ -582,7 +582,7 @@ contains
 
         else ! Compute velocity gradient at cell centers using finite differences
 
-            iv%beg = mom_idx%beg; iv%end = mom_idx%end
+            iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
             !$acc update device(iv)
 
             is1_viscous = ix; is2_viscous = iy; is3_viscous = iz

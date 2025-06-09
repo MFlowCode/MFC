@@ -42,13 +42,13 @@ contains
         !$acc update device(gamma_min, pres_inf)
 
         if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+            @:ALLOCATE(Res(1:2, 1:maxval(eqn_idx%Re_size)))
             do i = 1, 2
-                do j = 1, Re_size(i)
-                    Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
+                do j = 1, eqn_idx%Re_size(i)
+                    Res(i, j) = fluid_pp(eqn_idx%Re(i, j))%Re(i)
                 end do
             end do
-            !$acc update device(Res, Re_idx, Re_size)
+            !$acc update device(Res, eqn_idx%Re, eqn_idx%Re_size)
         end if
 
     end subroutine s_initialize_pressure_relaxation_module
@@ -233,7 +233,7 @@ contains
         !$acc loop seq
         do i = 1, num_fluids
             alpha_rho(i) = q_cons_vf(i)%sf(j, k, l)
-            alpha(i) = q_cons_vf(E_idx + i)%sf(j, k, l)
+            alpha(i) = q_cons_vf(eqn_idx%E + i)%sf(j, k, l)
         end do
 
         ! Compute mixture properties (combined bubble and standard logic)
@@ -284,10 +284,10 @@ contains
                 !$acc loop seq
                 do i = 1, 2
                     Re(i) = dflt_real
-                    if (Re_size(i) > 0) Re(i) = 0._wp
+                    if (eqn_idx%Re_size(i) > 0) Re(i) = 0._wp
                     !$acc loop seq
-                    do q = 1, Re_size(i)
-                        Re(i) = alpha(Re_idx(i, q))/Res(i, q) + Re(i)
+                    do q = 1, eqn_idx%Re_size(i)
+                        Re(i) = alpha(eqn_idx%Re(i, q))/Res(i, q) + Re(i)
                     end do
                     Re(i) = 1._wp/max(Re(i), sgm_eps)
                 end do
@@ -302,7 +302,7 @@ contains
                        q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
         end do
 
-        pres_relax = (q_cons_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
+        pres_relax = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
 
         !$acc loop seq
         do i = 1, num_fluids

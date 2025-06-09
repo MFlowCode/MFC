@@ -48,8 +48,8 @@ contains
     impure subroutine s_initialize_hyperelastic_module
         integer :: i !< generic iterator
 
-        @:ALLOCATE(btensor%vf(1:b_size))
-        do i = 1, b_size
+        @:ALLOCATE(btensor%vf(1:eqn_idx%b_size))
+        do i = 1, eqn_idx%b_size
             @:ALLOCATE(btensor%vf(i)%sf(0:m, 0:n, 0:p))
         end do
         @:ACC_SETUP_VFs(btensor)
@@ -99,7 +99,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
 
-        real(wp), dimension(tensor_size) :: tensora, tensorb
+        real(wp), dimension(eqn_idx%tensor_size) :: tensora, tensorb
         real(wp), dimension(num_fluids) :: alpha_k, alpha_rho_k
         real(wp), dimension(2) :: Re
         real(wp) :: rho, gamma, pi_inf, qv
@@ -125,7 +125,7 @@ contains
 
                     if (G > verysmall) then
                         !$acc loop seq
-                        do i = 1, tensor_size
+                        do i = 1, eqn_idx%tensor_size
                             tensora(i) = 0_wp
                         end do
                         ! STEP 1: computing the grad_xi tensor using finite differences
@@ -160,20 +160,20 @@ contains
                         tensorb(9) = tensora(1)*tensora(5) - tensora(2)*tensora(4)
 
                         ! STEP 2b: computing the determinant of the grad_xi tensor
-                        tensorb(tensor_size) = tensora(1)*(tensora(5)*tensora(9) - tensora(6)*tensora(8)) &
+                        tensorb(eqn_idx%tensor_size) = tensora(1)*(tensora(5)*tensora(9) - tensora(6)*tensora(8)) &
                                                - tensora(2)*(tensora(4)*tensora(9) - tensora(6)*tensora(7)) &
                                                + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
 
-                        if (tensorb(tensor_size) > verysmall) then
+                        if (tensorb(eqn_idx%tensor_size) > verysmall) then
                             ! STEP 2c: computing the inverse of grad_xi tensor = F
                             ! tensorb is the adjoint, tensora becomes F
                             !$acc loop seq
-                            do i = 1, tensor_size - 1
-                                tensora(i) = tensorb(i)/tensorb(tensor_size)
+                            do i = 1, eqn_idx%tensor_size - 1
+                                tensora(i) = tensorb(i)/tensorb(eqn_idx%tensor_size)
                             end do
 
                             ! STEP 2d: computing the J = det(F) = 1/det(\grad{\xi})
-                            tensorb(tensor_size) = 1_wp/tensorb(tensor_size)
+                            tensorb(eqn_idx%tensor_size) = 1_wp/tensorb(eqn_idx%tensor_size)
 
                             ! STEP 3: computing F transpose F
                             tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
@@ -187,7 +187,7 @@ contains
                                 btensor%vf(${BIJ}$)%sf(j, k, l) = tensorb(${TXY}$)
                             #:endfor
                             ! store the determinant at the last entry of the btensor
-                            btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
+                            btensor%vf(eqn_idx%b_size)%sf(j, k, l) = tensorb(eqn_idx%tensor_size)
                             ! STEP 5a: updating the Cauchy stress primitive scalar field
                             if (hyper_model == 1) then
                                 call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)
@@ -195,11 +195,11 @@ contains
                                 call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)
                             end if
                             ! STEP 5b: updating the pressure field
-                            q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
+                            q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, l) - &
                                                            G*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma
                             ! STEP 5c: updating the Cauchy stress conservative scalar field
                             !$acc loop seq
-                            do i = 1, b_size - 1
+                            do i = 1, eqn_idx%b_size - 1
                                 q_cons_vf(strxb + i - 1)%sf(j, k, l) = &
                                     rho*q_prim_vf(strxb + i - 1)%sf(j, k, l)
                             end do
@@ -222,7 +222,7 @@ contains
     pure subroutine s_neoHookean_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(inout) :: btensor
+        type(scalar_field), dimension(eqn_idx%b_size), intent(inout) :: btensor
         real(wp), intent(in) :: G
         integer, intent(in) :: j, k, l
 
@@ -240,13 +240,13 @@ contains
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
         !$acc loop seq
-        do i = 1, b_size - 1
+        do i = 1, eqn_idx%b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
-                G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
+                G*btensor(i)%sf(j, k, l)/btensor(eqn_idx%b_size)%sf(j, k, l)
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &
-            0.5_wp*(trace - 3.0_wp)/btensor(b_size)%sf(j, k, l)
+            0.5_wp*(trace - 3.0_wp)/btensor(eqn_idx%b_size)%sf(j, k, l)
 
     end subroutine s_neoHookean_cauchy_solver
 
@@ -261,7 +261,7 @@ contains
     pure subroutine s_Mooney_Rivlin_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(inout) :: btensor
+        type(scalar_field), dimension(eqn_idx%b_size), intent(inout) :: btensor
         real(wp), intent(in) :: G
         integer, intent(in) :: j, k, l
 
@@ -281,13 +281,13 @@ contains
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
         !$acc loop seq
-        do i = 1, b_size - 1
+        do i = 1, eqn_idx%b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
-                G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
+                G*btensor(i)%sf(j, k, l)/btensor(eqn_idx%b_size)%sf(j, k, l)
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &
-            0.5_wp*(trace - 3.0_wp)/btensor(b_size)%sf(j, k, l)
+            0.5_wp*(trace - 3.0_wp)/btensor(eqn_idx%b_size)%sf(j, k, l)
 
     end subroutine s_Mooney_Rivlin_cauchy_solver
 
@@ -296,7 +296,7 @@ contains
         integer :: i !< iterator
 
         ! Deallocating memory
-        do i = 1, b_size
+        do i = 1, eqn_idx%b_size
             @:DEALLOCATE(btensor%vf(i)%sf)
         end do
         @:DEALLOCATE(fd_coeff_x)

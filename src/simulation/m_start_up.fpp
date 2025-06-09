@@ -643,7 +643,7 @@ contains
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
 
-                    do i = 1, sys_size!adv_idx%end
+                    do i = 1, sys_size!eqn_idx%adv%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -659,7 +659,7 @@ contains
                         end do
                     end if
                 else
-                    do i = 1, adv_idx%end
+                    do i = 1, eqn_idx%adv%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -778,7 +778,7 @@ contains
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size !adv_idx%end
+                    do i = 1, sys_size !eqn_idx%adv%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
@@ -1205,7 +1205,7 @@ contains
                     call s_convert_to_mixture_variables(v_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
 
                     dyn_pres = 0._wp
-                    do i = mom_idx%beg, mom_idx%end
+                    do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         dyn_pres = dyn_pres + 5e-1_wp*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l) &
                                    /max(rho, sgm_eps)
                     end do
@@ -1218,19 +1218,19 @@ contains
 
                     if (mhd) then
                         if (n == 0) then
-                            pres_mag = 0.5_wp*(Bx0**2 + v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg+1)%sf(j, k, l)**2)
+                            pres_mag = 0.5_wp*(Bx0**2 + v_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + v_vf(eqn_idx%B%beg+1)%sf(j, k, l)**2)
                         else
-                            pres_mag = 0.5_wp*(v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg+1)%sf(j, k, l)**2 + v_vf(B_idx%beg+2)%sf(j, k, l)**2)
+                            pres_mag = 0.5_wp*(v_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + v_vf(eqn_idx%B%beg+1)%sf(j, k, l)**2 + v_vf(eqn_idx%B%beg+2)%sf(j, k, l)**2)
                         end if
                     end if
 
-                    call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._wp, &
+                    call s_compute_pressure(v_vf(eqn_idx%E)%sf(j, k, l), 0._wp, &
                                             dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag = pres_mag)
 
                     do i = 1, num_fluids
-                        v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
+                        v_vf(i + eqn_idx%internalEnergies%beg - 1)%sf(j, k, l) = v_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)* &
                                                                              (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) &
-                                                                             + v_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
+                                                                             + v_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
                     end do
 
                 end do
@@ -1634,7 +1634,7 @@ contains
         if (chemistry) then
             !$acc update device(q_T_sf%sf)
         end if
-        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, n_idx, pi_fac, low_Mach)
+        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, eqn_idx%n, pi_fac, low_Mach)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
         !$acc update device(acoustic_source, num_source)

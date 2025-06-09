@@ -853,7 +853,7 @@ contains
                                         ! Fu''s code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
                                         tau = abs(beta(2) - beta(0))
                                         alpha = 1._wp + tau/beta                    ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
-                                        alpha = (alpha*alpha*alpha)**2._wp          ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
+                                        alpha = (alpha*alpha*alpha)**2._wp          ! Equation 22 eqn_idx%cont. (some CPU compilers cannot optimize x**6.0)
                                         omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
                                         delta = merge(0._wp, 1._wp, omega < teno_CT)! Equation 26
                                         alpha = delta*d_cbL_${XYZ}$ (:, j)          ! Equation 27
