@@ -242,17 +242,14 @@ contains
                                                            norm_dir, &
                                                            ix, iy, iz)
         else
-            call s_compute_cartesian_viscous_source_flux(velL_vf, &
-                                                         dvelL_dx_vf, &
+            call s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, &
                                                          dvelL_dy_vf, &
                                                          dvelL_dz_vf, &
-                                                         velR_vf, &
                                                          dvelR_dx_vf, &
                                                          dvelR_dy_vf, &
                                                          dvelR_dz_vf, &
                                                          flux_src_vf, &
-                                                         norm_dir, &
-                                                         ix, iy, iz)
+                                                         norm_dir)
         end if
     end subroutine s_compute_viscous_source_flux
 
@@ -347,19 +344,15 @@ contains
             qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             dqL_prim_dy_vf, &
             dqL_prim_dz_vf, &
-            qL_prim_vf, &
             qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
             dqR_prim_dy_vf, &
             dqR_prim_dz_vf, &
-            qR_prim_vf, &
             norm_dir, ix, iy, iz)
 
         ! Reshaping inputted data based on dimensional splitting direction
         call s_initialize_riemann_solver( &
-            q_prim_vf, &
-            flux_vf, flux_src_vf, &
-            flux_gsrc_vf, &
-            norm_dir, ix, iy, iz)
+            flux_src_vf, &
+            norm_dir)
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
@@ -1030,7 +1023,7 @@ contains
 
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                        flux_gsrc_vf, &
-                                       norm_dir, ix, iy, iz)
+                                       norm_dir)
 
     end subroutine s_hll_riemann_solver
 
@@ -1162,20 +1155,16 @@ contains
             qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             dqL_prim_dy_vf, &
             dqL_prim_dz_vf, &
-            qL_prim_vf, &
             qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
             dqR_prim_dy_vf, &
             dqR_prim_dz_vf, &
-            qR_prim_vf, &
             norm_dir, ix, iy, iz)
 
         ! Reshaping inputted data based on dimensional splitting direction
 
         call s_initialize_riemann_solver( &
-            q_prim_vf, &
-            flux_vf, flux_src_vf, &
-            flux_gsrc_vf, &
-            norm_dir, ix, iy, iz)
+            flux_src_vf, &
+            norm_dir)
 
         idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
 
@@ -2609,7 +2598,6 @@ contains
 
         if (surface_tension) then
             call s_compute_capilary_source_flux( &
-                q_prim_vf, &
                 vel_src_rsx_vf, &
                 vel_src_rsy_vf, &
                 vel_src_rsz_vf, &
@@ -2619,10 +2607,8 @@ contains
 
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                        flux_gsrc_vf, &
-                                       norm_dir, ix, iy, iz)
-        ! Populating the buffers of the left and right Riemann problem
-        ! states variables, based on the choice of boundary conditions
-
+                                       norm_dir)
+                                       
     end subroutine s_hllc_riemann_solver
 
     !> HLLD Riemann solver resolves 5 of the 7 waves of MHD equations:
@@ -2680,13 +2666,13 @@ contains
 
         call s_populate_riemann_states_variables_buffers( &
             qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-            dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
+            dqL_prim_dy_vf, dqL_prim_dz_vf, &
             qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
-            dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
+            dqR_prim_dy_vf, dqR_prim_dz_vf, &
             norm_dir, ix, iy, iz)
 
         call s_initialize_riemann_solver( &
-            q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+            flux_src_vf, norm_dir)
 
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
@@ -2872,7 +2858,7 @@ contains
         #:endfor
 
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, &
-                                       norm_dir, ix, iy, iz)
+                                       norm_dir)
     end subroutine s_hlld_riemann_solver
 
 
@@ -3020,11 +3006,9 @@ contains
         qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
         dqL_prim_dy_vf, &
         dqL_prim_dz_vf, &
-        qL_prim_vf, &
         qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
         dqR_prim_dy_vf, &
         dqR_prim_dz_vf, &
-        qR_prim_vf, &
         norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), target, intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -3032,15 +3016,9 @@ contains
 
         type(scalar_field), &
             allocatable, dimension(:), &
-            target, intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
-                                     dqL_prim_dy_vf, dqR_prim_dy_vf, &
-                                     dqL_prim_dz_vf, dqR_prim_dz_vf, &
-                                     qL_prim_vf, qR_prim_vf
-        type(scalar_field), &
-            dimension(:), &
-            pointer :: dqL_prim_d_vf, dqR_prim_d_vf
-
-        integer :: end_val, bc_beg, bc_end
+            intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+                             dqL_prim_dy_vf, dqR_prim_dy_vf, &
+                             dqL_prim_dz_vf, dqR_prim_dz_vf
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
@@ -3190,18 +3168,14 @@ contains
         !!  @param iz Index bounds in the z-dir
         !!  @param q_prim_vf Cell-averaged primitive variables
     subroutine s_initialize_riemann_solver( &
-        q_prim_vf, &
-        flux_vf, flux_src_vf, &
-        flux_gsrc_vf, &
-        norm_dir, ix, iy, iz)
+        flux_src_vf, &
+        norm_dir)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), &
             dimension(sys_size), &
-            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
+            intent(inout) :: flux_src_vf
 
         integer, intent(in) :: norm_dir
-        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, l ! Generic loop iterators
         ! Reshaping Inputted Data in x-direction
@@ -3410,40 +3384,36 @@ contains
     end subroutine s_compute_cylindrical_viscous_source_flux
 
     !> @brief Computes Cartesian viscous source flux contributions for momentum and energy.
-        !! Calculates averaged velocity gradients, gets Re and interface velocities,
-        !! calls helpers for shear/bulk stress, then updates `flux_src_vf`.
-        !! @param[in] velL_vf Left boundary velocity (num_dims scalar_field).
-        !! @param[in] dvelL_dx_vf Left boundary d(vel)/dx (num_dims scalar_field).
-        !! @param[in] dvelL_dy_vf Left boundary d(vel)/dy (num_dims scalar_field).
-        !! @param[in] dvelL_dz_vf Left boundary d(vel)/dz (num_dims scalar_field).
-        !! @param[in] velR_vf Right boundary velocity (num_dims scalar_field).
-        !! @param[in] dvelR_dx_vf Right boundary d(vel)/dx (num_dims scalar_field).
-        !! @param[in] dvelR_dy_vf Right boundary d(vel)/dy (num_dims scalar_field).
-        !! @param[in] dvelR_dz_vf Right boundary d(vel)/dz (num_dims scalar_field).
-        !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
-        !! @param[in] norm_dir Interface normal direction (1=x, 2=y, 3=z).
-        !! @param[in] ix X-direction loop bounds (int_bounds_info).
-        !! @param[in] iy Y-direction loop bounds (int_bounds_info).
-        !! @param[in] iz Z-direction loop bounds (int_bounds_info).
-    pure subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
-                                                            dvelL_dx_vf, &
+    !! Calculates averaged velocity gradients, gets Re and interface velocities,
+    !! calls helpers for shear/bulk stress, then updates `flux_src_vf`.
+    !! @param[in] velL_vf Left boundary velocity (num_dims scalar_field).
+    !! @param[in] dvelL_dx_vf Left boundary d(vel)/dx (num_dims scalar_field).
+    !! @param[in] dvelL_dy_vf Left boundary d(vel)/dy (num_dims scalar_field).
+    !! @param[in] dvelL_dz_vf Left boundary d(vel)/dz (num_dims scalar_field).
+    !! @param[in] velR_vf Right boundary velocity (num_dims scalar_field).
+    !! @param[in] dvelR_dx_vf Right boundary d(vel)/dx (num_dims scalar_field).
+    !! @param[in] dvelR_dy_vf Right boundary d(vel)/dy (num_dims scalar_field).
+    !! @param[in] dvelR_dz_vf Right boundary d(vel)/dz (num_dims scalar_field).
+    !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
+    !! @param[in] norm_dir Interface normal direction (1=x, 2=y, 3=z).
+    !! @param[in] ix X-direction loop bounds (int_bounds_info).
+    !! @param[in] iy Y-direction loop bounds (int_bounds_info).
+    !! @param[in] iz Z-direction loop bounds (int_bounds_info).
+    pure subroutine s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, &
                                                             dvelL_dy_vf, &
                                                             dvelL_dz_vf, &
-                                                            velR_vf, &
                                                             dvelR_dx_vf, &
                                                             dvelR_dy_vf, &
                                                             dvelR_dz_vf, &
                                                             flux_src_vf, &
-                                                            norm_dir, &
-                                                            ix, iy, iz)
+                                                            norm_dir)
+
         ! Arguments
-        type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dy_vf, dvelR_dy_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         integer, intent(in) :: norm_dir
-        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! Local variables
         real(wp), dimension(num_dims, num_dims) :: vel_grad_avg        !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
@@ -3618,19 +3588,15 @@ contains
         !!  @param flux_src_vf   Intercell source fluxes
         !!  @param flux_gsrc_vf  Intercell geometric source fluxes
         !!  @param norm_dir Dimensional splitting coordinate direction
-        !!  @param ix   Index bounds in  first coordinate direction
-        !!  @param iy   Index bounds in second coordinate direction
-        !!  @param iz   Index bounds in  third coordinate direction
     pure subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                               flux_gsrc_vf, &
-                                              norm_dir, ix, iy, iz)
+                                              norm_dir)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
         integer, intent(in) :: norm_dir
-        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, l !< Generic loop iterators
 
