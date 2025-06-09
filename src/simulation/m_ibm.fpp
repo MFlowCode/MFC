@@ -338,7 +338,7 @@ contains
             end if
 
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, gp%ip%alpha, &
-                                                            gp%ip%alpha_rho, Re_K, j, k, l)
+                                                            gp%ip%alpha_rho, Re_K, G_K, Gs)
 
             dyn_pres = 0._wp
 
