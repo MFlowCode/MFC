@@ -249,9 +249,8 @@ module m_global_parameters
     ! integer :: eqn_idx%damage                              !< Index of damage state variable (D) for continuum damage model
     !> @}
 
-    type(system_of_equations) :: eqn_idx 
-
-    !$acc declare create(eqn_idx%bub)
+    type(system_of_equations) :: eqn_idx
+    !$acc declare create(eqn_idx)
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
     ! Stands for "InDices With INTerior".
@@ -264,16 +263,6 @@ module m_global_parameters
     type(int_bounds_info) :: idwbuff(1:3)
     !$acc declare create(idwbuff)
 
-    !> @name The number of fluids, along with their identifying indexes, respectively,
-    !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
-    !! numbers, will be non-negligible.
-    !> @{
-    ! integer, dimension(2) :: eqn_idx%Re_size
-    ! integer, allocatable, dimension(:, :) :: eqn_idx%Re
-    !> @}
-
-    !$acc declare create(eqn_idx%Re_size, eqn_idx%Re)
-
     ! The WENO average (WA) flag regulates whether the calculation of any cell-
     ! average spatial derivatives is carried out in each cell by utilizing the
     ! arithmetic mean of the left and right, WENO-reconstructed, cell-boundary
@@ -285,24 +274,12 @@ module m_global_parameters
 
     !$acc declare create(wa_flg)
 
-    !> @name The coordinate direction indexes and flags (flg), respectively, for which
-    !! the configurations will be determined with respect to a working direction
-    !! and that will be used to isolate the contributions, in that direction, in
-    !! the dimensionally split system of equations.
-    !> @{
-    ! integer, dimension(3) :: eqn_idx%dir
-    ! real(wp), dimension(3) :: eqn_idx%flg
-    ! integer, dimension(3) :: eqn_idx%dir_tau !!used for hypoelasticity=true
-    !> @}
-
-    !$acc declare create(eqn_idx%dir, eqn_idx%flg, eqn_idx%dir_tau)
-
     integer :: buff_size !<
     !! The number of cells that are necessary to be able to store enough boundary
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
-    !$acc declare create(sys_size, buff_size, eqn_idx%E, eqn_idx%gamma, eqn_idx%pi_inf, eqn_idx%alf, eqn_idx%n, eqn_idx%stress, eqn_idx%b_size, eqn_idx%tensor_size, eqn_idx%xi, eqn_idx%species, eqn_idx%B, eqn_idx%c)
+    !$acc declare create(buff_size)
 
     integer :: shear_num !! Number of shear stress components
     integer, dimension(3) :: shear_indices !<
@@ -1030,7 +1007,7 @@ contains
             if (eqn_idx%Re_size(1) > 0._wp) shear_stress = .true.
             if (eqn_idx%Re_size(2) > 0._wp) bulk_stress = .true.
 
-            !$acc update device(eqn_idx%Re_size, viscous, shear_stress, bulk_stress)
+            !$acc update device(eqn_idx, viscous, shear_stress, bulk_stress)
 
             ! Bookkeeping the indexes of any viscous fluids and any pairs of
             ! fluids whose interface will support effects of surface tension
@@ -1218,14 +1195,12 @@ contains
         chemxb = eqn_idx%species%beg
         chemxe = eqn_idx%species%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, eqn_idx%E, eqn_idx%alf, eqn_idx%n, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, eqn_idx%c)
-        !$acc update device(eqn_idx%b_size, xibeg, xiend, eqn_idx%tensor_size)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, buff_size, eqn_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, xibeg, xiend)
 
-        !$acc update device(eqn_idx%species)
         !$acc update device(cfl_target, m, n, p)
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, eqn_idx%gamma, eqn_idx%pi_inf, eqn_idx%E, eqn_idx%alf, eqn_idx%stress, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, eqn_idx%xi, eqn_idx%B, low_Mach)
+        !$acc update device(dt, buff_size, pref, rhoref, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, low_Mach)
 
         !$acc update device(Bx0, powell)
 
@@ -1239,7 +1214,7 @@ contains
 
         !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
         !$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN, mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
-        !$acc enter data copyin(eqn_idx%dir, eqn_idx%flg, eqn_idx%dir_tau)
+        !$acc enter data copyin(eqn_idx%dir, eqn_idx%dir_flg, eqn_idx%dir_tau)
 
         !$acc enter data copyin(relax, relax_model, palpha_eps,ptgalpha_eps)
 
@@ -1341,3 +1316,4 @@ contains
     end subroutine s_finalize_global_parameters_module
 
 end module m_global_parameters
+

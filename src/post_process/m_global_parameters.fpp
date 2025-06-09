@@ -120,23 +120,23 @@ module m_global_parameters
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
-    ! type(int_bounds_info) :: eqn_idx%cont              !< Indexes of first & last continuity eqns.
-    ! type(int_bounds_info) :: eqn_idx%mom               !< Indexes of first & last momentum eqns.
-    ! integer :: eqn_idx%E                               !< Index of energy equation
-    ! integer :: eqn_idx%n                               !< Index of number density
-    ! type(int_bounds_info) :: eqn_idx%adv               !< Indexes of first & last advection eqns.
-    ! type(int_bounds_info) :: eqn_idx%internalEnergies  !< Indexes of first & last internal energy eqns.
-    ! type(bub_bounds_info) :: eqn_idx%bub               !< Indexes of first & last bubble variable eqns.
-    ! integer :: eqn_idx%gamma                           !< Index of specific heat ratio func. eqn.
-    ! integer :: eqn_idx%alf                             !< Index of specific heat ratio func. eqn.
-    ! integer :: eqn_idx%pi_inf                          !< Index of liquid stiffness func. eqn.
-    ! type(int_bounds_info) :: eqn_idx%B                 !< Indexes of first and last magnetic field eqns.
-    ! type(int_bounds_info) :: eqn_idx%stress            !< Indices of elastic stresses
-    ! type(int_bounds_info) :: eqn_idx%xi                !< Indexes of first and last reference map eqns.
-    ! integer :: eqn_idx%c                               !< Index of color function
-    ! type(int_bounds_info) :: eqn_idx%species           !< Indexes of first & last concentration eqns.
-    ! integer :: eqn_idx%damage                          !< Index of damage state variable (D) for continuum damage model
-    !> @}
+    ! type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
+    ! type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
+    ! integer :: E_idx                               !< Index of energy equation
+    ! integer :: n_idx                               !< Index of number density
+    ! type(int_bounds_info) :: adv_idx               !< Indexes of first & last advection eqns.
+    ! type(int_bounds_info) :: internalEnergies_idx  !< Indexes of first & last internal energy eqns.
+    ! type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
+    ! integer :: gamma_idx                           !< Index of specific heat ratio func. eqn.
+    ! integer :: alf_idx                             !< Index of specific heat ratio func. eqn.
+    ! integer :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
+    ! type(int_bounds_info) :: B_idx                 !< Indexes of first and last magnetic field eqns.
+    ! type(int_bounds_info) :: stress_idx            !< Indices of elastic stresses
+    ! type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
+    ! integer :: c_idx                               !< Index of color function
+    ! type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
+    ! integer :: damage_idx                          !< Index of damage state variable (D) for continuum damage model
+    ! !> @}
 
     type(system_of_equations) :: eqn_idx
 
@@ -625,7 +625,7 @@ contains
             eqn_idx%adv%beg = eqn_idx%E + 1
             eqn_idx%adv%end = eqn_idx%adv%beg !one volume advection equation
             eqn_idx%alf = eqn_idx%adv%end
-            sys_size = eqn_idx%alf !eqn_idx%adv%end
+            sys_size = eqn_idx%alf !adv%end
 
             if (bubbles_euler) then
                 eqn_idx%bub%beg = sys_size + 1

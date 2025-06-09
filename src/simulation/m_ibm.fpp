@@ -97,8 +97,8 @@ contains
 
         ! Initialize the ip component of each ghost point
         do i = 1, num_gps
-            allocate (ghost_points(i)%ip%alpha_rho(num_fluids))
-            allocate (ghost_points(i)%ip%alpha(num_fluids))
+            allocate(ghost_points(i)%ip%alpha_rho(num_fluids))
+            allocate(ghost_points(i)%ip%alpha(num_fluids))
             ghost_points(i)%ip%vel = 0.0_wp
             ghost_points(i)%ip%pressure = 0.0_wp
 
@@ -107,19 +107,19 @@ contains
             end if
 
             if (bubbles_euler) then
-                allocate (ghost_points(i)%ip%r(nb))
-                allocate (ghost_points(i)%ip%v(nb))
+                allocate(ghost_points(i)%ip%r(nb))
+                allocate(ghost_points(i)%ip%v(nb))
                 if (.not. polytropic) then
-                    allocate (ghost_points(i)%ip%pb(nb))
-                    allocate (ghost_points(i)%ip%mv(nb))
+                    allocate(ghost_points(i)%ip%pb(nb))
+                    allocate(ghost_points(i)%ip%mv(nb))
                 end if
             end if
 
             if (qbmm) then
-                allocate (ghost_points(i)%ip%nmom(nb*nmom))
+                allocate(ghost_points(i)%ip%nmom(nb*nmom))
                 if (.not. polytropic) then
-                    allocate (ghost_points(i)%ip%presb(nb*nnode))
-                    allocate (ghost_points(i)%ip%massv(nb*nnode))
+                    allocate(ghost_points(i)%ip%presb(nb*nnode))
+                    allocate(ghost_points(i)%ip%massv(nb*nnode))
                 end if
             end if
         end do
@@ -211,7 +211,7 @@ contains
             end do
 
             if (surface_tension) then
-                q_prim_vf(c_idx)%sf(j, k, l) = gp%ip%c
+                q_prim_vf(eqn_idx%c)%sf(j, k, l) = gp%ip%c
             end if
 
             if (model_eqns /= 4) then
@@ -255,14 +255,14 @@ contains
 
             ! Set color function
             if (surface_tension) then
-                q_cons_vf(c_idx)%sf(j, k, l) = gp%ip%c
+                q_cons_vf(eqn_idx%c)%sf(j, k, l) = gp%ip%c
             end if
 
             ! Set Energy
             if (bubbles_euler) then
-                q_cons_vf(E_idx)%sf(j, k, l) = (1 - gp%ip%alpha(1))*(gamma*gp%ip%pressure + pi_inf + dyn_pres)
+                q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1 - gp%ip%alpha(1))*(gamma*gp%ip%pressure + pi_inf + dyn_pres)
             else
-                q_cons_vf(E_idx)%sf(j, k, l) = gamma*gp%ip%pressure + pi_inf + dyn_pres
+                q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*gp%ip%pressure + pi_inf + dyn_pres
             end if
 
             ! Set bubble vars
@@ -334,7 +334,7 @@ contains
             end do
 
             if (surface_tension) then
-                q_prim_vf(c_idx)%sf(j, k, l) = gp%ip%c
+                q_prim_vf(eqn_idx%c)%sf(j, k, l) = gp%ip%c
             end if
 
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, gp%ip%alpha, &
@@ -814,7 +814,7 @@ contains
                     coeff = gp%interp_coeffs(i - i1 + 1, j - j1 + 1, k - k1 + 1)
 
                     gp%ip%pressure = gp%ip%pressure + coeff* &
-                                     q_prim_vf(E_idx)%sf(i, j, k)
+                                     q_prim_vf(eqn_idx%E)%sf(i, j, k)
 
                     !$acc loop seq
                     do q = momxb, momxe
@@ -831,7 +831,7 @@ contains
                     end do
 
                     if (surface_tension) then
-                        gp%ip%c = gp%ip%c + coeff*q_prim_vf(c_idx)%sf(i, j, k)
+                        gp%ip%c = gp%ip%c + coeff*q_prim_vf(eqn_idx%c)%sf(i, j, k)
                     end if
 
                     if (bubbles_euler .and. .not. qbmm) then
@@ -872,26 +872,12 @@ contains
 
     !> Subroutine to deallocate memory reserved for the IBM module
     impure subroutine s_finalize_ibm_module()
-        integer :: i
 
-        if (allocated(ghost_points)) then
-            do i = 1, size(ghost_points)
-                if (allocated(ghost_points(i)%ip%alpha_rho)) deallocate (ghost_points(i)%ip%alpha_rho)
-                if (allocated(ghost_points(i)%ip%alpha)) deallocate (ghost_points(i)%ip%alpha)
-                if (allocated(ghost_points(i)%ip%r)) deallocate (ghost_points(i)%ip%r)
-                if (allocated(ghost_points(i)%ip%v)) deallocate (ghost_points(i)%ip%v)
-                if (allocated(ghost_points(i)%ip%pb)) deallocate (ghost_points(i)%ip%pb)
-                if (allocated(ghost_points(i)%ip%mv)) deallocate (ghost_points(i)%ip%mv)
-                if (allocated(ghost_points(i)%ip%nmom)) deallocate (ghost_points(i)%ip%nmom)
-                if (allocated(ghost_points(i)%ip%presb)) deallocate (ghost_points(i)%ip%presb)
-                if (allocated(ghost_points(i)%ip%massv)) deallocate (ghost_points(i)%ip%massv)
-            end do
-        end if
+        if (allocated(ghost_points)) deallocate(ghost_points)
 
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(levelset%sf)
         @:DEALLOCATE(levelset_norm%sf)
-        @:DEALLOCATE(ghost_points)
         @:DEALLOCATE(inner_points)
 
     end subroutine s_finalize_ibm_module

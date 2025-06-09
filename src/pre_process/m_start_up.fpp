@@ -84,7 +84,7 @@ module m_start_up
         !! @param ib_markers track if a cell is within the immersed boundary
         impure subroutine s_read_abstract_ic_data_files(q_cons_vf, ib_markers)
 
-            import :: scalar_field, integer_field, sys_size, pres_field
+            import :: scalar_field, integer_field, eqn_idx, pres_field
 
             type(scalar_field), &
                 dimension(sys_size), &

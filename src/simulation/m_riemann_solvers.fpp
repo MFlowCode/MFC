@@ -3323,7 +3323,7 @@ contains
                     Res(i, j) = fluid_pp(eqn_idx%Re(i, j))%Re(i)
                 end do
             end do
-            !$acc update device(Res, eqn_idx%Re, eqn_idx%Re_size)
+            !$acc update device(Res, eqn_idx%Re, Re_size)
         end if
 
         !$acc enter data copyin(is1, is2, is3, isx, isy, isz)

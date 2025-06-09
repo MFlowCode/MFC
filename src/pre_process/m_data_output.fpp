@@ -53,7 +53,7 @@ module m_data_output
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
         impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
 
-            import :: scalar_field, integer_field, sys_size, m, n, p, &
+            import :: scalar_field, integer_field, eqn_idx, m, n, p, &
                 pres_field, levelset_field, levelset_norm_field, num_dims
 
             ! Conservative variables

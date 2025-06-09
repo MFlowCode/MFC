@@ -289,7 +289,7 @@ contains
             end do
         end do
 
-        call s_populate_capillary_buffers(c_divs, bc_type)
+        call s_populate_capillary_buffers(c_divs, bc_type, bc_bound)
 
         iv%beg = 1; iv%end = num_dims + 1
 

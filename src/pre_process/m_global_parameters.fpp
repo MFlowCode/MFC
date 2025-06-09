@@ -113,7 +113,6 @@ module m_global_parameters
     ! integer :: eqn_idx%c                               !< Index of the color function
     ! type(int_bounds_info) :: eqn_idx%species           !< Indexes of first & last concentration eqns.
     ! integer :: eqn_idx%damage                          !< Index of damage state variable (D) for continuum damage model
-
     type(system_of_equations) :: eqn_idx
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).

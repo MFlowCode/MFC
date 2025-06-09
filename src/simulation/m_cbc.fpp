@@ -101,10 +101,10 @@ module m_cbc
     !$acc declare create(is1, is2, is3)
 
     integer :: dj
-    integer :: bcxb, bcxe, bcyb, bcye, bczb, bcze
+    type(boundary_bounds) :: bc_bound !< Boundary flags
     integer :: cbc_dir, cbc_loc
     integer :: flux_cbc_index
-    !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc, flux_cbc_index)
+    !$acc declare create(dj, bc_bound, cbc_dir, cbc_loc, flux_cbc_index)
 
     !! GRCBC inputs for subsonic inflow and outflow conditions consisting of
     !! inflow velocities, pressure, density and void fraction as well as
@@ -392,23 +392,23 @@ contains
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
 
-        bcxb = bc_x%beg
-        bcxe = bc_x%end
+        bc_bound%xb = bc_x%beg
+        bc_bound%xe = bc_x%end
 
-        !$acc update device(bcxb, bcxe)
+        !$acc update device(bc_bound)
 
         if (n > 0) then
-            bcyb = bc_y%beg
-            bcye = bc_y%end
+            bc_bound%yb = bc_y%beg
+            bc_bound%ye = bc_y%end
 
-            !$acc update device(bcyb, bcye)
+            !$acc update device(bc_bound)
         end if
 
         if (p > 0) then
-            bczb = bc_z%beg
-            bcze = bc_z%end
+            bc_bound%zb = bc_z%beg
+            bc_bound%ze = bc_z%end
 
-            !$acc update device(bczb, bcze)
+            !$acc update device(bc_bound)
         end if
 
         ! Allocate GRCBC inputs
@@ -911,15 +911,15 @@ contains
 
                         Ma = vel(eqn_idx%dir(1))/c
 
-                        if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SLIP_WALL) .or. &
-                            (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SLIP_WALL)) then
-                            call s_compute_slip_wall_L(lambda, L, rho, c, dpres_ds, dvel_ds)
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_BUFFER) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_BUFFER)) then
+                        if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_SLIP_WALL) .or. &
+                            (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_SLIP_WALL)) then
+                            call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_NR_SUB_BUFFER) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_NR_SUB_BUFFER)) then
                             call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_INFLOW) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_INFLOW)) then
-                            call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, dpres_ds, dvel_ds)
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_NR_SUB_INFLOW) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_NR_SUB_INFLOW)) then
+                            call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                             ! Add GRCBC for Subsonic Inflow
                             if (bc_${XYZ}$%grcbc_in) then
                                 !$acc loop seq
@@ -938,8 +938,8 @@ contains
                                 end do
                                 L(advxe) = rho*c**2._wp*(1._wp + Ma)*(vel(eqn_idx%dir(1)) + vel_in(${CBC_DIR}$, eqn_idx%dir(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_OUTFLOW) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_NR_SUB_OUTFLOW) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                             ! Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
@@ -950,17 +950,17 @@ contains
                                     L(advxe) = L(advxe) + rho*c**2._wp*(1._wp - Ma)*(vel(eqn_idx%dir(1)) + vel_out(${CBC_DIR}$, eqn_idx%dir(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
                                 end if
                             end if
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_FF_SUB_OUTFLOW) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_FF_SUB_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_FF_SUB_OUTFLOW) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_FF_SUB_OUTFLOW)) then
                             call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_CP_SUB_OUTFLOW) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_CP_SUB_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_CP_SUB_OUTFLOW) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_CP_SUB_OUTFLOW)) then
                             call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SUP_INFLOW) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_INFLOW)) then
-                            call s_compute_supersonic_inflow_L(L)
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SUP_OUTFLOW) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_SUP_INFLOW) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_SUP_INFLOW)) then
+                            call s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_SUP_OUTFLOW) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_SUP_OUTFLOW)) then
                             call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                         end if
 

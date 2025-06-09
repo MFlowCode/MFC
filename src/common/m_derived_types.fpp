@@ -135,6 +135,37 @@ module m_derived_types
         integer, dimension(:, :), allocatable :: moms !< Moment indices for qbmm
         integer, dimension(:, :, :), allocatable :: fullmom !< Moment indices for qbmm
     end type bub_bounds_info
+        
+        
+    !> @name Annotations of the structure of the state and flux vectors in terms of the
+    !! size and the configuration of the system of equations to which they belong
+    !> @{
+    type system_of_equations
+        type(int_bounds_info) :: cont                  !< Indexes of first & last continuity eqns.
+        type(int_bounds_info) :: mom                   !< Indexes of first & last momentum eqns.
+        integer :: E                                   !< Index of energy equation
+        integer :: n                                   !< Index of number density
+        type(int_bounds_info) :: adv                   !< Indexes of first & last advection eqns.
+        type(int_bounds_info) :: internalEnergies      !< Indexes of first & last internal energy eqns.
+        type(bub_bounds_info) :: bub                   !< Indexes of first & last bubble variable eqns.
+        integer :: alf                                 !< Index of void fraction
+        integer :: gamma                               !< Index of specific heat ratio func. eqn.
+        integer :: pi_inf                              !< Index of liquid stiffness func. eqn.
+        type(int_bounds_info) :: B                     !< Indexes of first and last magnetic field eqns.
+        type(int_bounds_info) :: stress                !< Indexes of first and last shear stress eqns.
+        type(int_bounds_info) :: xi                    !< Indexes of first and last reference map eqns.
+        integer :: b_size                              !< Number of elements in the symmetric b tensor, plus one
+        integer :: tensor_size                         !< Number of elements in the full tensor plus one
+        type(int_bounds_info) :: species               !< Indexes of first & last concentration eqns.
+        integer :: c                                   !< Index of color function
+        integer :: damage                              !< Index of damage state variable (D) for continuum damage model
+        integer, dimension(3) :: dir
+        real(wp), dimension(3) :: dir_flg
+        integer, dimension(3) :: dir_tau !!used for hypoelasticity=true
+        integer, dimension(2) :: Re_size
+        integer, allocatable, dimension(:, :) :: Re
+    end type system_of_equations
+    !> @}
 
     !> @name Annotations of the structure of the state and flux vectors in terms of the
     !! size and the configuration of the system of equations to which they belong
@@ -376,9 +407,9 @@ module m_derived_types
     end type mpi_io_airfoil_ib_var
 
     !> Derived type for boundary flags
-    type boundary_flags
+    type boundary_bounds
         real(wp) :: xb, xe, yb, ye, zb, ze
-    end type boundary_flags
+    end type boundary_bounds
 
     !> Derived type annexing integral regions
     type integral_parameters
