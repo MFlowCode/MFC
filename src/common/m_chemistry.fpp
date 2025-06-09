@@ -25,7 +25,7 @@ contains
         ! conservative variables.
 
         type(scalar_field), intent(inout) :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
         integer :: x, y, z, eqn
@@ -62,7 +62,7 @@ contains
     subroutine s_compute_T_from_primitives(q_T_sf, q_prim_vf, bounds)
 
         type(scalar_field), intent(inout) :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
         integer :: x, y, z, i
@@ -87,9 +87,9 @@ contains
 
     subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_T_sf, q_prim_qp, bounds)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
         type(scalar_field), intent(inout) :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_qp, q_prim_qp
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_qp, q_prim_qp
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
         integer :: x, y, z

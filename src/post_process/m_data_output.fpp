@@ -1193,7 +1193,7 @@ contains
     end subroutine s_write_lag_bubbles_results
     impure subroutine s_write_intf_data_file(q_prim_vf)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(IN) :: q_prim_vf
         integer :: i, j, k, l, cent !< Generic loop iterators
         integer :: counter, root !< number of data points extracted to fit shape to SH perturbations
         real(wp), parameter :: pi = 4._wp*tan(1._wp)
@@ -1283,7 +1283,7 @@ contains
     end subroutine s_write_intf_data_file
 
     impure subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(IN) :: q_prim_vf, q_cons_vf
         real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
         real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H
         real(wp), dimension(num_vels) :: vel

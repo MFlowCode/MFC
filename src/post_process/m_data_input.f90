@@ -80,7 +80,7 @@ contains
             !! Generic string used to store the location of a particular file
 
         character(LEN= &
-                  int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !<
+                  int(floor(log10(real(eqn_idx%sys_size, wp)))) + 1) :: file_num !<
             !! Used to store the variable position, in character form, of the
             !! currently manipulated conservative variable file
 
@@ -201,7 +201,7 @@ contains
         end if
 
         ! Reading the Conservative Variables Data Files
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
 
             ! Checking whether the data file associated with the variable
             ! position of currently manipulated conservative variable exists
@@ -242,7 +242,7 @@ contains
 
             ! Checking whether the data file associated with the variable
             ! position of currently manipulated conservative variable exists
-            write (file_num, '(I0)') sys_size + 1
+            write (file_num, '(I0)') eqn_idx%sys_size + 1
             file_loc = trim(t_step_dir)//'/q_cons_vf'// &
                        trim(file_num)//'.dat'
             inquire (FILE=trim(file_loc), EXIST=file_check)
@@ -292,12 +292,12 @@ contains
 
         integer :: i
 
-        integer :: alt_sys !Altered sys_size for lagrangian solver
+        integer :: alt_sys !Altered eqn_idx%sys_size for lagrangian solver
 
         if (bubbles_lagrange) then
-            alt_sys = sys_size + 1
+            alt_sys = eqn_idx%sys_size + 1
         else
-            alt_sys = sys_size
+            alt_sys = eqn_idx%sys_size
         end if
 
         allocate (x_cb_glb(-1:m_glb))
@@ -395,11 +395,11 @@ contains
                 WP_MOK = int(8._wp, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                NVARS_MOK = int(eqn_idx%sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity .or. mhd) then
-                    do i = 1, sys_size
+                    do i = 1, eqn_idx%sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -475,7 +475,7 @@ contains
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size
+                    do i = 1, eqn_idx%sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         ! Initial displacement to skip at beginning of file
@@ -487,7 +487,7 @@ contains
                                                mpi_p, status, ierr)
                     end do
                 else
-                    do i = 1, sys_size
+                    do i = 1, eqn_idx%sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         ! Initial displacement to skip at beginning of file
@@ -501,14 +501,14 @@ contains
                 end if
 
                 if (bubbles_lagrange) then !Lagrangian solver
-                    var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+                    var_MOK = int(eqn_idx%sys_size + 1, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(sys_size + 1), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(eqn_idx%sys_size + 1), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ(ifile, MPI_IO_DATA%var(sys_size + 1)%sf, data_size, &
+                    call MPI_FILE_READ(ifile, MPI_IO_DATA%var(eqn_idx%sys_size + 1)%sf, data_size, &
                                        mpi_p, status, ierr)
                 end if
 
@@ -817,7 +817,7 @@ contains
                     q_particle%sf(-j, 0:n, 0:p) = &
                         q_particle%sf(0, 0:n, 0:p)
                 else
-                    do i = 1, sys_size
+                    do i = 1, eqn_idx%sys_size
                         q_cons_vf(i)%sf(-j, 0:n, 0:p) = q_cons_vf(i)%sf(0, 0:n, 0:p)
                     end do
                 end if
@@ -844,7 +844,7 @@ contains
 
                     ! Remaining momentum component(s), if any, as well as the
                     ! energy and the variable(s) from advection equation(s)
-                    do i = eqn_idx%mom%beg + 1, sys_size
+                    do i = eqn_idx%mom%beg + 1, eqn_idx%sys_size
                         q_cons_vf(i)%sf(-j, 0:n, 0:p) = &
                             q_cons_vf(i)%sf(j - 1, 0:n, 0:p)
                     end do
@@ -860,7 +860,7 @@ contains
                     q_particle%sf(-j, 0:n, 0:p) = &
                         q_particle%sf((m + 1) - j, 0:n, 0:p)
                 else
-                    do i = 1, sys_size
+                    do i = 1, eqn_idx%sys_size
                         q_cons_vf(i)%sf(-j, 0:n, 0:p) = &
                             q_cons_vf(i)%sf((m + 1) - j, 0:n, 0:p)
                     end do
@@ -887,7 +887,7 @@ contains
                     q_particle%sf(m + j, 0:n, 0:p) = &
                         q_particle%sf(m, 0:n, 0:p)
                 else
-                    do i = 1, sys_size
+                    do i = 1, eqn_idx%sys_size
                         q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
                             q_cons_vf(i)%sf(m, 0:n, 0:p)
                     end do
@@ -916,7 +916,7 @@ contains
 
                     ! Remaining momentum component(s), if any, as well as the
                     ! energy and the variable(s) from advection equation(s)
-                    do i = eqn_idx%mom%beg + 1, sys_size
+                    do i = eqn_idx%mom%beg + 1, eqn_idx%sys_size
                         q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
                             q_cons_vf(i)%sf((m + 1) - j, 0:n, 0:p)
                     end do
@@ -932,7 +932,7 @@ contains
                     q_particle%sf(m + j, 0:n, 0:p) = &
                         q_particle%sf(j - 1, 0:n, 0:p)
                 else
-                    do i = 1, sys_size
+                    do i = 1, eqn_idx%sys_size
                         q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
                             q_cons_vf(i)%sf(j - 1, 0:n, 0:p)
                     end do
@@ -965,7 +965,7 @@ contains
                     if (present(q_particle)) then
                         q_particle%sf(:, -j, 0:p) = q_particle%sf(:, 0, 0:p)
                     else
-                        do i = 1, sys_size
+                        do i = 1, eqn_idx%sys_size
                             q_cons_vf(i)%sf(:, -j, 0:p) = q_cons_vf(i)%sf(:, 0, 0:p)
                         end do
                     end if
@@ -992,7 +992,7 @@ contains
                                 q_cons_vf(eqn_idx%mom%end)%sf(:, -j, k) = &
                                     -q_cons_vf(eqn_idx%mom%end)%sf(:, j - 1, k + ((p + 1)/2))
 
-                                do i = eqn_idx%E, sys_size
+                                do i = eqn_idx%E, eqn_idx%sys_size
                                     q_cons_vf(i)%sf(:, -j, k) = &
                                         q_cons_vf(i)%sf(:, j - 1, k + ((p + 1)/2))
                                 end do
@@ -1013,7 +1013,7 @@ contains
                                 q_cons_vf(eqn_idx%mom%end)%sf(:, -j, k) = &
                                     -q_cons_vf(eqn_idx%mom%end)%sf(:, j - 1, k - ((p + 1)/2))
 
-                                do i = eqn_idx%E, sys_size
+                                do i = eqn_idx%E, eqn_idx%sys_size
                                     q_cons_vf(i)%sf(:, -j, k) = &
                                         q_cons_vf(i)%sf(:, j - 1, k - ((p + 1)/2))
                                 end do
@@ -1042,7 +1042,7 @@ contains
 
                         ! Remaining z-momentum component, if any, as well as the
                         ! energy and variable(s) from advection equation(s)
-                        do i = eqn_idx%mom%beg + 2, sys_size
+                        do i = eqn_idx%mom%beg + 2, eqn_idx%sys_size
                             q_cons_vf(i)%sf(:, -j, 0:p) = &
                                 q_cons_vf(i)%sf(:, j - 1, 0:p)
                         end do
@@ -1058,7 +1058,7 @@ contains
                         q_particle%sf(:, -j, 0:p) = &
                             q_particle%sf(:, (n + 1) - j, 0:p)
                     else
-                        do i = 1, sys_size
+                        do i = 1, eqn_idx%sys_size
                             q_cons_vf(i)%sf(:, -j, 0:p) = &
                                 q_cons_vf(i)%sf(:, (n + 1) - j, 0:p)
                         end do
@@ -1085,7 +1085,7 @@ contains
                         q_particle%sf(:, n + j, 0:p) = &
                             q_particle%sf(:, n, 0:p)
                     else
-                        do i = 1, sys_size
+                        do i = 1, eqn_idx%sys_size
                             q_cons_vf(i)%sf(:, n + j, 0:p) = &
                                 q_cons_vf(i)%sf(:, n, 0:p)
                         end do
@@ -1112,7 +1112,7 @@ contains
 
                         ! Remaining z-momentum component, if any, as well as the
                         ! energy and variable(s) from advection equation(s)
-                        do i = eqn_idx%mom%beg + 2, sys_size
+                        do i = eqn_idx%mom%beg + 2, eqn_idx%sys_size
                             q_cons_vf(i)%sf(:, n + j, 0:p) = &
                                 q_cons_vf(i)%sf(:, (n + 1) - j, 0:p)
                         end do
@@ -1128,7 +1128,7 @@ contains
                         q_particle%sf(:, n + j, 0:p) = &
                             q_particle%sf(:, j - 1, 0:p)
                     else
-                        do i = 1, sys_size
+                        do i = 1, eqn_idx%sys_size
                             q_cons_vf(i)%sf(:, n + j, 0:p) = &
                                 q_cons_vf(i)%sf(:, j - 1, 0:p)
                         end do
@@ -1161,7 +1161,7 @@ contains
                         if (present(q_particle)) then
                             q_particle%sf(:, :, -j) = q_particle%sf(:, :, 0)
                         else
-                            do i = 1, sys_size
+                            do i = 1, eqn_idx%sys_size
                                 q_cons_vf(i)%sf(:, :, -j) = q_cons_vf(i)%sf(:, :, 0)
                             end do
                         end if
@@ -1187,7 +1187,7 @@ contains
                                 -q_cons_vf(eqn_idx%mom%end)%sf(:, :, j - 1)
 
                             ! Energy and advection equation(s) variable(s)
-                            do i = eqn_idx%E, sys_size
+                            do i = eqn_idx%E, eqn_idx%sys_size
                                 q_cons_vf(i)%sf(:, :, -j) = &
                                     q_cons_vf(i)%sf(:, :, j - 1)
                             end do
@@ -1203,7 +1203,7 @@ contains
                             q_particle%sf(:, :, -j) = &
                                 q_particle%sf(:, :, (p + 1) - j)
                         else
-                            do i = 1, sys_size
+                            do i = 1, eqn_idx%sys_size
                                 q_cons_vf(i)%sf(:, :, -j) = &
                                     q_cons_vf(i)%sf(:, :, (p + 1) - j)
                             end do
@@ -1231,7 +1231,7 @@ contains
                             q_particle%sf(:, :, p + j) = &
                                 q_particle%sf(:, :, p)
                         else
-                            do i = 1, sys_size
+                            do i = 1, eqn_idx%sys_size
                                 q_cons_vf(i)%sf(:, :, p + j) = &
                                     q_cons_vf(i)%sf(:, :, p)
                             end do
@@ -1258,7 +1258,7 @@ contains
                                 -q_cons_vf(eqn_idx%mom%end)%sf(:, :, (p + 1) - j)
 
                             ! Energy and advection equation(s) variable(s)
-                            do i = eqn_idx%E, sys_size
+                            do i = eqn_idx%E, eqn_idx%sys_size
                                 q_cons_vf(i)%sf(:, :, p + j) = &
                                     q_cons_vf(i)%sf(:, :, (p + 1) - j)
                             end do
@@ -1274,7 +1274,7 @@ contains
                             q_particle%sf(:, :, p + j) = &
                                 q_particle%sf(:, :, j - 1)
                         else
-                            do i = 1, sys_size
+                            do i = 1, eqn_idx%sys_size
                                 q_cons_vf(i)%sf(:, :, p + j) = &
                                     q_cons_vf(i)%sf(:, :, j - 1)
                             end do
@@ -1311,8 +1311,8 @@ contains
         ! Allocating the parts of the conservative and primitive variables
         ! that do not require the direct knowledge of the dimensionality of
         ! the simulation
-        allocate (q_cons_vf(1:sys_size))
-        allocate (q_prim_vf(1:sys_size))
+        allocate (q_cons_vf(1:eqn_idx%sys_size))
+        allocate (q_prim_vf(1:eqn_idx%sys_size))
         if (bubbles_lagrange) allocate (q_particle(1))
 
         ! Allocating the parts of the conservative and primitive variables
@@ -1325,7 +1325,7 @@ contains
             ! Simulation is 3D
             if (p > 0) then
 
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     allocate (q_cons_vf(i)%sf(-buff_size:m + buff_size, &
                                               -buff_size:n + buff_size, &
                                               -buff_size:p + buff_size))
@@ -1355,7 +1355,7 @@ contains
                 ! Simulation is 2D
             else
 
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     allocate (q_cons_vf(i)%sf(-buff_size:m + buff_size, &
                                               -buff_size:n + buff_size, &
                                               0:0))
@@ -1386,7 +1386,7 @@ contains
             ! Simulation is 1D
         else
 
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 allocate (q_cons_vf(i)%sf(-buff_size:m + buff_size, &
                                           0:0, &
                                           0:0))
@@ -1423,7 +1423,7 @@ contains
         integer :: i !< Generic loop iterator
 
         ! Deallocating the conservative and primitive variables
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             deallocate (q_cons_vf(i)%sf)
             deallocate (q_prim_vf(i)%sf)
         end do

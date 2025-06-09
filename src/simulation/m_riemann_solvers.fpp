@@ -160,7 +160,7 @@ contains
                                 norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(IN) :: q_prim_vf
 
         type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
 
@@ -171,7 +171,7 @@ contains
                              dqL_prim_dz_vf, dqR_prim_dz_vf
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
         integer, intent(IN) :: norm_dir
@@ -222,7 +222,7 @@ contains
                           dvelL_dz_vf, dvelR_dz_vf
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(INOUT) :: flux_src_vf
 
         integer, intent(IN) :: norm_dir
@@ -267,7 +267,7 @@ contains
                                     norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
 
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
@@ -279,7 +279,7 @@ contains
 
         ! Intercell fluxes
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
         integer, intent(in) :: norm_dir
@@ -1181,7 +1181,7 @@ contains
                                      norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
         type(scalar_field), &
@@ -1192,7 +1192,7 @@ contains
 
         ! Intercell fluxes
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
         integer, intent(in) :: norm_dir
@@ -1701,7 +1701,7 @@ contains
                                 #:if (NORM_DIR == 3)
                                     if (grid_geometry == 3) then
                                         !$acc loop seq
-                                        do i = 1, sys_size
+                                        do i = 1, eqn_idx%sys_size
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0_wp
                                         end do
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + eqn_idx%dir(1)) = &
@@ -1945,7 +1945,7 @@ contains
                                 #:if (NORM_DIR == 3)
                                     if (grid_geometry == 3) then
                                         !$acc loop seq
-                                        do i = 1, sys_size
+                                        do i = 1, eqn_idx%sys_size
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                         end do
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
@@ -2410,7 +2410,7 @@ contains
                                 #:if (NORM_DIR == 3)
                                     if (grid_geometry == 3) then
                                         !$acc loop seq
-                                        do i = 1, sys_size
+                                        do i = 1, eqn_idx%sys_size
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                         end do
 
@@ -2920,7 +2920,7 @@ contains
                                 #:if (NORM_DIR == 3)
                                     if (grid_geometry == 3) then
                                         !$acc loop seq
-                                        do i = 1, sys_size
+                                        do i = 1, eqn_idx%sys_size
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                         end do
 
@@ -3011,8 +3011,8 @@ contains
 
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
@@ -3333,13 +3333,13 @@ contains
 
         @:ALLOCATE(flux_rsx_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
+            is3%beg:is3%end, 1:eqn_idx%sys_size))
         @:ALLOCATE(flux_gsrc_rsx_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
+            is3%beg:is3%end, 1:eqn_idx%sys_size))
         @:ALLOCATE(flux_src_rsx_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, advxb:sys_size))
+            is3%beg:is3%end, advxb:eqn_idx%sys_size))
         @:ALLOCATE(vel_src_rsx_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:num_vels))
@@ -3360,13 +3360,13 @@ contains
 
         @:ALLOCATE(flux_rsy_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
+            is3%beg:is3%end, 1:eqn_idx%sys_size))
         @:ALLOCATE(flux_gsrc_rsy_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
+            is3%beg:is3%end, 1:eqn_idx%sys_size))
         @:ALLOCATE(flux_src_rsy_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, advxb:sys_size))
+            is3%beg:is3%end, advxb:eqn_idx%sys_size))
         @:ALLOCATE(vel_src_rsy_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:num_vels))
@@ -3388,13 +3388,13 @@ contains
 
         @:ALLOCATE(flux_rsz_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
+            is3%beg:is3%end, 1:eqn_idx%sys_size))
         @:ALLOCATE(flux_gsrc_rsz_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
+            is3%beg:is3%end, 1:eqn_idx%sys_size))
         @:ALLOCATE(flux_src_rsz_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, advxb:sys_size))
+            is3%beg:is3%end, advxb:eqn_idx%sys_size))
         @:ALLOCATE(vel_src_rsz_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:num_vels))
@@ -3490,7 +3490,7 @@ contains
 
             if (bc_x%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
                 !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             qL_prim_rsx_vf(-1, k, l, i) = &
@@ -3545,7 +3545,7 @@ contains
             if (bc_x%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
 
                 !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             qR_prim_rsx_vf(m + 1, k, l, i) = &
@@ -3604,7 +3604,7 @@ contains
 
             if (bc_y%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
                 !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             qL_prim_rsy_vf(-1, k, l, i) = &
@@ -3654,7 +3654,7 @@ contains
             if (bc_y%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
 
                 !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             qR_prim_rsy_vf(n + 1, k, l, i) = &
@@ -3707,7 +3707,7 @@ contains
 
             if (bc_z%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
                 !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             qL_prim_rsz_vf(-1, k, l, i) = &
@@ -3751,7 +3751,7 @@ contains
             if (bc_z%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
 
                 !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             qR_prim_rsz_vf(p + 1, k, l, i) = &
@@ -3820,7 +3820,7 @@ contains
         norm_dir)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: flux_src_vf
 
         integer, intent(in) :: norm_dir
@@ -3933,7 +3933,7 @@ contains
         !! @param[in] dvelR_dx_vf Right boundary $\partial v_i/\partial x$ (num_dims scalar_field).
         !! @param[in] dvelR_dy_vf Right boundary $\partial v_i/\partial y$ (num_dims scalar_field).
         !! @param[in] dvelR_dz_vf Right boundary $\partial v_i/\partial z$ (num_dims scalar_field).
-        !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
+        !! @param[inout] flux_src_vf Intercell source flux array to update (eqn_idx%sys_size scalar_field).
         !! @param[in] norm_dir Interface normal direction (1=x-face, 2=y-face, 3=z-face).
         !! @param[in] ix Global X-direction loop bounds (int_bounds_info).
         !! @param[in] iy Global Y-direction loop bounds (int_bounds_info).
@@ -3948,7 +3948,7 @@ contains
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dy_vf, dvelR_dy_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: flux_src_vf
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
@@ -4095,7 +4095,7 @@ contains
     !! @param[in] dvelR_dx_vf Right boundary d(vel)/dx (num_dims scalar_field).
     !! @param[in] dvelR_dy_vf Right boundary d(vel)/dy (num_dims scalar_field).
     !! @param[in] dvelR_dz_vf Right boundary d(vel)/dz (num_dims scalar_field).
-    !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
+    !! @param[inout] flux_src_vf Intercell source flux array to update (eqn_idx%sys_size scalar_field).
     !! @param[in] norm_dir Interface normal direction (1=x, 2=y, 3=z).
     !! @param[in] ix X-direction loop bounds (int_bounds_info).
     !! @param[in] iy Y-direction loop bounds (int_bounds_info).
@@ -4113,7 +4113,7 @@ contains
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dy_vf, dvelR_dy_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: flux_src_vf
         integer, intent(in) :: norm_dir
 
         ! Local variables
@@ -4294,7 +4294,7 @@ contains
                                               norm_dir)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
         integer, intent(in) :: norm_dir
@@ -4304,7 +4304,7 @@ contains
         ! Reshaping Outputted Data in y-direction
         if (norm_dir == 2) then
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do l = is3%beg, is3%end
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
@@ -4317,7 +4317,7 @@ contains
 
             if (cyl_coord) then
                 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
@@ -4356,7 +4356,7 @@ contains
             ! Reshaping Outputted Data in z-direction
         elseif (norm_dir == 3) then
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do j = is1%beg, is1%end
                     do k = is2%beg, is2%end
                         do l = is3%beg, is3%end
@@ -4369,7 +4369,7 @@ contains
             end do
             if (grid_geometry == 3) then
                 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
                             do l = is3%beg, is3%end
@@ -4408,7 +4408,7 @@ contains
             end if
         elseif (norm_dir == 1) then
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end

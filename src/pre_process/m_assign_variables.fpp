@@ -303,7 +303,7 @@ contains
 
         real(wp) :: Ys(1:num_species)
 
-        real(wp), dimension(sys_size) :: orig_prim_vf !<
+        real(wp), dimension(eqn_idx%sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes
 
         integer :: i  !< Generic loop iterator
@@ -313,7 +313,7 @@ contains
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
 
         ! Transferring original primitive variables
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             orig_prim_vf(i) = q_prim_vf(i)%sf(j, k, l)
         end do
 

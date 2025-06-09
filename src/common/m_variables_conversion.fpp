@@ -82,7 +82,7 @@ contains
     subroutine s_convert_to_mixture_variables(q_vf, i, j, k, &
                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_vf
         integer, intent(in) :: i, j, k
         real(wp), intent(out), target :: rho, gamma, pi_inf, qv
         real(wp), optional, dimension(2), intent(out) :: Re_K
@@ -208,7 +208,7 @@ contains
     subroutine s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
                                                       rho, gamma, pi_inf, qv)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_vf
         integer, intent(in) :: i, j, k
 
         real(wp), intent(out), target :: rho
@@ -250,7 +250,7 @@ contains
     subroutine s_convert_species_to_mixture_variables_bubbles(q_vf, j, k, l, &
                                                               rho, gamma, pi_inf, qv, Re_K)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_vf
 
         integer, intent(in) :: j, k, l
 
@@ -372,7 +372,7 @@ contains
     subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
                                                       gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_vf
 
         integer, intent(in) :: k, l, r
 
@@ -735,7 +735,7 @@ contains
     !Initialize mv at the quadrature nodes based on the initialized moments and sigma
     pure subroutine s_initialize_mv(qK_cons_vf, mv)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: qK_cons_vf
 
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: mv
 
@@ -767,7 +767,7 @@ contains
 
     !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
     pure subroutine s_initialize_pb(qK_cons_vf, mv, pb)
-        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: qK_cons_vf
 
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: pb
@@ -811,9 +811,9 @@ contains
                                                              qK_prim_vf, &
                                                              ibounds)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: qK_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: qK_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: ibounds
 
         real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
@@ -1156,8 +1156,8 @@ contains
     impure subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                                     q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
 
         ! Density, specific heat ratio function, liquid stiffness function
         ! and dynamic pressure, as defined in the incompressible flow sense,

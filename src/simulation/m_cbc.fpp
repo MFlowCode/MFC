@@ -133,7 +133,7 @@ contains
         logical :: is_cbc
 
         if (chemistry) then
-            flux_cbc_index = sys_size
+            flux_cbc_index = eqn_idx%sys_size
         else
             flux_cbc_index = eqn_idx%adv%end
         end if
@@ -162,7 +162,7 @@ contains
 
         @:ALLOCATE(q_prim_rsx_vf(0:buff_size, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
+            is3%beg:is3%end, 1:eqn_idx%sys_size))
 
         if (weno_order > 1) then
 
@@ -205,7 +205,7 @@ contains
 
             @:ALLOCATE(q_prim_rsy_vf(0:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, 1:sys_size))
+                is3%beg:is3%end, 1:eqn_idx%sys_size))
 
             if (weno_order > 1) then
 
@@ -250,7 +250,7 @@ contains
 
             @:ALLOCATE(q_prim_rsz_vf(0:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, 1:sys_size))
+                is3%beg:is3%end, 1:eqn_idx%sys_size))
 
             if (weno_order > 1) then
 
@@ -626,11 +626,11 @@ contains
                      ix, iy, iz)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: q_prim_vf
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: flux_vf, flux_src_vf
 
         integer, intent(in) :: cbc_dir_norm, cbc_loc_norm
@@ -653,7 +653,7 @@ contains
         real(wp), dimension(2) :: Re_cbc
         real(wp), dimension(num_vels) :: vel, dvel_ds
         real(wp), dimension(num_fluids) :: adv, dadv_ds
-        real(wp), dimension(sys_size) :: L
+        real(wp), dimension(eqn_idx%sys_size) :: L
         real(wp), dimension(3) :: lambda
 
         real(wp) :: rho         !< Cell averaged density
@@ -1128,11 +1128,11 @@ contains
                                 ix, iy, iz)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: q_prim_vf
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: flux_vf, flux_src_vf
 
         type(int_bounds_info), intent(in) :: ix, iy, iz
@@ -1164,7 +1164,7 @@ contains
         if (cbc_dir == 1) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = 0, buff_size
@@ -1240,7 +1240,7 @@ contains
         elseif (cbc_dir == 2) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = 0, buff_size
@@ -1316,7 +1316,7 @@ contains
         else
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = 0, buff_size
@@ -1401,7 +1401,7 @@ contains
     subroutine s_finalize_cbc(flux_vf, flux_src_vf)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: flux_vf, flux_src_vf
 
         integer :: i, j, k, r !< Generic loop iterators

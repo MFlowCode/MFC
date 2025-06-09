@@ -75,7 +75,7 @@ contains
         !! @param q_cons_vf Initial conservative variables
     impure subroutine s_initialize_bubbles_EL_module(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
 
         integer :: nBubs_glb, i
 
@@ -190,7 +190,7 @@ contains
         !! @param q_cons_vf Conservative variables
     impure subroutine s_read_input_bubbles(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
 
         real(wp), dimension(8) :: inputBubble
         real(wp) :: qtime
@@ -280,7 +280,7 @@ contains
         !! @param bub_id Local id of the bubble
     impure subroutine s_add_bubbles(inputBubble, q_cons_vf, bub_id)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
         real(wp), dimension(8), intent(in) :: inputBubble
         integer, intent(in) :: bub_id
         integer :: i
@@ -499,7 +499,7 @@ contains
         !! @param stage Current stage in the time-stepper algorithm
     subroutine s_compute_bubble_EL_dynamics(q_prim_vf, stage)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: stage
 
         real(wp) :: myVapFlux
@@ -631,9 +631,9 @@ contains
         !! @param rhs_vf Time derivative of the conservative variables
     subroutine s_compute_bubbles_EL_source(q_cons_vf, q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
 
         integer :: i, j, k, l
 
@@ -737,7 +737,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
         real(wp), intent(in) :: pinf, rhol, gamma, pi_inf
         integer, dimension(3), intent(in) :: cell
         real(wp), intent(out) :: cson
@@ -808,7 +808,7 @@ contains
         !$acc routine seq
 #endif
         integer, intent(in) :: bub_id, ptype
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
         real(wp), intent(out) :: f_pinfl
         integer, dimension(3), intent(out) :: cell
         real(wp), intent(out), optional :: preterm1, term2, Romega

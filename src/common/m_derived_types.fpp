@@ -140,6 +140,7 @@ module m_derived_types
     !! size and the configuration of the system of equations to which they belong
     !> @{
     type system_of_equations
+        integer :: sys_size                            !< Size of the system of equations
         type(int_bounds_info) :: cont                  !< Indexes of first & last continuity eqns.
         type(int_bounds_info) :: mom                   !< Indexes of first & last momentum eqns.
         integer :: E                                   !< Index of energy equation

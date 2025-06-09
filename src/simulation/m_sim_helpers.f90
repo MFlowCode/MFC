@@ -36,7 +36,7 @@ contains
         !$acc routine seq
 #endif
 
-        type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
+        type(scalar_field), intent(in), dimension(eqn_idx%sys_size) :: q_prim_vf
         real(wp), intent(inout), dimension(num_fluids) :: alpha
         real(wp), intent(inout), dimension(num_vels) :: vel
         real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres

@@ -23,13 +23,13 @@ contains
         real(wp), intent(in) :: rho, c, dpres_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
         real(wp) :: L1
-        L1 = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L1 = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
     end function f_base_L1
 
     !> Fill density L variables
     pure subroutine s_fill_density_L(L, lambda_factor, lambda2, c, mf, dalpha_rho_ds, dpres_ds)
         !$acc routine seq
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: lambda_factor, lambda2, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -43,25 +43,25 @@ contains
     !> Fill velocity L variables
     pure subroutine s_fill_velocity_L(L, lambda_factor, lambda2, dvel_ds)
         !$acc routine seq
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: lambda_factor, lambda2
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
         integer :: i
 
         do i = momxb + 1, momxe
-            L(i) = lambda_factor*lambda2*dvel_ds(dir_idx(i - contxe))
+            L(i) = lambda_factor*lambda2*dvel_ds(eqn_idx%dir(i - contxe))
         end do
     end subroutine s_fill_velocity_L
 
     !> Fill advection L variables
     pure subroutine s_fill_advection_L(L, lambda_factor, lambda2, dadv_ds)
         !$acc routine seq
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: lambda_factor, lambda2
         real(wp), dimension(num_fluids), intent(in) :: dadv_ds
         integer :: i
 
-        do i = E_idx, advxe - 1
+        do i = eqn_idx%E, advxe - 1
             L(i) = lambda_factor*lambda2*dadv_ds(i - momxe)
         end do
     end subroutine s_fill_advection_L
@@ -69,7 +69,7 @@ contains
     !> Fill chemistry L variables
     pure subroutine s_fill_chemistry_L(L, lambda_factor, lambda2, dYs_ds)
         !$acc routine seq
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: lambda_factor, lambda2
         real(wp), dimension(num_species), intent(in) :: dYs_ds
         integer :: i
@@ -89,7 +89,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c, dpres_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
         integer :: i
@@ -107,7 +107,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -117,7 +117,7 @@ contains
         real(wp) :: lambda_factor
 
         lambda_factor = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(1)))
-        L(1) = lambda_factor*lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda_factor*lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         lambda_factor = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(2)))
         call s_fill_density_L(L, lambda_factor, lambda(2), c, mf, dalpha_rho_ds, dpres_ds)
@@ -126,7 +126,7 @@ contains
         call s_fill_chemistry_L(L, lambda_factor, lambda(2), dYs_ds)
 
         lambda_factor = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(3)))
-        L(advxe) = lambda_factor*lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
+        L(advxe) = lambda_factor*lambda(3)*(dpres_ds + rho*c*dvel_ds(eqn_idx%dir(1)))
     end subroutine s_compute_nonreflecting_subsonic_buffer_L
 
     !> Nonreflecting subsonic inflow CBC (Thompson 1990, pg. 455)
@@ -137,7 +137,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c, dpres_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
 
@@ -154,7 +154,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -178,7 +178,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -189,7 +189,7 @@ contains
         call s_fill_density_L(L, 1._wp, lambda(2), c, mf, dalpha_rho_ds, dpres_ds)
         call s_fill_velocity_L(L, 1._wp, lambda(2), dvel_ds)
         call s_fill_advection_L(L, 1._wp, lambda(2), dadv_ds)
-        L(advxe) = L(1) + 2._wp*rho*c*lambda(2)*dvel_ds(dir_idx(1))
+        L(advxe) = L(1) + 2._wp*rho*c*lambda(2)*dvel_ds(eqn_idx%dir(1))
     end subroutine s_compute_force_free_subsonic_outflow_L
 
     !> Constant pressure subsonic outflow CBC (Thompson 1990, pg. 455)
@@ -200,7 +200,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -221,7 +221,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         L(1:advxe) = 0._wp
         if (chemistry) L(chemxb:chemxe) = 0._wp
     end subroutine s_compute_supersonic_inflow_L
@@ -234,7 +234,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -247,6 +247,6 @@ contains
         call s_fill_velocity_L(L, 1._wp, lambda(2), dvel_ds)
         call s_fill_advection_L(L, 1._wp, lambda(2), dadv_ds)
         call s_fill_chemistry_L(L, 1._wp, lambda(2), dYs_ds)
-        L(advxe) = lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
+        L(advxe) = lambda(3)*(dpres_ds + rho*c*dvel_ds(eqn_idx%dir(1)))
     end subroutine s_compute_supersonic_outflow_L
 end module m_compute_cbc

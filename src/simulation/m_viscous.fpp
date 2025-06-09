@@ -60,9 +60,9 @@ contains
                                                tau_Re_vf, &
                                                ix, iy, iz)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(num_dims), intent(in) :: grad_x_vf, grad_y_vf, grad_z_vf
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: tau_Re_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: tau_Re_vf
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
         real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables

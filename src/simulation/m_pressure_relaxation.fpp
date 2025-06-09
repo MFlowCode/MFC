@@ -67,7 +67,7 @@ contains
     !! @param q_cons_vf Cell-average conservative variables
     pure subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
         integer :: j, k, l
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -85,7 +85,7 @@ contains
     pure subroutine s_relax_cell_pressure(q_cons_vf, j, k, l)
         !$acc routine seq
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: j, k, l
 
         ! Volume fraction correction
@@ -105,7 +105,7 @@ contains
     pure logical function s_needs_pressure_relaxation(q_cons_vf, j, k, l)
         !$acc routine seq
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
         integer, intent(in) :: j, k, l
         integer :: i
 
@@ -123,7 +123,7 @@ contains
     pure subroutine s_correct_volume_fractions(q_cons_vf, j, k, l)
         !$acc routine seq
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: j, k, l
         real(wp) :: sum_alpha
         integer :: i
@@ -153,7 +153,7 @@ contains
     pure subroutine s_equilibrate_pressure(q_cons_vf, j, k, l)
         !$acc routine seq
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: j, k, l
 
         real(wp) :: pres_relax, f_pres, df_pres
@@ -222,7 +222,7 @@ contains
     pure subroutine s_correct_internal_energies(q_cons_vf, j, k, l)
         !$acc routine seq
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: j, k, l
 
         real(wp), dimension(num_fluids) :: alpha_rho, alpha

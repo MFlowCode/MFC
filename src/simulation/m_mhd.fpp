@@ -69,8 +69,8 @@ contains
         !!  @param rhs_vf     rhs variables
     pure subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
 
         integer :: k, l, q, r
         real(wp), dimension(3) :: v, B

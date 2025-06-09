@@ -174,7 +174,7 @@ contains
     pure subroutine s_derive_sound_speed(q_prim_vf, q_sf)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: q_prim_vf
 
         real(wp), &
@@ -232,7 +232,7 @@ contains
 
         integer, intent(in) :: i
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end, &
                             -offset_y%beg:n + offset_y%end, &
@@ -377,7 +377,7 @@ contains
         integer, intent(in) :: i
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: q_prim_vf
 
         real(wp), &
@@ -476,7 +476,7 @@ contains
         !!  @param q_sf Q_M
     pure subroutine s_derive_qm(q_prim_vf, q_sf)
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: q_prim_vf
 
         real(wp), &
@@ -564,7 +564,7 @@ contains
     impure subroutine s_derive_numerical_schlieren_function(q_cons_vf, q_sf)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: q_cons_vf
 
         real(wp), &

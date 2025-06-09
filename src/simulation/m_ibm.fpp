@@ -145,11 +145,11 @@ contains
     pure subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb, mv)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(INOUT) :: q_cons_vf !< Primitive Variables
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(INOUT) :: q_prim_vf !< Primitive Variables
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), optional, intent(INOUT) :: pb, mv
@@ -760,7 +760,7 @@ contains
     pure subroutine s_interpolate_image_point(q_prim_vf, gp, pb, mv)
         !$acc routine seq
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(IN) :: q_prim_vf !< Primitive Variables
 
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(INOUT) :: pb, mv

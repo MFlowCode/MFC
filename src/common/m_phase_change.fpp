@@ -48,7 +48,7 @@ contains
         !!      some parameter. It replaces the procedure pointer, which CCE
         !!      is breaking on.
     impure subroutine s_relaxation_solver(q_cons_vf)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
         ! This is empty because in current master the procedure pointer
         ! was never assigned
         @:ASSERT(.false., "s_relaxation_solver called but it currently does nothing")
@@ -80,7 +80,7 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
     pure subroutine s_infinite_relaxation_k(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
         real(wp) :: pS, pSOV, pSSL !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
         real(wp) :: TS, TSOV, TSSL, TSatOV, TSatSL !< equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor and subcooled liquid
         real(wp) :: rhoe, dynE, rhos !< total internal energy, kinetic energy, and total entropy
@@ -293,7 +293,7 @@ contains
         integer, intent(in) :: j, k, l, MFL
         real(wp), intent(out) :: pS
         real(wp), dimension(num_fluids), intent(out) :: p_infpT
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
         real(wp), intent(in) :: rhoe
         real(wp), intent(out) :: TS
         real(wp) :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
@@ -397,7 +397,7 @@ contains
         real(wp), intent(inout) :: pS
         real(wp), dimension(num_fluids), intent(in) :: p_infpT
         real(wp), intent(in) :: rhoe
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
         real(wp), intent(inout) :: TS
 
         real(wp), dimension(num_fluids) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
@@ -521,7 +521,7 @@ contains
         !> @name variables for the correction of the reacting partial densities
         !> @{
         real(wp), intent(out) :: MCT
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
         real(wp), intent(inout) :: rM
         integer, intent(in) :: j, k, l
         !> @}
@@ -586,7 +586,7 @@ contains
         real(wp), dimension(2, 2), intent(out) :: Jac
         integer, intent(in) :: k, l
         real(wp), intent(in) :: mCPD, mCVGP, mCVGP2, pS
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
         real(wp), dimension(2, 2), intent(out) :: TJac
 
         real(wp) :: ml, mT, TS, dFdT, dTdm, dTdp ! mass of the reacting fluid, total reacting mass, and auxiliary variables
@@ -690,7 +690,7 @@ contains
 
         integer, intent(in) :: j, k, l
         real(wp), intent(in) :: mCPD, mCVGP, mQD
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
         real(wp), intent(in) :: pS, rhoe
         real(wp), dimension(2), intent(out) :: R2D
 

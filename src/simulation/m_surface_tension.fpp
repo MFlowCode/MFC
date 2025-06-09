@@ -74,7 +74,7 @@ contains
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsy_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsz_vf
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: flux_src_vf
         integer, intent(in) :: id
         type(int_bounds_info), intent(in) :: isx, isy, isz
@@ -227,7 +227,7 @@ contains
 
     impure subroutine s_get_capilary(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
         type(int_bounds_info) :: isx, isy, isz

@@ -66,14 +66,14 @@ contains
                 if (p > 0) then
 
                     allocate (q_cons_buffer_in(0:buff_size* &
-                                               sys_size* &
+                                               eqn_idx%sys_size* &
                                                (m + 2*buff_size + 1)* &
                                                (n + 2*buff_size + 1)* &
                                                (p + 2*buff_size + 1)/ &
                                                (min(m, n, p) &
                                                 + 2*buff_size + 1) - 1))
                     allocate (q_cons_buffer_out(0:buff_size* &
-                                                sys_size* &
+                                                eqn_idx%sys_size* &
                                                 (m + 2*buff_size + 1)* &
                                                 (n + 2*buff_size + 1)* &
                                                 (p + 2*buff_size + 1)/ &
@@ -84,11 +84,11 @@ contains
                 else
 
                     allocate (q_cons_buffer_in(0:buff_size* &
-                                               sys_size* &
+                                               eqn_idx%sys_size* &
                                                (max(m, n) &
                                                 + 2*buff_size + 1) - 1))
                     allocate (q_cons_buffer_out(0:buff_size* &
-                                                sys_size* &
+                                                eqn_idx%sys_size* &
                                                 (max(m, n) &
                                                  + 2*buff_size + 1) - 1))
 
@@ -97,8 +97,8 @@ contains
                 ! Simulation is 1D
             else
 
-                allocate (q_cons_buffer_in(0:buff_size*sys_size - 1))
-                allocate (q_cons_buffer_out(0:buff_size*sys_size - 1))
+                allocate (q_cons_buffer_in(0:buff_size*eqn_idx%sys_size - 1))
+                allocate (q_cons_buffer_out(0:buff_size*eqn_idx%sys_size - 1))
 
             end if
 
@@ -850,7 +850,7 @@ contains
                                                               sweep_coord, q_particle)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: q_cons_vf
 
         character(LEN=3), intent(in) :: pbc_loc
@@ -877,10 +877,10 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = m - buff_size + 1, m
-                                do i = 1, sys_size
-                                    r = sys_size*(j - m + buff_size - 1) &
-                                        + sys_size*buff_size*k + (i - 1) &
-                                        + sys_size*buff_size*(n + 1)*l
+                                do i = 1, eqn_idx%sys_size
+                                    r = eqn_idx%sys_size*(j - m + buff_size - 1) &
+                                        + eqn_idx%sys_size*buff_size*k + (i - 1) &
+                                        + eqn_idx%sys_size*buff_size*(n + 1)*l
                                     if (present(q_particle)) then
                                         q_cons_buffer_out(r) = &
                                             q_particle%sf(j, k, l)
@@ -895,10 +895,10 @@ contains
 
                     ! Sending/receiving the data to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV(q_cons_buffer_out(0), &
-                                      buff_size*sys_size*(n + 1)*(p + 1), &
+                                      buff_size*eqn_idx%sys_size*(n + 1)*(p + 1), &
                                       mpi_p, bc_x%end, 0, &
                                       q_cons_buffer_in(0), &
-                                      buff_size*sys_size*(n + 1)*(p + 1), &
+                                      buff_size*eqn_idx%sys_size*(n + 1)*(p + 1), &
                                       mpi_p, bc_x%beg, 0, &
                                       MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
                                       ierr)
@@ -910,10 +910,10 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, buff_size - 1
-                                do i = 1, sys_size
-                                    r = (i - 1) + sys_size*j &
-                                        + sys_size*buff_size*k &
-                                        + sys_size*buff_size*(n + 1)*l
+                                do i = 1, eqn_idx%sys_size
+                                    r = (i - 1) + eqn_idx%sys_size*j &
+                                        + eqn_idx%sys_size*buff_size*k &
+                                        + eqn_idx%sys_size*buff_size*(n + 1)*l
                                     if (present(q_particle)) then
                                         q_cons_buffer_out(r) = &
                                             q_particle%sf(j, k, l)
@@ -928,10 +928,10 @@ contains
 
                     ! Sending/receiving the data to/from bc_x%beg/bc_x%beg
                     call MPI_SENDRECV(q_cons_buffer_out(0), &
-                                      buff_size*sys_size*(n + 1)*(p + 1), &
+                                      buff_size*eqn_idx%sys_size*(n + 1)*(p + 1), &
                                       mpi_p, bc_x%beg, 1, &
                                       q_cons_buffer_in(0), &
-                                      buff_size*sys_size*(n + 1)*(p + 1), &
+                                      buff_size*eqn_idx%sys_size*(n + 1)*(p + 1), &
                                       mpi_p, bc_x%beg, 0, &
                                       MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
                                       ierr)
@@ -942,10 +942,10 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = -buff_size, -1
-                            do i = 1, sys_size
-                                r = sys_size*(j + buff_size) &
-                                    + sys_size*buff_size*k + (i - 1) &
-                                    + sys_size*buff_size*(n + 1)*l
+                            do i = 1, eqn_idx%sys_size
+                                r = eqn_idx%sys_size*(j + buff_size) &
+                                    + eqn_idx%sys_size*buff_size*k + (i - 1) &
+                                    + eqn_idx%sys_size*buff_size*(n + 1)*l
                                 if (present(q_particle)) then
                                     q_particle%sf(j, k, l) = q_cons_buffer_in(r)
                                 else
@@ -971,10 +971,10 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, buff_size - 1
-                                do i = 1, sys_size
-                                    r = (i - 1) + sys_size*j &
-                                        + sys_size*buff_size*k &
-                                        + sys_size*buff_size*(n + 1)*l
+                                do i = 1, eqn_idx%sys_size
+                                    r = (i - 1) + eqn_idx%sys_size*j &
+                                        + eqn_idx%sys_size*buff_size*k &
+                                        + eqn_idx%sys_size*buff_size*(n + 1)*l
                                     if (present(q_particle)) then
                                         q_cons_buffer_out(r) = &
                                             q_particle%sf(j, k, l)
@@ -988,10 +988,10 @@ contains
                     end do
 
                     call MPI_SENDRECV(q_cons_buffer_out(0), &
-                                      buff_size*sys_size*(n + 1)*(p + 1), &
+                                      buff_size*eqn_idx%sys_size*(n + 1)*(p + 1), &
                                       mpi_p, bc_x%beg, 1, &
                                       q_cons_buffer_in(0), &
-                                      buff_size*sys_size*(n + 1)*(p + 1), &
+                                      buff_size*eqn_idx%sys_size*(n + 1)*(p + 1), &
                                       mpi_p, bc_x%end, 1, &
                                       MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
                                       ierr)
@@ -1003,10 +1003,10 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = m - buff_size + 1, m
-                                do i = 1, sys_size
-                                    r = sys_size*(j - m + buff_size - 1) &
-                                        + sys_size*buff_size*k + (i - 1) &
-                                        + sys_size*buff_size*(n + 1)*l
+                                do i = 1, eqn_idx%sys_size
+                                    r = eqn_idx%sys_size*(j - m + buff_size - 1) &
+                                        + eqn_idx%sys_size*buff_size*k + (i - 1) &
+                                        + eqn_idx%sys_size*buff_size*(n + 1)*l
                                     if (present(q_particle)) then
                                         q_cons_buffer_out(r) = &
                                             q_particle%sf(j, k, l)
@@ -1020,10 +1020,10 @@ contains
                     end do
 
                     call MPI_SENDRECV(q_cons_buffer_out(0), &
-                                      buff_size*sys_size*(n + 1)*(p + 1), &
+                                      buff_size*eqn_idx%sys_size*(n + 1)*(p + 1), &
                                       mpi_p, bc_x%end, 0, &
                                       q_cons_buffer_in(0), &
-                                      buff_size*sys_size*(n + 1)*(p + 1), &
+                                      buff_size*eqn_idx%sys_size*(n + 1)*(p + 1), &
                                       mpi_p, bc_x%end, 1, &
                                       MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
                                       ierr)
@@ -1034,10 +1034,10 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = m + 1, m + buff_size
-                            do i = 1, sys_size
-                                r = (i - 1) + sys_size*(j - m - 1) &
-                                    + sys_size*buff_size*k &
-                                    + sys_size*buff_size*(n + 1)*l
+                            do i = 1, eqn_idx%sys_size
+                                r = (i - 1) + eqn_idx%sys_size*(j - m - 1) &
+                                    + eqn_idx%sys_size*buff_size*k &
+                                    + eqn_idx%sys_size*buff_size*(n + 1)*l
                                 if (present(q_particle)) then
                                     q_particle%sf(j, k, l) = q_cons_buffer_in(r)
                                 else
@@ -1071,11 +1071,11 @@ contains
                     do l = 0, p
                         do k = n - buff_size + 1, n
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
-                                    r = sys_size*(j + buff_size) &
-                                        + sys_size*(m + 2*buff_size + 1)* &
+                                do i = 1, eqn_idx%sys_size
+                                    r = eqn_idx%sys_size*(j + buff_size) &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                         (k - n + buff_size - 1) + (i - 1) &
-                                        + sys_size*(m + 2*buff_size + 1)* &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                         buff_size*l
                                     if (present(q_particle)) then
                                         q_cons_buffer_out(r) = &
@@ -1091,10 +1091,10 @@ contains
 
                     ! Sending/receiving the data to/from bc_y%end/bc_y%beg
                     call MPI_SENDRECV(q_cons_buffer_out(0), buff_size* &
-                                      sys_size*(m + 2*buff_size + 1)* &
+                                      eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                       (p + 1), mpi_p, &
                                       bc_y%end, 0, q_cons_buffer_in(0), &
-                                      buff_size*sys_size* &
+                                      buff_size*eqn_idx%sys_size* &
                                       (m + 2*buff_size + 1)*(p + 1), &
                                       mpi_p, bc_y%beg, 0, &
                                       MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
@@ -1107,10 +1107,10 @@ contains
                     do l = 0, p
                         do k = 0, buff_size - 1
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
-                                    r = sys_size*(j + buff_size) &
-                                        + sys_size*(m + 2*buff_size + 1)*k &
-                                        + sys_size*(m + 2*buff_size + 1)* &
+                                do i = 1, eqn_idx%sys_size
+                                    r = eqn_idx%sys_size*(j + buff_size) &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)*k &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                         buff_size*l + (i - 1)
                                     if (present(q_particle)) then
                                         q_cons_buffer_out(r) = &
@@ -1126,10 +1126,10 @@ contains
 
                     ! Sending/receiving the data to/from bc_y%beg/bc_y%beg
                     call MPI_SENDRECV(q_cons_buffer_out(0), buff_size* &
-                                      sys_size*(m + 2*buff_size + 1)* &
+                                      eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                       (p + 1), mpi_p, &
                                       bc_y%beg, 1, q_cons_buffer_in(0), &
-                                      buff_size*sys_size* &
+                                      buff_size*eqn_idx%sys_size* &
                                       (m + 2*buff_size + 1)*(p + 1), &
                                       mpi_p, bc_y%beg, 0, &
                                       MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
@@ -1141,10 +1141,10 @@ contains
                 do l = 0, p
                     do k = -buff_size, -1
                         do j = -buff_size, m + buff_size
-                            do i = 1, sys_size
-                                r = (i - 1) + sys_size*(j + buff_size) &
-                                    + sys_size*(m + 2*buff_size + 1)* &
-                                    (k + buff_size) + sys_size* &
+                            do i = 1, eqn_idx%sys_size
+                                r = (i - 1) + eqn_idx%sys_size*(j + buff_size) &
+                                    + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
+                                    (k + buff_size) + eqn_idx%sys_size* &
                                     (m + 2*buff_size + 1)*buff_size*l
                                 if (present(q_particle)) then
                                     q_particle%sf(j, k, l) = q_cons_buffer_in(r)
@@ -1171,10 +1171,10 @@ contains
                     do l = 0, p
                         do k = 0, buff_size - 1
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
-                                    r = sys_size*(j + buff_size) &
-                                        + sys_size*(m + 2*buff_size + 1)*k &
-                                        + sys_size*(m + 2*buff_size + 1)* &
+                                do i = 1, eqn_idx%sys_size
+                                    r = eqn_idx%sys_size*(j + buff_size) &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)*k &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                         buff_size*l + (i - 1)
                                     if (present(q_particle)) then
                                         q_cons_buffer_out(r) = &
@@ -1190,10 +1190,10 @@ contains
 
                     ! Sending/receiving the data to/from bc_y%beg/bc_y%end
                     call MPI_SENDRECV(q_cons_buffer_out(0), buff_size* &
-                                      sys_size*(m + 2*buff_size + 1)* &
+                                      eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                       (p + 1), mpi_p, &
                                       bc_y%beg, 1, q_cons_buffer_in(0), &
-                                      buff_size*sys_size* &
+                                      buff_size*eqn_idx%sys_size* &
                                       (m + 2*buff_size + 1)*(p + 1), &
                                       mpi_p, bc_y%end, 1, &
                                       MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
@@ -1206,11 +1206,11 @@ contains
                     do l = 0, p
                         do k = n - buff_size + 1, n
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
-                                    r = sys_size*(j + buff_size) &
-                                        + sys_size*(m + 2*buff_size + 1)* &
+                                do i = 1, eqn_idx%sys_size
+                                    r = eqn_idx%sys_size*(j + buff_size) &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                         (k - n + buff_size - 1) + (i - 1) &
-                                        + sys_size*(m + 2*buff_size + 1)* &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                         buff_size*l
                                     if (present(q_particle)) then
                                         q_cons_buffer_out(r) = &
@@ -1226,10 +1226,10 @@ contains
 
                     ! Sending/receiving the data to/from bc_y%end/bc_y%end
                     call MPI_SENDRECV(q_cons_buffer_out(0), buff_size* &
-                                      sys_size*(m + 2*buff_size + 1)* &
+                                      eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                       (p + 1), mpi_p, &
                                       bc_y%end, 0, q_cons_buffer_in(0), &
-                                      buff_size*sys_size* &
+                                      buff_size*eqn_idx%sys_size* &
                                       (m + 2*buff_size + 1)*(p + 1), &
                                       mpi_p, bc_y%end, 1, &
                                       MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
@@ -1241,10 +1241,10 @@ contains
                 do l = 0, p
                     do k = n + 1, n + buff_size
                         do j = -buff_size, m + buff_size
-                            do i = 1, sys_size
-                                r = (i - 1) + sys_size*(j + buff_size) &
-                                    + sys_size*(m + 2*buff_size + 1)* &
-                                    (k - n - 1) + sys_size* &
+                            do i = 1, eqn_idx%sys_size
+                                r = (i - 1) + eqn_idx%sys_size*(j + buff_size) &
+                                    + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
+                                    (k - n - 1) + eqn_idx%sys_size* &
                                     (m + 2*buff_size + 1)*buff_size*l
                                 if (present(q_particle)) then
                                     q_particle%sf(j, k, l) = q_cons_buffer_in(r)
@@ -1279,10 +1279,10 @@ contains
                     do l = p - buff_size + 1, p
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
-                                    r = sys_size*(j + buff_size) &
-                                        + sys_size*(m + 2*buff_size + 1)* &
-                                        (k + buff_size) + sys_size* &
+                                do i = 1, eqn_idx%sys_size
+                                    r = eqn_idx%sys_size*(j + buff_size) &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
+                                        (k + buff_size) + eqn_idx%sys_size* &
                                         (m + 2*buff_size + 1)* &
                                         (n + 2*buff_size + 1)* &
                                         (l - p + buff_size - 1) + (i - 1)
@@ -1300,11 +1300,11 @@ contains
 
                     ! Sending/receiving the data to/from bc_z%end/bc_z%beg
                     call MPI_SENDRECV(q_cons_buffer_out(0), buff_size* &
-                                      sys_size*(m + 2*buff_size + 1)* &
+                                      eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                       (n + 2*buff_size + 1), &
                                       mpi_p, bc_z%end, 0, &
                                       q_cons_buffer_in(0), buff_size* &
-                                      sys_size*(m + 2*buff_size + 1)* &
+                                      eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                       (n + 2*buff_size + 1), &
                                       mpi_p, bc_z%beg, 0, &
                                       MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
@@ -1317,11 +1317,11 @@ contains
                     do l = 0, buff_size - 1
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
-                                    r = sys_size*(j + buff_size) &
-                                        + sys_size*(m + 2*buff_size + 1)* &
+                                do i = 1, eqn_idx%sys_size
+                                    r = eqn_idx%sys_size*(j + buff_size) &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                         (k + buff_size) + (i - 1) &
-                                        + sys_size*(m + 2*buff_size + 1)* &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                         (n + 2*buff_size + 1)*l
                                     if (present(q_particle)) then
                                         q_cons_buffer_out(r) = &
@@ -1337,11 +1337,11 @@ contains
 
                     ! Sending/receiving the data to/from bc_z%beg/bc_z%beg
                     call MPI_SENDRECV(q_cons_buffer_out(0), buff_size* &
-                                      sys_size*(m + 2*buff_size + 1)* &
+                                      eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                       (n + 2*buff_size + 1), &
                                       mpi_p, bc_z%beg, 1, &
                                       q_cons_buffer_in(0), buff_size* &
-                                      sys_size*(m + 2*buff_size + 1)* &
+                                      eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                       (n + 2*buff_size + 1), &
                                       mpi_p, bc_z%beg, 0, &
                                       MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
@@ -1353,11 +1353,11 @@ contains
                 do l = -buff_size, -1
                     do k = -buff_size, n + buff_size
                         do j = -buff_size, m + buff_size
-                            do i = 1, sys_size
-                                r = sys_size*(j + buff_size) &
-                                    + sys_size*(m + 2*buff_size + 1)* &
+                            do i = 1, eqn_idx%sys_size
+                                r = eqn_idx%sys_size*(j + buff_size) &
+                                    + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                     (k + buff_size) + (i - 1) &
-                                    + sys_size*(m + 2*buff_size + 1)* &
+                                    + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                     (n + 2*buff_size + 1)*(l + buff_size)
                                 if (present(q_particle)) then
                                     q_particle%sf(j, k, l) = q_cons_buffer_in(r)
@@ -1384,11 +1384,11 @@ contains
                     do l = 0, buff_size - 1
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
-                                    r = sys_size*(j + buff_size) &
-                                        + sys_size*(m + 2*buff_size + 1)* &
+                                do i = 1, eqn_idx%sys_size
+                                    r = eqn_idx%sys_size*(j + buff_size) &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                         (k + buff_size) + (i - 1) &
-                                        + sys_size*(m + 2*buff_size + 1)* &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                         (n + 2*buff_size + 1)*l
                                     if (present(q_particle)) then
                                         q_cons_buffer_out(r) = &
@@ -1404,11 +1404,11 @@ contains
 
                     ! Sending/receiving the data to/from bc_z%beg/bc_z%end
                     call MPI_SENDRECV(q_cons_buffer_out(0), buff_size* &
-                                      sys_size*(m + 2*buff_size + 1)* &
+                                      eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                       (n + 2*buff_size + 1), &
                                       mpi_p, bc_z%beg, 1, &
                                       q_cons_buffer_in(0), buff_size* &
-                                      sys_size*(m + 2*buff_size + 1)* &
+                                      eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                       (n + 2*buff_size + 1), &
                                       mpi_p, bc_z%end, 1, &
                                       MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
@@ -1421,10 +1421,10 @@ contains
                     do l = p - buff_size + 1, p
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
-                                    r = sys_size*(j + buff_size) &
-                                        + sys_size*(m + 2*buff_size + 1)* &
-                                        (k + buff_size) + sys_size* &
+                                do i = 1, eqn_idx%sys_size
+                                    r = eqn_idx%sys_size*(j + buff_size) &
+                                        + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
+                                        (k + buff_size) + eqn_idx%sys_size* &
                                         (m + 2*buff_size + 1)* &
                                         (n + 2*buff_size + 1)* &
                                         (l - p + buff_size - 1) + (i - 1)
@@ -1442,11 +1442,11 @@ contains
 
                     ! Sending/receiving the data to/from bc_z%end/bc_z%end
                     call MPI_SENDRECV(q_cons_buffer_out(0), buff_size* &
-                                      sys_size*(m + 2*buff_size + 1)* &
+                                      eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                       (n + 2*buff_size + 1), &
                                       mpi_p, bc_z%end, 0, &
                                       q_cons_buffer_in(0), buff_size* &
-                                      sys_size*(m + 2*buff_size + 1)* &
+                                      eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                       (n + 2*buff_size + 1), &
                                       mpi_p, bc_z%end, 1, &
                                       MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
@@ -1458,11 +1458,11 @@ contains
                 do l = p + 1, p + buff_size
                     do k = -buff_size, n + buff_size
                         do j = -buff_size, m + buff_size
-                            do i = 1, sys_size
-                                r = sys_size*(j + buff_size) &
-                                    + sys_size*(m + 2*buff_size + 1)* &
+                            do i = 1, eqn_idx%sys_size
+                                r = eqn_idx%sys_size*(j + buff_size) &
+                                    + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                     (k + buff_size) + (i - 1) &
-                                    + sys_size*(m + 2*buff_size + 1)* &
+                                    + eqn_idx%sys_size*(m + 2*buff_size + 1)* &
                                     (n + 2*buff_size + 1)*(l - p - 1)
                                 if (present(q_particle)) then
                                     q_particle%sf(j, k, l) = q_cons_buffer_in(r)
