@@ -51,16 +51,16 @@ contains
         !$acc loop seq
         do i = 1, num_fluids
             alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-            alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+            alpha(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
         end do
 
         if (elasticity) then
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
-                                                            alpha_rho, Re, j, k, l, G, Gs)
+                                                            alpha_rho, Re, G, Gs)
         elseif (bubbles_euler) then
-            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
+            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         else
-            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
+            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
 
         !$acc loop seq
@@ -74,7 +74,7 @@ contains
             vel_sum = vel_sum + vel(i)**2._wp
         end do
 
-        pres = q_prim_vf(E_idx)%sf(j, k, l)
+        pres = q_prim_vf(eqn_idx%E)%sf(j, k, l)
 
         E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_sum + qv
 
@@ -260,7 +260,7 @@ contains
 
         end if
 
-        if (any(re_size > 0)) then
+        if (any(eqn_idx%re_size > 0)) then
             max_dt(j, k, l) = min(icfl_dt, vcfl_dt)
         else
             max_dt(j, k, l) = icfl_dt

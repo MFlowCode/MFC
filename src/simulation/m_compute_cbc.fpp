@@ -23,7 +23,7 @@ contains
         !!      Thompson (1990). At the slip wall (frictionless wall),
         !!      the normal component of velocity is zero at all times,
         !!      while the transverse velocities may be nonzero.
-    pure subroutine s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    pure subroutine s_compute_slip_wall_L(lambda, L, rho, c, dpres_ds, dvel_ds)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_slip_wall_L
 #else
@@ -32,14 +32,12 @@ contains
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
-        real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
-        real(wp), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, advxe
             L(i) = 0._wp
@@ -71,7 +69,7 @@ contains
         integer :: i !< Generic loop iterator
 
         L(1) = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(1)))*lambda(1) &
-               *(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+               *(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, momxb
             L(i) = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(2)))*lambda(2) &
@@ -80,16 +78,16 @@ contains
 
         do i = momxb + 1, momxe
             L(i) = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(2)))*lambda(2) &
-                   *(dvel_ds(dir_idx(i - contxe)))
+                   *(dvel_ds(eqn_idx%dir(i - contxe)))
         end do
 
-        do i = E_idx, advxe - 1
+        do i = eqn_idx%E, advxe - 1
             L(i) = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(2)))*lambda(2) &
                    *(dadv_ds(i - momxe))
         end do
 
         L(advxe) = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(3)))*lambda(3) &
-                   *(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
+                   *(dpres_ds + rho*c*dvel_ds(eqn_idx%dir(1)))
 
         if (chemistry) then
             do i = chemxb, chemxe
@@ -103,7 +101,7 @@ contains
         !!      see pg. 455, Thompson (1990). This nonreflecting subsonic
         !!      CBC assumes an incoming flow and reduces the amplitude of
         !!      any reflections caused by outgoing waves.
-    pure subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    pure subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, dpres_ds, dvel_ds)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_inflow_L
 #else
@@ -112,14 +110,12 @@ contains
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
-        real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
-        real(wp), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, advxe
             L(i) = 0._wp
@@ -154,17 +150,17 @@ contains
 
         integer :: i !> Generic loop iterator
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, momxb
             L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
 
         do i = momxb + 1, momxe
-            L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
+            L(i) = lambda(2)*(dvel_ds(eqn_idx%dir(i - contxe)))
         end do
 
-        do i = E_idx, advxe - 1
+        do i = eqn_idx%E, advxe - 1
             L(i) = lambda(2)*(dadv_ds(i - momxe))
         end do
 
@@ -202,21 +198,21 @@ contains
 
         integer :: i !> Generic loop iterator
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, momxb
             L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
 
         do i = momxb + 1, momxe
-            L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
+            L(i) = lambda(2)*(dvel_ds(eqn_idx%dir(i - contxe)))
         end do
 
-        do i = E_idx, advxe - 1
+        do i = eqn_idx%E, advxe - 1
             L(i) = lambda(2)*(dadv_ds(i - momxe))
         end do
 
-        L(advxe) = L(1) + 2._wp*rho*c*lambda(2)*dvel_ds(dir_idx(1))
+        L(advxe) = L(1) + 2._wp*rho*c*lambda(2)*dvel_ds(eqn_idx%dir(1))
 
     end subroutine s_compute_force_free_subsonic_outflow_L
 
@@ -240,17 +236,17 @@ contains
 
         integer :: i !> Generic loop iterator
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, momxb
             L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
 
         do i = momxb + 1, momxe
-            L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
+            L(i) = lambda(2)*(dvel_ds(eqn_idx%dir(i - contxe)))
         end do
 
-        do i = E_idx, advxe - 1
+        do i = eqn_idx%E, advxe - 1
             L(i) = lambda(2)*(dadv_ds(i - momxe))
         end do
 
@@ -263,19 +259,14 @@ contains
         !!      state, or nearly a steady state, CBC in which only the
         !!      transverse terms may generate a time dependence at the
         !!      inflow boundary.
-    pure subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    pure subroutine s_compute_supersonic_inflow_L(L)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_supersonic_inflow_L
 #else
         !$acc routine seq
 #endif
-        real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
-        real(wp), intent(in) :: rho, c
-        real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
-        real(wp), intent(in) :: dpres_ds
-        real(wp), dimension(num_dims), intent(in) :: dvel_ds
-        real(wp), dimension(num_fluids), intent(in) :: dadv_ds
+
         integer :: i
 
         do i = 1, advxe
@@ -310,21 +301,21 @@ contains
         real(wp), dimension(num_species), intent(in) :: dYs_ds
         integer :: i !< Generic loop iterator
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, momxb
             L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
 
         do i = momxb + 1, momxe
-            L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
+            L(i) = lambda(2)*(dvel_ds(eqn_idx%dir(i - contxe)))
         end do
 
-        do i = E_idx, advxe - 1
+        do i = eqn_idx%E, advxe - 1
             L(i) = lambda(2)*(dadv_ds(i - momxe))
         end do
 
-        L(advxe) = lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
+        L(advxe) = lambda(3)*(dpres_ds + rho*c*dvel_ds(eqn_idx%dir(1)))
 
         if (chemistry) then
             do i = chemxb, chemxe

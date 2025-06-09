@@ -639,13 +639,12 @@ contains
     end subroutine s_compute_weno_coefficients
 
     subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
-                      norm_dir, weno_dir, &
+                      weno_dir, &
                       is1_weno_d, is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
-        integer, intent(in) :: norm_dir
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
 
@@ -668,7 +667,7 @@ contains
 
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
-                                   norm_dir, weno_dir)
+                                   weno_dir)
         end if
 
         if (weno_order == 1) then
@@ -854,7 +853,7 @@ contains
                                         ! Fu''s code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
                                         tau = abs(beta(2) - beta(0))
                                         alpha = 1._wp + tau/beta                    ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
-                                        alpha = (alpha*alpha*alpha)**2._wp          ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
+                                        alpha = (alpha*alpha*alpha)**2._wp          ! Equation 22 eqn_idx%cont. (some CPU compilers cannot optimize x**6.0)
                                         omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
                                         delta = merge(0._wp, 1._wp, omega < teno_CT)! Equation 26
                                         alpha = delta*d_cbL_${XYZ}$ (:, j)          ! Equation 27
@@ -1120,11 +1119,10 @@ contains
         !! @param is2_weno Index bounds in second coordinate direction
         !! @param is3_weno Index bounds in third coordinate direction
     subroutine s_initialize_weno(v_vf, &
-                                 norm_dir, weno_dir)
+                                 weno_dir)
 
         type(scalar_field), dimension(:), intent(IN) :: v_vf
 
-        integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
 
         integer :: j, k, l, q

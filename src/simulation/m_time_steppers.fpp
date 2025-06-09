@@ -18,6 +18,8 @@ module m_time_steppers
 
     use m_rhs                  !< Right-hane-side (RHS) evaluation procedures
 
+    use m_pressure_relaxation  !< Pressure relaxation procedures
+
     use m_data_output          !< Run-time info & solution data output procedures
 
     use m_bubbles_EE           !< Ensemble-averaged bubble dynamics routines
@@ -133,7 +135,7 @@ contains
         ! Allocating the cell-average primitive variables
         @:ALLOCATE(q_prim_vf(1:sys_size))
 
-        do i = 1, adv_idx%end
+        do i = 1, eqn_idx%adv%end
             @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
@@ -141,22 +143,22 @@ contains
         end do
 
         if (bubbles_euler) then
-            do i = bub_idx%beg, bub_idx%end
+            do i = eqn_idx%bub%beg, eqn_idx%bub%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
             if (adv_n) then
-                @:ALLOCATE(q_prim_vf(n_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                @:ALLOCATE(q_prim_vf(eqn_idx%n)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(q_prim_vf(n_idx))
+                @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%n))
             end if
         end if
 
         if (mhd) then
-            do i = B_idx%beg, B_idx%end
+            do i = eqn_idx%B%beg, eqn_idx%B%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
@@ -165,7 +167,7 @@ contains
         end if
 
         if (elasticity) then
-            do i = stress_idx%beg, stress_idx%end
+            do i = eqn_idx%stress%beg, eqn_idx%stress%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
@@ -183,14 +185,14 @@ contains
         end if
 
         if (cont_damage) then
-            @:ALLOCATE(q_prim_vf(damage_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(q_prim_vf(eqn_idx%damage)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
-            @:ACC_SETUP_SFs(q_prim_vf(damage_idx))
+            @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%damage))
         end if
 
         if (model_eqns == 3) then
-            do i = internalEnergies_idx%beg, internalEnergies_idx%end
+            do i = eqn_idx%internalEnergies%beg, eqn_idx%internalEnergies%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
@@ -199,10 +201,10 @@ contains
         end if
 
         if (surface_tension) then
-            @:ALLOCATE(q_prim_vf(c_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(q_prim_vf(eqn_idx%c)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
-            @:ACC_SETUP_SFs(q_prim_vf(c_idx))
+            @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%c))
         end if
 
         if (chemistry) then
@@ -902,13 +904,13 @@ contains
         call nvtxStartRange("TIMESTEP")
 
         ! Stage 1 of 3
-        call s_adaptive_dt_bubble(t_step, 1)
+        call s_adaptive_dt_bubble(1)
 
         ! Stage 2 of 3
         call s_3rd_order_tvd_rk(t_step, time_avg)
 
         ! Stage 3 of 3
-        call s_adaptive_dt_bubble(t_step, 3)
+        call s_adaptive_dt_bubble(3)
 
         call nvtxEndRange
 
@@ -920,9 +922,9 @@ contains
 
     !> Bubble source part in Strang operator splitting scheme
         !! @param t_step Current time-step
-    impure subroutine s_adaptive_dt_bubble(t_step, stage)
+    impure subroutine s_adaptive_dt_bubble(stage)
 
-        integer, intent(in) :: t_step, stage
+        integer, intent(in) :: stage
 
         type(vector_field) :: gm_alpha_qp
 
@@ -930,18 +932,17 @@ contains
             q_cons_ts(1)%vf, &
             q_T_sf, &
             q_prim_vf, &
-            idwint, &
-            gm_alpha_qp%vf)
+            idwint)
 
         if (bubbles_euler) then
 
-            call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+            call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, rhs_vf)
             call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         elseif (bubbles_lagrange) then
 
             call s_populate_variables_buffers(q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, bc_type)
-            call s_compute_bubble_EL_dynamics(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf, stage)
+            call s_compute_bubble_EL_dynamics(q_prim_vf, stage)
             call s_transfer_data_to_tmp()
             call s_smear_voidfraction()
             if (stage == 3) then
@@ -978,8 +979,7 @@ contains
             q_cons_ts(1)%vf, &
             q_T_sf, &
             q_prim_vf, &
-            idwint, &
-            gm_alpha_qp%vf)
+            idwint)
 
         !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
         do l = 0, p
@@ -1025,7 +1025,7 @@ contains
         call s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = momxb, E_idx
+        do i = momxb, eqn_idx%E
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -1110,18 +1110,18 @@ contains
         end if
 
         ! Deallocating the cell-average primitive variables
-        do i = 1, adv_idx%end
+        do i = 1, eqn_idx%adv%end
             @:DEALLOCATE(q_prim_vf(i)%sf)
         end do
 
         if (mhd) then
-            do i = B_idx%beg, B_idx%end
+            do i = eqn_idx%B%beg, eqn_idx%B%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
         end if
 
         if (elasticity) then
-            do i = stress_idx%beg, stress_idx%end
+            do i = eqn_idx%stress%beg, eqn_idx%stress%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
         end if
@@ -1133,17 +1133,17 @@ contains
         end if
 
         if (cont_damage) then
-            @:DEALLOCATE(q_prim_vf(damage_idx)%sf)
+            @:DEALLOCATE(q_prim_vf(eqn_idx%damage)%sf)
         end if
 
         if (bubbles_euler) then
-            do i = bub_idx%beg, bub_idx%end
+            do i = eqn_idx%bub%beg, eqn_idx%bub%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
         end if
 
         if (model_eqns == 3) then
-            do i = internalEnergies_idx%beg, internalEnergies_idx%end
+            do i = eqn_idx%internalEnergies%beg, eqn_idx%internalEnergies%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
         end if

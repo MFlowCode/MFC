@@ -206,7 +206,7 @@ contains
                             G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs(i)  !alpha_K(1) * Gs(1)
                         end do
 
-                        if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(damage_idx)%sf(k, l, q)), 0._wp)
+                        if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(eqn_idx%damage)%sf(k, l, q)), 0._wp)
 
                         rho_K_field(k, l, q) = rho_K
                         G_K_field(k, l, q) = G_K
@@ -401,7 +401,7 @@ contains
             l = 0; q = 0
             !$acc parallel loop gang vector default(present)
             do k = 0, m
-                rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_star, 0._wp))**cont_damage_s
+                rhs_vf(eqn_idx%damage)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(eqn_idx%stress%beg)%sf(k, l, q)) - tau_star, 0._wp))**cont_damage_s
             end do
         elseif (p == 0) then
             q = 0
@@ -409,13 +409,13 @@ contains
             do l = 0, n
                 do k = 0, m
                     ! Maximum principal stress
-                    tau_p = 0.5_wp*(q_cons_vf(stress_idx%beg)%sf(k, l, q) + &
-                                    q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)) + &
-                            sqrt((q_cons_vf(stress_idx%beg)%sf(k, l, q) - &
-                                  q_cons_vf(stress_idx%beg + 2)%sf(k, l, q))**2.0_wp + &
-                                 4._wp*q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)**2.0_wp)/2._wp
+                    tau_p = 0.5_wp*(q_cons_vf(eqn_idx%stress%beg)%sf(k, l, q) + &
+                                    q_cons_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)) + &
+                            sqrt((q_cons_vf(eqn_idx%stress%beg)%sf(k, l, q) - &
+                                  q_cons_vf(eqn_idx%stress%beg + 2)%sf(k, l, q))**2.0_wp + &
+                                 4._wp*q_cons_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)**2.0_wp)/2._wp
 
-                    rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
+                    rhs_vf(eqn_idx%damage)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
                 end do
             end do
         else
@@ -423,12 +423,12 @@ contains
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        tau_xx = q_cons_vf(stress_idx%beg)%sf(k, l, q)
-                        tau_xy = q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)
-                        tau_yy = q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)
-                        tau_xz = q_cons_vf(stress_idx%beg + 3)%sf(k, l, q)
-                        tau_yz = q_cons_vf(stress_idx%beg + 4)%sf(k, l, q)
-                        tau_zz = q_cons_vf(stress_idx%beg + 5)%sf(k, l, q)
+                        tau_xx = q_cons_vf(eqn_idx%stress%beg)%sf(k, l, q)
+                        tau_xy = q_cons_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)
+                        tau_yy = q_cons_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)
+                        tau_xz = q_cons_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)
+                        tau_yz = q_cons_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)
+                        tau_zz = q_cons_vf(eqn_idx%stress%beg + 5)%sf(k, l, q)
 
                         ! Invariants of the stress tensor
                         I1 = tau_xx + tau_yy + tau_zz
@@ -452,7 +452,7 @@ contains
                             tau_p = I1/3.0_wp
                         end if
 
-                        rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
+                        rhs_vf(eqn_idx%damage)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
                     end do
                 end do
             end do

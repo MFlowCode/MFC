@@ -406,7 +406,7 @@ contains
                                                mpi_p, status, ierr)
                     end do
                 else
-                    do i = 1, adv_idx%end
+                    do i = 1, eqn_idx%adv%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -833,18 +833,18 @@ contains
                         q_particle%sf(j - 1, 0:n, 0:p)
                 else
                     ! Density or partial densities
-                    do i = 1, cont_idx%end
+                    do i = 1, eqn_idx%cont%end
                         q_cons_vf(i)%sf(-j, 0:n, 0:p) = &
                             q_cons_vf(i)%sf(j - 1, 0:n, 0:p)
                     end do
 
                     ! x-component of momentum
-                    q_cons_vf(mom_idx%beg)%sf(-j, 0:n, 0:p) = &
-                        -q_cons_vf(mom_idx%beg)%sf(j - 1, 0:n, 0:p)
+                    q_cons_vf(eqn_idx%mom%beg)%sf(-j, 0:n, 0:p) = &
+                        -q_cons_vf(eqn_idx%mom%beg)%sf(j - 1, 0:n, 0:p)
 
                     ! Remaining momentum component(s), if any, as well as the
                     ! energy and the variable(s) from advection equation(s)
-                    do i = mom_idx%beg + 1, sys_size
+                    do i = eqn_idx%mom%beg + 1, sys_size
                         q_cons_vf(i)%sf(-j, 0:n, 0:p) = &
                             q_cons_vf(i)%sf(j - 1, 0:n, 0:p)
                     end do
@@ -905,18 +905,18 @@ contains
                 else
 
                     ! Density or partial densities
-                    do i = 1, cont_idx%end
+                    do i = 1, eqn_idx%cont%end
                         q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
                             q_cons_vf(i)%sf((m + 1) - j, 0:n, 0:p)
                     end do
 
                     ! x-component of momentum
-                    q_cons_vf(mom_idx%beg)%sf(m + j, 0:n, 0:p) = &
-                        -q_cons_vf(mom_idx%beg)%sf((m + 1) - j, 0:n, 0:p)
+                    q_cons_vf(eqn_idx%mom%beg)%sf(m + j, 0:n, 0:p) = &
+                        -q_cons_vf(eqn_idx%mom%beg)%sf((m + 1) - j, 0:n, 0:p)
 
                     ! Remaining momentum component(s), if any, as well as the
                     ! energy and the variable(s) from advection equation(s)
-                    do i = mom_idx%beg + 1, sys_size
+                    do i = eqn_idx%mom%beg + 1, sys_size
                         q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
                             q_cons_vf(i)%sf((m + 1) - j, 0:n, 0:p)
                     end do
@@ -981,18 +981,18 @@ contains
                                 q_particle%sf(:, -j, k) = &
                                     q_particle%sf(:, j - 1, k + ((p + 1)/2))
                             else
-                                do i = 1, mom_idx%beg
+                                do i = 1, eqn_idx%mom%beg
                                     q_cons_vf(i)%sf(:, -j, k) = &
                                         q_cons_vf(i)%sf(:, j - 1, k + ((p + 1)/2))
                                 end do
 
-                                q_cons_vf(mom_idx%beg + 1)%sf(:, -j, k) = &
-                                    -q_cons_vf(mom_idx%beg + 1)%sf(:, j - 1, k + ((p + 1)/2))
+                                q_cons_vf(eqn_idx%mom%beg + 1)%sf(:, -j, k) = &
+                                    -q_cons_vf(eqn_idx%mom%beg + 1)%sf(:, j - 1, k + ((p + 1)/2))
 
-                                q_cons_vf(mom_idx%end)%sf(:, -j, k) = &
-                                    -q_cons_vf(mom_idx%end)%sf(:, j - 1, k + ((p + 1)/2))
+                                q_cons_vf(eqn_idx%mom%end)%sf(:, -j, k) = &
+                                    -q_cons_vf(eqn_idx%mom%end)%sf(:, j - 1, k + ((p + 1)/2))
 
-                                do i = E_idx, sys_size
+                                do i = eqn_idx%E, sys_size
                                     q_cons_vf(i)%sf(:, -j, k) = &
                                         q_cons_vf(i)%sf(:, j - 1, k + ((p + 1)/2))
                                 end do
@@ -1002,18 +1002,18 @@ contains
                                 q_particle%sf(:, -j, k) = &
                                     q_particle%sf(:, j - 1, k - ((p + 1)/2))
                             else
-                                do i = 1, mom_idx%beg
+                                do i = 1, eqn_idx%mom%beg
                                     q_cons_vf(i)%sf(:, -j, k) = &
                                         q_cons_vf(i)%sf(:, j - 1, k - ((p + 1)/2))
                                 end do
 
-                                q_cons_vf(mom_idx%beg + 1)%sf(:, -j, k) = &
-                                    -q_cons_vf(mom_idx%beg + 1)%sf(:, j - 1, k - ((p + 1)/2))
+                                q_cons_vf(eqn_idx%mom%beg + 1)%sf(:, -j, k) = &
+                                    -q_cons_vf(eqn_idx%mom%beg + 1)%sf(:, j - 1, k - ((p + 1)/2))
 
-                                q_cons_vf(mom_idx%end)%sf(:, -j, k) = &
-                                    -q_cons_vf(mom_idx%end)%sf(:, j - 1, k - ((p + 1)/2))
+                                q_cons_vf(eqn_idx%mom%end)%sf(:, -j, k) = &
+                                    -q_cons_vf(eqn_idx%mom%end)%sf(:, j - 1, k - ((p + 1)/2))
 
-                                do i = E_idx, sys_size
+                                do i = eqn_idx%E, sys_size
                                     q_cons_vf(i)%sf(:, -j, k) = &
                                         q_cons_vf(i)%sf(:, j - 1, k - ((p + 1)/2))
                                 end do
@@ -1031,18 +1031,18 @@ contains
                             q_particle%sf(:, j - 1, 0:p)
                     else
                         ! Density or partial densities and x-momentum component
-                        do i = 1, mom_idx%beg
+                        do i = 1, eqn_idx%mom%beg
                             q_cons_vf(i)%sf(:, -j, 0:p) = &
                                 q_cons_vf(i)%sf(:, j - 1, 0:p)
                         end do
 
                         ! y-component of momentum
-                        q_cons_vf(mom_idx%beg + 1)%sf(:, -j, 0:p) = &
-                            -q_cons_vf(mom_idx%beg + 1)%sf(:, j - 1, 0:p)
+                        q_cons_vf(eqn_idx%mom%beg + 1)%sf(:, -j, 0:p) = &
+                            -q_cons_vf(eqn_idx%mom%beg + 1)%sf(:, j - 1, 0:p)
 
                         ! Remaining z-momentum component, if any, as well as the
                         ! energy and variable(s) from advection equation(s)
-                        do i = mom_idx%beg + 2, sys_size
+                        do i = eqn_idx%mom%beg + 2, sys_size
                             q_cons_vf(i)%sf(:, -j, 0:p) = &
                                 q_cons_vf(i)%sf(:, j - 1, 0:p)
                         end do
@@ -1101,18 +1101,18 @@ contains
                             q_particle%sf(:, (n + 1) - j, 0:p)
                     else
                         ! Density or partial densities and x-momentum component
-                        do i = 1, mom_idx%beg
+                        do i = 1, eqn_idx%mom%beg
                             q_cons_vf(i)%sf(:, n + j, 0:p) = &
                                 q_cons_vf(i)%sf(:, (n + 1) - j, 0:p)
                         end do
 
                         ! y-component of momentum
-                        q_cons_vf(mom_idx%beg + 1)%sf(:, n + j, 0:p) = &
-                            -q_cons_vf(mom_idx%beg + 1)%sf(:, (n + 1) - j, 0:p)
+                        q_cons_vf(eqn_idx%mom%beg + 1)%sf(:, n + j, 0:p) = &
+                            -q_cons_vf(eqn_idx%mom%beg + 1)%sf(:, (n + 1) - j, 0:p)
 
                         ! Remaining z-momentum component, if any, as well as the
                         ! energy and variable(s) from advection equation(s)
-                        do i = mom_idx%beg + 2, sys_size
+                        do i = eqn_idx%mom%beg + 2, sys_size
                             q_cons_vf(i)%sf(:, n + j, 0:p) = &
                                 q_cons_vf(i)%sf(:, (n + 1) - j, 0:p)
                         end do
@@ -1177,17 +1177,17 @@ contains
                         else
                             ! Density or the partial densities and the momentum
                             ! components in x- and y-directions
-                            do i = 1, mom_idx%beg + 1
+                            do i = 1, eqn_idx%mom%beg + 1
                                 q_cons_vf(i)%sf(:, :, -j) = &
                                     q_cons_vf(i)%sf(:, :, j - 1)
                             end do
 
                             ! z-component of momentum
-                            q_cons_vf(mom_idx%end)%sf(:, :, -j) = &
-                                -q_cons_vf(mom_idx%end)%sf(:, :, j - 1)
+                            q_cons_vf(eqn_idx%mom%end)%sf(:, :, -j) = &
+                                -q_cons_vf(eqn_idx%mom%end)%sf(:, :, j - 1)
 
                             ! Energy and advection equation(s) variable(s)
-                            do i = E_idx, sys_size
+                            do i = eqn_idx%E, sys_size
                                 q_cons_vf(i)%sf(:, :, -j) = &
                                     q_cons_vf(i)%sf(:, :, j - 1)
                             end do
@@ -1248,17 +1248,17 @@ contains
                         else
                             ! Density or the partial densities and the momentum
                             ! components in x- and y-directions
-                            do i = 1, mom_idx%beg + 1
+                            do i = 1, eqn_idx%mom%beg + 1
                                 q_cons_vf(i)%sf(:, :, p + j) = &
                                     q_cons_vf(i)%sf(:, :, (p + 1) - j)
                             end do
 
                             ! z-component of momentum
-                            q_cons_vf(mom_idx%end)%sf(:, :, p + j) = &
-                                -q_cons_vf(mom_idx%end)%sf(:, :, (p + 1) - j)
+                            q_cons_vf(eqn_idx%mom%end)%sf(:, :, p + j) = &
+                                -q_cons_vf(eqn_idx%mom%end)%sf(:, :, (p + 1) - j)
 
                             ! Energy and advection equation(s) variable(s)
-                            do i = E_idx, sys_size
+                            do i = eqn_idx%E, sys_size
                                 q_cons_vf(i)%sf(:, :, p + j) = &
                                     q_cons_vf(i)%sf(:, :, (p + 1) - j)
                             end do

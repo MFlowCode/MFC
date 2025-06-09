@@ -398,27 +398,26 @@ contains
         @:ALLOCATE(bubmoms(1:nb, 1:nmom))
 
         do i = 1, nb
-            bubrs(i) = bub_idx%rs(i)
+            bubrs(i) = eqn_idx%bub%rs(i)
         end do
         !$acc update device(bubrs)
 
         do j = 1, nmom
             do i = 1, nb
-                bubmoms(i, j) = bub_idx%moms(i, j)
+                bubmoms(i, j) = eqn_idx%bub%moms(i, j)
             end do
         end do
         !$acc update device(bubmoms)
 
     end subroutine s_initialize_qbmm_module
 
-    pure subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb, mv, rhs_mv)
+    pure subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(in) :: flux_n_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
 
         integer :: i, j, k, l, q
         real(wp) :: nb_q, nb_dot, R, R2, nR, nR2, nR_dot, nR2_dot, var, AX
@@ -543,7 +542,7 @@ contains
             do l = 0, p
                 do q = 0, n
                     do i = 0, m
-                        rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + mom_sp(2)%sf(i, q, l)
+                        rhs_vf(eqn_idx%alf)%sf(i, q, l) = rhs_vf(eqn_idx%alf)%sf(i, q, l) + mom_sp(2)%sf(i, q, l)
                         j = bubxb
                         !$acc loop seq
                         do k = 1, nb
@@ -562,8 +561,7 @@ contains
 
     end subroutine s_compute_qbmm_rhs
 
-!Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
-
+    !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
     pure subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff_nonpoly
@@ -700,7 +698,7 @@ contains
 
     end subroutine s_coeff
 
-    subroutine s_mom_inv(q_cons_vf, q_prim_vf, momsp, moms3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz, nbub_sc)
+    subroutine s_mom_inv(q_cons_vf, q_prim_vf, momsp, moms3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz)
 
         type(scalar_field), dimension(:), intent(inout) :: q_cons_vf, q_prim_vf
         type(scalar_field), dimension(:), intent(inout) :: momsp
@@ -708,7 +706,6 @@ contains
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
         type(int_bounds_info), intent(in) :: ix, iy, iz
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(inout) :: nbub_sc
 
         real(wp), dimension(nmom) :: moms, msum
         real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
@@ -725,8 +722,8 @@ contains
             do id2 = is2_qbmm%beg, is2_qbmm%end
                 do id1 = is1_qbmm%beg, is1_qbmm%end
 
-                    alf = q_prim_vf(alf_idx)%sf(id1, id2, id3)
-                    pres = q_prim_vf(E_idx)%sf(id1, id2, id3)
+                    alf = q_prim_vf(eqn_idx%alf)%sf(id1, id2, id3)
+                    pres = q_prim_vf(eqn_idx%E)%sf(id1, id2, id3)
                     rho = q_prim_vf(contxb)%sf(id1, id2, id3)
 
                     if (bubble_model == 2) then

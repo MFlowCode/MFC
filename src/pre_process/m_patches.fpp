@@ -828,7 +828,7 @@ contains
                     ! Updating the patch identities bookkeeping variable
                     if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
 
-                    q_prim_vf(alf_idx)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
+                    q_prim_vf(eqn_idx%alf)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
                                                      exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
                 end if
 
@@ -891,7 +891,7 @@ contains
                         ! Updating the patch identities bookkeeping variable
                         if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
 
-                        q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
+                        q_prim_vf(eqn_idx%alf)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
                                                          exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
                     end if
 
@@ -1125,8 +1125,8 @@ contains
                             if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                                 !zero density, reassign according to Tait EOS
                                 q_prim_vf(1)%sf(i, j, 0) = &
-                                    (((q_prim_vf(E_idx)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))* &
-                                    rhoref*(1._wp - q_prim_vf(alf_idx)%sf(i, j, 0))
+                                    (((q_prim_vf(eqn_idx%E)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))* &
+                                    rhoref*(1._wp - q_prim_vf(eqn_idx%alf)%sf(i, j, 0))
                             end if
 
                             ! Updating the patch identities bookkeeping variable
@@ -1273,9 +1273,9 @@ contains
                     if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
 
                     ! Assign Parameters
-                    q_prim_vf(mom_idx%beg)%sf(i, j, 0) = U0*sin(x_cc(i)/L0)*cos(y_cc(j)/L0)
-                    q_prim_vf(mom_idx%end)%sf(i, j, 0) = -U0*cos(x_cc(i)/L0)*sin(y_cc(j)/L0)
-                    q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(patch_id)%pres + (cos(2*x_cc(i))/L0 + &
+                    q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = U0*sin(x_cc(i)/L0)*cos(y_cc(j)/L0)
+                    q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = -U0*cos(x_cc(i)/L0)*sin(y_cc(j)/L0)
+                    q_prim_vf(eqn_idx%E)%sf(i, j, 0) = patch_icpp(patch_id)%pres + (cos(2*x_cc(i))/L0 + &
                                                                                 cos(2*y_cc(j))/L0)* &
                                                    (q_prim_vf(1)%sf(i, j, 0)*U0*U0)/16
                 end if
@@ -2299,8 +2299,7 @@ contains
                             if (interpolate) then
                                 STL_levelset%sf(i, j, k, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
                                                                                              total_vertices, &
-                                                                                             point, &
-                                                                                             (/dx, dy, dz/))
+                                                                                             point)
                             else
                                 STL_levelset%sf(i, j, k, patch_id) = distance
                             end if
@@ -2323,15 +2322,12 @@ contains
                                 ! Get the shortest distance between the cell center and the model boundary
                                 STL_levelset%sf(i, j, 0, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
                                                                                              total_vertices, &
-                                                                                             point, &
-                                                                                             (/dx, dy, dz/))
+                                                                                             point)
                             else
                                 ! Get the shortest distance between the cell center and the interpolated model boundary
                                 STL_levelset%sf(i, j, 0, patch_id) = f_distance(boundary_v, &
-                                                                                boundary_vertex_count, &
                                                                                 boundary_edge_count, &
-                                                                                point, &
-                                                                                (/dx, dy, dz/))
+                                                                                point)
                             end if
 
                             ! Correct the sign of the levelset
@@ -2341,10 +2337,9 @@ contains
 
                             ! Get the boundary normals
                             call f_normals(boundary_v, &
-                                            boundary_vertex_count, &
-                                            boundary_edge_count, &
-                                            point, &
-                                            & (/dx, dy, dz/), normals)
+                                           boundary_edge_count, &
+                                           point, &
+                                           normals)
 
                             ! Correct the sign of the levelset_norm
                             if (patch_id_fp(i, j, k) == 0) then

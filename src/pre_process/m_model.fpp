@@ -1104,11 +1104,10 @@ contains
     !! @param point                        The cell centers of the current levelset cell
     !! @param spacing                      Dimensions of the current levelset cell
     !! @return                             Distance which the levelset distance without interpolation
-    pure function f_distance(boundary_v, boundary_vertex_count, boundary_edge_count, point, spacing) result(distance)
-        integer, intent(in) :: boundary_vertex_count, boundary_edge_count
+    pure function f_distance(boundary_v, boundary_edge_count, point) result(distance)
+        integer, intent(in) :: boundary_edge_count
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
         t_vec3, intent(in) :: point
-        t_vec3, intent(in) :: spacing
 
         integer :: i
         real(wp) :: dist_buffer1, dist_buffer2
@@ -1132,16 +1131,13 @@ contains
 
     !> This procedure determines the levelset normals of 2D models without interpolation.
     !! @param boundary_v                   Group of all the boundary vertices of the 2D model without interpolation
-    !! @param boundary_vertex_count        Output the total number of boundary vertices
     !! @param boundary_edge_count          Output the total number of boundary edges
     !! @param point                        The cell centers of the current levelset cell
-    !! @param spacing                      Dimensions of the current levelset cell
     !! @param normals                      Output levelset normals without interpolation
-    pure subroutine f_normals(boundary_v, boundary_vertex_count, boundary_edge_count, point, spacing, normals)
-        integer, intent(in) :: boundary_vertex_count, boundary_edge_count
+    pure subroutine f_normals(boundary_v, boundary_edge_count, point, normals)
+        integer, intent(in) :: boundary_edge_count
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
         t_vec3, intent(in) :: point
-        t_vec3, intent(in) :: spacing
         t_vec3, intent(out) :: normals
 
         integer :: i, idx_buffer
@@ -1176,13 +1172,11 @@ contains
     !! @param interpolated_boundary_v      Group of all the boundary vertices of the interpolated 2D model
     !! @param total_vertices               Total number of vertices after interpolation
     !! @param point                        The cell centers of the current levelset cell
-    !! @param spacing                      Dimensions of the current levelset cell
     !! @return                             Distance which the levelset distance without interpolation
-    pure function f_interpolated_distance(interpolated_boundary_v, total_vertices, point, spacing) result(distance)
+    pure function f_interpolated_distance(interpolated_boundary_v, total_vertices, point) result(distance)
         integer, intent(in) :: total_vertices
         real(wp), intent(in), dimension(1:total_vertices, 1:3) :: interpolated_boundary_v
         t_vec3, intent(in) :: point
-        t_vec3, intent(in) :: spacing
 
         integer :: i !< Loop iterator
         real(wp) :: dist_buffer, min_dist

@@ -197,16 +197,16 @@ contains
                     ! Compute mixture sound speed
                     if (alt_soundspeed .neqv. .true.) then
                         q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)* &
-                                          q_prim_vf(E_idx)%sf(i, j, k) + &
+                                          q_prim_vf(eqn_idx%E)%sf(i, j, k) + &
                                           pi_inf_sf(i, j, k))/(gamma_sf(i, j, k)* &
                                                                rho_sf(i, j, k)))
                     else
-                        blkmod1 = ((fluid_pp(1)%gamma + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + &
+                        blkmod1 = ((fluid_pp(1)%gamma + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + &
                                    fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-                        blkmod2 = ((fluid_pp(2)%gamma + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + &
+                        blkmod2 = ((fluid_pp(2)%gamma + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + &
                                    fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
-                        q_sf(i, j, k) = (1._wp/(rho_sf(i, j, k)*(q_prim_vf(adv_idx%beg)%sf(i, j, k)/blkmod1 + &
-                                                                 (1._wp - q_prim_vf(adv_idx%beg)%sf(i, j, k))/blkmod2)))
+                        q_sf(i, j, k) = (1._wp/(rho_sf(i, j, k)*(q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k)/blkmod1 + &
+                                                                 (1._wp - q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k))/blkmod2)))
                     end if
 
                     if (mixture_err .and. q_sf(i, j, k) < 0._wp) then
@@ -246,40 +246,40 @@ contains
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
                     if (i == 1) then
-                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0._wp) then
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k, l) - &
-                                  q_prim_vf(adv_idx%beg)%sf(j - 1, k, l)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j + 1, k, l) - &
-                                     q_prim_vf(adv_idx%beg)%sf(j, k, l)
+                        if (q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l) >= 0._wp) then
+                            top = q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l) - &
+                                  q_prim_vf(eqn_idx%adv%beg)%sf(j - 1, k, l)
+                            bottom = q_prim_vf(eqn_idx%adv%beg)%sf(j + 1, k, l) - &
+                                     q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l)
                         else
-                            top = q_prim_vf(adv_idx%beg)%sf(j + 2, k, l) - &
-                                  q_prim_vf(adv_idx%beg)%sf(j + 1, k, l)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j + 1, k, l) - &
-                                     q_prim_vf(adv_idx%beg)%sf(j, k, l)
+                            top = q_prim_vf(eqn_idx%adv%beg)%sf(j + 2, k, l) - &
+                                  q_prim_vf(eqn_idx%adv%beg)%sf(j + 1, k, l)
+                            bottom = q_prim_vf(eqn_idx%adv%beg)%sf(j + 1, k, l) - &
+                                     q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l)
                         end if
                     elseif (i == 2) then
-                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0._wp) then
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k, l) - &
-                                  q_prim_vf(adv_idx%beg)%sf(j, k - 1, l)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j, k + 1, l) - &
-                                     q_prim_vf(adv_idx%beg)%sf(j, k, l)
+                        if (q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l) >= 0._wp) then
+                            top = q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l) - &
+                                  q_prim_vf(eqn_idx%adv%beg)%sf(j, k - 1, l)
+                            bottom = q_prim_vf(eqn_idx%adv%beg)%sf(j, k + 1, l) - &
+                                     q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l)
                         else
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k + 2, l) - &
-                                  q_prim_vf(adv_idx%beg)%sf(j, k + 1, l)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j, k + 1, l) - &
-                                     q_prim_vf(adv_idx%beg)%sf(j, k, l)
+                            top = q_prim_vf(eqn_idx%adv%beg)%sf(j, k + 2, l) - &
+                                  q_prim_vf(eqn_idx%adv%beg)%sf(j, k + 1, l)
+                            bottom = q_prim_vf(eqn_idx%adv%beg)%sf(j, k + 1, l) - &
+                                     q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l)
                         end if
                     else
-                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0._wp) then
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k, l) - &
-                                  q_prim_vf(adv_idx%beg)%sf(j, k, l - 1)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j, k, l + 1) - &
-                                     q_prim_vf(adv_idx%beg)%sf(j, k, l)
+                        if (q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l) >= 0._wp) then
+                            top = q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l) - &
+                                  q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l - 1)
+                            bottom = q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l + 1) - &
+                                     q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l)
                         else
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k, l + 2) - &
-                                  q_prim_vf(adv_idx%beg)%sf(j, k, l + 1)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j, k, l + 1) - &
-                                     q_prim_vf(adv_idx%beg)%sf(j, k, l)
+                            top = q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l + 2) - &
+                                  q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l + 1)
+                            bottom = q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l + 1) - &
+                                     q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l)
                         end if
                     end if
 
@@ -401,15 +401,15 @@ contains
                                 q_sf(j, k, l) = &
                                     q_sf(j, k, l) + 1._wp/y_cc(k)* &
                                     (fd_coeff_y(r, k)*y_cc(r + k)* &
-                                     q_prim_vf(mom_idx%end)%sf(j, r + k, l) &
+                                     q_prim_vf(eqn_idx%mom%end)%sf(j, r + k, l) &
                                      - fd_coeff_z(r, l)* &
-                                     q_prim_vf(mom_idx%beg + 1)%sf(j, k, r + l))
+                                     q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, r + l))
                             else
                                 q_sf(j, k, l) = &
                                     q_sf(j, k, l) + fd_coeff_y(r, k)* &
-                                    q_prim_vf(mom_idx%end)%sf(j, r + k, l) &
+                                    q_prim_vf(eqn_idx%mom%end)%sf(j, r + k, l) &
                                     - fd_coeff_z(r, l)* &
-                                    q_prim_vf(mom_idx%beg + 1)%sf(j, k, r + l)
+                                    q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, r + l)
                             end if
                         end do
 
@@ -429,15 +429,15 @@ contains
                             if (grid_geometry == 3) then
                                 q_sf(j, k, l) = &
                                     q_sf(j, k, l) + fd_coeff_z(r, l)/y_cc(k)* &
-                                    q_prim_vf(mom_idx%beg)%sf(j, k, r + l) &
+                                    q_prim_vf(eqn_idx%mom%beg)%sf(j, k, r + l) &
                                     - fd_coeff_x(r, j)* &
-                                    q_prim_vf(mom_idx%end)%sf(r + j, k, l)
+                                    q_prim_vf(eqn_idx%mom%end)%sf(r + j, k, l)
                             else
                                 q_sf(j, k, l) = &
                                     q_sf(j, k, l) + fd_coeff_z(r, l)* &
-                                    q_prim_vf(mom_idx%beg)%sf(j, k, r + l) &
+                                    q_prim_vf(eqn_idx%mom%beg)%sf(j, k, r + l) &
                                     - fd_coeff_x(r, j)* &
-                                    q_prim_vf(mom_idx%end)%sf(r + j, k, l)
+                                    q_prim_vf(eqn_idx%mom%end)%sf(r + j, k, l)
                             end if
                         end do
 
@@ -456,9 +456,9 @@ contains
                         do r = -fd_number, fd_number
                             q_sf(j, k, l) = &
                                 q_sf(j, k, l) + fd_coeff_x(r, j)* &
-                                q_prim_vf(mom_idx%beg + 1)%sf(r + j, k, l) &
+                                q_prim_vf(eqn_idx%mom%beg + 1)%sf(r + j, k, l) &
                                 - fd_coeff_y(r, k)* &
-                                q_prim_vf(mom_idx%beg)%sf(j, r + k, l)
+                                q_prim_vf(eqn_idx%mom%beg)%sf(j, r + k, l)
                         end do
 
                     end do
@@ -504,17 +504,17 @@ contains
                             q_jacobian_sf(jj, 1) = &
                                 q_jacobian_sf(jj, 1) + &
                                 fd_coeff_x(r, j)* &
-                                q_prim_vf(mom_idx%beg + jj - 1)%sf(r + j, k, l)
+                                q_prim_vf(eqn_idx%mom%beg + jj - 1)%sf(r + j, k, l)
                             ! d()/dy
                             q_jacobian_sf(jj, 2) = &
                                 q_jacobian_sf(jj, 2) + &
                                 fd_coeff_y(r, k)* &
-                                q_prim_vf(mom_idx%beg + jj - 1)%sf(j, r + k, l)
+                                q_prim_vf(eqn_idx%mom%beg + jj - 1)%sf(j, r + k, l)
                             ! d()/dz
                             q_jacobian_sf(jj, 3) = &
                                 q_jacobian_sf(jj, 3) + &
                                 fd_coeff_z(r, l)* &
-                                q_prim_vf(mom_idx%beg + jj - 1)%sf(j, k, r + l)
+                                q_prim_vf(eqn_idx%mom%beg + jj - 1)%sf(j, k, r + l)
                         end do
                     end do
 
@@ -667,10 +667,10 @@ contains
 
                         q_sf(j, k, l) = 0._wp
 
-                        do i = 1, adv_idx%end - E_idx
+                        do i = 1, eqn_idx%adv%end - eqn_idx%E
                             q_sf(j, k, l) = &
                                 q_sf(j, k, l) - schlieren_alpha(i)* &
-                                q_cons_vf(i + E_idx)%sf(j, k, l)* &
+                                q_cons_vf(i + eqn_idx%E)%sf(j, k, l)* &
                                 gm_rho_sf(j, k, l)/gm_rho_max(1)
                         end do
                     end do

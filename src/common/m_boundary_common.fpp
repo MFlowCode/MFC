@@ -143,7 +143,7 @@ contains
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, -1, k, l)
                     case (BC_AXIS)
-                        call s_axis(q_prim_vf, pb, mv, 2, -1, k, l)
+                        call s_axis(q_prim_vf, pb, mv, k, l)
                     case (BC_REFLECTIVE)
                         call s_symmetry(q_prim_vf, pb, mv, 2, -1, k, l)
                     case (BC_PERIODIC)
@@ -496,7 +496,7 @@ contains
                     q_prim_vf(momxe)%sf(k, l, -j) = &
                         -q_prim_vf(momxe)%sf(k, l, j - 1)
 
-                    do i = E_idx, sys_size
+                    do i = eqn_idx%E, sys_size
                         q_prim_vf(i)%sf(k, l, -j) = &
                             q_prim_vf(i)%sf(k, l, j - 1)
                     end do
@@ -536,7 +536,7 @@ contains
                     q_prim_vf(momxe)%sf(k, l, p + j) = &
                         -q_prim_vf(momxe)%sf(k, l, p - (j - 1))
 
-                    do i = E_idx, sys_size
+                    do i = eqn_idx%E, sys_size
                         q_prim_vf(i)%sf(k, l, p + j) = &
                             q_prim_vf(i)%sf(k, l, p - (j - 1))
                     end do
@@ -714,7 +714,7 @@ contains
 
     end subroutine s_periodic
 
-    pure subroutine s_axis(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
+    pure subroutine s_axis(q_prim_vf, pb, mv, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_axis
 #else
@@ -722,7 +722,6 @@ contains
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
-        integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
         integer :: j, q, i
@@ -740,7 +739,7 @@ contains
                 q_prim_vf(momxe)%sf(k, -j, l) = &
                     -q_prim_vf(momxe)%sf(k, j - 1, l + ((p + 1)/2))
 
-                do i = E_idx, sys_size
+                do i = eqn_idx%E, sys_size
                     q_prim_vf(i)%sf(k, -j, l) = &
                         q_prim_vf(i)%sf(k, j - 1, l + ((p + 1)/2))
                 end do
@@ -756,7 +755,7 @@ contains
                 q_prim_vf(momxe)%sf(k, -j, l) = &
                     -q_prim_vf(momxe)%sf(k, j - 1, l - ((p + 1)/2))
 
-                do i = E_idx, sys_size
+                do i = eqn_idx%E, sys_size
                     q_prim_vf(i)%sf(k, -j, l) = &
                         q_prim_vf(i)%sf(k, j - 1, l - ((p + 1)/2))
                 end do

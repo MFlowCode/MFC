@@ -305,57 +305,57 @@ contains
 
                         if ((i >= chemxb) .and. (i <= chemxe)) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
-                        else if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
+                        else if (((i >= eqn_idx%cont%beg) .and. (i <= eqn_idx%cont%end)) &
                                  .or. &
-                                 ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
+                                 ((i >= eqn_idx%adv%beg) .and. (i <= eqn_idx%adv%end)) &
                                  .or. &
                                  ((i >= chemxb) .and. (i <= chemxe)) &
                                  ) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i == mom_idx%beg) then !u
-                            write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i == stress_idx%beg) then !tau_e
-                            write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i == E_idx) then !p
+                        else if (i == eqn_idx%mom%beg) then !u
+                            write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)/rho
+                        else if (i == eqn_idx%stress%beg) then !tau_e
+                            write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%stress%beg)%sf(j, 0, 0)/rho
+                        else if (i == eqn_idx%E) then !p
                             if (mhd) then
-                                pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(B_idx%beg)%sf(j, 0, 0)**2 + q_cons_vf(B_idx%beg + 1)%sf(j, 0, 0)**2)
+                                pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(eqn_idx%B%beg)%sf(j, 0, 0)**2 + q_cons_vf(eqn_idx%B%beg + 1)%sf(j, 0, 0)**2)
                             end if
 
                             call s_compute_pressure( &
-                                q_cons_vf(E_idx)%sf(j, 0, 0), &
-                                q_cons_vf(alf_idx)%sf(j, 0, 0), &
-                                0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2._wp)/rho, &
+                                q_cons_vf(eqn_idx%E)%sf(j, 0, 0), &
+                                q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), &
+                                0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)**2._wp)/rho, &
                                 pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
                             write (2, FMT) x_cb(j), pres
                         else if (mhd) then
-                            if (i == mom_idx%beg + 1) then ! v
-                                write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg + 1)%sf(j, 0, 0)/rho
-                            else if (i == mom_idx%beg + 2) then ! w
-                                write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg + 2)%sf(j, 0, 0)/rho
-                            else if (i == B_idx%beg) then ! By
-                                write (2, FMT) x_cb(j), q_cons_vf(B_idx%beg)%sf(j, 0, 0)/rho
-                            else if (i == B_idx%beg + 1) then ! Bz
-                                write (2, FMT) x_cb(j), q_cons_vf(B_idx%beg + 1)%sf(j, 0, 0)/rho
+                            if (i == eqn_idx%mom%beg + 1) then ! v
+                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, 0, 0)/rho
+                            else if (i == eqn_idx%mom%beg + 2) then ! w
+                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg + 2)%sf(j, 0, 0)/rho
+                            else if (i == eqn_idx%B%beg) then ! By
+                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%B%beg)%sf(j, 0, 0)/rho
+                            else if (i == eqn_idx%B%beg + 1) then ! Bz
+                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%B%beg + 1)%sf(j, 0, 0)/rho
                             end if
-                        else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles_euler) then
+                        else if ((i >= eqn_idx%bub%beg) .and. (i <= eqn_idx%bub%end) .and. bubbles_euler) then
 
                             if (qbmm) then
                                 nbub = q_cons_vf(bubxb)%sf(j, 0, 0)
                             else
                                 if (adv_n) then
-                                    nbub = q_cons_vf(n_idx)%sf(j, 0, 0)
+                                    nbub = q_cons_vf(eqn_idx%n)%sf(j, 0, 0)
                                 else
                                     do k = 1, nb
-                                        nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
+                                        nRtmp(k) = q_cons_vf(eqn_idx%bub%rs(k))%sf(j, 0, 0)
                                     end do
 
-                                    call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
+                                    call s_comp_n_from_cons(q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), nRtmp, nbub, weight)
                                 end if
                             end if
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
-                        else if (i == n_idx .and. adv_n .and. bubbles_euler) then
+                        else if (i == eqn_idx%n .and. adv_n .and. bubbles_euler) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i == damage_idx) then
+                        else if (i == eqn_idx%damage) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         end if
                     end do
@@ -641,7 +641,7 @@ contains
 
             ! Write the data for each variable
             if (bubbles_euler) then
-                do i = 1, sys_size! adv_idx%end
+                do i = 1, sys_size! eqn_idx%adv%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -658,7 +658,7 @@ contains
                 end if
             else
                 do i = 1, sys_size !TODO: check if this is right
-                    !            do i = 1, adv_idx%end
+                    !            do i = 1, eqn_idx%adv%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -705,7 +705,7 @@ contains
 
             ! Write the data for each variable
             if (bubbles_euler) then
-                do i = 1, sys_size! adv_idx%end
+                do i = 1, sys_size! eqn_idx%adv%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
@@ -732,7 +732,7 @@ contains
                 end if
             else
                 do i = 1, sys_size !TODO: check if this is right
-                    !            do i = 1, adv_idx%end
+                    !            do i = 1, eqn_idx%adv%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
@@ -935,7 +935,7 @@ contains
         do i = momxb, momxe
             write (1, '(I3,A20,A20)') i, "\rho u_"//coord(i - momxb + 1), "u_"//coord(i - momxb + 1)
         end do
-        do i = E_idx, E_idx
+        do i = eqn_idx%E, eqn_idx%E
             write (1, '(I3,A20,A20)') i, "\rho U", "p"
         end do
         do i = advxb, advxe
@@ -950,7 +950,7 @@ contains
 
         write (1, '(A)') ""
         if (momxb /= 0) write (1, '("[",I2,",",I2,"]",A)') momxb, momxe, " Momentum"
-        if (E_idx /= 0) write (1, '("[",I2,",",I2,"]",A)') E_idx, E_idx, " Energy/Pressure"
+        if (eqn_idx%E /= 0) write (1, '("[",I2,",",I2,"]",A)') eqn_idx%E, eqn_idx%E, " Energy/Pressure"
         if (advxb /= 0) write (1, '("[",I2,",",I2,"]",A)') advxb, advxe, " Advection"
         if (contxb /= 0) write (1, '("[",I2,",",I2,"]",A)') contxb, contxe, " Continuity"
         if (bubxb /= 0) write (1, '("[",I2,",",I2,"]",A)') bubxb, bubxe, " Bubbles_euler"

@@ -85,16 +85,16 @@ contains
                     divB = 0._wp
                     !$acc loop seq
                     do r = -fd_number, fd_number
-                        divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                        divB = divB + q_prim_vf(eqn_idx%B%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
                     end do
                     !$acc loop seq
                     do r = -fd_number, fd_number
-                        divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                        divB = divB + q_prim_vf(eqn_idx%B%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
                     end do
                     if (p > 0) then
                         !$acc loop seq
                         do r = -fd_number, fd_number
-                            divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
+                            divB = divB + q_prim_vf(eqn_idx%B%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
                         end do
                     end if
 
@@ -102,9 +102,9 @@ contains
                     v(2) = q_prim_vf(momxb + 1)%sf(k, l, q)
                     v(3) = q_prim_vf(momxb + 2)%sf(k, l, q)
 
-                    B(1) = q_prim_vf(B_idx%beg)%sf(k, l, q)
-                    B(2) = q_prim_vf(B_idx%beg + 1)%sf(k, l, q)
-                    B(3) = q_prim_vf(B_idx%beg + 2)%sf(k, l, q)
+                    B(1) = q_prim_vf(eqn_idx%B%beg)%sf(k, l, q)
+                    B(2) = q_prim_vf(eqn_idx%B%beg + 1)%sf(k, l, q)
+                    B(3) = q_prim_vf(eqn_idx%B%beg + 2)%sf(k, l, q)
 
                     vdotB = sum(v*B)
 
@@ -121,11 +121,11 @@ contains
                     rhs_vf(momxb + 1)%sf(k, l, q) = rhs_vf(momxb + 1)%sf(k, l, q) - divB*B(2)
                     rhs_vf(momxb + 2)%sf(k, l, q) = rhs_vf(momxb + 2)%sf(k, l, q) - divB*B(3)
 
-                    rhs_vf(E_idx)%sf(k, l, q) = rhs_vf(E_idx)%sf(k, l, q) - divB*vdotB
+                    rhs_vf(eqn_idx%E)%sf(k, l, q) = rhs_vf(eqn_idx%E)%sf(k, l, q) - divB*vdotB
 
-                    rhs_vf(B_idx%beg)%sf(k, l, q) = rhs_vf(B_idx%beg)%sf(k, l, q) - divB*v(1)
-                    rhs_vf(B_idx%beg + 1)%sf(k, l, q) = rhs_vf(B_idx%beg + 1)%sf(k, l, q) - divB*v(2)
-                    rhs_vf(B_idx%beg + 2)%sf(k, l, q) = rhs_vf(B_idx%beg + 2)%sf(k, l, q) - divB*v(3)
+                    rhs_vf(eqn_idx%B%beg)%sf(k, l, q) = rhs_vf(eqn_idx%B%beg)%sf(k, l, q) - divB*v(1)
+                    rhs_vf(eqn_idx%B%beg + 1)%sf(k, l, q) = rhs_vf(eqn_idx%B%beg + 1)%sf(k, l, q) - divB*v(2)
+                    rhs_vf(eqn_idx%B%beg + 2)%sf(k, l, q) = rhs_vf(eqn_idx%B%beg + 2)%sf(k, l, q) - divB*v(3)
 
                 end do
             end do

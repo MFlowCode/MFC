@@ -29,9 +29,8 @@ module m_boundary_conditions
  s_write_parallel_boundary_condition_files
 
 contains
-    impure subroutine s_line_segment_bc(patch_id, q_prim_vf, bc_type)
+    impure subroutine s_line_segment_bc(patch_id, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
         integer, intent(in) :: patch_id
 
@@ -79,9 +78,8 @@ contains
 
     end subroutine s_line_segment_bc
 
-    impure subroutine s_circle_bc(patch_id, q_prim_vf, bc_type)
+    impure subroutine s_circle_bc(patch_id, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 
         integer, intent(in) :: patch_id
@@ -143,9 +141,8 @@ contains
 
     end subroutine s_circle_bc
 
-    impure subroutine s_rectangle_bc(patch_id, q_prim_vf, bc_type)
+    impure subroutine s_rectangle_bc(patch_id, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 
         integer, intent(in) :: patch_id
@@ -247,9 +244,9 @@ contains
                 end if
 
                 if (patch_bc(i)%geometry == 2) then
-                    call s_circle_bc(i, q_prim_vf, bc_type)
+                    call s_circle_bc(i, bc_type)
                 elseif (patch_bc(i)%geometry == 3) then
-                    call s_rectangle_bc(i, q_prim_vf, bc_type)
+                    call s_rectangle_bc(i, bc_type)
                 end if
             end do
             !< Apply 1D patches to 2D domain
@@ -260,7 +257,7 @@ contains
                 end if
 
                 if (patch_bc(i)%geometry == 1) then
-                    call s_line_segment_bc(i, q_prim_vf, bc_type)
+                    call s_line_segment_bc(i, bc_type)
                 end if
             end do
         end if

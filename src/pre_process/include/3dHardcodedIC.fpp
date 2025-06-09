@@ -33,14 +33,14 @@
             q_prim_vf(advxe)%sf(i, j, k) = 1._wp - alph
             q_prim_vf(contxb)%sf(i, j, k) = alph*rhoH
             q_prim_vf(contxe)%sf(i, j, k) = (1._wp - alph)*rhoL
-            q_prim_vf(E_idx)%sf(i, j, k) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
+            q_prim_vf(eqn_idx%E)%sf(i, j, k) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
         else
             q_prim_vf(advxb)%sf(i, j, k) = alph
             q_prim_vf(advxe)%sf(i, j, k) = 1._wp - alph
             q_prim_vf(contxb)%sf(i, j, k) = alph*rhoH
             q_prim_vf(contxe)%sf(i, j, k) = (1._wp - alph)*rhoL
             pInt = pref + rhoH*9.81_wp*(1.2_wp - intH)
-            q_prim_vf(E_idx)%sf(i, j, k) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
+            q_prim_vf(eqn_idx%E)%sf(i, j, k) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
         end if
 
     case (301) ! (3D lung geometry in X direction, |sin(*)+sin(*)|)
@@ -51,7 +51,7 @@
         if (x_cc(i) > intH) then
             q_prim_vf(contxb)%sf(i, j, k) = patch_icpp(1)%alpha_rho(1)
             q_prim_vf(contxe)%sf(i, j, k) = patch_icpp(1)%alpha_rho(2)
-            q_prim_vf(E_idx)%sf(i, j, k) = patch_icpp(1)%pres
+            q_prim_vf(eqn_idx%E)%sf(i, j, k) = patch_icpp(1)%pres
             q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
