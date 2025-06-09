@@ -88,13 +88,13 @@ contains
 
                     if (idir == 1) then
                         divB = 1._wp/dx(k)* &
-                        (flux_gsrc_n(1)%sf(k, l, q) - flux_gsrc_n(1)%sf(k - 1, l, q))
+                               (flux_gsrc_n(1)%sf(k, l, q) - flux_gsrc_n(1)%sf(k - 1, l, q))
                     else if (idir == 2) then
                         divB = 1._wp/dy(l)* &
-                        (flux_gsrc_n(1)%sf(k, l, q) - flux_gsrc_n(1)%sf(k, l - 1, q))
+                               (flux_gsrc_n(1)%sf(k, l, q) - flux_gsrc_n(1)%sf(k, l - 1, q))
                     else if (idir == 3) then
                         divB = 1._wp/dz(l)* &
-                        (flux_gsrc_n(1)%sf(k, l, q) - flux_gsrc_n(1)%sf(k, l, q - 1))
+                               (flux_gsrc_n(1)%sf(k, l, q) - flux_gsrc_n(1)%sf(k, l, q - 1))
                     end if
 
                     v(1) = q_prim_vf(momxb)%sf(k, l, q)

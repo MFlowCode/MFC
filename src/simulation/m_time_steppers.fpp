@@ -436,7 +436,7 @@ contains
                         !     q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) &
                         !     - dt*q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)/hyper_cleaning_tau
                         q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) * &
+                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)* &
                             exp(-dt/hyper_cleaning_tau)
                     end do
                 end do
@@ -746,7 +746,7 @@ contains
                         !     q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) &
                         !     - dt*q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)/hyper_cleaning_tau
                         q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) * &
+                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)* &
                             exp(-dt/hyper_cleaning_tau)
                     end do
                 end do
@@ -838,7 +838,7 @@ contains
                         !     q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) &
                         !     - dt*q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)/hyper_cleaning_tau
                         q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) * &
+                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)* &
                             exp(-dt/hyper_cleaning_tau)
                     end do
                 end do
@@ -933,7 +933,7 @@ contains
                         !     q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) &
                         !     - dt*q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)/hyper_cleaning_tau
                         q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) * &
+                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)* &
                             exp(-dt/hyper_cleaning_tau)
                     end do
                 end do
