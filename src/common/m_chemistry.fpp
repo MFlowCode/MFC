@@ -162,7 +162,7 @@ contains
         
         if (chemistry) then
             ! Set offsets based on direction using array indexing
-            offsets = 0
+            offsets(:) = 0
             offsets(idir) = 1
 
             !$acc parallel loop collapse(3) gang vector default(present) &

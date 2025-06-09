@@ -45,7 +45,8 @@ module m_riemann_solvers
         gas_constant, get_mixture_molecular_weight, &
         get_mixture_specific_heat_cv_mass, get_mixture_energy_mass, &
         get_species_specific_heats_r, get_species_enthalpies_rt, &
-        get_mixture_specific_heat_cp_mass
+        get_mixture_specific_heat_cp_mass, get_mixture_viscosity_mixavg
+
 
     implicit none
 
@@ -107,7 +108,7 @@ module m_riemann_solvers
     !$acc declare create(is1, is2, is3, isx, isy, isz)
 
     real(wp), allocatable, dimension(:) :: Gs
-    !$acc declare create(Gs)
+    !$acc declare create(gs)
 
     real(wp), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
@@ -674,6 +675,12 @@ contains
                             end if
 
                             if (viscous) then
+                                if (chem_params%diffusion) then
+                                    call get_mixture_viscosity_mixavg(T_L, Ys_L, Re_L(1))
+                                    call get_mixture_viscosity_mixavg(T_R, Ys_R, Re_R(1))
+                                    Re_L(1) = 1.0_wp/Re_L(1)
+                                    Re_R(1) = 1.0_wp/Re_R(1)
+                                end if
                                 !$acc loop seq
                                 do i = 1, 2
                                     Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2._wp/(1._wp/Re_L(i) + 1._wp/Re_R(i))
@@ -2683,6 +2690,12 @@ contains
                                                               vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
                                 if (viscous) then
+                                    if (chem_params%diffusion) then
+                                        call get_mixture_viscosity_mixavg(T_L, Ys_L, Re_L(1))
+                                        call get_mixture_viscosity_mixavg(T_R, Ys_R, Re_R(1))
+                                        Re_L(1) = 1.0_wp/Re_L(1)
+                                        Re_R(1) = 1.0_wp/Re_R(1)
+                                    end if
                                     !$acc loop seq
                                     do i = 1, 2
                                         Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2._wp/(1._wp/Re_L(i) + 1._wp/Re_R(i))
@@ -3845,6 +3858,21 @@ contains
                 end do
             end if
 
+            if (chem_params%diffusion) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = E_idx, chemxe
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                if (i .eq. E_idx .or. i .ge. chemxb) then
+                                    flux_src_vf(i)%sf(j, k, l) = 0._wp
+                                end if
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
             if (qbmm) then
 
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -3868,7 +3896,22 @@ contains
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
-                                flux_src_vf(i)%sf(k, j, l) = 0._wp
+                                flux_src_vf(i)%sf(j, k, l) = 0._wp
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if (chem_params%diffusion) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = E_idx, chemxe
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                if (i .eq. E_idx .or. i .ge. chemxb) then
+                                    flux_src_vf(i)%sf(j, k, l) = 0._wp
+                                end if
                             end do
                         end do
                     end do
@@ -3897,7 +3940,22 @@ contains
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
                             do l = is3%beg, is3%end
-                                flux_src_vf(i)%sf(l, k, j) = 0._wp
+                                flux_src_vf(i)%sf(j, k, l) = 0._wp
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if (chem_params%diffusion) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = E_idx, chemxe
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                if (i .eq. E_idx .or. i .ge. chemxb) then
+                                    flux_src_vf(i)%sf(j, k, l) = 0._wp
+                                end if
                             end do
                         end do
                     end do
