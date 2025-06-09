@@ -35,14 +35,14 @@ contains
 
         integer :: i, j !< generic loop iterators
 
-        @:ALLOCATE(Res_viscous(1:2, 1:maxval(Re_size)))
+        @:ALLOCATE(Res_viscous(1:2, 1:maxval(eqn_idx%Re_size)))
 
         do i = 1, 2
-            do j = 1, Re_size(i)
-                Res_viscous(i, j) = fluid_pp(Reqn_idx%E(i, j))%Re(i)
+            do j = 1, eqn_idx%Re_size(i)
+                Res_viscous(i, j) = fluid_pp(eqn_idx%Re(i, j))%Re(i)
             end do
         end do
-        !$acc update device(Res_viscous, Reqn_idx%E, Re_size)
+        !$acc update device(Res_viscous, eqn_idx%Re, eqn_idx%Re_size)
         !$acc enter data copyin(is1_viscous, is2_viscous, is3_viscous, iv)
 
     end subroutine s_initialize_viscous_module
@@ -60,9 +60,9 @@ contains
                                                tau_Re_vf, &
                                                ix, iy, iz)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(num_dims), intent(in) :: grad_x_vf, grad_y_vf, grad_z_vf
-        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: tau_Re_vf
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: tau_Re_vf
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
         real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
@@ -159,10 +159,10 @@ contains
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
+                                    if (eqn_idx%Re_size(i) > 0) Re_visc(i) = 0._wp
                                     !$acc loop seq
-                                    do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Reqn_idx%E(i, q))/Res_viscous(i, q) &
+                                    do q = 1, eqn_idx%Re_size(i)
+                                        Re_visc(i) = alpha_visc(eqn_idx%Re(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
                                     end do
 
@@ -266,10 +266,10 @@ contains
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
+                                    if (eqn_idx%Re_size(i) > 0) Re_visc(i) = 0._wp
                                     !$acc loop seq
-                                    do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Reqn_idx%E(i, q))/Res_viscous(i, q) &
+                                    do q = 1, eqn_idx%Re_size(i)
+                                        Re_visc(i) = alpha_visc(eqn_idx%Re(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
                                     end do
 
@@ -370,10 +370,10 @@ contains
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
+                                    if (eqn_idx%Re_size(i) > 0) Re_visc(i) = 0._wp
                                     !$acc loop seq
-                                    do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Reqn_idx%E(i, q))/Res_viscous(i, q) &
+                                    do q = 1, eqn_idx%Re_size(i)
+                                        Re_visc(i) = alpha_visc(eqn_idx%Re(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
                                     end do
 
@@ -478,10 +478,10 @@ contains
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
+                                    if (eqn_idx%Re_size(i) > 0) Re_visc(i) = 0._wp
                                     !$acc loop seq
-                                    do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Reqn_idx%E(i, q))/Res_viscous(i, q) &
+                                    do q = 1, eqn_idx%Re_size(i)
+                                        Re_visc(i) = alpha_visc(eqn_idx%Re(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
                                     end do
 

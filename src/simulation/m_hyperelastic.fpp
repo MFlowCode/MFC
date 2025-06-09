@@ -96,8 +96,8 @@ contains
         !! btensor is symmetric, save the data space
     subroutine s_hyperelastic_rmt_stress_update(q_cons_vf, q_prim_vf)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
 
         real(wp), dimension(eqn_idx%tensor_size) :: tensora, tensorb
         real(wp), dimension(num_fluids) :: alpha_k, alpha_rho_k
@@ -221,7 +221,7 @@ contains
         !! btensor is symmetric, save the data space
     pure subroutine s_neoHookean_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
         !$acc routine seq
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(eqn_idx%b_size), intent(inout) :: btensor
         real(wp), intent(in) :: G
         integer, intent(in) :: j, k, l
@@ -260,7 +260,7 @@ contains
         !! btensor is symmetric, save the data space
     pure subroutine s_Mooney_Rivlin_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
         !$acc routine seq
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(eqn_idx%b_size), intent(inout) :: btensor
         real(wp), intent(in) :: G
         integer, intent(in) :: j, k, l

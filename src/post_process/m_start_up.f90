@@ -369,21 +369,21 @@ contains
 
         ! Adding the magnetic field to the formatted database file
         if (mhd .and. prim_vars_wrt) then
-            do i = B_idx%beg, B_idx%end
+            do i = eqn_idx%B%beg, eqn_idx%B%end
                 q_sf = q_prim_vf(i)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
 
                 ! 1D: output By, Bz
                 if (n == 0) then
-                    if (i == B_idx%beg) then
+                    if (i == eqn_idx%B%beg) then
                         write (varname, '(A)') 'By'
                     else
                         write (varname, '(A)') 'Bz'
                     end if
                     ! 2D/3D: output Bx, By, Bz
                 else
-                    if (i == B_idx%beg) then
+                    if (i == eqn_idx%B%beg) then
                         write (varname, '(A)') 'Bx'
-                    elseif (i == B_idx%beg + 1) then
+                    elseif (i == eqn_idx%B%beg + 1) then
                         write (varname, '(A)') 'By'
                     else
                         write (varname, '(A)') 'Bz'

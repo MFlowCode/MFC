@@ -51,13 +51,13 @@ contains
         end if
 
         if (elliptic_smoothing) then
-            allocate (q_prim_temp(0:m, 0:n, 0:p, 1:eqn_idx%sys_size))
+            allocate (q_prim_temp(0:m, 0:n, 0:p, 1:sys_size))
         end if
 
     end subroutine s_initialize_perturbation_module
 
     impure subroutine s_perturb_sphere(q_prim_vf)
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !< generic loop operators
 
         real(wp) :: perturb_alpha
@@ -89,7 +89,7 @@ contains
     end subroutine s_perturb_sphere
 
     impure subroutine s_perturb_surrounding_flow(q_prim_vf)
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k !<  generic loop iterators
 
         real(wp) :: perturb_alpha
@@ -121,7 +121,7 @@ contains
         !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4),
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
     impure subroutine s_superposition_instability_wave(q_prim_vf)
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
         real(wp) :: uratio, Ldomain
         integer :: i, j, k, q
@@ -617,7 +617,7 @@ contains
 
     impure subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
         integer :: i, j, k, l, q
 
@@ -629,7 +629,7 @@ contains
             ! Perform smoothing and store in temp array
             if (n == 0) then
                 do j = 0, m
-                    do i = 1, eqn_idx%sys_size
+                    do i = 1, sys_size
                         q_prim_temp(j, 0, 0, i) = (1._wp/4._wp)* &
                                                   (q_prim_vf(i)%sf(j + 1, 0, 0) + q_prim_vf(i)%sf(j - 1, 0, 0) + &
                                                    2._wp*q_prim_vf(i)%sf(j, 0, 0))
@@ -638,7 +638,7 @@ contains
             else if (p == 0) then
                 do k = 0, n
                     do j = 0, m
-                        do i = 1, eqn_idx%sys_size
+                        do i = 1, sys_size
                             q_prim_temp(j, k, 0, i) = (1._wp/8._wp)* &
                                                       (q_prim_vf(i)%sf(j + 1, k, 0) + q_prim_vf(i)%sf(j - 1, k, 0) + &
                                                        q_prim_vf(i)%sf(j, k + 1, 0) + q_prim_vf(i)%sf(j, k - 1, 0) + &
@@ -650,7 +650,7 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            do i = 1, eqn_idx%sys_size
+                            do i = 1, sys_size
                                 q_prim_temp(j, k, l, i) = (1._wp/12._wp)* &
                                                           (q_prim_vf(i)%sf(j + 1, k, l) + q_prim_vf(i)%sf(j - 1, k, l) + &
                                                            q_prim_vf(i)%sf(j, k + 1, l) + q_prim_vf(i)%sf(j, k - 1, l) + &
@@ -666,7 +666,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        do i = 1, eqn_idx%sys_size
+                        do i = 1, sys_size
                             q_prim_vf(i)%sf(j, k, l) = q_prim_temp(j, k, l, i)
                         end do
                     end do

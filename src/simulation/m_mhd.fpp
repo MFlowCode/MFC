@@ -69,8 +69,8 @@ contains
         !!  @param rhs_vf     rhs variables
     pure subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         integer :: k, l, q, r
         real(wp), dimension(3) :: v, B
@@ -85,16 +85,16 @@ contains
                     divB = 0._wp
                     !$acc loop seq
                     do r = -fd_number, fd_number
-                        divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                        divB = divB + q_prim_vf(eqn_idx%B%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
                     end do
                     !$acc loop seq
                     do r = -fd_number, fd_number
-                        divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                        divB = divB + q_prim_vf(eqn_idx%B%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
                     end do
                     if (p > 0) then
                         !$acc loop seq
                         do r = -fd_number, fd_number
-                            divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
+                            divB = divB + q_prim_vf(eqn_idx%B%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
                         end do
                     end if
 
@@ -102,9 +102,9 @@ contains
                     v(2) = q_prim_vf(momxb + 1)%sf(k, l, q)
                     v(3) = q_prim_vf(momxb + 2)%sf(k, l, q)
 
-                    B(1) = q_prim_vf(B_idx%beg)%sf(k, l, q)
-                    B(2) = q_prim_vf(B_idx%beg + 1)%sf(k, l, q)
-                    B(3) = q_prim_vf(B_idx%beg + 2)%sf(k, l, q)
+                    B(1) = q_prim_vf(eqn_idx%B%beg)%sf(k, l, q)
+                    B(2) = q_prim_vf(eqn_idx%B%beg + 1)%sf(k, l, q)
+                    B(3) = q_prim_vf(eqn_idx%B%beg + 2)%sf(k, l, q)
 
                     vdotB = sum(v*B)
 
@@ -123,9 +123,9 @@ contains
 
                     rhs_vf(eqn_idx%E)%sf(k, l, q) = rhs_vf(eqn_idx%E)%sf(k, l, q) - divB*vdotB
 
-                    rhs_vf(B_idx%beg)%sf(k, l, q) = rhs_vf(B_idx%beg)%sf(k, l, q) - divB*v(1)
-                    rhs_vf(B_idx%beg + 1)%sf(k, l, q) = rhs_vf(B_idx%beg + 1)%sf(k, l, q) - divB*v(2)
-                    rhs_vf(B_idx%beg + 2)%sf(k, l, q) = rhs_vf(B_idx%beg + 2)%sf(k, l, q) - divB*v(3)
+                    rhs_vf(eqn_idx%B%beg)%sf(k, l, q) = rhs_vf(eqn_idx%B%beg)%sf(k, l, q) - divB*v(1)
+                    rhs_vf(eqn_idx%B%beg + 1)%sf(k, l, q) = rhs_vf(eqn_idx%B%beg + 1)%sf(k, l, q) - divB*v(2)
+                    rhs_vf(eqn_idx%B%beg + 2)%sf(k, l, q) = rhs_vf(eqn_idx%B%beg + 2)%sf(k, l, q) - divB*v(3)
 
                 end do
             end do

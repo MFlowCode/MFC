@@ -76,7 +76,7 @@ contains
     !! param q_cons_vf Conservative variable
     subroutine s_compute_mixture_density(q_cons_vf)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer :: i, j, k, l !< standard iterators
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -100,9 +100,9 @@ contains
     !! @param q_prim_vf Primitive variables
     subroutine s_compute_body_forces_rhs(q_cons_vf, q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         integer :: i, j, k, l !< Loop variables
 

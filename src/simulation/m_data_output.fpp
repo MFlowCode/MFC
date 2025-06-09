@@ -79,14 +79,14 @@ contains
     impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
         type(scalar_field), &
-            dimension(eqn_idx%sys_size), &
+            dimension(sys_size), &
             intent(in) :: q_cons_vf
 
         type(scalar_field), &
             intent(inout) :: q_T_sf
 
         type(scalar_field), &
-            dimension(eqn_idx%sys_size), &
+            dimension(sys_size), &
             intent(inout) :: q_prim_vf
 
         integer, intent(in) :: t_step
@@ -261,7 +261,7 @@ contains
         !!  @param t_step Current time step
     impure subroutine s_write_run_time_information(q_prim_vf, t_step)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: t_step
 
         real(wp) :: rho        !< Cell-avg. density
@@ -390,9 +390,9 @@ contains
         !!  @param t_step Current time-step
     impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
 
@@ -455,7 +455,7 @@ contains
         end if
 
         ! Writing the conservative variables data files
-        do i = 1, eqn_idx%sys_size
+        do i = 1, sys_size
             write (file_path, '(A,I0,A)') trim(t_step_dir)//'/q_cons_vf', &
                 i, '.dat'
 
@@ -470,7 +470,7 @@ contains
             do i = 1, nb
                 do r = 1, nnode
                     write (file_path, '(A,I0,A)') trim(t_step_dir)//'/pb', &
-                        eqn_idx%sys_size + (i - 1)*nnode + r, '.dat'
+                        sys_size + (i - 1)*nnode + r, '.dat'
 
                     open (2, FILE=trim(file_path), &
                           FORM='unformatted', &
@@ -483,7 +483,7 @@ contains
             do i = 1, nb
                 do r = 1, nnode
                     write (file_path, '(A,I0,A)') trim(t_step_dir)//'/mv', &
-                        eqn_idx%sys_size + (i - 1)*nnode + r, '.dat'
+                        sys_size + (i - 1)*nnode + r, '.dat'
 
                     open (2, FILE=trim(file_path), &
                           FORM='unformatted', &
@@ -526,7 +526,7 @@ contains
 
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
-            do i = 1, eqn_idx%sys_size
+            do i = 1, sys_size
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
             end do
             ! q_prim_vf(bubxb) stores the value of nb needed in riemann solvers, so replace with true primitive value (=1._wp)
@@ -539,7 +539,7 @@ contains
         if (n == 0 .and. p == 0) then
 
             if (model_eqns == 2) then
-                do i = 1, eqn_idx%sys_size
+                do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
                     open (2, FILE=trim(file_path))
@@ -555,7 +555,7 @@ contains
                 end do
             end if
 
-            do i = 1, eqn_idx%sys_size
+            do i = 1, sys_size
                 write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
 
                 open (2, FILE=trim(file_path))
@@ -599,7 +599,7 @@ contains
 
         ! 2D
         if ((n > 0) .and. (p == 0)) then
-            do i = 1, eqn_idx%sys_size
+            do i = 1, sys_size
                 write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
                 open (2, FILE=trim(file_path))
                 do j = 0, m
@@ -653,7 +653,7 @@ contains
             end if
 
             if (prim_vars_wrt) then
-                do i = 1, eqn_idx%sys_size
+                do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
                     open (2, FILE=trim(file_path))
@@ -686,7 +686,7 @@ contains
 
         ! 3D
         if (p > 0) then
-            do i = 1, eqn_idx%sys_size
+            do i = 1, sys_size
                 write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
                 open (2, FILE=trim(file_path))
                 do j = 0, m
@@ -750,7 +750,7 @@ contains
             end if
 
             if (prim_vars_wrt) then
-                do i = 1, eqn_idx%sys_size
+                do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
                     open (2, FILE=trim(file_path))
@@ -788,8 +788,8 @@ contains
         !!  @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
 
@@ -812,9 +812,9 @@ contains
         integer :: alt_sys !< Altered system size for the lagrangian subgrid bubble model
 
         if (present(beta)) then
-            alt_sys = eqn_idx%sys_size + 1
+            alt_sys = sys_size + 1
         else
-            alt_sys = eqn_idx%sys_size
+            alt_sys = sys_size
         end if
 
         if (file_per_process) then
@@ -863,11 +863,11 @@ contains
             WP_MOK = int(8._wp, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(eqn_idx%sys_size, MPI_OFFSET_KIND)
+            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
             if (bubbles_euler) then
                 ! Write the data for each variable
-                do i = 1, eqn_idx%sys_size
+                do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -875,7 +875,7 @@ contains
                 end do
                 !Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
-                    do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 2*nb*nnode
+                    do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -883,7 +883,7 @@ contains
                     end do
                 end if
             else
-                do i = 1, eqn_idx%sys_size !TODO: check if correct (eqn_idx%sys_size
+                do i = 1, sys_size !TODO: check if correct (sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -926,7 +926,7 @@ contains
 
             if (bubbles_euler) then
                 ! Write the data for each variable
-                do i = 1, eqn_idx%sys_size
+                do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
@@ -939,7 +939,7 @@ contains
                 end do
                 !Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
-                    do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 2*nb*nnode
+                    do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         ! Initial displacement to skip at beginning of file
@@ -952,7 +952,7 @@ contains
                     end do
                 end if
             else
-                do i = 1, eqn_idx%sys_size !TODO: check if correct (eqn_idx%sys_size
+                do i = 1, sys_size !TODO: check if correct (sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
@@ -967,14 +967,14 @@ contains
 
             ! Correction for the lagrangian subgrid bubble model
             if (present(beta)) then
-                var_MOK = int(eqn_idx%sys_size + 1, MPI_OFFSET_KIND)
+                var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
 
                 ! Initial displacement to skip at beginning of file
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(eqn_idx%sys_size + 1), &
+                call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(sys_size + 1), &
                                        'native', mpi_info_int, ierr)
-                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(eqn_idx%sys_size + 1)%sf, data_size, &
+                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(sys_size + 1)%sf, data_size, &
                                         mpi_p, status, ierr)
             end if
 
@@ -1044,7 +1044,7 @@ contains
     impure subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
 
         integer, intent(in) :: t_step
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp), dimension(0:m, 0:n, 0:p), intent(in) :: accel_mag
 
         real(wp), dimension(-1:m) :: distx

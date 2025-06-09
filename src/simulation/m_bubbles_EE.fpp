@@ -72,7 +72,7 @@ contains
     ! Compute the bubble volume fraction alpha from the bubble number density n
         !! @param q_cons_vf is the conservative variable
     pure subroutine s_comp_alpha_from_n(q_cons_vf)
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp) :: nR3bar
         integer(wp) :: i, j, k, l
 
@@ -95,7 +95,7 @@ contains
     pure subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu)
 
         integer, intent(in) :: idir
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), intent(inout) :: divu !< matrix for div(u)
 
         integer :: j, k, l
@@ -154,10 +154,10 @@ contains
         !!  @param q_prim_vf Primitive variables
         !!  @param q_cons_vf Conservative variables
     impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, t_step, rhs_vf)
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: t_step
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         real(wp) :: rddot
         real(wp) :: pb, mv, vflux, pbdot

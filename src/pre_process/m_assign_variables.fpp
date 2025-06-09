@@ -45,12 +45,12 @@ module m_assign_variables
         subroutine s_assign_patch_xxxxx_primitive_variables(patch_id, j, k, l, &
                                                             eta, q_prim_vf, patch_id_fp)
 
-            import :: scalar_field, eqn_idx%sys_size, n, m, p, wp
+            import :: scalar_field, system_of_equations, n, m, p, wp
 
             integer, intent(in) :: patch_id
             integer, intent(in) :: j, k, l
             real(wp), intent(in) :: eta
-            type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
+            type(scalar_field), dimension(:), intent(inout) :: q_prim_vf
             integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
         end subroutine s_assign_patch_xxxxx_primitive_variables
@@ -108,7 +108,7 @@ contains
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
         real(wp), intent(in) :: eta
-        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(:), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
         real(wp) :: Ys(1:num_species)
@@ -193,7 +193,7 @@ contains
     pure subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
         integer, intent(in) :: j, k, l
-        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(:), intent(inout) :: q_prim_vf
 
         integer :: i
         real(wp) :: pres_mag, loc, n_tait, B_tait, p0
@@ -282,7 +282,7 @@ contains
         integer, intent(in) :: j, k, l
         real(wp), intent(in) :: eta
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(:), intent(inout) :: q_prim_vf
 
         ! Density, the specific heat ratio function and the liquid stiffness
         ! function, respectively, obtained from the combination of primitive
@@ -303,7 +303,7 @@ contains
 
         real(wp) :: Ys(1:num_species)
 
-        real(wp), dimension(eqn_idx%sys_size) :: orig_prim_vf !<
+        real(wp), dimension(sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes
 
         integer :: i  !< Generic loop iterator
@@ -313,7 +313,7 @@ contains
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
 
         ! Transferring original primitive variables
-        do i = 1, eqn_idx%sys_size
+        do i = 1, sys_size
             orig_prim_vf(i) = q_prim_vf(i)%sf(j, k, l)
         end do
 
@@ -466,22 +466,22 @@ contains
 
         if (mhd) then
             if (n == 0) then ! 1D: By, Bz
-                q_prim_vf(B_idx%beg)%sf(j, k, l) = &
+                q_prim_vf(eqn_idx%B%beg)%sf(j, k, l) = &
                     eta*patch_icpp(patch_id)%By &
-                    + (1._wp - eta)*orig_prim_vf(B_idx%beg)
-                q_prim_vf(B_idx%beg + 1)%sf(j, k, l) = &
+                    + (1._wp - eta)*orig_prim_vf(eqn_idx%B%beg)
+                q_prim_vf(eqn_idx%B%beg + 1)%sf(j, k, l) = &
                     eta*patch_icpp(patch_id)%Bz &
-                    + (1._wp - eta)*orig_prim_vf(B_idx%beg + 1)
+                    + (1._wp - eta)*orig_prim_vf(eqn_idx%B%beg + 1)
             else ! 2D/3D: Bx, By, Bz
-                q_prim_vf(B_idx%beg)%sf(j, k, l) = &
+                q_prim_vf(eqn_idx%B%beg)%sf(j, k, l) = &
                     eta*patch_icpp(patch_id)%Bx &
-                    + (1._wp - eta)*orig_prim_vf(B_idx%beg)
-                q_prim_vf(B_idx%beg + 1)%sf(j, k, l) = &
+                    + (1._wp - eta)*orig_prim_vf(eqn_idx%B%beg)
+                q_prim_vf(eqn_idx%B%beg + 1)%sf(j, k, l) = &
                     eta*patch_icpp(patch_id)%By &
-                    + (1._wp - eta)*orig_prim_vf(B_idx%beg + 1)
-                q_prim_vf(B_idx%beg + 2)%sf(j, k, l) = &
+                    + (1._wp - eta)*orig_prim_vf(eqn_idx%B%beg + 1)
+                q_prim_vf(eqn_idx%B%beg + 2)%sf(j, k, l) = &
                     eta*patch_icpp(patch_id)%Bz &
-                    + (1._wp - eta)*orig_prim_vf(B_idx%beg + 2)
+                    + (1._wp - eta)*orig_prim_vf(eqn_idx%B%beg + 2)
             end if
         end if
 

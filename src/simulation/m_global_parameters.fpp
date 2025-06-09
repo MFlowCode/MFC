@@ -228,7 +228,7 @@ module m_global_parameters
     !> @name Annotations of the structure of the state and flux vectors in terms of the
     !! size and the configuration of the system of equations to which they belong
     !> @{
-    ! integer :: eqn_idx%sys_size                                !< Number of unknowns in system of eqns.
+    integer :: sys_size                                !< Number of unknowns in system of eqns.
     ! type(int_bounds_info) :: eqn_idx%cont                  !< Indexes of first & last continuity eqns.
     ! type(int_bounds_info) :: eqn_idx%mom                   !< Indexes of first & last momentum eqns.
     ! integer :: eqn_idx%E                                   !< Index of energy equation
@@ -540,8 +540,8 @@ contains
         hyperelasticity = .false.
         elasticity = .false.
         hyper_model = dflt_int
-        eqn_idx%eqn_idx%b_size = dflt_int
-        eqn_idx%eqn_idx%tensor_size = dflt_int
+        eqn_idx%b_size = dflt_int
+        eqn_idx%tensor_size = dflt_int
         weno_flat = .true.
         riemann_flat = .true.
         rdma_mpi = .false.
@@ -796,7 +796,7 @@ contains
             eqn_idx%adv%end = eqn_idx%adv%beg + 1
             eqn_idx%gamma = eqn_idx%adv%beg
             eqn_idx%pi_inf = eqn_idx%adv%end
-            eqn_idx%eqn_idx%sys_size = eqn_idx%adv%end
+            sys_size = eqn_idx%adv%end
 
             ! Volume Fraction Model
         else
@@ -813,7 +813,7 @@ contains
                 eqn_idx%adv%beg = eqn_idx%E + 1
                 eqn_idx%adv%end = eqn_idx%E + num_fluids
 
-                eqn_idx%eqn_idx%sys_size = eqn_idx%adv%end
+                sys_size = eqn_idx%adv%end
 
                 if (bubbles_euler) then
                     eqn_idx%alf = eqn_idx%adv%end
@@ -822,7 +822,7 @@ contains
                 end if
 
                 if (bubbles_euler) then
-                    eqn_idx%bub%beg = eqn_idx%eqn_idx%sys_size + 1
+                    eqn_idx%bub%beg = sys_size + 1
                     if (qbmm) then
                         nmomsp = 4 !number of special moments
                         if (nnode == 4) then
@@ -832,18 +832,18 @@ contains
                         eqn_idx%bub%end = eqn_idx%adv%end + nb*nmom
                     else
                         if (.not. polytropic) then
-                            eqn_idx%bub%end = eqn_idx%eqn_idx%sys_size + 4*nb
+                            eqn_idx%bub%end = sys_size + 4*nb
                         else
-                            eqn_idx%bub%end = eqn_idx%eqn_idx%sys_size + 2*nb
+                            eqn_idx%bub%end = sys_size + 2*nb
                         end if
                     end if
-                    eqn_idx%eqn_idx%sys_size = eqn_idx%bub%end
+                    sys_size = eqn_idx%bub%end
                     ! print*, 'alf idx', eqn_idx%alf
                     ! print*, 'bub -idx beg end', eqn_idx%bub%beg, eqn_idx%bub%end
 
                     if (adv_n) then
                         eqn_idx%n = eqn_idx%bub%end + 1
-                        eqn_idx%eqn_idx%sys_size = eqn_idx%n
+                        sys_size = eqn_idx%n
                     end if
 
                     @:ALLOCATE(weight(nb), R0(nb), V0(nb))
@@ -920,13 +920,13 @@ contains
                 end if
 
                 if (mhd) then
-                    eqn_idx%B%beg = eqn_idx%eqn_idx%sys_size + 1
+                    eqn_idx%B%beg = sys_size + 1
                     if (n == 0) then
-                        eqn_idx%B%end = eqn_idx%eqn_idx%sys_size + 2 ! 1D: By, Bz
+                        eqn_idx%B%end = sys_size + 2 ! 1D: By, Bz
                     else
-                        eqn_idx%B%end = eqn_idx%eqn_idx%sys_size + 3 ! 2D/3D: Bx, By, Bz
+                        eqn_idx%B%end = sys_size + 3 ! 2D/3D: Bx, By, Bz
                     end if
-                    eqn_idx%eqn_idx%sys_size = eqn_idx%B%end
+                    sys_size = eqn_idx%B%end
                 end if
 
             else if (model_eqns == 3) then
@@ -940,7 +940,7 @@ contains
                 eqn_idx%alf = eqn_idx%adv%end
                 eqn_idx%internalEnergies%beg = eqn_idx%adv%end + 1
                 eqn_idx%internalEnergies%end = eqn_idx%adv%end + num_fluids
-                eqn_idx%eqn_idx%sys_size = eqn_idx%internalEnergies%end
+                sys_size = eqn_idx%internalEnergies%end
 
             else if (model_eqns == 4) then
                 eqn_idx%cont%beg = 1 ! one continuity equation
@@ -951,15 +951,15 @@ contains
                 eqn_idx%adv%beg = eqn_idx%E + 1
                 eqn_idx%adv%end = eqn_idx%adv%beg !one volume advection equation
                 eqn_idx%alf = eqn_idx%adv%end
-                eqn_idx%eqn_idx%sys_size = eqn_idx%adv%end
+                sys_size = eqn_idx%adv%end
 
                 if (bubbles_euler) then
-                    eqn_idx%bub%beg = eqn_idx%eqn_idx%sys_size + 1
-                    eqn_idx%bub%end = eqn_idx%eqn_idx%sys_size + 2*nb
+                    eqn_idx%bub%beg = sys_size + 1
+                    eqn_idx%bub%end = sys_size + 2*nb
                     if (.not. polytropic) then
-                        eqn_idx%bub%end = eqn_idx%eqn_idx%sys_size + 4*nb
+                        eqn_idx%bub%end = sys_size + 4*nb
                     end if
-                    eqn_idx%eqn_idx%sys_size = eqn_idx%bub%end
+                    sys_size = eqn_idx%bub%end
 
                     @:ALLOCATE(eqn_idx%bub%rs(nb), eqn_idx%bub%vs(nb))
                     @:ALLOCATE(eqn_idx%bub%ps(nb), eqn_idx%bub%ms(nb))
@@ -1037,11 +1037,11 @@ contains
 
             if (hypoelasticity .or. hyperelasticity) then
                 elasticity = .true.
-                eqn_idx%stress%beg = eqn_idx%eqn_idx%sys_size + 1
-                eqn_idx%stress%end = eqn_idx%eqn_idx%sys_size + (num_dims*(num_dims + 1))/2
+                eqn_idx%stress%beg = sys_size + 1
+                eqn_idx%stress%end = sys_size + (num_dims*(num_dims + 1))/2
                 if (cyl_coord) eqn_idx%stress%end = eqn_idx%stress%end + 1
                 ! number of stresses is 1 in 1D, 3 in 2D, 4 in 2D-Axisym, 6 in 3D
-                eqn_idx%eqn_idx%sys_size = eqn_idx%stress%end
+                sys_size = eqn_idx%stress%end
 
                 ! shear stress index is 2 for 2D and 2,4,5 for 3D
                 if (num_dims == 1) then
@@ -1068,23 +1068,23 @@ contains
 
             if (hyperelasticity) then
                 ! number of entries in the symmetric btensor plus the jacobian
-                eqn_idx%eqn_idx%b_size = (num_dims*(num_dims + 1))/2 + 1
+                eqn_idx%b_size = (num_dims*(num_dims + 1))/2 + 1
                 ! storing the jacobian in the last entry
-                eqn_idx%eqn_idx%tensor_size = num_dims**2 + 1
-                eqn_idx%xi%beg = eqn_idx%eqn_idx%sys_size + 1
-                eqn_idx%xi%end = eqn_idx%eqn_idx%sys_size + num_dims
+                eqn_idx%tensor_size = num_dims**2 + 1
+                eqn_idx%xi%beg = sys_size + 1
+                eqn_idx%xi%end = sys_size + num_dims
                 ! adding three more equations for the \xi field and the elastic energy
-                eqn_idx%eqn_idx%sys_size = eqn_idx%xi%end + 1
+                sys_size = eqn_idx%xi%end + 1
             end if
 
             if (surface_tension) then
-                eqn_idx%c = eqn_idx%eqn_idx%sys_size + 1
-                eqn_idx%eqn_idx%sys_size = eqn_idx%c
+                eqn_idx%c = sys_size + 1
+                sys_size = eqn_idx%c
             end if
 
             if (cont_damage) then
-                eqn_idx%damage = eqn_idx%eqn_idx%sys_size + 1
-                eqn_idx%eqn_idx%sys_size = eqn_idx%damage
+                eqn_idx%damage = sys_size + 1
+                sys_size = eqn_idx%damage
             end if
 
         end if
@@ -1092,33 +1092,33 @@ contains
         ! END: Volume Fraction Model
 
         if (chemistry) then
-            eqn_idx%species%beg = eqn_idx%eqn_idx%sys_size + 1
-            eqn_idx%species%end = eqn_idx%eqn_idx%sys_size + num_species
-            eqn_idx%eqn_idx%sys_size = eqn_idx%species%end
+            eqn_idx%species%beg = sys_size + 1
+            eqn_idx%species%end = sys_size + num_species
+            sys_size = eqn_idx%species%end
         end if
 
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
-            allocate (MPI_IO_DATA%view(1:eqn_idx%eqn_idx%sys_size + 2*nb*4))
-            allocate (MPI_IO_DATA%var(1:eqn_idx%eqn_idx%sys_size + 2*nb*4))
+            allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
+            allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
         elseif (bubbles_lagrange) then
-            allocate (MPI_IO_DATA%view(1:eqn_idx%eqn_idx%sys_size + 1))
-            allocate (MPI_IO_DATA%var(1:eqn_idx%eqn_idx%sys_size + 1))
+            allocate (MPI_IO_DATA%view(1:sys_size + 1))
+            allocate (MPI_IO_DATA%var(1:sys_size + 1))
         else
-            allocate (MPI_IO_DATA%view(1:eqn_idx%eqn_idx%sys_size))
-            allocate (MPI_IO_DATA%var(1:eqn_idx%eqn_idx%sys_size))
+            allocate (MPI_IO_DATA%view(1:sys_size))
+            allocate (MPI_IO_DATA%var(1:sys_size))
         end if
 
-        do i = 1, eqn_idx%eqn_idx%sys_size
+        do i = 1, sys_size
             allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
             MPI_IO_DATA%var(i)%sf => null()
         end do
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
-            do i = eqn_idx%eqn_idx%sys_size + 1, eqn_idx%eqn_idx%sys_size + 2*nb*4
+            do i = sys_size + 1, sys_size + 2*nb*4
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         elseif (bubbles_lagrange) then
-            do i = 1, eqn_idx%eqn_idx%sys_size + 1
+            do i = 1, sys_size + 1
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
@@ -1289,11 +1289,11 @@ contains
             deallocate (start_idx)
 
             if (bubbles_lagrange) then
-                do i = 1, eqn_idx%eqn_idx%sys_size + 1
+                do i = 1, sys_size + 1
                     MPI_IO_DATA%var(i)%sf => null()
                 end do
             else
-                do i = 1, eqn_idx%eqn_idx%sys_size
+                do i = 1, sys_size
                     MPI_IO_DATA%var(i)%sf => null()
                 end do
             end if

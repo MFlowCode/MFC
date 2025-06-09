@@ -123,17 +123,17 @@ contains
     !! @param rhs_vf rhs variables
     impure subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, t_step, rhs_vf)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf !<
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !<
         !! This variable contains the WENO-reconstructed values of the cell-average
         !! conservative variables, which are located in q_cons_vf, at cell-interior
         !! Gaussian quadrature points (QP).
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf !<
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf !<
         !! The primitive variables at cell-interior Gaussian quadrature points. These
         !! are calculated from the conservative variables and gradient magnitude (GM)
         !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         integer, intent(in) :: t_step
 

@@ -82,7 +82,7 @@ contains
     subroutine s_convert_to_mixture_variables(q_vf, i, j, k, &
                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
         integer, intent(in) :: i, j, k
         real(wp), intent(out), target :: rho, gamma, pi_inf, qv
         real(wp), optional, dimension(2), intent(out) :: Re_K
@@ -208,7 +208,7 @@ contains
     subroutine s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
                                                       rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
         integer, intent(in) :: i, j, k
 
         real(wp), intent(out), target :: rho
@@ -255,7 +255,7 @@ contains
     subroutine s_convert_species_to_mixture_variables_bubbles(q_vf, j, k, l, &
                                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
 
         integer, intent(in) :: j, k, l
 
@@ -339,9 +339,9 @@ contains
             if (num_fluids == 1) then ! need to consider case with num_fluids >= 2
                 do i = 1, 2
 
-                    Re_K(i) = dflt_real; if (Re_size(i) > 0) Re_K(i) = 0._wp
+                    Re_K(i) = dflt_real; if (eqn_idx%Re_size(i) > 0) Re_K(i) = 0._wp
 
-                    do q = 1, Re_size(i)
+                    do q = 1, eqn_idx%Re_size(i)
                         Re_K(i) = (1 - alpha_K(eqn_idx%Re(i, q)))/fluid_pp(eqn_idx%Re(i, q))%Re(i) &
                                   + Re_K(i)
                     end do
@@ -379,7 +379,7 @@ contains
     subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
                                                       gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
 
         integer, intent(in) :: k, l, r
 
@@ -434,7 +434,7 @@ contains
             Re_K(i) = dflt_real; if (eqn_idx%Re_size(i) > 0) Re_K(i) = 0._wp
 
             do j = 1, eqn_idx%Re_size(i)
-                Re_K(i) = alpha_K(eqn_idx%Re(i, j))/fluid_pp(Re(i, j))%Re(i) &
+                Re_K(i) = alpha_K(eqn_idx%Re(i, j))/fluid_pp(eqn_idx%Re(i, j))%Re(i) &
                           + Re_K(i)
             end do
 
@@ -530,9 +530,9 @@ contains
             do i = 1, 2
                 Re_K(i) = dflt_real
 
-                if (Re_size(i) > 0) Re_K(i) = 0._wp
+                if (eqn_idx%Re_size(i) > 0) Re_K(i) = 0._wp
 
-                do j = 1, Re_size(i)
+                do j = 1, eqn_idx%Re_size(i)
                     Re_K(i) = alpha_K(eqn_idx%Re(i, j))/Res(i, j) &
                               + Re_K(i)
                 end do
@@ -597,9 +597,9 @@ contains
                 do i = 1, 2
                     Re_K(i) = dflt_real
 
-                    if (Re_size(i) > 0) Re_K(i) = 0._wp
+                    if (eqn_idx%Re_size(i) > 0) Re_K(i) = 0._wp
 
-                    do j = 1, Re_size(i)
+                    do j = 1, eqn_idx%Re_size(i)
                         Re_K(i) = (1._wp - alpha_K(eqn_idx%Re(i, j)))/Res(i, j) &
                                   + Re_K(i)
                     end do
@@ -657,9 +657,9 @@ contains
 #ifdef MFC_SIMULATION
 
         if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+            @:ALLOCATE(Res(1:2, 1:maxval(eqn_idx%Re_size)))
             do i = 1, 2
-                do j = 1, Re_size(i)
+                do j = 1, eqn_idx%Re_size(i)
                     Res(i, j) = fluid_pp(eqn_idx%Re(i, j))%Re(i)
                 end do
             end do
@@ -745,7 +745,7 @@ contains
     !Initialize mv at the quadrature nodes based on the initialized moments and sigma
     pure subroutine s_initialize_mv(qK_cons_vf, mv)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: qK_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: mv
 
@@ -777,7 +777,7 @@ contains
 
     !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
     pure subroutine s_initialize_pb(qK_cons_vf, mv, pb)
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: qK_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: pb
@@ -822,9 +822,9 @@ contains
                                                              ibounds, &
                                                              gm_alphaK_vf)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: qK_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: qK_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: ibounds
         type(scalar_field), &
             allocatable, optional, dimension(:), &
@@ -1090,7 +1090,7 @@ contains
 
                         else
                             if (adv_n) then
-                                qK_prim_vf(eqn_idx%n)%sf(j, k, l) = qK_cons_vf(eqn%n)%sf(j, k, l)
+                                qK_prim_vf(eqn_idx%n)%sf(j, k, l) = qK_cons_vf(eqn_idx%n)%sf(j, k, l)
                                 nbub_sc = qK_prim_vf(eqn_idx%n)%sf(j, k, l)
                             else
                                 call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
@@ -1170,8 +1170,8 @@ contains
     impure subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                                     q_cons_vf)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
         ! Density, specific heat ratio function, liquid stiffness function
         ! and dynamic pressure, as defined in the incompressible flow sense,
@@ -1547,8 +1547,8 @@ contains
                     do i = 1, num_vels
                         FK_vf(j, k, l, contxe + eqn_idx%dir(i)) = &
                             rho_K*vel_K(eqn_idx%dir(1)) &
-                            *vel_K(eqn_idx%di(i)) &
-                            + pres_K*dir_flg(eqn_idx%dir(i))
+                            *vel_K(eqn_idx%dir(i)) &
+                            + pres_K*eqn_idx%dir_flg(eqn_idx%dir(i))
                     end do
 
                     ! energy flux, u(E+p)

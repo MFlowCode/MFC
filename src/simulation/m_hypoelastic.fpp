@@ -90,8 +90,8 @@ contains
     subroutine s_compute_hypoelastic_rhs(idir, q_prim_vf, rhs_vf)
 
         integer, intent(in) :: idir
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         real(wp) :: rho_K, G_K
 
@@ -389,8 +389,8 @@ contains
 
     pure subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         real(wp) :: tau_p ! principal stress
         real(wp) :: tau_xx, tau_xy, tau_yy, tau_zz, tau_yz, tau_xz

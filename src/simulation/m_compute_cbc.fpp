@@ -30,7 +30,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -39,7 +39,7 @@ contains
 
         integer :: i
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, advxe
             L(i) = 0._wp
@@ -60,7 +60,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -71,7 +71,7 @@ contains
         integer :: i !< Generic loop iterator
 
         L(1) = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(1)))*lambda(1) &
-               *(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+               *(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, momxb
             L(i) = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(2)))*lambda(2) &
@@ -80,7 +80,7 @@ contains
 
         do i = momxb + 1, momxe
             L(i) = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(2)))*lambda(2) &
-                   *(dvel_ds(dir_idx(i - contxe)))
+                   *(dvel_ds(eqn_idx%dir(i - contxe)))
         end do
 
         do i = eqn_idx%E, advxe - 1
@@ -89,7 +89,7 @@ contains
         end do
 
         L(advxe) = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(3)))*lambda(3) &
-                   *(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
+                   *(dpres_ds + rho*c*dvel_ds(eqn_idx%dir(1)))
 
         if (chemistry) then
             do i = chemxb, chemxe
@@ -110,7 +110,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -119,7 +119,7 @@ contains
 
         integer :: i
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, advxe
             L(i) = 0._wp
@@ -144,7 +144,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -154,14 +154,14 @@ contains
 
         integer :: i !> Generic loop iterator
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, momxb
             L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
 
         do i = momxb + 1, momxe
-            L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
+            L(i) = lambda(2)*(dvel_ds(eqn_idx%dir(i - contxe)))
         end do
 
         do i = eqn_idx%E, advxe - 1
@@ -193,7 +193,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -202,21 +202,21 @@ contains
 
         integer :: i !> Generic loop iterator
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, momxb
             L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
 
         do i = momxb + 1, momxe
-            L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
+            L(i) = lambda(2)*(dvel_ds(eqn_idx%dir(i - contxe)))
         end do
 
         do i = eqn_idx%E, advxe - 1
             L(i) = lambda(2)*(dadv_ds(i - momxe))
         end do
 
-        L(advxe) = L(1) + 2._wp*rho*c*lambda(2)*dvel_ds(dir_idx(1))
+        L(advxe) = L(1) + 2._wp*rho*c*lambda(2)*dvel_ds(eqn_idx%dir(1))
 
     end subroutine s_compute_force_free_subsonic_outflow_L
 
@@ -231,7 +231,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -240,14 +240,14 @@ contains
 
         integer :: i !> Generic loop iterator
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, momxb
             L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
 
         do i = momxb + 1, momxe
-            L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
+            L(i) = lambda(2)*(dvel_ds(eqn_idx%dir(i - contxe)))
         end do
 
         do i = eqn_idx%E, advxe - 1
@@ -270,7 +270,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -301,7 +301,7 @@ contains
         !$acc routine seq
 #endif
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(eqn_idx%sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
@@ -310,21 +310,21 @@ contains
         real(wp), dimension(num_species), intent(in) :: dYs_ds
         integer :: i !< Generic loop iterator
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(eqn_idx%dir(1)))
 
         do i = 2, momxb
             L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
 
         do i = momxb + 1, momxe
-            L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
+            L(i) = lambda(2)*(dvel_ds(eqn_idx%dir(i - contxe)))
         end do
 
         do i = eqn_idx%E, advxe - 1
             L(i) = lambda(2)*(dadv_ds(i - momxe))
         end do
 
-        L(advxe) = lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
+        L(advxe) = lambda(3)*(dpres_ds + rho*c*dvel_ds(eqn_idx%dir(1)))
 
         if (chemistry) then
             do i = chemxb, chemxe

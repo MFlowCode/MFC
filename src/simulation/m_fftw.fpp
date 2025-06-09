@@ -79,7 +79,7 @@ contains
 
         x_size = m + 1
 
-        batch_size = x_size*eqn_idx%sys_size
+        batch_size = x_size*sys_size
 
 #if defined(MFC_OpenACC)
         rank = 1; istride = 1; ostride = 1
@@ -89,8 +89,8 @@ contains
         gpu_fft_size(1) = real_size; 
         iembed(1) = 0
         oembed(1) = 0
-        !$acc enter data copyin(real_size, cmplx_size, x_size, eqn_idx%sys_size, batch_size, Nfq)
-        !$acc update device(real_size, cmplx_size, x_size, eqn_idx%sys_size, batch_size)
+        !$acc enter data copyin(real_size, cmplx_size, x_size, sys_size, batch_size, Nfq)
+        !$acc update device(real_size, cmplx_size, x_size, sys_size, batch_size)
 #else
         ! Allocate input and output DFT data sizes
         fftw_real_data = fftw_alloc_real(int(real_size, c_size_t))
@@ -107,9 +107,9 @@ contains
 #endif
 
 #if defined(MFC_OpenACC)
-        @:ALLOCATE(data_real_gpu(1:real_size*x_size*eqn_idx%sys_size))
-        @:ALLOCATE(data_cmplx_gpu(1:cmplx_size*x_size*eqn_idx%sys_size))
-        @:ALLOCATE(data_fltr_cmplx_gpu(1:cmplx_size*x_size*eqn_idx%sys_size))
+        @:ALLOCATE(data_real_gpu(1:real_size*x_size*sys_size))
+        @:ALLOCATE(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
+        @:ALLOCATE(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
 
 #if defined(__PGI)
         ierr = cufftPlanMany(fwd_plan_gpu, rank, gpu_fft_size, iembed, istride, real_size, oembed, ostride, cmplx_size, CUFFT_D2Z, batch_size)
@@ -130,7 +130,7 @@ contains
         !! @param q_cons_vf Conservative variables
     impure subroutine s_apply_fourier_filter(q_cons_vf)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(c_double), pointer :: p_real(:)
         complex(c_double_complex), pointer :: p_cmplx(:), p_fltr_cmplx(:)
         integer :: i, j, k, l !< Generic loop iterators
@@ -140,7 +140,7 @@ contains
 #if defined(MFC_OpenACC)
 
         !$acc parallel loop collapse(3) gang vector default(present)
-        do k = 1, eqn_idx%sys_size
+        do k = 1, sys_size
             do j = 0, m
                 do l = 1, cmplx_size
                     data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
@@ -149,7 +149,7 @@ contains
         end do
 
         !$acc parallel loop collapse(3) gang vector default(present)
-        do k = 1, eqn_idx%sys_size
+        do k = 1, sys_size
             do j = 0, m
                 do l = 0, p
                     data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = q_cons_vf(k)%sf(j, 0, l)
@@ -174,7 +174,7 @@ contains
         !$acc update device(Nfq)
 
         !$acc parallel loop collapse(3) gang vector default(present)
-        do k = 1, eqn_idx%sys_size
+        do k = 1, sys_size
             do j = 0, m
                 do l = 1, Nfq
                     data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
@@ -192,7 +192,7 @@ contains
         !$acc end host_data
 
         !$acc parallel loop collapse(3) gang vector default(present)
-        do k = 1, eqn_idx%sys_size
+        do k = 1, sys_size
             do j = 0, m
                 do l = 0, p
                     data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, dp)
@@ -204,7 +204,7 @@ contains
         do i = 1, fourier_rings
 
             !$acc parallel loop collapse(3) gang vector default(present)
-            do k = 1, eqn_idx%sys_size
+            do k = 1, sys_size
                 do j = 0, m
                     do l = 1, cmplx_size
                         data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
@@ -213,7 +213,7 @@ contains
             end do
 
             !$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
-            do k = 1, eqn_idx%sys_size
+            do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
                         data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = q_cons_vf(k)%sf(j, i, l)
@@ -234,7 +234,7 @@ contains
             !$acc update device(Nfq)
 
             !$acc parallel loop collapse(3) gang vector default(present)
-            do k = 1, eqn_idx%sys_size
+            do k = 1, sys_size
                 do j = 0, m
                     do l = 1, Nfq
                         data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
@@ -252,7 +252,7 @@ contains
             !$acc end host_data
 
             !$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
-            do k = 1, eqn_idx%sys_size
+            do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
                         data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, dp)
@@ -266,7 +266,7 @@ contains
 #else
         Nfq = 3
         do j = 0, m
-            do k = 1, eqn_idx%sys_size
+            do k = 1, sys_size
                 data_fltr_cmplx(:) = (0_dp, 0_dp)
                 data_real(1:p + 1) = q_cons_vf(k)%sf(j, 0, 0:p)
                 call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
@@ -281,7 +281,7 @@ contains
         do i = 1, fourier_rings
             Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
             do j = 0, m
-                do k = 1, eqn_idx%sys_size
+                do k = 1, sys_size
                     data_fltr_cmplx(:) = (0_dp, 0_dp)
                     data_real(1:p + 1) = q_cons_vf(k)%sf(j, i, 0:p)
                     call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)

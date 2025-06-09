@@ -36,7 +36,7 @@ contains
         !$acc routine seq
 #endif
 
-        type(scalar_field), intent(in), dimension(eqn_idx%sys_size) :: q_prim_vf
+        type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         real(wp), intent(inout), dimension(num_fluids) :: alpha
         real(wp), intent(inout), dimension(num_vels) :: vel
         real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres
@@ -260,7 +260,7 @@ contains
 
         end if
 
-        if (any(re_size > 0)) then
+        if (any(eqn_idx%re_size > 0)) then
             max_dt(j, k, l) = min(icfl_dt, vcfl_dt)
         else
             max_dt(j, k, l) = icfl_dt

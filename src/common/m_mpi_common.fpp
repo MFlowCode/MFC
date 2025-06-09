@@ -57,36 +57,36 @@ contains
         if (qbmm .and. .not. polytropic) then
             if (n > 0) then
                 if (p > 0) then
-                    halo_size = -1 + buff_size*(eqn_idx%sys_size + 2*nb*4)* &
+                    halo_size = -1 + buff_size*(sys_size + 2*nb*4)* &
                                              & (m + 2*buff_size + 1)* &
                                              & (n + 2*buff_size + 1)* &
                                              & (p + 2*buff_size + 1)/ &
                                              & (min(m, n, p) + 2*buff_size + 1)
                 else
-                    halo_size = -1 + buff_size*(eqn_idx%sys_size + 2*nb*4)* &
+                    halo_size = -1 + buff_size*(sys_size + 2*nb*4)* &
                                              & (max(m, n) + 2*buff_size + 1)
                 end if
             else
-                halo_size = -1 + buff_size*(eqn_idx%sys_size + 2*nb*4)
+                halo_size = -1 + buff_size*(sys_size + 2*nb*4)
             end if
         else
             if (n > 0) then
                 if (p > 0) then
-                    halo_size = -1 + buff_size*eqn_idx%sys_size* &
+                    halo_size = -1 + buff_size*sys_size* &
                                             & (m + 2*buff_size + 1)* &
                                             & (n + 2*buff_size + 1)* &
                                             & (p + 2*buff_size + 1)/ &
                                             & (min(m, n, p) + 2*buff_size + 1)
                 else
-                    halo_size = -1 + buff_size*eqn_idx%sys_size* &
+                    halo_size = -1 + buff_size*sys_size* &
                                             & (max(m, n) + 2*buff_size + 1)
                 end if
             else
-                halo_size = -1 + buff_size*eqn_idx%sys_size
+                halo_size = -1 + buff_size*sys_size
             end if
         end if
 
-        v_size = eqn_idx%sys_size
+        v_size = sys_size
 
         allocate (buff_send(0:halo_size))
 
@@ -136,7 +136,7 @@ contains
     impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta)
 
         type(scalar_field), &
-            dimension(eqn_idx%sys_size), &
+            dimension(sys_size), &
             intent(in) :: q_cons_vf
 
         type(integer_field), &
@@ -166,12 +166,12 @@ contains
         integer :: alt_sys
 
         if (present(beta)) then
-            alt_sys = eqn_idx%sys_size + 1
+            alt_sys = sys_size + 1
         else
-            alt_sys = eqn_idx%sys_size
+            alt_sys = sys_size
         end if
 
-        do i = 1, eqn_idx%sys_size
+        do i = 1, sys_size
             MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m, 0:n, 0:p)
         end do
 
@@ -184,8 +184,8 @@ contains
         if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do j = 1, nnode
-                    MPI_IO_DATA%var(eqn_idx%sys_size + (i - 1)*nnode + j)%sf => pb%sf(0:m, 0:n, 0:p, j, i)
-                    MPI_IO_DATA%var(eqn_idx%sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv%sf(0:m, 0:n, 0:p, j, i)
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => pb%sf(0:m, 0:n, 0:p, j, i)
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv%sf(0:m, 0:n, 0:p, j, i)
                 end do
             end do
         end if
@@ -195,8 +195,8 @@ contains
         if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do j = 1, nnode
-                    MPI_IO_DATA%var(eqn_idx%sys_size + (i - 1)*nnode + j)%sf => pb_ts(1)%sf(0:m, 0:n, 0:p, j, i)
-                    MPI_IO_DATA%var(eqn_idx%sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv_ts(1)%sf(0:m, 0:n, 0:p, j, i)
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => pb_ts(1)%sf(0:m, 0:n, 0:p, j, i)
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv_ts(1)%sf(0:m, 0:n, 0:p, j, i)
                 end do
             end do
         end if
@@ -219,7 +219,7 @@ contains
 
 #ifndef MFC_POST_PROCESS
         if (qbmm .and. .not. polytropic) then
-            do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 2*nb*4
+            do i = sys_size + 1, sys_size + 2*nb*4
                 call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
                                               MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
                 call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
@@ -620,7 +620,7 @@ contains
                                                 mpi_dir, &
                                                 pbc_loc)
 
-        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
 
         integer, intent(in) :: mpi_dir, pbc_loc
@@ -647,15 +647,15 @@ contains
 #ifdef MFC_SIMULATION
         if (qbmm .and. .not. polytropic) then
             buffer_counts = (/ &
-                            buff_size*(eqn_idx%sys_size + 2*nb*4)*(n + 1)*(p + 1), &
-                            buff_size*(eqn_idx%sys_size + 2*nb*4)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(sys_size + 2*nb*4)*(n + 1)*(p + 1), &
+                            buff_size*(sys_size + 2*nb*4)*(m + 2*buff_size + 1)*(p + 1), &
                             buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
                             /)
         else
 #endif
             buffer_counts = (/ &
-                            buff_size*eqn_idx%sys_size*(n + 1)*(p + 1), &
-                            buff_size*eqn_idx%sys_size*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*sys_size*(n + 1)*(p + 1), &
+                            buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
                             buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
                             /)
 #ifdef MFC_SIMULATION
@@ -700,7 +700,7 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, buff_size - 1
-                                do i = 1, eqn_idx%sys_size
+                                do i = 1, sys_size
                                     r = (i - 1) + v_size*(j + buff_size*(k + (n + 1)*l))
                                     buff_send(r) = q_cons_vf(i)%sf(j + pack_offset, k, l)
                                 end do
@@ -714,11 +714,11 @@ contains
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, buff_size - 1
-                                    do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 4
+                                    do i = sys_size + 1, sys_size + 4
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*4 + v_size* &
                                                 (j + buff_size*(k + (n + 1)*l))
-                                            buff_send(r) = pb(j + pack_offset, k, l, i - eqn_idx%sys_size, q)
+                                            buff_send(r) = pb(j + pack_offset, k, l, i - sys_size, q)
                                         end do
                                     end do
                                 end do
@@ -729,11 +729,11 @@ contains
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, buff_size - 1
-                                    do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 4
+                                    do i = sys_size + 1, sys_size + 4
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                 (j + buff_size*(k + (n + 1)*l))
-                                            buff_send(r) = mv(j + pack_offset, k, l, i - eqn_idx%sys_size, q)
+                                            buff_send(r) = mv(j + pack_offset, k, l, i - sys_size, q)
                                         end do
                                     end do
                                 end do
@@ -743,7 +743,7 @@ contains
 #endif
                 #:elif mpi_dir == 2
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, eqn_idx%sys_size
+                    do i = 1, sys_size
                         do l = 0, p
                             do k = 0, buff_size - 1
                                 do j = -buff_size, m + buff_size
@@ -759,7 +759,7 @@ contains
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 4
+                        do i = sys_size + 1, sys_size + 4
                             do l = 0, p
                                 do k = 0, buff_size - 1
                                     do j = -buff_size, m + buff_size
@@ -767,7 +767,7 @@ contains
                                             r = (i - 1) + (q - 1)*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  (k + buff_size*l))
-                                            buff_send(r) = pb(j, k + pack_offset, l, i - eqn_idx%sys_size, q)
+                                            buff_send(r) = pb(j, k + pack_offset, l, i - sys_size, q)
                                         end do
                                     end do
                                 end do
@@ -775,7 +775,7 @@ contains
                         end do
 
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 4
+                        do i = sys_size + 1, sys_size + 4
                             do l = 0, p
                                 do k = 0, buff_size - 1
                                     do j = -buff_size, m + buff_size
@@ -783,7 +783,7 @@ contains
                                             r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  (k + buff_size*l))
-                                            buff_send(r) = mv(j, k + pack_offset, l, i - eqn_idx%sys_size, q)
+                                            buff_send(r) = mv(j, k + pack_offset, l, i - sys_size, q)
                                         end do
                                     end do
                                 end do
@@ -793,7 +793,7 @@ contains
 #endif
                 #:else
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, eqn_idx%sys_size
+                    do i = 1, sys_size
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
@@ -809,7 +809,7 @@ contains
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 4
+                        do i = sys_size + 1, sys_size + 4
                             do l = 0, buff_size - 1
                                 do k = -buff_size, n + buff_size
                                     do j = -buff_size, m + buff_size
@@ -817,7 +817,7 @@ contains
                                             r = (i - 1) + (q - 1)*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                            buff_send(r) = pb(j, k, l + pack_offset, i - eqn_idx%sys_size, q)
+                                            buff_send(r) = pb(j, k, l + pack_offset, i - sys_size, q)
                                         end do
                                     end do
                                 end do
@@ -825,7 +825,7 @@ contains
                         end do
 
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 4
+                        do i = sys_size + 1, sys_size + 4
                             do l = 0, buff_size - 1
                                 do k = -buff_size, n + buff_size
                                     do j = -buff_size, m + buff_size
@@ -833,7 +833,7 @@ contains
                                             r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                            buff_send(r) = mv(j, k, l + pack_offset, i - eqn_idx%sys_size, q)
+                                            buff_send(r) = mv(j, k, l + pack_offset, i - sys_size, q)
                                         end do
                                     end do
                                 end do
@@ -898,7 +898,7 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = -buff_size, -1
-                                do i = 1, eqn_idx%sys_size
+                                do i = 1, sys_size
                                     r = (i - 1) + v_size* &
                                         (j + buff_size*((k + 1) + (n + 1)*l))
                                     q_cons_vf(i)%sf(j + unpack_offset, k, l) = buff_recv(r)
@@ -919,11 +919,11 @@ contains
                         do l = 0, p
                             do k = 0, n
                                 do j = -buff_size, -1
-                                    do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 4
+                                    do i = sys_size + 1, sys_size + 4
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*4 + v_size* &
                                                 (j + buff_size*((k + 1) + (n + 1)*l))
-                                            pb(j + unpack_offset, k, l, i - eqn_idx%sys_size, q) = buff_recv(r)
+                                            pb(j + unpack_offset, k, l, i - sys_size, q) = buff_recv(r)
                                         end do
                                     end do
                                 end do
@@ -934,11 +934,11 @@ contains
                         do l = 0, p
                             do k = 0, n
                                 do j = -buff_size, -1
-                                    do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 4
+                                    do i = sys_size + 1, sys_size + 4
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                 (j + buff_size*((k + 1) + (n + 1)*l))
-                                            mv(j + unpack_offset, k, l, i - eqn_idx%sys_size, q) = buff_recv(r)
+                                            mv(j + unpack_offset, k, l, i - sys_size, q) = buff_recv(r)
                                         end do
                                     end do
                                 end do
@@ -948,7 +948,7 @@ contains
 #endif
                 #:elif mpi_dir == 2
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, eqn_idx%sys_size
+                    do i = 1, sys_size
                         do l = 0, p
                             do k = -buff_size, -1
                                 do j = -buff_size, m + buff_size
@@ -970,7 +970,7 @@ contains
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 4
+                        do i = sys_size + 1, sys_size + 4
                             do l = 0, p
                                 do k = -buff_size, -1
                                     do j = -buff_size, m + buff_size
@@ -978,7 +978,7 @@ contains
                                             r = (i - 1) + (q - 1)*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  ((k + buff_size) + buff_size*l))
-                                            pb(j, k + unpack_offset, l, i - eqn_idx%sys_size, q) = buff_recv(r)
+                                            pb(j, k + unpack_offset, l, i - sys_size, q) = buff_recv(r)
                                         end do
                                     end do
                                 end do
@@ -986,7 +986,7 @@ contains
                         end do
 
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 4
+                        do i = sys_size + 1, sys_size + 4
                             do l = 0, p
                                 do k = -buff_size, -1
                                     do j = -buff_size, m + buff_size
@@ -994,7 +994,7 @@ contains
                                             r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  ((k + buff_size) + buff_size*l))
-                                            mv(j, k + unpack_offset, l, i - eqn_idx%sys_size, q) = buff_recv(r)
+                                            mv(j, k + unpack_offset, l, i - sys_size, q) = buff_recv(r)
                                         end do
                                     end do
                                 end do
@@ -1005,7 +1005,7 @@ contains
                 #:else
                     ! Unpacking buffer from bc_z%beg
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, eqn_idx%sys_size
+                    do i = 1, sys_size
                         do l = -buff_size, -1
                             do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
@@ -1028,7 +1028,7 @@ contains
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 4
+                        do i = sys_size + 1, sys_size + 4
                             do l = -buff_size, -1
                                 do k = -buff_size, n + buff_size
                                     do j = -buff_size, m + buff_size
@@ -1037,7 +1037,7 @@ contains
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  ((k + buff_size) + (n + 2*buff_size + 1)* &
                                                   (l + buff_size)))
-                                            pb(j, k, l + unpack_offset, i - eqn_idx%sys_size, q) = buff_recv(r)
+                                            pb(j, k, l + unpack_offset, i - sys_size, q) = buff_recv(r)
                                         end do
                                     end do
                                 end do
@@ -1045,7 +1045,7 @@ contains
                         end do
 
                         !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = eqn_idx%sys_size + 1, eqn_idx%sys_size + 4
+                        do i = sys_size + 1, sys_size + 4
                             do l = -buff_size, -1
                                 do k = -buff_size, n + buff_size
                                     do j = -buff_size, m + buff_size
@@ -1054,7 +1054,7 @@ contains
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  ((k + buff_size) + (n + 2*buff_size + 1)* &
                                                   (l + buff_size)))
-                                            mv(j, k, l + unpack_offset, i - eqn_idx%sys_size, q) = buff_recv(r)
+                                            mv(j, k, l + unpack_offset, i - sys_size, q) = buff_recv(r)
                                         end do
                                     end do
                                 end do
