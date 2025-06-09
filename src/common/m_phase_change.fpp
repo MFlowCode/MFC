@@ -139,7 +139,7 @@ contains
                     ! calculating the total energy that MUST be preserved throughout the pT- and pTg-relaxation procedures
                     ! at each of the cells. The internal energy is calculated as the total energy minus the kinetic
                     ! energy to preserved its value at sharp interfaces
-                    rhoe = q_cons_vf(E_idx)%sf(j, k, l) - dynE
+                    rhoe = q_cons_vf(eqn_idx%E)%sf(j, k, l) - dynE
 
                     ! Calling pT-equilibrium for either finishing phase-change module, or as an IC for the pTg-equilibrium
                     ! for this case, MFL cannot be either 0 or 1, so I chose it to be 2

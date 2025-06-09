@@ -42,10 +42,10 @@ contains
                     end do
 
                     ! e = E - 1/2*|u|^2
-                    ! cons. E_idx     = \rho E
+                    ! cons. eqn_idx%E     = \rho E
                     ! cons. contxb    = \rho         (1-fluid model)
                     ! cons. momxb + i = \rho u_i
-                    energy = q_cons_vf(E_idx)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
+                    energy = q_cons_vf(eqn_idx%E)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
                     !$acc loop seq
                     do eqn = momxb, momxe
                         energy = energy - &
@@ -78,7 +78,7 @@ contains
                     end do
 
                     call get_mixture_molecular_weight(Ys, mix_mol_weight)
-                    q_T_sf%sf(x, y, z) = q_prim_vf(E_idx)%sf(x, y, z)*mix_mol_weight/(gas_constant*q_prim_vf(1)%sf(x, y, z))
+                    q_T_sf%sf(x, y, z) = q_prim_vf(eqn_idx%E)%sf(x, y, z)*mix_mol_weight/(gas_constant*q_prim_vf(1)%sf(x, y, z))
                 end do
             end do
         end do
