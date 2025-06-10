@@ -24,7 +24,7 @@ module m_mpi_common
 
     implicit none
 
-    integer, private :: err_code, ierr, v_size !<
+    integer, private :: ierr, v_size !<
     !$acc declare create(v_size)
     !! Generic flags used to identify and report MPI errors
 

@@ -44,9 +44,8 @@ module m_mpi_proxy
 
     !> @name Generic flags used to identify and report MPI errors
     !> @{
-    integer, private :: err_code, ierr, v_size
+    integer, private :: ierr
     !> @}
-    !$acc declare create(v_size)
 
 contains
 

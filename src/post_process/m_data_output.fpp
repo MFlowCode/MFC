@@ -997,7 +997,7 @@ contains
                             end do
                         end if
                     end if
-                elseif (wp == dp) then
+                elseif (wp == sp) then
                     do i = -offset_x%beg, m + offset_x%end
                         do j = -offset_y%beg, n + offset_y%end
                             do k = -offset_z%beg, p + offset_z%end

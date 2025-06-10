@@ -23,7 +23,7 @@ module m_mpi_proxy
 
     implicit none
 
-    integer, private :: err_code, ierr, v_size !<
+    integer, private :: ierr, v_size !<
         !! Generic flags used to identify and report MPI errors
 
     real(wp), private, allocatable, dimension(:), target :: q_prims_buff_send !<

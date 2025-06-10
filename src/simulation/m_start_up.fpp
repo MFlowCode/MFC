@@ -104,8 +104,6 @@ module m_start_up
  s_save_performance_metrics
 
 
-    type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
-
     real(wp) :: dt_init
 
 contains

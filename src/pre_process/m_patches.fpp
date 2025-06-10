@@ -48,7 +48,6 @@ module m_patches
     !! is to act as a pseudo volume fraction to indicate the contribution of each
     !! patch toward the composition of a cell's fluid state.
 
-    real(wp) :: r_cyl, theta_cyl, x_cart, y_cart, z_cart
     real(wp) :: cart_x, cart_y, cart_z
     real(wp) :: sph_phi !<
     !! Variables to be used to hold cell locations in Cartesian coordinates if

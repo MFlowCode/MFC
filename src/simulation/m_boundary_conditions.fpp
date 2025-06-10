@@ -65,6 +65,7 @@ contains
     impure subroutine s_read_parallel_boundary_condition_files(bc_type)
 
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
+        integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
 
         integer :: dir, loc
         character(len=path_len) :: file_loc, file_path
@@ -72,7 +73,7 @@ contains
 #ifdef MFC_MPI
         integer :: ierr
         integer :: file_id
-        integer :: offset
+        integer(kind=int64_kind) :: offset
         character(len=7) :: proc_rank_str
         logical :: dir_check
 

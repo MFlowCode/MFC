@@ -133,7 +133,7 @@ contains
         real(wp) :: qv_K
         real(wp), dimension(num_fluids) :: Gs
 
-        real(wp) :: pres_IP, coeff
+        real(wp) :: pres_IP
         real(wp), dimension(3) :: vel_IP, vel_norm_IP
         real(wp) :: c_IP
         real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
@@ -152,7 +152,7 @@ contains
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
 
-        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, innerp, norm, buf, j, k, l, q, coeff)
+        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, innerp, norm, buf, j, k, l, q)
         do i = 1, num_gps
 
             gp = ghost_points(i)

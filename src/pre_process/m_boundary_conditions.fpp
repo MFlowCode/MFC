@@ -315,7 +315,7 @@ contains
 #ifdef MFC_MPI
         integer :: ierr
         integer :: file_id
-        integer :: offset
+        integer(wp) :: offset
         character(len=7) :: proc_rank_str
         logical :: dir_check
 
