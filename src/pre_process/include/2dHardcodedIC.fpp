@@ -4,8 +4,43 @@
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: factor
+    integer  :: Nx1,Nx2,Ny1,Ny2,Ny3,Ny4,Ny5,Ny6,mpi_size,ierr,global_idx
+    integer  :: mpi_rank,lol,idx,stdout,i_min,i_max,local_x_min,local_x_max
+integer :: local_start, local_end, local_n
 
+  integer, parameter :: nFiles = 14
+  integer, parameter :: xRows  = 1281
+  integer, parameter :: Nrows  = xRows
+
+  ! Variables for file reading and domain data
+  real(wp)                ::  domain_start, domain_end, x_step
+  real(wp), dimension(Nrows)            :: x_coords
+  real(wp), dimension(Nrows, nFiles)      :: stored_values
+  character(len=100), dimension(nFiles)   :: fileNames
+  character(len=20)       :: file_num_str
+  character(len=6), parameter :: zeros_default = "000000"
+  character(len=*), parameter :: init_dir = "/u/dadam/MFC-Adam/examples/1D_reacting_shocktube/"
+  integer                 :: f, iter, ios, unit
+  logical                 :: files_loaded
+  files_loaded=.false.
     eps = 1e-9_wp
+    do f = 1, nFiles
+        ! Convert file number to string with proper formatting
+        if (f < 10) then
+            write(file_num_str, '(I1)') f  ! Single digit
+        else
+            write(file_num_str, '(I2)') f  ! Double digit
+            ! For more than 99 files, you might need to adjust this format
+        end if
+
+        ! Create the filename with the pattern "prim.X.00.000000.dat"
+        if (f == 15) then
+            fileNames(f) = trim(init_dir) // "T.15.00." // zeros_default // ".dat"
+        else
+            fileNames(f) = trim(init_dir) // "prim." // trim(file_num_str) // ".00." // zeros_default // ".dat"
+        end if
+
+    end do
 
 #:enddef
 
@@ -129,7 +164,64 @@
             q_prim_vf(advxb)%sf(i, j, 0) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
         end if
+        case (211) !2D Boundary Lido for multicomponent transport problems
 
+                if (.not. files_loaded) then
+                    ! Print status message
+                    print *, "Loading all data files..."
+
+                    do f = 1, nFiles
+                      ! Open the file for reading
+                        open(newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
+                        if (ios /= 0) then
+                            print *, "Error opening file: ", trim(fileNames(f))
+                            cycle  ! Skip this file on error
+                        endif
+
+                        ! Read all rows at once into memory
+                        do iter = 1, nRows
+                            read(unit, *, iostat=ios) x_coords(iter), stored_values(iter, f)
+                            if (ios /= 0) then
+                                print *, "Error reading file ", trim(fileNames(f)), " at row ", iter
+                                exit  ! Exit loop on error
+                            endif
+                        end do
+                        close(unit)
+                    end do
+
+                    ! Calculate domain information for mapping
+                    domain_start = x_coords(1)
+                    domain_end = x_coords(nRows)
+                    x_step = (domain_end - domain_start) / (nRows - 1)
+
+                    print *, "All data files loaded. Domain range:", domain_start, "to", domain_end
+                    files_loaded = .true.
+
+                endif
+
+                ! Simple direct mapping - find the closest index without interpolation
+                idx = nint((x_cc(i) - domain_start) / x_step) + 1
+
+                ! Boundary protection
+                ! if (idx < 1) idx = 1
+                ! if (idx > nRows) idx = nRows
+
+                ! Assign values directly from stored data for each file
+         do f = 1, nFiles-1
+            if (f > 2) then
+                lol = 1
+            else
+                lol = 0
+            end if
+            q_prim_vf(f+lol)%sf(i, j, 0) = stored_values(i+1, f)
+        end do
+
+        ! Set element 3 to zero (as requested)
+            q_prim_vf(3)%sf(i, j, 0) = 0.0_wp
+            ! print *, y_cc(0)
+            if (x_cc(i) .ge.  0.010378) then
+             q_prim_vf(2)%sf(i,j,0)=q_prim_vf(2)%sf(i,j,0)+(0.1_wp*94.67*10**(-6))*sin(2.0_wp*pi*(y_cc(j)*6.0_wp/(0.015147_wp/2.0_wp)))
+          end if
     case (250) ! MHD Orszag-Tang vortex
         ! gamma = 5/3
         !   rho = 25/(36*pi)
