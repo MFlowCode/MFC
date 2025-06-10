@@ -3775,14 +3775,13 @@ contains
         !!  @param iz   Index bounds in  third coordinate direction
     pure subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                               flux_gsrc_vf, &
-                                              norm_dir, ix, iy, iz)
+                                              norm_dir)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
         integer, intent(in) :: norm_dir
-        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, l !< Generic loop iterators
 
