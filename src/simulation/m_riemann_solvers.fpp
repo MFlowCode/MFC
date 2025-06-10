@@ -2760,7 +2760,6 @@ contains
 
         if (surface_tension) then
             call s_compute_capilary_source_flux( &
-                q_prim_vf, &
                 vel_src_rsx_vf, &
                 vel_src_rsy_vf, &
                 vel_src_rsz_vf, &
