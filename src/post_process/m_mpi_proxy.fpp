@@ -172,7 +172,7 @@ contains
             & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange',        &
             & 'rkck_adap_dt', 'output_partial_domain', 'relativity',           &
             & 'cont_damage', 'periodic_ibs', 'store_levelset',                 &
-            & 'slab_domain_decomposition' ]
+            & 'slab_domain_decomposition', 'q_filtered_wrt' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

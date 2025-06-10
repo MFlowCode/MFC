@@ -52,6 +52,8 @@ module m_time_steppers
 
     use m_volume_filtering
 
+    use m_compute_statistics
+
     implicit none
 
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
@@ -89,8 +91,22 @@ module m_time_steppers
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_filtered
 
+    type(vector_field), allocatable, dimension(:) :: pt_Re_stress
+    type(vector_field), allocatable, dimension(:) :: R_mu
+    type(scalar_field), allocatable, dimension(:) :: pres_visc_stress_filtered
+
+    type(scalar_field) :: mag_div_Ru
+    type(scalar_field) :: mag_div_R_mu
+    type(scalar_field) :: mag_F_IMET
+
+    type(scalar_field), allocatable, dimension(:) :: R_u_stat
+    type(scalar_field), allocatable, dimension(:) :: R_mu_stat
+    type(scalar_field), allocatable, dimension(:) :: F_IMET_stat
+
     !$acc declare create(q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, rhs_ts_rkck, q_prim_ts, rhs_mv, rhs_pb, max_dt)
-    !$acc declare create(div_pres_visc_stress)
+    !$acc declare create(div_pres_visc_stress, q_cons_filtered, pt_Re_stress, R_mu, pres_visc_stress_filtered)
+    !$acc declare create(mag_div_Ru, mag_div_R_mu, mag_F_IMET)
+    !$acc declare create(R_u_stat, R_mu_stat, F_IMET_stat)
 
 contains
 
@@ -366,7 +382,7 @@ contains
             end do
         end do
 
-        if (compute_CD) then
+        if (compute_CD .or. fourier_transform_filtering) then
             @:ALLOCATE(div_pres_visc_stress(momxb:momxe))
             do i = momxb, momxe
                 @:ALLOCATE(div_pres_visc_stress(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -384,7 +400,72 @@ contains
                     idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_cons_filtered(i))
             end do
+
+            @:ALLOCATE(pt_Re_stress(1:num_dims))
+            do i = 1, num_dims
+                @:ALLOCATE(pt_Re_stress(i)%vf(1:num_dims))
+            end do
+            do i = 1, num_dims
+                do j = 1, num_dims
+                    @:ALLOCATE(pt_Re_stress(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end))
+                end do
+                @:ACC_SETUP_VFs(pt_Re_stress(i))
+            end do
+
+            @:ALLOCATE(R_mu(1:num_dims))
+            do i = 1, num_dims
+                @:ALLOCATE(R_mu(i)%vf(1:num_dims))
+            end do
+            do i = 1, num_dims
+                do j = 1, num_dims
+                    @:ALLOCATE(R_mu(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end))
+                end do
+                @:ACC_SETUP_VFs(R_mu(i))
+            end do
+
+            @:ALLOCATE(pres_visc_stress_filtered(1:num_dims))
+            do i = 1, num_dims
+                @:ALLOCATE(pres_visc_stress_filtered(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    idwbuff(2)%beg:idwbuff(2)%end, &
+                    idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(pres_visc_stress_filtered(i))
+            end do
+
+            @:ALLOCATE(mag_div_Ru%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(mag_div_Ru)
+
+            @:ALLOCATE(mag_div_R_mu%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(mag_div_R_mu)
+
+            @:ALLOCATE(mag_F_IMET%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(mag_F_IMET)
         end if
+
+        @:ALLOCATE(R_u_stat(2:4))
+        do i = 2, 4
+            @:ALLOCATE(R_u_stat(i)%sf(0:m, 0:n, 0:p))
+            @:ACC_SETUP_SFs(R_u_stat(i))
+        end do
+        @:ALLOCATE(R_mu_stat(2:4))
+        do i = 2, 4
+            @:ALLOCATE(R_mu_stat(i)%sf(0:m, 0:n, 0:p))
+            @:ACC_SETUP_SFs(R_mu_stat(i))
+        end do
+        @:ALLOCATE(F_IMET_stat(2:4))
+        do i = 2, 4
+            @:ALLOCATE(F_IMET_stat(i)%sf(0:m, 0:n, 0:p))
+            @:ACC_SETUP_SFs(F_IMET_stat(i))
+        end do
 
     end subroutine s_initialize_time_steppers_module
 
@@ -694,6 +775,8 @@ contains
 
         real(wp) :: start, finish
 
+        integer :: n_step
+
         ! Stage 1 of 3
 
         if (.not. adap_dt) then
@@ -707,6 +790,30 @@ contains
         end if
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, div_pres_visc_stress)
+
+        if (fourier_transform_filtering) then 
+            call s_apply_fftw_filter_cons(q_cons_ts(1)%vf, q_cons_filtered)
+            call s_setup_terms_filtering(q_cons_ts(1)%vf, pt_Re_stress, R_mu)
+            call s_apply_fftw_filter_tensor(pt_Re_stress, R_mu, q_cons_filtered, div_pres_visc_stress, pres_visc_stress_filtered)
+            call s_compute_pseudo_turbulent_reynolds_stress(q_cons_filtered, pt_Re_stress, mag_div_Ru)
+            call s_compute_R_mu(q_cons_filtered, R_mu, mag_div_R_mu)
+            call s_compute_interphase_momentum_exchange_term(pres_visc_stress_filtered, mag_F_IMET)
+        end if
+        
+        if (t_step > 5) then
+            n_step = t_step - 5
+            print *, n_step
+            call s_compute_s_order_statistics(mag_div_Ru, n_step, R_u_stat, 1)
+            !call s_compute_s_order_statistics(mag_div_R_mu, n_step, R_mu_stat, 2)
+            !call s_compute_s_order_statistics(mag_F_IMET, n_step, F_IMET_stat, 3)
+        end if
+
+
+        ! R_u_stat(2)%sf(0:m, 0:n, 0:p) = q_cons_filtered(6)%sf(0:m, 0:n, 0:p)
+        ! R_u_stat(3)%sf(0:m, 0:n, 0:p) = mag_div_Ru%sf(0:m, 0:n, 0:p)
+        ! R_u_stat(4)%sf(0:m, 0:n, 0:p) = mag_div_R_mu%sf(0:m, 0:n, 0:p)
+        ! R_mu_stat(2)%sf(0:m, 0:n, 0:p) = mag_F_IMET%sf(0:m, 0:n, 0:p)
+
 
         if (compute_CD) then
             call s_compute_drag_coefficient(div_pres_visc_stress)
@@ -1380,12 +1487,57 @@ contains
             @:DEALLOCATE(rhs_vf)
         end if
 
-        if (compute_CD) then
+        if (compute_CD .or. fourier_transform_filtering) then
             do i = momxb, momxe
                 @:DEALLOCATE(div_pres_visc_stress(i)%sf)
             end do
             @:DEALLOCATE(div_pres_visc_stress)
         end if
+
+        if (fourier_transform_filtering) then 
+            do i = 1, sys_size
+                @:DEALLOCATE(q_cons_filtered(i)%sf)
+            end do
+            @:DEALLOCATE(q_cons_filtered)
+
+            do i = 1, num_dims
+                do j = 1, num_dims
+                    @:DEALLOCATE(pt_Re_stress(i)%vf(j)%sf)
+                end do
+                @:DEALLOCATE(pt_Re_stress(i)%vf)
+            end do
+            @:DEALLOCATE(pt_Re_stress)
+
+            do i = 1, num_dims
+                do j = 1, num_dims
+                    @:DEALLOCATE(R_mu(i)%vf(j)%sf)
+                end do
+                @:DEALLOCATE(R_mu(i)%vf)
+            end do
+            @:DEALLOCATE(R_mu)
+
+            do i = 1, num_dims
+                @:DEALLOCATE(pres_visc_stress_filtered(i)%sf)
+            end do
+            @:DEALLOCATE(pres_visc_stress_filtered)
+
+            @:DEALLOCATE(mag_div_Ru%sf)
+            @:DEALLOCATE(mag_div_R_mu%sf)
+            @:DEALLOCATE(mag_F_IMET%sf)
+        end if
+
+        do i = 2, 4
+            @:DEALLOCATE(R_u_stat(i)%sf)
+        end do
+        @:DEALLOCATE(R_u_stat)
+        do i = 2, 4
+            @:DEALLOCATE(R_mu_stat(i)%sf)
+        end do
+        @:DEALLOCATE(R_mu_stat)
+        do i = 2, 4
+            @:DEALLOCATE(F_IMET_stat(i)%sf)
+        end do
+        @:DEALLOCATE(F_IMET_stat)
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then

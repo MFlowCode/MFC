@@ -1420,6 +1420,11 @@ contains
 
         call cpu_time(start)
         call nvtxStartRange("SAVE-DATA")
+        do i = 2, 4 
+            !$acc update host(R_u_stat(i)%sf)
+            !$acc update host(R_mu_stat(i)%sf)
+            !$acc update host(F_IMET_stat(i)%sf)
+        end do  
         do i = 1, sys_size
             !$acc update host(q_cons_ts(1)%vf(i)%sf)
             do l = 0, p
@@ -1452,7 +1457,12 @@ contains
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
-            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count)
+            if (fourier_transform_filtering) then
+                call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, &
+                                        R_u_stat=R_u_stat, R_mu_stat=R_mu_stat, F_IMET_stat=F_IMET_stat)
+            else
+                call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count)
+            end if
         end if
 
         call nvtxEndRange
@@ -1570,6 +1580,8 @@ contains
         call s_initialize_particle_forces_module()
         call s_initialize_additional_forcing_module()
         if (fourier_transform_filtering) call s_initialize_fftw_explicit_filter_module()
+
+        call s_initialize_statistics_module()
 
     end subroutine s_initialize_modules
 

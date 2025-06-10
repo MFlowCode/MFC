@@ -85,7 +85,8 @@ contains
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
             cfl_target, surface_tension, bubbles_lagrange, rkck_adap_dt, &
             sim_data, hyperelasticity, Bx0, relativity, cont_damage, & 
-            periodic_ibs, store_levelset, slab_domain_decomposition
+            periodic_ibs, store_levelset, slab_domain_decomposition, &
+            q_filtered_wrt
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -179,6 +180,7 @@ contains
         ! Populating the buffer regions of the conservative variables
         if (buff_size > 0) then
             call s_populate_conservative_variables_buffer_regions()
+            if (q_filtered_wrt) call s_populate_filtered_variables_buffer_regions()
             if (bubbles_lagrange) call s_populate_conservative_variables_buffer_regions(q_particle(1))
         end if
 
@@ -322,6 +324,32 @@ contains
 
             end if
         end do
+
+        ! Adding filtered quantities
+        if (q_filtered_wrt) then
+            ! filtered cons vars
+            do i = 2, 4
+                q_sf = R_u_stat(i)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                write (varname, '(A,I0)') 'R_u_stats', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+
+                varname(:) = ' '
+            end do
+            do i = 2, 4
+                q_sf = R_mu_stat(i)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                write (varname, '(A,I0)') 'R_mu_stats', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+
+                varname(:) = ' '
+            end do
+            do i = 2, 4
+                q_sf = F_IMET_stat(i)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                write (varname, '(A,I0)') 'F_IMET_stats', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+
+                varname(:) = ' '
+            end do
+        end if
 
         ! Adding the species' concentrations to the formatted database file
         if (chemistry) then

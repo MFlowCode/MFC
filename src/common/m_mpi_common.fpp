@@ -153,7 +153,7 @@ contains
     !! @param levelset closest distance from every cell to the IB
     !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     !! @param beta Eulerian void fraction from lagrangian bubbles
-    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta)
+    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta, R_u_stat, R_mu_stat, F_IMET_stat)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -174,6 +174,10 @@ contains
         type(scalar_field), &
             intent(in), optional :: beta
 
+        type(scalar_field), dimension(2:4), intent(in), optional :: R_u_stat
+        type(scalar_field), dimension(2:4), intent(in), optional :: R_mu_stat
+        type(scalar_field), dimension(2:4), intent(in), optional :: F_IMET_stat
+
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
 
@@ -187,6 +191,8 @@ contains
 
         if (present(beta)) then
             alt_sys = sys_size + 1
+        else if (present(R_u_stat) .and. present(R_mu_stat) .and. present(F_IMET_stat)) then
+            alt_sys = sys_size + 9
         else
             alt_sys = sys_size
         end if
@@ -194,6 +200,18 @@ contains
         do i = 1, sys_size
             MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m, 0:n, 0:p)
         end do
+        
+        if (present(R_u_stat) .and. present(R_mu_stat) .and. present(F_IMET_stat)) then 
+            do i = sys_size+1, sys_size+3
+                MPI_IO_DATA%var(i)%sf => R_u_stat(i-sys_size+1)%sf(0:m, 0:n, 0:p)
+            end do
+            do i = sys_size+4, sys_size+6
+                MPI_IO_DATA%var(i)%sf => R_mu_stat(i-sys_size-2)%sf(0:m, 0:n, 0:p)
+            end do
+            do i = sys_size+7, sys_size+9 
+                MPI_IO_DATA%var(i)%sf => F_IMET_stat(i-sys_size-5)%sf(0:m, 0:n, 0:p)
+            end do 
+        end if
 
         if (present(beta)) then
             MPI_IO_DATA%var(alt_sys)%sf => beta%sf(0:m, 0:n, 0:p)
@@ -1124,7 +1142,7 @@ contains
         buffer_counts = (/ &
                         buff_size*1*(n + 1)*(p + 1), &
                         buff_size*1*(m + 2*buff_size + 1)*(p + 1), &
-                        buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
+                        buff_size*1*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
                         /)
 
         buffer_count = buffer_counts(mpi_dir)
@@ -1166,7 +1184,7 @@ contains
                         do k = 0, n
                             do j = 0, buff_size - 1
                                 do i = 1, 1
-                                    r = (i - 1) + v_size*(j + buff_size*(k + (n + 1)*l))
+                                    r = (i - 1) + 1*(j + buff_size*(k + (n + 1)*l))
                                     buff_send_scalarfield(r) = q_temp%sf(j + pack_offset, k, l)
                                 end do
                             end do
@@ -1178,7 +1196,7 @@ contains
                         do l = 0, p
                             do k = 0, buff_size - 1
                                 do j = -buff_size, m + buff_size
-                                    r = (i - 1) + v_size* &
+                                    r = (i - 1) + 1* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          (k + buff_size*l))
                                     buff_send_scalarfield(r) = q_temp%sf(j, k + pack_offset, l)
@@ -1192,7 +1210,7 @@ contains
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
-                                    r = (i - 1) + v_size* &
+                                    r = (i - 1) + 1* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)*l))
                                     buff_send_scalarfield(r) = q_temp%sf(j, k, l + pack_offset)
@@ -1258,7 +1276,7 @@ contains
                         do k = 0, n
                             do j = -buff_size, -1
                                 do i = 1, 1
-                                    r = (i - 1) + v_size* &
+                                    r = (i - 1) + 1* &
                                         (j + buff_size*((k + 1) + (n + 1)*l))
                                     q_temp%sf(j + unpack_offset, k, l) = buff_recv_scalarfield(r)
 #if defined(__INTEL_COMPILER)
@@ -1277,7 +1295,7 @@ contains
                         do l = 0, p
                             do k = -buff_size, -1
                                 do j = -buff_size, m + buff_size
-                                    r = (i - 1) + v_size* &
+                                    r = (i - 1) + 1* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + buff_size*l))
                                     q_temp%sf(j, k + unpack_offset, l) = buff_recv_scalarfield(r)
@@ -1298,7 +1316,7 @@ contains
                         do l = -buff_size, -1
                             do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
-                                    r = (i - 1) + v_size* &
+                                    r = (i - 1) + 1* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)* &
                                           (l + buff_size)))

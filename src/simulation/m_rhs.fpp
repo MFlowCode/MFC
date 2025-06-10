@@ -999,7 +999,7 @@ contains
             end do
 
             ! particle forces loop, x-dir
-            if (compute_CD .and. present(div_pres_visc_stress)) then
+            if ((compute_CD .or. fourier_transform_filtering) .and. present(div_pres_visc_stress)) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do k = 0, p
                     do j = 0, n 
@@ -1128,7 +1128,7 @@ contains
             end do
 
             ! particle forces loop, y-dir
-            if (compute_CD .and. present(div_pres_visc_stress)) then
+            if ((compute_CD .or. fourier_transform_filtering) .and. present(div_pres_visc_stress)) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do k = 0, p 
                     do j = 0, n 
@@ -1353,7 +1353,7 @@ contains
             end if
 
             ! particle forces loop, z-dir
-            if (compute_CD .and. present(div_pres_visc_stress)) then
+            if ((compute_CD .or. fourier_transform_filtering) .and. present(div_pres_visc_stress)) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do k = 0, p 
                     do j = 0, n 
@@ -1596,7 +1596,7 @@ contains
             end do
 
             ! particle momentum exchange, viscous stress tensor, x-dir
-            if (compute_CD .and. present(div_pres_visc_stress)) then
+            if ((compute_CD .or. fourier_transform_filtering) .and. present(div_pres_visc_stress)) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do k = 0, p 
                     do j = 0, n 
@@ -1695,7 +1695,7 @@ contains
             end if
 
             ! particle momentum exchange, viscous stress tensor, y-dir
-            if (compute_CD .and. present(div_pres_visc_stress)) then
+            if ((compute_CD .or. fourier_transform_filtering) .and. present(div_pres_visc_stress)) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do k = 0, p 
                     do j = 0, n 
@@ -1797,7 +1797,7 @@ contains
             end do
 
             ! particle momentum exchange, viscous stress tensor, z-dir
-            if (compute_CD .and. present(div_pres_visc_stress)) then
+            if ((compute_CD .or. fourier_transform_filtering) .and. present(div_pres_visc_stress)) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do k = 0, p 
                     do j = 0, n 

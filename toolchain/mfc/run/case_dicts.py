@@ -446,6 +446,7 @@ POST_PROCESS.update({
     'surface_tension': ParamType.LOG,
     'output_partial_domain': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
+    'q_filtered_wrt': ParamType.LOG,
 })
 
 for cmp_id in range(1,3+1):

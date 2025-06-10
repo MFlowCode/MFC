@@ -322,6 +322,7 @@ module m_global_parameters
     logical :: periodic_ibs
     logical :: store_levelset
     logical :: slab_domain_decomposition
+    logical :: q_filtered_wrt
 
 contains
 
@@ -467,6 +468,7 @@ contains
         periodic_ibs = .false.
         store_levelset = .true.
         slab_domain_decomposition = .false.
+        q_filtered_wrt = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -778,6 +780,13 @@ contains
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
+        else if (q_filtered_wrt) then
+            allocate (MPI_IO_DATA%view(1:sys_size+9))
+            allocate (MPI_IO_DATA%var(1:sys_size+9))
+            do i = 1, sys_size+9
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
         else
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
@@ -963,6 +972,12 @@ contains
             end do
 
             if (bubbles_lagrange) MPI_IO_DATA%var(sys_size + 1)%sf => null()
+
+            if (q_filtered_wrt) then 
+                do i = sys_size+1, sys_size+9
+                    MPI_IO_DATA%var(i)%sf => null()
+                end do
+            end if
 
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)

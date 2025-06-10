@@ -12,6 +12,8 @@ module m_volume_filtering
 
     use m_ibm
 
+    use m_boundary_common
+
 #ifdef MFC_MPI
     use mpi                    !< Message passing interface (MPI) module
 #endif
@@ -23,11 +25,11 @@ module m_volume_filtering
     implicit none
 
     private; public :: s_initialize_fftw_explicit_filter_module, &
- s_apply_fftw_filter_cons, & 
- s_initialize_filtering_kernel, s_initialize_fluid_indicator_function, & 
- s_initialize_filtered_fluid_indicator_function, & 
+ s_initialize_filtering_kernel, s_initialize_fluid_indicator_function, s_initialize_filtered_fluid_indicator_function, & 
  s_finalize_fftw_explicit_filter_module, & 
- s_apply_fftw_filter_tensor, s_apply_fftw_filter_scalarfield
+ s_apply_fftw_filter_cons, s_apply_fftw_filter_tensor, s_apply_fftw_filter_scalarfield, &
+ s_mpi_transpose_slabZ2Y, s_mpi_transpose_slabY2Z, s_mpi_FFT_fwd, s_mpi_FFT_bwd, &
+ s_setup_terms_filtering, s_compute_pseudo_turbulent_reynolds_stress, s_compute_R_mu, s_compute_interphase_momentum_exchange_term
 
 #if !defined(MFC_OpenACC)
     include 'fftw3.f03'
@@ -460,12 +462,12 @@ contains
     end subroutine s_apply_fftw_filter_scalarfield
 
     !< apply the gaussian filter to the requisite tensors to compute unclosed terms of interest
-    subroutine s_apply_fftw_filter_tensor(pt_Re_stress, R_mu, q_cons_filtered, rhs_rhouu, pImT_filtered)
+    subroutine s_apply_fftw_filter_tensor(pt_Re_stress, R_mu, q_cons_filtered, div_pres_visc_stress, pres_visc_stress_filtered)
         type(vector_field), dimension(1:num_dims), intent(inout) :: pt_Re_stress
         type(vector_field), dimension(1:num_dims), intent(inout) :: R_mu
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_filtered
-        type(scalar_field), dimension(momxb:momxe), intent(inout) :: rhs_rhouu
-        type(scalar_field), dimension(1:num_dims), intent(inout) :: pImT_filtered
+        type(scalar_field), dimension(momxb:momxe), intent(inout) :: div_pres_visc_stress
+        type(scalar_field), dimension(1:num_dims), intent(inout) :: pres_visc_stress_filtered
 
         integer :: i, j, k, l, q
 
@@ -485,7 +487,7 @@ contains
 
         ! interphase momentum exchange
         do l = 1, num_dims
-            call s_apply_fftw_filter_scalarfield(q_cons_filtered(advxb), .false., rhs_rhouu(momxb-1+l), pImT_filtered(l))
+            call s_apply_fftw_filter_scalarfield(q_cons_filtered(advxb), .false., div_pres_visc_stress(momxb-1+l), pres_visc_stress_filtered(l))
         end do 
 
     end subroutine s_apply_fftw_filter_tensor
@@ -983,8 +985,8 @@ contains
                     !$acc loop seq
                     do l = 1, num_dims
                         div_R_mu(l, i, j, k) = (R_mu(l)%vf(1)%sf(i+1, j, k) - R_mu(l)%vf(1)%sf(i-1, j, k))/(2._wp*dx(i)) &
-                                           + (R_mu(l)%vf(2)%sf(i, j+1, k) - R_mu(l)%vf(2)%sf(i, j-1, k))/(2._wp*dy(j)) & 
-                                           + (R_mu(l)%vf(3)%sf(i, j, k+1) - R_mu(l)%vf(3)%sf(i, j, k-1))/(2._wp*dz(k))
+                                             + (R_mu(l)%vf(2)%sf(i, j+1, k) - R_mu(l)%vf(2)%sf(i, j-1, k))/(2._wp*dy(j)) & 
+                                             + (R_mu(l)%vf(3)%sf(i, j, k+1) - R_mu(l)%vf(3)%sf(i, j, k-1))/(2._wp*dz(k))
                     end do
                 end do
             end do
@@ -1001,8 +1003,8 @@ contains
 
     end subroutine s_compute_R_mu
 
-    subroutine s_compute_interphase_momentum_exchange_term(pImT_filtered, mag_F_IMET)
-        type(scalar_field), dimension(1:num_dims), intent(in) :: pImT_filtered
+    subroutine s_compute_interphase_momentum_exchange_term(pres_visc_stress_filtered, mag_F_IMET)
+        type(scalar_field), dimension(1:num_dims), intent(in) :: pres_visc_stress_filtered
         type(scalar_field), intent(inout) :: mag_F_IMET
 
         integer :: i, j, k, l, q, ii
@@ -1011,9 +1013,9 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p 
-                    mag_F_IMET%sf(i, j, k) = sqrt(pImT_filtered(1)%sf(i, j, k)**2 & 
-                                               + pImT_filtered(2)%sf(i, j, k)**2 & 
-                                               + pImT_filtered(3)%sf(i, j, k)**2)
+                    mag_F_IMET%sf(i, j, k) = sqrt(pres_visc_stress_filtered(1)%sf(i, j, k)**2 & 
+                                                + pres_visc_stress_filtered(2)%sf(i, j, k)**2 & 
+                                                + pres_visc_stress_filtered(3)%sf(i, j, k)**2)
                 end do
             end do
         end do 
