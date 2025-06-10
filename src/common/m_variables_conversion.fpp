@@ -44,7 +44,6 @@ module m_variables_conversion
 #ifndef MFC_PRE_PROCESS
               s_compute_speed_of_sound, &
               s_compute_fast_magnetosonic_speed, &
-              s_compute_wave_speed, &
 #endif
               s_finalize_variables_conversion_module
 
@@ -92,11 +91,11 @@ contains
 
         if (model_eqns == 1) then        ! Gamma/pi_inf model
             call s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
-                                                        rho, gamma, pi_inf, qv, Re_K, G_K, G)
+                                                        rho, gamma, pi_inf, qv)
 
         else if (bubbles_euler) then
             call s_convert_species_to_mixture_variables_bubbles(q_vf, i, j, k, &
-                                                                rho, gamma, pi_inf, qv, Re_K, G_K, G)
+                                                                rho, gamma, pi_inf, qv, Re_K)
         else
             ! Volume fraction model
             call s_convert_species_to_mixture_variables(q_vf, i, j, k, &
@@ -207,7 +206,7 @@ contains
         !! @param pi_inf liquid stiffness
         !! @param qv fluid reference energy
     subroutine s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
-                                                      rho, gamma, pi_inf, qv, Re_K, G_K, G)
+                                                      rho, gamma, pi_inf, qv)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
         integer, intent(in) :: i, j, k
@@ -216,11 +215,6 @@ contains
         real(wp), intent(out), target :: gamma
         real(wp), intent(out), target :: pi_inf
         real(wp), intent(out), target :: qv
-
-        real(wp), optional, dimension(2), intent(out) :: Re_K
-
-        real(wp), optional, intent(out) :: G_K
-        real(wp), optional, dimension(num_fluids), intent(in) :: G
 
         ! Transferring the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
@@ -254,7 +248,7 @@ contains
         !! @param pi_inf liquid stiffness
         !! @param qv fluid reference energy
     subroutine s_convert_species_to_mixture_variables_bubbles(q_vf, j, k, l, &
-                                                              rho, gamma, pi_inf, qv, Re_K, G_K, G)
+                                                              rho, gamma, pi_inf, qv, Re_K)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
 
@@ -266,8 +260,6 @@ contains
         real(wp), intent(out), target :: qv
 
         real(wp), optional, dimension(2), intent(out) :: Re_K
-        real(wp), optional, intent(out) :: G_K
-        real(wp), optional, dimension(num_fluids), intent(in) :: G
 
         integer :: i, q
         real(wp), dimension(num_fluids) :: alpha_rho_K, alpha_K
@@ -464,7 +456,7 @@ contains
 
     pure subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
                                                                gamma_K, pi_inf_K, qv_K, &
-                                                               alpha_K, alpha_rho_K, Re_K, k, l, r, &
+                                                               alpha_K, alpha_rho_K, Re_K, &
                                                                G_K, G)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_acc
@@ -480,8 +472,6 @@ contains
 
         real(wp), optional, intent(out) :: G_K
         real(wp), optional, dimension(num_fluids), intent(in) :: G
-
-        integer, intent(in) :: k, l, r
 
         integer :: i, j !< Generic loop iterators
         real(wp) :: alpha_K_sum
@@ -548,7 +538,7 @@ contains
 
     pure subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
                                                                        gamma_K, pi_inf_K, qv_K, &
-                                                                       alpha_K, alpha_rho_K, Re_K, k, l, r)
+                                                                       alpha_K, alpha_rho_K, Re_K)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_bubbles_acc
 #else
@@ -561,7 +551,6 @@ contains
             !! Partial densities and volume fractions
 
         real(wp), dimension(2), intent(out) :: Re_K
-        integer, intent(in) :: k, l, r
 
         integer :: i, j !< Generic loop iterators
 
@@ -820,16 +809,12 @@ contains
     subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, &
                                                              q_T_sf, &
                                                              qK_prim_vf, &
-                                                             ibounds, &
-                                                             gm_alphaK_vf)
+                                                             ibounds)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: ibounds
-        type(scalar_field), &
-            allocatable, optional, dimension(:), &
-            intent(in) :: gm_alphaK_vf
 
         real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(wp), dimension(2) :: Re_K
@@ -903,13 +888,13 @@ contains
                         ! If in simulation, use acc mixture subroutines
                         if (elasticity) then
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-                                                                            alpha_rho_K, Re_K, j, k, l, G_K, Gs)
+                                                                            alpha_rho_K, Re_K, G_K, Gs)
                         else if (bubbles_euler) then
                             call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
-                                                                                    alpha_K, alpha_rho_K, Re_K, j, k, l)
+                                                                                    alpha_K, alpha_rho_K, Re_K)
                         else
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
-                                                                            alpha_K, alpha_rho_K, Re_K, j, k, l)
+                                                                            alpha_K, alpha_rho_K, Re_K)
                         end if
 #else
                         ! If pre-processing, use non acc mixture subroutines
@@ -1510,13 +1495,13 @@ contains
                     if (elasticity) then
                         call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                         alpha_K, alpha_rho_K, Re_K, &
-                                                                        j, k, l, G_K, Gs)
+                                                                        G_K, Gs)
                     else if (bubbles_euler) then
                         call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, &
-                                                                                pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K, j, k, l)
+                                                                                pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K)
                     else
                         call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
-                                                                        alpha_K, alpha_rho_K, Re_K, j, k, l)
+                                                                        alpha_K, alpha_rho_K, Re_K)
                     end if
 
                     ! Computing the energy from the pressure
@@ -1718,119 +1703,6 @@ contains
         c_fast = sqrt(0.5_wp*(term + sqrt(disc)))
 
     end subroutine s_compute_fast_magnetosonic_speed
-#endif
-
-#ifndef MFC_PRE_PROCESS
-    subroutine s_compute_wave_speed(wave_speeds, vel_L, vel_R, pres_L, pres_R, rho_L, rho_R, rho_avg, &
-                                    c_L, c_R, c_avg, c_fast_L, c_fast_R, G_L, G_R, &
-                                    tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
-                                    s_L, s_R, s_S, s_M, s_P, idx, idx_tau)
-
-        ! Computes the wave speeds for the Riemann solver
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_wave_speed
-#else
-        !$acc routine seq
-#endif
-
-        ! Input parameters
-        integer, intent(in) :: wave_speeds
-        integer, intent(in) :: idx, idx_tau
-        real(wp), intent(in) :: rho_L, rho_R
-        real(wp), dimension(:), intent(in) :: vel_L, vel_R, tau_e_L, tau_e_R
-        real(wp), intent(in) :: pres_L, pres_R, c_L, c_R
-        real(wp), intent(in) :: gamma_L, gamma_R, pi_inf_L, pi_inf_R
-        real(wp), intent(in) :: rho_avg, c_avg
-        real(wp), intent(in) :: c_fast_L, c_fast_R
-        real(wp), intent(in) :: G_L, G_R
-
-        ! Local variables
-        real(wp) :: pres_SL, pres_SR, Ms_L, Ms_R
-
-        ! Output parameters
-        real(wp), intent(out) :: s_L, s_R, s_S, s_M, s_P
-
-        if (wave_speeds == 1) then
-            if (elasticity) then
-                s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
-                        (((4_wp*G_L)/3_wp) + tau_e_L(idx_tau))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                        (((4_wp*G_R)/3_wp) + tau_e_R(idx_tau))/rho_R))
-                s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
-                        (((4_wp*G_R)/3_wp) + tau_e_R(idx_tau))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                        (((4_wp*G_L)/3_wp) + tau_e_L(idx_tau))/rho_L))
-                s_S = (pres_R - tau_e_R(idx_tau) - pres_L + &
-                        tau_e_L(idx_tau) + rho_L*vel_L(idx)*(s_L - vel_L(idx)) - &
-                        rho_R*vel_R(idx)*(s_R - vel_R(idx)))/(rho_L*(s_L - vel_L(idx)) - &
-                        rho_R*(s_R - vel_R(idx)))
-            else if (mhd) then
-                s_L = min(vel_L(idx) - c_fast_L, vel_R(idx) - c_fast_R)
-                s_R = max(vel_R(idx) + c_fast_R, vel_L(idx) + c_fast_L)
-                s_S = (pres_R - pres_L + rho_L*vel_L(idx)* &
-                (s_L - vel_L(idx)) - rho_R*vel_R(idx)*(s_R - vel_R(idx))) &
-                /(rho_L*(s_L - vel_L(idx)) - rho_R*(s_R - vel_R(idx)))
-            else if (hypoelasticity) then
-                s_L = min(vel_L(idx) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + &
-                                                    tau_e_L(idx_tau))/rho_L) &
-                        , vel_R(idx) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + &
-                                                        tau_e_R(idx_tau))/rho_R))
-                s_R = max(vel_R(idx) + sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + &
-                                                    tau_e_R(idx_tau))/rho_R) &
-                        , vel_L(idx) + sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + &
-                                                        tau_e_L(idx_tau))/rho_L))
-                s_S = (pres_R - pres_L + rho_L*vel_L(idx)* &
-                (s_L - vel_L(idx)) - rho_R*vel_R(idx)*(s_R - vel_R(idx))) &
-                /(rho_L*(s_L - vel_L(idx)) - rho_R*(s_R - vel_R(idx)))
-            else if (hyperelasticity) then
-                s_L = min(vel_L(idx) - sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L) &
-                        , vel_R(idx) - sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R))
-                s_R = max(vel_R(idx) + sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R) &
-                        , vel_L(idx) + sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L))
-                s_S = (pres_R - pres_L + rho_L*vel_L(idx)* &
-                (s_L - vel_L(idx)) - rho_R*vel_R(idx)*(s_R - vel_R(idx))) &
-                /(rho_L*(s_L - vel_L(idx)) - rho_R*(s_R - vel_R(idx)))
-            else
-                s_L = min(vel_L(idx) - c_L, vel_R(idx) - c_R)
-                s_R = max(vel_R(idx) + c_R, vel_L(idx) + c_L)
-                s_S = (pres_R - pres_L + rho_L*vel_L(idx)* &
-                (s_L - vel_L(idx)) - rho_R*vel_R(idx)*(s_R - vel_R(idx))) &
-                /(rho_L*(s_L - vel_L(idx)) - rho_R*(s_R - vel_R(idx)))
-            end if
-        else if (wave_speeds == 2) then
-            pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(idx) - vel_R(idx)))
-            pres_SR = pres_SL
-            Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
-                                   (pres_SL/pres_L - 1._wp)*pres_L/ &
-                                   ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-            Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
-                                   (pres_SR/pres_R - 1._wp)*pres_R/ &
-                                   ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
-            s_L = vel_L(idx) - c_L*Ms_L
-            s_R = vel_R(idx) + c_R*Ms_R
-            s_S = 5e-1_wp*((vel_L(idx) + vel_R(idx)) + (pres_L - pres_R)/(rho_avg*c_avg))
-        end if
-
-        ! ! follows Einfeldt et al.
-        ! s_M/P = min/max(0.,s_L/R)
-        s_M = min(0._wp, s_L)
-        s_P = max(0._wp, s_R)
-
-#ifdef DEBUG
-        ! Check for potential issues in wave speed calculation
-        if (s_R <= s_L) then
-            print *, 'WARNING: Wave speed issue detected in s_compute_wave_speed'
-            print *, 'Left wave speed >= Right wave speed:', s_L, s_R
-            print *, 'Input velocities :', vel_L(idx), vel_R(idx)
-            print *, 'Sound speeds:', c_L, c_R
-            print *, 'Densities:', rho_L, rho_R
-            print *, 'Pressures:', pres_L, pres_R
-            print *, 'Wave speeds method:', wave_speeds
-            if (elasticity .or. hypoelasticity .or. hyperelasticity) then
-                print *, 'Shear moduli:', G_L, G_R
-            end if
-            call s_mpi_abort('Error: Invalid wave speeds in s_compute_wave_speed')
-        end if
-#endif
-    end subroutine s_compute_wave_speed
 #endif
 
 end module m_variables_conversion

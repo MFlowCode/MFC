@@ -1239,15 +1239,9 @@ contains
 
     end subroutine s_initialize_internal_energy_equations
 
-    impure subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+    impure subroutine s_perform_time_step(t_step, time_avg)
         integer, intent(inout) :: t_step
-        real(wp), intent(inout) :: time_avg, time_final
-        real(wp), intent(inout) :: io_time_avg, io_time_final
-        real(wp), dimension(:), intent(inout) :: proc_time
-        real(wp), dimension(:), intent(inout) :: io_proc_time
-        logical, intent(inout) :: file_exists
-        real(wp), intent(inout) :: start, finish
-        integer, intent(inout) :: nt
+        real(wp), intent(inout) :: time_avg
 
 
         integer :: i
@@ -1329,16 +1323,13 @@ contains
 
     end subroutine s_perform_time_step
 
-    impure subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+    impure subroutine s_save_performance_metrics(time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists)
 
-        integer, intent(inout) :: t_step
         real(wp), intent(inout) :: time_avg, time_final
         real(wp), intent(inout) :: io_time_avg, io_time_final
         real(wp), dimension(:), intent(inout) :: proc_time
         real(wp), dimension(:), intent(inout) :: io_proc_time
         logical, intent(inout) :: file_exists
-        real(wp), intent(inout) :: start, finish
-        integer, intent(inout) :: nt
 
         real(wp) :: grind_time
 

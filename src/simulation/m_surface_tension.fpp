@@ -65,12 +65,11 @@ contains
         end if
     end subroutine s_initialize_surface_tension_module
 
-    pure subroutine s_compute_capilary_source_flux(q_prim_vf, &
-                                                   vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
-                                                   flux_src_vf, &
-                                                   id, isx, isy, isz)
+    pure subroutine s_compute_capilary_source_flux( &
+        vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
+        flux_src_vf, &
+        id, isx, isy, isz)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsx_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsy_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsz_vf
@@ -336,7 +335,7 @@ contains
         !$acc update device(is1, is2, is3, iv)
 
         if (recon_dir == 1) then
-            !$acc parallel loop collapse(4) default(present)
+            !$acc parallel loop collapse(4) gang vector default(present)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -349,7 +348,7 @@ contains
             end do
             !$acc end parallel loop
         else if (recon_dir == 2) then
-            !$acc parallel loop collapse(4) default(present)
+            !$acc parallel loop collapse(4) gang vector default(present)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -362,7 +361,7 @@ contains
             end do
             !$acc end parallel loop
         else if (recon_dir == 3) then
-            !$acc parallel loop collapse(4) default(present)
+            !$acc parallel loop collapse(4) gang vector default(present)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
