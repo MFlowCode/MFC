@@ -18,6 +18,8 @@ module m_time_steppers
 
     use m_rhs                  !< Right-hane-side (RHS) evaluation procedures
 
+    use m_pressure_relaxation  !< Pressure relaxation procedures
+
     use m_data_output          !< Run-time info & solution data output procedures
 
     use m_bubbles_EE           !< Ensemble-averaged bubble dynamics routines
@@ -900,13 +902,13 @@ contains
         call nvtxStartRange("TIMESTEP")
 
         ! Stage 1 of 3
-        call s_adaptive_dt_bubble(t_step, 1)
+        call s_adaptive_dt_bubble(1)
 
         ! Stage 2 of 3
         call s_3rd_order_tvd_rk(t_step, time_avg)
 
         ! Stage 3 of 3
-        call s_adaptive_dt_bubble(t_step, 3)
+        call s_adaptive_dt_bubble(3)
 
         call nvtxEndRange
 
@@ -918,9 +920,9 @@ contains
 
     !> Bubble source part in Strang operator splitting scheme
         !! @param t_step Current time-step
-    impure subroutine s_adaptive_dt_bubble(t_step, stage)
+    impure subroutine s_adaptive_dt_bubble(stage)
 
-        integer, intent(in) :: t_step, stage
+        integer, intent(in) :: stage
 
         type(vector_field) :: gm_alpha_qp
 
@@ -928,18 +930,17 @@ contains
             q_cons_ts(1)%vf, &
             q_T_sf, &
             q_prim_vf, &
-            idwint, &
-            gm_alpha_qp%vf)
+            idwint)
 
         if (bubbles_euler) then
 
-            call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+            call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, rhs_vf)
             call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         elseif (bubbles_lagrange) then
 
             call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            call s_compute_bubble_EL_dynamics(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf, stage)
+            call s_compute_bubble_EL_dynamics(q_prim_vf, stage)
             call s_transfer_data_to_tmp()
             call s_smear_voidfraction()
             if (stage == 3) then
@@ -976,8 +977,7 @@ contains
             q_cons_ts(1)%vf, &
             q_T_sf, &
             q_prim_vf, &
-            idwint, &
-            gm_alpha_qp%vf)
+            idwint)
 
         !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
         do l = 0, p

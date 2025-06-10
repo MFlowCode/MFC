@@ -153,10 +153,9 @@ contains
         !!      that are needed for the bubble modeling
         !!  @param q_prim_vf Primitive variables
         !!  @param q_cons_vf Conservative variables
-    impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, t_step, rhs_vf)
+    impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        integer, intent(in) :: t_step
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         real(wp) :: rddot

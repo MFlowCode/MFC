@@ -156,7 +156,7 @@ contains
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, 2, -1, k, l)
                     case (BC_AXIS)
-                        call s_axis(q_prim_vf, 2, -1, k, l, pb, mv)
+                        call s_axis(q_prim_vf, pb, mv, k, l)
                     case (BC_REFLECTIVE)
                         call s_symmetry(q_prim_vf, 2, -1, k, l, pb, mv)
                     case (BC_PERIODIC)
@@ -735,11 +735,10 @@ contains
 
     end subroutine s_periodic
 
-    pure subroutine s_axis(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
-        !$acc routine seq
+    pure subroutine s_axis(q_prim_vf, pb, mv, k, l)
+!$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
-        integer, intent(in) :: bc_dir, bc_loc
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: k, l
 
         integer :: j, q, i
