@@ -205,6 +205,11 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
 
+    type(int_bounds_info), dimension(3) :: nidx !< Indicies for neighboring processors
+
+    integer, allocatable, dimension(:,:,:) :: neighbor_ranks
+    !! Neighbor ranks for lagrangian particle communication
+
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
 

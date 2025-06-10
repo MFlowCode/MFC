@@ -128,7 +128,9 @@ contains
             s_coord(1:3) = lbk_s(l, 1:3, 2)
             center(1:2) = lbk_pos(l, 1:2, 2)
             if (p > 0) center(3) = lbk_pos(l, 3, 2)
+            cell = -buff_size
             call s_get_cell(s_coord, cell)
+            !print*, s_coord
             call s_compute_stddsv(cell, volpart, stddsv)
 
             strength_vol = volpart
@@ -250,7 +252,7 @@ contains
                 theta = 0._wp
                 Nr = ceiling(lag_params%charwidth/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
                 Nr_count = 1._wp - mapCells*1._wp
-                dzp = y_cb(cellaux(2) + 1) - y_cb(cellaux(2))
+                dzp = y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)
                 Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
                 distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
                 func = dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
@@ -281,21 +283,27 @@ contains
         celloutside = .false.
 
         if (num_dims == 2) then
-            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+            if ((cellaux(1) < -buff_size + mapCells) .or. &
+                (cellaux(2) < -buff_size + mapCells)) then
                 celloutside = .true.
             end if
             if (cyl_coord .and. y_cc(cellaux(2)) < 0._wp) then
                 celloutside = .true.
             end if
-            if ((cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
+            if ((cellaux(2) > n + buff_size - mapCells) .or. &
+                (cellaux(1) > m + buff_size - mapCells)) then
                 celloutside = .true.
             end if
         else
-            if ((cellaux(3) < -buff_size) .or. (cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+            if ((cellaux(3) < -buff_size + mapCells) .or. &
+                (cellaux(1) < -buff_size + mapCells) .or. &
+                (cellaux(2) < -buff_size + mapCells)) then
                 celloutside = .true.
             end if
 
-            if ((cellaux(3) > p + buff_size) .or. (cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
+            if ((cellaux(3) > p + buff_size - mapCells) .or. &
+                (cellaux(2) > n + buff_size - mapCells) .or. &
+                (cellaux(1) > m + buff_size - mapCells)) then
                 celloutside = .true.
             end if
         end if
@@ -412,7 +420,7 @@ contains
             !!      real type into integer.
             !! @param s Computational coordinates of the bubble, real type
             !! @param get_cell Computational coordinates of the bubble, integer type
-    subroutine s_get_cell(s_cell, get_cell)
+    subroutine  s_get_cell(s_cell, get_cell)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_get_cell
 #else

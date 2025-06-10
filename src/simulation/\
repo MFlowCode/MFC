@@ -606,11 +606,13 @@ contains
                 gas_mv(k, 1) = myMass_v
 
             else
+
                 ! Radial acceleration from bubble models
                 intfc_dveldt(k, stage) = f_rddot(myRho, myPinf, myR, myV, myR0, &
                                                  myPb, myPbdot, dmalf, dmntait, dmBtait, &
                                                  dm_bub_adv_src, dm_divu, &
                                                  myCson)
+                print*, proc_rank, intfc_dveldt(k, stage)
                 intfc_draddt(k, stage) = myV
                 gas_dmvdt(k, stage) = myMvdot
                 gas_dpdt(k, stage) = myPbdot
@@ -1243,11 +1245,11 @@ contains
             call s_mpi_send_particles(intfc_rad, intfc_draddt, intfc_vel, &
                                       intfc_draddt, mtn_posPrev, mtn_pos, &
                                       mtn_dposdt, mtn_vel, mtn_dveldt, gas_p, &
-                                      gas_dpdt, gas_mv, gas_dmvdt, gas_mg, lag_id, bub_R0, lag_num_ts)
+                                      gas_dpdt, gas_mv, gas_dmvdt, lag_id, bub_R0, lag_num_ts)
             call s_mpi_recv_particles(intfc_rad, intfc_draddt, intfc_vel, &
                                       intfc_draddt, mtn_posPrev, mtn_pos, &
                                       mtn_dposdt, mtn_vel, mtn_dveldt, gas_p, &
-                                      gas_dpdt, gas_mv, gas_dmvdt, gas_mg, lag_id, bub_R0, lag_num_ts, nbubs)
+                                      gas_dpdt, gas_mv, gas_dmvdt, lag_id, bub_R0, lag_num_ts, nbubs)
         end if
 
     end subroutine s_enforce_EL_bubbles_boundary_conditions
@@ -1338,26 +1340,20 @@ contains
         if (p == 0 .and. cyl_coord .neqv. .true.) then
             ! Defining a virtual z-axis that has the same dimensions as y-axis
             ! defined in the input file
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - mapCells)) .and. &
-                                  (pos_part(1) >= x_cb(-buff_size - 1 + mapCells)) .and. &
-                                  (pos_part(2) < y_cb(n + buff_size - mapCells)) .and. &
-                                  (pos_part(2) >= y_cb(-buff_size - 1 + mapCells)) .and. &
+            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size)) .and. (pos_part(1) >= x_cb(-buff_size - 1)) .and. &
+                                  (pos_part(2) < y_cb(n + buff_size)) .and. (pos_part(2) >= y_cb(-buff_size - 1)) .and. &
                                   (pos_part(3) < lag_params%charwidth/2._wp) .and. (pos_part(3) >= -lag_params%charwidth/2._wp))
         else
             ! cyl_coord
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - mapCells)) .and. &
-                                  (pos_part(1) >= x_cb(-buff_size - 1 + mapCells)) .and. &
+            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size)) .and. (pos_part(1) >= x_cb(-buff_size - 1)) .and. &
                                   (abs(pos_part(2)) < y_cb(n + buff_size)) .and. (abs(pos_part(2)) >= max(y_cb(-buff_size - 1), 0._wp)))
         end if
 
         ! 3D
         if (p > 0) then
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - mapCells)) .and. &
-                                  (pos_part(1) >= x_cb(-buff_size - 1 + mapCells)) .and. &
-                                  (pos_part(2) < y_cb(n + buff_size - mapCells)) .and. &
-                                  (pos_part(2) >= y_cb(-buff_size - 1 + mapCells)) .and. &
-                                  (pos_part(3) < z_cb(p + buff_size - mapCells)) .and. &
-                                  (pos_part(3) >= z_cb(-buff_size - 1 + mapCells)))
+            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size)) .and. (pos_part(1) >= x_cb(-buff_size - 1)) .and. &
+                                  (pos_part(2) < y_cb(n + buff_size)) .and. (pos_part(2) >= y_cb(-buff_size - 1)) .and. &
+                                  (pos_part(3) < z_cb(p + buff_size)) .and. (pos_part(3) >= z_cb(-buff_size - 1)))
         end if
 
         ! For symmetric and wall boundary condition

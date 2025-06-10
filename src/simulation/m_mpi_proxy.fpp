@@ -44,11 +44,18 @@ module m_mpi_proxy
 
     !> @name Generic flags used to identify and report MPI errors
     !> @{
-    integer, private :: ierr
+    integer, private :: request, ierr
     !> @}
 
     integer :: i_halo_size
     !$acc declare create(i_halo_size)
+
+    integer, dimension(-1:1, -1:1, -1:1) :: p_send_counts, p_recv_counts
+    integer, dimension(:,:,:,:), allocatable :: p_send_ids
+    character(len=1), dimension(:), allocatable :: p_send_buff, p_recv_buff
+    type(bounds_info), dimension(3) :: comm_coords
+    integer :: p_buff_size
+    !$acc declare create(p_send_counts, comm_coords)
 
 contains
 
@@ -72,11 +79,39 @@ contains
             end if
 
             !$acc update device(i_halo_size)
+
             @:ALLOCATE(ib_buff_send(0:i_halo_size), ib_buff_recv(0:i_halo_size))
         end if
 #endif
 
     end subroutine s_initialize_mpi_proxy_module
+
+    subroutine s_initialize_particles_mpi(lag_num_ts)
+
+        integer :: i, j, k
+        integer :: real_size, int_size, nVar, lag_num_ts
+
+        call MPI_Pack_size(1, mpi_p, MPI_COMM_WORLD, real_size, ierr)
+        call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
+
+        nVar = 28 + 10*lag_num_ts + int_size
+        p_buff_size = nVar*lag_params%nBubs_glb*real_size
+        @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
+
+        comm_coords(1)%beg = x_cb(buff_size - mapCells - 1)
+        comm_coords(1)%end = x_cb(m - buff_size + mapCells)
+        if (n > 0) then
+            comm_coords(2)%beg = y_cb(buff_size - mapCells - 1)
+            comm_coords(2)%end = y_cb(m - buff_size + mapCells)
+            if (p > 0) then
+                comm_coords(3)%beg = z_cb(buff_size - mapCells - 1)
+                comm_coords(3)%end = z_cb(p - buff_size + mapCells)
+            end if
+        end if
+
+        @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, 0:lag_params%nBubs_glb))
+
+    end subroutine s_initialize_particles_mpi
 
     !>  Since only the processor with rank 0 reads and verifies
         !!      the consistency of user inputs, these are initially not
@@ -135,7 +170,7 @@ contains
 
         if (bubbles_lagrange) then
             #:for VAR in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector', &
-                & 'write_bubbles', 'write_bubbles_stats']
+                & 'write_bubbles', 'write_bubbles_stats', 'vel_model', 'drag_model']
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -416,6 +451,191 @@ contains
 #endif
 
     end subroutine s_mpi_sendrecv_ib_buffers
+
+    subroutine s_add_particles_to_transfer_list(pos, posPrev, nbub)
+
+        real(wp), dimension(:,:) :: pos, posPrev
+        integer :: bubID, nbub
+        integer :: i, j, k
+
+        do k = nidx(3)%beg, nidx(3)%end
+            do j = nidx(2)%beg, nidx(2)%end
+                do i = nidx(1)%beg, nidx(1)%end
+                    p_send_counts(i,j,k) = 0
+                end do
+            end do
+        end do
+
+        do k = 1, nbub
+            ! Left face
+            if (posPrev(k,1) > comm_coords(1)%beg .and. pos(k,1) < comm_coords(1)%beg .and. nidx(1)%beg /= 0) then
+                p_send_ids(-1, 0, 0, p_send_counts(-1, 0, 0)) = k
+                p_send_counts(-1, 0, 0) = p_send_counts(-1, 0, 0) + 1
+
+                if (n > 0) then
+                    ! Left bottom corner
+                    if (posPrev(k,2) > comm_coords(2)%beg .and. pos(k,2) < comm_coords(2)%beg .and. nidx(2)%beg /= 0) then
+                        p_send_ids(-1, -1, 0, p_send_counts(-1, -1, 0)) = k
+                        p_send_counts(-1, -1, 0) = p_send_counts(-1, -1, 0) + 1
+                        p_send_ids(0, -1, 0, p_send_counts(0, -1, 0)) = k
+                        p_send_counts(0, -1, 0) = p_send_counts(0, -1, 0) + 1
+
+                    ! Left top corner
+                    elseif (posPrev(k,2) < comm_coords(2)%end .and. pos(k,2) > comm_coords(2)%end .and. nidx(2)%end /= 0) then
+                        p_send_ids(-1, 1, 0, p_send_counts(-1, 1, 0)) = k
+                        p_send_counts(-1, 1, 0) = p_send_counts(-1, 1, 0) + 1
+                        p_send_ids(0, 1, 0, p_send_counts(0, 1, 0)) = k
+                        p_send_counts(0, 1, 0) = p_send_counts(0, 1, 0) + 1
+                    end if
+                end if
+
+            ! Right face
+            elseif (posPrev(k,1) < comm_coords(1)%end .and. pos(k,1) > comm_coords(1)%end .and. nidx(1)%end /= 0) then
+                p_send_ids(1, 0, 0, p_send_counts(1, 0, 0)) = k
+                p_send_counts(1, 0, 0) = p_send_counts(1, 0, 0) + 1
+
+                if (n > 0) then
+                    ! Right bottom corner
+                    if (posPrev(k,2) > comm_coords(2)%beg .and. pos(k,2) < comm_coords(2)%beg .and. nidx(2)%beg /= 0) then
+                        p_send_ids(1, -1, 0, p_send_counts(1, -1, 0)) = k
+                        p_send_counts(1, -1, 0) = p_send_counts(1, -1, 0) + 1
+                        p_send_ids(0, -1, 0, p_send_counts(0, -1, 0)) = k
+                        p_send_counts(0, -1, 0) = p_send_counts(0, -1, 0) + 1
+
+                    ! Right top corner
+                    elseif (posPrev(k,2) < comm_coords(2)%end .and. pos(k,2) > comm_coords(2)%end .and. nidx(2)%end /= 0) then
+                        p_send_ids(1, 1, 0, p_send_counts(1, 1, 0)) = k
+                        p_send_counts(1, 1, 0) = p_send_counts(1, 1, 0) + 1
+                        p_send_ids(0, 1, 0, p_send_counts(0, 1, 0)) = k
+                        p_send_counts(0, 1, 0) = p_send_counts(0, 1, 0) + 1
+                    end if
+                end if
+
+            ! Bottom face (corners already accounted for)
+            elseif (posPrev(k,2) > comm_coords(2)%beg .and. pos(k,2) < comm_coords(2)%beg .and. nidx(2)%beg /= 0) then
+                p_send_ids(0, -1, 0, p_send_counts(0, -1, 0)) = k
+                p_send_counts(0, -1, 0) = p_send_counts(0, -1, 0) + 1
+
+            ! Top face (corners already accounted for)
+            elseif (posPrev(k,2) < comm_coords(2)%end .and. pos(k,2) > comm_coords(2)%end .and. nidx(2)%end /= 0) then
+                p_send_ids(0, 1, 0, p_send_counts(0, 1, 0)) = k
+                p_send_counts(0, 1, 0) = p_send_counts(0, 1, 0) + 1
+            end if
+        end do
+
+    end subroutine s_add_particles_to_transfer_list
+
+    subroutine s_mpi_send_particles(rad, drad, rvel, drvel, posPrev, pos, dpos, &
+                                    vel, dvel, gas_p, dgasp, gas_mv, dgasmv, gas_mg, lag_id, bub_R0, lag_num_ts)
+
+        real(wp), dimension(:) :: bub_R0, gas_mg
+        real(wp), dimension(:, :) :: rad, drad, rvel, drvel, gas_p, dgasp, gas_mv, dgasmv
+        real(wp), dimension(:, :, :) :: pos, dpos, posPrev, vel, dvel
+        integer, dimension(:,:) :: lag_id
+        integer :: i, j, k, l, q
+        integer :: position, bub_id, lag_num_ts
+
+#ifdef MFC_MPI
+        do k = nidx(3)%beg, nidx(3)%end
+            do j = nidx(2)%beg, nidx(2)%end
+                do i = nidx(1)%beg, nidx(1)%end
+                    if (abs(i) + abs(j) + abs(k) > 0) then
+                        call MPI_Isend(p_send_counts(i,j,k), 1, MPI_INTEGER, neighbor_ranks(i,j,k), 0, MPI_COMM_WORLD, request, ierr)
+                        if (p_send_counts(i,j,k) > 0) then
+                            print*, "SEND", proc_rank, p_send_counts(i,j,k)
+                        end if
+                        if (p_send_counts(i,j,k) > 0) then
+                            position = 0
+                            do l = 0, p_send_counts(i,j,k) - 1
+                                bub_id = p_send_ids(i,j,k,l)
+                                do q = 1, 2
+                                    call MPI_Pack(rad(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                    call MPI_Pack(rvel(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                    call MPI_Pack(posPrev(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                    call MPI_Pack(pos(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                    call MPI_Pack(vel(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                    call MPI_Pack(gas_p(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                    call MPI_Pack(gas_mv(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                end do
+                                do q = 1, lag_num_ts
+                                    call MPI_Pack(drad(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                    call MPI_Pack(drvel(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                    call MPI_Pack(dpos(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                    call MPI_Pack(dvel(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                    call MPI_Pack(dgasp(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                    call MPI_Pack(dgasmv(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                end do
+                                call MPI_Pack(lag_id(bub_id, 1), 1, MPI_INTEGER, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(gas_mg(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(bub_R0(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                            end do
+
+                            call MPI_Isend(p_send_buff, position, MPI_PACKED, neighbor_ranks(i,j,k), 1, MPI_COMM_WORLD, request, ierr)
+                        end if
+                    end if
+                end do
+            end do
+        end do
+#endif
+
+    end subroutine s_mpi_send_particles
+
+    subroutine s_mpi_recv_particles(rad, drad, rvel, drvel, posPrev, pos, dpos, &
+                                    vel, dvel, gas_p, dgasp, gas_mv, dgasmv, gas_mg, lag_id, bub_R0, lag_num_ts, nbubs)
+
+        real(wp), dimension(:) :: bub_R0, gas_mg
+        real(wp), dimension(:, :) :: rad, drad, rvel, drvel, gas_p, dgasp, gas_mv, dgasmv
+        real(wp), dimension(:, :, :) :: pos, dpos, posPrev, vel, dvel
+        integer, dimension(:, :) :: lag_id
+        integer :: i, j, k, l, q
+        integer :: position, bub_id, nbubs, lag_num_ts
+
+#ifdef MFC_MPI
+        do k = nidx(3)%beg, nidx(3)%end
+            do j = nidx(2)%beg, nidx(2)%end
+                do i = nidx(1)%beg, nidx(1)%end
+                    if (abs(i) + abs(j) + abs(k) > 0) then
+                        call MPI_recv(p_recv_counts(i,j,k), 1, MPI_INTEGER, neighbor_ranks(i,j,k), 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        if (p_recv_counts(i,j,k) > 0) then
+                            print*, "RECV", proc_rank, p_recv_counts(i,j,k)
+                        end if
+                        if (p_recv_counts(i,j,k) > 0) then
+                            position = 0
+                            call MPI_recv(p_recv_buff, p_buff_size, MPI_PACKED, neighbor_ranks(i,j,k), 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                            do l = 0, p_recv_counts(i,j,k) - 1
+                                nbubs = nbubs + 1
+                                bub_id = nbubs
+                                do q = 1, 2
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, rad(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, rvel(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, posPrev(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, pos(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, vel(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, gas_p(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, gas_mv(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                end do
+                                do q = 1, lag_num_ts
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, drad(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, drvel(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, dpos(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, dvel(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, dgasp(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                    call MPI_Unpack(p_recv_buff, p_buff_size, position, dgasmv(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                end do
+                                call MPI_Unpack(p_recv_buff, p_buff_size, position, lag_id(bub_id, 1), 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_buff_size, position, gas_mg(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_buff_size, position, bub_R0(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                lag_id(bub_id, 2) = bub_id
+                            end do
+                        end if
+                    end if
+                end do
+            end do
+        end do
+#endif
+
+    end subroutine s_mpi_recv_particles
 
     subroutine s_mpi_send_random_number(phi_rn, num_freq)
         integer, intent(in) :: num_freq
