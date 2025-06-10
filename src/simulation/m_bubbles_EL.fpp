@@ -3,6 +3,7 @@
 !! @brief Contains module m_bubbles_EL
 
 #:include 'macros.fpp'
+#:include 'directive_macros.fpp'
 
 !> @brief This module is used to to compute the volume-averaged bubble model
 module m_bubbles_EL

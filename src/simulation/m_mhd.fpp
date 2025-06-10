@@ -3,6 +3,7 @@
 !! @brief Contains module m_mhd
 
 #:include 'macros.fpp'
+#:include 'directive_macros.fpp'
 
 !> @brief This module is used to compute source terms for magnetohydrodynamics
 !!              Note: not applicable for 1D
