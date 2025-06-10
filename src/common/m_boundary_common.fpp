@@ -736,7 +736,7 @@ contains
     end subroutine s_periodic
 
     pure subroutine s_axis(q_prim_vf, pb, mv, k, l)
-!$acc routine seq
+        !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: k, l
@@ -1087,7 +1087,7 @@ contains
     end subroutine s_dirichlet
 
     pure subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb, mv)
-!$acc routine seq
+        !$acc routine seq
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
