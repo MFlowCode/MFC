@@ -1097,7 +1097,7 @@ contains
 
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                        flux_gsrc_vf, &
-                                       norm_dir, ix, iy, iz)
+                                       norm_dir)
 
     end subroutine s_hll_riemann_solver
 
