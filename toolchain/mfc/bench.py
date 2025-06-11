@@ -82,7 +82,7 @@ def bench(targets = None):
 def diff():
     lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
     cons.print(f"[bold]Comparing Benchmarks: Speedups from [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] to [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] are displayed below. Thus, numbers > 1 represent increases in performance.[/bold]")
-    
+
     if lhs["metadata"] != rhs["metadata"]:
         _lock_to_str = lambda lock: ' '.join([f"{k}={v}" for k, v in lock.items()])
         cons.print(f"[bold yellow]Warning[/bold yellow]: Metadata in lhs and rhs are not equal.\n"
@@ -126,17 +126,17 @@ def diff():
                     if not math.isfinite(lhs_summary[target.name]["grind"]) or not math.isfinite(rhs_summary[target.name]["grind"]):
                         err = 1
                         cons.print(f"lhs_summary or rhs_summary reports non-real grind time for {target.name} - Case: {slug}")
-                    
-                        grind_time_value = lhs_summary[target.name]["grind"] / rhs_summary[target.name]["grind"]
-                        speedups += f" & Grind: {grind_time_value:.2f}"
-                        if grind_time_value <0.98:
-                            raise MFCException(f"Benchmarking failed since grind time speedup for {target.name} below acceptable threshold (<0.98) - Case: {slug}")
+
+                    grind_time_value = lhs_summary[target.name]["grind"] / rhs_summary[target.name]["grind"]
+                    speedups += f" & Grind: {grind_time_value:.2f}"
+                    if grind_time_value <0.98:
+                        raise MFCException(f"Benchmarking failed since grind time speedup for {target.name} below acceptable threshold (<0.98) - Case: {slug}")
             except Exception as _:
                 err = 1
                 cons.print(f"lhs_summary or rhs_summary reports non-real grind time for {target.name} - Case: {slug}")
-            
+
         table.add_row(f"[magenta]{slug}[/magenta]", *speedups)
-    
+
     cons.raw.print(table)
     if err:
         raise MFCException("Benchmarking failed")
