@@ -260,7 +260,7 @@ contains
 
     ! Generate a random unit vector (spherical distribution)
     function f_unit_vector(theta, eta) result(vec)
-        real(wp) :: theta, eta
+        real(wp), intent(in) :: theta, eta
         real(wp), dimension(3) :: vec
 
         theta = 2.0_wp*pi*theta

@@ -531,7 +531,7 @@ end
 % Plot TKE budget
 function plot_tke_budget(T, P, D, y_norm_mth, mth, timestep)
 
-    % Normalizaiton
+    % Normalization
     T = T / (8/mth);    % T / (Delta U^3 / mth)
     P = P / (8/mth);    % P / (Delta U^3 / mth)
     D = D / (8/mth);    % D / (Delta U^3 / mth)
