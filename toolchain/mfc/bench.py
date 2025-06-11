@@ -85,9 +85,8 @@ def diff():
 
     if lhs["metadata"] != rhs["metadata"]:
         _lock_to_str = lambda lock: ' '.join([f"{k}={v}" for k, v in lock.items()])
-    cons.print(f"[bold]Comparing Benchmarks: Speedups from [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] to [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] are displayed below. Thus, numbers > 1 represent increases in performance.[/bold]")
 
-    cons.print(f"""\
+        cons.print(f"""\
 [bold yellow]Warning[/bold yellow]: Metadata in lhs and rhs are not equal.
     This could mean that the benchmarks are not comparable (e.g. one was run on CPUs and the other on GPUs).
     lhs:
@@ -112,7 +111,7 @@ def diff():
     table.add_column("[bold]Pre Process[/bold]", justify="right")
     table.add_column("[bold]Simulation[/bold]", justify="right")
     table.add_column("[bold]Post Process[/bold]", justify="right")
-
+    
     err = 0
     for slug in slugs:
         lhs_summary, rhs_summary = lhs["cases"][slug]["output_summary"], rhs["cases"][slug]["output_summary"]
