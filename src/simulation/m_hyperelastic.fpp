@@ -56,7 +56,7 @@ contains
         @:ACC_SETUP_VFs(btensor)
 
         @:ALLOCATE(Gs(1:num_fluids))
-        !$acc loop seq
+        $:LOOP()
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
         end do
@@ -112,7 +112,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    !$acc loop seq
+                    $:LOOP()
                     do i = 1, num_fluids
                         alpha_rho_k(i) = q_cons_vf(i)%sf(j, k, l)
                         alpha_k(i) = q_cons_vf(advxb + i - 1)%sf(j, k, l)
@@ -125,7 +125,7 @@ contains
                     !if ( G <= verysmall ) G_K = 0_wp
 
                     if (G > verysmall) then
-                        !$acc loop seq
+                        $:LOOP()
                         do i = 1, tensor_size
                             tensora(i) = 0_wp
                         end do
@@ -134,7 +134,7 @@ contains
                         ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
                         ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
                         ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
-                        !$acc loop seq
+                        $:LOOP()
                         do r = -fd_number, fd_number
                             ! derivatives in the x-direction
                             tensora(1) = tensora(1) + q_prim_vf(xibeg)%sf(j + r, k, l)*fd_coeff_x(r, j)
@@ -168,7 +168,7 @@ contains
                         if (tensorb(tensor_size) > verysmall) then
                             ! STEP 2c: computing the inverse of grad_xi tensor = F
                             ! tensorb is the adjoint, tensora becomes F
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, tensor_size - 1
                                 tensora(i) = tensorb(i)/tensorb(tensor_size)
                             end do
@@ -199,7 +199,7 @@ contains
                             q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
                                                            G*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma
                             ! STEP 5c: updating the Cauchy stress conservative scalar field
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, b_size - 1
                                 q_cons_vf(strxb + i - 1)%sf(j, k, l) = &
                                     rho*q_prim_vf(strxb + i - 1)%sf(j, k, l)
@@ -240,7 +240,7 @@ contains
         #:endfor
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
-        !$acc loop seq
+        $:LOOP()
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
                 G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
@@ -281,7 +281,7 @@ contains
 
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
-        !$acc loop seq
+        $:LOOP()
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
                 G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)

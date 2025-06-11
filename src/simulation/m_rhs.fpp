@@ -652,11 +652,11 @@ contains
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         alf_sum%sf(j, k, l) = 0._wp
-                        !$acc loop seq
+                        $:LOOP()
                         do i = advxb, advxe - 1
                             alf_sum%sf(j, k, l) = alf_sum%sf(j, k, l) + q_cons_qp%vf(i)%sf(j, k, l)
                         end do
-                        !$acc loop seq
+                        $:LOOP()
                         do i = advxb, advxe - 1
                             q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1._wp - q_cons_qp%vf(alf_idx)%sf(j, k, l)) &
                                                           /alf_sum%sf(j, k, l)
@@ -1462,7 +1462,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        !$acc loop seq
+                        $:LOOP()
                         do i = momxb, E_idx
                             rhs_vf(i)%sf(j, k, l) = &
                                 rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
@@ -1511,7 +1511,7 @@ contains
                     $:PARALLEL_LOOP(collapse=2)
                     do l = 0, p
                         do j = 0, m
-                            !$acc loop seq
+                            $:LOOP()
                             do i = momxb, E_idx
                                 rhs_vf(i)%sf(j, 0, l) = &
                                     rhs_vf(i)%sf(j, 0, l) + 1._wp/(y_cc(1) - y_cc(-1))* &
@@ -1527,7 +1527,7 @@ contains
                 do l = 0, p
                     do k = 1, n
                         do j = 0, m
-                            !$acc loop seq
+                            $:LOOP()
                             do i = momxb, E_idx
                                 rhs_vf(i)%sf(j, k, l) = &
                                     rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
@@ -1543,7 +1543,7 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            !$acc loop seq
+                            $:LOOP()
                             do i = momxb, E_idx
                                 rhs_vf(i)%sf(j, k, l) = &
                                     rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
@@ -1564,7 +1564,7 @@ contains
                     do l = 0, p
                         do k = 1, n
                             do j = 0, m
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, k, l) = &
                                         rhs_vf(i)%sf(j, k, l) - 5e-1_wp/y_cc(k)* &
@@ -1579,7 +1579,7 @@ contains
                         $:PARALLEL_LOOP(collapse=2)
                         do l = 0, p
                             do j = 0, m
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, 0, l) = &
                                         rhs_vf(i)%sf(j, 0, l) - 1._wp/y_cc(0)* &
@@ -1594,7 +1594,7 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, k, l) = &
                                         rhs_vf(i)%sf(j, k, l) - 5e-1_wp/y_cc(k)* &
@@ -1629,7 +1629,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        !$acc loop seq
+                        $:LOOP()
                         do i = momxb, E_idx
                             rhs_vf(i)%sf(j, k, l) = &
                                 rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
@@ -1706,7 +1706,7 @@ contains
                     if (mpp_lim) then
                         sum_alpha = 0._wp
 
-                        !$acc loop seq
+                        $:LOOP()
                         do i = 1, num_fluids
                             if ((q_cons_vf(i + contxb - 1)%sf(j, k, l) < 0._wp) .or. &
                                 (q_cons_vf(i + advxb - 1)%sf(j, k, l) < 0._wp)) then
@@ -1720,7 +1720,7 @@ contains
                             sum_alpha = sum_alpha + q_cons_vf(i + advxb - 1)%sf(j, k, l)
                         end do
 
-                        !$acc loop seq
+                        $:LOOP()
                         do i = 1, num_fluids
                             q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + advxb - 1)%sf(j, k, l)/sum_alpha
                         end do
@@ -1731,7 +1731,7 @@ contains
                     ! Is the pressure relaxation procedure necessary?
                     relax = 1
 
-                    !$acc loop seq
+                    $:LOOP()
                     do i = 1, num_fluids
                         if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > (1._wp - sgm_eps)) relax = 0
                     end do
@@ -1740,7 +1740,7 @@ contains
                         ! Initial state
                         pres_relax = 0._wp
 
-                        !$acc loop seq
+                        $:LOOP()
                         do i = 1, num_fluids
                             if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
                                 pres_K_init(i) = &
@@ -1760,12 +1760,12 @@ contains
                         f_pres = 1e-9_wp
                         df_pres = 1e9_wp
 
-                        !$acc loop seq
+                        $:LOOP()
                         do i = 1, num_fluids
                             rho_K_s(i) = 0._wp
                         end do
 
-                        !$acc loop seq
+                        $:LOOP()
                         do iter = 0, 49
 
                             if (abs(f_pres) > 1e-10_wp) then
@@ -1781,7 +1781,7 @@ contains
                                 f_pres = -1._wp
                                 df_pres = 0._wp
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_fluids
                                     if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
                                         rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
@@ -1801,7 +1801,7 @@ contains
                         end do
 
                         ! Cell update of the volume fraction
-                        !$acc loop seq
+                        $:LOOP()
                         do i = 1, num_fluids
                             if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) &
                                 q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l) &
@@ -1817,7 +1817,7 @@ contains
                     ! However, the internal-energy equations should be reset with the corresponding mixture
                     ! pressure from the correction. This step is carried out below.
 
-                    !$acc loop seq
+                    $:LOOP()
                     do i = 1, num_fluids
                         alpha_rho(i) = q_cons_vf(i)%sf(j, k, l)
                         alpha(i) = q_cons_vf(E_idx + i)%sf(j, k, l)
@@ -1829,14 +1829,14 @@ contains
                         pi_inf = 0._wp
 
                         if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, num_fluids
                                 rho = rho + alpha_rho(i)
                                 gamma = gamma + alpha(i)*gammas(i)
                                 pi_inf = pi_inf + alpha(i)*pi_infs(i)
                             end do
                         else if ((model_eqns == 2) .and. (num_fluids > 2)) then
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, num_fluids - 1
                                 rho = rho + alpha_rho(i)
                                 gamma = gamma + alpha(i)*gammas(i)
@@ -1855,7 +1855,7 @@ contains
                         sum_alpha = 0._wp
 
                         if (mpp_lim) then
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, num_fluids
                                 alpha_rho(i) = max(0._wp, alpha_rho(i))
                                 alpha(i) = min(max(0._wp, alpha(i)), 1._wp)
@@ -1866,7 +1866,7 @@ contains
 
                         end if
 
-                        !$acc loop seq
+                        $:LOOP()
                         do i = 1, num_fluids
                             rho = rho + alpha_rho(i)
                             gamma = gamma + alpha(i)*gammas(i)
@@ -1874,12 +1874,12 @@ contains
                         end do
 
                         if (viscous) then
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, 2
                                 Re(i) = dflt_real
 
                                 if (Re_size(i) > 0) Re(i) = 0._wp
-                                !$acc loop seq
+                                $:LOOP()
                                 do q = 1, Re_size(i)
                                     Re(i) = alpha(Re_idx(i, q))/Res(i, q) &
                                             + Re(i)
@@ -1893,7 +1893,7 @@ contains
 
                     dyn_pres = 0._wp
 
-                    !$acc loop seq
+                    $:LOOP()
                     do i = momxb, momxe
                         dyn_pres = dyn_pres + 5e-1_wp*q_cons_vf(i)%sf(j, k, l)* &
                                    q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
@@ -1901,7 +1901,7 @@ contains
 
                     pres_relax = (q_cons_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
 
-                    !$acc loop seq
+                    $:LOOP()
                     do i = 1, num_fluids
                         q_cons_vf(i + intxb - 1)%sf(j, k, l) = &
                             q_cons_vf(i + advxb - 1)%sf(j, k, l)* &

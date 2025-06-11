@@ -488,7 +488,7 @@ contains
 
                         rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + mom_sp(2)%sf(i, q, l)
                         j = bubxb
-                        !$acc loop seq
+                        $:LOOP()
                         do k = 1, nb
                             rhs_vf(j)%sf(i, q, l) = &
                                 rhs_vf(j)%sf(i, q, l) + mom_3d(0, 0, k)%sf(i, q, l)
@@ -876,10 +876,10 @@ contains
 
                         nbub = q_cons_vf(bubxb)%sf(id1, id2, id3)
 
-                        !$acc loop seq
+                        $:LOOP()
                         do q = 1, nb
                             !Initialize moment set for each R0 bin
-                            !$acc loop seq
+                            $:LOOP()
                             do r = 2, nmom
                                 moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
                             end do
@@ -890,13 +890,13 @@ contains
 
                             if (polytropic) then
                                 !Account for bubble pressure pb0 at each R0 bin
-                                !$acc loop seq
+                                $:LOOP()
                                 do j = 1, nnode
                                     wght_pb(j, q) = wght(j, q)*(pb0(q) - pv)
                                 end do
                             else
                                 !Account for bubble pressure, mass transfer rate and heat transfer rate in wght_pb, wght_mv and wght_ht using Preston model
-                                !$acc loop seq
+                                $:LOOP()
                                 do j = 1, nnode
                                     chi_vw = 1._wp/(1._wp + R_v/R_n*(pb(id1, id2, id3, j, q)/pv - 1._wp))
                                     x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
@@ -919,13 +919,13 @@ contains
 
                             !Compute change in moments due to bubble dynamics
                             r = 1
-                            !$acc loop seq
+                            $:LOOP()
                             do i2 = 0, 2
-                                !$acc loop seq
+                                $:LOOP()
                                 do i1 = 0, 2
                                     if ((i1 + i2) <= 2) then
                                         momsum = 0._wp
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do j = 1, nterms
                                             ! Account for term with pb in Rayleigh Plesset equation
                                             if (bubble_model == 3 .and. j == 3) then
@@ -960,7 +960,7 @@ contains
 
                             ! Compute change in pb and mv for non-polytroic model
                             if (.not. polytropic) then
-                                !$acc loop seq
+                                $:LOOP()
                                 do j = 1, nnode
                                     ! Compute Rdot (drdt) at quadrature node in the ODE for pb (note this is not the same as bubble variable Rdot)
                                     drdt = msum(2)
@@ -1010,11 +1010,11 @@ contains
                         end if
 
                     else
-                        !$acc loop seq
+                        $:LOOP()
                         do q = 1, nb
-                            !$acc loop seq
+                            $:LOOP()
                             do i1 = 0, 2
-                                !$acc loop seq
+                                $:LOOP()
                                 do i2 = 0, 2
                                     moms3d(i1, i2, q)%sf(id1, id2, id3) = 0._wp
                                 end do

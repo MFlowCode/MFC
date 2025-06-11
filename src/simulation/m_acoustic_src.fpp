@@ -232,7 +232,7 @@ contains
 
                 if (bubbles_euler) then
                     if (num_fluids > 2) then
-                        !$acc loop seq
+                        $:LOOP()
                         do q = 1, num_fluids - 1
                             myRho = myRho + myalpha_rho(q)
                             B_tait = B_tait + myalpha(q)*pi_infs(q)
@@ -246,7 +246,7 @@ contains
                 end if
 
                 if ((.not. bubbles_euler) .or. (mpp_lim .and. (num_fluids > 2))) then
-                    !$acc loop seq
+                    $:LOOP()
                     do q = 1, num_fluids
                         myRho = myRho + myalpha_rho(q)
                         B_tait = B_tait + myalpha(q)*pi_infs(q)
@@ -317,11 +317,11 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    !$acc loop seq
+                    $:LOOP()
                     do q = contxb, contxe
                         rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)
                     end do
-                    !$acc loop seq
+                    $:LOOP()
                     do q = momxb, momxe
                         rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mom_src(q - contxe, j, k, l)
                     end do

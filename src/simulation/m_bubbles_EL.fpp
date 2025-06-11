@@ -570,7 +570,7 @@ contains
             call s_get_pinf(k, q_prim_vf, 1, myPinf, cell, aux1, aux2)
 
             ! Obtain liquid density and computing speed of sound from pinf
-            !$acc loop seq
+            $:LOOP()
             do i = 1, num_fluids
                 myalpha_rho(i) = q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
                 myalpha(i) = q_prim_vf(E_idx + i)%sf(cell(1), cell(2), cell(3))
@@ -750,7 +750,7 @@ contains
         real(wp), dimension(num_dims) :: vel
         integer :: i
 
-        !$acc loop seq
+        $:LOOP()
         do i = 1, num_dims
             vel(i) = q_prim_vf(i + contxe)%sf(cell(1), cell(2), cell(3))
         end do
@@ -831,7 +831,7 @@ contains
 
         !< Find current bubble cell
         cell(:) = int(scoord(:))
-        !$acc loop seq
+        $:LOOP()
         do i = 1, num_dims
             if (scoord(i) < 0._wp) cell(i) = cell(i) - 1
         end do
@@ -922,11 +922,11 @@ contains
             charpres2 = 0._wp
             vol = 0._wp
 
-            !$acc loop seq
+            $:LOOP()
             do i = 1, smearGrid
-                !$acc loop seq
+                $:LOOP()
                 do j = 1, smearGrid
-                    !$acc loop seq
+                    $:LOOP()
                     do k = 1, smearGridz
                         cellaux(1) = cell(1) + i - (mapCells + 1)
                         cellaux(2) = cell(2) + j - (mapCells + 1)
@@ -1648,7 +1648,7 @@ contains
 
         integer :: i
 
-        !$acc loop seq
+        $:LOOP()
         do i = bub_id, nBubs - 1
             lag_id(i, 1) = lag_id(i + 1, 1)
             bub_R0(i) = bub_R0(i + 1)

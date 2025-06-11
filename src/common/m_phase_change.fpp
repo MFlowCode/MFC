@@ -107,7 +107,7 @@ contains
                 do l = 0, p
 
                     rho = 0.0_wp; TvF = 0.0_wp
-                    !$acc loop seq
+                    $:LOOP()
                     do i = 1, num_fluids
 
                         ! Mixture density
@@ -133,7 +133,7 @@ contains
 
                     ! kinetic energy as an auxiliary variable to the calculation of the total internal energy
                     dynE = 0.0_wp
-                    !$acc loop seq
+                    $:LOOP()
                     do i = momxb, momxe
 
                         dynE = dynE + 5.0e-1_wp*q_cons_vf(i)%sf(j, k, l)**2/rho
@@ -255,7 +255,7 @@ contains
 
                     ! calculating volume fractions, internal energies, and total entropy
                     rhos = 0.0_wp
-                    !$acc loop seq
+                    $:LOOP()
                     do i = 1, num_fluids
 
                         ! volume fractions
@@ -308,7 +308,7 @@ contains
         ! auxiliary variables for the pT-equilibrium solver
         mCP = 0.0_wp; mQ = 0.0_wp; p_infpT = ps_inf; 
         ! Performing tests before initializing the pT-equilibrium
-        !$acc loop seq
+        $:LOOP()
         do i = 1, num_fluids
 
             ! sum of the total alpha*rho*cp of the system
@@ -357,7 +357,7 @@ contains
 
             ! updating functions used in the Newton's solver
             gpp = 0.0_wp; gp = 0.0_wp; hp = 0.0_wp
-            !$acc loop seq
+            $:LOOP()
             do i = 1, num_fluids
 
                 gp = gp + (gs_min(i) - 1.0_wp)*q_cons_vf(i + contxb - 1)%sf(j, k, l)*cvs(i) &
@@ -451,7 +451,7 @@ contains
             mCP = 0.0_wp; mCPD = 0.0_wp; mCVGP = 0.0_wp; mCVGP2 = 0.0_wp; mQ = 0.0_wp; mQD = 0.0_wp
             ! Those must be updated through the iterations, as they either depend on
             ! the partial masses for all fluids, or on the equilibrium pressure
-            !$acc loop seq
+            $:LOOP()
             do i = 1, num_fluids
 
                 ! sum of the total alpha*rho*cp of the system

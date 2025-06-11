@@ -49,7 +49,7 @@ contains
 
         integer :: i
 
-        !$acc loop seq
+        $:LOOP()
         do i = 1, num_fluids
             alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
             alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
@@ -64,13 +64,13 @@ contains
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
         end if
 
-        !$acc loop seq
+        $:LOOP()
         do i = 1, num_vels
             vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
         end do
 
         vel_sum = 0._wp
-        !$acc loop seq
+        $:LOOP()
         do i = 1, num_vels
             vel_sum = vel_sum + vel(i)**2._wp
         end do

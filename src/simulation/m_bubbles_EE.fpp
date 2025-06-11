@@ -82,7 +82,7 @@ contains
             do k = 0, n
                 do j = 0, m
                     nR3bar = 0._wp
-                    !$acc loop seq
+                    $:LOOP()
                     do i = 1, nb
                         nR3bar = nR3bar + weight(i)*(q_cons_vf(rs(i))%sf(j, k, l))**3._wp
                     end do
@@ -180,7 +180,7 @@ contains
                 do j = 0, m
                     bub_adv_src(j, k, l) = 0._wp
 
-                    !$acc loop seq
+                    $:LOOP()
                     do q = 1, nb
                         bub_r_src(j, k, l, q) = 0._wp
                         bub_v_src(j, k, l, q) = 0._wp
@@ -202,7 +202,7 @@ contains
                     if (adv_n) then
                         nbub = q_prim_vf(n_idx)%sf(j, k, l)
                     else
-                        !$acc loop seq
+                        $:LOOP()
                         do q = 1, nb
                             Rtmp(q) = q_prim_vf(rs(q))%sf(j, k, l)
                             Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
@@ -210,7 +210,7 @@ contains
 
                         R3 = 0._wp
 
-                        !$acc loop seq
+                        $:LOOP()
                         do q = 1, nb
                             R3 = R3 + weight(q)*Rtmp(q)**3._wp
                         end do
@@ -221,7 +221,7 @@ contains
                     if (.not. adap_dt) then
                         R2Vav = 0._wp
 
-                        !$acc loop seq
+                        $:LOOP()
                         do q = 1, nb
                             R2Vav = R2Vav + weight(q)*Rtmp(q)**2._wp*Vtmp(q)
                         end do
@@ -229,10 +229,10 @@ contains
                         bub_adv_src(j, k, l) = 4._wp*pi*nbub*R2Vav
                     end if
 
-                    !$acc loop seq
+                    $:LOOP()
                     do q = 1, nb
 
-                        !$acc loop seq
+                        $:LOOP()
                         do ii = 1, num_fluids
                             myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
                             myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
@@ -243,14 +243,14 @@ contains
                         B_tait = 0._wp
 
                         if (mpp_lim .and. (num_fluids > 2)) then
-                            !$acc loop seq
+                            $:LOOP()
                             do ii = 1, num_fluids
                                 myRho = myRho + myalpha_rho(ii)
                                 n_tait = n_tait + myalpha(ii)*gammas(ii)
                                 B_tait = B_tait + myalpha(ii)*pi_infs(ii)
                             end do
                         else if (num_fluids > 2) then
-                            !$acc loop seq
+                            $:LOOP()
                             do ii = 1, num_fluids - 1
                                 myRho = myRho + myalpha_rho(ii)
                                 n_tait = n_tait + myalpha(ii)*gammas(ii)
@@ -333,7 +333,7 @@ contains
                         rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + bub_adv_src(i, q, l)
                         if (num_fluids > 1) rhs_vf(advxb)%sf(i, q, l) = &
                             rhs_vf(advxb)%sf(i, q, l) - bub_adv_src(i, q, l)
-                        !$acc loop seq
+                        $:LOOP()
                         do k = 1, nb
                             rhs_vf(rs(k))%sf(i, q, l) = rhs_vf(rs(k))%sf(i, q, l) + bub_r_src(i, q, l, k)
                             rhs_vf(vs(k))%sf(i, q, l) = rhs_vf(vs(k))%sf(i, q, l) + bub_v_src(i, q, l, k)

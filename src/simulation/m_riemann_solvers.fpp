@@ -374,13 +374,13 @@ contains
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, contxe
                                 alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                 alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                             end do
 
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, num_vels
                                 vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
                                 vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
@@ -388,13 +388,13 @@ contains
 
                             vel_L_rms = 0._wp; vel_R_rms = 0._wp
 
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, num_vels
                                 vel_L_rms = vel_L_rms + vel_L(i)**2._wp
                                 vel_R_rms = vel_R_rms + vel_R(i)**2._wp
                             end do
 
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, num_fluids
                                 alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                 alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
@@ -438,7 +438,7 @@ contains
                             pres_mag%R = 0._wp
 
                             if (mpp_lim) then
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_fluids
                                     alpha_rho_L(i) = max(0._wp, alpha_rho_L(i))
                                     alpha_L(i) = min(max(0._wp, alpha_L(i)), 1._wp)
@@ -447,7 +447,7 @@ contains
 
                                 alpha_L = alpha_L/max(alpha_L_sum, sgm_eps)
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_fluids
                                     alpha_rho_R(i) = max(0._wp, alpha_rho_R(i))
                                     alpha_R(i) = min(max(0._wp, alpha_R(i)), 1._wp)
@@ -457,7 +457,7 @@ contains
                                 alpha_R = alpha_R/max(alpha_R_sum, sgm_eps)
                             end if
 
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, num_fluids
                                 rho_L = rho_L + alpha_rho_L(i)
                                 gamma_L = gamma_L + alpha_L(i)*gammas(i)
@@ -471,13 +471,13 @@ contains
                             end do
 
                             if (viscous) then
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, 2
                                     Re_L(i) = dflt_real
 
                                     if (Re_size(i) > 0) Re_L(i) = 0._wp
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do q = 1, Re_size(i)
                                         Re_L(i) = alpha_L(Re_idx(i, q))/Res(i, q) &
                                                   + Re_L(i)
@@ -487,13 +487,13 @@ contains
 
                                 end do
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, 2
                                     Re_R(i) = dflt_real
 
                                     if (Re_size(i) > 0) Re_R(i) = 0._wp
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do q = 1, Re_size(i)
                                         Re_R(i) = alpha_R(Re_idx(i, q))/Res(i, q) &
                                                   + Re_R(i)
@@ -504,7 +504,7 @@ contains
                             end if
 
                             if (chemistry) then
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = chemxb, chemxe
                                     Ys_L(i - chemxb + 1) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                     Ys_R(i - chemxb + 1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
@@ -601,7 +601,7 @@ contains
                             if (hypoelasticity) then
                                 G_L = 0._wp; G_R = 0._wp
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_fluids
                                     G_L = G_L + alpha_L(i)*Gs(i)
                                     G_R = G_R + alpha_R(i)*Gs(i)
@@ -634,7 +634,7 @@ contains
                             !    G_L = 0._wp
                             !    G_R = 0._wp
                             !
-                            !    !$acc loop seq
+                            !    $:LOOP()
                             !    do i = 1, num_fluids
                             !        G_L = G_L + alpha_L(i)*Gs(i)
                             !        G_R = G_R + alpha_R(i)*Gs(i)
@@ -643,17 +643,17 @@ contains
                             !    if ((G_L > 1e-3_wp) .and. (G_R > 1e-3_wp)) then
                             !    E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
                             !    E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
-                            !    !$acc loop seq
+                            !    $:LOOP()
                             !    do i = 1, b_size-1
                             !        tau_e_L(i) = G_L*qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
                             !        tau_e_R(i) = G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                             !    end do
-                            !    !$acc loop seq
+                            !    $:LOOP()
                             !    do i = 1, b_size-1
                             !        tau_e_L(i) = 0_wp
                             !        tau_e_R(i) = 0_wp
                             !    end do
-                            !    !$acc loop seq
+                            !    $:LOOP()
                             !    do i = 1, num_dims
                             !        xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
                             !        xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
@@ -681,7 +681,7 @@ contains
                             end if
 
                             if (viscous) then
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, 2
                                     Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2._wp/(1._wp/Re_L(i) + 1._wp/Re_R(i))
                                 end do
@@ -760,7 +760,7 @@ contains
 
                             ! Mass
                             if (.not. relativity) then
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         (s_M*alpha_rho_R(i)*vel_R(norm_dir) &
@@ -770,7 +770,7 @@ contains
                                         /(s_M - s_P)
                                 end do
                             elseif (relativity) then
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         (s_M*Ga%R*alpha_rho_R(i)*vel_R(norm_dir) &
@@ -851,7 +851,7 @@ contains
                                      + s_M*s_P*(cm%L(3) - cm%R(3))) &
                                     /(s_M - s_P)
                             elseif (bubbles_euler) then
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_vels
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
@@ -866,7 +866,7 @@ contains
                                         + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R(dir_idx(i)) - vel_L(dir_idx(i)))
                                 end do
                             else if (hypoelasticity) then
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_vels
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
@@ -882,7 +882,7 @@ contains
                                         /(s_M - s_P)
                                 end do
                             else
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_vels
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
@@ -978,7 +978,7 @@ contains
                             end if
 
                             ! Advection
-                            !$acc loop seq
+                            $:LOOP()
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf(j, k, l, i) = &
                                     (qL_prim_rs${XYZ}$_vf(j, k, l, i) &
@@ -1003,7 +1003,7 @@ contains
                             !end if
 
                             ! Div(U)?
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, num_vels
                                 vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = &
                                     (xi_M*(rho_L*vel_L(dir_idx(i))* &
@@ -1024,7 +1024,7 @@ contains
                             end if
 
                             if (chemistry) then
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = chemxb, chemxe
                                     Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                     Y_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
@@ -1074,7 +1074,7 @@ contains
                             #:if (NORM_DIR == 2)
                                 if (cyl_coord) then
                                     !Substituting the advective flux into the inviscid geometrical source flux
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, E_idx
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
@@ -1083,7 +1083,7 @@ contains
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + 2) &
                                         - (s_M*pres_R - s_P*pres_L)/(s_M - s_P)
                                     ! Geometrical source of the void fraction(s) is zero
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = advxb, advxe
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
@@ -1096,7 +1096,7 @@ contains
                                         (s_M*tau_e_R(4) - s_P*tau_e_L(4)) &
                                         /(s_M - s_P)
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = strxb, strxe
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
@@ -1312,7 +1312,7 @@ contains
 
                                 vel_L_rms = 0._wp; vel_R_rms = 0._wp
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
                                     vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
                                     vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
@@ -1337,32 +1337,32 @@ contains
                                 alpha_R_sum = 0._wp
 
                                 if (mpp_lim) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         qL_prim_rs${XYZ}$_vf(j, k, l, i) = max(0._wp, qL_prim_rs${XYZ}$_vf(j, k, l, i))
                                         qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0._wp, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1._wp)
                                         alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     end do
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
                                     end do
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0._wp, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
                                         qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0._wp, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1._wp)
                                         alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                     end do
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
                                     end do
                                 end if
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_fluids
                                     rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                     gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
@@ -1379,13 +1379,13 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, 2
                                         Re_L(i) = dflt_real
 
                                         if (Re_size(i) > 0) Re_L(i) = 0._wp
 
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do q = 1, Re_size(i)
                                             Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
                                                       + Re_L(i)
@@ -1395,13 +1395,13 @@ contains
 
                                     end do
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, 2
                                         Re_R(i) = dflt_real
 
                                         if (Re_size(i) > 0) Re_R(i) = 0._wp
 
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do q = 1, Re_size(i)
                                             Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
                                                       + Re_R(i)
@@ -1417,18 +1417,18 @@ contains
 
                                 ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
                                 if (hypoelasticity) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, strxe - strxb + 1
                                         tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
                                         tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                                     end do
                                     G_L = 0_wp; G_R = 0_wp
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         G_L = G_L + alpha_L(i)*Gs(i)
                                         G_R = G_R + alpha_R(i)*Gs(i)
                                     end do
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, strxe - strxb + 1
                                         ! Elastic contribution to energy if G large enough
                                         if ((G_L > verysmall) .and. (G_R > verysmall)) then
@@ -1445,13 +1445,13 @@ contains
 
                                 ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
                                 if (hyperelasticity) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_dims
                                         xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
                                         xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                                     end do
                                     G_L = 0_wp; G_R = 0_wp; 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         ! Mixture left and right shear modulus
                                         G_L = G_L + alpha_L(i)*Gs(i)
@@ -1462,7 +1462,7 @@ contains
                                         E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
                                         E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
                                     end if
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, b_size - 1
                                         tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
                                         tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
@@ -1486,7 +1486,7 @@ contains
                                                               vel_avg_rms, 0._wp, c_avg)
 
                                 if (viscous) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, 2
                                         Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2._wp/(1._wp/Re_L(i) + 1._wp/Re_R(i))
                                     end do
@@ -1581,7 +1581,7 @@ contains
 
                                 ! COMPUTING FLUXES
                                 ! MASS FLUX.
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i)*(vel_L(idx1) + s_M*(xi_L - 1._wp)) + &
@@ -1590,7 +1590,7 @@ contains
 
                                 ! MOMENTUM FLUX.
                                 ! f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = rho_Star*vel_K_Star* &
@@ -1606,7 +1606,7 @@ contains
                                 ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
                                     flux_ene_e = 0_wp; 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_dims
                                         idxi = dir_idx(i)
                                         ! MOMENTUM ELASTIC FLUX.
@@ -1624,7 +1624,7 @@ contains
                                 end if
 
                                 ! VOLUME FRACTION FLUX.
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = advxb, advxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i)*s_S + &
@@ -1632,7 +1632,7 @@ contains
                                 end do
 
                                 ! SOURCE TERM FOR VOLUME FRACTION ADVECTION FLUX.
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
                                     vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
@@ -1642,7 +1642,7 @@ contains
 
                                 ! INTERNAL ENERGIES ADVECTION FLUX.
                                 ! K-th pressure and velocity in preparation for the internal energy flux
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_fluids
                                     p_K_Star = xi_M*(xi_MP*((pres_L + pi_infs(i)/(1_wp + gammas(i)))* &
                                                             xi_L**(1_wp/gammas(i) + 1_wp) - pi_infs(i)/(1_wp + gammas(i)) - pres_L) + pres_L) + &
@@ -1661,7 +1661,7 @@ contains
 
                                 ! HYPOELASTIC STRESS EVOLUTION FLUX.
                                 if (hypoelasticity) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, strxe - strxb + 1
                                         flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
                                             xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*tau_e_L(i) - rho_L*vel_L(idx1)*tau_e_L(i)) + &
@@ -1671,7 +1671,7 @@ contains
 
                                 ! REFERENCE MAP FLUX.
                                 if (hyperelasticity) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_dims
                                         flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
                                             xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*xi_field_L(i) &
@@ -1692,11 +1692,11 @@ contains
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then
                                         !Substituting the advective flux into the inviscid geometrical source flux
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = 1, E_idx
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = intxb, intxe
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
@@ -1704,7 +1704,7 @@ contains
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) = &
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
                                         ! Geometrical source of the void fraction(s) is zero
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = advxb, advxe
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0_wp
                                         end do
@@ -1712,7 +1712,7 @@ contains
                                 #:endif
                                 #:if (NORM_DIR == 3)
                                     if (grid_geometry == 3) then
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = 1, sys_size
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0_wp
                                         end do
@@ -1737,26 +1737,26 @@ contains
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, contxe
                                     alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                     alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                 end do
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
                                     vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
                                     vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
                                 end do
 
                                 vel_L_rms = 0._wp; vel_R_rms = 0._wp
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
                                     vel_L_rms = vel_L_rms + vel_L(i)**2._wp
                                     vel_R_rms = vel_R_rms + vel_R(i)**2._wp
                                 end do
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_fluids
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
@@ -1769,7 +1769,7 @@ contains
                                 gamma_L = 0._wp
                                 pi_inf_L = 0._wp
                                 qv_L = 0._wp
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_fluids
                                     rho_L = rho_L + alpha_rho_L(i)
                                     gamma_L = gamma_L + alpha_L(i)*gammas(i)
@@ -1781,7 +1781,7 @@ contains
                                 gamma_R = 0._wp
                                 pi_inf_R = 0._wp
                                 qv_R = 0._wp
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_fluids
                                     rho_R = rho_R + alpha_rho_R(i)
                                     gamma_R = gamma_R + alpha_R(i)*gammas(i)
@@ -1856,7 +1856,7 @@ contains
                                 xi_M = (5e-1_wp + sign(5e-1_wp, s_S))
                                 xi_P = (5e-1_wp - sign(5e-1_wp, s_S))
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*alpha_rho_L(i) &
@@ -1867,7 +1867,7 @@ contains
 
                                 ! Momentum flux.
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         xi_M*(rho_L*(vel_L(dir_idx(1))* &
@@ -1886,7 +1886,7 @@ contains
 
                                 if (bubbles_euler) then
                                     ! Put p_tilde in
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_dims
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                             flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) + &
@@ -1897,7 +1897,7 @@ contains
 
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = 0._wp
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = alf_idx, alf_idx !only advect the void fraction
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
@@ -1907,7 +1907,7 @@ contains
                                 end do
 
                                 ! Source for volume fraction advection equation
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
 
                                     vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = 0._wp
@@ -1918,7 +1918,7 @@ contains
 
                                 ! Add advection flux for bubble variables
                                 if (bubbles_euler) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = bubxb, bubxe
                                         flux_rs${XYZ}$_vf(j, k, l, i) = &
                                             xi_M*nbub_L*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
@@ -1933,7 +1933,7 @@ contains
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then
                                         ! Substituting the advective flux into the inviscid geometrical source flux
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = 1, E_idx
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
@@ -1950,7 +1950,7 @@ contains
                                                                       (1._wp - dir_flg(dir_idx(1)))* &
                                                                       vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
                                         ! Geometrical source of the void fraction(s) is zero
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = advxb, advxe
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                         end do
@@ -1958,7 +1958,7 @@ contains
                                 #:endif
                                 #:if (NORM_DIR == 3)
                                     if (grid_geometry == 3) then
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = 1, sys_size
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                         end do
@@ -1992,7 +1992,7 @@ contains
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_fluids
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
@@ -2000,7 +2000,7 @@ contains
 
                                 vel_L_rms = 0._wp; vel_R_rms = 0._wp
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
                                     vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
                                     vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
@@ -2018,7 +2018,7 @@ contains
 
                                 ! Retain this in the refactor
                                 if (mpp_lim .and. (num_fluids > 2)) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                         gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
@@ -2026,7 +2026,7 @@ contains
                                         qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
                                     end do
                                 else if (num_fluids > 2) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids - 1
                                         rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                         gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
@@ -2046,7 +2046,7 @@ contains
                                 qv_R = 0._wp
 
                                 if (mpp_lim .and. (num_fluids > 2)) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                         gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
@@ -2054,7 +2054,7 @@ contains
                                         qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                     end do
                                 else if (num_fluids > 2) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids - 1
                                         rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                         gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
@@ -2070,13 +2070,13 @@ contains
 
                                 if (viscous) then
                                     if (num_fluids == 1) then ! Need to consider case with num_fluids >= 2
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = 1, 2
                                             Re_L(i) = dflt_real
 
                                             if (Re_size(i) > 0) Re_L(i) = 0._wp
 
-                                            !$acc loop seq
+                                            $:LOOP()
                                             do q = 1, Re_size(i)
                                                 Re_L(i) = (1._wp - qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q)))/Res(i, q) &
                                                           + Re_L(i)
@@ -2086,13 +2086,13 @@ contains
 
                                         end do
 
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = 1, 2
                                             Re_R(i) = dflt_real
 
                                             if (Re_size(i) > 0) Re_R(i) = 0._wp
 
-                                            !$acc loop seq
+                                            $:LOOP()
                                             do q = 1, Re_size(i)
                                                 Re_R(i) = (1._wp - qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q)))/Res(i, q) &
                                                           + Re_R(i)
@@ -2111,7 +2111,7 @@ contains
                                 H_R = (E_R + pres_R)/rho_R
 
                                 if (avg_state == 2) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, nb
                                         R0_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, rs(i))
                                         R0_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, rs(i))
@@ -2131,7 +2131,7 @@ contains
                                         else
                                             nbub_L_denom = 0._wp
                                             nbub_R_denom = 0._wp
-                                            !$acc loop seq
+                                            $:LOOP()
                                             do i = 1, nb
                                                 nbub_L_denom = nbub_L_denom + (R0_L(i)**3._wp)*weight(i)
                                                 nbub_R_denom = nbub_R_denom + (R0_R(i)**3._wp)*weight(i)
@@ -2145,7 +2145,7 @@ contains
                                         nbub_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, bubxb)
                                     end if
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, nb
                                         if (.not. qbmm) then
                                             if (polytropic) then
@@ -2178,7 +2178,7 @@ contains
                                         R3V2Lbar = 0._wp
                                         R3V2Rbar = 0._wp
 
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = 1, nb
                                             PbwR3Lbar = PbwR3Lbar + pbw_L(i)*(R0_L(i)**3._wp)*weight(i)
                                             PbwR3Rbar = PbwR3Rbar + pbw_R(i)*(R0_R(i)**3._wp)*weight(i)
@@ -2213,7 +2213,7 @@ contains
                                     gamma_avg = 5e-1_wp*(gamma_L + gamma_R)
                                     vel_avg_rms = 0._wp
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_dims
                                         vel_avg_rms = vel_avg_rms + (5e-1_wp*(vel_L(i) + vel_R(i)))**2._wp
                                     end do
@@ -2232,7 +2232,7 @@ contains
                                                               vel_avg_rms, 0._wp, c_avg)
 
                                 if (viscous) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, 2
                                         Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2._wp/(1._wp/Re_L(i) + 1._wp/Re_R(i))
                                     end do
@@ -2296,7 +2296,7 @@ contains
                                     pcorr = 0._wp
                                 end if
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
@@ -2315,7 +2315,7 @@ contains
 
                                 ! Include p_tilde
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         xi_M*(rho_L*(vel_L(dir_idx(1))* &
@@ -2347,7 +2347,7 @@ contains
                                     + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 ! Volume fraction flux
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = advxb, advxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
@@ -2357,7 +2357,7 @@ contains
                                 end do
 
                                 ! Source for volume fraction advection equation
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
                                     vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = &
                                         xi_M*(vel_L(dir_idx(i)) + &
@@ -2373,7 +2373,7 @@ contains
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
                                 ! Add advection flux for bubble variables
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = bubxb, bubxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*nbub_L*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
@@ -2402,7 +2402,7 @@ contains
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then
                                         ! Substituting the advective flux into the inviscid geometrical source flux
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = 1, E_idx
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
@@ -2419,7 +2419,7 @@ contains
                                                                       (1._wp - dir_flg(dir_idx(1)))* &
                                                                       vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
                                         ! Geometrical source of the void fraction(s) is zero
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = advxb, advxe
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                         end do
@@ -2427,7 +2427,7 @@ contains
                                 #:endif
                                 #:if (NORM_DIR == 3)
                                     if (grid_geometry == 3) then
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = 1, sys_size
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                         end do
@@ -2468,14 +2468,14 @@ contains
 
                                 !idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_fluids
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                 end do
 
                                 vel_L_rms = 0._wp; vel_R_rms = 0._wp
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
                                     vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
                                     vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
@@ -2502,32 +2502,32 @@ contains
                                 ! Change this by splitting it into the cases
                                 ! present in the bubbles_euler
                                 if (mpp_lim) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         qL_prim_rs${XYZ}$_vf(j, k, l, i) = max(0._wp, qL_prim_rs${XYZ}$_vf(j, k, l, i))
                                         qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0._wp, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1._wp)
                                         alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     end do
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
                                     end do
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0._wp, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
                                         qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0._wp, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1._wp)
                                         alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                     end do
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
                                     end do
                                 end if
 
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_fluids
                                     rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                     gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
@@ -2541,13 +2541,13 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, 2
                                         Re_L(i) = dflt_real
 
                                         if (Re_size(i) > 0) Re_L(i) = 0._wp
 
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do q = 1, Re_size(i)
                                             Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
                                                       + Re_L(i)
@@ -2557,13 +2557,13 @@ contains
 
                                     end do
 
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, 2
                                         Re_R(i) = dflt_real
 
                                         if (Re_size(i) > 0) Re_R(i) = 0._wp
 
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do q = 1, Re_size(i)
                                             Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
                                                       + Re_R(i)
@@ -2575,7 +2575,7 @@ contains
 
                                 if (chemistry) then
                                     c_sum_Yi_Phi = 0.0_wp
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = chemxb, chemxe
                                         Ys_L(i - chemxb + 1) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                         Ys_R(i - chemxb + 1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
@@ -2634,19 +2634,19 @@ contains
 
                                 ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
                                 if (hypoelasticity) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, strxe - strxb + 1
                                         tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
                                         tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                                     end do
                                     G_L = 0_wp
                                     G_R = 0_wp
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         G_L = G_L + alpha_L(i)*Gs(i)
                                         G_R = G_R + alpha_R(i)*Gs(i)
                                     end do
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, strxe - strxb + 1
                                         ! Elastic contribution to energy if G large enough
                                         if ((G_L > verysmall) .and. (G_R > verysmall)) then
@@ -2663,14 +2663,14 @@ contains
 
                                 ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
                                 if (hyperelasticity) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_dims
                                         xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
                                         xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                                     end do
                                     G_L = 0_wp
                                     G_R = 0_wp
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_fluids
                                         ! Mixture left and right shear modulus
                                         G_L = G_L + alpha_L(i)*Gs(i)
@@ -2681,7 +2681,7 @@ contains
                                         E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
                                         E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
                                     end if
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, b_size - 1
                                         tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
                                         tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
@@ -2705,7 +2705,7 @@ contains
                                                               vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
                                 if (viscous) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, 2
                                         Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2._wp/(1._wp/Re_L(i) + 1._wp/Re_R(i))
                                     end do
@@ -2781,7 +2781,7 @@ contains
 
                                 ! COMPUTING THE HLLC FLUXES
                                 ! MASS FLUX.
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
@@ -2792,7 +2792,7 @@ contains
 
                                 ! MOMENTUM FLUX.
                                 ! f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
@@ -2827,7 +2827,7 @@ contains
                                 ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
                                     flux_ene_e = 0_wp
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_dims
                                         idxi = dir_idx(i)
                                         ! MOMENTUM ELASTIC FLUX.
@@ -2846,7 +2846,7 @@ contains
 
                                 ! HYPOELASTIC STRESS EVOLUTION FLUX.
                                 if (hypoelasticity) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, strxe - strxb + 1
                                         flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
                                             xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*tau_e_L(i) - rho_L*vel_L(idx1)*tau_e_L(i)) + &
@@ -2855,7 +2855,7 @@ contains
                                 end if
 
                                 ! VOLUME FRACTION FLUX.
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = advxb, advxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
@@ -2865,7 +2865,7 @@ contains
                                 end do
 
                                 ! VOLUME FRACTION SOURCE FLUX.
-                                !$acc loop seq
+                                $:LOOP()
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
                                     vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
@@ -2888,7 +2888,7 @@ contains
 
                                 ! REFERENCE MAP FLUX.
                                 if (hyperelasticity) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = 1, num_dims
                                         flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
                                             xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*xi_field_L(i) &
@@ -2901,7 +2901,7 @@ contains
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
 
                                 if (chemistry) then
-                                    !$acc loop seq
+                                    $:LOOP()
                                     do i = chemxb, chemxe
                                         Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                         Y_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
@@ -2916,7 +2916,7 @@ contains
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then
                                         !Substituting the advective flux into the inviscid geometrical source flux
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = 1, E_idx
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
@@ -2933,7 +2933,7 @@ contains
                                                                       (1._wp - dir_flg(idx1))* &
                                                                       vel_R(idx1)) - vel_R(idx1))))
                                         ! Geometrical source of the void fraction(s) is zero
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = advxb, advxe
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                         end do
@@ -2941,7 +2941,7 @@ contains
                                 #:endif
                                 #:if (NORM_DIR == 3)
                                     if (grid_geometry == 3) then
-                                        !$acc loop seq
+                                        $:LOOP()
                                         do i = 1, sys_size
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                         end do
@@ -3134,7 +3134,7 @@ contains
                             ! Sum properties of all fluid components
                             rho%L = 0._wp; gamma%L = 0._wp; pi_inf%L = 0._wp; qv%L = 0._wp
                             rho%R = 0._wp; gamma%R = 0._wp; pi_inf%R = 0._wp; qv%R = 0._wp
-                            !$acc loop seq
+                            $:LOOP()
                             do i = 1, num_fluids
                                 rho%L = rho%L + alpha_rho_L(i)
                                 gamma%L = gamma%L + alpha_L(i)*gammas(i)
@@ -3304,7 +3304,7 @@ contains
                             ! Energy
                             flux_rs${XYZ}$_vf(j, k, l, E_idx) = F_hlld(7)
                             ! Partial fraction
-                            !$acc loop seq
+                            $:LOOP()
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf(j, k, l, i) = 0._wp ! TODO multi-component (zero for now)
                             end do
@@ -4017,7 +4017,7 @@ contains
 
                     ! Average velocities and their derivatives at the interface
                     ! For cylindrical: x-dir ~ axial (z_cyl), y-dir ~ radial (r_cyl), z-dir ~ azimuthal (theta_cyl)
-                    !$acc loop seq
+                    $:LOOP()
                     do i_vel = 1, num_dims
                         avg_v_int(i_vel) = 0.5_wp*(velL_vf(i_vel)%sf(j, k, l) + velR_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
 
@@ -4095,7 +4095,7 @@ contains
                             end if
                         end select
 
-                        !$acc loop seq
+                        $:LOOP()
                         do i_vel = 1, num_dims
                             flux_src_vf(momxb + i_vel - 1)%sf(j, k, l) = flux_src_vf(momxb + i_vel - 1)%sf(j, k, l) - stress_vector_shear(i_vel)
                             flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - vel_src_int(i_vel)*stress_vector_shear(i_vel)
