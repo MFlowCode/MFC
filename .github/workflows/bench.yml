@@ -18,7 +18,7 @@ jobs:
         with: 
           filters: ".github/file-filter.yml"
 
-  self:
+  phoenix:
     name: Georgia Tech | Phoenix (NVHPC)
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: file-changes
@@ -66,3 +66,52 @@ jobs:
             pr/build/benchmarks/*
             master/bench-${{ matrix.device }}.*
             master/build/benchmarks/*
+
+  frontier:
+      name: Oak Ridge | Frontier (AMD ROCm)
+      if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+      needs: file-changes
+      strategy:
+        matrix:
+          device: ['cpu', 'gpu']
+      runs-on:
+        group:  frontier
+        labels: olcf
+      timeout-minutes: 1400
+      env:
+        ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
+        ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      steps:
+        - name: Clone - PR
+          uses: actions/checkout@v4
+          with:
+            path: pr
+
+        - name: Clone - Master
+          uses: actions/checkout@v4
+          with:
+            repository: MFlowCode/MFC
+            ref: master
+            path: master
+
+        - name: Bench (Master v. PR)
+          run: |
+            (cd pr     && bash .github/workflows/frontier/submit-bench.sh .github/workflows/frontier/bench.sh ${{ matrix.device }}) &
+            (cd master && bash .github/workflows/frontier/submit-bench.sh .github/workflows/frontier/bench.sh ${{ matrix.device }}) &
+            wait %1 && wait %2
+
+        - name: Generate & Post Comment
+          run: |
+            (cd pr && . ./mfc.sh load -c p -m g)
+            (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml)
+
+        - name: Archive Logs
+          uses: actions/upload-artifact@v4
+          if:   always()
+          with:
+            name: logs-frontier-${{ matrix.device }}
+            path: |
+              pr/bench-${{ matrix.device }}.*
+              pr/build/benchmarks/*
+              master/bench-${{ matrix.device }}.*
+              master/build/benchmarks/*
