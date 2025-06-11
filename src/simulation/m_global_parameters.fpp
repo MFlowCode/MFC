@@ -311,7 +311,6 @@ module m_global_parameters
 
     $:DECLARE(create=["buff_size"])
 
-
     integer :: shear_num !! Number of shear stress components
     integer, dimension(3) :: shear_indices !<
     !! Indices of the stress components that represent shear stress

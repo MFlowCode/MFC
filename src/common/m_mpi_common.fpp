@@ -643,7 +643,7 @@ contains
 #ifdef MFC_MPI
 
         call nvtxStartRange("RHS-COMM-PACKBUF")
-$:UPDATE(device=["v_size"])
+        $:UPDATE(device=["v_size"])
 
 #ifdef MFC_SIMULATION
         if (qbmm .and. .not. polytropic) then

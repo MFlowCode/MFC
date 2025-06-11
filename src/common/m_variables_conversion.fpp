@@ -653,7 +653,7 @@ contains
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
         end do
-$:UPDATE(device=["gammas","gs_min","pi_infs","ps_inf","cvs","qvs","qvps","Gs"])
+        $:UPDATE(device=["gammas","gs_min","pi_infs","ps_inf","cvs","qvs","qvps","Gs"])
 
 #ifdef MFC_SIMULATION
 
