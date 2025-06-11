@@ -94,6 +94,12 @@ jobs:
             ref: master
             path: master
 
+        - name: Setup & Build
+          run: | 
+            (cd pr     && bash .github/workflows/frontier/build.sh ${{ matrix.device }}) &
+            (cd master && bash .github/workflows/frontier/build.sh ${{ matrix.device }}) &
+            wait %1 && wait %2
+
         - name: Bench (Master v. PR)
           run: |
             (cd pr     && bash .github/workflows/frontier/submit-bench.sh .github/workflows/frontier/bench.sh ${{ matrix.device }}) &
