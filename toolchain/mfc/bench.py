@@ -116,7 +116,7 @@ def diff():
     for slug in slugs:
         lhs_summary, rhs_summary = lhs["cases"][slug]["output_summary"], rhs["cases"][slug]["output_summary"]
         speedups = ['N/A', 'N/A', 'N/A']
-        
+
         for i, target in enumerate(sorted(DEFAULT_TARGETS, key=lambda t: t.runOrder)):
             if (target.name not in lhs_summary) or (target.name not in rhs_summary):
                 cons.print(f"{target.name} not present in lhs_summary or rhs_summary - Case: {slug}")
@@ -141,12 +141,12 @@ def diff():
 
                     grind_time_value = lhs_summary[target.name]["grind"] / rhs_summary[target.name]["grind"]
                     grind_time_speedup += f" & Grind: {grind_time_value:.2f}"
+                    speedups[i] += f" & Grind: {grind_time_speedup}"
                     if grind_time_value <0.98:
                         raise MFCException(f"Benchmarking failed since grind time speedup for {target.name} below acceptable threshold (<0.98) - Case: {slug}")
             except Exception as _:
                 err = 1
                 cons.print(f"lhs_summary or rhs_summary reports non-real grind time for {target.name} - Case: {slug}")
-            speedups[i] += f" & Grind: {grind_time_speedup}"
 
         table.add_row(f"[magenta]{slug}[/magenta]", *speedups)
 
