@@ -471,7 +471,6 @@ contains
             if (posPrev(k,1) > comm_coords(1)%beg .and. pos(k,1) < comm_coords(1)%beg .and. nidx(1)%beg /= 0) then
                 p_send_ids(-1, 0, 0, p_send_counts(-1, 0, 0)) = k
                 p_send_counts(-1, 0, 0) = p_send_counts(-1, 0, 0) + 1
-
                 if (n > 0) then
                     ! Left bottom corner
                     if (posPrev(k,2) > comm_coords(2)%beg .and. pos(k,2) < comm_coords(2)%beg .and. nidx(2)%beg /= 0) then
@@ -479,21 +478,40 @@ contains
                         p_send_counts(-1, -1, 0) = p_send_counts(-1, -1, 0) + 1
                         p_send_ids(0, -1, 0, p_send_counts(0, -1, 0)) = k
                         p_send_counts(0, -1, 0) = p_send_counts(0, -1, 0) + 1
-
+                        if (p > 0) then
+                            ! Left bottom back corner
+                            if (posPrev(k, 3) > comm_coords(3)%beg .and. pos(k,3) < comm_coords(3)%beg .and. nidx(3)%beg /= 0) then
+                                p_send_ids(-1, -1, -1, p_send_counts(-1, -1, -1)) = k
+                                p_send_counts(-1, -1, -1) = p_send_counts(-1, -1, -1) + 1
+                            ! Left bottom front corner
+                            elseif (posPrev(k, 3) < comm_coords(3)%end .and. pos(k,3) > comm_coords(3)%end .and. nidx(3)%end /= 0) then
+                                p_send_ids(-1, -1, 1, p_send_counts(-1, -1, 1)) = k
+                                p_send_counts(-1, -1, 1) = p_send_counts(-1, -1, 1) + 1
+                            end if
+                        end if
                     ! Left top corner
                     elseif (posPrev(k,2) < comm_coords(2)%end .and. pos(k,2) > comm_coords(2)%end .and. nidx(2)%end /= 0) then
                         p_send_ids(-1, 1, 0, p_send_counts(-1, 1, 0)) = k
                         p_send_counts(-1, 1, 0) = p_send_counts(-1, 1, 0) + 1
                         p_send_ids(0, 1, 0, p_send_counts(0, 1, 0)) = k
                         p_send_counts(0, 1, 0) = p_send_counts(0, 1, 0) + 1
+                        if (p > 0) then
+                            ! Left top back corner
+                            if (posPrev(k, 3) > comm_coords(3)%beg .and. pos(k,3) < comm_coords(3)%beg .and. nidx(3)%beg /= 0) then
+                                p_send_ids(-1, 1, 1, p_send_counts(-1, 1, 1)) = k
+                                p_send_counts(-1, 1, 1) = p_send_counts(-1, 1, 1) + 1
+                            ! Left top front corner
+                            elseif (posPrev(k, 3) < comm_coords(3)%end .and. pos(k,3) > comm_coords(3)%end .and. nidx(3)%end /= 0) then
+                                p_send_ids(-1, 1, -1, p_send_counts(-1, 1, -1)) = k
+                                p_send_counts(-1, 1, -1) = p_send_counts(-1, 1, -1) + 1
+                            end if
+                        end if
                     end if
                 end if
-
             ! Right face
             elseif (posPrev(k,1) < comm_coords(1)%end .and. pos(k,1) > comm_coords(1)%end .and. nidx(1)%end /= 0) then
                 p_send_ids(1, 0, 0, p_send_counts(1, 0, 0)) = k
                 p_send_counts(1, 0, 0) = p_send_counts(1, 0, 0) + 1
-
                 if (n > 0) then
                     ! Right bottom corner
                     if (posPrev(k,2) > comm_coords(2)%beg .and. pos(k,2) < comm_coords(2)%beg .and. nidx(2)%beg /= 0) then
@@ -501,25 +519,74 @@ contains
                         p_send_counts(1, -1, 0) = p_send_counts(1, -1, 0) + 1
                         p_send_ids(0, -1, 0, p_send_counts(0, -1, 0)) = k
                         p_send_counts(0, -1, 0) = p_send_counts(0, -1, 0) + 1
-
+                        if (p > 0) then
+                            ! Right bottom back corner
+                            if (posPrev(k, 3) > comm_coords(3)%beg .and. pos(k,3) < comm_coords(3)%beg .and. nidx(3)%beg /= 0) then
+                                p_send_ids(1, -1, -1, p_send_counts(1, -1, -1)) = k
+                                p_send_counts(1, -1, -1) = p_send_counts(1, -1, -1) + 1
+                            ! Right bottom front corner
+                            elseif (posPrev(k, 3) < comm_coords(3)%end .and. pos(k,3) > comm_coords(3)%end .and. nidx(3)%end /= 0) then
+                                p_send_ids(1, -1, 1, p_send_counts(1, -1, 1)) = k
+                                p_send_counts(1, -1, 1) = p_send_counts(1, -1, 1) + 1
+                            end if
+                        end if
                     ! Right top corner
                     elseif (posPrev(k,2) < comm_coords(2)%end .and. pos(k,2) > comm_coords(2)%end .and. nidx(2)%end /= 0) then
                         p_send_ids(1, 1, 0, p_send_counts(1, 1, 0)) = k
                         p_send_counts(1, 1, 0) = p_send_counts(1, 1, 0) + 1
                         p_send_ids(0, 1, 0, p_send_counts(0, 1, 0)) = k
                         p_send_counts(0, 1, 0) = p_send_counts(0, 1, 0) + 1
+                        if (p > 0) then
+                            ! Right top back corner
+                            if (posPrev(k, 3) > comm_coords(3)%beg .and. pos(k,3) < comm_coords(3)%beg .and. nidx(3)%beg /= 0) then
+                                p_send_ids(1, 1, -1, p_send_counts(1, 1, -1)) = k
+                                p_send_counts(1, 1, -1) = p_send_counts(1, 1, -1) + 1
+                            ! Right top front corner
+                            elseif (posPrev(k, 3) < comm_coords(3)%end .and. pos(k,3) > comm_coords(3)%end .and. nidx(3)%end /= 0) then
+                                p_send_ids(1, 1, 1, p_send_counts(1, 1, 1)) = k
+                                p_send_counts(1, 1, 1) = p_send_counts(1, 1, 1) + 1
+                            end if
+                        end if
                     end if
                 end if
-
             ! Bottom face (corners already accounted for)
             elseif (posPrev(k,2) > comm_coords(2)%beg .and. pos(k,2) < comm_coords(2)%beg .and. nidx(2)%beg /= 0) then
                 p_send_ids(0, -1, 0, p_send_counts(0, -1, 0)) = k
                 p_send_counts(0, -1, 0) = p_send_counts(0, -1, 0) + 1
-
+                if (p > 0) then
+                    ! Bottom face back corner
+                    if (posPrev(k, 3) > comm_coords(3)%beg .and. pos(k,3) < comm_coords(3)%beg .and. nidx(3)%beg /= 0) then
+                        p_send_ids(0, -1, -1, p_send_counts(0, -1, -1)) = k
+                        p_send_counts(0, -1, -1) = p_send_counts(0, -1, -1) + 1
+                    ! Bottom face front corner
+                    elseif (posPrev(k, 3) < comm_coords(3)%end .and. pos(k,3) > comm_coords(3)%end .and. nidx(3)%end /= 0) then
+                        p_send_ids(0, -1, 1, p_send_counts(0, -1, 1)) = k
+                        p_send_counts(0, -1, 1) = p_send_counts(0, -1, 1) + 1
+                    end if
+                endif
             ! Top face (corners already accounted for)
             elseif (posPrev(k,2) < comm_coords(2)%end .and. pos(k,2) > comm_coords(2)%end .and. nidx(2)%end /= 0) then
                 p_send_ids(0, 1, 0, p_send_counts(0, 1, 0)) = k
                 p_send_counts(0, 1, 0) = p_send_counts(0, 1, 0) + 1
+                if (p > 0) then
+                    ! Top face back corner
+                    if (posPrev(k, 3) > comm_coords(3)%beg .and. pos(k,3) < comm_coords(3)%beg .and. nidx(3)%beg /= 0) then
+                        p_send_ids(0, 1, -1, p_send_counts(0, 1, -1)) = k
+                        p_send_counts(0, 1, -1) = p_send_counts(0, 1, -1) + 1
+                    ! Top face front corner
+                    elseif (posPrev(k, 3) < comm_coords(3)%end .and. pos(k,3) > comm_coords(3)%end .and. nidx(3)%end /= 0) then
+                        p_send_ids(0, 1, 1, p_send_counts(0, 1, 1)) = k
+                        p_send_counts(0, 1, 1) = p_send_counts(0, 1, 1) + 1
+                    end if
+                endif
+            ! Back face (everything else accounted for)
+            elseif (posPrev(k, 3) > comm_coords(3)%beg .and. pos(k,3) < comm_coords(3)%beg .and. nidx(3)%beg /= 0) then
+                p_send_ids(0, 0, -1, p_send_counts(0, 0, -1)) = k
+                p_send_counts(0, 0, -1) = p_send_counts(0, 0, -1) + 1
+            ! Front face (everything else accounted for)
+            elseif (posPrev(k, 3) < comm_coords(3)%end .and. pos(k,3) > comm_coords(3)%end .and. nidx(3)%end /= 0) then
+                p_send_ids(0, 0, 1, p_send_counts(0, 0, 1)) = k
+                p_send_counts(0, 0, 1) = p_send_counts(0, 0, 1) + 1
             end if
         end do
 
@@ -542,7 +609,7 @@ contains
                     if (abs(i) + abs(j) + abs(k) > 0) then
                         call MPI_Isend(p_send_counts(i,j,k), 1, MPI_INTEGER, neighbor_ranks(i,j,k), 0, MPI_COMM_WORLD, request, ierr)
                         if (p_send_counts(i,j,k) > 0) then
-                            print*, "SEND", proc_rank, p_send_counts(i,j,k)
+                            print*, "SEND", proc_rank, neighbor_ranks(i,j,k), p_send_counts(i,j,k)
                         end if
                         if (p_send_counts(i,j,k) > 0) then
                             position = 0
@@ -597,7 +664,7 @@ contains
                     if (abs(i) + abs(j) + abs(k) > 0) then
                         call MPI_recv(p_recv_counts(i,j,k), 1, MPI_INTEGER, neighbor_ranks(i,j,k), 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         if (p_recv_counts(i,j,k) > 0) then
-                            print*, "RECV", proc_rank, p_recv_counts(i,j,k)
+                            print*, "RECV", neighbor_ranks(i,j,k), proc_rank, p_recv_counts(i,j,k)
                         end if
                         if (p_recv_counts(i,j,k) > 0) then
                             position = 0

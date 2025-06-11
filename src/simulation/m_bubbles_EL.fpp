@@ -1189,7 +1189,7 @@ contains
                 mtn_pos(k, 1, dest) = x_cb(m) - intfc_rad(k,dest)
             elseif (mtn_pos(k, 1, dest) > x_cb(m + buff_size - mapCells)) then
                 call s_remove_lag_bubble(k)
-            elseif (mtn_pos(k, 1, dest) < x_cb(mapCells -buff_size - 1)) then
+            elseif (mtn_pos(k, 1, dest) < x_cb(mapCells - buff_size - 1)) then
                 call s_remove_lag_bubble(k)
             end if
 
