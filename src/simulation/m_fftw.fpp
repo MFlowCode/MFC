@@ -47,12 +47,12 @@ module m_fftw
     !! Filtered complex data in Fourier space
 
 #if defined(MFC_OpenACC)
-    !$acc declare create(real_size, cmplx_size, x_size, batch_size, Nfq)
+    $:DECLARE(create=["real_size","cmplx_size","x_size","batch_size","Nfq"])
 
     real(dp), allocatable, target :: data_real_gpu(:)
     complex(dp), allocatable, target :: data_cmplx_gpu(:)
     complex(dp), allocatable, target :: data_fltr_cmplx_gpu(:)
-!$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
+    $:DECLARE(create=["data_real_gpu","data_cmplx_gpu","data_fltr_cmplx_gpu"])
 
 #if defined(__PGI)
     integer :: fwd_plan_gpu, bwd_plan_gpu

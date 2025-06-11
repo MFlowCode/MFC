@@ -27,14 +27,14 @@ module m_hyperelastic
     !! The btensor at the cell-interior Gaussian quadrature points.
     !! These tensor is needed to be calculated once and make the code DRY.
     type(vector_field) :: btensor !<
-    !$acc declare create(btensor)
+    $:DECLARE(create=["btensor"])
 
     real(wp), allocatable, dimension(:, :) :: fd_coeff_x
     real(wp), allocatable, dimension(:, :) :: fd_coeff_y
     real(wp), allocatable, dimension(:, :) :: fd_coeff_z
-    !$acc declare create(fd_coeff_x,fd_coeff_y,fd_coeff_z)
+    $:DECLARE(create=["fd_coeff_x","fd_coeff_y", "fd_coeff_z"])
     real(wp), allocatable, dimension(:) :: Gs
-    !$acc declare create(Gs)
+    $:DECLARE(create=["Gs"])
 
 contains
 

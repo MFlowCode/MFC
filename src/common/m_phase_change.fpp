@@ -41,7 +41,7 @@ module m_phase_change
     real(wp) :: A, B, C, D
     !> @}
 
-    !$acc declare create(max_iter,pCr,TCr,mixM,lp,vp,A,B,C,D)
+    $:DECLARE(create=["max_iter","pCr","TCr","mixM","lp","vp","A","B","C","D"])
 
 contains
 
@@ -88,14 +88,14 @@ contains
         real(wp) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
         real(wp) :: TvF !< total volume fraction
 
-        !$acc declare create(pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF)
+        $:DECLARE(create=["pS","pSOV","pSSL","TS","TSOV","TSSL","TSatOV","TSatSL"])
+        $:DECLARE(create=["rhoe","dynE","rhos","rho","rM","m1","m2","MCT","TvF"])
 
         real(wp), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
+        $:DECLARE(create=["p_infOV","p_infpT","p_infSL","sk","hk","gk","ek","rhok"])
 
         !< Generic loop iterators
         integer :: i, j, k, l
-
-        !$acc declare create(p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok)
 
         ! starting equilibrium solver
         $:PARALLEL_LOOP(collapse=3, private=["p_infOV", "p_infpT", "p_infSL", &

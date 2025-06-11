@@ -30,16 +30,16 @@ module m_surface_tension
     !> @{
     type(scalar_field), allocatable, dimension(:) :: c_divs
     !> @)
-    !$acc declare create(c_divs)
+    $:DECLARE(create=["c_divs"])
 
     !> @name cell boundary reconstructed gradient components and magnitude
     !> @{
     real(wp), allocatable, dimension(:, :, :, :) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !> @}
-    !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
+    $:DECLARE(create=["gL_x","gR_x","gL_y","gR_y","gL_z","gR_z"])
 
     type(int_bounds_info) :: is1, is2, is3, iv
-    !$acc declare create(is1, is2, is3, iv)
+    $:DECLARE(create=["is1","is2","is3","iv"])
 
 contains
 

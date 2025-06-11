@@ -51,16 +51,16 @@ module m_variables_conversion
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
     real(wp), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+    $:DECLARE(create=["gammas","gs_min","pi_infs","ps_inf","cvs","qvs","qvps"])
 #endif
 
     real(wp), allocatable, dimension(:) :: Gs
     integer, allocatable, dimension(:) :: bubrs
     real(wp), allocatable, dimension(:, :) :: Res
-    !$acc declare create(bubrs, Gs, Res)
+    $:DECLARE(create=["bubrs","Gs","Res"])
 
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
-    !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
+    $:DECLARE(create=["is1b","is2b","is3b","is1e","is2e","is3e"])
 
     real(wp), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
     real(wp), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function

@@ -66,8 +66,7 @@ module m_riemann_solvers
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
-    !$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
-    !$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
+    $:DECLARE(create=["flux_rsx_vf","flux_src_rsx_vf","flux_rsy_vf","flux_src_rsy_vf","flux_rsz_vf","flux_src_rsz_vf"])
     !> @}
 
     !> The cell-boundary values of the geometrical source flux that are computed
@@ -78,7 +77,7 @@ module m_riemann_solvers
     real(wp), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsx_vf !<
     real(wp), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsy_vf !<
     real(wp), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsz_vf !<
-    !$acc declare create( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
+    $:DECLARE(create=["flux_gsrc_rsx_vf","flux_gsrc_rsy_vf","flux_gsrc_rsz_vf"])
     !> @}
 
     ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
@@ -87,17 +86,17 @@ module m_riemann_solvers
     real(wp), allocatable, dimension(:, :, :, :) :: vel_src_rsx_vf
     real(wp), allocatable, dimension(:, :, :, :) :: vel_src_rsy_vf
     real(wp), allocatable, dimension(:, :, :, :) :: vel_src_rsz_vf
-    !$acc declare create(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
+    $:DECLARE(create=["vel_src_rsx_vf","vel_src_rsy_vf","vel_src_rsz_vf"])
 
     real(wp), allocatable, dimension(:, :, :, :) :: mom_sp_rsx_vf
     real(wp), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf
     real(wp), allocatable, dimension(:, :, :, :) :: mom_sp_rsz_vf
-    !$acc declare create(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
+    $:DECLARE(create=["mom_sp_rsx_vf","mom_sp_rsy_vf","mom_sp_rsz_vf"])
 
     real(wp), allocatable, dimension(:, :, :, :) :: Re_avg_rsx_vf
     real(wp), allocatable, dimension(:, :, :, :) :: Re_avg_rsy_vf
     real(wp), allocatable, dimension(:, :, :, :) :: Re_avg_rsz_vf
-    !$acc declare create(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
+    $:DECLARE(create=["Re_avg_rsx_vf","Re_avg_rsy_vf","Re_avg_rsz_vf"])
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
@@ -105,13 +104,13 @@ module m_riemann_solvers
     type(int_bounds_info) :: isx, isy, isz
     !> @}
 
-    !$acc declare create(is1, is2, is3, isx, isy, isz)
+    $:DECLARE(create=["is1","is2","is3","isx","isy","isz"])
 
     real(wp), allocatable, dimension(:) :: Gs
-    !$acc declare create(Gs)
+    $:DECLARE(create=["Gs"])
 
     real(wp), allocatable, dimension(:, :) :: Res
-    !$acc declare create(Res)
+    $:DECLARE(create=["Res"])
 
 contains
 

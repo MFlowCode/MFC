@@ -21,7 +21,7 @@ module m_bubbles
     real(wp) :: chi_vw  !< Bubble wall properties (Ando 2010)
     real(wp) :: k_mw    !< Bubble wall properties (Ando 2010)
     real(wp) :: rho_mw  !< Bubble wall properties (Ando 2010)
-    !$acc declare create(chi_vw, k_mw, rho_mw)
+    $:DECLARE(create=["chi_vw","k_mw","rho_mw"])
 
 contains
 

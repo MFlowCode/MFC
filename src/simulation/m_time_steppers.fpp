@@ -76,7 +76,7 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare create(q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts, rhs_mv, rhs_pb, max_dt)
+    $:DECLARE(create=["q_cons_ts","q_prim_vf","q_T_sf","rhs_vf","q_prim_ts","rhs_mv","rhs_pb","max_dt"])
 
 contains
 

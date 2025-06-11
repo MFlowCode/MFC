@@ -22,13 +22,13 @@ module m_bubbles_EE
 
     real(wp), allocatable, dimension(:, :, :) :: bub_adv_src
     real(wp), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
-    !$acc declare create(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
+    $:DECLARE(create=["bub_adv_src","bub_r_src","bub_v_src","bub_p_src","bub_m_src"])
 
     type(scalar_field) :: divu !< matrix for div(u)
-    !$acc declare create(divu)
+    $:DECLARE(create=["divu"])
 
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
-    !$acc declare create(rs, vs, ms, ps)
+    $:DECLARE(create=["rs","vs","ms","ps"])
 
 contains
 

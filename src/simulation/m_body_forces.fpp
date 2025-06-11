@@ -23,7 +23,7 @@ module m_body_forces
               s_finalize_body_forces_module
 
     real(wp), allocatable, dimension(:, :, :) :: rhoM
-    !$acc declare create(rhoM)
+    $:DECLARE(create=["rhoM"])
 
 contains
 

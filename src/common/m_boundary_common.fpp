@@ -21,7 +21,7 @@ module m_boundary_common
     implicit none
 
     type(scalar_field), dimension(:, :), allocatable :: bc_buffers
-    !$acc declare create(bc_buffers)
+    $:DECLARE(create=["bc_buffers"])
 
     real(wp) :: bcxb, bcxe, bcyb, bcye, bczb, bcze
 

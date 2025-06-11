@@ -4,6 +4,7 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'directive_macros.fpp'
 
 !> @brief The module contains all of the parameters describing the program
 !!              logistics, the computational domain and the simulation algorithm.
@@ -53,7 +54,7 @@ module m_global_parameters
     logical :: cyl_coord
     integer :: grid_geometry
     !> @}
-    !$acc declare create(cyl_coord, grid_geometry)
+    $:DECLARE(create=["cyl_coord","grid_geometry"])
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
@@ -76,7 +77,7 @@ module m_global_parameters
 
     real(wp) :: dt !< Size of the time-step
 
-    !$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
+    $:DECLARE(create=["x_cb","y_cb","z_cb","x_cc","y_cc","z_cc","dx","dy","dz","dt","m","n","p"])
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number
     !! of time-step iterations between successive solution backups, respectively
@@ -90,7 +91,7 @@ module m_global_parameters
     real(wp) :: t_stop, t_save, cfl_target
     integer :: n_start
     !> @}
-    !$acc declare create(cfl_target)
+    $:DECLARE(create=["cfl_target"])
 
     logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
 
@@ -158,7 +159,7 @@ module m_global_parameters
     logical :: bulk_stress   !< Bulk stresses
     logical :: cont_damage   !< Continuum damage modeling
 
-    !$acc declare create(chemistry)
+    $:DECLARE(create=["chemistry"])
 
     logical :: bodyForces
     logical :: bf_x, bf_y, bf_z !< body force toggle in three directions
@@ -169,24 +170,27 @@ module m_global_parameters
         #:endfor
     #:endfor
     real(wp), dimension(3) :: accel_bf
-    !$acc declare create(accel_bf)
+    $:DECLARE(create=["accel_bf"])
 
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity)
+        $:DECLARE(create=["num_dims","num_vels","weno_polyn","weno_order"])
+        $:DECLARE(create=["weno_num_stencils","num_fluids","wenojs"])
+        $:DECLARE(create=["mapped_weno", "wenoz","teno","wenoz_q","mhd","relativity"])
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage)
+    $:DECLARE(create=["mpp_lim","model_eqns","mixture_err","alt_soundspeed"])
+    $:DECLARE(create=["avg_state","mp_weno","weno_eps","teno_CT","hypoelasticity"])
+    $:DECLARE(create=["hyperelasticity","hyper_model","elasticity","low_Mach"])
+    $:DECLARE(create=["viscous","shear_stress","bulk_stress","cont_damage"])
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
     real(wp) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
     real(wp) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
 
-!#ifndef _CRAYFTN
-!$acc declare create(relax, relax_model, palpha_eps,ptgalpha_eps)
-!#endif
+    $:DECLARE(create=["relax", "relax_model", "palpha_eps","ptgalpha_eps"])
 
     integer :: num_bc_patches
     logical :: bc_io
@@ -196,6 +200,10 @@ module m_global_parameters
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
+    $:DECLARE(create=["bc_x%vb1", "bc_x%vb2", "bc_x%vb3", "bc_x%ve1", "bc_x%ve2", "bc_x%ve3"])
+    $:DECLARE(create=["bc_y%vb1", "bc_y%vb2", "bc_y%vb3", "bc_y%ve1", "bc_y%ve2", "bc_y%ve3"])
+    $:DECLARE(create=["bc_z%vb1", "bc_z%vb2", "bc_z%vb3", "bc_z%ve1", "bc_z%ve2", "bc_z%ve3"])
+
     type(bounds_info) :: x_domain, y_domain, z_domain
     real(wp) :: x_a, y_a, z_a
     real(wp) :: x_b, y_b, z_b
@@ -248,19 +256,20 @@ module m_global_parameters
     integer :: c_idx                                   !< Index of color function
     integer :: damage_idx                              !< Index of damage state variable (D) for continuum damage model
     !> @}
-
-    !$acc declare create(bub_idx)
+    $:DECLARE(create=["sys_size","E_idx","n_idx","bub_idx","alf_idx","gamma_idx"])
+    $:DECLARE(create=["pi_inf_idx","B_idx","stress_idx","xi_idx","b_size"])
+    $:DECLARE(create=["tensor_size","species_idx","c_idx"])
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
     ! Stands for "InDices With INTerior".
     type(int_bounds_info) :: idwint(1:3)
-    !$acc declare create(idwint)
+    $:DECLARE(create=["idwint"])
 
     ! Cell Indices for the entire (local) domain. In simulation and post_process,
     ! this includes the buffer region. idwbuff and idwint are the same otherwise.
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
-    !$acc declare create(idwbuff)
+    $:DECLARE(create=["idwbuff"])
 
     !> @name The number of fluids, along with their identifying indexes, respectively,
     !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
@@ -270,7 +279,7 @@ module m_global_parameters
     integer, allocatable, dimension(:, :) :: Re_idx
     !> @}
 
-    !$acc declare create(Re_size, Re_idx)
+    $:DECLARE(create=["Re_size","Re_idx"])
 
     ! The WENO average (WA) flag regulates whether the calculation of any cell-
     ! average spatial derivatives is carried out in each cell by utilizing the
@@ -281,7 +290,7 @@ module m_global_parameters
     real(wp) :: wa_flg
     !> @{
 
-    !$acc declare create(wa_flg)
+    $:DECLARE(create=["wa_flg"])
 
     !> @name The coordinate direction indexes and flags (flg), respectively, for which
     !! the configurations will be determined with respect to a working direction
@@ -293,14 +302,15 @@ module m_global_parameters
     integer, dimension(3) :: dir_idx_tau !!used for hypoelasticity=true
     !> @}
 
-    !$acc declare create(dir_idx, dir_flg, dir_idx_tau)
+    $:DECLARE(create=["dir_idx","dir_flg","dir_idx_tau"])
 
     integer :: buff_size !<
     !! The number of cells that are necessary to be able to store enough boundary
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
-    !$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx, B_idx, c_idx)
+    $:DECLARE(create=["buff_size"])
+
 
     integer :: shear_num !! Number of shear stress components
     integer, dimension(3) :: shear_indices !<
@@ -311,7 +321,7 @@ module m_global_parameters
     !! Indices of shear stress components to reflect for boundary conditions.
     !! Size: (1:3, 1:shear_BC_flip_num) for (x/y/z, [indices])
 
-    !$acc declare create(shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices)
+    $:DECLARE(create=["shear_num","shear_indices","shear_BC_flip_num","shear_BC_flip_indices"])
 
     ! END: Simulation Algorithm Parameters
 
@@ -322,10 +332,6 @@ module m_global_parameters
     !! in the flow. These include the stiffened gas equation of state parameters,
     !! the Reynolds numbers and the Weber numbers.
 
-    !$acc declare create(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
-    !$acc declare create(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
-    !$acc declare create(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
-
     integer :: fd_order !<
     !! The order of the finite-difference (fd) approximations of the first-order
     !! derivatives that need to be evaluated when the CoM or flow probe data
@@ -335,7 +341,7 @@ module m_global_parameters
     !! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
     !! it is a measure of the half-size of the finite-difference stencil for the
     !! selected order of accuracy.
-    !$acc declare create(fd_order,fd_number)
+    $:DECLARE(create=["fd_order","fd_number"])
 
     logical :: probe_wrt
     logical :: integral_wrt
@@ -348,7 +354,7 @@ module m_global_parameters
     !> @{
     real(wp) :: rhoref, pref
     !> @}
-    !$acc declare create(rhoref, pref)
+    $:DECLARE(create=["rhoref","pref"])
 
     !> @name Immersed Boundaries
     !> @{
@@ -363,7 +369,7 @@ module m_global_parameters
     !! the maximum allowable number of patches, num_patches_max, may be changed
     !! in the module m_derived_types.f90.
 
-    !$acc declare create(ib, num_ibs, patch_ib)
+    $:DECLARE(create=["ib","num_ibs","patch_ib"])
     !> @}
 
     !> @name Bubble modeling
@@ -378,26 +384,31 @@ module m_global_parameters
     real(wp) :: Ca       !< Cavitation number
     real(wp) :: Web      !< Weber number
     real(wp) :: Re_inv   !< Inverse Reynolds number
+    $:DECLARE(create=["R0ref","Ca","Web","Re_inv"])
 
     real(wp), dimension(:), allocatable :: weight !< Simpson quadrature weights
     real(wp), dimension(:), allocatable :: R0     !< Bubble sizes
     real(wp), dimension(:), allocatable :: V0     !< Bubble velocities
-    !$acc declare create(weight, R0, V0)
+    $:DECLARE(create=["weight","R0","V0"])
 
     logical :: bubbles_euler      !< Bubbles euler on/off
     logical :: polytropic   !< Polytropic  switch
     logical :: polydisperse !< Polydisperse bubbles
+    $:DECLARE(create=["bubbles_euler","polytropic","polydisperse"])
+
     logical :: adv_n        !< Solve the number density equation and compute alpha from number density
     logical :: adap_dt      !< Adaptive step size control
     real(wp) :: adap_dt_tol !< Tolerance to control adaptive step size
+    $:DECLARE(create=["adv_n","adap_dt","adap_dt_tol"])
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
+    $:DECLARE(create=["bubble_model","thermal"])
 
     real(wp), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
-    !$acc declare create(ptil)
 
     real(wp) :: poly_sigma  !< log normal sigma for polydisperse PDF
+    $:DECLARE(create=["ptil", "poly_sigma"])
 
     logical :: qbmm      !< Quadrature moment method
     integer, parameter :: nmom = 6 !< Number of carried moments per R0 location
@@ -406,38 +417,39 @@ module m_global_parameters
     integer :: R0_type
 
     real(wp) :: pi_fac   !< Factor for artificial pi_inf
+    $:DECLARE(create=["qbmm", "nmomsp","nmomtot","R0_type","pi_fac"])
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(nb)
+        $:DECLARE(create=["nb"])
     #:endif
-
-    !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles_euler, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, pi_fac)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
-    !$acc declare create(mom_sp, mom_3d)
+    $:DECLARE(create=["mom_sp","mom_3d"])
 
     !> @}
 
     type(chemistry_parameters) :: chem_params
-    !$acc declare create(chem_params)
+    $:DECLARE(create=["chem_params"])
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
 
     real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_vl, k_nl, cp_n, cp_v
-    !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_vl, k_nl, cp_n, cp_v)
+    $:DECLARE(create=["R_n","R_v","phi_vn","phi_nv","Pe_c","Tw",])
+    $:DECLARE(create=["pv","M_n", "M_v","k_vl","k_nl","cp_n","cp_v"])
 
     real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    !$acc declare create( k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
+    $:DECLARE(create=["k_n","k_v","pb0","mass_n0","mass_v0","Pe_T"])
+    $:DECLARE(create=["Re_trans_T","Re_trans_c","Im_trans_T","Im_trans_c","omegaN"])
 
     real(wp) :: mul0, ss, gamma_v, mu_v
     real(wp) :: gamma_m, gamma_n, mu_n
     real(wp) :: gam
     !> @}
 
-    !$acc declare create(mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+    $:DECLARE(create=["mul0","ss","gamma_v","mu_v","gamma_m","gamma_n","mu_n","gam"])
 
     !> @name Acoustic acoustic_source parameters
     !> @{
@@ -445,14 +457,14 @@ module m_global_parameters
     type(acoustic_parameters), dimension(num_probes_max) :: acoustic !< Acoustic source parameters
     integer :: num_source !< Number of acoustic sources
     !> @}
-    !$acc declare create(acoustic_source, acoustic, num_source)
+    $:DECLARE(create=["acoustic_source","acoustic","num_source"])
 
     !> @name Surface tension parameters
     !> @{
 
     real(wp) :: sigma
     logical :: surface_tension
-    !$acc declare create(sigma, surface_tension)
+    $:DECLARE(create=["sigma","surface_tension"])
     !> @}
 
     integer :: momxb, momxe
@@ -463,11 +475,13 @@ module m_global_parameters
     integer :: strxb, strxe
     integer :: chemxb, chemxe
     integer :: xibeg, xiend
-    !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe, chemxb, chemxe)
-    !$acc declare create(xibeg,xiend)
+    $:DECLARE(create=["momxb","momxe","advxb","advxe","contxb","contxe"])
+    $:DECLARE(create=["intxb","intxe", "bubxb","bubxe"])
+    $:DECLARE(create=["strxb","strxe","chemxb","chemxe"])
+    $:DECLARE(create=["xibeg","xiend"])
 
     real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+    $:DECLARE(create=["gammas","gs_min","pi_infs","ps_inf","cvs","qvs","qvps"])
 
     real(wp) :: mytime       !< Current simulation time
     real(wp) :: finaltime    !< Final simulation time
@@ -478,25 +492,25 @@ module m_global_parameters
 
     type(pres_field), allocatable, dimension(:) :: mv_ts
 
-    !$acc declare create(pb_ts, mv_ts)
+    $:DECLARE(create=["pb_ts","mv_ts"])
 
     !> @name lagrangian subgrid bubble parameters
     !> @{!
     logical :: bubbles_lagrange                         !< Lagrangian subgrid bubble model switch
     type(bubbles_lagrange_parameters) :: lag_params     !< Lagrange bubbles' parameters
-    !$acc declare create(bubbles_lagrange, lag_params)
+    $:DECLARE(create=["bubbles_lagrange","lag_params"])
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
     logical :: powell !< Powell‐correction for div B = 0
-    !$acc declare create(Bx0, powell)
+    $:DECLARE(create=["Bx0","powell"])
 
     !> @name Continuum damage model parameters
     !> @{!
     real(wp) :: tau_star        !< Stress threshold for continuum damage modeling
     real(wp) :: cont_damage_s   !< Exponent s for continuum damage modeling
     real(wp) :: alpha_bar       !< Damage rate factor for continuum damage modeling
-    !$acc declare create(tau_star, cont_damage_s, alpha_bar)
+    $:DECLARE(create=["tau_star","cont_damage_s","alpha_bar"])
     !> @}
 
 contains

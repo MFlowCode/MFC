@@ -36,15 +36,15 @@ module m_ibm
     type(integer_field), public :: ib_markers
     type(levelset_field), public :: levelset
     type(levelset_norm_field), public :: levelset_norm
-    !$acc declare create(ib_markers, levelset, levelset_norm)
+    $:DECLARE(create=["ib_markers","levelset","levelset_norm"])
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
     type(ghost_point), dimension(:), allocatable :: inner_points
-    !$acc declare create(ghost_points, inner_points)
+    $:DECLARE(create=["ghost_points","inner_points"])
 
     integer :: num_gps !< Number of ghost points
     integer :: num_inner_gps !< Number of ghost points
-    !$acc declare create(gp_layers, num_gps, num_inner_gps)
+    $:DECLARE(create=["gp_layers","num_gps","num_inner_gps"])
 
 contains
 

@@ -49,6 +49,7 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsx_vf
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
+    $:DECLARE(create=["q_prim_rsx_vf","q_prim_rsy_vf","q_prim_rsz_vf"])
 
     type(scalar_field), allocatable, dimension(:) :: F_rs_vf, F_src_rs_vf !<
 
@@ -58,6 +59,7 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :, :) :: F_rsx_vf, F_src_rsx_vf !<
     real(wp), allocatable, dimension(:, :, :, :) :: F_rsy_vf, F_src_rsy_vf !<
     real(wp), allocatable, dimension(:, :, :, :) :: F_rsz_vf, F_src_rsz_vf !<
+    $:DECLARE(create=["F_rsx_vf","F_src_rsx_vf","F_rsy_vf","F_src_rsy_vf","F_rsz_vf","F_src_rsz_vf"])
 
     !! There is a CCE bug that is causing some subset of these variables to interfere
     !! with variables of the same name in m_riemann_solvers.fpp, and giving this versions
@@ -68,13 +70,14 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsx_vf_l, flux_src_rsx_vf_l !<
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsy_vf_l, flux_src_rsy_vf_l
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_l, flux_src_rsz_vf_l
+    $:DECLARE(create=["flux_rsx_vf_l","flux_src_rsx_vf_l","flux_rsy_vf_l","flux_src_rsy_vf_l","flux_rsz_vf_l","flux_src_rsz_vf_l"])
 
     real(wp) :: c           !< Cell averaged speed of sound
     real(wp), dimension(2) :: Re          !< Cell averaged Reynolds numbers
-    !$acc declare create(c, Re)
+    $:DECLARE(create=["c","Re"])
 
     real(wp) :: dpres_ds !< Spatial derivatives in s-dir of pressure
-    !$acc declare create(dpres_ds)
+    $:DECLARE(create=["dpres_ds"])
 
     real(wp), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
 
@@ -94,18 +97,21 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynomial interpolant coefficients in y-dir
     real(wp), allocatable, dimension(:, :, :) :: pi_coef_z !< Polynomial interpolant coefficients in z-dir
 
+    $:DECLARE(create=["ds","fd_coef_x","fd_coef_y","fd_coef_z","pi_coef_x","pi_coef_y","pi_coef_z"])
+
     !! The first dimension of the array identifies the polynomial, the
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the location of the CBC.
 
     type(int_bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
-    !$acc declare create(is1, is2, is3)
+    $:DECLARE(create=["is1","is2","is3"])
 
     integer :: dj
     integer :: bcxb, bcxe, bcyb, bcye, bczb, bcze
     integer :: cbc_dir, cbc_loc
     integer :: flux_cbc_index
-    !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc, flux_cbc_index)
+    $:DECLARE(create=["dj","bcxb","bcxe","bcyb","bcye","bczb","bcze"])
+    $:DECLARE(create=["cbc_dir", "cbc_loc","flux_cbc_index"])
 
     !! GRCBC inputs for subsonic inflow and outflow conditions consisting of
     !! inflow velocities, pressure, density and void fraction as well as
@@ -114,14 +120,9 @@ module m_cbc
     real(wp), allocatable, dimension(:) :: pres_in, pres_out, Del_in, Del_out
     real(wp), allocatable, dimension(:, :) :: vel_in, vel_out
     real(wp), allocatable, dimension(:, :) :: alpha_rho_in, alpha_in
-    !$acc declare create(pres_in, pres_out, Del_in, Del_out)
-    !$acc declare create(vel_in, vel_out)
-    !$acc declare create(alpha_rho_in, alpha_in)
-
-    !$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf_l, flux_src_rsx_vf_l, &
-    !$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf_l, flux_src_rsy_vf_l, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf_l, flux_src_rsz_vf_l, &
-    !$acc                 ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
-    !$acc                 pi_coef_x,pi_coef_y,pi_coef_z)
+    $:DECLARE(create=["pres_in","pres_out","Del_in","Del_out"])
+    $:DECLARE(create=["vel_in","vel_out"])
+    $:DECLARE(create=["alpha_rho_in","alpha_in"])
 
 contains
 

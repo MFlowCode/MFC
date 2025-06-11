@@ -25,10 +25,10 @@ module m_viscous
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
-    !$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)
+    $:DECLARE(create=["is1_viscous","is2_viscous","is3_viscous","iv"])
 
     real(wp), allocatable, dimension(:, :) :: Res_viscous
-    !$acc declare create(Res_viscous)
+    $:DECLARE(create=["Res_viscous"])
 
 contains
 

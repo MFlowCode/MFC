@@ -55,13 +55,14 @@ module m_data_output
     real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     real(wp), public, allocatable, dimension(:, :) :: c_mass
-    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+    $:DECLARE(create=["icfl_sf","vcfl_sf","ccfl_sf","Rc_sf"])
 
     real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
     real(wp) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
     real(wp) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
-    !$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
+    $:DECLARE(create=["icfl_max_loc","icfl_max_glb","vcfl_max_loc","vcfl_max_glb"])
+    $:DECLARE(create=["ccfl_max_loc","ccfl_max_glb","Rc_min_loc","Rc_min_glb"])
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
     !> @{

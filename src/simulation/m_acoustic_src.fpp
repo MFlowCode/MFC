@@ -24,41 +24,43 @@ module m_acoustic_src
     private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
 
     integer, allocatable, dimension(:) :: pulse, support
-    !$acc declare create(pulse, support)
+    $:DECLARE(create=["pulse","support"])
 
     logical, allocatable, dimension(:) :: dipole
-    !$acc declare create(dipole)
+    $:DECLARE(create=["dipole"])
 
     real(wp), allocatable, target, dimension(:, :) :: loc_acoustic
-    !$acc declare create(loc_acoustic)
+    $:DECLARE(create=["loc_acoustic"])
 
-    real(wp), allocatable, dimension(:) :: mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay
-    !$acc declare create(mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
+    real(wp), allocatable, dimension(:) :: mag, length, height, wavelength, frequency
+    real(wp), allocatable, dimension(:) :: gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay
+    $:DECLARE(create=["mag","length","height","wavelength","frequency"])
+    $:DECLARE(create=["gauss_sigma_dist","gauss_sigma_time","npulse","dir","delay"])
 
     real(wp), allocatable, dimension(:) :: foc_length, aperture
-    !$acc declare create(foc_length, aperture)
+    $:DECLARE(create=["foc_length","aperture"])
 
     real(wp), allocatable, dimension(:) :: element_spacing_angle, element_polygon_ratio, rotate_angle
-    !$acc declare create(element_spacing_angle, element_polygon_ratio, rotate_angle)
+    $:DECLARE(create=["element_spacing_angle","element_polygon_ratio","rotate_angle"])
 
     real(wp), allocatable, dimension(:) :: bb_bandwidth, bb_lowest_freq
-    !$acc declare create(bb_bandwidth, bb_lowest_freq)
+    $:DECLARE(create=["bb_bandwidth","bb_lowest_freq"])
 
     integer, allocatable, dimension(:) :: num_elements, element_on, bb_num_freq
-    !$acc declare create(num_elements, element_on, bb_num_freq)
+    $:DECLARE(create=["num_elements","element_on","bb_num_freq"])
 
     !> @name Acoustic source terms
     !> @{
     real(wp), allocatable, dimension(:, :, :) :: mass_src, e_src
     real(wp), allocatable, dimension(:, :, :, :) :: mom_src
     !> @}
-    !$acc declare create(mass_src, e_src, mom_src)
+    $:DECLARE(create=["mass_src","e_src","mom_src"])
 
     integer, dimension(:), allocatable :: source_spatials_num_points !< Number of non-zero source grid points for each source
-    !$acc declare create(source_spatials_num_points)
+    $:DECLARE(create=["source_spatials_num_points"])
 
     type(source_spatial_type), dimension(:), allocatable :: source_spatials !< Data of non-zero source grid points for each source
-    !$acc declare create(source_spatials)
+    $:DECLARE(create=["source_spatials"])
 
 contains
 

@@ -33,20 +33,26 @@ module m_bubbles_EL
     real(wp), allocatable, dimension(:) :: bub_R0            !< Initial bubble radius
     real(wp), allocatable, dimension(:) :: Rmax_stats        !< Maximum radius
     real(wp), allocatable, dimension(:) :: Rmin_stats        !< Minimum radius
+    $:DECLARE(create=["lag_id", "bub_R0", "Rmax_stats", "Rmin_stats"])
+
     real(wp), allocatable, dimension(:) :: gas_mg            !< Bubble's gas mass
     real(wp), allocatable, dimension(:) :: gas_betaT         !< heatflux model (Preston et al., 2007)
     real(wp), allocatable, dimension(:) :: gas_betaC         !< massflux model (Preston et al., 2007)
     real(wp), allocatable, dimension(:) :: bub_dphidt        !< subgrid velocity potential (Maeda & Colonius, 2018)
+    $:DECLARE(create=["gas_mg", "gas_betaT", "gas_betaC", "bub_dphidt"])
+
     !(nBub, 1 -> actual val or 2 -> temp val)
     real(wp), allocatable, dimension(:, :) :: gas_p          !< Pressure in the bubble
     real(wp), allocatable, dimension(:, :) :: gas_mv         !< Vapor mass in the bubble
     real(wp), allocatable, dimension(:, :) :: intfc_rad      !< Bubble radius
     real(wp), allocatable, dimension(:, :) :: intfc_vel      !< Velocity of the bubble interface
+    $:DECLARE(create=["gas_p", "gas_mv", "intfc_rad", "intfc_vel"])
     !(nBub, 1-> x or 2->y or 3 ->z, 1 -> actual or 2 -> temporal val)
     real(wp), allocatable, dimension(:, :, :) :: mtn_pos     !< Bubble's position
     real(wp), allocatable, dimension(:, :, :) :: mtn_posPrev !< Bubble's previous position
     real(wp), allocatable, dimension(:, :, :) :: mtn_vel     !< Bubble's velocity
     real(wp), allocatable, dimension(:, :, :) :: mtn_s       !< Bubble's computational cell position in real format
+    $:DECLARE(create=["mtn_pos", "mtn_posPrev", "mtn_vel", "mtn_s"])
     !(nBub, 1-> x or 2->y or 3 ->z, time-stage)
     real(wp), allocatable, dimension(:, :) :: intfc_draddt   !< Time derivative of bubble's radius
     real(wp), allocatable, dimension(:, :) :: intfc_dveldt   !< Time derivative of bubble's interface velocity
@@ -54,21 +60,18 @@ module m_bubbles_EL
     real(wp), allocatable, dimension(:, :) :: gas_dmvdt      !< Time derivative of the vapor mass in the bubble
     real(wp), allocatable, dimension(:, :, :) :: mtn_dposdt  !< Time derivative of the bubble's position
     real(wp), allocatable, dimension(:, :, :) :: mtn_dveldt  !< Time derivative of the bubble's velocity
-
-    !$acc declare create(lag_id, bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt,       &
-    !$acc gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
-    !$acc gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt)
+    $:DECLARE(create=["intfc_draddt", "intfc_dveldt", "gas_dpdt", "gas_dmvdt", "mtn_dposdt", "mtn_dveldt"])
 
     integer, private :: lag_num_ts                                  !<  Number of time stages in the time-stepping scheme
 
-    !$acc declare create(lag_num_ts)
+    $:DECLARE(create=["lag_num_ts"])
 
     integer :: nBubs                            !< Number of bubbles in the local domain
     real(wp) :: Rmax_glb, Rmin_glb       !< Maximum and minimum bubbe size in the local domain
     type(vector_field) :: q_beta                !< Projection of the lagrangian particles in the Eulerian framework
     integer :: q_beta_idx                       !< Size of the q_beta vector field
 
-    !$acc declare create(nBubs, Rmax_glb, Rmin_glb, q_beta, q_beta_idx)
+    $:DECLARE(create=["nBubs","Rmax_glb","Rmin_glb","q_beta","q_beta_idx"])
 
 contains
 

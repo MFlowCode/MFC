@@ -75,13 +75,13 @@ module m_rhs
     !! conservative variables, which are located in q_cons_vf, at cell-interior
     !! Gaussian quadrature points (QP).
     type(vector_field) :: q_cons_qp !<
-    !$acc declare create(q_cons_qp)
+    $:DECLARE(create=["q_cons_qp"])
 
     !! The primitive variables at cell-interior Gaussian quadrature points. These
     !! are calculated from the conservative variables and gradient magnitude (GM)
     !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
     type(vector_field) :: q_prim_qp !<
-    !$acc declare create(q_prim_qp)
+    $:DECLARE(create=["q_prim_qp"])
 
     !> @name The first-order spatial derivatives of the primitive variables at cell-
     !! interior Gaussian quadrature points. These are WENO-reconstructed from
@@ -90,7 +90,7 @@ module m_rhs
     !! of the primitive variables, located in qK_prim_n, where K = L or R.
     !> @{
     type(vector_field), allocatable, dimension(:) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
-    !$acc declare create(dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
+    $:DECLARE(create=["dq_prim_dx_qp","dq_prim_dy_qp","dq_prim_dz_qp"])
     !> @}
 
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
@@ -100,26 +100,26 @@ module m_rhs
     !> @{
     type(vector_field), allocatable, dimension(:) :: dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n
     type(vector_field), allocatable, dimension(:) :: dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n
-    !$acc declare create(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
-    !$acc declare create(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
+    $:DECLARE(create=["dqL_prim_dx_n","dqL_prim_dy_n","dqL_prim_dz_n"])
+    $:DECLARE(create=["dqR_prim_dx_n","dqR_prim_dy_n","dqR_prim_dz_n"])
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
-    !$acc declare create(tau_Re_vf)
+    $:DECLARE(create=["tau_Re_vf"])
 
     type(vector_field) :: gm_alpha_qp  !<
     !! The gradient magnitude of the volume fractions at cell-interior Gaussian
     !! quadrature points. gm_alpha_qp is calculated from individual first-order
     !! spatial derivatives located in dq_prim_ds_qp.
 
-    !$acc declare create(gm_alpha_qp)
+    $:DECLARE(create=["gm_alpha_qp"])
 
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
     !! average gradient magnitude of volume fractions, located in gm_alpha_qp.
     !> @{
     type(vector_field), allocatable, dimension(:) :: gm_alphaL_n
     type(vector_field), allocatable, dimension(:) :: gm_alphaR_n
-    !$acc declare create(gm_alphaL_n, gm_alphaR_n)
+    $:DECLARE(create=["gm_alphaL_n","gm_alphaR_n"])
     !> @}
 
     !> @name The cell-boundary values of the fluxes (src - source, gsrc - geometrical
@@ -129,44 +129,44 @@ module m_rhs
     type(vector_field), allocatable, dimension(:) :: flux_n
     type(vector_field), allocatable, dimension(:) :: flux_src_n
     type(vector_field), allocatable, dimension(:) :: flux_gsrc_n
-    !$acc declare create(flux_n, flux_src_n, flux_gsrc_n)
+    $:DECLARE(create=["flux_n","flux_src_n","flux_gsrc_n"])
     !> @}
 
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
-    !$acc declare create(qL_prim, qR_prim)
+    $:DECLARE(create=["qL_prim","qR_prim"])
 
     type(int_bounds_info) :: iv !< Vector field indical bounds
-    !$acc declare create(iv)
+    $:DECLARE(create=["iv"])
 
     !> @name Indical bounds in the x-, y- and z-directions
     !> @{
     type(int_bounds_info) :: irx, iry, irz
-    !$acc declare create(irx, iry, irz)
+    $:DECLARE(create=["irx","iry","irz"])
 
     type(int_bounds_info) :: is1, is2, is3
-    !$acc declare create(is1, is2, is3)
+    $:DECLARE(create=["is1","is2","is3"])
 
     !> @name Saved fluxes for testing
     !> @{
     type(scalar_field) :: alf_sum
     !> @}
-    !$acc declare create(alf_sum)
+    $:DECLARE(create=["alf_sum"])
 
     real(wp), allocatable, dimension(:, :, :) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
     real(wp), allocatable, dimension(:, :, :, :) :: qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf
     real(wp), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf
-    !$acc declare create(blkmod1, blkmod2, alpha1, alpha2, Kterm)
-    !$acc declare create(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
-    !$acc declare create(dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
+    $:DECLARE(create=["blkmod1","blkmod2","alpha1","alpha2","Kterm"])
+    $:DECLARE(create=["qL_rsx_vf","qL_rsy_vf","qL_rsz_vf","qR_rsx_vf","qR_rsy_vf","qR_rsz_vf"])
+    $:DECLARE(create=["dqL_rsx_vf","dqL_rsy_vf","dqL_rsz_vf","dqR_rsx_vf","dqR_rsy_vf","dqR_rsz_vf"])
 
     real(wp), allocatable, dimension(:) :: gamma_min, pres_inf
-    !$acc declare create(gamma_min, pres_inf)
+    $:DECLARE(create=["gamma_min","pres_inf"])
 
     real(wp), allocatable, dimension(:, :) :: Res
-    !$acc declare create(Res)
+    $:DECLARE(create=["Res"])
 
     real(wp), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
-    !$acc declare create(nbub)
+    $:DECLARE(create=["nbub"])
 
 contains
 

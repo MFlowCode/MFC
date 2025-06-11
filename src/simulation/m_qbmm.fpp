@@ -26,21 +26,21 @@ module m_qbmm
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff, s_compute_qbmm_rhs
 
     real(wp), allocatable, dimension(:, :, :, :, :) :: momrhs
-    !$acc declare create(momrhs)
+    $:DECLARE(create=["momrhs"])
 
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: nterms = ${nterms}$
     #:else
         integer :: nterms
-        !$acc declare create(nterms)
+        $:DECLARE(create=["nterms"])
     #:endif
 
     type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
-    !$acc declare create(is1_qbmm, is2_qbmm, is3_qbmm)
+    $:DECLARE(create=["is1_qbmm","is2_qbmm","is3_qbmm"])
 
     integer, allocatable, dimension(:) :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
-    !$acc declare create(bubrs, bubmoms)
+    $:DECLARE(create=["bubrs","bubmoms"])
 
 contains
 

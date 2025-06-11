@@ -43,6 +43,7 @@ module m_weno
     !> @{
     real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
     !> @}
+    $:DECLARE(create=["v_rs_ws_x","v_rs_ws_y","v_rs_ws_z"])
 
     ! WENO Coefficients
 
@@ -59,6 +60,8 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
     !> @}
+    $:DECLARE(create=["poly_coef_cbL_x","poly_coef_cbL_y","poly_coef_cbL_z"])
+    $:DECLARE(create=["poly_coef_cbR_x","poly_coef_cbR_y","poly_coef_cbR_z"])
 
     !> @name The ideal weights at the left and the right cell-boundaries and at the
     !! left and the right quadrature points, in x-, y- and z-directions. Note
@@ -73,6 +76,7 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_y
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_z
     !> @}
+    $:DECLARE(create=["d_cbL_x","d_cbL_y","d_cbL_z","d_cbR_x","d_cbR_y","d_cbR_z"])
 
     !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
     !! that the first array dimension identifies the smoothness indicator, the
@@ -83,27 +87,22 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_y
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_z
     !> @}
+    $:DECLARE(create=["beta_coef_x","beta_coef_y","beta_coef_z"])
 
     ! END: WENO Coefficients
 
     integer :: v_size !< Number of WENO-reconstructed cell-average variables
-    !$acc declare create(v_size)
+    $:DECLARE(create=["v_size"])
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
     type(int_bounds_info) :: is1_weno, is2_weno, is3_weno
-    !$acc declare create(is1_weno, is2_weno, is3_weno)
+    $:DECLARE(create=["is1_weno","is2_weno","is3_weno"])
     !
     !> @}
 
     real(wp) :: test
-    !$acc declare create(test)
-
-    !$acc declare create( &
-    !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
-    !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
-    !$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
-    !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z)
+    $:DECLARE(create=["test"])
 
 contains
 

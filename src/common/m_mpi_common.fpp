@@ -1,5 +1,6 @@
 
 #:include 'macros.fpp'
+#:include 'directive_macros.fpp'
 
 !> @brief The module serves as a proxy to the parameters and subroutines
 !!          available in the MPI implementation's MPI module. Specifically,
@@ -25,7 +26,7 @@ module m_mpi_common
     implicit none
 
     integer, private :: err_code, ierr, v_size !<
-    !$acc declare create(v_size)
+    $:DECLARE(create=["v_size"])
     !! Generic flags used to identify and report MPI errors
 
     real(wp), private, allocatable, dimension(:), target :: buff_send !<
@@ -38,10 +39,10 @@ module m_mpi_common
     !! average primitive variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
-    !$acc declare create(buff_send, buff_recv)
+    $:DECLARE(create=["buff_send","buff_recv"])
 
     integer :: halo_size, nVars
-    !$acc declare create(halo_size, nVars)
+    $:DECLARE(create=["halo_size","nVars"])
 
 contains
 

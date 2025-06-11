@@ -25,12 +25,12 @@ module m_mhd
     real(wp), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
     real(wp), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
     real(wp), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
-    !$acc declare create(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
+    $:DECLARE(create=["du_dx","du_dy","du_dz","dv_dx","dv_dy","dv_dz","dw_dx","dw_dy","dw_dz"])
 
     real(wp), allocatable, dimension(:, :) :: fd_coeff_x_h
     real(wp), allocatable, dimension(:, :) :: fd_coeff_y_h
     real(wp), allocatable, dimension(:, :) :: fd_coeff_z_h
-    !$acc declare create(fd_coeff_x_h,fd_coeff_y_h,fd_coeff_z_h)
+    $:DECLARE(create=["fd_coeff_x_h","fd_coeff_y_h","fd_coeff_z_h"])
 
 contains
 
