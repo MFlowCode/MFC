@@ -1,4 +1,5 @@
 #:include 'macros.fpp'
+#:include 'directive_macros.fpp'
 !>
 !! @file m_helper.f90
 !! @brief Contains module m_helper
@@ -43,7 +44,7 @@ contains
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
     pure subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
-        !$acc routine seq
+        $:ROUTINE()
         real(wp), intent(in) :: vftmp
         real(wp), dimension(nb), intent(in) :: Rtmp
         real(wp), intent(out) :: ntmp
@@ -57,7 +58,7 @@ contains
     end subroutine s_comp_n_from_prim
 
     pure subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
-        !$acc routine seq
+        $:ROUTINE()
         real(wp), intent(in) :: vftmp
         real(wp), dimension(nb), intent(in) :: nRtmp
         real(wp), intent(out) :: ntmp

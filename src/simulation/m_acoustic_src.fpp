@@ -340,7 +340,7 @@ contains
     !! @param gauss_sigma_time_local sigma in time for Gaussian pulse
     !! @param source Source term amplitude
     pure elemental subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source, sum_BB)
-        !$acc routine seq
+        $:ROUTINE()
         integer, intent(in) :: ai, term_index
         real(wp), intent(in) :: sim_time, c, sum_BB
         real(wp), intent(in) :: frequency_local, gauss_sigma_time_local
@@ -692,7 +692,7 @@ contains
     !! @param c Speed of sound
     !! @return frequency_local Converted frequency
     pure elemental function f_frequency_local(freq_conv_flag, ai, c)
-        !$acc routine seq
+        $:ROUTINE()
         logical, intent(in) :: freq_conv_flag
         integer, intent(in) :: ai
         real(wp), intent(in) :: c
@@ -711,7 +711,7 @@ contains
     !! @param ai Acoustic source index
     !! @return gauss_sigma_time_local Converted Gaussian sigma time
     pure elemental function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
-        !$acc routine seq
+        $:ROUTINE()
         logical, intent(in) :: gauss_conv_flag
         integer, intent(in) :: ai
         real(wp), intent(in) :: c

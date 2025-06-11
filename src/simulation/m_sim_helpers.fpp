@@ -1,3 +1,4 @@
+#:include 'directive_macros.fpp'
 module m_sim_helpers
 
     use m_derived_types        !< Definitions of the derived types
@@ -33,7 +34,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_enthalpy
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
@@ -98,7 +99,7 @@ contains
         !! @param vcfl_sf (optional) cell centered viscous cfl number
         !! @param Rc_sf (optional) cell centered Rc
     pure subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
-        !$acc routine seq
+        $:ROUTINE()
         real(wp), intent(in), dimension(num_vels) :: vel
         real(wp), intent(in) :: c, rho
         real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: icfl_sf
@@ -195,7 +196,7 @@ contains
         !! @param k y coordinate
         !! @param l z coordinate
     pure subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
-        !$acc routine seq
+        $:ROUTINE()
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in) :: c, rho
         real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: max_dt

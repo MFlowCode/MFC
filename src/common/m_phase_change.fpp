@@ -290,7 +290,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_infinite_pt_relaxation_k
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
 
         ! initializing variables
@@ -395,7 +395,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_infinite_ptg_relaxation_k
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
 
         integer, intent(in) :: j, k, l
@@ -520,7 +520,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_correct_partial_densities
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
 
         !> @name variables for the correction of the reacting partial densities
@@ -583,7 +583,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_jacobian_matrix
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
 
         real(wp), dimension(2, 2), intent(out) :: InvJac
@@ -690,7 +690,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_pTg_residue
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
 
         integer, intent(in) :: j, k, l
@@ -741,7 +741,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_TSat
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
 
         real(wp), intent(in) :: pSat

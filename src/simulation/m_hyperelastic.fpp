@@ -221,7 +221,7 @@ contains
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
     pure subroutine s_neoHookean_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
-        !$acc routine seq
+        $:ROUTINE()
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(inout) :: btensor
         real(wp), intent(in) :: G
@@ -260,7 +260,7 @@ contains
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
     pure subroutine s_Mooney_Rivlin_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
-        !$acc routine seq
+        $:ROUTINE()
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(inout) :: btensor
         real(wp), intent(in) :: G

@@ -3,6 +3,7 @@
 !! @brief Contains module m_ibm
 
 #:include 'macros.fpp'
+#:include 'directive_macros.fpp'
 
 !> @brief This module is used to handle all operations related to immersed
 !!              boundary methods (IBMs)
@@ -744,7 +745,7 @@ contains
     !> Function that uses the interpolation coefficients and the current state
     !! at the cell centers in order to estimate the state at the image point
     pure subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
-        !$acc routine seq
+        $:ROUTINE()
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_prim_vf !< Primitive Variables

@@ -242,7 +242,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_ghost_cell_extrapolation
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -311,7 +311,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_symmetry
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -575,7 +575,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_periodic
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -718,7 +718,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_axis
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -782,7 +782,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_slip_wall
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -881,7 +881,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_no_slip_wall
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -1016,7 +1016,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_dirichlet
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -1085,7 +1085,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_qbmm_extrapolation
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
@@ -1284,7 +1284,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_periodic
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         integer, intent(in) :: bc_dir, bc_loc
@@ -1342,7 +1342,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_reflective
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         integer, intent(in) :: bc_dir, bc_loc
@@ -1424,7 +1424,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_ghost_cell_extrapolation
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         integer, intent(in) :: bc_dir, bc_loc

@@ -4265,7 +4265,7 @@ contains
     !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
     !! @param[out] tau_shear_out Calculated shear stress tensor (stress on i-face, j-direction).
     pure subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
-        !$acc routine seq
+        $:ROUTINE()
 
         implicit none
 
@@ -4299,7 +4299,7 @@ contains
     !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
     !! @param[out] tau_bulk_out Calculated bulk stress tensor (stress on i-face, i-direction).
     pure subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
-        !$acc routine seq
+        $:ROUTINE()
 
         implicit none
 

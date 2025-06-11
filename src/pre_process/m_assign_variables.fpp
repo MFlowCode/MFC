@@ -3,6 +3,7 @@
 !! @brief Contains module m_assign_variables
 
 #:include 'case.fpp'
+#:include 'directive_macros.fpp'
 
 module m_assign_variables
 
@@ -103,7 +104,7 @@ contains
         !! @param patch_id_fp Array to track patch ids
     pure subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
                                                                eta, q_prim_vf, patch_id_fp)
-        !$acc routine seq
+        $:ROUTINE()
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
@@ -276,7 +277,7 @@ contains
         !! @param patch_id_fp Array to track patch ids
     impure subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, &
                                                                  eta, q_prim_vf, patch_id_fp)
-        !$acc routine seq
+        $:ROUTINE()
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l

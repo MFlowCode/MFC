@@ -738,7 +738,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_cson_from_pinf
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         integer, intent(in) :: bub_id
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -809,7 +809,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_get_pinf
 #else
-        !$acc routine seq
+        $:ROUTINE()
 #endif
         integer, intent(in) :: bub_id, ptype
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
