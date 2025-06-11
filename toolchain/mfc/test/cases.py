@@ -3,6 +3,7 @@ import os, typing, itertools
 
 from mfc   import common
 from .case import Nt, define_case_d, define_case_f, CaseGeneratorStack, TestCaseBuilder
+from ..state import ARG
 
 def get_bc_mods(bc: int, dimInfo):
     params = {}
@@ -320,9 +321,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_ppn(dimInfo):
         if len(dimInfo[0]) == 3:
             cases.append(define_case_d(stack, '2 MPI Ranks', {'m': 29, 'n': 29, 'p': 49}, ppn=2))
+            cases.append(define_case_d(stack, '2 MPI Ranks -> RDMA MPI', {'m': 29, 'n': 29, 'p': 49, 'rdma_mpi': 'T'}, ppn=2))
         else:
             cases.append(define_case_d(stack, '2 MPI Ranks', {}, ppn=2))
-
+            cases.append(define_case_d(stack, '2 MPI Ranks -> RDMA MPI', {'rdma_mpi': 'T'}, ppn=2))
 
     def alter_ib(dimInfo, six_eqn_model=False):
         for slip in [True, False]:

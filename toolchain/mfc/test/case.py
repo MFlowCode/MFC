@@ -134,8 +134,6 @@ class TestCase(case.Case):
         tasks             = ["-n", str(self.ppn)]
         jobs              = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
         case_optimization = ["--case-optimization"]  if ARG("case_optimization") else []
-        rdma_mpi_args     = ["--rdma-mpi"]           if ARG("rdma_mpi")          else []
-
 
         if self.params.get("bubbles_lagrange", 'F') == 'T':
             input_bubbles_lagrange(self)
@@ -146,7 +144,7 @@ class TestCase(case.Case):
 
         command = [
             mfc_script, "run", filepath, "--no-build", *tasks, *case_optimization,
-            *jobs, "-t", *target_names, *gpus_select, *rdma_mpi_args, *ARG("--")
+            *jobs, "-t", *target_names, *gpus_select, *ARG("--")
         ]
 
         return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
