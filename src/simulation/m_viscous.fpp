@@ -1000,7 +1000,7 @@ contains
 
         end if
 
-        $:UPDATE(device=["is1_viscous","is2_viscous","is3_viscous","iv"])
+        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
 
         if (n > 0) then
             if (p > 0) then
@@ -1097,7 +1097,7 @@ contains
 
         end if
 
-        $:UPDATE(device=["is1_viscous","is2_viscous","is3_viscous","iv"])
+        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
 
         if (n > 0) then
             if (p > 0) then
@@ -1200,7 +1200,7 @@ contains
         is3_viscous = iz
         iv = iv_in
 
-        $:UPDATE(device=["is1_viscous","is2_viscous","is3_viscous","iv"])
+        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
 
         ! First-Order Spatial Derivatives in x-direction
         if (norm_dir == 1) then
