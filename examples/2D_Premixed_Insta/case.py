@@ -21,7 +21,7 @@ sol_L.TPX =  300,  101325, 'H:1'
 
 L    = 0.01500
 Nx   = 1000
-Ny   = 200
+Ny   = 26
 dx   = L / Nx
 dy   = dx
 dt   = 0.5e-8
@@ -47,7 +47,7 @@ data = {
     "cyl_coord": "F",
     "dt": dt,
     "t_step_start": 0,
-    "t_step_stop": 400,
+    "t_step_stop": 100,
     "t_step_save": 25,
     "t_step_print": 1,
     # Simulation Algorithm
