@@ -283,27 +283,27 @@ contains
         celloutside = .false.
 
         if (num_dims == 2) then
-            if ((cellaux(1) < -buff_size + mapCells) .or. &
-                (cellaux(2) < -buff_size + mapCells)) then
+            if ((cellaux(1) < -buff_size) .or. &
+                (cellaux(2) < -buff_size)) then
                 celloutside = .true.
             end if
-            if (cyl_coord .and. y_cc(cellaux(2)) < 0._wp) then
+            if (cyl_coord .and. cellaux(2) < 0) then
                 celloutside = .true.
             end if
-            if ((cellaux(2) > n + buff_size - mapCells) .or. &
-                (cellaux(1) > m + buff_size - mapCells)) then
+            if ((cellaux(2) > n + buff_size) .or. &
+                (cellaux(1) > m + buff_size)) then
                 celloutside = .true.
             end if
         else
-            if ((cellaux(3) < -buff_size + mapCells) .or. &
-                (cellaux(1) < -buff_size + mapCells) .or. &
-                (cellaux(2) < -buff_size + mapCells)) then
+            if ((cellaux(3) < -buff_size) .or. &
+                (cellaux(1) < -buff_size) .or. &
+                (cellaux(2) < -buff_size)) then
                 celloutside = .true.
             end if
 
-            if ((cellaux(3) > p + buff_size - mapCells) .or. &
-                (cellaux(2) > n + buff_size - mapCells) .or. &
-                (cellaux(1) > m + buff_size - mapCells)) then
+            if ((cellaux(3) > p + buff_size) .or. &
+                (cellaux(2) > n + buff_size) .or. &
+                (cellaux(1) > m + buff_size)) then
                 celloutside = .true.
             end if
         end if

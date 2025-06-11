@@ -1180,16 +1180,16 @@ contains
         integer, dimension(3) :: cell
 
         !$acc parallel loop gang vector default(present) private(cell)
-        do k = 1, nBubs
+        do k = nBubs, 1, -1
             if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                 .and. mtn_pos(k,1,dest) < x_cb(-1) + intfc_rad(k,dest)) then
                 mtn_pos(k, 1, dest) = x_cb(-1) + intfc_rad(k,dest)
             elseif (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                 .and. mtn_pos(k,1,dest) > x_cb(m) - intfc_rad(k,dest)) then
                 mtn_pos(k, 1, dest) = x_cb(m) - intfc_rad(k,dest)
-            elseif (mtn_pos(k, 1, dest) > x_cb(m + buff_size - mapCells)) then
+            elseif (mtn_pos(k, 1, dest) > x_cb(m + buff_size)) then
                 call s_remove_lag_bubble(k)
-            elseif (mtn_pos(k, 1, dest) < x_cb(mapCells - buff_size - 1)) then
+            elseif (mtn_pos(k, 1, dest) < x_cb(buff_size - 1)) then
                 call s_remove_lag_bubble(k)
             end if
 
@@ -1199,9 +1199,9 @@ contains
             else if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                 .and. mtn_pos(k,2,dest) > y_cb(n) - intfc_rad(k,dest)) then
                 mtn_pos(k, 2, dest) = y_cb(n) - intfc_rad(k,dest)
-            elseif (mtn_pos(k, 2, dest) > y_cb(n + buff_size - mapCells)) then
+            elseif (mtn_pos(k, 2, dest) > y_cb(n + buff_size)) then
                 call s_remove_lag_bubble(k)
-            elseif (mtn_pos(k, 2, dest) < y_cb(mapCells - buff_size - 1)) then
+            elseif (mtn_pos(k, 2, dest) < y_cb(buff_size - 1)) then
                 call s_remove_lag_bubble(k)
             end if
 
@@ -1212,9 +1212,9 @@ contains
                 else if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                     .and. mtn_pos(k,3,dest) > z_cb(p) - intfc_rad(k,dest)) then
                     mtn_pos(k, 3, dest) = z_cb(p) - intfc_rad(k,dest)
-                elseif (mtn_pos(k, 3, dest) > z_cb(p + buff_size - mapCells)) then
+                elseif (mtn_pos(k, 3, dest) > z_cb(p + buff_size)) then
                     call s_remove_lag_bubble(k)
-                elseif (mtn_pos(k, 3, dest) < z_cb(mapCells - buff_size - 1)) then
+                elseif (mtn_pos(k, 3, dest) < z_cb(buff_size - 1)) then
                     call s_remove_lag_bubble(k)
                 end if
             end if
@@ -1235,7 +1235,6 @@ contains
                     call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
                 end if
             end if
-
         end do
 
         if (num_procs > 1) then
@@ -1338,26 +1337,26 @@ contains
         if (p == 0 .and. cyl_coord .neqv. .true.) then
             ! Defining a virtual z-axis that has the same dimensions as y-axis
             ! defined in the input file
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - mapCells)) .and. &
-                                  (pos_part(1) >= x_cb(-buff_size - 1 + mapCells)) .and. &
-                                  (pos_part(2) < y_cb(n + buff_size - mapCells)) .and. &
-                                  (pos_part(2) >= y_cb(-buff_size - 1 + mapCells)) .and. &
+            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size)) .and. &
+                                  (pos_part(1) >= x_cb(-buff_size - 1)) .and. &
+                                  (pos_part(2) < y_cb(n + buff_size)) .and. &
+                                  (pos_part(2) >= y_cb(-buff_size - 1)) .and. &
                                   (pos_part(3) < lag_params%charwidth/2._wp) .and. (pos_part(3) >= -lag_params%charwidth/2._wp))
         else
             ! cyl_coord
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - mapCells)) .and. &
-                                  (pos_part(1) >= x_cb(-buff_size - 1 + mapCells)) .and. &
+            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size)) .and. &
+                                  (pos_part(1) >= x_cb(-buff_size - 1)) .and. &
                                   (abs(pos_part(2)) < y_cb(n + buff_size)) .and. (abs(pos_part(2)) >= max(y_cb(-buff_size - 1), 0._wp)))
         end if
 
         ! 3D
         if (p > 0) then
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - mapCells)) .and. &
-                                  (pos_part(1) >= x_cb(-buff_size - 1 + mapCells)) .and. &
-                                  (pos_part(2) < y_cb(n + buff_size - mapCells)) .and. &
-                                  (pos_part(2) >= y_cb(-buff_size - 1 + mapCells)) .and. &
-                                  (pos_part(3) < z_cb(p + buff_size - mapCells)) .and. &
-                                  (pos_part(3) >= z_cb(-buff_size - 1 + mapCells)))
+            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size)) .and. &
+                                  (pos_part(1) >= x_cb(-buff_size - 1)) .and. &
+                                  (pos_part(2) < y_cb(n + buff_size)) .and. &
+                                  (pos_part(2) >= y_cb(-buff_size - 1)) .and. &
+                                  (pos_part(3) < z_cb(p + buff_size)) .and. &
+                                  (pos_part(3) >= z_cb(-buff_size - 1)))
         end if
 
         ! For symmetric and wall boundary condition

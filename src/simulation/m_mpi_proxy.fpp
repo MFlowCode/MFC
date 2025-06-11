@@ -98,14 +98,14 @@ contains
         p_buff_size = nVar*lag_params%nBubs_glb*real_size
         @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
 
-        comm_coords(1)%beg = x_cb(buff_size - mapCells - 1)
-        comm_coords(1)%end = x_cb(m - buff_size + mapCells)
+        comm_coords(1)%beg = x_cb(buff_size - 1)
+        comm_coords(1)%end = x_cb(m - buff_size)
         if (n > 0) then
-            comm_coords(2)%beg = y_cb(buff_size - mapCells - 1)
-            comm_coords(2)%end = y_cb(m - buff_size + mapCells)
+            comm_coords(2)%beg = y_cb(buff_size)
+            comm_coords(2)%end = y_cb(n - buff_size)
             if (p > 0) then
-                comm_coords(3)%beg = z_cb(buff_size - mapCells - 1)
-                comm_coords(3)%end = z_cb(p - buff_size + mapCells)
+                comm_coords(3)%beg = z_cb(buff_size - 1)
+                comm_coords(3)%end = z_cb(p - buff_size)
             end if
         end if
 
