@@ -1,7 +1,7 @@
 close all; clear all;
 
 %% Initialization
-disp("Initialize"); tic;
+disp("Initialize run_turbulence ..."); tic;
 % Create directories
 create_directory();
 % Read user inputs
@@ -9,7 +9,7 @@ set_user_inputs(); load variables/user_inputs.mat;
 % Set grids
 create_grid(); load variables/user_inputs.mat;
 % Allocate array for momentum thickness
-mth = zeros(Nfiles,1);
+mth = zeros(1,Nfiles);
 toc;
 
 %% Loop over timesteps
@@ -34,13 +34,23 @@ for i = 1:Nfiles
 
     % Compute Reynolds stress
     disp("[5/6] Compute Reynolds stress ..."); tic;
-    f_compute_Reynolds_stress(qp(1,:,:,:), qp_fluc(momxb:momxe,:,:,:), y_norm_vth, timesteps(i)); toc;
+    if (Reynolds_stress)
+        f_compute_Reynolds_stress(qp(1,:,:,:), qp_fluc(momxb:momxe,:,:,:), y_norm_vth, timesteps(i)); 
+    else
+        disp("skipped");
+    end
+    toc;
 
     % Compute TKE budget
     disp("[6/6] Compute TKE budget ..."); tic;
-    f_compute_tke_budget(dvel_ds, dvelmean_dy, dvelfluc_ds, ...
+    if (tke_budget)
+        f_compute_tke_budget(dvel_ds, dvelmean_dy, dvelfluc_ds, ...
                         squeeze(qp(1,:,:,:)), qp_fluc(momxb:momxe,:,:,:), squeeze(qp(E_idx,:,:,:)), ...
-                        y_norm_mth, mth(i), timesteps(i)); toc;
+                        y_norm_mth, mth(i), timesteps(i)); 
+    else
+        disp("skipped");
+    end
+    toc;
 end
 disp("End of loop");
 
@@ -88,9 +98,9 @@ function create_grid()
     r = mp*np*pp;
 
     % Allocate memory
-    x_cc = zeros(mp,1); x_cb = zeros(mpp,1);
-    y_cc = zeros(np,1); y_cb = zeros(npp,1); 
-    z_cc = zeros(pp,1); z_cb = zeros(ppp,1);
+    x_cc = zeros(1,mp); x_cb = zeros(1,mpp);
+    y_cc = zeros(1,np); y_cb = zeros(1,npp); 
+    z_cc = zeros(1,pp); z_cb = zeros(1,ppp);
 
     % x-dir
     for i = 1:mpp
@@ -197,49 +207,51 @@ end
 function [dvel_ds dvelmean_dy dvelfluc_ds] = f_compute_vel_derivatives(vel, vel_mean, vel_fluc)
 
     load variables/user_inputs.mat;
-    
-    dvel_ds = zeros(3,3,mp,np,pp);
+
     dvelmean_dy = zeros(3,np);
+    dvel_ds = zeros(3,3,mp,np,pp);
     dvelfluc_ds = zeros(3,3,mp,np,pp);
-
-    % Compute velocity derivatives
-    vel1 = squeeze(vel(1,:,:,:));
-    vel2 = squeeze(vel(2,:,:,:));
-    vel3 = squeeze(vel(3,:,:,:));
-
-    dvel_ds(1,1,:,:,:) = f_compute_derivative_3d(vel1,x_cc,1);
-    dvel_ds(2,1,:,:,:) = f_compute_derivative_3d(vel2,x_cc,1);
-    dvel_ds(3,1,:,:,:) = f_compute_derivative_3d(vel3,x_cc,1);
-
-    dvel_ds(1,2,:,:,:) = f_compute_derivative_3d(vel1,y_cc,2);
-    dvel_ds(2,2,:,:,:) = f_compute_derivative_3d(vel2,y_cc,2);
-    dvel_ds(3,2,:,:,:) = f_compute_derivative_3d(vel3,y_cc,2);
-
-    dvel_ds(1,3,:,:,:) = f_compute_derivative_3d(vel1,z_cc,3);
-    dvel_ds(2,3,:,:,:) = f_compute_derivative_3d(vel2,z_cc,3);
-    dvel_ds(3,3,:,:,:) = f_compute_derivative_3d(vel3,z_cc,3);
 
     % favre-averaged velocity derivatives
     dvelmean_dy(1,:) = f_compute_derivative_1d(vel_mean(1,:),y_cc);
     dvelmean_dy(2,:) = f_compute_derivative_1d(vel_mean(2,:),y_cc);
     dvelmean_dy(3,:) = f_compute_derivative_1d(vel_mean(3,:),y_cc);
 
-    % fluctuating velocity derivatives
-    vel_fluc1 = squeeze(vel_fluc(1,:,:,:));
-    vel_fluc2 = squeeze(vel_fluc(2,:,:,:));
-    vel_fluc3 = squeeze(vel_fluc(3,:,:,:));
-    
-    dvelfluc_ds(1,1,:,:,:) = f_compute_derivative_3d(vel_fluc1,x_cc,1);
-    dvelfluc_ds(2,1,:,:,:) = f_compute_derivative_3d(vel_fluc2,x_cc,1);
-    dvelfluc_ds(3,1,:,:,:) = f_compute_derivative_3d(vel_fluc3,x_cc,1);
+    if (tke_budget)
+        % Compute velocity derivatives
+        vel1 = squeeze(vel(1,:,:,:));
+        vel2 = squeeze(vel(2,:,:,:));
+        vel3 = squeeze(vel(3,:,:,:));
 
-    dvelfluc_ds(1,2,:,:,:) = f_compute_derivative_3d(vel_fluc1,y_cc,2);
-    dvelfluc_ds(2,2,:,:,:) = f_compute_derivative_3d(vel_fluc2,y_cc,2);
-    dvelfluc_ds(3,2,:,:,:) = f_compute_derivative_3d(vel_fluc3,y_cc,2);
+        dvel_ds(1,1,:,:,:) = f_compute_derivative_3d(vel1,x_cc,1);
+        dvel_ds(2,1,:,:,:) = f_compute_derivative_3d(vel2,x_cc,1);
+        dvel_ds(3,1,:,:,:) = f_compute_derivative_3d(vel3,x_cc,1);
 
-    dvelfluc_ds(1,3,:,:,:) = f_compute_derivative_3d(vel_fluc1,z_cc,3);
-    dvelfluc_ds(2,3,:,:,:) = f_compute_derivative_3d(vel_fluc2,z_cc,3);
-    dvelfluc_ds(3,3,:,:,:) = f_compute_derivative_3d(vel_fluc3,z_cc,3);
+        dvel_ds(1,2,:,:,:) = f_compute_derivative_3d(vel1,y_cc,2);
+        dvel_ds(2,2,:,:,:) = f_compute_derivative_3d(vel2,y_cc,2);
+        dvel_ds(3,2,:,:,:) = f_compute_derivative_3d(vel3,y_cc,2);
+
+        dvel_ds(1,3,:,:,:) = f_compute_derivative_3d(vel1,z_cc,3);
+        dvel_ds(2,3,:,:,:) = f_compute_derivative_3d(vel2,z_cc,3);
+        dvel_ds(3,3,:,:,:) = f_compute_derivative_3d(vel3,z_cc,3);
+
+        % fluctuating velocity derivatives
+        vel_fluc1 = squeeze(vel_fluc(1,:,:,:));
+        vel_fluc2 = squeeze(vel_fluc(2,:,:,:));
+        vel_fluc3 = squeeze(vel_fluc(3,:,:,:));
+        
+        dvelfluc_ds(1,1,:,:,:) = f_compute_derivative_3d(vel_fluc1,x_cc,1);
+        dvelfluc_ds(2,1,:,:,:) = f_compute_derivative_3d(vel_fluc2,x_cc,1);
+        dvelfluc_ds(3,1,:,:,:) = f_compute_derivative_3d(vel_fluc3,x_cc,1);
+
+        dvelfluc_ds(1,2,:,:,:) = f_compute_derivative_3d(vel_fluc1,y_cc,2);
+        dvelfluc_ds(2,2,:,:,:) = f_compute_derivative_3d(vel_fluc2,y_cc,2);
+        dvelfluc_ds(3,2,:,:,:) = f_compute_derivative_3d(vel_fluc3,y_cc,2);
+
+        dvelfluc_ds(1,3,:,:,:) = f_compute_derivative_3d(vel_fluc1,z_cc,3);
+        dvelfluc_ds(2,3,:,:,:) = f_compute_derivative_3d(vel_fluc2,z_cc,3);
+        dvelfluc_ds(3,3,:,:,:) = f_compute_derivative_3d(vel_fluc3,z_cc,3);
+    end
 end
 
 % Compute mixing layer thickness
@@ -249,14 +261,16 @@ function [vth mth y_norm_mth y_norm_vth] = f_compute_mixing_layer_thickness(qp_m
 
     % Compute vorticity thickness
     vth = 2 / max(abs(dvelmean_dy(1,:)),[],"all");
+    disp("vth: "+num2str(vth));
     
     % Compute momentum thickness
     f = qp_mean(1,:) .* (1 - qp_mean(momxb, :)) .* (1 + qp_mean(momxb, :)) / 4;
     mth = trapz(y_cc,f);
+    disp("mth: "+num2str(mth));
 
     % Compute mth-normalized y value
-    y_norm_mth = y_cc'/mth;
-    y_norm_vth = y_cc'/vth;
+    y_norm_mth = y_cc/mth;
+    y_norm_vth = y_cc/vth;
 
 end
 
@@ -597,21 +611,21 @@ function plot_growth_rate(time, mth)
     % Integrated growth rate
     f_growth_rate = figure("DefaultAxesFontSize", 18); 
 
-    plot(time(1:end-1),dmth,'-ko','LineWidth',2); hold on; grid on;
-    plot([0 max(time)],[0.012 0.012], 'r--','LineWidth',1);
-    plot([0 max(time)],[0.0135 0.0135], 'b--','LineWidth',1);
-    plot([0 max(time)],[0.014 0.014], 'g--','LineWidth',1);
-    plot([0 max(time)],[0.015 0.015], 'c--','LineWidth',1);
-    plot([0 max(time)],[0.017 0.017], 'm--.','LineWidth',1);
+    h1 = plot(time(1:end-1),dmth,'-ko','LineWidth',2); hold on; grid on;
+    h2 = plot([0 max(time)],[0.012 0.012], 'r--','LineWidth',1);
+    h3 = plot([0 max(time)],[0.0135 0.0135], 'b--','LineWidth',1);
+    h4 = plot([0 max(time)],[0.014 0.014], 'g--','LineWidth',1);
+    h5 = plot([0 max(time)],[0.015 0.015], 'c--','LineWidth',1);
+    h6 = plot([0 max(time)],[0.017 0.017], 'm--.','LineWidth',1);
     axis([0 max(time) 0 0.04]);
     xlabel('$t U_1 / \delta_{\omega h}^0$','interpreter','latex');
     ylabel('$\dot{\delta}_{\theta} / \Delta U$','interpreter','latex');
-    legend("$\mbox{Present}$",...
+    legend([h1,h2,h3,h4,h5,h6],{"$\mbox{Present}$",...
             "$0.012^{[1]}$",...     % [1] Baltzer & Livescu (2020, JFM) 
             "$0.0135^{[2]}$",...    % [2] Vaghefi (2014, Thesis) 
             "$0.014^{[3,4]}$",...   % [3] Rogers & Moser (1993, PoF) [4] Blakeley et al. (2023, JFM)
             "$0.015^{[5]}$",...     % [5] Sharan, Matheou & Dimotakis (2019, JFM)
-            "$0.017^{[6]}$",...     % [6] Almagro et al. (2017, JFM)
+            "$0.017^{[6]}$"},...    % [6] Almagro et al. (2017, JFM)
             'Interpreter','latex','location','northeast');
     set(gca,'TickLabelInterpreter','latex');
 

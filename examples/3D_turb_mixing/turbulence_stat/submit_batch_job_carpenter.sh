@@ -15,7 +15,7 @@ echo "Running on $BC_MPI_TASKS_ALLOC processors."
 echo "Current working directory is `pwd`"
 echo "########################################"
 
-/app/matlab/R2023b/bin/matlab -nodisplay -nosplash -nodesktop -r "run('/p/global/hyeoksu/MFC/mixlayer/examples/3D_turb_mixing/turbulence_stat/run_turbulence.m'); run('/p/global/hyeoksu/MFC/mixlayer/examples/3D_turb_mixing/turbulence_stat/average_tke_over_self_similar.m'); exit;"
+/app/matlab/R2023b/bin/matlab -nodisplay -nosplash -nodesktop -r "run('/p/global/hyeoksu/MFC/mixlayer/examples/3D_turb_mixing/turbulence_stat/run_turbulence.m'); exit;"
 
 echo "########################################"
 echo "Program finished with exit code $? at: `date`"

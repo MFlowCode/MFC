@@ -1,5 +1,9 @@
 function set_user_inputs()
 
+    %% Options
+    Reynolds_stress = false;
+    tke_budget = false;
+
     %% Fluid property (Air)
     gamma_a = 1.4;
     pi_inf_a = 0;
@@ -26,8 +30,8 @@ function set_user_inputs()
     loops_y = 2;
 
     %% Time
-    Nt_beg = 384*25;
-    Nt_end = 384*26;
+    Nt_beg = 384*0;
+    Nt_end = 384*30;
     Nt_save = 384;
     dt = 0.013033561420658195;
     Nfiles  = (Nt_end - Nt_beg)/Nt_save + 1;

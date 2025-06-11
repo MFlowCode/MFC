@@ -1,6 +1,8 @@
 close all; clear all;
 
+
 % Setup
+disp("Start average_tke_over_self_similar ..."); tic;
 set_user_inputs(); load variables/user_inputs.mat;
 
 ybeg = -5; yend = 5; ny = 101;
@@ -12,7 +14,7 @@ P_averaged = zeros(ny,1);
 D_averaged = zeros(ny,1);
 
 % Compute averaged TKE budget
-for q = 1:navg
+for q = 1:Nfiles
     load("results/tke_budget_data/tstep_"+string(timesteps(q))+".mat");
 
     % Normalization
@@ -40,6 +42,7 @@ T_averaged = f_compute_derivative_1d(T0_averaged,y*mth);
 % Plot
 plot_tke_budget(T_averaged, P_averaged, D_averaged, y, mth);
 
+disp("End of program"); toc;
 
 %% FUNCTIONS
 % Compute the wall-normal derivative of a discretized function, fun(y)
