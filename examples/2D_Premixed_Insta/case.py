@@ -19,8 +19,8 @@ ctfile    = 'h2o2.yaml'
 sol_L     = ct.Solution(ctfile)
 sol_L.TPX =  300,  101325, 'H:1'
 
-L    = 0.015147
-Nx   = 400
+L    = 0.01500
+Nx   = 1000
 Ny   = 200
 dx   = L / Nx
 dy   = dx
@@ -47,8 +47,8 @@ data = {
     "cyl_coord": "F",
     "dt": dt,
     "t_step_start": 0,
-    "t_step_stop": 1,
-    "t_step_save": 1,
+    "t_step_stop": 400,
+    "t_step_save": 25,
     "t_step_print": 1,
     # Simulation Algorithm
     "model_eqns": 2,
@@ -69,8 +69,8 @@ data = {
     "bc_x%end": -8,
     "bc_y%beg": -1,
     "bc_y%end": -1,
-    'bc_x%grcbc_out' : 'T',
-    'bc_x%pres_out'  : 506625,
+  #  'bc_x%grcbc_out' : 'T',
+  #  'bc_x%pres_out'  : 506625,
     "num_patches": 1,
     "num_fluids": 1,
     "viscous": "F",
@@ -81,13 +81,13 @@ data = {
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "T",
-    "parallel_io": "F",
+    "parallel_io": "T",
      "chem_wrt_T"                  : "T",
     "fd_order"        : 2,
     # Fluid Parameters (Heavy Gas)
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0.0e00,
-   # "fluid_pp(1)%Re(1)": 100000000,
+ # "fluid_pp(1)%Re(1)": 100000000,
     # Fluid Parameters (Light Gas)
 
     # Body Forces
