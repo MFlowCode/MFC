@@ -303,10 +303,10 @@ contains
         ! Determining local stability criteria extrema at current time-step
 
 #ifdef _CRAYFTN
-        !$acc update host(icfl_sf)
+        $:UPDATE(host=["icfl_sf"])
 
         if (viscous) then
-            !$acc update host(vcfl_sf, Rc_sf)
+            $:UPDATE(host=["vcfl_sf","Rc_sf"])
         end if
 
         icfl_max_loc = maxval(icfl_sf)
@@ -529,7 +529,7 @@ contains
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
-                !$acc update host(q_prim_vf(i)%sf(:,:,:))
+                $:UPDATE(host=["q_prim_vf(i)%sf(:,:,:)"])
             end do
             ! q_prim_vf(bubxb) stores the value of nb needed in riemann solvers, so replace with true primitive value (=1._wp)
             if (qbmm) then

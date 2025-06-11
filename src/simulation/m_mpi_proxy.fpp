@@ -835,7 +835,7 @@ contains
                 else
 #endif
 
-                    !$acc update host(ib_buff_send, ib_buff_send)
+                    $:UPDATE(host=["ib_buff_send","ib_buff_send"])
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
@@ -889,7 +889,7 @@ contains
                     !$acc wait
                 else
 #endif
-                    !$acc update host(ib_buff_send)
+                    $:UPDATE(host=["ib_buff_send"])
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
@@ -967,7 +967,7 @@ contains
                 else
 #endif
 
-                    !$acc update host(ib_buff_send)
+                    $:UPDATE(host=["ib_buff_send"])
                     call MPI_SENDRECV( &
                         ib_buff_send(0), &
                         gp_layers*(n + 1)*(p + 1), &
@@ -1020,7 +1020,7 @@ contains
                 else
 #endif
 
-                    !$acc update host(ib_buff_send)
+                    $:UPDATE(host=["ib_buff_send"])
 
                     call MPI_SENDRECV( &
                         ib_buff_send(0), &
@@ -1099,7 +1099,7 @@ contains
                 else
 #endif
 
-                    !$acc update host(ib_buff_send)
+                    $:UPDATE(host=["ib_buff_send"])
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
@@ -1155,7 +1155,7 @@ contains
                 else
 #endif
 
-                    !$acc update host(ib_buff_send)
+                    $:UPDATE(host=["ib_buff_send"])
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
@@ -1235,7 +1235,7 @@ contains
                 else
 #endif
 
-                    !$acc update host(ib_buff_send)
+                    $:UPDATE(host=["ib_buff_send"])
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
@@ -1291,7 +1291,7 @@ contains
                 else
 #endif
 
-                    !$acc update host(ib_buff_send)
+                    $:UPDATE(host=["ib_buff_send"])
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
@@ -1374,7 +1374,7 @@ contains
                 else
 #endif
 
-                    !$acc update host(ib_buff_send)
+                    $:UPDATE(host=["ib_buff_send"])
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
@@ -1430,7 +1430,7 @@ contains
                 else
 #endif
 
-                    !$acc update host(ib_buff_send)
+                    $:UPDATE(host=["ib_buff_send"])
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
@@ -1510,7 +1510,7 @@ contains
                     !$acc wait
                 else
 #endif
-                    !$acc update host(ib_buff_send)
+                    $:UPDATE(host=["ib_buff_send"])
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
@@ -1566,7 +1566,7 @@ contains
                     !$acc wait
                 else
 #endif
-                    !$acc update host(ib_buff_send)
+                    $:UPDATE(host=["ib_buff_send"])
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &

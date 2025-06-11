@@ -1298,7 +1298,7 @@ contains
 
         if (probe_wrt) then
             do i = 1, sys_size
-                !$acc update host(q_cons_ts(1)%vf(i)%sf)
+                $:UPDATE(host=["q_cons_ts(1)%vf(i)%sf"])
             end do
         end if
 
@@ -1404,7 +1404,7 @@ contains
         call cpu_time(start)
         call nvtxStartRange("SAVE-DATA")
         do i = 1, sys_size
-            !$acc update host(q_cons_ts(1)%vf(i)%sf)
+            $:UPDATE(host=["q_cons_ts(1)%vf(i)%sf"])
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -1418,8 +1418,8 @@ contains
         end do
 
         if (qbmm .and. .not. polytropic) then
-            !$acc update host(pb_ts(1)%sf)
-            !$acc update host(mv_ts(1)%sf)
+            $:UPDATE(host=["pb_ts(1)%sf"])
+            $:UPDATE(host=["mv_ts(1)%sf"])
         end if
 
         if (cfl_dt) then
@@ -1429,16 +1429,16 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            !$acc update host(intfc_rad)
+            $:UPDATE(host=["intfc_rad"])
             do i = 1, nBubs
                 if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
                     call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
                 end if
             end do
 
-            !$acc update host(q_beta%vf(1)%sf)
+            $:UPDATE(host=["q_beta%vf(1)%sf"])
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, q_beta%vf(1))
-            !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_vel)
+            $:UPDATE(host=["Rmax_stats","Rmin_stats","gas_p","gas_mv","intfc_vel"])
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else

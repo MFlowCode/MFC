@@ -860,7 +860,7 @@ $:UPDATE(device=["v_size"])
                     call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
                 #:else
                     call nvtxStartRange("RHS-COMM-DEV2HOST")
-                    !$acc update host(buff_send)
+                    $:UPDATE(host=["buff_send"])
                     call nvtxEndRange
                     call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
                 #:endif
@@ -1190,7 +1190,7 @@ $:UPDATE(device=["v_size"])
                     call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
                 #:else
                     call nvtxStartRange("RHS-COMM-DEV2HOST")
-                    !$acc update host(buff_send)
+                    $:UPDATE(host=["buff_send"])
                     call nvtxEndRange
                     call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
                 #:endif

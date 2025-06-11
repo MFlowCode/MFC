@@ -948,7 +948,7 @@ contains
             if (stage == 3) then
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
-                    !$acc update host(gas_p, gas_mv, intfc_rad, intfc_vel)
+                    $:UPDATE(host=["gas_p","gas_mv","intfc_rad","intfc_vel"])
                     call s_write_lag_particles(mytime)
                 end if
                 call s_write_void_evol(mytime)
@@ -1051,7 +1051,7 @@ contains
         integer :: i !< Generic loop iterator
 
         do i = 1, sys_size
-            !$acc update host(q_prim_vf(i)%sf)
+            $:UPDATE(host=["q_prim_vf(i)%sf"])
         end do
 
         if (t_step == t_step_start) then

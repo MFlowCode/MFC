@@ -251,9 +251,11 @@ contains
 
         $:UPDATE(device=["bubbles_lagrange", "lag_params"])
 
-        !$acc update device(lag_id, bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC,   &
-        !$acc bub_dphidt, gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel,       &
-        !$acc mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, nBubs)
+        $:UPDATE(device=["lag_id","bub_R0","Rmax_stats","Rmin_stats","gas_mg", &
+            & "gas_betaT","gas_betaC","bub_dphidt","gas_p","gas_mv", &
+            & "intfc_rad","intfc_vel","mtn_pos","mtn_posPrev","mtn_vel", &
+            & "mtn_s","intfc_draddt","intfc_dveldt","gas_dpdt","gas_dmvdt", &
+            & "mtn_dposdt","mtn_dveldt","nBubs"])
 
         Rmax_glb = min(dflt_real, -dflt_real)
         Rmin_glb = max(dflt_real, -dflt_real)
@@ -1044,7 +1046,7 @@ contains
             if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
 
             if (lag_params%write_bubbles) then
-                !$acc update host(gas_p, gas_mv, intfc_rad, intfc_vel)
+                $:UPDATE(host=["gas_p","gas_mv","intfc_rad","intfc_vel"])
                 call s_write_lag_particles(mytime)
             end if
 
@@ -1078,7 +1080,7 @@ contains
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
 
                 if (lag_params%write_bubbles) then
-                    !$acc update host(gas_p, gas_mv, intfc_rad, intfc_vel)
+                    $:UPDATE(host=["gas_p","gas_mv","intfc_rad","intfc_vel"])
                     call s_write_lag_particles(mytime)
                 end if
 
@@ -1125,7 +1127,7 @@ contains
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
 
                 if (lag_params%write_bubbles) then
-                    !$acc update host(gas_p, gas_mv, intfc_rad, intfc_vel)
+                    $:UPDATE(host=["gas_p","gas_mv","intfc_rad","intfc_vel"])
                     call s_write_lag_particles(mytime)
                 end if
 
@@ -1623,7 +1625,7 @@ contains
         write (file_loc, '(A,I0,A)') 'stats_lag_bubbles_', proc_rank, '.dat'
         file_loc = trim(case_dir)//'/D/'//trim(file_loc)
 
-        !$acc update host(Rmax_glb, Rmin_glb)
+        $:UPDATE(host=["Rmax_glb","Rmin_glb"])
 
         open (13, FILE=trim(file_loc), FORM='formatted', position='rewind')
         write (13, *) 'proc_rank, particleID, x, y, z, Rmax_glb, Rmin_glb'
