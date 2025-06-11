@@ -551,15 +551,6 @@ contains
                     end do
                     close (2)
                 end do
-                if (chemistry) then
-                    write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/T.', i, '.', proc_rank, '.', t_step, '.dat'
-                    open (2, FILE=trim(file_path))
-                    do j = 0, m
-                        ! todo: revisit change here
-                            write (2, FMT) x_cb(j), q_T_sf%sf(j, 0, 0)
-                    end do
-                    close (2)
-                end if
             end if
 
             do i = 1, sys_size
