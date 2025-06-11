@@ -30,6 +30,13 @@ module m_cbc
 
     use m_compute_cbc
 
+    use m_thermochem, only: &
+        get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, &
+        get_mixture_specific_heat_cp_mass, gas_constant, &
+        get_mixture_molecular_weight, get_species_enthalpies_rt, &
+        molecular_weights, get_species_specific_heats_r, &
+        get_mole_fractions, get_species_specific_heats_r
+
     implicit none
 
     private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
@@ -96,7 +103,8 @@ module m_cbc
     integer :: dj
     integer :: bcxb, bcxe, bcyb, bcye, bczb, bcze
     integer :: cbc_dir, cbc_loc
-    !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc)
+    integer :: flux_cbc_index
+    !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc, flux_cbc_index)
 
     !! GRCBC inputs for subsonic inflow and outflow conditions consisting of
     !! inflow velocities, pressure, density and void fraction as well as
@@ -119,10 +127,17 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_cbc_module
+    impure subroutine s_initialize_cbc_module
 
         integer :: i
         logical :: is_cbc
+
+        if (chemistry) then
+            flux_cbc_index = sys_size
+        else
+            flux_cbc_index = adv_idx%end
+        end if
+        !$acc update device(flux_cbc_index)
 
         call s_any_cbc_boundaries(is_cbc)
 
@@ -153,7 +168,7 @@ contains
 
             @:ALLOCATE(F_rsx_vf(0:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, 1:adv_idx%end))
+                is3%beg:is3%end, 1:flux_cbc_index))
 
             @:ALLOCATE(F_src_rsx_vf(0:buff_size, &
                 is2%beg:is2%end, &
@@ -163,7 +178,7 @@ contains
 
         @:ALLOCATE(flux_rsx_vf_l(-1:buff_size, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:adv_idx%end))
+            is3%beg:is3%end, 1:flux_cbc_index))
 
         @:ALLOCATE(flux_src_rsx_vf_l(-1:buff_size, &
             is2%beg:is2%end, &
@@ -196,7 +211,7 @@ contains
 
                 @:ALLOCATE(F_rsy_vf(0:buff_size, &
                     is2%beg:is2%end, &
-                    is3%beg:is3%end, 1:adv_idx%end))
+                    is3%beg:is3%end, 1:flux_cbc_index))
 
                 @:ALLOCATE(F_src_rsy_vf(0:buff_size, &
                     is2%beg:is2%end, &
@@ -206,7 +221,7 @@ contains
 
             @:ALLOCATE(flux_rsy_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, 1:adv_idx%end))
+                is3%beg:is3%end, 1:flux_cbc_index))
 
             @:ALLOCATE(flux_src_rsy_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
@@ -241,7 +256,7 @@ contains
 
                 @:ALLOCATE(F_rsz_vf(0:buff_size, &
                     is2%beg:is2%end, &
-                    is3%beg:is3%end, 1:adv_idx%end))
+                    is3%beg:is3%end, 1:flux_cbc_index))
 
                 @:ALLOCATE(F_src_rsz_vf(0:buff_size, &
                     is2%beg:is2%end, &
@@ -251,7 +266,7 @@ contains
 
             @:ALLOCATE(flux_rsz_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, 1:adv_idx%end))
+                is3%beg:is3%end, 1:flux_cbc_index))
 
             @:ALLOCATE(flux_src_rsz_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
@@ -640,7 +655,6 @@ contains
         real(wp), dimension(num_fluids) :: adv, dadv_ds
         real(wp), dimension(sys_size) :: L
         real(wp), dimension(3) :: lambda
-        real(wp), dimension(num_species) :: Y_s
 
         real(wp) :: rho         !< Cell averaged density
         real(wp) :: pres        !< Cell averaged pressure
@@ -651,12 +665,13 @@ contains
         real(wp) :: qv          !< Cell averaged fluid reference energy
         real(wp) :: c
         real(wp) :: Ma
+        real(wp) :: T, sum_Enthalpies
+        real(wp) :: Cv, Cp, e_mix, Mw, R_gas
+        real(wp), dimension(num_species) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
 
         real(wp) :: vel_K_sum, vel_dv_dt_sum
 
-        integer :: i, j, k, r, q !< Generic loop iterators
-
-        real(wp) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
+        integer :: i, j, k, r !< Generic loop iterators
 
         ! Reshaping of inputted data and association of the FD and PI
         ! coefficients, or CBC coefficients, respectively, hinging on
@@ -684,7 +699,7 @@ contains
                                                                is1, is2, is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
                     !$acc parallel loop collapse(3) gang vector default(present)
-                    do i = 1, advxe
+                    do i = 1, flux_cbc_index
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 flux_rs${XYZ}$_vf_l(0, k, r, i) = F_rs${XYZ}$_vf(0, k, r, i) &
@@ -715,7 +730,7 @@ contains
                                                                is1, is2, is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
                     !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, advxe
+                    do i = 1, flux_cbc_index
                         do j = 0, 1
                             do r = is3%beg, is3%end
                                 do k = is2%beg, is2%end
@@ -757,7 +772,7 @@ contains
                 end if
 
                 ! FD2 or FD4 of RHS at j = 0
-                !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
+                !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda,Ys,dYs_dt,dYs_ds,h_k,Cp_i,Gamma_i,Xs)
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
 
@@ -786,9 +801,9 @@ contains
                         end do
 
                         if (bubbles_euler) then
-                            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc, 0, k, r)
+                            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc)
                         else
-                            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc, 0, k, r)
+                            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc)
                         end if
 
                         !$acc loop seq
@@ -796,7 +811,33 @@ contains
                             mf(i) = alpha_rho(i)/rho
                         end do
 
-                        E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_K_sum
+                        if (chemistry) then
+                            !$acc loop seq
+                            do i = chemxb, chemxe
+                                Ys(i - chemxb + 1) = q_prim_rs${XYZ}$_vf(0, k, r, i)
+                            end do
+
+                            call get_mixture_molecular_weight(Ys, Mw)
+                            R_gas = gas_constant/Mw
+                            T = pres/rho/R_gas
+                            call get_mixture_specific_heat_cp_mass(T, Ys, Cp)
+                            call get_mixture_energy_mass(T, Ys, e_mix)
+                            E = rho*e_mix + 5e-1_wp*rho*vel_K_sum
+                            if (chem_params%gamma_method == 1) then
+                                !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
+                                call get_mole_fractions(Mw, Ys, Xs)
+                                call get_species_specific_heats_r(T, Cp_i)
+                                Gamma_i = Cp_i/(Cp_i - 1.0_wp)
+                                gamma = sum(Xs(:)/(Gamma_i(:) - 1.0_wp))
+                            else if (chem_params%gamma_method == 2) then
+                                !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
+                                call get_mixture_specific_heat_cv_mass(T, Ys, Cv)
+                                gamma = 1.0_wp/(Cp/Cv - 1.0_wp)
+                            end if
+                        else
+                            E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_K_sum
+                        end if
+
                         H = (E + pres)/rho
 
                         ! Compute mixture sound speed
@@ -819,6 +860,13 @@ contains
                         do i = 1, advxe - E_idx
                             dadv_ds(i) = 0._wp
                         end do
+
+                        if (chemistry) then
+                            !$acc loop seq
+                            do i = 1, num_species
+                                dYs_ds(i) = 0._wp
+                            end do
+                        end if
 
                         !$acc loop seq
                         do j = 0, buff_size
@@ -845,6 +893,15 @@ contains
                                              fd_coef_${XYZ}$ (j, cbc_loc) + &
                                              dadv_ds(i)
                             end do
+
+                            if (chemistry) then
+                                !$acc loop seq
+                                do i = 1, num_species
+                                    dYs_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, chemxb - 1 + i)* &
+                                                fd_coef_${XYZ}$ (j, cbc_loc) + &
+                                                dYs_ds(i)
+                                end do
+                            end if
                         end do
 
                         ! First-Order Temporal Derivatives of Primitive Variables
@@ -856,13 +913,13 @@ contains
 
                         if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SLIP_WALL) .or. &
                             (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SLIP_WALL)) then
-                            call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                            call s_compute_slip_wall_L(lambda, L, rho, c, dpres_ds, dvel_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_BUFFER) .or. &
                                  (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_BUFFER)) then
-                            call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                            call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_INFLOW) .or. &
                                  (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_INFLOW)) then
-                            call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                            call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, dpres_ds, dvel_ds)
                             ! Add GRCBC for Subsonic Inflow
                             if (bc_${XYZ}$%grcbc_in) then
                                 !$acc loop seq
@@ -883,7 +940,7 @@ contains
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_OUTFLOW) .or. &
                                  (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
-                            call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                            call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                             ! Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
                                 L(advxe) = c*(1._wp - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
@@ -901,10 +958,10 @@ contains
                             call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SUP_INFLOW) .or. &
                                  (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_INFLOW)) then
-                            call s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                            call s_compute_supersonic_inflow_L(L)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SUP_OUTFLOW) .or. &
                                  (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_OUTFLOW)) then
-                            call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                            call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                         end if
 
                         ! Be careful about the cylindrical coordinate!
@@ -934,6 +991,13 @@ contains
                         do i = 1, num_dims
                             vel_dv_dt_sum = vel_dv_dt_sum + vel(i)*dvel_dt(i)
                         end do
+
+                        if (chemistry) then
+                            !$acc loop seq
+                            do i = 1, num_species
+                                dYs_dt(i) = -1._wp*L(chemxb + i - 1)
+                            end do
+                        end if
 
                         ! The treatment of void fraction source is unclear
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
@@ -978,13 +1042,31 @@ contains
                                                                         + rho*dvel_dt(i - contxe))
                         end do
 
-                        flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
-                                                               + ds(0)*(pres*dgamma_dt &
-                                                                        + gamma*dpres_dt &
-                                                                        + dpi_inf_dt &
-                                                                        + dqv_dt &
-                                                                        + rho*vel_dv_dt_sum &
-                                                                        + 5e-1_wp*drho_dt*vel_K_sum)
+                        if (chemistry) then
+                            ! Evolution of LODI equation of energy for real gases adjusted to perfect gas, doi:10.1006/jcph.2002.6990
+                            call get_species_enthalpies_rt(T, h_k)
+                            sum_Enthalpies = 0._wp
+                            !$acc loop seq
+                            do i = 1, num_species
+                                h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
+                                sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
+                            end do
+                            flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
+                                                                   + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2)/(c*c) + sum_Enthalpies)
+                            !$acc loop seq
+                            do i = 1, num_species
+                                flux_rs${XYZ}$_vf_l(-1, k, r, i - 1 + chemxb) = flux_rs${XYZ}$_vf_l(0, k, r, chemxb + i - 1) &
+                                                                                + ds(0)*(drho_dt*Ys(i) + rho*dYs_dt(i))
+                            end do
+                        else
+                            flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
+                                                                   + ds(0)*(pres*dgamma_dt &
+                                                                            + gamma*dpres_dt &
+                                                                            + dpi_inf_dt &
+                                                                            + dqv_dt &
+                                                                            + rho*vel_dv_dt_sum &
+                                                                            + 5e-1_wp*drho_dt*vel_K_sum)
+                        end if
 
                         if (riemann_solver == 1) then
                             !$acc loop seq
@@ -1029,8 +1111,7 @@ contains
         ! The reshaping of outputted data and disssociation of the FD and PI
         ! coefficients, or CBC coefficients, respectively, based on selected
         ! CBC coordinate direction.
-        call s_finalize_cbc(flux_vf, flux_src_vf, &
-                            ix, iy, iz)
+        call s_finalize_cbc(flux_vf, flux_src_vf)
     end subroutine s_cbc
 
     !>  The computation of parameters, the allocation of memory,
@@ -1106,7 +1187,7 @@ contains
             end do
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, advxe
+            do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1182,7 +1263,7 @@ contains
             end do
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, advxe
+            do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1258,7 +1339,7 @@ contains
             end do
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, advxe
+            do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1317,17 +1398,11 @@ contains
         !!      are necessary in order to finalize the CBC application
         !!  @param flux_vf Cell-boundary-average fluxes
         !!  @param flux_src_vf Cell-boundary-average flux sources
-        !!  @param ix Index bound in the first coordinate direction
-        !!  @param iy Index bound in the second coordinate direction
-        !!  @param iz Index bound in the third coordinate direction
-    subroutine s_finalize_cbc(flux_vf, flux_src_vf, &
-                              ix, iy, iz)
+    subroutine s_finalize_cbc(flux_vf, flux_src_vf)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: flux_vf, flux_src_vf
-
-        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, r !< Generic loop iterators
 
@@ -1339,7 +1414,7 @@ contains
         if (cbc_dir == 1) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, advxe
+            do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1390,7 +1465,7 @@ contains
         elseif (cbc_dir == 2) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, advxe
+            do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1443,7 +1518,7 @@ contains
         else
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, advxe
+            do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
@@ -1496,7 +1571,7 @@ contains
     end subroutine s_finalize_cbc
 
     ! Detext if the problem has any characteristic boundary conditions
-    subroutine s_any_cbc_boundaries(toggle)
+    pure elemental subroutine s_any_cbc_boundaries(toggle)
 
         logical, intent(inout) :: toggle
 
@@ -1511,7 +1586,7 @@ contains
     end subroutine s_any_cbc_boundaries
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_cbc_module
+    impure subroutine s_finalize_cbc_module
 
         logical :: is_cbc
 

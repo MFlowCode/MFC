@@ -76,10 +76,10 @@ class MFCInputFile(Case):
         # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
         common.file_write(
             os.path.join(modules_dir, "m_thermochem.f90"),
-            pyro.codegen.fortran90.gen_thermochem_code(
+            pyro.FortranCodeGenerator().generate(
+                "m_thermochem",
                 self.get_cantera_solution(),
-                module_name="m_thermochem",
-                real_type=real_type
+                pyro.CodeGenerationOptions(scalar_type = real_type)
             ),
             True
         )

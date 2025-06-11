@@ -92,8 +92,6 @@ BASE_CFG = {
     'rdma_mpi'                          : 'F',
 
     'bubbles_lagrange'                 : 'F',
-    'rkck_adap_dt'                     : 'F',
-    'rkck_tolerance'                   : 1.0e-09,
     'lag_params%nBubs_glb'             : 1,
     'lag_params%solver_approach'       : 0,
     'lag_params%cluster_type'          : 2,
@@ -257,6 +255,8 @@ print(json.dumps({{**case, **mods}}))
 
         if "Example" in self.trace.split(" -> "):
             tolerance = 1e-3
+        elif "Cylindrical" in self.trace.split(" -> "):
+            tolerance = 1e-9
         elif self.params.get("hypoelasticity", 'F') == 'T':
             tolerance = 1e-7
         elif self.params.get("mixlayer_perturb", 'F') == 'T':

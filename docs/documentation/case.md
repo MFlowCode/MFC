@@ -436,7 +436,7 @@ The effect and use of the source term are assessed by [Schmidmayer et al., 2019]
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer.
 Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md)).
 
-- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`.
+- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles_euler = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`. Additionally, it can be used with ``bubbles_lagrange = 'T'`` and `time_stepper = 3`
 
 - `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, 5, and 7, that correspond to the 1st, 3rd, 5th, and 7th order, respectively.
 
@@ -461,7 +461,7 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively ([Toro, 2013](references.md)).
 `riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations ([Miyoshi and Kusano, 2005](references.md)).
 
-- `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method ([Chen et al., 2022](references.md)) and the improved velocity reconstruction method ([Thornber et al., 2008](references.md)). This feature requires `riemann_solver = 2` and `model_eqns = 2`.
+- `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method ([Chen et al., 2022](references.md)) and the improved velocity reconstruction method ([Thornber et al., 2008](references.md)). This feature requires `model_eqns = 2` or `3`. `low_Mach = 1` works for `riemann_solver = 1` and `2`, but `low_Mach = 2` only works for `riemann_solver = 2`.
 
 - `avg_state` specifies the choice of the method to compute averaged variables at the cell-boundaries from the left and the right states in the Riemann solver by an integer of 1 or 2.
 `avg_state = 1` and `2` correspond to Roe- and arithmetic averages, respectively.
@@ -790,8 +790,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `x0`                  | Real    | Reference length                                          |
 | `Thost`               | Real    | Temperature of the surrounding liquid (host)              |
 | `diffcoefvap`         | Real    | Vapor diffusivity in the gas                              |
-| `rkck_adap_dt`        | Logical | Activates the adaptive rkck time stepping algorithm       |
-| `rkck_tolerance`      | Real    | Admissible error truncation tolerance in the rkck stepper  |
 
 - `nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
 
@@ -804,8 +802,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - `heatTransfer_model` Activates the heat transfer model at the bubble's interface based on ([Preston et al., 2007](references.md)).
 
 - `massTransfer_model` Activates the mass transfer model at the bubble's interface based on ([Preston et al., 2007](references.md)).
-
-- `rkck_adap_dt` Activates the adaptive 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepping algorithm (requires `time_stepper ==4`). A maximum error between the 4th and 5th order Runge-Kutta-Cash-Karp solutions for the same time step size is calculated. If the error is smaller than a tolerance (`rkck_tolerance`), then the algorithm employs the 5th order solution, while if not, both eulerian/lagrangian variables are re-calculated with a smaller time step size.
 
 ### 10. Velocity Field Setup
 

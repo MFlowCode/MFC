@@ -48,7 +48,7 @@ contains
     !>  Reads the configuration file post_process.inp, in order
         !!      to populate parameters in module m_global_parameters.f90
         !!      with the user provided inputs
-    subroutine s_read_input_file
+    impure subroutine s_read_input_file
 
         character(LEN=name_len) :: file_loc !<
             !! Generic string used to store the address of a particular file
@@ -83,7 +83,7 @@ contains
             polydisperse, poly_sigma, file_per_process, relax, &
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
-            cfl_target, surface_tension, bubbles_lagrange, rkck_adap_dt, &
+            cfl_target, surface_tension, bubbles_lagrange, &
             sim_data, hyperelasticity, Bx0, relativity, cont_damage
 
         ! Inquiring the status of the post_process.inp file
@@ -113,7 +113,7 @@ contains
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
 
-            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
         else
             call s_mpi_abort('File post_process.inp is missing. Exiting.')
@@ -125,7 +125,7 @@ contains
         !!      individual choices are compatible with the code's options
         !!      and that the combination of these choices results into a
         !!      valid configuration for the post-process
-    subroutine s_check_input_file
+    impure subroutine s_check_input_file
 
         character(LEN=len_trim(case_dir)) :: file_loc !<
             !! Generic string used to store the address of a particular file
@@ -151,16 +151,16 @@ contains
 
     end subroutine s_check_input_file
 
-    subroutine s_perform_time_step(t_step)
+    impure subroutine s_perform_time_step(t_step)
 
         integer, intent(inout) :: t_step
         if (proc_rank == 0) then
             if (cfl_dt) then
-                print '(" ["I3"%]  Saving "I8" of "I0"")', &
+                print '(" [", I3, "%]  Saving ", I8, " of ", I0, "")', &
                     int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), &
                     t_step, n_save
             else
-                print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
+                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " @ t_step = ", I0, "")', &
                     int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                     (t_step - t_step_start)/t_step_save + 1, &
                     (t_step_stop - t_step_start)/t_step_save + 1, &
@@ -189,7 +189,7 @@ contains
 
     end subroutine s_perform_time_step
 
-    subroutine s_save_data(t_step, varname, pres, c, H)
+    impure subroutine s_save_data(t_step, varname, pres, c, H)
 
         integer, intent(inout) :: t_step
         character(LEN=name_len), intent(inout) :: varname
@@ -544,31 +544,17 @@ contains
         end if
 
         ! Adding the vorticity to the formatted database file
-        if (p > 0) then
-            do i = 1, num_vels
-                if (omega_wrt(i)) then
+        do i = 1, 3
+            if (omega_wrt(i)) then
 
-                    call s_derive_vorticity_component(i, q_prim_vf, q_sf)
+                call s_derive_vorticity_component(i, q_prim_vf, q_sf)
 
-                    write (varname, '(A,I0)') 'omega', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
+                write (varname, '(A,I0)') 'omega', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
 
-                    varname(:) = ' '
-                end if
-            end do
-        elseif (n > 0) then
-            do i = 1, num_vels
-                if (omega_wrt(i)) then
-
-                    call s_derive_vorticity_component(i, q_prim_vf, q_sf)
-
-                    write (varname, '(A,I0)') 'omega', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                    varname(:) = ' '
-                end if
-            end do
-        end if
+                varname(:) = ' '
+            end if
+        end do
 
         if (ib) then
             q_sf = real(ib_markers%sf(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end))
@@ -685,12 +671,12 @@ contains
 
     end subroutine s_save_data
 
-    subroutine s_initialize_modules
+    impure subroutine s_initialize_modules
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
         if (bubbles_euler .and. nb > 1) then
-            call s_simpson
+            call s_simpson(weight, R0)
         end if
         if (bubbles_euler .and. .not. polytropic) then
             call s_initialize_nonpoly()
@@ -709,7 +695,7 @@ contains
         end if
     end subroutine s_initialize_modules
 
-    subroutine s_initialize_mpi_domain
+    impure subroutine s_initialize_mpi_domain
         ! Initialization of the MPI environment
         call s_mpi_initialize()
 
@@ -722,7 +708,7 @@ contains
             call s_read_input_file()
             call s_check_input_file()
 
-            print '(" Post-processing a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
+            print '(" Post-processing a ", I0, "x", I0, "x", I0, " case on ", I0, " rank(s)")', m, n, p, num_procs
         end if
 
         ! Broadcasting the user inputs to all of the processors and performing the
@@ -734,7 +720,7 @@ contains
 
     end subroutine s_initialize_mpi_domain
 
-    subroutine s_finalize_modules
+    impure subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
 

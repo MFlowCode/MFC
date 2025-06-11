@@ -24,7 +24,7 @@ module m_perturbation
 
 contains
 
-    subroutine s_initialize_perturbation_module()
+    impure subroutine s_initialize_perturbation_module()
 
         if (elliptic_smoothing) then
             allocate (q_prim_temp(0:m, 0:n, 0:p, 1:sys_size))
@@ -32,12 +32,12 @@ contains
 
     end subroutine s_initialize_perturbation_module
 
-    subroutine s_perturb_sphere(q_prim_vf)
+    impure subroutine s_perturb_sphere(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !< generic loop operators
 
         real(wp) :: perturb_alpha
-        real(wp) :: alpha_unadv
+
         real(wp) :: rand_real
         call random_seed()
 
@@ -64,9 +64,9 @@ contains
 
     end subroutine s_perturb_sphere
 
-    subroutine s_perturb_surrounding_flow(q_prim_vf)
+    impure subroutine s_perturb_surrounding_flow(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        integer :: i, j, k, l !<  generic loop iterators
+        integer :: i, j, k !<  generic loop iterators
 
         real(wp) :: perturb_alpha
         real(wp) :: rand_real
@@ -89,7 +89,7 @@ contains
         end do
     end subroutine s_perturb_surrounding_flow
 
-    subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
+    impure subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
@@ -294,7 +294,7 @@ contains
 
     end function modmul
 
-    subroutine s_finalize_perturbation_module()
+    impure subroutine s_finalize_perturbation_module()
 
         if (elliptic_smoothing) then
             deallocate (q_prim_temp)

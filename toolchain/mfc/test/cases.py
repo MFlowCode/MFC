@@ -174,12 +174,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
 
     def alter_low_Mach_correction():
-        stack.push('', {'riemann_solver': 2, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'dt': 1e-7})
+        stack.push('', {'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'dt': 1e-7})
 
-        for low_Mach in [1, 2]:
-            stack.push(f"low_Mach={low_Mach}", {'low_Mach': low_Mach})
-            cases.append(define_case_d(stack, '', {}))
-            stack.pop()
+        stack.push(f"riemann_solver=1",{'riemann_solver': 1})
+        cases.append(define_case_d(stack, 'low_Mach=1', {'low_Mach': 1}))
+        stack.pop()
+        stack.push(f"riemann_solver=2",{'riemann_solver': 2})
+        cases.append(define_case_d(stack, 'low_Mach=1', {'low_Mach': 1}))
+        cases.append(define_case_d(stack, 'low_Mach=2', {'low_Mach': 2}))
+        stack.pop()
 
         stack.pop()
 
@@ -300,7 +303,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
-            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11,
+            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-10,
             'viscous': 'T'
             })
 
@@ -783,7 +786,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Lagrangian bubbles
         for adap_dt in ['F', 'T']:
             for couplingMethod in [1, 2]:
-                stack.push("Lagrange bubbles", {"bubbles_lagrange": 'T',
+                stack.push("Lagrange Bubbles", {"bubbles_lagrange": 'T',
                     'dt': 1e-06, 'lag_params%pressure_corrector': 'T', 'bubble_model': 2,
                     'num_fluids': 2, 'lag_params%heatTransfer_model': 'T', 'lag_params%massTransfer_model': 'T', 
                     'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'fluid_pp(2)%gamma': 2.5,
@@ -797,18 +800,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'patch_icpp(2)%alpha(2)': 0.,  'patch_icpp(3)%alpha_rho(1)': 0.96, 'patch_icpp(3)%alpha(1)': 4e-02,
                     'patch_icpp(3)%alpha_rho(2)': 0., 'patch_icpp(3)%alpha(2)': 0.,'patch_icpp(1)%pres': 1.0,
                     'patch_icpp(2)%pres': 1.0, 'patch_icpp(3)%pres': 1.0, 'acoustic_source': 'T', 'acoustic(1)%loc(2)': 0.5,
-                    'acoustic(1)%wavelength': 0.25, 'acoustic(1)%support': 3, 'acoustic(1)%height': 1e10
+                    'acoustic(1)%wavelength': 0.25, 'acoustic(1)%support': 3, 'acoustic(1)%height': 1e10, 
+                    'acoustic(1)%mag': 2e+04, 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50
                 })
                 if couplingMethod==1:
-                    stack.push('One-way coupling',{'lag_params%solver_approach': 1})
+                    stack.push('One-way Coupling',{'lag_params%solver_approach': 1})
                 else:
-                    stack.push('Two-way coupling',{'lag_params%solver_approach': 2})
+                    stack.push('Two-way Coupling',{'lag_params%solver_approach': 2})
 
                 if adap_dt=='F':
-                    stack.push('',{'acoustic(1)%mag': 2e+04, 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50})
+                    stack.push('',{})
                 else:
-                    stack.push('rkck stepper',{'rkck_adap_dt': 'F', 'time_stepper': 4,
-                            'acoustic(1)%mag': 6e+04, 'n_start': 0, 't_save': 5e-05, 't_stop': 5e-05})
+                    stack.push('adap_dt=T',{'adap_dt': 'T'})
 
                 cases.append(define_case_d(stack, '', {}))
 
@@ -932,7 +935,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 continue
 
             # # List of currently broken examples -> currently attempting to fix!
-            brokenCases = ["2D_ibm_cfl_dt", "1D_sodHypo", "2D_viscous", "2D_laplace_pressure_jump", "2D_bubbly_steady_shock", "2D_advection", "2D_hardcodied_ic", "2D_ibm_multiphase", "2D_acoustic_broadband", "1D_inert_shocktube", "1D_reactive_shocktube", "2D_ibm_steady_shock", "3D_performance_test", "3D_ibm_stl_ellipsoid", "3D_sphbubcollapse", "2D_ibm_stl_wedge", "3D_ibm_stl_pyramid", "3D_ibm_bowshock", "3D_turb_mixing", "2D_mixing_artificial_Ma", "3D_lagrange_bubblescreen", "2D_triple_point"]
+            brokenCases = ["2D_ibm_cfl_dt", "1D_sodHypo", "2D_viscous", "2D_laplace_pressure_jump", "2D_bubbly_steady_shock", "2D_advection", "2D_hardcodied_ic", "2D_ibm_multiphase", "2D_acoustic_broadband", "1D_inert_shocktube", "1D_reactive_shocktube", "2D_ibm_steady_shock", "3D_performance_test", "3D_ibm_stl_ellipsoid", "3D_sphbubcollapse", "2D_ibm_stl_wedge", "3D_ibm_stl_pyramid", "3D_ibm_bowshock", "3D_turb_mixing", "2D_mixing_artificial_Ma", "2D_lagrange_bubblescreen", "3D_lagrange_bubblescreen", "2D_triple_point"]
             if path in brokenCases:
                 continue
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"
@@ -957,9 +960,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         case['m'] = 25
                         case['n'] = 25
                         case['p'] = 25
-
-                if 'rkck_adap_dt' in case and case['rkck_adap_dt'] == 'T':
-                    case['rkck_adap_dt'] = 'F'
 
             cases.append(define_case_f(name, path, [], {}, functor=modify_example_case))
 

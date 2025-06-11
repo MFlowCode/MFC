@@ -270,10 +270,6 @@ module m_global_parameters
     integer :: chemxb, chemxe
     !> @}
 
-    !> @ lagrangian solver parameters
-    logical :: rkck_adap_dt
-    !> @}
-
     integer, allocatable, dimension(:, :, :) :: logic_grid
 
     type(pres_field) :: pb
@@ -291,7 +287,7 @@ contains
     !>  Assigns default values to user inputs prior to reading
         !!              them in. This allows for an easier consistency check of
         !!              these parameters once they are read from the input file.
-    subroutine s_assign_default_values_to_user_inputs
+    impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i !< Generic loop operator
 
@@ -549,16 +545,13 @@ contains
             fluid_pp(i)%G = 0._wp
         end do
 
-        ! Lagrangian solver
-        rkck_adap_dt = .false.
-
         Bx0 = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs
 
     !> Computation of parameters, allocation procedures, and/or
         !! any other tasks needed to properly setup the module
-    subroutine s_initialize_global_parameters_module
+    impure subroutine s_initialize_global_parameters_module
 
         integer :: i, j, fac
 
@@ -919,7 +912,7 @@ contains
 
     end subroutine s_initialize_global_parameters_module
 
-    subroutine s_initialize_parallel_io
+    impure subroutine s_initialize_parallel_io
 
         num_dims = 1 + min(1, n) + min(1, p)
 
@@ -952,7 +945,7 @@ contains
 
     end subroutine s_initialize_parallel_io
 
-    subroutine s_finalize_global_parameters_module
+    impure subroutine s_finalize_global_parameters_module
 
         integer :: i
 
