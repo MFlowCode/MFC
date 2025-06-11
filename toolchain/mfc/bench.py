@@ -87,7 +87,7 @@ def diff():
         _lock_to_str = lambda lock: ' '.join([f"{k}={v}" for k, v in lock.items()])
     cons.print(f"[bold]Comparing Benchmarks: Speedups from [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] to [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] are displayed below. Thus, numbers > 1 represent increases in performance.[/bold]")
 
-        cons.print(f"""\
+    cons.print(f"""\
 [bold yellow]Warning[/bold yellow]: Metadata in lhs and rhs are not equal.
     This could mean that the benchmarks are not comparable (e.g. one was run on CPUs and the other on GPUs).
     lhs:
