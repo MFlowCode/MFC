@@ -3335,7 +3335,7 @@ contains
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
         end do
-        !$acc update device(Gs)
+        $:UPDATE(device=["Gs"])
 
         if (viscous) then
             @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
@@ -3347,7 +3347,7 @@ contains
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-            !$acc update device(Res, Re_idx, Re_size)
+            $:UPDATE(device=["Res","Re_idx","Re_size"])
         end if
 
         !$acc enter data copyin(is1, is2, is3, isx, isy, isz)
@@ -3496,7 +3496,7 @@ contains
             dir_idx = (/3, 1, 2/); dir_flg = (/0._wp, 0._wp, 1._wp/)
         end if
 
-        !$acc update device(is1, is2, is3)
+        $:UPDATE(device=["is1","is2","is3"])
 
         if (elasticity) then
             if (norm_dir == 1) then
@@ -3509,8 +3509,10 @@ contains
         end if
 
         isx = ix; isy = iy; isz = iz
-        !$acc update device(isx, isy, isz) ! for stuff in the same module
-        !$acc update device(dir_idx, dir_flg,  dir_idx_tau) ! for stuff in different modules
+        ! for stuff in the same module
+        $:UPDATE(device=["isx","isy","isz"])
+        ! for stuff in different modules
+        $:UPDATE(device=["dir_idx","dir_flg","dir_idx_tau"])
 
         ! Population of Buffers in x-direction
         if (norm_dir == 1) then

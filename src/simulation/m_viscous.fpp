@@ -43,7 +43,7 @@ contains
                 Res_viscous(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
             end do
         end do
-        !$acc update device(Res_viscous, Re_idx, Re_size)
+        $:UPDATE(device=["Res_viscous","Re_idx","Re_size"])
         !$acc enter data copyin(is1_viscous, is2_viscous, is3_viscous, iv)
 
     end subroutine s_initialize_viscous_module
@@ -76,7 +76,7 @@ contains
 
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
-        !$acc update device(is1_viscous, is2_viscous, is3_viscous)
+        $:UPDATE(device=["is1_viscous","is2_viscous","is3_viscous"])
 
         $:PARALLEL_LOOP(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end
@@ -550,7 +550,7 @@ contains
 
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
 
-            !$acc update device(iv)
+            $:UPDATE(device=["iv"])
 
             call s_reconstruct_cell_boundary_values_visc( &
                 q_prim_qp%vf(iv%beg:iv%end), &
@@ -588,11 +588,11 @@ contains
         else ! Compute velocity gradient at cell centers using finite differences
 
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
-            !$acc update device(iv)
+            $:UPDATE(device=["iv"])
 
             is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
-            !$acc update device(is1_viscous, is2_viscous, is3_viscous)
+            $:UPDATE(device=["is1_viscous","is2_viscous","is3_viscous"])
 
             $:PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
@@ -1000,7 +1000,7 @@ contains
 
         end if
 
-        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
+        $:UPDATE(device=["is1_viscous","is2_viscous","is3_viscous","iv"])
 
         if (n > 0) then
             if (p > 0) then
@@ -1097,7 +1097,7 @@ contains
 
         end if
 
-        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
+        $:UPDATE(device=["is1_viscous","is2_viscous","is3_viscous","iv"])
 
         if (n > 0) then
             if (p > 0) then
@@ -1200,7 +1200,7 @@ contains
         is3_viscous = iz
         iv = iv_in
 
-        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
+        $:UPDATE(device=["is1_viscous","is2_viscous","is3_viscous","iv"])
 
         ! First-Order Spatial Derivatives in x-direction
         if (norm_dir == 1) then
@@ -1320,7 +1320,7 @@ contains
 
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
-        !$acc update device(is1_viscous, is2_viscous, is3_viscous)
+        $:UPDATE(device=["is1_viscous","is2_viscous","is3_viscous"])
 
         $:PARALLEL_LOOP(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end

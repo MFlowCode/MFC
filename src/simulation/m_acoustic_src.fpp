@@ -111,7 +111,12 @@ contains
                 delay(i) = acoustic(i)%delay
             end if
         end do
-        !$acc update device(loc_acoustic, mag, dipole, support, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on, bb_num_freq, bb_bandwidth, bb_lowest_freq)
+        $:UPDATE(device=["loc_acoustic","mag","dipole","support","length", &
+            & "height","wavelength","frequency","gauss_sigma_dist", &
+            & "gauss_sigma_time","foc_length","aperture","npulse","pulse", &
+            & "dir","delay","element_polygon_ratio","rotate_angle", &
+            & "element_spacing_angle","num_elements","element_on", &
+            & "bb_num_freq","bb_bandwidth","bb_lowest_freq"])
 
         @:ALLOCATE(mass_src(0:m, 0:n, 0:p))
         @:ALLOCATE(mom_src(1:num_vels, 0:m, 0:n, 0:p))
@@ -469,14 +474,14 @@ contains
                 call s_mpi_abort('Fatal Error: Inconsistent allocation of source_spatials')
             end if
 
-            !$acc update device(source_spatials(ai)%coord)
-            !$acc update device(source_spatials(ai)%val)
+            $:UPDATE(device=["source_spatials(ai)%coord"])
+            $:UPDATE(device=["source_spatials(ai)%val"])
             if (support(ai) >= 5) then
                 if (dim == 2) then
-                    !$acc update device(source_spatials(ai)%angle)
+                    $:UPDATE(device=["source_spatials(ai)%angle"])
                 end if
                 if (dim == 3) then
-                    !$acc update device(source_spatials(ai)%xyz_to_r_ratios)
+                    $:UPDATE(device=["source_spatials(ai)%xyz_to_r_ratios"])
                 end if
             end if
 

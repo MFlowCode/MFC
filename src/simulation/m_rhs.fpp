@@ -180,7 +180,7 @@ contains
         integer :: num_eqns_after_adv
 
         !$acc enter data copyin(idwbuff, idwbuff)
-        !$acc update device(idwbuff, idwbuff)
+        $:UPDATE(device=["idwbuff", "idwbuff"])
 
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
@@ -578,7 +578,7 @@ contains
             gamma_min(i) = 1._wp/fluid_pp(i)%gamma + 1._wp
             pres_inf(i) = fluid_pp(i)%pi_inf/(1._wp + fluid_pp(i)%gamma)
         end do
-        !$acc update device(gamma_min, pres_inf)
+        $:UPDATE(device=["gamma_min", "pres_inf"])
 
         if (viscous) then
             @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
@@ -590,7 +590,7 @@ contains
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-            !$acc update device(Res, Re_idx, Re_size)
+            $:UPDATE(device=["Res","Re_idx","Re_size"])
         end if
 
         $:PARALLEL_LOOP(collapse=4)
@@ -2005,7 +2005,7 @@ contains
 
         end if
 
-        !$acc update device(is1, is2, is3, iv)
+        $:UPDATE(device=["is1","is2","is3","iv"])
 
         if (recon_dir == 1) then
             !$acc parallel loop collapse(4) default(present)

@@ -53,12 +53,12 @@ contains
 
         ! Computing centered finite difference coefficients
         call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_h, buff_size, fd_number, fd_order)
-        !$acc update device(fd_coeff_x_h)
+        $:UPDATE(device=["fd_coeff_x_h"])
         call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_h, buff_size, fd_number, fd_order)
-        !$acc update device(fd_coeff_y_h)
+        $:UPDATE(device=["fd_coeff_y_h"])
         if (p > 0) then
             call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_h, buff_size, fd_number, fd_order)
-            !$acc update device(fd_coeff_z_h)
+            $:UPDATE(device=["fd_coeff_z_h"])
         end if
 
     end subroutine s_initialize_mhd_powell_module

@@ -909,7 +909,7 @@ contains
 
 #if defined(MFC_OpenACC)
             if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
+                $:UPDATE(device=["ib_buff_recv"])
             end if
 #endif
 
@@ -1038,7 +1038,7 @@ contains
             end if
 
             if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
+                $:UPDATE(device=["ib_buff_recv"])
             end if
 
             ! Unpacking buffer received from bc_x%end
@@ -1175,7 +1175,7 @@ contains
 
 #if defined(MFC_OpenACC)
             if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
+                $:UPDATE(device=["ib_buff_recv"])
             end if
 #endif
 
@@ -1311,7 +1311,7 @@ contains
 
 #if defined(MFC_OpenACC)
             if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
+                $:UPDATE(device=["ib_buff_recv"])
             end if
 #endif
 
@@ -1450,7 +1450,7 @@ contains
 
 #if defined(MFC_OpenACC)
             if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
+                $:UPDATE(device=["ib_buff_recv"])
             end if
 #endif
 
@@ -1586,7 +1586,7 @@ contains
 
 #if defined(MFC_OpenACC)
             if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
+                $:UPDATE(device=["ib_buff_recv"])
             end if
 #endif
 

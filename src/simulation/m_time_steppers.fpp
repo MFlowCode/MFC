@@ -1006,7 +1006,7 @@ contains
             call s_mpi_allreduce_min(dt_local, dt)
         end if
 
-        !$acc update device(dt)
+        $:UPDATE(device=["dt"])
 
     end subroutine s_compute_dt
 

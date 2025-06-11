@@ -81,9 +81,9 @@ contains
 
         integer :: i, j, k
 
-        !$acc update device(ib_markers%sf)
-        !$acc update device(levelset%sf)
-        !$acc update device(levelset_norm%sf)
+        $:UPDATE(device=["ib_markers%sf"])
+        $:UPDATE(device=["levelset%sf"])
+        $:UPDATE(device=["levelset_norm%sf"])
 
         ! Get neighboring IB variables from other processors
         call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
@@ -92,20 +92,20 @@ contains
 
         call s_find_num_ghost_points(num_gps, num_inner_gps)
 
-        !$acc update device(num_gps, num_inner_gps)
+        $:UPDATE(device=["num_gps", "num_inner_gps"])
         @:ALLOCATE(ghost_points(1:num_gps))
         @:ALLOCATE(inner_points(1:num_inner_gps))
 
         !$acc enter data copyin(ghost_points, inner_points)
 
         call s_find_ghost_points(ghost_points, inner_points)
-        !$acc update device(ghost_points, inner_points)
+        $:UPDATE(device=["ghost_points", "inner_points"])
 
         call s_compute_image_points(ghost_points, levelset, levelset_norm)
-        !$acc update device(ghost_points)
+        $:UPDATE(device=["ghost_points"])
 
         call s_compute_interpolation_coeffs(ghost_points)
-        !$acc update device(ghost_points)
+        $:UPDATE(device=["ghost_points"])
 
     end subroutine s_ibm_setup
 

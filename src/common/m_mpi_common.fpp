@@ -643,7 +643,7 @@ contains
 #ifdef MFC_MPI
 
         call nvtxStartRange("RHS-COMM-PACKBUF")
-!$acc update device(v_size)
+$:UPDATE(device=["v_size"])
 
 #ifdef MFC_SIMULATION
         if (qbmm .and. .not. polytropic) then
@@ -878,7 +878,7 @@ contains
                     !$acc wait
                 #:else
                     call nvtxStartRange("RHS-COMM-HOST2DEV")
-                    !$acc update device(buff_recv)
+                    $:UPDATE(device=["buff_recv"])
                     call nvtxEndRange
                 #:endif
             end if
@@ -1093,7 +1093,7 @@ contains
 #ifdef MFC_MPI
 
         nVars = num_dims + 1
-        !$acc update device(nVars)
+        $:UPDATE(device=["nVars"])
 
         buffer_counts = (/ &
                         buff_size*nVars*(n + 1)*(p + 1), &
@@ -1208,7 +1208,7 @@ contains
                     !$acc wait
                 #:else
                     call nvtxStartRange("RHS-COMM-HOST2DEV")
-                    !$acc update device(buff_recv)
+                    $:UPDATE(device=["buff_recv"])
                     call nvtxEndRange
                 #:endif
             end if

@@ -52,9 +52,9 @@ contains
             end if
         end do
 
-        !$acc update device(rs, vs)
+        $:UPDATE(device=["rs", "vs"])
         if (.not. polytropic) then
-            !$acc update device(ps, ms)
+            $:UPDATE(device=["ps", "ms"])
         end if
 
         @:ALLOCATE(divu%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))

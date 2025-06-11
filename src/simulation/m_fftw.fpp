@@ -91,7 +91,7 @@ contains
         iembed(1) = 0
         oembed(1) = 0
         !$acc enter data copyin(real_size, cmplx_size, x_size, sys_size, batch_size, Nfq)
-        !$acc update device(real_size, cmplx_size, x_size, sys_size, batch_size)
+        $:UPDATE(device=["real_size","cmplx_size","x_size","sys_size","batch_size"])
 #else
         ! Allocate input and output DFT data sizes
         fftw_real_data = fftw_alloc_real(int(real_size, c_size_t))
@@ -172,7 +172,7 @@ contains
 #endif
         !$acc end host_data
         Nfq = 3
-        !$acc update device(Nfq)
+        $:UPDATE(device=["Nfq"])
 
         $:PARALLEL_LOOP(collapse=3)
         do k = 1, sys_size
@@ -232,7 +232,7 @@ contains
             !$acc end host_data
 
             Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
-            !$acc update device(Nfq)
+            $:UPDATE(device=["Nfq"])
 
             $:PARALLEL_LOOP(collapse=3)
             do k = 1, sys_size

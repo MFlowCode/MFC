@@ -56,7 +56,7 @@ contains
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
         end do
-        !$acc update device(Gs)
+        $:UPDATE(device=["Gs"])
 
         @:ALLOCATE(fd_coeff_x_h(-fd_number:fd_number, 0:m))
         if (n > 0) then
@@ -69,16 +69,16 @@ contains
         ! Computing centered finite difference coefficients
         call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_h, buff_size, &
                                                       fd_number, fd_order)
-        !$acc update device(fd_coeff_x_h)
+        $:UPDATE(device=["fd_coeff_x_h"])
         if (n > 0) then
             call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_h, buff_size, &
                                                           fd_number, fd_order)
-            !$acc update device(fd_coeff_y_h)
+            $:UPDATE(device=["fd_coeff_y_h"])
         end if
         if (p > 0) then
             call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_h, buff_size, &
                                                           fd_number, fd_order)
-            !$acc update device(fd_coeff_z_h)
+            $:UPDATE(device=["fd_coeff_z_h"])
         end if
 
     end subroutine s_initialize_hypoelastic_module

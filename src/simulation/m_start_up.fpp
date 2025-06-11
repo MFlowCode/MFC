@@ -3,6 +3,7 @@
 !! @brief Contains module m_start_up
 
 #:include 'case.fpp'
+#:include 'directive_macros.fpp'
 
 !> @brief The purpose of the module is primarily to read in the files that
 !!              contain the inputs, the initial condition data and the grid data
@@ -1268,12 +1269,12 @@ contains
         if (cfl_dt) then
             if ((mytime + dt) >= t_stop) then
                 dt = t_stop - mytime
-                !$acc update device(dt)
+                $:UPDATE(device=["dt"])
             end if
         else
             if ((mytime + dt) >= finaltime) then
                 dt = finaltime - mytime
-                !$acc update device(dt)
+                $:UPDATE(device=["dt"])
             end if
         end if
 
@@ -1634,38 +1635,44 @@ contains
         integer :: i
         !Update GPU DATA
         do i = 1, sys_size
-            !$acc update device(q_cons_ts(1)%vf(i)%sf)
+            $:UPDATE(device=["q_cons_ts(1)%vf(i)%sf"])
         end do
 
         if (qbmm .and. .not. polytropic) then
-            !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
+            $:UPDATE(device=["pb_ts(1)%sf","mv_ts(1)%sf"])
         end if
         if (chemistry) then
-            !$acc update device(q_T_sf%sf)
+            $:UPDATE(device=["q_T_sf%sf"])
         end if
-        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, n_idx, pi_fac, low_Mach)
-        !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+        $:UPDATE(device=["nb","R0ref","Ca","Web","Re_inv","weight","R0","V0", &
+            & "bubbles_euler","polytropic","polydisperse","qbmm","R0_type", &
+            & "ptil","bubble_model","thermal","poly_sigma","adv_n","adap_dt", &
+            & "adap_dt_tol","n_idx","pi_fac","low_Mach"])
+        $:UPDATE(device=["R_n","R_v","phi_vn","phi_nv","Pe_c","Tw","pv","M_n", &
+            & "M_v","k_n","k_v","pb0","mass_n0","mass_v0","Pe_T","Re_trans_T", &
+            & "Re_trans_c","Im_trans_T","Im_trans_c","omegaN","mul0","ss", &
+            & "gamma_v","mu_v","gamma_m","gamma_n","mu_n","gam"])
 
-        !$acc update device(acoustic_source, num_source)
-        !$acc update device(sigma, surface_tension)
+        $:UPDATE(device=["acoustic_source", "num_source"])
+        $:UPDATE(device=["sigma", "surface_tension"])
 
-        !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
+        $:UPDATE(device=["dx","dy","dz","x_cb","x_cc","y_cb","y_cc","z_cb","z_cc"])
 
-        !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
-        !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
-        !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
+        $:UPDATE(device=["bc_x%vb1","bc_x%vb2","bc_x%vb3","bc_x%ve1","bc_x%ve2","bc_x%ve3"])
+        $:UPDATE(device=["bc_y%vb1","bc_y%vb2","bc_y%vb3","bc_y%ve1","bc_y%ve2","bc_y%ve3"])
+        $:UPDATE(device=["bc_z%vb1","bc_z%vb2","bc_z%vb3","bc_z%ve1","bc_z%ve2","bc_z%ve3"])
 
-        !$acc update device(bc_x%grcbc_in, bc_x%grcbc_out, bc_x%grcbc_vel_out)
-        !$acc update device(bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out)
-        !$acc update device(bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out)
+        $:UPDATE(device=["bc_x%grcbc_in","bc_x%grcbc_out","bc_x%grcbc_vel_out"])
+        $:UPDATE(device=["bc_y%grcbc_in","bc_y%grcbc_out","bc_y%grcbc_vel_out"])
+        $:UPDATE(device=["bc_z%grcbc_in","bc_z%grcbc_out","bc_z%grcbc_vel_out"])
 
-        !$acc update device(relax, relax_model)
+        $:UPDATE(device=["relax", "relax_model"])
         if (relax) then
-            !$acc update device(palpha_eps, ptgalpha_eps)
+            $:UPDATE(device=["palpha_eps", "ptgalpha_eps"])
         end if
 
         if (ib) then
-            !$acc update device(ib_markers%sf)
+            $:UPDATE(device=["ib_markers%sf"])
         end if
     end subroutine s_initialize_gpu_vars
 

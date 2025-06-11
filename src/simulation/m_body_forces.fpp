@@ -68,7 +68,7 @@ contains
             end if
         end if
 
-        !$acc update device(accel_bf)
+        $:UPDATE(device=["accel_bf"])
 
     end subroutine s_compute_acceleration
 

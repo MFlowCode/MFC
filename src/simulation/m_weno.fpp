@@ -625,11 +625,11 @@ contains
         #:endfor
 
         if (weno_dir == 1) then
-            !$acc update device(poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x)
+            $:UPDATE(device=["poly_coef_cbL_x","poly_coef_cbR_x","d_cbL_x","d_cbR_x","beta_coef_x"])
         elseif (weno_dir == 2) then
-            !$acc update device(poly_coef_cbL_y, poly_coef_cbR_y, d_cbL_y, d_cbR_y, beta_coef_y)
+            $:UPDATE(device=["poly_coef_cbL_y","poly_coef_cbR_y","d_cbL_y","d_cbR_y","beta_coef_y"])
         else
-            !$acc update device(poly_coef_cbL_z, poly_coef_cbR_z, d_cbL_z, d_cbR_z, beta_coef_z)
+            $:UPDATE(device=["poly_coef_cbL_z","poly_coef_cbR_z","d_cbL_z","d_cbR_z","beta_coef_z"])
         end if
 
         ! Nullifying WENO coefficients and cell-boundary locations pointers
@@ -664,7 +664,7 @@ contains
         is2_weno = is2_weno_d
         is3_weno = is3_weno_d
 
-        !$acc update device(is1_weno, is2_weno, is3_weno)
+        $:UPDATE(device=["is1_weno","is2_weno","is3_weno"])
 
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
@@ -1135,7 +1135,7 @@ contains
         ! as to reshape the inputted data in the coordinate direction of
         ! the WENO reconstruction
         v_size = ubound(v_vf, 1)
-        !$acc update device(v_size)
+        $:UPDATE(device=["v_size"])
 
         if (weno_dir == 1) then
             $:PARALLEL_LOOP(collapse=4)

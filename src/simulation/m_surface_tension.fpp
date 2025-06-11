@@ -337,7 +337,7 @@ contains
 
         end if
 
-        !$acc update device(is1, is2, is3, iv)
+        $:UPDATE(device=["is1","is2","is3","iv"])
 
         if (recon_dir == 1) then
             !$acc parallel loop collapse(4) default(present)

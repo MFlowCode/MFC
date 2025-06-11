@@ -59,7 +59,7 @@ contains
             end if
 
             !$acc enter data copyin(nterms)
-            !$acc update device(nterms)
+            $:UPDATE(device=["nterms"])
 
         #:endif
 
@@ -393,7 +393,7 @@ contains
             end do
         end if
 
-        !$acc update device(momrhs)
+        $:UPDATE(device=["momrhs"])
 
         @:ALLOCATE(bubrs(1:nb))
         @:ALLOCATE(bubmoms(1:nb, 1:nmom))
@@ -401,14 +401,14 @@ contains
         do i = 1, nb
             bubrs(i) = bub_idx%rs(i)
         end do
-        !$acc update device(bubrs)
+        $:UPDATE(device=["bubrs"])
 
         do j = 1, nmom
             do i = 1, nb
                 bubmoms(i, j) = bub_idx%moms(i, j)
             end do
         end do
-        !$acc update device(bubmoms)
+        $:UPDATE(device=["bubmoms"])
 
     end subroutine s_initialize_qbmm_module
 
@@ -838,7 +838,7 @@ contains
 
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
 
-        !$acc update device(is1_qbmm, is2_qbmm, is3_qbmm)
+        $:UPDATE(device=["is1_qbmm","is2_qbmm","is3_qbmm"])
 
         $:PARALLEL_LOOP(collapse=3, private=["moms", "msum", "wght", "abscX", &
             "abscY", "wght_pb", "wght_mv", "wght_ht", "coeff", "ht", "r", "q", &

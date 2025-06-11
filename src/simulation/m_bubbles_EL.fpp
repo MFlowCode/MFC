@@ -101,7 +101,7 @@ contains
             call s_mpi_abort('Please check the lag_params%solver_approach input')
         end if
 
-        !$acc update device(lag_num_ts, q_beta_idx)
+        $:UPDATE(device=["lag_num_ts", "q_beta_idx"])
 
         @:ALLOCATE(q_beta%vf(1:q_beta_idx))
 
@@ -249,7 +249,7 @@ contains
 
         print *, " Lagrange bubbles running, in proc", proc_rank, "number:", bub_id, "/", id
 
-        !$acc update device(bubbles_lagrange, lag_params)
+        $:UPDATE(device=["bubbles_lagrange", "lag_params"])
 
         !$acc update device(lag_id, bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC,   &
         !$acc bub_dphidt, gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel,       &
@@ -257,9 +257,9 @@ contains
 
         Rmax_glb = min(dflt_real, -dflt_real)
         Rmin_glb = max(dflt_real, -dflt_real)
-        !$acc update device(Rmax_glb, Rmin_glb)
+        $:UPDATE(device=["Rmax_glb", "Rmin_glb"])
 
-        !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
+        $:UPDATE(device=["dx","dy","dz","x_cb","x_cc","y_cb","y_cc","z_cb","z_cc"])
 
         !Populate temporal variables
         call s_transfer_data_to_tmp()
@@ -1676,7 +1676,7 @@ contains
         end do
 
         nBubs = nBubs - 1
-        !$acc update device(nBubs)
+        $:UPDATE(device=["nBubs"])
 
     end subroutine s_remove_lag_bubble
 

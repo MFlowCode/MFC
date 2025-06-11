@@ -803,10 +803,10 @@ contains
             else
                 weno_num_stencils = weno_polyn
             end if
-            !$acc update device(weno_polyn)
-            !$acc update device(weno_num_stencils)
-            !$acc update device(nb)
-            !$acc update device(num_dims, num_vels, num_fluids)
+            $:UPDATE(device=["weno_polyn"])
+            $:UPDATE(device=["weno_num_stencils"])
+            $:UPDATE(device=["nb"])
+            $:UPDATE(device=["num_dims","num_vels","num_fluids"])
         #:endif
 
         ! Initializing the number of fluids for which viscous effects will
@@ -1042,7 +1042,7 @@ contains
             if (Re_size(1) > 0._wp) shear_stress = .true.
             if (Re_size(2) > 0._wp) bulk_stress = .true.
 
-            !$acc update device(Re_size, viscous, shear_stress, bulk_stress)
+            $:UPDATE(device=["Re_size","viscous","shear_stress","bulk_stress"])
 
             ! Bookkeeping the indexes of any viscous fluids and any pairs of
             ! fluids whose interface will support effects of surface tension
@@ -1098,7 +1098,7 @@ contains
                     ! y-dir: flip tau_xy and tau_yz
                     ! z-dir: flip tau_xz and tau_yz
                 end if
-                !$acc update device(shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices)
+                $:UPDATE(device=["shear_num","shear_indices","shear_BC_flip_num","shear_BC_flip_indices"])
             end if
 
             if (hyperelasticity) then
@@ -1165,7 +1165,7 @@ contains
         ! cell-boundary values or otherwise, the unaltered left and right,
         ! WENO-reconstructed, cell-boundary values
         wa_flg = 0._wp; if (weno_avg) wa_flg = 1._wp
-        !$acc update device(wa_flg)
+        $:UPDATE(device=["wa_flg"])
 
         ! Resort to default WENO-JS if no other WENO scheme is selected
         #:if not MFC_CASE_OPTIMIZATION
@@ -1175,7 +1175,7 @@ contains
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
         Np = 0
 
-        !$acc update device(Re_size)
+        $:UPDATE(device=["Re_size"])
 
         if (elasticity) then
             fd_number = max(1, fd_order/2)
@@ -1193,7 +1193,7 @@ contains
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
                                            num_dims)
-        !$acc update device(idwint, idwbuff)
+        $:UPDATE(device=["idwint", "idwbuff"])
 
         ! Configuring Coordinate Direction Indexes
         if (bubbles_euler) then
@@ -1203,7 +1203,7 @@ contains
                 & idwbuff(3)%beg:idwbuff(3)%end))
         end if
 
-        !$acc update device(fd_order,fd_number)
+        $:UPDATE(device=["fd_order", "fd_number"])
 
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
@@ -1230,23 +1230,32 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, c_idx)
-        !$acc update device(b_size, xibeg, xiend, tensor_size)
+        $:UPDATE(device=["momxb","momxe","advxb","advxe","contxb","contxe", &
+            & "bubxb","bubxe","intxb","intxe","sys_size","buff_size","E_idx", &
+            & "alf_idx","n_idx","adv_n","adap_dt","pi_fac","strxb","strxe", &
+            & "chemxb","chemxe","c_idx"])
+        $:UPDATE(device=["b_size","xibeg","xiend","tensor_size"])
 
-        !$acc update device(species_idx)
-        !$acc update device(cfl_target, m, n, p)
+        $:UPDATE(device=["species_idx"])
+        $:UPDATE(device=["cfl_target","m","n","p"])
 
-        !$acc update device(alt_soundspeed, acoustic_source, num_source)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, B_idx, low_Mach)
+        $:UPDATE(device=["alt_soundspeed","acoustic_source","num_source"])
+        $:UPDATE(device=["dt","sys_size","buff_size","pref","rhoref", &
+            & "gamma_idx","pi_inf_idx","E_idx","alf_idx","stress_idx", &
+            & "mpp_lim","bubbles_euler","hypoelasticity","alt_soundspeed", &
+            & "avg_state","num_fluids","model_eqns","num_dims","num_vels", &
+            & "mixture_err","grid_geometry","cyl_coord","mp_weno","weno_eps", &
+            & "teno_CT","hyperelasticity","hyper_model","elasticity","xi_idx", &
+            & "B_idx","low_Mach"])
 
-        !$acc update device(Bx0, powell)
+        $:UPDATE(device=["Bx0", "powell"])
 
-        !$acc update device(cont_damage, tau_star, cont_damage_s, alpha_bar)
+        $:UPDATE(device=["cont_damage","tau_star","cont_damage_s","alpha_bar"])
 
         #:if not MFC_CASE_OPTIMIZATION
-            !$acc update device(wenojs, mapped_weno, wenoz, teno)
-            !$acc update device(wenoz_q)
-            !$acc update device(mhd, relativity)
+            $:UPDATE(device=["wenojs","mapped_weno","wenoz","teno"])
+            $:UPDATE(device=["wenoz_q"])
+            $:UPDATE(device=["mhd", "relativity"])
         #:endif
 
         !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)

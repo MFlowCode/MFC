@@ -653,7 +653,7 @@ contains
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
         end do
-!$acc update device(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
+$:UPDATE(device=["gammas","gs_min","pi_infs","ps_inf","cvs","qvs","qvps","Gs"])
 
 #ifdef MFC_SIMULATION
 
@@ -665,7 +665,7 @@ contains
                 end do
             end do
 
-            !$acc update device(Res, Re_idx, Re_size)
+            $:UPDATE(device=["Res","Re_idx","Re_size"])
         end if
 #endif
 
@@ -679,7 +679,7 @@ contains
             do i = 1, nb
                 bubrs(i) = bub_idx%rs(i)
             end do
-            !$acc update device(bubrs)
+            $:UPDATE(device=["bubrs"])
         end if
 
 #ifdef MFC_POST_PROCESS
@@ -1476,7 +1476,7 @@ contains
         is2b = is2%beg; is2e = is2%end
         is3b = is3%beg; is3e = is3%end
 
-        !$acc update device(is1b, is2b, is3b, is1e, is2e, is3e)
+        $:UPDATE(device=["is1b","is2b","is3b","is1e","is2e","is3e"])
 
         ! Computing the flux variables from the primitive variables, without
         ! accounting for the contribution of either viscosity or capillarity

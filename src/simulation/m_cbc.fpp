@@ -139,7 +139,7 @@ contains
         else
             flux_cbc_index = adv_idx%end
         end if
-        !$acc update device(flux_cbc_index)
+        $:UPDATE(device=["flux_cbc_index"])
 
         call s_any_cbc_boundaries(is_cbc)
 
@@ -389,7 +389,8 @@ contains
 
         end if
 
-        !$acc update device(fd_coef_x, fd_coef_y, fd_coef_z, pi_coef_x, pi_coef_y, pi_coef_z)
+        $:UPDATE(device=["fd_coef_x","fd_coef_y","fd_coef_z", &
+            & "pi_coef_x","pi_coef_y","pi_coef_z"])
 
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
@@ -397,20 +398,20 @@ contains
         bcxb = bc_x%beg
         bcxe = bc_x%end
 
-        !$acc update device(bcxb, bcxe)
+        $:UPDATE(device=["bcxb", "bcxe"])
 
         if (n > 0) then
             bcyb = bc_y%beg
             bcye = bc_y%end
 
-            !$acc update device(bcyb, bcye)
+            $:UPDATE(device=["bcyb", "bcye"])
         end if
 
         if (p > 0) then
             bczb = bc_z%beg
             bcze = bc_z%end
 
-            !$acc update device(bczb, bcze)
+            $:UPDATE(device=["bczb", "bcze"])
         end if
 
         ! Allocate GRCBC inputs
@@ -442,7 +443,8 @@ contains
                 end do
             end if
         #:endfor
-        !$acc update device(vel_in, vel_out, pres_in, pres_out, Del_in, Del_out, alpha_rho_in, alpha_in)
+        $:UPDATE(device=["vel_in","vel_out","pres_in","pres_out", &
+            & "Del_in","Del_out","alpha_rho_in","alpha_in"])
 
     end subroutine s_initialize_cbc_module
 
@@ -606,7 +608,7 @@ contains
 
         end if
 
-        !$acc update device(ds)
+        $:UPDATE(device=["ds"])
 
     end subroutine s_associate_cbc_coefficients_pointers
 
@@ -682,7 +684,7 @@ contains
         cbc_dir = cbc_dir_norm
         cbc_loc = cbc_loc_norm
 
-        !$acc update device(cbc_dir, cbc_loc)
+        $:UPDATE(device=["cbc_dir", "cbc_loc"])
 
         call s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, &
                               ix, iy, iz)
@@ -1163,8 +1165,8 @@ contains
         end if
 
         dj = max(0, cbc_loc)
-        !$acc update device(is1, is2, is3, dj)
-        !$acc update device( dir_idx, dir_flg)
+        $:UPDATE(device=["is1","is2","is3","dj"])
+        $:UPDATE(device=["dir_idx","dir_flg"])
 
         ! Reshaping Inputted Data in x-direction
         if (cbc_dir == 1) then
@@ -1420,7 +1422,7 @@ contains
 
         ! Determining the indicial shift based on CBC location
         dj = max(0, cbc_loc)
-        !$acc update device(dj)
+        $:UPDATE(device=["dj"])
 
         ! Reshaping Outputted Data in x-direction
         if (cbc_dir == 1) then

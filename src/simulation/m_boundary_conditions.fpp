@@ -2,6 +2,7 @@
 ! @brief Contains module m_boundary_conditions
 
 !> @brief This module contains
+#:include 'directive_macros.fpp'
 module m_boundary_conditions
 
     use m_derived_types
@@ -39,7 +40,7 @@ contains
         do dir = 1, num_dims
             do loc = -1, 1, 2
                 read (1) bc_type(dir, loc)%sf
-                !$acc update device(bc_type(dir, loc)%sf)
+                $:UPDATE(device=["bc_type(dir, loc)%sf"])
             end do
         end do
         close (1)
@@ -55,7 +56,7 @@ contains
         do dir = 1, num_dims
             do loc = -1, 1, 2
                 read (1) bc_buffers(dir, loc)%sf
-                !$acc update device(bc_buffers(dir, loc)%sf)
+                $:UPDATE(device=["bc_buffers(dir, loc)%sf"])
             end do
         end do
         close (1)
@@ -103,7 +104,7 @@ contains
                 call MPI_File_set_view(file_id, int(offset, KIND=MPI_ADDRESS_KIND), MPI_INTEGER, MPI_BC_TYPE_TYPE(dir, loc), 'native', MPI_INFO_NULL, ierr)
                 call MPI_File_read_all(file_id, bc_type(dir, loc)%sf, 1, MPI_BC_TYPE_TYPE(dir, loc), MPI_STATUS_IGNORE, ierr)
                 offset = offset + sizeof(bc_type(dir, loc)%sf)
-                !$acc update device(bc_type(dir, loc)%sf)
+                $:UPDATE(device=["bc_type(dir, loc)%sf"])
             end do
         end do
 
@@ -113,7 +114,7 @@ contains
                 call MPI_File_set_view(file_id, int(offset, KIND=MPI_ADDRESS_KIND), mpi_p, MPI_BC_BUFFER_TYPE(dir, loc), 'native', MPI_INFO_NULL, ierr)
                 call MPI_File_read_all(file_id, bc_buffers(dir, loc)%sf, 1, MPI_BC_BUFFER_TYPE(dir, loc), MPI_STATUS_IGNORE, ierr)
                 offset = offset + sizeof(bc_buffers(dir, loc)%sf)
-                !$acc update device(bc_buffers(dir, loc)%sf)
+                $:UPDATE(device=["bc_buffers(dir, loc)%sf"])
             end do
         end do
 
