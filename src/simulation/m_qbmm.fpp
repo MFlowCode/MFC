@@ -865,7 +865,7 @@ contains
 #ifdef _CRAYFTN
             !DIR$ INLINEALWAYS s_chyqmom
 #else
-            !$acc routine seq
+            $:ROUTINE()
 #endif
             real(wp), intent(in) :: pres, rho, c
             real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
