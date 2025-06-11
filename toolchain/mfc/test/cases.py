@@ -3,7 +3,6 @@ import os, typing, itertools
 
 from mfc   import common
 from .case import Nt, define_case_d, define_case_f, CaseGeneratorStack, TestCaseBuilder
-from ..state import ARG
 
 def get_bc_mods(bc: int, dimInfo):
     params = {}
