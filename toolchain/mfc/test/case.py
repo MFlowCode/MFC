@@ -135,7 +135,7 @@ class TestCase(case.Case):
         jobs              = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
         case_optimization = ["--case-optimization"]  if ARG("case_optimization") else []
         rdma_mpi_args     = ["--rdma-mpi"]           if ARG("rdma_mpi")          else []
-        
+
         if self.params.get("bubbles_lagrange", 'F') == 'T':
             input_bubbles_lagrange(self)
 
