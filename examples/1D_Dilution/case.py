@@ -28,7 +28,7 @@ L    = 0.015
 Nx   = 1280
 dx   = L / Nx
 dt   = 1.0e-8
-Tend = 0.60e-4
+Tend = 0.60e-3
 
 NT         = int(Tend / dt)
 SAVE_COUNT = 800
@@ -46,7 +46,7 @@ case = {
     'p'                            : 0,
     'dt'                           : float(dt),
     't_step_start'                 : 0,
-    't_step_stop'                  : 2000,
+    't_step_stop'                  : NT,
     't_step_save'                  : NS,
     't_step_print'                 : NS,
     'parallel_io'                  : 'F',
@@ -74,7 +74,7 @@ case = {
 
     # Chemistry ================================================================
     'chemistry'                    : 'T' if not args.chemistry else 'T',
-    'chem_params%diffusion'        : 'F',
+    'chem_params%diffusion'        : 'T',
     'chem_params%reactions'        : 'T',
     # ==========================================================================
 

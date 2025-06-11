@@ -3896,7 +3896,7 @@ contains
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
-                                flux_src_vf(i)%sf(j, k, l) = 0._wp
+                                flux_src_vf(i)%sf(k, j, l) = 0._wp
                             end do
                         end do
                     end do
@@ -3910,7 +3910,7 @@ contains
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
                                 if (i .eq. E_idx .or. i .ge. chemxb) then
-                                    flux_src_vf(i)%sf(j, k, l) = 0._wp
+                                    flux_src_vf(i)%sf(k, j, l) = 0._wp
                                 end if
                             end do
                         end do
@@ -3940,7 +3940,7 @@ contains
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
                             do l = is3%beg, is3%end
-                                flux_src_vf(i)%sf(j, k, l) = 0._wp
+                                flux_src_vf(i)%sf(l, k, j) = 0._wp
                             end do
                         end do
                     end do
@@ -3954,7 +3954,7 @@ contains
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
                                 if (i .eq. E_idx .or. i .ge. chemxb) then
-                                    flux_src_vf(i)%sf(j, k, l) = 0._wp
+                                    flux_src_vf(i)%sf(l, k, j) = 0._wp
                                 end if
                             end do
                         end do
