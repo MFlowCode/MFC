@@ -261,13 +261,14 @@ contains
     ! Generate a random unit vector (spherical distribution)
     function f_unit_vector(theta, eta) result(vec)
         real(wp), intent(in) :: theta, eta
+        real(wp) :: zeta, xi
         real(wp), dimension(3) :: vec
 
-        theta = 2.0_wp*pi*theta
-        eta = acos(2.0_wp*eta - 1.0_wp)
-        vec(1) = sin(eta)*cos(theta)
-        vec(2) = sin(eta)*sin(theta)
-        vec(3) = cos(eta)
+        xi = 2.0_wp*pi*theta
+        zeta = acos(2.0_wp*eta - 1.0_wp)
+        vec(1) = sin(zeta)*cos(xi)
+        vec(2) = sin(zeta)*sin(xi)
+        vec(3) = cos(zeta)
 
     end function f_unit_vector
 
