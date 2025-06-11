@@ -85,21 +85,33 @@ def diff():
 
     if lhs["metadata"] != rhs["metadata"]:
         _lock_to_str = lambda lock: ' '.join([f"{k}={v}" for k, v in lock.items()])
-        cons.print(f"[bold yellow]Warning[/bold yellow]: Metadata in lhs and rhs are not equal.\n"
-                  f"   This could mean that the benchmarks are not comparable (e.g. one was run on CPUs and the other on GPUs).\n"
-                  f"         Invocation,\t\t Modes\n"
-                  f"    lhs: {' '.join(lhs['metadata']['invocation'])} | {_lock_to_str(lhs['metadata']['lock'])}\n"
-                  f"    rhs: {' '.join(rhs['metadata']['invocation'])} | {_lock_to_str(rhs['metadata']['lock'])}")
+    cons.print(f"[bold]Comparing Benchmarks: Speedups from [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] to [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] are displayed below. Thus, numbers > 1 represent increases in performance.[/bold]")
+
+        cons.print(f"""\
+[bold yellow]Warning[/bold yellow]: Metadata in lhs and rhs are not equal.
+    This could mean that the benchmarks are not comparable (e.g. one was run on CPUs and the other on GPUs).
+    lhs:
+    * Invocation: [magenta]{' '.join(lhs['metadata']['invocation'])}[/magenta]
+    * Modes:      {_lock_to_str(lhs['metadata']['lock'])}
+    rhs:
+    * Invocation: {' '.join(rhs['metadata']['invocation'])}
+    * Modes:      [magenta]{_lock_to_str(rhs['metadata']['lock'])}[/magenta]
+        """)
 
     slugs = set(lhs["cases"].keys()) & set(rhs["cases"].keys())
     if len(slugs) not in [len(lhs["cases"]), len(rhs["cases"])]:
         cons.print(f"""\
-[bold yellow]Warning[/bold yellow]: Cases in lhs and rhs differ. Using intersection: {slugs} with {len(slugs)} elements.
+[bold yellow]Warning[/bold yellow]: Cases in lhs and rhs are not equal.
     * rhs cases: {', '.join(set(rhs['cases'].keys()) - slugs)}.
-    * lhs cases: {', '.join(set(lhs['cases'].keys()) - slugs)}.""")
+    * lhs cases: {', '.join(set(lhs['cases'].keys()) - slugs)}.
+    Using intersection: {slugs} with {len(slugs)} elements.
+        """)
 
     table = rich.table.Table(show_header=True, box=rich.table.box.SIMPLE)
     table.add_column("[bold]Case[/bold]",    justify="left")
+    table.add_column("[bold]Pre Process[/bold]", justify="right")
+    table.add_column("[bold]Simulation[/bold]", justify="right")
+    table.add_column("[bold]Post Process[/bold]", justify="right")
 
     err = 0
     for slug in slugs:
@@ -107,7 +119,6 @@ def diff():
         speedups = []
 
         for target in sorted(DEFAULT_TARGETS, key=lambda t: t.runOrder):
-            table.add_column(f"[bold]{target.name}[/bold]", justify="right") #add column for each target
             if (target.name not in lhs_summary) or (target.name not in rhs_summary):
                 cons.print(f"{target.name} not present in lhs_summary or rhs_summary - Case: {slug}")
                 err = 1; continue
