@@ -530,7 +530,7 @@ contains
         ! Subgrid p_inf model based on Maeda and Colonius (2018).
         if (lag_params%pressure_corrector) then
             ! Calculate velocity potentials (valid for one bubble per cell)
-            !$acc parallel loop gang vector default(present) private(k, cell)
+            $:PARALLEL_LOOP(private=["k","cell"])
             do k = 1, nBubs
                 call s_get_pinf(k, q_prim_vf, 2, paux, cell, preterm1, term2, Romega)
                 myR0 = bub_R0(k)
@@ -551,8 +551,9 @@ contains
 
         ! Radial motion model
         adap_dt_stop_max = 0
-        !$acc parallel loop gang vector default(present) private(k, myalpha_rho, myalpha, Re, cell) &
-        !$acc reduction(MAX:adap_dt_stop_max) copy(adap_dt_stop_max) copyin(stage)
+        $:PARALLEL_LOOP(private=["k","myalpha_rho","myalpha","Re","cell"], &
+            & reduction=["adap_dt_stop_max"],reductionOp="MAX", &
+            & copy=["adap_dt_stop_max"],copyin=["stage"])
         do k = 1, nBubs
             ! Keller-Miksis model
 
@@ -1030,7 +1031,7 @@ contains
         integer :: k
 
         if (time_stepper == 1) then ! 1st order TVD RK
-            !$acc parallel loop gang vector default(present) private(k)
+            $:PARALLEL_LOOP(private=["k"])
             do k = 1, nBubs
                 !u{1} = u{n} +  dt * RHS{n}
                 intfc_rad(k, 1) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
@@ -1052,7 +1053,7 @@ contains
 
         elseif (time_stepper == 2) then ! 2nd order TVD RK
             if (stage == 1) then
-                !$acc parallel loop gang vector default(present) private(k)
+                $:PARALLEL_LOOP(private=["k"])
                 do k = 1, nBubs
                     !u{1} = u{n} +  dt * RHS{n}
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
@@ -1064,7 +1065,7 @@ contains
                 end do
 
             elseif (stage == 2) then
-                !$acc parallel loop gang vector default(present) private(k)
+                $:PARALLEL_LOOP(private=["k"])
                 do k = 1, nBubs
                     !u{1} = u{n} + (1/2) * dt * (RHS{n} + RHS{1})
                     intfc_rad(k, 1) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/2._wp
@@ -1088,7 +1089,7 @@ contains
 
         elseif (time_stepper == 3) then ! 3rd order TVD RK
             if (stage == 1) then
-                !$acc parallel loop gang vector default(present) private(k)
+                $:PARALLEL_LOOP(private=["k"])
                 do k = 1, nBubs
                     !u{1} = u{n} +  dt * RHS{n}
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
@@ -1100,7 +1101,7 @@ contains
                 end do
 
             elseif (stage == 2) then
-                !$acc parallel loop gang vector default(present) private(k)
+                $:PARALLEL_LOOP(private=["k"])
                 do k = 1, nBubs
                     !u{2} = u{n} + (1/4) * dt * [RHS{n} + RHS{1}]
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/4._wp
@@ -1111,7 +1112,7 @@ contains
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4._wp
                 end do
             elseif (stage == 3) then
-                !$acc parallel loop gang vector default(present) private(k)
+                $:PARALLEL_LOOP(private=["k"])
                 do k = 1, nBubs
                     !u{n+1} = u{n} + (2/3) * dt * [(1/4)* RHS{n} + (1/4)* RHS{1} + RHS{2}]
                     intfc_rad(k, 1) = intfc_rad(k, 1) + (2._wp/3._wp)*dt*(intfc_draddt(k, 1)/4._wp + intfc_draddt(k, 2)/4._wp + intfc_draddt(k, 3))
@@ -1197,7 +1198,7 @@ contains
 
         integer :: k
 
-        !$acc parallel loop gang vector default(present) private(k)
+        $:PARALLEL_LOOP(private=["k"])
         do k = 1, nBubs
             gas_p(k, 2) = gas_p(k, 1)
             gas_mv(k, 2) = gas_mv(k, 1)
@@ -1605,8 +1606,8 @@ contains
 
         integer :: k
 
-        !$acc parallel loop gang vector default(present) reduction(MAX:Rmax_glb) &
-        !$acc reduction(MIN: Rmin_glb) copy(Rmax_glb, Rmin_glb)
+        $:PARALLEL_LOOP(reduction=[["Rmax_glb"], ["Rmin_glb"]], &
+            & reductionOp=["MAX", "MIN"], copy=["Rmax_glb","Rmin_glb"])
         do k = 1, nBubs
             Rmax_glb = max(Rmax_glb, intfc_rad(k, 1)/bub_R0(k))
             Rmin_glb = min(Rmin_glb, intfc_rad(k, 1)/bub_R0(k))

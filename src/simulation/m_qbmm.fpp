@@ -429,7 +429,7 @@ contains
 
             !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb
             if (.not. polytropic) then
-                !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var, AX)
+                $:PARALLEL_LOOP(collapse=5,private=["nb_q","nR","nR2","R","R2","nb_dot","nR_dot","nR2_dot","var","AX"])
                 do i = 1, nb
                     do q = 1, nnode
                         do l = 0, p
@@ -513,7 +513,7 @@ contains
 
             !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb
             if (.not. polytropic) then
-                !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var, AX)
+                $:PARALLEL_LOOP(collapse=5,private=["nb_q","nR","nR2","R","R2","nb_dot","nR_dot","nR2_dot","var","AX"])
                 do i = 1, nb
                     do q = 1, nnode
                         do l = 0, p
@@ -570,7 +570,7 @@ contains
             if (.not. polytropic) then
                 if (grid_geometry == 3) then
                     !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb
-                    !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var, AX)
+                    $:PARALLEL_LOOP(collapse=5,private=["nb_q","nR","nR2","R","R2","nb_dot","nR_dot","nR2_dot","var","AX"])
                     do i = 1, nb
                         do q = 1, nnode
                             do l = 0, p
@@ -621,7 +621,7 @@ contains
                     end do
                 else
                     !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb
-                    !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var, AX)
+                    $:PARALLEL_LOOP(collapse=5,private=["nb_q","nR","nR2","R","R2","nb_dot","nR_dot","nR2_dot","var","AX"])
                     do i = 1, nb
                         do q = 1, nnode
                             do l = 0, p

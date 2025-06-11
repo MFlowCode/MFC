@@ -673,7 +673,7 @@ contains
 
         if (weno_order == 1) then
             if (weno_dir == 1) then
-                !$acc parallel loop collapse(4) default(present)
+                $:PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -686,7 +686,7 @@ contains
                 end do
                 !$acc end parallel loop
             else if (weno_dir == 2) then
-                !$acc parallel loop collapse(4) default(present)
+                $:PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -699,7 +699,7 @@ contains
                 end do
                 !$acc end parallel loop
             else if (weno_dir == 3) then
-                !$acc parallel loop collapse(4) default(present)
+                $:PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -715,7 +715,7 @@ contains
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha,tau)
+                    $:PARALLEL_LOOP(collapse=4,private=["beta","dvd","poly","omega","alpha","tau"])
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -794,7 +794,7 @@ contains
         elseif (weno_order == 5) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop vector gang collapse(3) default(present) private(dvd, poly, beta, alpha, omega, tau, delta)
+                    $:PARALLEL_LOOP(collapse=3,private=["dvd","poly","beta","alpha","omega","tau","delta"])
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -914,7 +914,7 @@ contains
         elseif (weno_order == 7) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop vector gang collapse(3) default(present) private(poly, beta, alpha, omega, tau, delta, dvd, v)
+                    $:PARALLEL_LOOP(collapse=3,private=["poly","beta","alpha","omega","tau","delta","dvd","v"])
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -1269,7 +1269,7 @@ contains
         real(wp), parameter :: alpha_mp = 2._wp
         real(wp), parameter :: beta_mp = 4._wp/3._wp
 
-        !$acc parallel loop gang vector collapse (4)  default(present) private(d)
+        $:PARALLEL_LOOP(collapse=4,private=["d"])
         do l = is3_weno%beg, is3_weno%end
             do k = is2_weno%beg, is2_weno%end
                 do j = is1_weno%beg, is1_weno%end

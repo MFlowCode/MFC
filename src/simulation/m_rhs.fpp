@@ -1010,7 +1010,7 @@ contains
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, flux_src_n_vf%vf, idir, 1, irx, iry, irz)
             end if
 
-            !$acc parallel loop collapse(4) gang vector default(present) private(inv_ds, flux_face1, flux_face2)
+            $:PARALLEL_LOOP(collapse=4,private=["inv_ds","flux_face1","flux_face2"])
             do j = 1, sys_size
                 do q_loop = 0, p
                     do l_loop = 0, n
@@ -1025,8 +1025,8 @@ contains
             end do
 
             if (model_eqns == 3) then
-                !$acc parallel loop collapse(4) gang vector default(present) &
-                !$acc private(inv_ds, advected_qty_val, pressure_val, flux_face1, flux_face2)
+                $:PARALLEL_LOOP(collapse=4,private=["inv_ds","advected_qty_val", &
+                    & "pressure_val","flux_face1","flux_face2"])
                 do q_loop = 0, p
                     do l_loop = 0, n
                         do k_loop = 0, m
@@ -1055,7 +1055,7 @@ contains
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, flux_src_n_vf%vf, idir, 1, irx, iry, irz)
             end if
 
-            !$acc parallel loop collapse(4) gang vector default(present) private(inv_ds, flux_face1, flux_face2)
+            $:PARALLEL_LOOP(collapse=4,private=["inv_ds","flux_face1","flux_face2"])
             do j = 1, sys_size
                 do l = 0, p
                     do k = 0, n
@@ -1070,8 +1070,8 @@ contains
             end do
 
             if (model_eqns == 3) then
-                !$acc parallel loop collapse(4) gang vector default(present) &
-                !$acc private(inv_ds, advected_qty_val, pressure_val, flux_face1, flux_face2)
+                $:PARALLEL_LOOP(collapse=4,private=["inv_ds","advected_qty_val", &
+                    & "pressure_val","flux_face1","flux_face2"])
                 do l = 0, p
                     do k = 0, n
                         do q = 0, m
@@ -1096,7 +1096,7 @@ contains
             end if
 
             if (cyl_coord) then
-                !$acc parallel loop collapse(4) gang vector default(present) private(flux_face1, flux_face2)
+                $:PARALLEL_LOOP(collapse=4,private=["flux_face1","flux_face2"])
                 do j = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -1122,8 +1122,8 @@ contains
             end if
 
             if (grid_geometry == 3) then ! Cylindrical Coordinates
-                !$acc parallel loop collapse(4) gang vector default(present) &
-                !$acc private(inv_ds, velocity_val, flux_face1, flux_face2)
+                $:PARALLEL_LOOP(collapse=4,private=["inv_ds","velocity_val", &
+                    & "flux_face1","flux_face2"])
                 do j = 1, sys_size
                     do k = 0, p
                         do q = 0, n
@@ -1138,7 +1138,7 @@ contains
                         end do
                     end do
                 end do
-                !$acc parallel loop collapse(4) gang vector default(present) private(flux_face1, flux_face2)
+                $:PARALLEL_LOOP(collapse=4,private=["flux_face1","flux_face2"])
                 do j = 1, sys_size
                     do k = 0, p
                         do q = 0, n
@@ -1152,7 +1152,7 @@ contains
                     end do
                 end do
             else ! Cartesian Coordinates
-                !$acc parallel loop collapse(4) gang vector default(present) private(inv_ds, flux_face1, flux_face2)
+                $:PARALLEL_LOOP(collapse=4,private=["inv_ds","flux_face1","flux_face2"])
                 do j = 1, sys_size
                     do k = 0, p
                         do q = 0, n
@@ -1168,8 +1168,8 @@ contains
             end if
 
             if (model_eqns == 3) then
-                !$acc parallel loop collapse(4) gang vector default(present) &
-                !$acc private(inv_ds, advected_qty_val, pressure_val, flux_face1, flux_face2)
+                $:PARALLEL_LOOP(collapse=4,private=["inv_ds","advected_qty_val", &
+                    & "pressure_val","flux_face1","flux_face2"])
                 do k = 0, p
                     do q = 0, n
                         do l = 0, m
@@ -1213,8 +1213,8 @@ contains
             case (1) ! x-direction
                 use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
                 if (use_standard_riemann) then
-                    !$acc parallel loop collapse(4) gang vector default(present) &
-                    !$acc private(local_inv_ds, local_term_coeff, local_flux1, local_flux2)
+                    $:PARALLEL_LOOP(collapse=4,private=["local_inv_ds", &
+                        & "local_term_coeff","local_flux1","local_flux2"])
                     do j_adv = advxb, advxe
                         do q_idx = 0, p ! z_extent
                             do l_idx = 0, n ! y_extent
@@ -1262,8 +1262,8 @@ contains
                                     end do; end do; end do
                         end if
                     else ! NOT alt_soundspeed
-                        !$acc parallel loop collapse(4) gang vector default(present) &
-                        !$acc private(local_inv_ds, local_term_coeff, local_flux1, local_flux2)
+                        $:PARALLEL_LOOP(collapse=4,private=["local_inv_ds", &
+                            & "local_term_coeff","local_flux1","local_flux2"])
                         do j_adv = advxb, advxe
                             do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
                                         local_inv_ds = 1._wp/dx(k_idx)
@@ -1280,8 +1280,8 @@ contains
             case (2) ! y-direction: loops q_idx (x), k_idx (y), l_idx (z); sf(q_idx, k_idx, l_idx); dy(k_idx); Kterm(q_idx,k_idx,l_idx)
                 use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
                 if (use_standard_riemann) then
-                    !$acc parallel loop collapse(4) gang vector default(present) &
-                    !$acc private(local_inv_ds, local_term_coeff, local_flux1, local_flux2)
+                    $:PARALLEL_LOOP(collapse=4,private=["local_inv_ds", &
+                        & "local_term_coeff","local_flux1","local_flux2"])
                     do j_adv = advxb, advxe
                         do l_idx = 0, p ! z_extent
                             do k_idx = 0, n ! y_extent
@@ -1338,8 +1338,8 @@ contains
                                     end do; end do; end do
                         end if
                     else ! NOT alt_soundspeed
-                        !$acc parallel loop collapse(4) gang vector default(present) &
-                        !$acc private(local_inv_ds, local_term_coeff, local_flux1, local_flux2)
+                        $:PARALLEL_LOOP(collapse=4,private=["local_inv_ds", &
+                            & "local_term_coeff","local_flux1","local_flux2"])
                         do j_adv = advxb, advxe
                             do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
                                         local_inv_ds = 1._wp/dy(k_idx)
@@ -1361,8 +1361,8 @@ contains
                 end if
 
                 if (use_standard_riemann) then
-                    !$acc parallel loop collapse(4) gang vector default(present) &
-                    !$acc private(local_inv_ds, local_term_coeff, local_flux1, local_flux2)
+                    $:PARALLEL_LOOP(collapse=4,private=["local_inv_ds", &
+                        & "local_term_coeff","local_flux1","local_flux2"])
                     do j_adv = advxb, advxe
                         do k_idx = 0, p ! z_extent
                             do q_idx = 0, n ! y_extent
@@ -1411,8 +1411,8 @@ contains
                                     end do; end do; end do
                         end if
                     else ! NOT alt_soundspeed
-                        !$acc parallel loop collapse(4) gang vector default(present) &
-                        !$acc private(local_inv_ds, local_term_coeff, local_flux1, local_flux2)
+                        $:PARALLEL_LOOP(collapse=4,private=["local_inv_ds", &
+                            & "local_term_coeff","local_flux1","local_flux2"])
                         do j_adv = advxb, advxe
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
                                         local_inv_ds = 1._wp/dz(k_idx)
@@ -2008,7 +2008,7 @@ contains
         $:UPDATE(device=["is1","is2","is3","iv"])
 
         if (recon_dir == 1) then
-            !$acc parallel loop collapse(4) default(present)
+            $:PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -2021,7 +2021,7 @@ contains
             end do
             !$acc end parallel loop
         else if (recon_dir == 2) then
-            !$acc parallel loop collapse(4) default(present)
+            $:PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -2034,7 +2034,7 @@ contains
             end do
             !$acc end parallel loop
         else if (recon_dir == 3) then
-            !$acc parallel loop collapse(4) default(present)
+            $:PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end

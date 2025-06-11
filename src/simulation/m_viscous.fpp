@@ -1000,7 +1000,7 @@ contains
 
         end if
 
-        $:UPDATE(device=["is1_viscous","is2_viscous","is3_viscous","iv"])
+        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
 
         if (n > 0) then
             if (p > 0) then
@@ -1097,7 +1097,7 @@ contains
 
         end if
 
-        $:UPDATE(device=["is1_viscous","is2_viscous","is3_viscous","iv"])
+        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
 
         if (n > 0) then
             if (p > 0) then
@@ -1200,7 +1200,7 @@ contains
         is3_viscous = iz
         iv = iv_in
 
-        $:UPDATE(device=["is1_viscous","is2_viscous","is3_viscous","iv"])
+        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
 
         ! First-Order Spatial Derivatives in x-direction
         if (norm_dir == 1) then
@@ -1334,7 +1334,7 @@ contains
         end do
 
         if (n > 0) then
-            !$acc parallel loop collapse(3) gang vector
+            $:PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
@@ -1347,7 +1347,7 @@ contains
         end if
 
         if (p > 0) then
-            !$acc parallel loop collapse(3) gang vector
+            $:PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end

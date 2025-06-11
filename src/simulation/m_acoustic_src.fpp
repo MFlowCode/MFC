@@ -220,7 +220,7 @@ contains
 
             deallocate (phi_rn)
 
-            !$acc parallel loop gang vector default(present) private(myalpha, myalpha_rho)
+            $:PARALLEL_LOOP(private=["myalpha","myalpha_rho"])
             do i = 1, num_points
                 j = source_spatials(ai)%coord(1, i)
                 k = source_spatials(ai)%coord(2, i)

@@ -340,7 +340,7 @@ contains
         $:UPDATE(device=["is1","is2","is3","iv"])
 
         if (recon_dir == 1) then
-            !$acc parallel loop collapse(4) default(present)
+            $:PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -353,7 +353,7 @@ contains
             end do
             !$acc end parallel loop
         else if (recon_dir == 2) then
-            !$acc parallel loop collapse(4) default(present)
+            $:PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -366,7 +366,7 @@ contains
             end do
             !$acc end parallel loop
         else if (recon_dir == 3) then
-            !$acc parallel loop collapse(4) default(present)
+            $:PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end

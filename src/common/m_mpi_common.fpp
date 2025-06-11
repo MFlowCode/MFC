@@ -697,7 +697,7 @@ $:UPDATE(device=["v_size"])
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:PARALLEL_LOOP(collapse=4,private=["r"])
                     do l = 0, p
                         do k = 0, n
                             do j = 0, buff_size - 1
@@ -711,7 +711,7 @@ $:UPDATE(device=["v_size"])
 
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
-                        !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                        $:PARALLEL_LOOP(collapse=4,private=["r"])
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, buff_size - 1
@@ -726,7 +726,7 @@ $:UPDATE(device=["v_size"])
                             end do
                         end do
 
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:PARALLEL_LOOP(collapse=5,private=["r"])
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, buff_size - 1
@@ -743,7 +743,7 @@ $:UPDATE(device=["v_size"])
                     end if
 #endif
                 #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, sys_size
                         do l = 0, p
                             do k = 0, buff_size - 1
@@ -759,7 +759,7 @@ $:UPDATE(device=["v_size"])
 
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = 0, p
                                 do k = 0, buff_size - 1
@@ -775,7 +775,7 @@ $:UPDATE(device=["v_size"])
                             end do
                         end do
 
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = 0, p
                                 do k = 0, buff_size - 1
@@ -793,7 +793,7 @@ $:UPDATE(device=["v_size"])
                     end if
 #endif
                 #:else
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, sys_size
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
@@ -809,7 +809,7 @@ $:UPDATE(device=["v_size"])
 
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = 0, buff_size - 1
                                 do k = -buff_size, n + buff_size
@@ -825,7 +825,7 @@ $:UPDATE(device=["v_size"])
                             end do
                         end do
 
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = 0, buff_size - 1
                                 do k = -buff_size, n + buff_size
@@ -895,7 +895,7 @@ $:UPDATE(device=["v_size"])
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:PARALLEL_LOOP(collapse=4,private=["r"])
                     do l = 0, p
                         do k = 0, n
                             do j = -buff_size, -1
@@ -916,7 +916,7 @@ $:UPDATE(device=["v_size"])
 
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:PARALLEL_LOOP(collapse=5,private=["r"])
                         do l = 0, p
                             do k = 0, n
                                 do j = -buff_size, -1
@@ -931,7 +931,7 @@ $:UPDATE(device=["v_size"])
                             end do
                         end do
 
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:PARALLEL_LOOP(collapse=5,private=["r"])
                         do l = 0, p
                             do k = 0, n
                                 do j = -buff_size, -1
@@ -948,7 +948,7 @@ $:UPDATE(device=["v_size"])
                     end if
 #endif
                 #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, sys_size
                         do l = 0, p
                             do k = -buff_size, -1
@@ -970,7 +970,7 @@ $:UPDATE(device=["v_size"])
 
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = 0, p
                                 do k = -buff_size, -1
@@ -986,7 +986,7 @@ $:UPDATE(device=["v_size"])
                             end do
                         end do
 
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = 0, p
                                 do k = -buff_size, -1
@@ -1005,7 +1005,7 @@ $:UPDATE(device=["v_size"])
 #endif
                 #:else
                     ! Unpacking buffer from bc_z%beg
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, sys_size
                         do l = -buff_size, -1
                             do k = -buff_size, n + buff_size
@@ -1028,7 +1028,7 @@ $:UPDATE(device=["v_size"])
 
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = -buff_size, -1
                                 do k = -buff_size, n + buff_size
@@ -1045,7 +1045,7 @@ $:UPDATE(device=["v_size"])
                             end do
                         end do
 
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = -buff_size, -1
                                 do k = -buff_size, n + buff_size
@@ -1135,7 +1135,7 @@ $:UPDATE(device=["v_size"])
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:PARALLEL_LOOP(collapse=4,private=["r"])
                     do l = 0, p
                         do k = 0, n
                             do j = 0, buff_size - 1
@@ -1148,7 +1148,7 @@ $:UPDATE(device=["v_size"])
                     end do
 
                 #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, nVars
                         do l = 0, p
                             do k = 0, buff_size - 1
@@ -1163,7 +1163,7 @@ $:UPDATE(device=["v_size"])
                     end do
 
                 #:else
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, nVars
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
@@ -1224,7 +1224,7 @@ $:UPDATE(device=["v_size"])
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:PARALLEL_LOOP(collapse=4,private=["r"])
                     do l = 0, p
                         do k = 0, n
                             do j = -buff_size, -1
@@ -1244,7 +1244,7 @@ $:UPDATE(device=["v_size"])
                     end do
 
                 #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, nVars
                         do l = 0, p
                             do k = -buff_size, -1
@@ -1266,7 +1266,7 @@ $:UPDATE(device=["v_size"])
 
                 #:else
                     ! Unpacking buffer from bc_z%beg
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, nVars
                         do l = -buff_size, -1
                             do k = -buff_size, n + buff_size
