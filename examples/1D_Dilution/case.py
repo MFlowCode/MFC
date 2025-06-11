@@ -27,7 +27,7 @@ sol_L.TPX =  300,  8000, 'O2:2,N2:2,H2O:5'
 L    = 0.015
 Nx   = 1280
 dx   = L / Nx
-dt   = 1.0e-8
+dt   = 0.5e-8
 Tend = 0.60e-3
 
 NT         = int(Tend / dt)
@@ -46,9 +46,9 @@ case = {
     'p'                            : 0,
     'dt'                           : float(dt),
     't_step_start'                 : 0,
-    't_step_stop'                  : NT,
-    't_step_save'                  : NS,
-    't_step_print'                 : NS,
+    't_step_stop'                  : 200,
+    't_step_save'                  : 40,
+    't_step_print'                 : 1,
     'parallel_io'                  : 'F',
     # ==========================================================================
 

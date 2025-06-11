@@ -675,7 +675,7 @@ contains
                             end if
 
                             if (viscous) then
-                                if (chem_params%diffusion) then
+                                if (chemistry) then
                                     call get_mixture_viscosity_mixavg(T_L, Ys_L, Re_L(1))
                                     call get_mixture_viscosity_mixavg(T_R, Ys_R, Re_R(1))
                                     Re_L(1) = 1.0_wp/Re_L(1)
@@ -2690,7 +2690,7 @@ contains
                                                               vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
                                 if (viscous) then
-                                    if (chem_params%diffusion) then
+                                    if (chemistry) then
                                         call get_mixture_viscosity_mixavg(T_L, Ys_L, Re_L(1))
                                         call get_mixture_viscosity_mixavg(T_R, Ys_R, Re_R(1))
                                         Re_L(1) = 1.0_wp/Re_L(1)
@@ -3859,6 +3859,7 @@ contains
             end if
 
             if (chem_params%diffusion) then
+
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = E_idx, chemxe
                     do l = is3%beg, is3%end
@@ -3907,8 +3908,8 @@ contains
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = E_idx, chemxe
                     do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
                                 if (i .eq. E_idx .or. i .ge. chemxb) then
                                     flux_src_vf(i)%sf(k, j, l) = 0._wp
                                 end if
@@ -3950,9 +3951,9 @@ contains
             if (chem_params%diffusion) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = E_idx, chemxe
-                    do l = is3%beg, is3%end
+                    do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
+                            do l = is3%beg, is3%end
                                 if (i .eq. E_idx .or. i .ge. chemxb) then
                                     flux_src_vf(i)%sf(l, k, j) = 0._wp
                                 end if
