@@ -12,10 +12,11 @@
     <include-pattern>.*/src/.*\.(f|fpp|for|f90|f95|f03|f08)$</include-pattern>
     <include-pattern>.*/toolchain/.*\.py$</include-pattern>
 
-    <!-- For Python files -->
-    <rule ref="category/python/bestpractices.xml"/>
-    <rule ref="category/python/codestyle.xml"/>
-    <rule ref="category/python/design.xml"/>
-    <rule ref="category/python/errorprone.xml"/>
+    <!-- Rules -->
+    <rule ref="EmptyIfStmt"/>
+    <rule ref="EmptyWhileStmt"/>
+    <rule ref="EmptyTryBlock"/>
+    <rule ref="EmptyFinallyBlock"/>
+    <rule ref="EmptySwitchStatements"/>
 
 </ruleset>
