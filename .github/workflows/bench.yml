@@ -40,7 +40,7 @@ jobs:
             device: gpu
             build_script: ""
           - cluster: frontier
-            name: "Oak Ridge | Frontier (AMD ROCm)"
+            name: "Oak Ridge | Frontier (AMD ROCm) - GPU"
             group: frontier
             labels: olcf
             flag: f
