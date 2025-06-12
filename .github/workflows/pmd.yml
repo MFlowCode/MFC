@@ -3,19 +3,54 @@ name: PMD Analysis
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
-  pmd:
-    runs-on: ubuntu-latest
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-java@v4
-        with:
-            distribution: 'temurin'
-            java-version: '11'
-      - uses: pmd/pmd-github-action@v2
-        id: pmd
-        with:
-            rulesets: '.github/workflows/ruleset.xml'
-            analyzeModifiedFilesOnly: true
-            createGitHubAnnotations: false
-            uploadSarifReport: true
+      - name: Clone
+        uses: actions/checkout@v4
 
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+    
+  pmd:
+      name: PMD Analysis
+      if: needs.file-changes.outputs.checkall == 'true'
+      needs: file-changes
+      runs-on: "ubuntu-latest"
+      env:
+          pr_everything: 0
+      steps:
+          - name: Clone - PR
+            uses: actions/checkout@v4
+            with:
+              path: pr
+
+          - name: Clone PMD
+            run: |
+              sudo apt update -y
+              sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
+              git clone https://github.com/pmd/pmd.git pmd
+              (cd pmd && git checkout pmd)
+
+          - name: Build PMD
+            run: |
+              (cd pmd && ./mvnw clean install -DskipTests> ../pmd.txt)
+          
+          - name: Running PMD
+            run: |
+              (cd pmd &&  ./pmd cpd -l fortran pr/src/*  > ../pmd-fort.txt)
+              (cd pmd &&  ./pmd cpd -l python pr/toolchain/*  > ../pmd-py.txt)
+
+          - name: Display PMD Reports
+            uses: actions/upload-artifact@v2
+            with:
+                name: pmd-reports
+                path: |
+                    pmd-fort.txt
+                    pmd-py.txt
