@@ -18,7 +18,8 @@ contains
         integer :: x, y, z !< Generic loop iterators
 
         real(wp) :: divergence
-        $:PARALLEL_LOOP(collapse=3, gang vector default(present) private=["divergence"])
+
+        $:PARALLEL_LOOP(collapse=3, private=["divergence"])
         do x = ix_s%beg, ix_s%end
             do y = iy_s%beg, iy_s%end
                 do z = iz_s%beg, iz_s%end
