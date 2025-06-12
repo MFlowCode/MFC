@@ -126,22 +126,18 @@ def diff():
                 err = 1
                 cons.print(f"lhs_summary or rhs_summary reports non-real exec time for {target.name} - Case: {slug}")
 
-            exec_time_speedup = "N/A"
             try:
                 exec_time_value = lhs_summary[target.name]["exec"] / rhs_summary[target.name]["exec"]
-                exec_time_speedup = f"Exec: {exec_time_value:.2f}"
                 if exec_time_value < 0.9:
                     cons.print(f"[bold yellow]Warning[/bold yellow]: Exec time speedup for {target.name} is less than 0.9 - Case: {slug}")
-                speedups[i] = f"Exec: {exec_time_speedup}"
+                speedups[i] = f"Exec: {exec_time_value:.2f}"
                 if target == SIMULATION:
-                    grind_time_speedup = "N/A"
                     if not math.isfinite(lhs_summary[target.name]["grind"]) or not math.isfinite(rhs_summary[target.name]["grind"]):
                         err = 1
                         cons.print(f"lhs_summary or rhs_summary reports non-real grind time for {target.name} - Case: {slug}")
 
                     grind_time_value = lhs_summary[target.name]["grind"] / rhs_summary[target.name]["grind"]
-                    grind_time_speedup += f" & Grind: {grind_time_value:.2f}"
-                    speedups[i] += f" & Grind: {grind_time_speedup}"
+                    speedups[i] += f" & Grind: {grind_time_value:.2f}"
                     if grind_time_value <0.98:
                         raise MFCException(f"Benchmarking failed since grind time speedup for {target.name} below acceptable threshold (<0.98) - Case: {slug}")
             except Exception as _:
