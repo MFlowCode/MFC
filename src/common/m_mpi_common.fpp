@@ -28,12 +28,12 @@ module m_mpi_common
     !$acc declare create(v_size)
     !! Generic flags used to identify and report MPI errors
 
-    real(wp), private, allocatable, dimension(:), target :: buff_send !<
+    real(wp), private, allocatable, dimension(:) :: buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
     !! primitive variables, for a single computational domain boundary at the
     !! time, to the relevant neighboring processor.
 
-    real(wp), private, allocatable, dimension(:), target :: buff_recv !<
+    real(wp), private, allocatable, dimension(:) :: buff_recv !<
     !! buff_recv is utilized to receive and unpack the buffer of the cell-
     !! average primitive variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
@@ -813,16 +813,12 @@ contains
         #:endfor
         call nvtxEndRange ! Packbuf
 
-        p_send => buff_send(0)
-        p_recv => buff_recv(0)
-
         ! Send/Recv
 #ifdef MFC_SIMULATION
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
                 #:if rdma_mpi
-                    !$acc data attach(p_send, p_recv)
-                    !$acc host_data use_device(p_send, p_recv)
+                    !$acc host_data use_device(buff_send, buff_recv)
                     call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
                 #:else
                     call nvtxStartRange("RHS-COMM-DEV2HOST")
@@ -832,15 +828,14 @@ contains
                 #:endif
 
                 call MPI_SENDRECV( &
-                    p_send, buffer_count, mpi_p, dst_proc, send_tag, &
-                    p_recv, buffer_count, mpi_p, src_proc, recv_tag, &
+                    buff_send, buffer_count, mpi_p, dst_proc, send_tag, &
+                    buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                 call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
                 #:if rdma_mpi
                     !$acc end host_data
-                    !$acc end data
                     !$acc wait
                 #:else
                     call nvtxStartRange("RHS-COMM-HOST2DEV")
@@ -851,8 +846,8 @@ contains
         #:endfor
 #else
         call MPI_SENDRECV( &
-            p_send, buffer_count, mpi_p, dst_proc, send_tag, &
-            p_recv, buffer_count, mpi_p, src_proc, recv_tag, &
+            buff_send, buffer_count, mpi_p, dst_proc, send_tag, &
+            buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
 

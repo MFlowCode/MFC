@@ -32,12 +32,12 @@ module m_mpi_proxy
 
     implicit none
 
-    integer, private, allocatable, dimension(:), target :: ib_buff_send !<
+    integer, private, allocatable, dimension(:) :: ib_buff_send !<
     !! This variable is utilized to pack and send the buffer of the immersed
     !! boundary markers, for a single computational domain boundary at the
     !! time, to the relevant neighboring processor.
 
-    integer, private, allocatable, dimension(:), target :: ib_buff_recv !<
+    integer, private, allocatable, dimension(:) :: ib_buff_recv !<
     !! q_cons_buff_recv is utilized to receive and unpack the buffer of the
     !! immersed boundary markers, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
@@ -257,7 +257,7 @@ contains
 
 #ifdef MFC_MPI
 
-        call nvtxStartRange("RHS-COMM-PACKBUF")
+        call nvtxStartRange("IB-MARKER-COMM-PACKBUF")
 
         buffer_counts = (/ &
                         gp_layers*(n + 1)*(p + 1), &
@@ -335,44 +335,15 @@ contains
         #:endfor
         call nvtxEndRange ! Packbuf
 
-        p_i_send => ib_buff_send(0)
-        p_i_recv => ib_buff_recv(0)
-
-        ! Send/Recv
-        #:for rdma_mpi in [False, True]
-            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
-                #:if rdma_mpi
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-                    call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
-                #:else
-                    call nvtxStartRange("RHS-COMM-DEV2HOST")
-                    !$acc update host(ib_buff_send)
-                    call nvtxEndRange
-                    call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
-                #:endif
-
-                call MPI_SENDRECV( &
-                    p_i_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
-                    p_i_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
-
-                #:if rdma_mpi
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                #:else
-                    call nvtxStartRange("RHS-COMM-HOST2DEV")
-                    !$acc update device(ib_buff_recv)
-                    call nvtxEndRange
-                #:endif
-            end if
-        #:endfor
+        call nvtxStartRange("IB-MARKER-SENDRECV")
+        call MPI_SENDRECV( &
+            ib_buff_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
+            ib_buff_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
+            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+        call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
         ! Unpack Received Buffer
-        call nvtxStartRange("RHS-COMM-UNPACKBUF")
+        call nvtxStartRange("IB-MARKER-COMM-UNPACKBUF")
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
