@@ -30,7 +30,7 @@
     character(len=*), parameter :: init_dir = "/home/YourDirectory" ! For example /home/MFC/examples/1D_Shock/D/
     character(len=20) :: file_num_str     ! For storing the file number as a string
     character(len=20) :: zeros_part       ! For the trailing zeros part
-    character(len=6), parameter :: zeros_default = "00000"  ! Default zeros (can be changed)
+    character(len=6), parameter :: zeros_default = "000000"  ! Default zeros (can be changed)
 #:enddef
 
 #:def HardcodedDellacation()
