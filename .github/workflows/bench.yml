@@ -39,8 +39,10 @@ jobs:
             group: frontier
             labels: olcf
             flag: f
-            device: gpu
-            build_script: bash .github/workflows/frontier/build.sh ${{ matrix.device }}
+            strategy: 
+              matrix:
+                device: ['gpu']
+            build_script: "bash .github/workflows/frontier/build.sh ${{ matrix.device }}"
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
