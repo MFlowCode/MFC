@@ -1,4 +1,4 @@
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 !>
 !! @file m_helper_basic.f90
 !! @brief Contains module m_helper_basic

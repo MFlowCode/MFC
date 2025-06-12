@@ -2,7 +2,7 @@
 !> procedure.
 
 #:include 'macros.fpp'
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 
 module m_phase_change
 

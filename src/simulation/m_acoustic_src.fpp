@@ -3,7 +3,7 @@
 !! @brief Contains module m_acoustic_src
 
 #:include 'macros.fpp'
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 
 !> @brief The module contains the subroutines used to create a acoustic source pressure source term
 module m_acoustic_src

@@ -3,7 +3,7 @@
 !! @brief Contains module m_start_up
 
 #:include 'case.fpp'
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 
 !> @brief The purpose of the module is primarily to read in the files that
 !!              contain the inputs, the initial condition data and the grid data

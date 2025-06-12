@@ -1,5 +1,5 @@
 #:include 'macros.fpp'
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 #:include 'inline_capillary.fpp'
 
 !> @brief This module is used to compute source terms for surface tension model

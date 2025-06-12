@@ -3,7 +3,7 @@
 !! @brief Contains module m_bubbles_EE
 
 #:include 'macros.fpp'
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 
 !> @brief This module is used to compute the ensemble-averaged bubble dynamic variables
 module m_bubbles_EE

@@ -19,7 +19,7 @@
 !!              Please refer to Thompson (1987, 1990) for detailed descriptions.
 
 #:include 'macros.fpp'
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 
 module m_cbc
 

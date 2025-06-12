@@ -3,7 +3,7 @@
 !! @brief Contains module m_bubbles
 
 #:include 'macros.fpp'
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 
 !> @brief This module contains the procedures shared by the ensemble-averaged and volume-averaged bubble models.
 module m_bubbles

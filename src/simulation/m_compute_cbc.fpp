@@ -1,4 +1,4 @@
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 !>
 !! @file m_compute_cbc.f90
 !! @brief CBC computation module

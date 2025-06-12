@@ -4,7 +4,7 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 
 !> @brief The module serves as a proxy to the parameters and subroutines
 !!          available in the MPI implementation's MPI module. Specifically,

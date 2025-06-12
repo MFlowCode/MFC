@@ -4,7 +4,7 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 
 !> @brief The module contains all of the parameters describing the program
 !!              logistics, the computational domain and the simulation algorithm.

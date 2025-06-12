@@ -2,7 +2,7 @@
 !! @file m_viscous.f90
 !! @brief Contains module m_viscous
 #:include 'macros.fpp'
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 
 !> @brief The module contains the subroutines used to compute viscous terms.
 module m_viscous

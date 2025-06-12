@@ -3,7 +3,7 @@
 !! @brief Contains module m_hyperelastic
 
 #:include 'macros.fpp'
-#:include 'directive_macros.fpp'
+#:include 'parallel_macros.fpp'
 
 !> @brief This module consists of subroutines used in the calculation
 !!              of the cauchy tensor
