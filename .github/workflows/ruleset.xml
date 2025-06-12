@@ -9,7 +9,7 @@
     </description>
 
     <!-- Only run on Fortran files in src/ directory and Python files in toolchain/ directory -->
-    <filepattern><MFC/>src/.*\.(f|fpp|for|f90|f95|f03|f08)$</filepattern>
-    <filepattern><MFC/>toolchain/.*\.(py)$</filepattern>
+    <include-pattern>.*/src/.*\.(f|fpp|for|f90|f95|f03|f08)$</include-pattern>
+    <include-pattern>.*/toolchain/.*\.py$</include-pattern>
 
 </ruleset>
