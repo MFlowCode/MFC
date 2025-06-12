@@ -18,7 +18,4 @@
     <rule ref="category/python/design.xml"/>
     <rule ref="category/python/errorprone.xml"/>
 
-    <!-- For Fortran files -->
-    <rule ref="category/fortran/bestpractices.xml"/>
-
 </ruleset>
