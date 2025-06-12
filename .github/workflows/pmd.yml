@@ -14,7 +14,7 @@ jobs:
       - uses: pmd/pmd-github-action@v2
         id: pmd
         with:
-            rulesets: 'ruleset.xml'
+            rulesets: '.github/workflows/ruleset.xml'
             analyzeModifiedFilesOnly: true
             createGitHubAnnotations: false
             uploadSarifReport: true
