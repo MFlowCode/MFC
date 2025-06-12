@@ -108,7 +108,7 @@ module m_riemann_solvers
     !$acc declare create(is1, is2, is3, isx, isy, isz)
 
     real(wp), allocatable, dimension(:) :: Gs
-    !$acc declare create(gs)
+    !$acc declare create(Gs)
 
     real(wp), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
