@@ -1,0 +1,21 @@
+name: PMD Analysis
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  pmd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-java@v4
+        with:
+            distribution: 'temurin'
+            java-version: '11'
+      - uses: pmd/pmd-github-action@v2
+        id: pmd
+        with:
+            rulesets: 'ruleset.xml'
+            analyzeModifiedFilesOnly: true
+            createGitHubAnnotations: false
+            uploadSarifReport: true
+
