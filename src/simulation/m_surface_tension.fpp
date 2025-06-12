@@ -30,16 +30,16 @@ module m_surface_tension
     !> @{
     type(scalar_field), allocatable, dimension(:) :: c_divs
     !> @)
-    $:DECLARE(create=["c_divs"])
+    $:GPU_DECLARE(create=["c_divs"])
 
     !> @name cell boundary reconstructed gradient components and magnitude
     !> @{
     real(wp), allocatable, dimension(:, :, :, :) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !> @}
-    $:DECLARE(create=["gL_x","gR_x","gL_y","gR_y","gL_z","gR_z"])
+    $:GPU_DECLARE(create=["gL_x","gR_x","gL_y","gR_y","gL_z","gR_z"])
 
     type(int_bounds_info) :: is1, is2, is3, iv
-    $:DECLARE(create=["is1","is2","is3","iv"])
+    $:GPU_DECLARE(create=["is1","is2","is3","iv"])
 
 contains
 
@@ -86,7 +86,7 @@ contains
         integer :: j, k, l, i
 
         if (id == 1) then
-            $:PARALLEL_LOOP(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
+            $:GPU_PARALLEL_LOOP(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
                 "w1R", "w2R", "w3R", "w1", "w2", "w3", "normWL", &
                 "normWR", "normW"])
             do l = isz%beg, isz%end
@@ -133,7 +133,7 @@ contains
 
         elseif (id == 2) then
 
-            $:PARALLEL_LOOP(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
+            $:GPU_PARALLEL_LOOP(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
                 "w1R", "w2R", "w3R", "w1", "w2", "w3", "normWL", "normWR", &
                 "normW"])
             do l = isz%beg, isz%end
@@ -180,7 +180,7 @@ contains
 
         elseif (id == 3) then
 
-            $:PARALLEL_LOOP(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
+            $:GPU_PARALLEL_LOOP(collapse=3, private=["Omega", "w1L", "w2L", "w3L", &
                 "w1R", "w2R", "w3R", "w1", "w2", "w3", "normWL", "normWR", &
                 "normW"])
             do l = isz%beg, isz%end
@@ -244,7 +244,7 @@ contains
         isx%end = m; isy%end = n; isz%end = p
 
         ! compute gradient components
-        $:PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -254,7 +254,7 @@ contains
             end do
         end do
 
-        $:PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -265,7 +265,7 @@ contains
         end do
 
         if (p > 0) then
-            $:PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -276,7 +276,7 @@ contains
             end do
         end if
 
-        $:PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -336,10 +336,10 @@ contains
 
         end if
 
-        $:UPDATE(device=["is1","is2","is3","iv"])
+        $:GPU_UPDATE(device=["is1","is2","is3","iv"])
 
         if (recon_dir == 1) then
-            $:PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -352,7 +352,7 @@ contains
             end do
             !$acc end parallel loop
         else if (recon_dir == 2) then
-            $:PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -365,7 +365,7 @@ contains
             end do
             !$acc end parallel loop
         else if (recon_dir == 3) then
-            $:PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end

@@ -2382,7 +2382,7 @@ contains
     end subroutine s_model
 
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 
         real(wp), intent(in) :: cyl_y, cyl_z
 
@@ -2393,7 +2393,7 @@ contains
 
     pure function f_convert_cyl_to_cart(cyl) result(cart)
 
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 
         t_vec3, intent(in) :: cyl
         t_vec3 :: cart
@@ -2405,7 +2405,7 @@ contains
     end function f_convert_cyl_to_cart
 
     subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 
         real(wp), intent(IN) :: cyl_x, cyl_y
 
@@ -2418,7 +2418,7 @@ contains
     !! @param offset Thickness
     !! @param a Starting position
     pure elemental function f_r(myth, offset, a)
-        $:ROUTINE()
+        $:GPU_ROUTINE()
         real(wp), intent(in) :: myth, offset, a
         real(wp) :: b
         real(wp) :: f_r

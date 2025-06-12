@@ -41,7 +41,7 @@ module m_phase_change
     real(wp) :: A, B, C, D
     !> @}
 
-    $:DECLARE(create=["max_iter","pCr","TCr","mixM","lp","vp","A","B","C","D"])
+    $:GPU_DECLARE(create=["max_iter","pCr","TCr","mixM","lp","vp","A","B","C","D"])
 
 contains
 
@@ -88,17 +88,17 @@ contains
         real(wp) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
         real(wp) :: TvF !< total volume fraction
 
-        $:DECLARE(create=["pS","pSOV","pSSL","TS","TSOV","TSSL","TSatOV","TSatSL"])
-        $:DECLARE(create=["rhoe","dynE","rhos","rho","rM","m1","m2","MCT","TvF"])
+        $:GPU_DECLARE(create=["pS","pSOV","pSSL","TS","TSOV","TSSL","TSatOV","TSatSL"])
+        $:GPU_DECLARE(create=["rhoe","dynE","rhos","rho","rM","m1","m2","MCT","TvF"])
 
         real(wp), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
-        $:DECLARE(create=["p_infOV","p_infpT","p_infSL","sk","hk","gk","ek","rhok"])
+        $:GPU_DECLARE(create=["p_infOV","p_infpT","p_infSL","sk","hk","gk","ek","rhok"])
 
         !< Generic loop iterators
         integer :: i, j, k, l
 
         ! starting equilibrium solver
-        $:PARALLEL_LOOP(collapse=3, private=["p_infOV", "p_infpT", "p_infSL", &
+        $:GPU_PARALLEL_LOOP(collapse=3, private=["p_infOV", "p_infpT", "p_infSL", &
             "sk", "hk", "gk", "ek", "rhok", "pS", "pSOV", "pSSL", &
             "TS", "TSOV", "TSatOV", "TSatSL", "TSSL", "rhoe", &
             "dynE", "rhos", "rho", "rM", "m1", "m2", "MCT", "TvF"])
@@ -107,7 +107,7 @@ contains
                 do l = 0, p
 
                     rho = 0.0_wp; TvF = 0.0_wp
-                    $:LOOP()
+                    $:GPU_LOOP()
                     do i = 1, num_fluids
 
                         ! Mixture density
@@ -133,7 +133,7 @@ contains
 
                     ! kinetic energy as an auxiliary variable to the calculation of the total internal energy
                     dynE = 0.0_wp
-                    $:LOOP()
+                    $:GPU_LOOP()
                     do i = momxb, momxe
 
                         dynE = dynE + 5.0e-1_wp*q_cons_vf(i)%sf(j, k, l)**2/rho
@@ -255,7 +255,7 @@ contains
 
                     ! calculating volume fractions, internal energies, and total entropy
                     rhos = 0.0_wp
-                    $:LOOP()
+                    $:GPU_LOOP()
                     do i = 1, num_fluids
 
                         ! volume fractions
@@ -290,7 +290,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_infinite_pt_relaxation_k
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
 
         ! initializing variables
@@ -307,7 +307,7 @@ contains
         ! auxiliary variables for the pT-equilibrium solver
         mCP = 0.0_wp; mQ = 0.0_wp; p_infpT = ps_inf; 
         ! Performing tests before initializing the pT-equilibrium
-        $:LOOP()
+        $:GPU_LOOP()
         do i = 1, num_fluids
 
             ! sum of the total alpha*rho*cp of the system
@@ -356,7 +356,7 @@ contains
 
             ! updating functions used in the Newton's solver
             gpp = 0.0_wp; gp = 0.0_wp; hp = 0.0_wp
-            $:LOOP()
+            $:GPU_LOOP()
             do i = 1, num_fluids
 
                 gp = gp + (gs_min(i) - 1.0_wp)*q_cons_vf(i + contxb - 1)%sf(j, k, l)*cvs(i) &
@@ -394,7 +394,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_infinite_ptg_relaxation_k
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
 
         integer, intent(in) :: j, k, l
@@ -450,7 +450,7 @@ contains
             mCP = 0.0_wp; mCPD = 0.0_wp; mCVGP = 0.0_wp; mCVGP2 = 0.0_wp; mQ = 0.0_wp; mQD = 0.0_wp
             ! Those must be updated through the iterations, as they either depend on
             ! the partial masses for all fluids, or on the equilibrium pressure
-            $:LOOP()
+            $:GPU_LOOP()
             do i = 1, num_fluids
 
                 ! sum of the total alpha*rho*cp of the system
@@ -519,7 +519,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_correct_partial_densities
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
 
         !> @name variables for the correction of the reacting partial densities
@@ -582,7 +582,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_jacobian_matrix
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
 
         real(wp), dimension(2, 2), intent(out) :: InvJac
@@ -689,7 +689,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_pTg_residue
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
 
         integer, intent(in) :: j, k, l
@@ -740,7 +740,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_TSat
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
 
         real(wp), intent(in) :: pSat

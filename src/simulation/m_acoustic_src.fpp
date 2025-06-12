@@ -24,43 +24,43 @@ module m_acoustic_src
     private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
 
     integer, allocatable, dimension(:) :: pulse, support
-    $:DECLARE(create=["pulse","support"])
+    $:GPU_DECLARE(create=["pulse","support"])
 
     logical, allocatable, dimension(:) :: dipole
-    $:DECLARE(create=["dipole"])
+    $:GPU_DECLARE(create=["dipole"])
 
     real(wp), allocatable, target, dimension(:, :) :: loc_acoustic
-    $:DECLARE(create=["loc_acoustic"])
+    $:GPU_DECLARE(create=["loc_acoustic"])
 
     real(wp), allocatable, dimension(:) :: mag, length, height, wavelength, frequency
     real(wp), allocatable, dimension(:) :: gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay
-    $:DECLARE(create=["mag","length","height","wavelength","frequency"])
-    $:DECLARE(create=["gauss_sigma_dist","gauss_sigma_time","npulse","dir","delay"])
+    $:GPU_DECLARE(create=["mag","length","height","wavelength","frequency"])
+    $:GPU_DECLARE(create=["gauss_sigma_dist","gauss_sigma_time","npulse","dir","delay"])
 
     real(wp), allocatable, dimension(:) :: foc_length, aperture
-    $:DECLARE(create=["foc_length","aperture"])
+    $:GPU_DECLARE(create=["foc_length","aperture"])
 
     real(wp), allocatable, dimension(:) :: element_spacing_angle, element_polygon_ratio, rotate_angle
-    $:DECLARE(create=["element_spacing_angle","element_polygon_ratio","rotate_angle"])
+    $:GPU_DECLARE(create=["element_spacing_angle","element_polygon_ratio","rotate_angle"])
 
     real(wp), allocatable, dimension(:) :: bb_bandwidth, bb_lowest_freq
-    $:DECLARE(create=["bb_bandwidth","bb_lowest_freq"])
+    $:GPU_DECLARE(create=["bb_bandwidth","bb_lowest_freq"])
 
     integer, allocatable, dimension(:) :: num_elements, element_on, bb_num_freq
-    $:DECLARE(create=["num_elements","element_on","bb_num_freq"])
+    $:GPU_DECLARE(create=["num_elements","element_on","bb_num_freq"])
 
     !> @name Acoustic source terms
     !> @{
     real(wp), allocatable, dimension(:, :, :) :: mass_src, e_src
     real(wp), allocatable, dimension(:, :, :, :) :: mom_src
     !> @}
-    $:DECLARE(create=["mass_src","e_src","mom_src"])
+    $:GPU_DECLARE(create=["mass_src","e_src","mom_src"])
 
     integer, dimension(:), allocatable :: source_spatials_num_points !< Number of non-zero source grid points for each source
-    $:DECLARE(create=["source_spatials_num_points"])
+    $:GPU_DECLARE(create=["source_spatials_num_points"])
 
     type(source_spatial_type), dimension(:), allocatable :: source_spatials !< Data of non-zero source grid points for each source
-    $:DECLARE(create=["source_spatials"])
+    $:GPU_DECLARE(create=["source_spatials"])
 
 contains
 
@@ -111,7 +111,7 @@ contains
                 delay(i) = acoustic(i)%delay
             end if
         end do
-        $:UPDATE(device=["loc_acoustic","mag","dipole","support","length", &
+        $:GPU_UPDATE(device=["loc_acoustic","mag","dipole","support","length", &
             & "height","wavelength","frequency","gauss_sigma_dist", &
             & "gauss_sigma_time","foc_length","aperture","npulse","pulse", &
             & "dir","delay","element_polygon_ratio","rotate_angle", &
@@ -167,7 +167,7 @@ contains
 
         sim_time = t_step*dt
 
-        $:PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -220,7 +220,7 @@ contains
 
             deallocate (phi_rn)
 
-            $:PARALLEL_LOOP(private=["myalpha","myalpha_rho"])
+            $:GPU_PARALLEL_LOOP(private=["myalpha","myalpha_rho"])
             do i = 1, num_points
                 j = source_spatials(ai)%coord(1, i)
                 k = source_spatials(ai)%coord(2, i)
@@ -239,7 +239,7 @@ contains
 
                 if (bubbles_euler) then
                     if (num_fluids > 2) then
-                        $:LOOP()
+                        $:GPU_LOOP()
                         do q = 1, num_fluids - 1
                             myRho = myRho + myalpha_rho(q)
                             B_tait = B_tait + myalpha(q)*pi_infs(q)
@@ -253,7 +253,7 @@ contains
                 end if
 
                 if ((.not. bubbles_euler) .or. (mpp_lim .and. (num_fluids > 2))) then
-                    $:LOOP()
+                    $:GPU_LOOP()
                     do q = 1, num_fluids
                         myRho = myRho + myalpha_rho(q)
                         B_tait = B_tait + myalpha(q)*pi_infs(q)
@@ -320,15 +320,15 @@ contains
         end do
 
         ! Update the rhs variables
-        $:PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    $:LOOP()
+                    $:GPU_LOOP()
                     do q = contxb, contxe
                         rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)
                     end do
-                    $:LOOP()
+                    $:GPU_LOOP()
                     do q = momxb, momxe
                         rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mom_src(q - contxe, j, k, l)
                     end do
@@ -347,7 +347,7 @@ contains
     !! @param gauss_sigma_time_local sigma in time for Gaussian pulse
     !! @param source Source term amplitude
     pure elemental subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source, sum_BB)
-        $:ROUTINE()
+        $:GPU_ROUTINE()
         integer, intent(in) :: ai, term_index
         real(wp), intent(in) :: sim_time, c, sum_BB
         real(wp), intent(in) :: frequency_local, gauss_sigma_time_local
@@ -474,14 +474,14 @@ contains
                 call s_mpi_abort('Fatal Error: Inconsistent allocation of source_spatials')
             end if
 
-            $:UPDATE(device=["source_spatials(ai)%coord"])
-            $:UPDATE(device=["source_spatials(ai)%val"])
+            $:GPU_UPDATE(device=["source_spatials(ai)%coord"])
+            $:GPU_UPDATE(device=["source_spatials(ai)%val"])
             if (support(ai) >= 5) then
                 if (dim == 2) then
-                    $:UPDATE(device=["source_spatials(ai)%angle"])
+                    $:GPU_UPDATE(device=["source_spatials(ai)%angle"])
                 end if
                 if (dim == 3) then
-                    $:UPDATE(device=["source_spatials(ai)%xyz_to_r_ratios"])
+                    $:GPU_UPDATE(device=["source_spatials(ai)%xyz_to_r_ratios"])
                 end if
             end if
 
@@ -699,7 +699,7 @@ contains
     !! @param c Speed of sound
     !! @return frequency_local Converted frequency
     pure elemental function f_frequency_local(freq_conv_flag, ai, c)
-        $:ROUTINE()
+        $:GPU_ROUTINE()
         logical, intent(in) :: freq_conv_flag
         integer, intent(in) :: ai
         real(wp), intent(in) :: c
@@ -718,7 +718,7 @@ contains
     !! @param ai Acoustic source index
     !! @return gauss_sigma_time_local Converted Gaussian sigma time
     pure elemental function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
-        $:ROUTINE()
+        $:GPU_ROUTINE()
         logical, intent(in) :: gauss_conv_flag
         integer, intent(in) :: ai
         real(wp), intent(in) :: c

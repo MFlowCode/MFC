@@ -26,7 +26,7 @@ module m_mpi_common
     implicit none
 
     integer, private :: err_code, ierr, v_size !<
-    $:DECLARE(create=["v_size"])
+    $:GPU_DECLARE(create=["v_size"])
     !! Generic flags used to identify and report MPI errors
 
     real(wp), private, allocatable, dimension(:), target :: buff_send !<
@@ -39,10 +39,10 @@ module m_mpi_common
     !! average primitive variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
-    $:DECLARE(create=["buff_send","buff_recv"])
+    $:GPU_DECLARE(create=["buff_send","buff_recv"])
 
     integer :: halo_size, nVars
-    $:DECLARE(create=["halo_size","nVars"])
+    $:GPU_DECLARE(create=["halo_size","nVars"])
 
 contains
 
@@ -639,7 +639,7 @@ contains
 #ifdef MFC_MPI
 
         call nvtxStartRange("RHS-COMM-PACKBUF")
-        $:UPDATE(device=["v_size"])
+        $:GPU_UPDATE(device=["v_size"])
 
 #ifdef MFC_SIMULATION
         if (qbmm .and. .not. polytropic) then
@@ -693,7 +693,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    $:PARALLEL_LOOP(collapse=4,private=["r"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                     do l = 0, p
                         do k = 0, n
                             do j = 0, buff_size - 1
@@ -707,7 +707,7 @@ contains
 
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
-                        $:PARALLEL_LOOP(collapse=4,private=["r"])
+                        $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, buff_size - 1
@@ -722,7 +722,7 @@ contains
                             end do
                         end do
 
-                        $:PARALLEL_LOOP(collapse=5,private=["r"])
+                        $:GPU_PARALLEL_LOOP(collapse=5,private=["r"])
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, buff_size - 1
@@ -739,7 +739,7 @@ contains
                     end if
 #endif
                 #:elif mpi_dir == 2
-                    $:PARALLEL_LOOP(collapse=4,private=["r"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, sys_size
                         do l = 0, p
                             do k = 0, buff_size - 1
@@ -755,7 +755,7 @@ contains
 
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
-                        $:PARALLEL_LOOP(collapse=5,private=["r"])
+                        $:GPU_PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = 0, p
                                 do k = 0, buff_size - 1
@@ -771,7 +771,7 @@ contains
                             end do
                         end do
 
-                        $:PARALLEL_LOOP(collapse=5,private=["r"])
+                        $:GPU_PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = 0, p
                                 do k = 0, buff_size - 1
@@ -789,7 +789,7 @@ contains
                     end if
 #endif
                 #:else
-                    $:PARALLEL_LOOP(collapse=4,private=["r"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, sys_size
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
@@ -805,7 +805,7 @@ contains
 
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
-                        $:PARALLEL_LOOP(collapse=5,private=["r"])
+                        $:GPU_PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = 0, buff_size - 1
                                 do k = -buff_size, n + buff_size
@@ -821,7 +821,7 @@ contains
                             end do
                         end do
 
-                        $:PARALLEL_LOOP(collapse=5,private=["r"])
+                        $:GPU_PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = 0, buff_size - 1
                                 do k = -buff_size, n + buff_size
@@ -856,7 +856,7 @@ contains
                     call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
                 #:else
                     call nvtxStartRange("RHS-COMM-DEV2HOST")
-                    $:UPDATE(host=["buff_send"])
+                    $:GPU_UPDATE(host=["buff_send"])
                     call nvtxEndRange
                     call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
                 #:endif
@@ -874,7 +874,7 @@ contains
                     !$acc wait
                 #:else
                     call nvtxStartRange("RHS-COMM-HOST2DEV")
-                    $:UPDATE(device=["buff_recv"])
+                    $:GPU_UPDATE(device=["buff_recv"])
                     call nvtxEndRange
                 #:endif
             end if
@@ -891,7 +891,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    $:PARALLEL_LOOP(collapse=4,private=["r"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                     do l = 0, p
                         do k = 0, n
                             do j = -buff_size, -1
@@ -912,7 +912,7 @@ contains
 
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
-                        $:PARALLEL_LOOP(collapse=5,private=["r"])
+                        $:GPU_PARALLEL_LOOP(collapse=5,private=["r"])
                         do l = 0, p
                             do k = 0, n
                                 do j = -buff_size, -1
@@ -927,7 +927,7 @@ contains
                             end do
                         end do
 
-                        $:PARALLEL_LOOP(collapse=5,private=["r"])
+                        $:GPU_PARALLEL_LOOP(collapse=5,private=["r"])
                         do l = 0, p
                             do k = 0, n
                                 do j = -buff_size, -1
@@ -944,7 +944,7 @@ contains
                     end if
 #endif
                 #:elif mpi_dir == 2
-                    $:PARALLEL_LOOP(collapse=4,private=["r"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, sys_size
                         do l = 0, p
                             do k = -buff_size, -1
@@ -966,7 +966,7 @@ contains
 
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
-                        $:PARALLEL_LOOP(collapse=5,private=["r"])
+                        $:GPU_PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = 0, p
                                 do k = -buff_size, -1
@@ -982,7 +982,7 @@ contains
                             end do
                         end do
 
-                        $:PARALLEL_LOOP(collapse=5,private=["r"])
+                        $:GPU_PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = 0, p
                                 do k = -buff_size, -1
@@ -1001,7 +1001,7 @@ contains
 #endif
                 #:else
                     ! Unpacking buffer from bc_z%beg
-                    $:PARALLEL_LOOP(collapse=4,private=["r"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, sys_size
                         do l = -buff_size, -1
                             do k = -buff_size, n + buff_size
@@ -1024,7 +1024,7 @@ contains
 
 #ifdef MFC_SIMULATION
                     if (qbmm .and. .not. polytropic) then
-                        $:PARALLEL_LOOP(collapse=5,private=["r"])
+                        $:GPU_PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = -buff_size, -1
                                 do k = -buff_size, n + buff_size
@@ -1041,7 +1041,7 @@ contains
                             end do
                         end do
 
-                        $:PARALLEL_LOOP(collapse=5,private=["r"])
+                        $:GPU_PARALLEL_LOOP(collapse=5,private=["r"])
                         do i = sys_size + 1, sys_size + 4
                             do l = -buff_size, -1
                                 do k = -buff_size, n + buff_size
@@ -1089,7 +1089,7 @@ contains
 #ifdef MFC_MPI
 
         nVars = num_dims + 1
-        $:UPDATE(device=["nVars"])
+        $:GPU_UPDATE(device=["nVars"])
 
         buffer_counts = (/ &
                         buff_size*nVars*(n + 1)*(p + 1), &
@@ -1131,7 +1131,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    $:PARALLEL_LOOP(collapse=4,private=["r"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                     do l = 0, p
                         do k = 0, n
                             do j = 0, buff_size - 1
@@ -1144,7 +1144,7 @@ contains
                     end do
 
                 #:elif mpi_dir == 2
-                    $:PARALLEL_LOOP(collapse=4,private=["r"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, nVars
                         do l = 0, p
                             do k = 0, buff_size - 1
@@ -1159,7 +1159,7 @@ contains
                     end do
 
                 #:else
-                    $:PARALLEL_LOOP(collapse=4,private=["r"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, nVars
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
@@ -1187,7 +1187,7 @@ contains
                     call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
                 #:else
                     call nvtxStartRange("RHS-COMM-DEV2HOST")
-                    $:UPDATE(host=["buff_send"])
+                    $:GPU_UPDATE(host=["buff_send"])
                     call nvtxEndRange
                     call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
                 #:endif
@@ -1205,7 +1205,7 @@ contains
                     !$acc wait
                 #:else
                     call nvtxStartRange("RHS-COMM-HOST2DEV")
-                    $:UPDATE(device=["buff_recv"])
+                    $:GPU_UPDATE(device=["buff_recv"])
                     call nvtxEndRange
                 #:endif
             end if
@@ -1221,7 +1221,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    $:PARALLEL_LOOP(collapse=4,private=["r"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                     do l = 0, p
                         do k = 0, n
                             do j = -buff_size, -1
@@ -1241,7 +1241,7 @@ contains
                     end do
 
                 #:elif mpi_dir == 2
-                    $:PARALLEL_LOOP(collapse=4,private=["r"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, nVars
                         do l = 0, p
                             do k = -buff_size, -1
@@ -1263,7 +1263,7 @@ contains
 
                 #:else
                     ! Unpacking buffer from bc_z%beg
-                    $:PARALLEL_LOOP(collapse=4,private=["r"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private=["r"])
                     do i = 1, nVars
                         do l = -buff_size, -1
                             do k = -buff_size, n + buff_size

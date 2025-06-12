@@ -21,7 +21,7 @@ module m_boundary_common
     implicit none
 
     type(scalar_field), dimension(:, :), allocatable :: bc_buffers
-    $:DECLARE(create=["bc_buffers"])
+    $:GPU_DECLARE(create=["bc_buffers"])
 
     real(wp) :: bcxb, bcxe, bcyb, bcye, bczb, bcze
 
@@ -84,7 +84,7 @@ contains
         if (bcxb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 1, -1)
         else
-            $:PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (int(bc_type(1, -1)%sf(0, k, l)))
@@ -108,7 +108,7 @@ contains
         if (bcxe >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 1, 1)
         else
-            $:PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (int(bc_type(1, 1)%sf(0, k, l)))
@@ -136,7 +136,7 @@ contains
         if (bcyb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 2, -1)
         else
-            $:PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(2, -1)%sf(k, 0, l)))
@@ -162,7 +162,7 @@ contains
         if (bcye >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 2, 1)
         else
-            $:PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(2, 1)%sf(k, 0, l)))
@@ -190,7 +190,7 @@ contains
         if (bczb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 3, -1)
         else
-            $:PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(3, -1)%sf(k, l, 0)))
@@ -214,7 +214,7 @@ contains
         if (bcze >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 3, 1)
         else
-            $:PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(3, 1)%sf(k, l, 0)))
@@ -242,7 +242,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_ghost_cell_extrapolation
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -311,7 +311,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_symmetry
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -575,7 +575,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_periodic
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -718,7 +718,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_axis
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -781,7 +781,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_slip_wall
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -880,7 +880,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_no_slip_wall
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -1015,7 +1015,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_dirichlet
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
@@ -1084,7 +1084,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_qbmm_extrapolation
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
@@ -1167,7 +1167,7 @@ contains
         if (bcxb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, -1)
         else
-            $:PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (bc_type(1, -1)%sf(0, k, l))
@@ -1185,7 +1185,7 @@ contains
         if (bcxe >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, 1)
         else
-            $:PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (bc_type(1, 1)%sf(0, k, l))
@@ -1206,7 +1206,7 @@ contains
         if (bcyb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, -1)
         else
-            $:PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (bc_type(2, -1)%sf(k, 0, l))
@@ -1224,7 +1224,7 @@ contains
         if (bcye >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, 1)
         else
-            $:PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (bc_type(2, 1)%sf(k, 0, l))
@@ -1245,7 +1245,7 @@ contains
         if (bczb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, -1)
         else
-            $:PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (bc_type(3, -1)%sf(k, l, 0))
@@ -1263,7 +1263,7 @@ contains
         if (bcze >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, 1)
         else
-            $:PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (bc_type(3, 1)%sf(k, l, 0))
@@ -1283,7 +1283,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_periodic
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         integer, intent(in) :: bc_dir, bc_loc
@@ -1341,7 +1341,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_reflective
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         integer, intent(in) :: bc_dir, bc_loc
@@ -1423,7 +1423,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_ghost_cell_extrapolation
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         integer, intent(in) :: bc_dir, bc_loc

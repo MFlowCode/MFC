@@ -34,7 +34,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_enthalpy
 #else
-        $:ROUTINE()
+        $:GPU_ROUTINE()
 #endif
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
@@ -49,7 +49,7 @@ contains
 
         integer :: i
 
-        $:LOOP()
+        $:GPU_LOOP()
         do i = 1, num_fluids
             alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
             alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
@@ -64,13 +64,13 @@ contains
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
 
-        $:LOOP()
+        $:GPU_LOOP()
         do i = 1, num_vels
             vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
         end do
 
         vel_sum = 0._wp
-        $:LOOP()
+        $:GPU_LOOP()
         do i = 1, num_vels
             vel_sum = vel_sum + vel(i)**2._wp
         end do
@@ -99,7 +99,7 @@ contains
         !! @param vcfl_sf (optional) cell centered viscous cfl number
         !! @param Rc_sf (optional) cell centered Rc
     pure subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
-        $:ROUTINE()
+        $:GPU_ROUTINE()
         real(wp), intent(in), dimension(num_vels) :: vel
         real(wp), intent(in) :: c, rho
         real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: icfl_sf
@@ -196,7 +196,7 @@ contains
         !! @param k y coordinate
         !! @param l z coordinate
     pure subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
-        $:ROUTINE()
+        $:GPU_ROUTINE()
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in) :: c, rho
         real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: max_dt
@@ -275,17 +275,17 @@ contains
 
         bc_type(1, -1)%sf(:, :, :) = bc_x%beg
         bc_type(1, 1)%sf(:, :, :) = bc_x%end
-        $:UPDATE(device=["bc_type(1,-1)%sf","bc_type(1,1)%sf"])
+        $:GPU_UPDATE(device=["bc_type(1,-1)%sf","bc_type(1,1)%sf"])
 
         if (n > 0) then
             bc_type(2, -1)%sf(:, :, :) = bc_y%beg
             bc_type(2, 1)%sf(:, :, :) = bc_y%end
-            $:UPDATE(device=["bc_type(2,-1)%sf","bc_type(2,1)%sf"])
+            $:GPU_UPDATE(device=["bc_type(2,-1)%sf","bc_type(2,1)%sf"])
 
             if (p > 0) then
                 bc_type(3, -1)%sf(:, :, :) = bc_z%beg
                 bc_type(3, 1)%sf(:, :, :) = bc_z%end
-                $:UPDATE(device=["bc_type(3,-1)%sf","bc_type(3,1)%sf"])
+                $:GPU_UPDATE(device=["bc_type(3,-1)%sf","bc_type(3,1)%sf"])
             end if
         end if
 

@@ -171,7 +171,7 @@
 #:enddef
 
 
-#:def PARALLEL_LOOP(collapse=None, private=None, parallelism=['gang', 'vector'], &
+#:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism=['gang', 'vector'], &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None)
@@ -215,7 +215,7 @@
     $:acc_directive
 #:enddef
 
-#:def ROUTINE(parallelism=['seq'], nohost=False, extraAccArgs=None)
+#:def GPU_ROUTINE(parallelism=['seq'], nohost=False, extraAccArgs=None)
     #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
 
     #:assert isinstance(nohost, bool)
@@ -233,7 +233,7 @@
     $:acc_directive
 #:enddef
 
-#:def DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, link=None, extraAccArgs=None)
+#:def GPU_DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, link=None, extraAccArgs=None)
     
     #:set copy_val = GEN_COPY_STR(copy)
 
@@ -259,7 +259,7 @@
     $:acc_directive
 #:enddef
 
-#:def LOOP(collapse=None, parallelism=["seq"], data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
+#:def GPU_LOOP(collapse=None, parallelism=["seq"], data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
 
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
 
@@ -287,7 +287,7 @@
     $:acc_directive
 #:enddef
 
-#:def DATA(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, deviceptr=None, attach=None, default=None, extraAccArgs=None)
+#:def GPU_DATA(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, deviceptr=None, attach=None, default=None, extraAccArgs=None)
     
     #:set copy_val = GEN_COPY_STR(copy)
 
@@ -318,7 +318,7 @@
     $:acc_directive
 #:enddef
 
-#:def ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraAccArgs=None)
+#:def GPU_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraAccArgs=None)
     #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
 
     #:set create_val = GEN_CREATE_STR(create)
@@ -332,7 +332,7 @@
     $:acc_directive
 #:enddef
 
-#:def EXIT_DATA(copyout=None, delete=None, detach=None, extraAccArgs=None)
+#:def GPU_EXIT_DATA(copyout=None, delete=None, detach=None, extraAccArgs=None)
     #:set copyout_val = GEN_COPYOUT_STR(copyout)
 
     #:set delete_val = GEN_DELETE_STR(delete)
@@ -346,7 +346,7 @@
     $:acc_directive
 #:enddef
 
-#:def CACHE(cache, extraAccArgs=None)
+#:def GPU_CACHE(cache, extraAccArgs=None)
     #:set cache_val = GEN_PARENTHESES_CLAUSE('cache', cache)
 
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
@@ -356,7 +356,7 @@
     $:acc_directive
 #:enddef
 
-#:def ATOMIC(atomic='update', extraAccArgs=None)
+#:def GPU_ATOMIC(atomic='update', extraAccArgs=None)
     #:assert isinstance(atomic, str)
     #:assert (atomic == 'read' or atomic == 'write' or atomic == 'update' or atomic == 'capture')
 
@@ -369,7 +369,7 @@
     $:acc_directive
 #:enddef
 
-#:def UPDATE(host=None, device=None, extraAccArgs=None)
+#:def GPU_UPDATE(host=None, device=None, extraAccArgs=None)
     #:set host_val = GEN_HOST_STR(host)
 
     #:set device_val = GEN_DEVICE_STR(device)
@@ -381,7 +381,7 @@
     $:acc_directive
 #:enddef
 
-#:def WAIT(host=None, device=None, extraAccArgs=None)
+#:def GPU_WAIT(host=None, device=None, extraAccArgs=None)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
 
     #:set clause_val = host_val.strip('\n') + device_val.strip('\n')

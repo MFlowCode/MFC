@@ -22,13 +22,13 @@ module m_bubbles_EE
 
     real(wp), allocatable, dimension(:, :, :) :: bub_adv_src
     real(wp), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
-    $:DECLARE(create=["bub_adv_src","bub_r_src","bub_v_src","bub_p_src","bub_m_src"])
+    $:GPU_DECLARE(create=["bub_adv_src","bub_r_src","bub_v_src","bub_p_src","bub_m_src"])
 
     type(scalar_field) :: divu !< matrix for div(u)
-    $:DECLARE(create=["divu"])
+    $:GPU_DECLARE(create=["divu"])
 
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
-    $:DECLARE(create=["rs","vs","ms","ps"])
+    $:GPU_DECLARE(create=["rs","vs","ms","ps"])
 
 contains
 
@@ -52,9 +52,9 @@ contains
             end if
         end do
 
-        $:UPDATE(device=["rs", "vs"])
+        $:GPU_UPDATE(device=["rs", "vs"])
         if (.not. polytropic) then
-            $:UPDATE(device=["ps", "ms"])
+            $:GPU_UPDATE(device=["ps", "ms"])
         end if
 
         @:ALLOCATE(divu%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
@@ -77,12 +77,12 @@ contains
         real(wp) :: nR3bar
         integer(wp) :: i, j, k, l
 
-        $:PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     nR3bar = 0._wp
-                    $:LOOP()
+                    $:GPU_LOOP()
                     do i = 1, nb
                         nR3bar = nR3bar + weight(i)*(q_cons_vf(rs(i))%sf(j, k, l))**3._wp
                     end do
@@ -104,7 +104,7 @@ contains
         if (idir == 1) then
 
             if (.not. qbmm) then
-                $:PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -120,7 +120,7 @@ contains
 
         elseif (idir == 2) then
 
-            $:PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -134,7 +134,7 @@ contains
 
         elseif (idir == 3) then
 
-            $:PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -173,13 +173,13 @@ contains
         integer :: dmBub_id !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
-        $:PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     bub_adv_src(j, k, l) = 0._wp
 
-                    $:LOOP()
+                    $:GPU_LOOP()
                     do q = 1, nb
                         bub_r_src(j, k, l, q) = 0._wp
                         bub_v_src(j, k, l, q) = 0._wp
@@ -191,7 +191,7 @@ contains
         end do
 
         adap_dt_stop_max = 0
-        $:PARALLEL_LOOP(collapse=3, private=["Rtmp", "Vtmp", "myalpha_rho", "myalpha"], &
+        $:GPU_PARALLEL_LOOP(collapse=3, private=["Rtmp", "Vtmp", "myalpha_rho", "myalpha"], &
             reduction=["adap_dt_stop_max"], reductionOp="MAX", &
             copy=["adap_dt_stop_max"])
         do l = 0, p
@@ -201,7 +201,7 @@ contains
                     if (adv_n) then
                         nbub = q_prim_vf(n_idx)%sf(j, k, l)
                     else
-                        $:LOOP()
+                        $:GPU_LOOP()
                         do q = 1, nb
                             Rtmp(q) = q_prim_vf(rs(q))%sf(j, k, l)
                             Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
@@ -209,7 +209,7 @@ contains
 
                         R3 = 0._wp
 
-                        $:LOOP()
+                        $:GPU_LOOP()
                         do q = 1, nb
                             R3 = R3 + weight(q)*Rtmp(q)**3._wp
                         end do
@@ -220,7 +220,7 @@ contains
                     if (.not. adap_dt) then
                         R2Vav = 0._wp
 
-                        $:LOOP()
+                        $:GPU_LOOP()
                         do q = 1, nb
                             R2Vav = R2Vav + weight(q)*Rtmp(q)**2._wp*Vtmp(q)
                         end do
@@ -228,10 +228,10 @@ contains
                         bub_adv_src(j, k, l) = 4._wp*pi*nbub*R2Vav
                     end if
 
-                    $:LOOP()
+                    $:GPU_LOOP()
                     do q = 1, nb
 
-                        $:LOOP()
+                        $:GPU_LOOP()
                         do ii = 1, num_fluids
                             myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
                             myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
@@ -242,14 +242,14 @@ contains
                         B_tait = 0._wp
 
                         if (mpp_lim .and. (num_fluids > 2)) then
-                            $:LOOP()
+                            $:GPU_LOOP()
                             do ii = 1, num_fluids
                                 myRho = myRho + myalpha_rho(ii)
                                 n_tait = n_tait + myalpha(ii)*gammas(ii)
                                 B_tait = B_tait + myalpha(ii)*pi_infs(ii)
                             end do
                         else if (num_fluids > 2) then
-                            $:LOOP()
+                            $:GPU_LOOP()
                             do ii = 1, num_fluids - 1
                                 myRho = myRho + myalpha_rho(ii)
                                 n_tait = n_tait + myalpha(ii)*gammas(ii)
@@ -325,14 +325,14 @@ contains
         if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         if (.not. adap_dt) then
-            $:PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do q = 0, n
                     do i = 0, m
                         rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + bub_adv_src(i, q, l)
                         if (num_fluids > 1) rhs_vf(advxb)%sf(i, q, l) = &
                             rhs_vf(advxb)%sf(i, q, l) - bub_adv_src(i, q, l)
-                        $:LOOP()
+                        $:GPU_LOOP()
                         do k = 1, nb
                             rhs_vf(rs(k))%sf(i, q, l) = rhs_vf(rs(k))%sf(i, q, l) + bub_r_src(i, q, l, k)
                             rhs_vf(vs(k))%sf(i, q, l) = rhs_vf(vs(k))%sf(i, q, l) + bub_v_src(i, q, l, k)

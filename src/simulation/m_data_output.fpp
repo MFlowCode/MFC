@@ -55,14 +55,14 @@ module m_data_output
     real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     real(wp), public, allocatable, dimension(:, :) :: c_mass
-    $:DECLARE(create=["icfl_sf","vcfl_sf","ccfl_sf","Rc_sf"])
+    $:GPU_DECLARE(create=["icfl_sf","vcfl_sf","ccfl_sf","Rc_sf"])
 
     real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
     real(wp) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
     real(wp) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
-    $:DECLARE(create=["icfl_max_loc","icfl_max_glb","vcfl_max_loc","vcfl_max_glb"])
-    $:DECLARE(create=["ccfl_max_loc","ccfl_max_glb","Rc_min_loc","Rc_min_glb"])
+    $:GPU_DECLARE(create=["icfl_max_loc","icfl_max_glb","vcfl_max_loc","vcfl_max_glb"])
+    $:GPU_DECLARE(create=["ccfl_max_loc","ccfl_max_glb","Rc_min_loc","Rc_min_glb"])
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
     !> @{
@@ -279,7 +279,7 @@ contains
         integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step
-        $:PARALLEL_LOOP(collapse=3, private=["vel", "alpha", "Re"])
+        $:GPU_PARALLEL_LOOP(collapse=3, private=["vel", "alpha", "Re"])
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -303,10 +303,10 @@ contains
         ! Determining local stability criteria extrema at current time-step
 
 #ifdef _CRAYFTN
-        $:UPDATE(host=["icfl_sf"])
+        $:GPU_UPDATE(host=["icfl_sf"])
 
         if (viscous) then
-            $:UPDATE(host=["vcfl_sf","Rc_sf"])
+            $:GPU_UPDATE(host=["vcfl_sf","Rc_sf"])
         end if
 
         icfl_max_loc = maxval(icfl_sf)
@@ -527,7 +527,7 @@ contains
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
-                $:UPDATE(host=["q_prim_vf(i)%sf(:,:,:)"])
+                $:GPU_UPDATE(host=["q_prim_vf(i)%sf(:,:,:)"])
             end do
             ! q_prim_vf(bubxb) stores the value of nb needed in riemann solvers, so replace with true primitive value (=1._wp)
             if (qbmm) then
