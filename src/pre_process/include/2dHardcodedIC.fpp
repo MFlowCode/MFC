@@ -207,7 +207,7 @@ integer :: local_start, local_end, local_n
                 ! if (idx > nRows) idx = nRows
 
                 ! Assign values directly from stored data for each file
-         do f = 1, nFiles-1
+         do f = 1, nFiles
             if (f > 2) then
                 lol = 1
             else
