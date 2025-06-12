@@ -2,26 +2,9 @@ name: PMD Analysis
 
 on: [push, pull_request, workflow_dispatch]
 
-jobs:
-  file-changes:
-    name: Detect File Changes
-    runs-on: 'ubuntu-latest'
-    outputs: 
-      checkall: ${{ steps.changes.outputs.checkall }}
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-
-      - name: Detect Changes
-        uses: dorny/paths-filter@v3
-        id: changes
-        with: 
-          filters: ".github/file-filter.yml"
-    
+jobs:    
   pmd:
       name: PMD Analysis
-      if: needs.file-changes.outputs.checkall == 'true'
-      needs: file-changes
       runs-on: "ubuntu-latest"
       env:
           pr_everything: 0
