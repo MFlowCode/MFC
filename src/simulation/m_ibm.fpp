@@ -71,7 +71,7 @@ contains
         @:ACC_SETUP_SFs(levelset)
         @:ACC_SETUP_SFs(levelset_norm)
 
-        !$acc enter data copyin(num_gps, num_inner_gps)
+        $:GPU_ENTER_DATA(copyin=["num_gps","num_inner_gps"])
 
     end subroutine s_initialize_ibm_module
 
@@ -96,7 +96,7 @@ contains
         @:ALLOCATE(ghost_points(1:num_gps))
         @:ALLOCATE(inner_points(1:num_inner_gps))
 
-        !$acc enter data copyin(ghost_points, inner_points)
+        $:GPU_ENTER_DATA(copyin=["ghost_points","inner_points"])
 
         call s_find_ghost_points(ghost_points, inner_points)
         $:GPU_UPDATE(device=["ghost_points", "inner_points"])

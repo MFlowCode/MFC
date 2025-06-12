@@ -611,7 +611,7 @@ contains
 
         integer :: i, j
 
-!$acc enter data copyin(is1b, is1e, is2b, is2e, is3b, is3e)
+$:GPU_ENTER_DATA(copyin=["is1b","is1e","is2b","is2e","is3b","is3e"])
 
 #ifdef MFC_SIMULATION
         @:ALLOCATE(gammas (1:num_fluids))

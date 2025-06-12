@@ -3338,7 +3338,7 @@ contains
             $:GPU_UPDATE(device=["Res","Re_idx","Re_size"])
         end if
 
-        !$acc enter data copyin(is1, is2, is3, isx, isy, isz)
+        $:GPU_ENTER_DATA(copyin=["is1","is2","is3","isx","isy","isz"])
 
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p

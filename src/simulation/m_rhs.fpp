@@ -174,7 +174,7 @@ contains
 
         integer :: num_eqns_after_adv
 
-        !$acc enter data copyin(idwbuff, idwbuff)
+        $:GPU_ENTER_DATA(copyin=["idwbuff","idwbuff"])
         $:GPU_UPDATE(device=["idwbuff", "idwbuff"])
 
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
@@ -202,29 +202,29 @@ contains
                 @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             else
                 q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
-                !$acc enter data copyin(q_prim_qp%vf(l)%sf)
-                !$acc enter data attach(q_prim_qp%vf(l)%sf)
+                $:GPU_ENTER_DATA(copyin=["q_prim_qp%vf(l)%sf"])
+                $:GPU_ENTER_DATA(attach=["q_prim_qp%vf(l)%sf"])
             end if
         end do
 
         do l = adv_idx%beg, adv_idx%end
             q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
-            !$acc enter data copyin(q_prim_qp%vf(l)%sf)
-            !$acc enter data attach(q_prim_qp%vf(l)%sf)
+            $:GPU_ENTER_DATA(copyin=["q_prim_qp%vf(l)%sf"])
+            $:GPU_ENTER_DATA(attach=["q_prim_qp%vf(l)%sf"])
         end do
 
         if (surface_tension) then
             q_prim_qp%vf(c_idx)%sf => &
                 q_cons_qp%vf(c_idx)%sf
-            !$acc enter data copyin(q_prim_qp%vf(c_idx)%sf)
-            !$acc enter data attach(q_prim_qp%vf(c_idx)%sf)
+            $:GPU_ENTER_DATA(copyin=["q_prim_qp%vf(c_idx)%sf"])
+            $:GPU_ENTER_DATA(attach=["q_prim_qp%vf(c_idx)%sf"])
         end if
 
         if (cont_damage) then
             q_prim_qp%vf(damage_idx)%sf => &
                 q_cons_qp%vf(damage_idx)%sf
-            !$acc enter data copyin(q_prim_qp%vf(damage_idx)%sf)
-            !$acc enter data attach(q_prim_qp%vf(damage_idx)%sf)
+            $:GPU_ENTER_DATA(copyin=["q_prim_qp%vf(damage_idx)%sf"])
+            $:GPU_ENTER_DATA(attach=["q_prim_qp%vf(damage_idx)%sf"])
         end if
 
         if (viscous) then
@@ -549,14 +549,14 @@ contains
                 if (riemann_solver /= 1 .and. riemann_solver /= 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
-                        !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
+                        $:GPU_ENTER_DATA(attach=["flux_src_n(i)%vf(l)%sf"])
                     end do
                 end if
             else
                 do l = 1, sys_size
                     flux_n(i)%vf(l)%sf => flux_n(1)%vf(l)%sf
                     flux_src_n(i)%vf(l)%sf => flux_src_n(1)%vf(l)%sf
-                    !$acc enter data attach(flux_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf)
+                    $:GPU_ENTER_DATA(attach=["flux_n(i)%vf(l)%sf","flux_src_n(i)%vf(l)%sf"])
                 end do
             end if
         end do
@@ -1788,13 +1788,13 @@ contains
                 @:DEALLOCATE(q_cons_qp%vf(j)%sf)
                 @:DEALLOCATE(q_prim_qp%vf(j)%sf)
             else
-                !$acc exit data detach(q_prim_qp%vf(j)%sf)
+                $:GPU_EXIT_DATA(detach=["q_prim_qp%vf(j)%sf"])
                 nullify (q_prim_qp%vf(j)%sf)
             end if
         end do
 
         do j = adv_idx%beg, adv_idx%end
-            !$acc exit data detach(q_prim_qp%vf(j)%sf)
+            $:GPU_EXIT_DATA(detach=["q_prim_qp%vf(j)%sf"])
             nullify (q_prim_qp%vf(j)%sf)
         end do
 
@@ -1827,7 +1827,7 @@ contains
         end if
 
         if (mpp_lim .and. bubbles_euler) then
-            !$acc exit data delete(alf_sum%sf)
+            $:GPU_EXIT_DATA(delete=["alf_sum%sf"])
             deallocate (alf_sum%sf)
         end if
 

@@ -1257,11 +1257,16 @@ contains
             $:GPU_UPDATE(device=["mhd", "relativity"])
         #:endif
 
-        !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles_euler, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
-        !$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN, mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
-        !$acc enter data copyin(dir_idx, dir_flg, dir_idx_tau)
+        $:GPU_ENTER_DATA(copyin=["nb","R0ref","Ca","Web","Re_inv","weight","R0", &
+            & "V0","bubbles_euler","polytropic","polydisperse","qbmm","R0_type", &
+            & "ptil","bubble_model","thermal","poly_sigma"])
+        $:GPU_ENTER_DATA(copyin=["R_n","R_v","phi_vn","phi_nv","Pe_c","Tw","pv", &
+            & "M_n","M_v","k_n","k_v","pb0","mass_n0","mass_v0","Pe_T", &
+            & "Re_trans_T","Re_trans_c","Im_trans_T","Im_trans_c","omegaN", &
+            & "mul0","ss","gamma_v","mu_v","gamma_m","gamma_n","mu_n","gam"])
+        $:GPU_ENTER_DATA(copyin=["dir_idx","dir_flg","dir_idx_tau"])
 
-        !$acc enter data copyin(relax, relax_model, palpha_eps,ptgalpha_eps)
+        $:GPU_ENTER_DATA(copyin=["relax","relax_model","palpha_eps","ptgalpha_eps"])
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))

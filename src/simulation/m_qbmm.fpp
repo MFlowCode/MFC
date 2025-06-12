@@ -58,7 +58,7 @@ contains
                 nterms = 7
             end if
 
-            !$acc enter data copyin(nterms)
+            $:GPU_ENTER_DATA(copyin=["nterms"])
             $:GPU_UPDATE(device=["nterms"])
 
         #:endif

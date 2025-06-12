@@ -90,7 +90,7 @@ contains
         gpu_fft_size(1) = real_size; 
         iembed(1) = 0
         oembed(1) = 0
-        !$acc enter data copyin(real_size, cmplx_size, x_size, sys_size, batch_size, Nfq)
+        $:GPU_ENTER_DATA(copyin=["real_size","cmplx_size","x_size","sys_size","batch_size","Nfq"])
         $:GPU_UPDATE(device=["real_size","cmplx_size","x_size","sys_size","batch_size"])
 #else
         ! Allocate input and output DFT data sizes

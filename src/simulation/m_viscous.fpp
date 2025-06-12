@@ -44,7 +44,7 @@ contains
             end do
         end do
         $:GPU_UPDATE(device=["Res_viscous","Re_idx","Re_size"])
-        !$acc enter data copyin(is1_viscous, is2_viscous, is3_viscous, iv)
+        $:GPU_ENTER_DATA(copyin=["is1_viscous","is2_viscous","is3_viscous","iv"])
 
     end subroutine s_initialize_viscous_module
 

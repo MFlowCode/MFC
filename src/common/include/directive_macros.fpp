@@ -215,7 +215,8 @@
     $:acc_directive
 #:enddef
 
-#:def GPU_ROUTINE(parallelism=['seq'], nohost=False, extraAccArgs=None)
+#:def GPU_ROUTINE(function_name=None, parallelism=['seq'], nohost=False, cray_inline=False, extraAccArgs=None)
+    #:assert isinstance(cray_inline, bool)
     #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
 
     #:assert isinstance(nohost, bool)
@@ -230,7 +231,19 @@
     #:set clause_val = parallelism_val.strip('\n') + nohost_val.strip('\n')
     #:set acc_directive = '!$acc routine ' + &
         & clause_val + extraAccArgs_val.strip('\n')
-    $:acc_directive
+    #:if cray_inline == True
+        #:if not isinstance(function_name, str)
+            #:stop "When inlining for Cray Compiler, function name must be given and given as a string"
+        #:endif
+#ifdef _CRAYFTN
+        #:set cray_directive = ('!DIR$ INLINEALWAYS ' + function_name).strip('\n')
+        $:cray_directive
+#else
+        $:acc_directive
+#endif
+    #:else
+        $:acc_directive
+    #:endif
 #:enddef
 
 #:def GPU_DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, link=None, extraAccArgs=None)
