@@ -66,12 +66,11 @@ contains
         end if
     end subroutine s_initialize_surface_tension_module
 
-    pure subroutine s_compute_capilary_source_flux(q_prim_vf, &
-                                                   vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
-                                                   flux_src_vf, &
-                                                   id, isx, isy, isz)
+    pure subroutine s_compute_capilary_source_flux( &
+        vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
+        flux_src_vf, &
+        id, isx, isy, isz)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsx_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsy_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsz_vf

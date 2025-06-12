@@ -119,7 +119,7 @@ contains
                     end do
                     ! If in simulation, use acc mixture subroutines
                     call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha_k, &
-                                                                    alpha_rho_k, Re, j, k, l, G, Gs)
+                                                                    alpha_rho_k, Re, G, Gs)
                     rho = max(rho, sgm_eps)
                     G = max(G, sgm_eps)
                     !if ( G <= verysmall ) G_K = 0_wp

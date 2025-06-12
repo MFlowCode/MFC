@@ -376,21 +376,17 @@ contains
         !!  @param Rc_min_glb Global minimum Rc stability criterion
     impure subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
                                                               vcfl_max_loc, &
-                                                              ccfl_max_loc, &
                                                               Rc_min_loc, &
                                                               icfl_max_glb, &
                                                               vcfl_max_glb, &
-                                                              ccfl_max_glb, &
                                                               Rc_min_glb)
 
         real(wp), intent(in) :: icfl_max_loc
         real(wp), intent(in) :: vcfl_max_loc
-        real(wp), intent(in) :: ccfl_max_loc
         real(wp), intent(in) :: Rc_min_loc
 
         real(wp), intent(out) :: icfl_max_glb
         real(wp), intent(out) :: vcfl_max_glb
-        real(wp), intent(out) :: ccfl_max_glb
         real(wp), intent(out) :: Rc_min_glb
 
 #ifdef MFC_SIMULATION
@@ -1179,7 +1175,8 @@ contains
                 #:endif
             end if
         #:endfor
-
+        p_send => buff_send(0)
+        p_recv => buff_recv(0)
         ! Send/Recv
 #ifdef MFC_SIMULATION
         #:for rdma_mpi in [False, True]

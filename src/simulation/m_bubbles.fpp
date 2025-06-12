@@ -70,7 +70,7 @@ contains
         else if (bubble_model == 3) then
             ! Rayleigh-Plesset bubbles
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
-            f_rddot = f_rddot_RP(fP, fRho, fR, fV, fR0, fCpbw)
+            f_rddot = f_rddot_RP(fP, fRho, fR, fV, fCpbw)
         end if
 
     end function f_rddot

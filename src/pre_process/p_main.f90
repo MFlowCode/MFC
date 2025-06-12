@@ -28,7 +28,7 @@ program p_main
 
     allocate (proc_time(0:num_procs - 1))
 
-    call s_apply_initial_condition(start, finish, proc_time, time_avg, time_final, file_exists)
+    call s_apply_initial_condition(start, finish)
 
     time_avg = abs(finish - start)
 
