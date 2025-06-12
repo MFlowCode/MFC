@@ -13,10 +13,6 @@
     <include-pattern>.*/toolchain/.*\.py$</include-pattern>
 
     <!-- Rules -->
-    <rule ref="EmptyIfStmt"/>
-    <rule ref="EmptyWhileStmt"/>
-    <rule ref="EmptyTryBlock"/>
-    <rule ref="EmptyFinallyBlock"/>
-    <rule ref="EmptySwitchStatements"/>
+    <rule ref="category/java/errorprone.xml/"/>
 
 </ruleset>
