@@ -26,13 +26,18 @@ jobs:
       matrix:
         include:
           - cluster: phoenix
-            name: "Georgia Tech | Phoenix (NVHPC)"
+            name: "Georgia Tech | Phoenix (NVHPC) - CPU"
             group: phoenix
             labels: gt
             flag: p
-            strategy: 
-              matrix:
-                device: ['cpu', 'gpu']
+            device: cpu
+            build_script: ""
+          - cluster: phoenix
+            name: "Georgia Tech | Phoenix (NVHPC) - GPU"
+            group: phoenix
+            labels: gt
+            flag: p
+            device: gpu
             build_script: ""
           - cluster: frontier
             name: "Oak Ridge | Frontier (AMD ROCm)"
