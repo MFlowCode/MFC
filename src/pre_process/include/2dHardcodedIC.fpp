@@ -9,7 +9,7 @@
 integer :: local_start, local_end, local_n
 
   integer, parameter :: nFiles = 14
-  integer, parameter :: xRows  = 1281
+  integer, parameter :: xRows  = 1001
   integer, parameter :: Nrows  = xRows
 
   ! Variables for file reading and domain data

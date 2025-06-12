@@ -1,7 +1,7 @@
 #:def Hardcoded1DVariables()
     
     integer, parameter :: nFiles = 14   ! Can be changed to any number
-    integer, parameter :: nRows  = 1281!
+    integer, parameter :: nRows  = 1001!
     integer :: f, iter, ios, unit, idx
     real(8) :: x_len, x_step
     character(len=100), dimension(nFiles) :: fileNames
