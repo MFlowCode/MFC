@@ -30,19 +30,22 @@ jobs:
             group: phoenix
             labels: gt
             flag: p
-            strategy: 
-              matrix:
-                device: ['cpu', 'gpu']
+            device: cpu
+            build_script: ""
+          - cluster: phoenix
+            name: "Georgia Tech | Phoenix (NVHPC)"
+            group: phoenix
+            labels: gt
+            flag: p
+            device: gpu
             build_script: ""
           - cluster: frontier
             name: "Oak Ridge | Frontier (AMD ROCm)"
             group: frontier
             labels: olcf
             flag: f
-            strategy: 
-              matrix:
-                device: ['gpu']
-            build_script: "bash .github/workflows/frontier/build.sh ${{ matrix.device }}"
+            device: gpu
+            build_script: "bash .github/workflows/frontier/build.sh gpu"
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
