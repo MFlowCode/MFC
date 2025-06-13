@@ -20,9 +20,11 @@ jobs:
 
           - name: Run CPD for Fortran
             continue-on-error: true
-            env:
-              PMD_VERSION: 7.14.0
             run: |
+              # Get latest PMD version from GitHub API
+              PMD_VERSION=$(curl -s https://api.github.com/repos/pmd/pmd/releases/latest | grep '"tag_name":' | cut -d'"' -f4 | sed 's/pmd_releases\///')
+              echo "Using PMD version: $PMD_VERSION"
+
               curl -sSL -o pmd.zip \
                 "https://github.com/pmd/pmd/releases/download/pmd_releases/${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip"
               unzip -q pmd.zip
