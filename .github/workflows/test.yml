@@ -89,8 +89,15 @@ jobs:
 
   self:
     name: Self Hosted
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: file-changes
+    # one consolidated condition
+    if: |
+      github.repository == 'MFlowCode/MFC' &&
+      needs.file-changes.outputs.checkall == 'true' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        !(matrix.lbl == 'frontier' && matrix.device == 'cpu')
+      )
     continue-on-error: false
     timeout-minutes: 1400
     strategy:
