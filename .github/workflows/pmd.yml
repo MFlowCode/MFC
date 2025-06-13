@@ -24,11 +24,11 @@ jobs:
 
           - name: Build PMD
             run: |
-              (cd pmd && mvn clean install -DskipTests> ../pmd.txt)
+              (cd pmd && ./mvnw clean install -DskipTests> ../pmd.txt)
 
           - name: Running PMD
             run: |
-              alias pmd="$HOME/pmd/bin/pmd"
+              alias pmd="/pmd/bin/pmd"
               pmd cpd -l fortran pr/src/*  > ../pmd-fort.txt
               pmd cpd -l python pr/toolchain/*  > ../pmd-py.txt
 
