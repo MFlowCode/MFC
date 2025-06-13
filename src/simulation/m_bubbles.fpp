@@ -70,7 +70,7 @@ contains
         else if (bubble_model == 3) then
             ! Rayleigh-Plesset bubbles
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
-            f_rddot = f_rddot_RP(fP, fRho, fR, fV, fR0, fCpbw)
+            f_rddot = f_rddot_RP(fP, fRho, fR, fV, fCpbw)
         end if
 
     end function f_rddot
@@ -208,9 +208,9 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fCpbw Boundary wall pressure
-    pure elemental function f_rddot_RP(fCp, fRho, fR, fV, fR0, fCpbw)
+    pure elemental function f_rddot_RP(fCp, fRho, fR, fV, fCpbw)
         $:GPU_ROUTINE()
-        real(wp), intent(in) :: fCp, fRho, fR, fV, fR0, fCpbw
+        real(wp), intent(in) :: fCp, fRho, fR, fV, fCpbw
 
         real(wp) :: f_rddot_RP
 
