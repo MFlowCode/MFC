@@ -28,8 +28,8 @@ jobs:
           
           - name: Running PMD
             run: |
-              (cd pmd &&  pmd cpd -l fortran pr/src/*  > ../pmd-fort.txt)
-              (cd pmd &&  pmd cpd -l python pr/toolchain/*  > ../pmd-py.txt)
+              (cd pmd &&  ./pmd cpd -l fortran pr/src/*  > ../pmd-fort.txt)
+              (cd pmd &&  ./pmd cpd -l python pr/toolchain/*  > ../pmd-py.txt)
 
           - name: Display PMD Reports
             run: |
