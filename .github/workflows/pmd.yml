@@ -18,7 +18,7 @@ jobs:
               distribution: temurin
               java-version: '17'
 
-          - name: Run CPD for Fortran & Python
+          - name: Run CPD for Fortran
             continue-on-error: true
             env:
               PMD_VERSION: 7.14.0
@@ -33,9 +33,3 @@ jobs:
                 --language fortran \
                 --minimum-tokens=10 \
                 --fail-on-violation false 
-
-              "${PMD_HOME}/bin/pmd" cpd \
-                --dir toolchain \
-                --language Python \
-                --minimum-tokens=10 \
-                --fail-on-violation false
