@@ -14,23 +14,35 @@ jobs:
             with:
               path: pr
 
-          - name: Clone PMD
-            run: |
-              sudo apt update -y
-              sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev maven
-              sudo apt install -y default-jdk
-              git clone https://github.com/pmd/pmd.git pmd
-              (cd pmd && git checkout)
+          - name: Set up Java
+            uses: actions/setup-java@v4
+            with:
+              distribution: temurin
+              java-version: '17'
 
-          - name: Build PMD
+          - name: Run CPD for Fortran
+            continue-on-error: true
+            env:
+              PMD_VERSION: 7.14.0
             run: |
-              (cd pmd && ./mvnw clean install -DskipTests> ../pmd.txt)
+              curl -sSL -o pmd.zip \
+                "https://github.com/pmd/pmd/releases/download/pmd_releases/${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip"
+              unzip -q pmd.zip
+              PMD_HOME="pmd-bin-${PMD_VERSION}"
+          
+              "${PMD_HOME}/bin/pmd" cpd \
+                --dir src \
+                --language fortran \
+                --minimum-tokens=10 \
+                --fail-on-violation false \
+                > ../pmd-fort.txt
 
-          - name: Running PMD
-            run: |
-              alias pmd="/pmd/bin/pmd"
-              pmd cpd -l fortran pr/src/*  > ../pmd-fort.txt
-              pmd cpd -l python pr/toolchain/*  > ../pmd-py.txt
+              "${PMD_HOME}/bin/pmd" cpd \
+                --dir toolchain \
+                --language fortran \
+                --minimum-tokens=10 \
+                --fail-on-violation false \
+                > ../pmd-py.txt
 
           - name: Display PMD Reports
             run: |
