@@ -167,7 +167,7 @@ contains
             offsets(idir) = 1
 
             !$acc parallel loop collapse(3) gang vector default(present) copyin(offsets) &
-            !$acc private(Ys_L,Ys_R,Ys_cell,Xs_L,Xs_R,mass_diffusivities_mixavg1,mass_diffusivities_mixavg2,mass_diffusivities_mixavg_Cell,h_l,h_r,Xs_cell,h_k,dXk_dxi,Mass_Diffu_Flux,offsets)
+            !$acc private(Ys_L,Ys_R,Ys_cell,Xs_L,Xs_R,mass_diffusivities_mixavg1,mass_diffusivities_mixavg2,mass_diffusivities_mixavg_Cell,h_l,h_r,Xs_cell,h_k,dXk_dxi,Mass_Diffu_Flux)
             do z = isc3%beg, isc3%end
                 do y = isc2%beg, isc2%end
                     do x = isc1%beg, isc1%end
