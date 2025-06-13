@@ -31,9 +31,8 @@ jobs:
               (cd pmd &&  ./pmd cpd -l python pr/toolchain/*  > ../pmd-py.txt)
 
           - name: Display PMD Reports
-            uses: actions/upload-artifact@v2
-            with:
-                name: pmd-reports
-                path: |
-                    pmd-fort.txt
-                    pmd-py.txt
+            run: |
+              echo "PMD Fortran Report:"
+              cat /pmd/pmd-fort.txt
+              echo "PMD Python Report:"
+              cat /pmd/pmd-py.txt
