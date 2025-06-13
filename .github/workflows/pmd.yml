@@ -11,8 +11,6 @@ jobs:
       steps:
           - name: Clone - PR
             uses: actions/checkout@v4
-            with:
-              path: pr
 
           - name: Set up Java
             uses: actions/setup-java@v4
@@ -31,13 +29,13 @@ jobs:
               PMD_HOME="pmd-bin-${PMD_VERSION}"
           
               "${PMD_HOME}/bin/pmd" cpd \
-                --dir /pr/src \
+                --dir src \
                 --language fortran \
                 --minimum-tokens=10 \
                 --fail-on-violation false 
 
               "${PMD_HOME}/bin/pmd" cpd \
-                --dir /pr/toolchain \
-                --language fortran \
+                --dir toolchain \
+                --language Python \
                 --minimum-tokens=10 \
-                --fail-on-violation false 
+                --fail-on-violation false
