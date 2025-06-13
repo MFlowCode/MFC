@@ -66,7 +66,8 @@ end
 function plot_tke_budget(T, P, D, y_norm_mth, mth)
 
     load variables/user_inputs.mat;
-
+    load reference_data/reference.mat;
+    
     % Plot
     f1 = figure("DefaultAxesFontSize",18);
     set(f1,"Position",[200 200 1000 700]);
@@ -82,40 +83,28 @@ function plot_tke_budget(T, P, D, y_norm_mth, mth)
     set(gca,'TickLabelInterpreter','latex');
     
     % Pantano & Sarkar (2002)
-    load reference_data/Pantano_Sarkar_2002/production.dat;
-    load reference_data/Pantano_Sarkar_2002/transport.dat;
-    load reference_data/Pantano_Sarkar_2002/dissipation.dat;
     h2 = plot([-100 -100],[-100 -100],'ko','LineWidth',2,'MarkerSize',8);
-    plot(transport(:,1),transport(:,2),'bo','LineWidth',2,'MarkerSize',8);
-    plot(production(:,1),production(:,2),'go','LineWidth',2,'MarkerSize',8);
-    plot(dissipation(:,1),dissipation(:,2),'ro','LineWidth',2,'MarkerSize',8);
+    plot(p2002_tke_transport(:,1),p2002_tke_transport(:,2),'bo','LineWidth',2,'MarkerSize',8);
+    plot(p2002_tke_production(:,1),p2002_tke_production(:,2),'go','LineWidth',2,'MarkerSize',8);
+    plot(p2002_tke_dissipation(:,1),p2002_tke_dissipation(:,2),'ro','LineWidth',2,'MarkerSize',8);
     
     % Rogers & Moser (1994)
-    load reference_data/Rogers_Moser_1994/production.dat;
-    load reference_data/Rogers_Moser_1994/transport.dat;
-    load reference_data/Rogers_Moser_1994/dissipation.dat;
     h3 = plot([-100 -100],[-100 -100],'k^','LineWidth',2,'MarkerSize',8);
-    plot(transport(:,1),transport(:,2),'b^','LineWidth',2,'MarkerSize',8);
-    plot(production(:,1),production(:,2),'g^','LineWidth',2,'MarkerSize',8);
-    plot(dissipation(:,1),dissipation(:,2),'r^','LineWidth',2,'MarkerSize',8);
+    plot(r1994_tke_transport(:,1),r1994_tke_transport(:,2),'b^','LineWidth',2,'MarkerSize',8);
+    plot(r1994_tke_production(:,1),r1994_tke_production(:,2),'g^','LineWidth',2,'MarkerSize',8);
+    plot(r1994_tke_dissipation(:,1),r1994_tke_dissipation(:,2),'r^','LineWidth',2,'MarkerSize',8);
     
     % Vaghefi (2014)
-    load reference_data/Vaghefi_2014/production.dat;
-    load reference_data/Vaghefi_2014/transport.dat;
-    load reference_data/Vaghefi_2014/dissipation.dat;
     h4 = plot([-100 -100],[-100 -100],'k+','LineWidth',2,'MarkerSize',8);
-    plot(transport(:,1),transport(:,2),'b+','LineWidth',2,'MarkerSize',8);
-    plot(production(:,1),production(:,2),'g+','LineWidth',2,'MarkerSize',8);
-    plot(dissipation(:,1),dissipation(:,2),'r+','LineWidth',2,'MarkerSize',8);
+    plot(v2014_tke_transport(:,1),v2014_tke_transport(:,2),'b+','LineWidth',2,'MarkerSize',8);
+    plot(v2014_tke_production(:,1),v2014_tke_production(:,2),'g+','LineWidth',2,'MarkerSize',8);
+    plot(v2014_tke_dissipation(:,1),v2014_tke_dissipation(:,2),'r+','LineWidth',2,'MarkerSize',8);
     
-    % Wang et al (2022)
-    load reference_data/Wang_et_al_2022/production.dat;
-    load reference_data/Wang_et_al_2022/transport.dat;
-    load reference_data/Wang_et_al_2022/dissipation.dat;
+    % Wang et al. (2022)
     h5 = plot([-100 -100],[-100 -100],'k*','LineWidth',2,'MarkerSize',8);
-    plot(transport(:,1),transport(:,2),'b*','LineWidth',2,'MarkerSize',8);
-    plot(production(:,1),production(:,2),'g*','LineWidth',2,'MarkerSize',8);
-    plot(dissipation(:,1),dissipation(:,2),'r*','LineWidth',2,'MarkerSize',8);
+    plot(w2022_tke_transport(:,1),w2022_tke_transport(:,2),'b*','LineWidth',2,'MarkerSize',8);
+    plot(w2022_tke_production(:,1),w2022_tke_production(:,2),'g*','LineWidth',2,'MarkerSize',8);
+    plot(w2022_tke_dissipation(:,1),w2022_tke_dissipation(:,2),'r*','LineWidth',2,'MarkerSize',8);
     
     legend([h1,h2,h3,h4,h5], {"$\mbox{Present}$", ...
             "$\mbox{Pantano \& Sarkar (2002)}$", ...

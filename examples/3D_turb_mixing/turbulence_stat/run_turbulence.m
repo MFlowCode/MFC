@@ -428,6 +428,7 @@ end
 function plot_Reynolds_stress(ruu, rvv, rww, ruv, y_norm_vth, timestep)
 
     load variables/user_inputs.mat;
+    load reference_data/reference.mat;
 
     % Sqrt & Normalization
     ruu = sqrt(ruu) / 2;    % sqrt(ruu) / Delta U
@@ -441,17 +442,11 @@ function plot_Reynolds_stress(ruu, rvv, rww, ruv, y_norm_vth, timestep)
     set(f1,"Position",[200 200 1000 700]);
 
     % sqrt(ruu)/Delta U
-    A = readmatrix("reference_data/Bell_Mehta_1990/ruu.dat");
-    y_norm_ref1 = A(:,1); ruu_ref1 = A(:,2);
-    A = readmatrix("reference_data/Vaghefi_2014/ruu.dat");
-    y_norm_ref2 = A(:,1); ruu_ref2 = A(:,2);
-    A = readmatrix("reference_data/Wang_et_al_2022/ruu.dat");
-    y_norm_ref3 = A(:,1); ruu_ref3 = A(:,2);
     subplot(2,2,1);
     plot(y_norm_vth,ruu,'k-','LineWidth',1); hold on; grid on;
-    plot(y_norm_ref1,ruu_ref1,'g+','LineWidth',1,'MarkerSize',8);
-    plot(y_norm_ref2,ruu_ref2,'bo','LineWidth',1,'MarkerSize',8);
-    plot(y_norm_ref3,ruu_ref3,'r^','LineWidth',1,'MarkerSize',8);
+    plot(b1990_rs_ruu(:,1),b1990_rs_ruu(:,2),'g+','LineWidth',1,'MarkerSize',8);
+    plot(v2014_rs_ruu(:,1),v2014_rs_ruu(:,2),'bo','LineWidth',1,'MarkerSize',8);
+    plot(w2022_rs_ruu(:,1),w2022_rs_ruu(:,2),'r^','LineWidth',1,'MarkerSize',8);
     axis([-1.5 1.5 0 0.25]);
     xticks([-1.5:0.5:1.5]);
     yticks([0:0.05:0.25]);
@@ -460,17 +455,11 @@ function plot_Reynolds_stress(ruu, rvv, rww, ruv, y_norm_vth, timestep)
     set(gca,'TickLabelInterpreter','latex');
 
     % sqrt(rvv)/Delta U
-    A = readmatrix("reference_data/Bell_Mehta_1990/rvv.dat");
-    y_norm_ref1 = A(:,1); rvv_ref1 = A(:,2);
-    A = readmatrix("reference_data/Vaghefi_2014/rvv.dat");
-    y_norm_ref2 = A(:,1); rvv_ref2 = A(:,2);
-    A = readmatrix("reference_data/Wang_et_al_2022/rvv.dat");
-    y_norm_ref3 = A(:,1); rvv_ref3 = A(:,2);
     subplot(2,2,2); 
     plot(y_norm_vth,rvv,'k-','LineWidth',1); hold on; grid on;
-    plot(y_norm_ref1,rvv_ref1,'g+','LineWidth',1,'MarkerSize',8);
-    plot(y_norm_ref2,rvv_ref2,'bo','LineWidth',1,'MarkerSize',8);
-    plot(y_norm_ref3,rvv_ref3,'r^','LineWidth',1,'MarkerSize',8);
+    plot(b1990_rs_rvv(:,1),b1990_rs_rvv(:,2),'g+','LineWidth',1,'MarkerSize',8);
+    plot(v2014_rs_rvv(:,1),v2014_rs_rvv(:,2),'bo','LineWidth',1,'MarkerSize',8);
+    plot(w2022_rs_rvv(:,1),w2022_rs_rvv(:,2),'r^','LineWidth',1,'MarkerSize',8);
     axis([-1.5 1.5 0 0.25]); 
     xticks([-1.5:0.5:1.5]);
     yticks([0:0.05:0.25]);
@@ -479,17 +468,11 @@ function plot_Reynolds_stress(ruu, rvv, rww, ruv, y_norm_vth, timestep)
     set(gca,'TickLabelInterpreter','latex');
 
     % sqrt(rww)/Delta U
-    A = readmatrix("reference_data/Bell_Mehta_1990/rww.dat");
-    y_norm_ref1 = A(:,1); rww_ref1 = A(:,2);
-    A = readmatrix("reference_data/Vaghefi_2014/rww.dat");
-    y_norm_ref2 = A(:,1); rww_ref2 = A(:,2);    
-    A = readmatrix("reference_data/Wang_et_al_2022/rww.dat");
-    y_norm_ref3 = A(:,1); rww_ref3 = A(:,2);
     subplot(2,2,3); 
     plot(y_norm_vth,rww,'k-','LineWidth',1); hold on; grid on;
-    plot(y_norm_ref1,rww_ref1,'g+','LineWidth',1,'MarkerSize',8);
-    plot(y_norm_ref2,rww_ref2,'bo','LineWidth',1,'MarkerSize',8);
-    plot(y_norm_ref3,rww_ref3,'r^','LineWidth',1,'MarkerSize',8);
+    plot(b1990_rs_rww(:,1),b1990_rs_rww(:,2),'g+','LineWidth',1,'MarkerSize',8);
+    plot(v2014_rs_rww(:,1),v2014_rs_rww(:,2),'bo','LineWidth',1,'MarkerSize',8);
+    plot(w2022_rs_rww(:,1),w2022_rs_rww(:,2),'r^','LineWidth',1,'MarkerSize',8);
     axis([-1.5 1.5 0 0.25]); 
     xticks([-1.5:0.5:1.5]);
     yticks([0:0.05:0.25]);
@@ -498,17 +481,11 @@ function plot_Reynolds_stress(ruu, rvv, rww, ruv, y_norm_vth, timestep)
     set(gca,'TickLabelInterpreter','latex');
 
     % sqrt(-rvu)/Delta U
-    A = readmatrix("reference_data/Bell_Mehta_1990/ruv.dat");
-    y_norm_ref1 = A(:,1); ruv_ref1 = A(:,2);
-    A = readmatrix("reference_data/Vaghefi_2014/ruv.dat");
-    y_norm_ref2 = A(:,1); ruv_ref2 = A(:,2);   
-    A = readmatrix("reference_data/Wang_et_al_2022/ruv.dat");
-    y_norm_ref3 = A(:,1); ruv_ref3 = A(:,2); 
     subplot(2,2,4); 
     plot(y_norm_vth,ruv,'k-','LineWidth',1); hold on; grid on;
-    plot(y_norm_ref1,ruv_ref1,'g+','LineWidth',1,'MarkerSize',8);
-    plot(y_norm_ref2,ruv_ref2,'bo','LineWidth',1,'MarkerSize',8);
-    plot(y_norm_ref3,ruv_ref3,'r^','LineWidth',1,'MarkerSize',8);
+    plot(b1990_rs_ruv(:,1),b1990_rs_ruv(:,2),'g+','LineWidth',1,'MarkerSize',8);
+    plot(v2014_rs_ruv(:,1),v2014_rs_ruv(:,2),'bo','LineWidth',1,'MarkerSize',8);
+    plot(w2022_rs_ruv(:,1),w2022_rs_ruv(:,2),'r^','LineWidth',1,'MarkerSize',8);
     axis([-1.5 1.5 0 0.25]); 
     xticks([-1.5:0.5:1.5]);
     yticks([0:0.05:0.25]);
@@ -537,6 +514,7 @@ function plot_tke_budget(T, P, D, y_norm_mth, mth, timestep)
     D = D / (8/mth);    % D / (Delta U^3 / mth)
 
     load variables/user_inputs.mat;
+    load reference_data/reference.mat;
 
     % Plot
     f1 = figure("DefaultAxesFontSize",18);
@@ -553,40 +531,28 @@ function plot_tke_budget(T, P, D, y_norm_mth, mth, timestep)
     set(gca,'TickLabelInterpreter','latex');
     
     % Pantano & Sarkar (2002)
-    load reference_data/Pantano_Sarkar_2002/production.dat;
-    load reference_data/Pantano_Sarkar_2002/transport.dat;
-    load reference_data/Pantano_Sarkar_2002/dissipation.dat;
     h2 = plot([-100 -100],[-100 -100],'ko','LineWidth',2,'MarkerSize',8);
-    plot(transport(:,1),transport(:,2),'bo','LineWidth',2,'MarkerSize',8);
-    plot(production(:,1),production(:,2),'go','LineWidth',2,'MarkerSize',8);
-    plot(dissipation(:,1),dissipation(:,2),'ro','LineWidth',2,'MarkerSize',8);
+    plot(p2002_tke_transport(:,1),p2002_tke_transport(:,2),'bo','LineWidth',2,'MarkerSize',8);
+    plot(p2002_tke_production(:,1),p2002_tke_production(:,2),'go','LineWidth',2,'MarkerSize',8);
+    plot(p2002_tke_dissipation(:,1),p2002_tke_dissipation(:,2),'ro','LineWidth',2,'MarkerSize',8);
     
     % Rogers & Moser (1994)
-    load reference_data/Rogers_Moser_1994/production.dat;
-    load reference_data/Rogers_Moser_1994/transport.dat;
-    load reference_data/Rogers_Moser_1994/dissipation.dat;
     h3 = plot([-100 -100],[-100 -100],'k^','LineWidth',2,'MarkerSize',8);
-    plot(transport(:,1),transport(:,2),'b^','LineWidth',2,'MarkerSize',8);
-    plot(production(:,1),production(:,2),'g^','LineWidth',2,'MarkerSize',8);
-    plot(dissipation(:,1),dissipation(:,2),'r^','LineWidth',2,'MarkerSize',8);
+    plot(r1994_tke_transport(:,1),r1994_tke_transport(:,2),'b^','LineWidth',2,'MarkerSize',8);
+    plot(r1994_tke_production(:,1),r1994_tke_production(:,2),'g^','LineWidth',2,'MarkerSize',8);
+    plot(r1994_tke_dissipation(:,1),r1994_tke_dissipation(:,2),'r^','LineWidth',2,'MarkerSize',8);
     
     % Vaghefi (2014)
-    load reference_data/Vaghefi_2014/production.dat;
-    load reference_data/Vaghefi_2014/transport.dat;
-    load reference_data/Vaghefi_2014/dissipation.dat;
     h4 = plot([-100 -100],[-100 -100],'k+','LineWidth',2,'MarkerSize',8);
-    plot(transport(:,1),transport(:,2),'b+','LineWidth',2,'MarkerSize',8);
-    plot(production(:,1),production(:,2),'g+','LineWidth',2,'MarkerSize',8);
-    plot(dissipation(:,1),dissipation(:,2),'r+','LineWidth',2,'MarkerSize',8);
+    plot(v2014_tke_transport(:,1),v2014_tke_transport(:,2),'b+','LineWidth',2,'MarkerSize',8);
+    plot(v2014_tke_production(:,1),v2014_tke_production(:,2),'g+','LineWidth',2,'MarkerSize',8);
+    plot(v2014_tke_dissipation(:,1),v2014_tke_dissipation(:,2),'r+','LineWidth',2,'MarkerSize',8);
     
     % Wang et al. (2022)
-    load reference_data/Wang_et_al_2022/production.dat;
-    load reference_data/Wang_et_al_2022/transport.dat;
-    load reference_data/Wang_et_al_2022/dissipation.dat;
     h5 = plot([-100 -100],[-100 -100],'k*','LineWidth',2,'MarkerSize',8);
-    plot(transport(:,1),transport(:,2),'b*','LineWidth',2,'MarkerSize',8);
-    plot(production(:,1),production(:,2),'g*','LineWidth',2,'MarkerSize',8);
-    plot(dissipation(:,1),dissipation(:,2),'r*','LineWidth',2,'MarkerSize',8);
+    plot(w2022_tke_transport(:,1),w2022_tke_transport(:,2),'b*','LineWidth',2,'MarkerSize',8);
+    plot(w2022_tke_production(:,1),w2022_tke_production(:,2),'g*','LineWidth',2,'MarkerSize',8);
+    plot(w2022_tke_dissipation(:,1),w2022_tke_dissipation(:,2),'r*','LineWidth',2,'MarkerSize',8);
     
     legend([h1,h2,h3,h4,h5], {"$\mbox{Present}$", ...
             "$\mbox{Pantano \& Sarkar (2002)}$", ...
