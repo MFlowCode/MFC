@@ -13,7 +13,7 @@
 program p_main
 
     use m_global_parameters     !< Global parameters for the code
-    use m_start_up
+    use m_start_up  !test change
 
     implicit none
 
