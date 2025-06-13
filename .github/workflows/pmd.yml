@@ -25,12 +25,12 @@ jobs:
           - name: Build PMD
             run: |
               (cd pmd && mvn clean install -DskipTests> ../pmd.txt)
-              export PMD_COMMAND="$(pwd)/pmd/bin/pmd"
+              export PATH=$PATH:$(pwd)/bin/pmd
 
           - name: Running PMD
             run: |
-              $PMD_COMMAND cpd -l fortran pr/src/*  > ../pmd-fort.txt
-              $PMD_COMMAND cpd -l python pr/toolchain/*  > ../pmd-py.txt
+              pmd cpd -l fortran pr/src/*  > ../pmd-fort.txt
+              pmd cpd -l python pr/toolchain/*  > ../pmd-py.txt
 
           - name: Display PMD Reports
             run: |
