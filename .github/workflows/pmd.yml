@@ -20,7 +20,7 @@ jobs:
               sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev maven
               sudo apt install -y default-jdk
               git clone https://github.com/pmd/pmd.git pmd
-              (cd pmd && git checkout master)
+              (cd pmd && git checkout)
 
           - name: Build PMD
             run: |
