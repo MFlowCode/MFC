@@ -10,7 +10,7 @@ module m_start_up
 
     use m_derived_types         !< Definitions of the derived types
 
-    use m_global_parameters     !< Global parameters for the codeI
+    use m_global_parameters     !< Global parameters for the code
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
@@ -38,7 +38,7 @@ module m_start_up
 
     use m_helper
 
-#ifdef MFC_MP
+#ifdef MFC_MPI
     use mpi                     !< Message passing interface (MPI) module
 #endif
 
