@@ -3,6 +3,7 @@
 !! @brief Contains module m_bubbles_EL_kernels
 
 #:include 'macros.fpp'
+#:include 'parallel_macros.fpp'
 
 !> @brief This module contains kernel functions used to map the effect of the lagrangian bubbles
 !!        in the Eulerian framework.
@@ -55,7 +56,7 @@ contains
         real(wp), dimension(3) :: s_coord
         integer :: l
 
-        !$acc parallel loop gang vector default(present) private(l, s_coord, cell)
+        $:GPU_PARALLEL_LOOP(private=["l","s_coord","cell"])
         do l = 1, nBubs
 
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
@@ -120,7 +121,7 @@ contains
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
-        !$acc parallel loop gang vector default(present) private(nodecoord, l, s_coord, cell, center) copyin(smearGrid, smearGridz)
+        $:GPU_PARALLEL_LOOP(private=["nodecoord","l","s_coord","cell","center"], copyin=["smearGrid","smearGridz"])
         do l = 1, nBubs
             nodecoord(1:3) = 0
             center(1:3) = 0._wp
@@ -203,7 +204,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_applygaussian
 #else
-        !$acc routine seq
+        $:GPU_ROUTINE()
 #endif
         real(wp), dimension(3), intent(in) :: center
         integer, dimension(3), intent(in) :: cellaux
@@ -273,7 +274,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_check_celloutside
 #else
-        !$acc routine seq
+        $:GPU_ROUTINE()
 #endif
         integer, dimension(3), intent(inout) :: cellaux
         logical, intent(out) :: celloutside
@@ -309,7 +310,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_shift_cell_symmetric_bc
 #else
-        !$acc routine seq
+        $:GPU_ROUTINE()
 #endif
         integer, dimension(3), intent(inout) :: cellaux
         integer, dimension(3), intent(in) :: cell
@@ -350,7 +351,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_stddsv
 #else
-        !$acc routine seq
+        $:GPU_ROUTINE()
 #endif
         integer, dimension(3), intent(in) :: cell
         real(wp), intent(in) :: volpart
@@ -391,7 +392,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_get_char_vol
 #else
-        !$acc routine seq
+        $:GPU_ROUTINE()
 #endif
         integer, intent(in) :: cellx, celly, cellz
         real(wp), intent(out) :: Charvol
@@ -416,7 +417,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_get_cell
 #else
-        !$acc routine seq
+        $:GPU_ROUTINE()
 #endif
         real(wp), dimension(3), intent(in) :: s_cell
         integer, dimension(3), intent(out) :: get_cell

@@ -102,3 +102,4 @@
                          //${message or '"No error description."'}$)
     end if
 #:enddef
+! New line at end of file is required for FYPP

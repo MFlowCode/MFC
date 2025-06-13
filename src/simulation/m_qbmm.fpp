@@ -3,6 +3,7 @@
 !! @brief Contains module m_qbmm
 
 #:include 'case.fpp'
+#:include 'parallel_macros.fpp'
 #:include 'macros.fpp'
 
 !> @brief This module is used to compute moment inversion via qbmm
@@ -25,21 +26,21 @@ module m_qbmm
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff, s_compute_qbmm_rhs
 
     real(wp), allocatable, dimension(:, :, :, :, :) :: momrhs
-    !$acc declare create(momrhs)
+    $:GPU_DECLARE(create=["momrhs"])
 
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: nterms = ${nterms}$
     #:else
         integer :: nterms
-        !$acc declare create(nterms)
+        $:GPU_DECLARE(create=["nterms"])
     #:endif
 
     type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
-    !$acc declare create(is1_qbmm, is2_qbmm, is3_qbmm)
+    $:GPU_DECLARE(create=["is1_qbmm","is2_qbmm","is3_qbmm"])
 
     integer, allocatable, dimension(:) :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
-    !$acc declare create(bubrs, bubmoms)
+    $:GPU_DECLARE(create=["bubrs","bubmoms"])
 
 contains
 
@@ -57,8 +58,8 @@ contains
                 nterms = 7
             end if
 
-            !$acc enter data copyin(nterms)
-            !$acc update device(nterms)
+            $:GPU_ENTER_DATA(copyin=["nterms"])
+            $:GPU_UPDATE(device=["nterms"])
 
         #:endif
 
@@ -392,7 +393,7 @@ contains
             end do
         end if
 
-        !$acc update device(momrhs)
+        $:GPU_UPDATE(device=["momrhs"])
 
         @:ALLOCATE(bubrs(1:nb))
         @:ALLOCATE(bubmoms(1:nb, 1:nmom))
@@ -400,14 +401,14 @@ contains
         do i = 1, nb
             bubrs(i) = bub_idx%rs(i)
         end do
-        !$acc update device(bubrs)
+        $:GPU_UPDATE(device=["bubrs"])
 
         do j = 1, nmom
             do i = 1, nb
                 bubmoms(i, j) = bub_idx%moms(i, j)
             end do
         end do
-        !$acc update device(bubmoms)
+        $:GPU_UPDATE(device=["bubmoms"])
 
     end subroutine s_initialize_qbmm_module
 
@@ -433,7 +434,7 @@ contains
         end select
 
         if (.not. polytropic) then
-            !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var, AX)
+            $:GPU_PARALLEL_LOOP(collapse=5,private=["nb_q","nR","nR2","R","R2","nb_dot","nR_dot","nR2_dot","var","AX"])
             do i = 1, nb
                 do q = 1, nnode
                     do l = 0, p
@@ -566,7 +567,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff_nonpoly
 #else
-        !$acc routine seq
+        $:GPU_ROUTINE()
 #endif
         real(wp), intent(in) :: pres, rho, c
         real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
@@ -639,7 +640,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff
 #else
-        !$acc routine seq
+        $:GPU_ROUTINE()
 #endif
 
         real(wp), intent(in) :: pres, rho, c
@@ -715,9 +716,12 @@ contains
         integer :: id1, id2, id3, i1, i2, j, q, r
 
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
-        !$acc update device(is1_qbmm, is2_qbmm, is3_qbmm)
+        $:GPU_UPDATE(device=["is1_qbmm","is2_qbmm","is3_qbmm"])
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T)
+        $:GPU_PARALLEL_LOOP(collapse=3, private=["moms", "msum", "wght", "abscX", &
+            "abscY", "wght_pb", "wght_mv", "wght_ht", "coeff", "ht", "r", "q", &
+            "n_tait", "B_tait", "pres", "rho", "nbub", "c", "alf", "momsum", &
+            "drdt", "drdt2", "chi_vw", "x_vw", "rho_mw", "k_mw", "T_bar", "grad_T"])
         do id3 = is3_qbmm%beg, is3_qbmm%end
             do id2 = is2_qbmm%beg, is2_qbmm%end
                 do id1 = is1_qbmm%beg, is1_qbmm%end
@@ -737,9 +741,10 @@ contains
 
                     if (alf > small_alf) then
                         nbub = q_cons_vf(bubxb)%sf(id1, id2, id3)
-                        !$acc loop seq
+                        $:GPU_LOOP()
                         do q = 1, nb
                             ! Gather moments for this bubble bin
+                            $:GPU_LOOP()
                             do r = 2, nmom
                                 moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
                             end do
@@ -747,12 +752,12 @@ contains
                             call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
 
                             if (polytropic) then
-                                !$acc loop seq
+                                $:GPU_LOOP()
                                 do j = 1, nnode
                                     wght_pb(j, q) = wght(j, q)*(pb0(q) - pv)
                                 end do
                             else
-                                !$acc loop seq
+                                $:GPU_LOOP()
                                 do j = 1, nnode
                                     chi_vw = 1._wp/(1._wp + R_v/R_n*(pb(id1, id2, id3, j, q)/pv - 1._wp))
                                     x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
@@ -771,13 +776,13 @@ contains
 
                             ! Compute change in moments due to bubble dynamics
                             r = 1
-                            !$acc loop seq
+                            $:GPU_LOOP()
                             do i2 = 0, 2
-                                !$acc loop seq
+                                $:GPU_LOOP()
                                 do i1 = 0, 2
                                     if ((i1 + i2) <= 2) then
                                         momsum = 0._wp
-                                        !$acc loop seq
+                                        $:GPU_LOOP()
                                         do j = 1, nterms
                                             select case (bubble_model)
                                             case (3)
@@ -807,7 +812,7 @@ contains
 
                             ! Compute change in pb and mv for non-polytropic model
                             if (.not. polytropic) then
-                                !$acc loop seq
+                                $:GPU_LOOP()
                                 do j = 1, nnode
                                     drdt = msum(2)
                                     drdt2 = merge(-1._wp, 1._wp, j == 1 .or. j == 2)/(2._wp*sqrt(merge(moms(4) - moms(2)**2._wp, verysmall, moms(4) - moms(2)**2._wp > 0._wp)))
@@ -835,11 +840,11 @@ contains
                             end if
                         end if
                     else
-                        !$acc loop seq
+                        $:GPU_LOOP()
                         do q = 1, nb
-                            !$acc loop seq
+                            $:GPU_LOOP()
                             do i1 = 0, 2
-                                !$acc loop seq
+                                $:GPU_LOOP()
                                 do i2 = 0, 2
                                     moms3d(i1, i2, q)%sf(id1, id2, id3) = 0._wp
                                 end do
@@ -860,7 +865,7 @@ contains
 #ifdef _CRAYFTN
             !DIR$ INLINEALWAYS s_chyqmom
 #else
-            !$acc routine seq
+            $:GPU_ROUTINE()
 #endif
             real(wp), intent(in) :: pres, rho, c
             real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
@@ -876,7 +881,7 @@ contains
 #ifdef _CRAYFTN
             !DIR$ INLINEALWAYS s_chyqmom
 #else
-            !$acc routine seq
+            $:GPU_ROUTINE()
 #endif
             real(wp), dimension(nmom), intent(in) :: momin
             real(wp), dimension(nnode), intent(inout) :: wght, abscX, abscY
@@ -936,7 +941,7 @@ contains
 #ifdef _CRAYFTN
             !DIR$ INLINEALWAYS s_hyqmom
 #else
-            !$acc routine seq
+            $:GPU_ROUTINE()
 #endif
             real(wp), dimension(2), intent(inout) :: frho, fup
             real(wp), dimension(3), intent(in) :: fmom
@@ -955,7 +960,7 @@ contains
         end subroutine s_hyqmom
 
         pure function f_quad(abscX, abscY, wght_in, q, r, s)
-            !$acc routine seq
+            $:GPU_ROUTINE()
             real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
             real(wp), intent(in) :: q, r, s
 
@@ -971,7 +976,7 @@ contains
         end function f_quad
 
         pure function f_quad2D(abscX, abscY, wght_in, pow)
-            !$acc routine seq
+            $:GPU_ROUTINE()
             real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
             real(wp), dimension(3), intent(in) :: pow
 
