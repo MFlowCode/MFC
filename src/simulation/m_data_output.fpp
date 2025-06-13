@@ -54,7 +54,7 @@ module m_data_output
     real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     real(wp), public, allocatable, dimension(:, :) :: c_mass
-    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf, c_mass)
 
     real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
