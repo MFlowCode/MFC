@@ -1,4 +1,4 @@
-name: PMD Analysis
+name: PMD
 
 on: [push, pull_request, workflow_dispatch]
 
@@ -17,22 +17,23 @@ jobs:
           - name: Clone PMD
             run: |
               sudo apt update -y
-              sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
+              sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev maven
+              sudo apt install -y default-jdk
               git clone https://github.com/pmd/pmd.git pmd
-              (cd pmd && git checkout pmd)
+              (cd pmd && git checkout master)
 
           - name: Build PMD
             run: |
-              (cd pmd && ./mvnw clean install -DskipTests> ../pmd.txt)
+              (cd pmd && mvn clean install -DskipTests> ../pmd.txt)
           
           - name: Running PMD
             run: |
-              (cd pmd &&  ./pmd cpd -l fortran pr/src/*  > ../pmd-fort.txt)
-              (cd pmd &&  ./pmd cpd -l python pr/toolchain/*  > ../pmd-py.txt)
+              (cd pmd &&  pmd cpd -l fortran pr/src/*  > ../pmd-fort.txt)
+              (cd pmd &&  pmd cpd -l python pr/toolchain/*  > ../pmd-py.txt)
 
           - name: Display PMD Reports
             run: |
               echo "PMD Fortran Report:"
-              cat /pmd/pmd-fort.txt
+              cat pmd-fort.txt
               echo "PMD Python Report:"
-              cat /pmd/pmd-py.txt
+              cat pmd-py.txt
