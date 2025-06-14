@@ -298,6 +298,7 @@ SIMULATION.update({
     'cont_damage_s': ParamType.REAL,
     'alpha_bar': ParamType.REAL,
     'num_igr_iters': ParamType.INT,
+    'num_igr_warm_start_iters': ParamType.INT,
     'alf_factor': ParamType.REAL,
     'igr_iter_solver': ParamType.INT,
     'igr_order': ParamType.INT,

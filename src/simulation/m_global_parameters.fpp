@@ -163,6 +163,7 @@ module m_global_parameters
     logical :: cont_damage   !< Continuum damage modeling
     integer :: igr_iter_solver !< IGR elliptic solver
     integer :: num_igr_iters !< number of iterations for elliptic solve
+    integer :: num_igr_warm_start_iters !< number of warm start iterations for elliptic solve
     real(wp) :: alf_factor  !< alpha factor for IGR
 
     !$acc declare create(chemistry)
@@ -578,6 +579,7 @@ contains
         cont_damage = .false.
         igr_iter_solver = 1
         num_igr_iters = dflt_num_igr_iters
+        num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor
 
         #:if not MFC_CASE_OPTIMIZATION

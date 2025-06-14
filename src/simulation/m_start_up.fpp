@@ -183,7 +183,8 @@ contains
             bubbles_lagrange, lag_params, &
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar, &
-            alf_factor, num_igr_iters, igr_iter_solver
+            alf_factor, num_igr_iters, igr_iter_solver, &
+            num_igr_warm_start_iters
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
