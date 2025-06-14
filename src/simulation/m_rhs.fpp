@@ -692,8 +692,7 @@ contains
                 q_cons_qp%vf, &
                 q_T_sf, &
                 q_prim_qp%vf, &
-                idwint, &
-                gm_alpha_qp%vf)
+                idwint)
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")
@@ -859,23 +858,22 @@ contains
                                       id, irx, iry, irz)
                 call nvtxEndRange
 
-            ! RHS additions for sub-grid bubbles_euler
-            if (bubbles_euler) then
-                call nvtxStartRange("RHS-BUBBLES-COMPUTE")
-                call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf, divu)
+
+                ! Additional physics and source terms
+                ! RHS addition for advection source
+                call nvtxStartRange("RHS-ADVECTION-SRC")
+                call s_compute_advection_source_term(id, &
+                                                     rhs_vf, &
+                                                     q_cons_qp, &
+                                                     q_prim_qp, &
+                                                     flux_src_n(id))
                 call nvtxEndRange
 
-            ! RHS additions for qbmm bubbles
-
-            if (qbmm) then
-                call nvtxStartRange("RHS-QBMM")
-                call s_compute_qbmm_rhs(id, &
-                                        q_cons_qp%vf, &
-                                        q_prim_qp%vf, &
-                                        rhs_vf, &
-                                        flux_n(id)%vf, &
-                                        pb, &
-                                        rhs_pb)
+                ! RHS additions for hypoelasticity
+                call nvtxStartRange("RHS-HYPOELASTICITY")
+                if (hypoelasticity) call s_compute_hypoelastic_rhs(id, &
+                                                                   q_prim_qp%vf, &
+                                                                   rhs_vf)
                 call nvtxEndRange
 
                 ! RHS additions for viscosity
@@ -894,7 +892,7 @@ contains
                 ! RHS additions for sub-grid bubbles_euler
                 if (bubbles_euler) then
                     call nvtxStartRange("RHS-BUBBLES-COMPUTE")
-                    call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf)
+                    call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf, divu)
                     call nvtxEndRange
                 end if
 
@@ -908,18 +906,17 @@ contains
                                             rhs_vf, &
                                             flux_n(id)%vf, &
                                             pb, &
-                                            rhs_pb, &
-                                            mv, &
-                                            rhs_mv)
+                                            rhs_pb)
                     call nvtxEndRange
                 end if
                 ! END: Additional physics and source terms
+
+                call nvtxStartRange("RHS-MHD")
+                if (mhd .and. powell) call s_compute_mhd_powell_rhs(q_prim_qp%vf, rhs_vf)
+                call nvtxEndRange
+
+                ! END: Additional physics and source terms
             end if
-
-            call nvtxStartRange("RHS-MHD")
-            if (mhd .and. powell) call s_compute_mhd_powell_rhs(q_prim_qp%vf, rhs_vf)
-            call nvtxEndRange
-
         end do
         ! END: Dimensional Splitting Loop
 
@@ -1865,7 +1862,7 @@ contains
                 else
                     !$acc exit data detach(q_prim_qp%vf(j)%sf)
                     nullify (q_prim_qp%vf(j)%sf)
-                end do
+                end if
             end do
 
             do j = adv_idx%beg, adv_idx%end
