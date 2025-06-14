@@ -74,7 +74,7 @@ contains
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsy_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsz_vf
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: flux_src_vf
         integer, intent(in) :: id
         type(int_bounds_info), intent(in) :: isx, isy, isz
@@ -117,12 +117,12 @@ contains
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
                                     flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1, i)
 
-                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) + &
                                                                  Omega(1, i)*vSrc_rsx_vf(j, k, l, i)
 
                             end do
 
-                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                            flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) + &
                                                              sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 1)
                         end if
                     end do
@@ -163,12 +163,12 @@ contains
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
                                     flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
 
-                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) + &
                                                                  Omega(2, i)*vSrc_rsy_vf(k, j, l, i)
 
                             end do
 
-                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                            flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) + &
                                                              sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
                         end if
                     end do
@@ -209,12 +209,12 @@ contains
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
                                     flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3, i)
 
-                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) + &
                                                                  Omega(3, i)*vSrc_rsz_vf(l, k, j, i)
 
                             end do
 
-                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                            flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) + &
                                                              sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsz_vf(l, k, j, 3)
                         end if
                     end do
@@ -227,7 +227,7 @@ contains
 
     impure subroutine s_get_capilary(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
         type(int_bounds_info) :: isx, isy, isz
@@ -245,7 +245,7 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs(1)%sf(j, k, l) = 1._wp/(x_cc(j + 1) - x_cc(j - 1))* &
-                                            (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j - 1, k, l))
+                                            (q_prim_vf(eqn_idx%c)%sf(j + 1, k, l) - q_prim_vf(eqn_idx%c)%sf(j - 1, k, l))
                 end do
             end do
         end do
@@ -255,7 +255,7 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))* &
-                                            (q_prim_vf(c_idx)%sf(j, k + 1, l) - q_prim_vf(c_idx)%sf(j, k - 1, l))
+                                            (q_prim_vf(eqn_idx%c)%sf(j, k + 1, l) - q_prim_vf(eqn_idx%c)%sf(j, k - 1, l))
                 end do
             end do
         end do
@@ -266,7 +266,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))* &
-                                                (q_prim_vf(c_idx)%sf(j, k, l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
+                                                (q_prim_vf(eqn_idx%c)%sf(j, k, l + 1) - q_prim_vf(eqn_idx%c)%sf(j, k, l - 1))
                     end do
                 end do
             end do
@@ -289,7 +289,7 @@ contains
             end do
         end do
 
-        call s_populate_capillary_buffers(c_divs, bc_type)
+        call s_populate_capillary_buffers(c_divs, bc_type, bc_bound)
 
         iv%beg = 1; iv%end = num_dims + 1
 

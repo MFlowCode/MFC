@@ -323,17 +323,17 @@ contains
             if (relativity .and. (rho_wrt .or. cons_vars_wrt)) dbvars = dbvars + 1
 
             ! Momentum
-            do i = 1, E_idx - mom_idx%beg
+            do i = 1, eqn_idx%E - eqn_idx%mom%beg
                 if (mom_wrt(i) .or. cons_vars_wrt) dbvars = dbvars + 1
             end do
 
             ! Velocity
-            do i = 1, E_idx - mom_idx%beg
+            do i = 1, eqn_idx%E - eqn_idx%mom%beg
                 if (vel_wrt(i) .or. prim_vars_wrt) dbvars = dbvars + 1
             end do
 
             ! Flux limiter function
-            do i = 1, E_idx - mom_idx%beg
+            do i = 1, eqn_idx%E - eqn_idx%mom%beg
                 if (flux_wrt(i)) dbvars = dbvars + 1
             end do
 
@@ -1193,7 +1193,7 @@ contains
     end subroutine s_write_lag_bubbles_results
     impure subroutine s_write_intf_data_file(q_prim_vf)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(IN) :: q_prim_vf
         integer :: i, j, k, l, cent !< Generic loop iterators
         integer :: counter, root !< number of data points extracted to fit shape to SH perturbations
         real(wp), parameter :: pi = 4._wp*tan(1._wp)
@@ -1207,8 +1207,8 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    if (q_prim_vf(E_idx + 2)%sf(i, j, k) > maxalph_loc) then
-                        maxalph_loc = q_prim_vf(E_idx + 2)%sf(i, j, k)
+                    if (q_prim_vf(eqn_idx%E + 2)%sf(i, j, k) > maxalph_loc) then
+                        maxalph_loc = q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)
                     end if
                 end do
             end do
@@ -1228,10 +1228,10 @@ contains
         thres = 0.9_wp*maxalph_glb
         do k = 0, n
             do j = 0, m
-                axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
-                axm = q_prim_vf(E_idx + 2)%sf(j, k, cent)
-                ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, cent)
-                aym = q_prim_vf(E_idx + 2)%sf(j, k, cent)
+                axp = q_prim_vf(eqn_idx%E + 2)%sf(j + 1, k, cent)
+                axm = q_prim_vf(eqn_idx%E + 2)%sf(j, k, cent)
+                ayp = q_prim_vf(eqn_idx%E + 2)%sf(j, k + 1, cent)
+                aym = q_prim_vf(eqn_idx%E + 2)%sf(j, k, cent)
                 if ((axp > thres .and. axm < thres) .or. (axp < thres .and. axm > thres) &
                     .or. (ayp > thres .and. aym < thres) .or. (ayp < thres .and. aym > thres)) then
                     if (counter == 0) then
@@ -1283,7 +1283,7 @@ contains
     end subroutine s_write_intf_data_file
 
     impure subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(IN) :: q_prim_vf, q_cons_vf
         real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
         real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H
         real(wp), dimension(num_vels) :: vel
@@ -1313,18 +1313,18 @@ contains
                     rho = 0_wp
                     gamma = 0_wp
                     pi_inf = 0_wp
-                    pres = q_prim_vf(E_idx)%sf(i, j, k)
-                    Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
+                    pres = q_prim_vf(eqn_idx%E)%sf(i, j, k)
+                    Egint = Egint + q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
                     do s = 1, num_vels
                         vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
-                        Egk = Egk + 0.5_wp*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
-                        Elk = Elk + 0.5_wp*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        Egk = Egk + 0.5_wp*q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        Elk = Elk + 0.5_wp*q_prim_vf(eqn_idx%E + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
                         if (abs(vel(s)) > maxvel) then
                             maxvel = abs(vel(s))
                         end if
                     end do
-                    do l = 1, adv_idx%end - E_idx
-                        adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
+                    do l = 1, eqn_idx%adv%end - eqn_idx%E
+                        adv(l) = q_prim_vf(eqn_idx%E + l)%sf(i, j, k)
                         gamma = gamma + adv(l)*fluid_pp(l)%gamma
                         pi_inf = pi_inf + adv(l)*fluid_pp(l)%pi_inf
                         rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
@@ -1343,7 +1343,7 @@ contains
                     Vl = Vl + adv(1)*dV
                     Vb = Vb + adv(2)*dV
                     pres_av = pres_av + adv(1)*pres*dV
-                    Et = Et + q_cons_vf(E_idx)%sf(i, j, k)*dV
+                    Et = Et + q_cons_vf(eqn_idx%E)%sf(i, j, k)*dV
                 end do
             end do
         end do

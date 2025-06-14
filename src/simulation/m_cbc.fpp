@@ -101,10 +101,10 @@ module m_cbc
     !$acc declare create(is1, is2, is3)
 
     integer :: dj
-    integer :: bcxb, bcxe, bcyb, bcye, bczb, bcze
+    type(boundary_bounds) :: bc_bound !< Boundary flags
     integer :: cbc_dir, cbc_loc
     integer :: flux_cbc_index
-    !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc, flux_cbc_index)
+    !$acc declare create(dj, bc_bound, cbc_dir, cbc_loc, flux_cbc_index)
 
     !! GRCBC inputs for subsonic inflow and outflow conditions consisting of
     !! inflow velocities, pressure, density and void fraction as well as
@@ -133,9 +133,9 @@ contains
         logical :: is_cbc
 
         if (chemistry) then
-            flux_cbc_index = sys_size
+            flux_cbc_index = eqn_idx%sys_size
         else
-            flux_cbc_index = adv_idx%end
+            flux_cbc_index = eqn_idx%adv%end
         end if
         !$acc update device(flux_cbc_index)
 
@@ -162,7 +162,7 @@ contains
 
         @:ALLOCATE(q_prim_rsx_vf(0:buff_size, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
+            is3%beg:is3%end, 1:eqn_idx%sys_size))
 
         if (weno_order > 1) then
 
@@ -172,7 +172,7 @@ contains
 
             @:ALLOCATE(F_src_rsx_vf(0:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         end if
 
@@ -182,7 +182,7 @@ contains
 
         @:ALLOCATE(flux_src_rsx_vf_l(-1:buff_size, &
             is2%beg:is2%end, &
-            is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+            is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         if (n > 0) then
 
@@ -205,7 +205,7 @@ contains
 
             @:ALLOCATE(q_prim_rsy_vf(0:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, 1:sys_size))
+                is3%beg:is3%end, 1:eqn_idx%sys_size))
 
             if (weno_order > 1) then
 
@@ -215,7 +215,7 @@ contains
 
                 @:ALLOCATE(F_src_rsy_vf(0:buff_size, &
                     is2%beg:is2%end, &
-                    is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                    is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
             end if
 
@@ -225,7 +225,7 @@ contains
 
             @:ALLOCATE(flux_src_rsy_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         end if
 
@@ -250,7 +250,7 @@ contains
 
             @:ALLOCATE(q_prim_rsz_vf(0:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, 1:sys_size))
+                is3%beg:is3%end, 1:eqn_idx%sys_size))
 
             if (weno_order > 1) then
 
@@ -260,7 +260,7 @@ contains
 
                 @:ALLOCATE(F_src_rsz_vf(0:buff_size, &
                     is2%beg:is2%end, &
-                    is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                    is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
             end if
 
@@ -270,7 +270,7 @@ contains
 
             @:ALLOCATE(flux_src_rsz_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
-                is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         end if
 
@@ -392,23 +392,23 @@ contains
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
 
-        bcxb = bc_x%beg
-        bcxe = bc_x%end
+        bc_bound%xb = bc_x%beg
+        bc_bound%xe = bc_x%end
 
-        !$acc update device(bcxb, bcxe)
+        !$acc update device(bc_bound)
 
         if (n > 0) then
-            bcyb = bc_y%beg
-            bcye = bc_y%end
+            bc_bound%yb = bc_y%beg
+            bc_bound%ye = bc_y%end
 
-            !$acc update device(bcyb, bcye)
+            !$acc update device(bc_bound)
         end if
 
         if (p > 0) then
-            bczb = bc_z%beg
-            bcze = bc_z%end
+            bc_bound%zb = bc_z%beg
+            bc_bound%ze = bc_z%end
 
-            !$acc update device(bczb, bcze)
+            !$acc update device(bc_bound)
         end if
 
         ! Allocate GRCBC inputs
@@ -626,11 +626,11 @@ contains
                      ix, iy, iz)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: q_prim_vf
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: flux_vf, flux_src_vf
 
         integer, intent(in) :: cbc_dir_norm, cbc_loc_norm
@@ -653,7 +653,7 @@ contains
         real(wp), dimension(2) :: Re_cbc
         real(wp), dimension(num_vels) :: vel, dvel_ds
         real(wp), dimension(num_fluids) :: adv, dadv_ds
-        real(wp), dimension(sys_size) :: L
+        real(wp), dimension(eqn_idx%sys_size) :: L
         real(wp), dimension(3) :: lambda
 
         real(wp) :: rho         !< Cell averaged density
@@ -793,11 +793,11 @@ contains
                             vel_K_sum = vel_K_sum + vel(i)**2._wp
                         end do
 
-                        pres = q_prim_rs${XYZ}$_vf(0, k, r, E_idx)
+                        pres = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%E)
 
                         !$acc loop seq
-                        do i = 1, advxe - E_idx
-                            adv(i) = q_prim_rs${XYZ}$_vf(0, k, r, E_idx + i)
+                        do i = 1, advxe - eqn_idx%E
+                            adv(i) = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%E + i)
                         end do
 
                         if (bubbles_euler) then
@@ -857,7 +857,7 @@ contains
 
                         dpres_ds = 0._wp
                         !$acc loop seq
-                        do i = 1, advxe - E_idx
+                        do i = 1, advxe - eqn_idx%E
                             dadv_ds(i) = 0._wp
                         end do
 
@@ -884,12 +884,12 @@ contains
                                              dvel_ds(i)
                             end do
 
-                            dpres_ds = q_prim_rs${XYZ}$_vf(j, k, r, E_idx)* &
+                            dpres_ds = q_prim_rs${XYZ}$_vf(j, k, r, eqn_idx%E)* &
                                        fd_coef_${XYZ}$ (j, cbc_loc) + &
                                        dpres_ds
                             !$acc loop seq
-                            do i = 1, advxe - E_idx
-                                dadv_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, E_idx + i)* &
+                            do i = 1, advxe - eqn_idx%E
+                                dadv_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, eqn_idx%E + i)* &
                                              fd_coef_${XYZ}$ (j, cbc_loc) + &
                                              dadv_ds(i)
                             end do
@@ -905,21 +905,21 @@ contains
                         end do
 
                         ! First-Order Temporal Derivatives of Primitive Variables
-                        lambda(1) = vel(dir_idx(1)) - c
-                        lambda(2) = vel(dir_idx(1))
-                        lambda(3) = vel(dir_idx(1)) + c
+                        lambda(1) = vel(eqn_idx%dir(1)) - c
+                        lambda(2) = vel(eqn_idx%dir(1))
+                        lambda(3) = vel(eqn_idx%dir(1)) + c
 
-                        Ma = vel(dir_idx(1))/c
+                        Ma = vel(eqn_idx%dir(1))/c
 
-                        if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SLIP_WALL) .or. &
-                            (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SLIP_WALL)) then
-                            call s_compute_slip_wall_L(lambda, L, rho, c, dpres_ds, dvel_ds)
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_BUFFER) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_BUFFER)) then
+                        if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_SLIP_WALL) .or. &
+                            (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_SLIP_WALL)) then
+                            call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_NR_SUB_BUFFER) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_NR_SUB_BUFFER)) then
                             call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_INFLOW) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_INFLOW)) then
-                            call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, dpres_ds, dvel_ds)
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_NR_SUB_INFLOW) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_NR_SUB_INFLOW)) then
+                            call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                             ! Add GRCBC for Subsonic Inflow
                             if (bc_${XYZ}$%grcbc_in) then
                                 !$acc loop seq
@@ -927,19 +927,19 @@ contains
                                     L(2) = c**3._wp*Ma*(alpha_rho(i - 1) - alpha_rho_in(i - 1, ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
                                 if (n > 0) then
-                                    L(momxb + 1) = c*Ma*(vel(dir_idx(2)) - vel_in(${CBC_DIR}$, dir_idx(2)))/Del_in(${CBC_DIR}$)
+                                    L(momxb + 1) = c*Ma*(vel(eqn_idx%dir(2)) - vel_in(${CBC_DIR}$, eqn_idx%dir(2)))/Del_in(${CBC_DIR}$)
                                     if (p > 0) then
-                                        L(momxb + 2) = c*Ma*(vel(dir_idx(3)) - vel_in(${CBC_DIR}$, dir_idx(3)))/Del_in(${CBC_DIR}$)
+                                        L(momxb + 2) = c*Ma*(vel(eqn_idx%dir(3)) - vel_in(${CBC_DIR}$, eqn_idx%dir(3)))/Del_in(${CBC_DIR}$)
                                     end if
                                 end if
                                 !$acc loop seq
-                                do i = E_idx, advxe - 1
-                                    L(i) = c*Ma*(adv(i + 1 - E_idx) - alpha_in(i + 1 - E_idx, ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                do i = eqn_idx%E, advxe - 1
+                                    L(i) = c*Ma*(adv(i + 1 - eqn_idx%E) - alpha_in(i + 1 - eqn_idx%E, ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
-                                L(advxe) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                L(advxe) = rho*c**2._wp*(1._wp + Ma)*(vel(eqn_idx%dir(1)) + vel_in(${CBC_DIR}$, eqn_idx%dir(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_OUTFLOW) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_NR_SUB_OUTFLOW) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                             ! Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
@@ -947,26 +947,26 @@ contains
 
                                 ! Add GRCBC for Subsonic Outflow (Normal Velocity)
                                 if (bc_${XYZ}$%grcbc_vel_out) then
-                                    L(advxe) = L(advxe) + rho*c**2._wp*(1._wp - Ma)*(vel(dir_idx(1)) + vel_out(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
+                                    L(advxe) = L(advxe) + rho*c**2._wp*(1._wp - Ma)*(vel(eqn_idx%dir(1)) + vel_out(${CBC_DIR}$, eqn_idx%dir(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
                                 end if
                             end if
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_FF_SUB_OUTFLOW) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_FF_SUB_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_FF_SUB_OUTFLOW) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_FF_SUB_OUTFLOW)) then
                             call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_CP_SUB_OUTFLOW) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_CP_SUB_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_CP_SUB_OUTFLOW) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_CP_SUB_OUTFLOW)) then
                             call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SUP_INFLOW) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_INFLOW)) then
-                            call s_compute_supersonic_inflow_L(L)
-                        else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SUP_OUTFLOW) .or. &
-                                 (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_SUP_INFLOW) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_SUP_INFLOW)) then
+                            call s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                        else if ((cbc_loc == -1 .and. bc_bound%${XYZ}$b == BC_CHAR_SUP_OUTFLOW) .or. &
+                                 (cbc_loc == 1 .and. bc_bound%${XYZ}$e == BC_CHAR_SUP_OUTFLOW)) then
                             call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                         end if
 
                         ! Be careful about the cylindrical coordinate!
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                            dpres_dt = -5e-1_wp*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
+                            dpres_dt = -5e-1_wp*(L(advxe) + L(1)) + rho*c*c*vel(eqn_idx%dir(1)) &
                                        /y_cc(n)
                         else
                             dpres_dt = -5e-1_wp*(L(advxe) + L(1))
@@ -980,9 +980,9 @@ contains
 
                         !$acc loop seq
                         do i = 1, num_dims
-                            dvel_dt(dir_idx(i)) = dir_flg(dir_idx(i))* &
+                            dvel_dt(eqn_idx%dir(i)) = eqn_idx%dir_flg(eqn_idx%dir(i))* &
                                                   (L(1) - L(advxe))/(2._wp*rho*c) + &
-                                                  (dir_flg(dir_idx(i)) - 1._wp)* &
+                                                  (eqn_idx%dir_flg(eqn_idx%dir(i)) - 1._wp)* &
                                                   L(momxb + i - 1)
                         end do
 
@@ -1002,12 +1002,12 @@ contains
                         ! The treatment of void fraction source is unclear
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
                             !$acc loop seq
-                            do i = 1, advxe - E_idx
-                                dadv_dt(i) = -L(momxe + i) !+ adv(i) * vel(dir_idx(1))/y_cc(n)
+                            do i = 1, advxe - eqn_idx%E
+                                dadv_dt(i) = -L(momxe + i) !+ adv(i) * vel(eqn_idx%dir(1))/y_cc(n)
                             end do
                         else
                             !$acc loop seq
-                            do i = 1, advxe - E_idx
+                            do i = 1, advxe - eqn_idx%E
                                 dadv_dt(i) = -L(momxe + i)
                             end do
                         end if
@@ -1051,7 +1051,7 @@ contains
                                 h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
                                 sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
                             end do
-                            flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
+                            flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, eqn_idx%E) &
                                                                    + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2)/(c*c) + sum_Enthalpies)
                             !$acc loop seq
                             do i = 1, num_species
@@ -1059,7 +1059,7 @@ contains
                                                                                 + ds(0)*(drho_dt*Ys(i) + rho*dYs_dt(i))
                             end do
                         else
-                            flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
+                            flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, eqn_idx%E) &
                                                                    + ds(0)*(pres*dgamma_dt &
                                                                             + gamma*dpres_dt &
                                                                             + dpi_inf_dt &
@@ -1077,12 +1077,12 @@ contains
                             !$acc loop seq
                             do i = advxb, advxe
                                 flux_src_rs${XYZ}$_vf_l(-1, k, r, i) = &
-                                    1._wp/max(abs(vel(dir_idx(1))), sgm_eps) &
-                                    *sign(1._wp, vel(dir_idx(1))) &
+                                    1._wp/max(abs(vel(eqn_idx%dir(1))), sgm_eps) &
+                                    *sign(1._wp, vel(eqn_idx%dir(1))) &
                                     *(flux_rs${XYZ}$_vf_l(0, k, r, i) &
-                                      + vel(dir_idx(1)) &
+                                      + vel(eqn_idx%dir(1)) &
                                       *flux_src_rs${XYZ}$_vf_l(0, k, r, i) &
-                                      + ds(0)*dadv_dt(i - E_idx))
+                                      + ds(0)*dadv_dt(i - eqn_idx%E))
                             end do
 
                         else
@@ -1090,7 +1090,7 @@ contains
                             !$acc loop seq
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) + &
-                                                                   ds(0)*dadv_dt(i - E_idx)
+                                                                   ds(0)*dadv_dt(i - eqn_idx%E)
                             end do
 
                             !$acc loop seq
@@ -1128,11 +1128,11 @@ contains
                                 ix, iy, iz)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: q_prim_vf
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(in) :: flux_vf, flux_src_vf
 
         type(int_bounds_info), intent(in) :: ix, iy, iz
@@ -1147,24 +1147,24 @@ contains
 
         if (cbc_dir == 1) then
             is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = iz
-            dir_idx = (/1, 2, 3/); dir_flg = (/1._wp, 0._wp, 0._wp/)
+            eqn_idx%dir = (/1, 2, 3/); eqn_idx%dir_flg = (/1._wp, 0._wp, 0._wp/)
         elseif (cbc_dir == 2) then
             is1%beg = 0; is1%end = buff_size; is2 = ix; is3 = iz
-            dir_idx = (/2, 1, 3/); dir_flg = (/0._wp, 1._wp, 0._wp/)
+            eqn_idx%dir = (/2, 1, 3/); eqn_idx%dir_flg = (/0._wp, 1._wp, 0._wp/)
         else
             is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = ix
-            dir_idx = (/3, 1, 2/); dir_flg = (/0._wp, 0._wp, 1._wp/)
+            eqn_idx%dir = (/3, 1, 2/); eqn_idx%dir_flg = (/0._wp, 0._wp, 1._wp/)
         end if
 
         dj = max(0, cbc_loc)
         !$acc update device(is1, is2, is3, dj)
-        !$acc update device( dir_idx, dir_flg)
+        !$acc update device( eqn_idx%dir, eqn_idx%dir_flg)
 
         ! Reshaping Inputted Data in x-direction
         if (cbc_dir == 1) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = 0, buff_size
@@ -1240,7 +1240,7 @@ contains
         elseif (cbc_dir == 2) then
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = 0, buff_size
@@ -1316,7 +1316,7 @@ contains
         else
 
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
+            do i = 1, eqn_idx%sys_size
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = 0, buff_size
@@ -1401,7 +1401,7 @@ contains
     subroutine s_finalize_cbc(flux_vf, flux_src_vf)
 
         type(scalar_field), &
-            dimension(sys_size), &
+            dimension(eqn_idx%sys_size), &
             intent(inout) :: flux_vf, flux_src_vf
 
         integer :: i, j, k, r !< Generic loop iterators

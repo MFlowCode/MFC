@@ -93,14 +93,14 @@
 
         if (low_Mach == 1) then
             pcorr = rho_L*rho_R* &
-                    (s_L - vel_L(dir_idx(1)))*(s_R - vel_R(dir_idx(1)))*(vel_R(dir_idx(1)) - vel_L(dir_idx(1)))/ &
-                    (rho_R*(s_R - vel_R(dir_idx(1))) - rho_L*(s_L - vel_L(dir_idx(1))))* &
+                    (s_L - vel_L(eqn_idx%dir(1)))*(s_R - vel_R(eqn_idx%dir(1)))*(vel_R(eqn_idx%dir(1)) - vel_L(eqn_idx%dir(1)))/ &
+                    (rho_R*(s_R - vel_R(eqn_idx%dir(1))) - rho_L*(s_L - vel_L(eqn_idx%dir(1))))* &
                     (zcoef - 1._wp)
         else if (low_Mach == 2) then
-            vel_L_tmp = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + zcoef*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
-            vel_R_tmp = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + zcoef*(vel_R(dir_idx(1)) - vel_L(dir_idx(1))))
-            vel_L(dir_idx(1)) = vel_L_tmp
-            vel_R(dir_idx(1)) = vel_R_tmp
+            vel_L_tmp = 5e-1_wp*((vel_L(eqn_idx%dir(1)) + vel_R(eqn_idx%dir(1))) + zcoef*(vel_L(eqn_idx%dir(1)) - vel_R(eqn_idx%dir(1))))
+            vel_R_tmp = 5e-1_wp*((vel_L(eqn_idx%dir(1)) + vel_R(eqn_idx%dir(1))) + zcoef*(vel_R(eqn_idx%dir(1)) - vel_L(eqn_idx%dir(1))))
+            vel_L(eqn_idx%dir(1)) = vel_L_tmp
+            vel_R(eqn_idx%dir(1)) = vel_R_tmp
         end if
     end if
 

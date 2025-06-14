@@ -66,7 +66,7 @@ contains
 
     impure subroutine s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
 
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp, ib_markers_sf
         type(levelset_field), intent(inout) :: levelset !< Levelset determined by models
         type(levelset_norm_field), intent(inout) :: levelset_norm !< Levelset_norm determined by models
@@ -251,7 +251,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         real(wp) :: pi_inf, gamma, lit_gamma
 
@@ -309,7 +309,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
         real(wp) :: th, thickness, nturns, mya
@@ -375,7 +375,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib
 
         real(wp) :: radius
@@ -452,7 +452,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib
 
         real(wp) :: x0, y0, f, x_act, y_act, ca, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
@@ -614,7 +614,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib
 
         real(wp) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
@@ -787,7 +787,7 @@ contains
         ! Patch identifier
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -828,7 +828,7 @@ contains
                     ! Updating the patch identities bookkeeping variable
                     if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
 
-                    q_prim_vf(alf_idx)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
+                    q_prim_vf(eqn_idx%alf)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
                                                      exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
                 end if
 
@@ -845,7 +845,7 @@ contains
         ! Patch identifier
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -891,7 +891,7 @@ contains
                         ! Updating the patch identities bookkeeping variable
                         if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
 
-                        q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
+                        q_prim_vf(eqn_idx%alf)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
                                                          exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
                     end if
 
@@ -912,7 +912,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop operators
         real(wp) :: a, b
@@ -979,7 +979,7 @@ contains
         ! Patch identifier
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -1064,7 +1064,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib !< True if this patch is an immersed boundary
 
         integer :: i, j, k !< generic loop iterators
@@ -1125,8 +1125,8 @@ contains
                             if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                                 !zero density, reassign according to Tait EOS
                                 q_prim_vf(1)%sf(i, j, 0) = &
-                                    (((q_prim_vf(E_idx)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))* &
-                                    rhoref*(1._wp - q_prim_vf(alf_idx)%sf(i, j, 0))
+                                    (((q_prim_vf(eqn_idx%E)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))* &
+                                    rhoref*(1._wp - q_prim_vf(eqn_idx%alf)%sf(i, j, 0))
                             end if
 
                             ! Updating the patch identities bookkeeping variable
@@ -1154,7 +1154,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop operators
         real(wp) :: a, b, c
@@ -1219,7 +1219,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
@@ -1273,9 +1273,9 @@ contains
                     if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
 
                     ! Assign Parameters
-                    q_prim_vf(mom_idx%beg)%sf(i, j, 0) = U0*sin(x_cc(i)/L0)*cos(y_cc(j)/L0)
-                    q_prim_vf(mom_idx%end)%sf(i, j, 0) = -U0*cos(x_cc(i)/L0)*sin(y_cc(j)/L0)
-                    q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(patch_id)%pres + (cos(2*x_cc(i))/L0 + &
+                    q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = U0*sin(x_cc(i)/L0)*cos(y_cc(j)/L0)
+                    q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = -U0*cos(x_cc(i)/L0)*sin(y_cc(j)/L0)
+                    q_prim_vf(eqn_idx%E)%sf(i, j, 0) = patch_icpp(patch_id)%pres + (cos(2*x_cc(i))/L0 + &
                                                                                 cos(2*y_cc(j))/L0)* &
                                                    (q_prim_vf(1)%sf(i, j, 0)*U0*U0)/16
                 end if
@@ -1294,7 +1294,7 @@ contains
         ! Patch identifier
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i
@@ -1354,7 +1354,7 @@ contains
         ! Patch identifier
         integer, intent(in) :: patch_id
         integer, intent(inout), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -1408,7 +1408,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j !< generic loop iterators
 
@@ -1477,7 +1477,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
@@ -1561,7 +1561,7 @@ contains
 
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         real(wp) :: r, x_p, eps, phi
         real(wp), dimension(2:9) :: as, Ps
@@ -1711,7 +1711,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib   !< True if this patch is an immersed boundary
 
         ! Generic loop iterators
@@ -1807,7 +1807,7 @@ contains
         integer, intent(in) :: patch_id
         logical, optional, intent(in) :: ib
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1904,7 +1904,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib   !< True if this patch is an immersed boundary
 
         integer :: i, j, k !< Generic loop iterators
@@ -2054,7 +2054,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
         real(wp) :: a, b, c, d
@@ -2133,7 +2133,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(1:eqn_idx%sys_size), intent(inout) :: q_prim_vf
 
         ! Variables for IBM+STL
         type(levelset_field), optional, intent(inout) :: STL_levelset !< Levelset determined by models

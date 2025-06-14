@@ -22,7 +22,7 @@ module m_boundary_common
     type(scalar_field), dimension(:, :), allocatable :: bc_buffers
     !$acc declare create(bc_buffers)
 
-    real(wp) :: bcxb, bcxe, bcyb, bcye, bczb, bcze
+    type(boundary_bounds) :: bc_bound
 
 #ifdef MFC_MPI
     integer, dimension(1:3, -1:1) :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
@@ -34,7 +34,7 @@ module m_boundary_common
  s_populate_capillary_buffers, &
  s_finalize_boundary_common_module
 
-    public :: bc_buffers, bcxb, bcxe, bcyb, bcye, bczb, bcze
+    public :: bc_buffers, bc_bound
 
 #ifdef MFC_MPI
     public :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
@@ -44,22 +44,22 @@ contains
 
     impure subroutine s_initialize_boundary_common_module()
 
-        bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
+        bc_bound%xb = bc_x%beg; bc_bound%xe = bc_x%end; bc_bound%yb = bc_y%beg; bc_bound%ye = bc_y%end; bc_bound%zb = bc_z%beg; bc_bound%ze = bc_z%end
 
         @:ALLOCATE(bc_buffers(1:num_dims, -1:1))
 
 #ifndef MFC_POST_PROCESS
         if (bc_io) then
-            @:ALLOCATE(bc_buffers(1, -1)%sf(1:sys_size, 0:n, 0:p))
-            @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size, 0:n, 0:p))
+            @:ALLOCATE(bc_buffers(1, -1)%sf(1:eqn_idx%sys_size, 0:n, 0:p))
+            @:ALLOCATE(bc_buffers(1, 1)%sf(1:eqn_idx%sys_size, 0:n, 0:p))
             @:ACC_SETUP_SFs(bc_buffers(1,-1), bc_buffers(1,1))
             if (n > 0) then
-                @:ALLOCATE(bc_buffers(2,-1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-                @:ALLOCATE(bc_buffers(2,1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
+                @:ALLOCATE(bc_buffers(2,-1)%sf(-buff_size:m+buff_size,1:eqn_idx%sys_size,0:p))
+                @:ALLOCATE(bc_buffers(2,1)%sf(-buff_size:m+buff_size,1:eqn_idx%sys_size,0:p))
                 @:ACC_SETUP_SFs(bc_buffers(2,-1), bc_buffers(2,1))
                 if (p > 0) then
-                    @:ALLOCATE(bc_buffers(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-                    @:ALLOCATE(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
+                    @:ALLOCATE(bc_buffers(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:eqn_idx%sys_size))
+                    @:ALLOCATE(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:eqn_idx%sys_size))
                     @:ACC_SETUP_SFs(bc_buffers(3,-1), bc_buffers(3,1))
                 end if
             end if
@@ -71,16 +71,17 @@ contains
     !>  The purpose of this procedure is to populate the buffers
     !!      of the primitive variables, depending on the selected
     !!      boundary conditions.
-    impure subroutine s_populate_variables_buffers(q_prim_vf, pb, mv, bc_type)
+    impure subroutine s_populate_variables_buffers(q_prim_vf, pb, mv, bc_type, bc_bound)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(boundary_bounds), intent(in) :: bc_bound
 
         integer :: k, l
 
         ! Population of Buffers in x-direction
-        if (bcxb >= 0) then
+        if (bc_bound%xb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 1, -1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -104,7 +105,7 @@ contains
             end do
         end if
 
-        if (bcxe >= 0) then
+        if (bc_bound%xe >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 1, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -132,7 +133,7 @@ contains
 
         if (n == 0) return
 
-        if (bcyb >= 0) then
+        if (bc_bound%yb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 2, -1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -142,7 +143,7 @@ contains
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, -1, k, l)
                     case (BC_AXIS)
-                        call s_axis(q_prim_vf, pb, mv, k, l)
+                        call s_axis(q_prim_vf, pb, mv, 2, -1, k, l)
                     case (BC_REFLECTIVE)
                         call s_symmetry(q_prim_vf, pb, mv, 2, -1, k, l)
                     case (BC_PERIODIC)
@@ -158,7 +159,7 @@ contains
             end do
         end if
 
-        if (bcye >= 0) then
+        if (bc_bound%ye >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 2, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -186,7 +187,7 @@ contains
 
         if (p == 0) return
 
-        if (bczb >= 0) then
+        if (bc_bound%zb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 3, -1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -210,7 +211,7 @@ contains
             end do
         end if
 
-        if (bcze >= 0) then
+        if (bc_bound%ze >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 3, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -243,7 +244,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
@@ -256,14 +257,14 @@ contains
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(-j, k, l) = &
                             q_prim_vf(i)%sf(0, k, l)
                     end do
                 end do
             else !< bc_x%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = &
                             q_prim_vf(i)%sf(m, k, l)
@@ -272,14 +273,14 @@ contains
             end if
         elseif (bc_dir == 2) then !< y-direction
             if (bc_loc == -1) then !< bc_y%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, -j, l) = &
                             q_prim_vf(i)%sf(k, 0, l)
                     end do
                 end do
             else !< bc_y%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, n + j, l) = &
                             q_prim_vf(i)%sf(k, n, l)
@@ -288,14 +289,14 @@ contains
             end if
         elseif (bc_dir == 3) then !< z-direction
             if (bc_loc == -1) then !< bc_z%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, -j) = &
                             q_prim_vf(i)%sf(k, l, 0)
                     end do
                 end do
             else !< bc_z%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, p + j) = &
                             q_prim_vf(i)%sf(k, l, p)
@@ -312,7 +313,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
@@ -330,7 +331,7 @@ contains
                     q_prim_vf(momxb)%sf(-j, k, l) = &
                         -q_prim_vf(momxb)%sf(j - 1, k, l)
 
-                    do i = momxb + 1, sys_size
+                    do i = momxb + 1, eqn_idx%sys_size
                         q_prim_vf(i)%sf(-j, k, l) = &
                             q_prim_vf(i)%sf(j - 1, k, l)
                     end do
@@ -371,7 +372,7 @@ contains
                     q_prim_vf(momxb)%sf(m + j, k, l) = &
                         -q_prim_vf(momxb)%sf(m - (j - 1), k, l)
 
-                    do i = momxb + 1, sys_size
+                    do i = momxb + 1, eqn_idx%sys_size
                         q_prim_vf(i)%sf(m + j, k, l) = &
                             q_prim_vf(i)%sf(m - (j - 1), k, l)
                     end do
@@ -413,7 +414,7 @@ contains
                     q_prim_vf(momxb + 1)%sf(k, -j, l) = &
                         -q_prim_vf(momxb + 1)%sf(k, j - 1, l)
 
-                    do i = momxb + 2, sys_size
+                    do i = momxb + 2, eqn_idx%sys_size
                         q_prim_vf(i)%sf(k, -j, l) = &
                             q_prim_vf(i)%sf(k, j - 1, l)
                     end do
@@ -453,7 +454,7 @@ contains
                     q_prim_vf(momxb + 1)%sf(k, n + j, l) = &
                         -q_prim_vf(momxb + 1)%sf(k, n - (j - 1), l)
 
-                    do i = momxb + 2, sys_size
+                    do i = momxb + 2, eqn_idx%sys_size
                         q_prim_vf(i)%sf(k, n + j, l) = &
                             q_prim_vf(i)%sf(k, n - (j - 1), l)
                     end do
@@ -495,7 +496,7 @@ contains
                     q_prim_vf(momxe)%sf(k, l, -j) = &
                         -q_prim_vf(momxe)%sf(k, l, j - 1)
 
-                    do i = E_idx, sys_size
+                    do i = eqn_idx%E, eqn_idx%sys_size
                         q_prim_vf(i)%sf(k, l, -j) = &
                             q_prim_vf(i)%sf(k, l, j - 1)
                     end do
@@ -535,7 +536,7 @@ contains
                     q_prim_vf(momxe)%sf(k, l, p + j) = &
                         -q_prim_vf(momxe)%sf(k, l, p - (j - 1))
 
-                    do i = E_idx, sys_size
+                    do i = eqn_idx%E, eqn_idx%sys_size
                         q_prim_vf(i)%sf(k, l, p + j) = &
                             q_prim_vf(i)%sf(k, l, p - (j - 1))
                     end do
@@ -576,7 +577,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
@@ -585,7 +586,7 @@ contains
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !< bc_x%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(-j, k, l) = &
                             q_prim_vf(i)%sf(m - (j - 1), k, l)
@@ -605,7 +606,7 @@ contains
                     end do
                 end if
             else !< bc_x%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = &
                             q_prim_vf(i)%sf(j - 1, k, l)
@@ -627,7 +628,7 @@ contains
             end if
         elseif (bc_dir == 2) then !< y-direction
             if (bc_loc == -1) then !< bc_y%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, -j, l) = &
                             q_prim_vf(i)%sf(k, n - (j - 1), l)
@@ -647,7 +648,7 @@ contains
                     end do
                 end if
             else !< bc_y%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, n + j, l) = &
                             q_prim_vf(i)%sf(k, j - 1, l)
@@ -669,7 +670,7 @@ contains
             end if
         elseif (bc_dir == 3) then !< z-direction
             if (bc_loc == -1) then !< bc_z%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, -j) = &
                             q_prim_vf(i)%sf(k, l, p - (j - 1))
@@ -689,7 +690,7 @@ contains
                     end do
                 end if
             else !< bc_z%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, p + j) = &
                             q_prim_vf(i)%sf(k, l, j - 1)
@@ -713,14 +714,15 @@ contains
 
     end subroutine s_periodic
 
-    pure subroutine s_axis(q_prim_vf, pb, mv, k, l)
+    pure subroutine s_axis(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_axis
 #else
         !$acc routine seq
 #endif
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+        integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
         integer :: j, q, i
@@ -738,7 +740,7 @@ contains
                 q_prim_vf(momxe)%sf(k, -j, l) = &
                     -q_prim_vf(momxe)%sf(k, j - 1, l + ((p + 1)/2))
 
-                do i = E_idx, sys_size
+                do i = eqn_idx%E, eqn_idx%sys_size
                     q_prim_vf(i)%sf(k, -j, l) = &
                         q_prim_vf(i)%sf(k, j - 1, l + ((p + 1)/2))
                 end do
@@ -754,7 +756,7 @@ contains
                 q_prim_vf(momxe)%sf(k, -j, l) = &
                     -q_prim_vf(momxe)%sf(k, j - 1, l - ((p + 1)/2))
 
-                do i = E_idx, sys_size
+                do i = eqn_idx%E, eqn_idx%sys_size
                     q_prim_vf(i)%sf(k, -j, l) = &
                         q_prim_vf(i)%sf(k, j - 1, l - ((p + 1)/2))
                 end do
@@ -782,7 +784,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
@@ -795,7 +797,7 @@ contains
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !< bc_x%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
                             q_prim_vf(i)%sf(-j, k, l) = &
@@ -807,7 +809,7 @@ contains
                     end do
                 end do
             else !< bc_x%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
                             q_prim_vf(i)%sf(m + j, k, l) = &
@@ -821,7 +823,7 @@ contains
             end if
         elseif (bc_dir == 2) then !< y-direction
             if (bc_loc == -1) then !< bc_y%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         if (i == momxb + 1) then
                             q_prim_vf(i)%sf(k, -j, l) = &
@@ -833,7 +835,7 @@ contains
                     end do
                 end do
             else !< bc_y%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         if (i == momxb + 1) then
                             q_prim_vf(i)%sf(k, n + j, l) = &
@@ -847,7 +849,7 @@ contains
             end if
         elseif (bc_dir == 3) then !< z-direction
             if (bc_loc == -1) then !< bc_z%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         if (i == momxe) then
                             q_prim_vf(i)%sf(k, l, -j) = &
@@ -859,7 +861,7 @@ contains
                     end do
                 end do
             else !< bc_z%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         if (i == momxe) then
                             q_prim_vf(i)%sf(k, l, p + j) = &
@@ -881,7 +883,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
@@ -894,7 +896,7 @@ contains
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !< bc_x%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
                             q_prim_vf(i)%sf(-j, k, l) = &
@@ -912,7 +914,7 @@ contains
                     end do
                 end do
             else !< bc_x%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
                             q_prim_vf(i)%sf(m + j, k, l) = &
@@ -932,7 +934,7 @@ contains
             end if
         elseif (bc_dir == 2) then !< y-direction
             if (bc_loc == -1) then !< bc_y%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
                             q_prim_vf(i)%sf(k, -j, l) = &
@@ -950,7 +952,7 @@ contains
                     end do
                 end do
             else !< bc_y%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
                             q_prim_vf(i)%sf(k, n + j, l) = &
@@ -970,7 +972,7 @@ contains
             end if
         elseif (bc_dir == 3) then !< z-direction
             if (bc_loc == -1) then !< bc_z%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
                             q_prim_vf(i)%sf(k, l, -j) = &
@@ -988,7 +990,7 @@ contains
                     end do
                 end do
             else !< bc_z%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
                             q_prim_vf(i)%sf(k, l, p + j) = &
@@ -1016,7 +1018,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
@@ -1028,14 +1030,14 @@ contains
 #else
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(-j, k, l) = &
                             bc_buffers(1, -1)%sf(i, k, l)
                     end do
                 end do
             else !< bc_x%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = &
                             bc_buffers(1, 1)%sf(i, k, l)
@@ -1044,14 +1046,14 @@ contains
             end if
         elseif (bc_dir == 2) then !< y-direction
             if (bc_loc == -1) then !< bc_y%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, -j, l) = &
                             bc_buffers(2, -1)%sf(k, i, l)
                     end do
                 end do
             else !< bc_y%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, n + j, l) = &
                             bc_buffers(2, 1)%sf(k, i, l)
@@ -1060,14 +1062,14 @@ contains
             end if
         elseif (bc_dir == 3) then !< z-direction
             if (bc_loc == -1) then !< bc_z%beg
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, -j) = &
                             bc_buffers(3, -1)%sf(k, l, i)
                     end do
                 end do
             else !< bc_z%end
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, p + j) = &
                             bc_buffers(3, 1)%sf(k, l, i)
@@ -1155,15 +1157,16 @@ contains
 
     end subroutine s_qbmm_extrapolation
 
-    impure subroutine s_populate_capillary_buffers(c_divs, bc_type)
+    impure subroutine s_populate_capillary_buffers(c_divs, bc_type, bc_bound)
 
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(boundary_bounds), intent(in) :: bc_bound
 
         integer :: k, l
 
         !< x-direction
-        if (bcxb >= 0) then
+        if (bc_bound%xb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, -1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1181,7 +1184,7 @@ contains
             end do
         end if
 
-        if (bcxe >= 0) then
+        if (bc_bound%xe >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1202,7 +1205,7 @@ contains
         if (n == 0) return
 
         !< y-direction
-        if (bcyb >= 0) then
+        if (bc_bound%yb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, -1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1220,7 +1223,7 @@ contains
             end do
         end if
 
-        if (bcye >= 0) then
+        if (bc_bound%ye >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1241,7 +1244,7 @@ contains
         if (p == 0) return
 
         !< z-direction
-        if (bczb >= 0) then
+        if (bc_bound%zb >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, -1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1259,7 +1262,7 @@ contains
             end do
         end if
 
-        if (bcze >= 0) then
+        if (bc_bound%ze >= 0) then
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)

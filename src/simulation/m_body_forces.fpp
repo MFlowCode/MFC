@@ -76,7 +76,7 @@ contains
     !! param q_cons_vf Conservative variable
     subroutine s_compute_mixture_density(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
         integer :: i, j, k, l !< standard iterators
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -100,9 +100,9 @@ contains
     !! @param q_prim_vf Primitive variables
     subroutine s_compute_body_forces_rhs(q_cons_vf, q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(inout) :: rhs_vf
 
         integer :: i, j, k, l !< Loop variables
 
@@ -110,7 +110,7 @@ contains
         call s_compute_mixture_density(q_cons_vf)
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = momxb, E_idx
+        do i = momxb, eqn_idx%E
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -128,7 +128,7 @@ contains
                     do j = 0, m
                         rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
                                                     rhoM(j, k, l)*accel_bf(1)
-                        rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
+                        rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + &
                                                     q_cons_vf(momxb)%sf(j, k, l)*accel_bf(1)
                     end do
                 end do
@@ -143,7 +143,7 @@ contains
                     do j = 0, m
                         rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
                                                         rhoM(j, k, l)*accel_bf(2)
-                        rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
+                        rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + &
                                                     q_cons_vf(momxb + 1)%sf(j, k, l)*accel_bf(2)
                     end do
                 end do
@@ -158,7 +158,7 @@ contains
                     do j = 0, m
                         rhs_vf(momxe)%sf(j, k, l) = rhs_vf(momxe)%sf(j, k, l) + &
                                                     (rhoM(j, k, l))*accel_bf(3)
-                        rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
+                        rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + &
                                                     q_cons_vf(momxe)%sf(j, k, l)*accel_bf(3)
                     end do
                 end do

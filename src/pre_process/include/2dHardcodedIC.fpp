@@ -22,7 +22,7 @@
             q_prim_vf(contxb)%sf(i, j, 0) = eps*1000._wp
             q_prim_vf(contxe)%sf(i, j, 0) = (1._wp - eps)*1._wp
             ! Pressure
-            q_prim_vf(E_idx)%sf(i, j, 0) = 1000._wp
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = 1000._wp
         end if
     case (202) ! Gresho vortex (Gouasmi et al 2022 JCP)
         r = ((x_cc(i) - 0.5_wp)**2 + (y_cc(j) - 0.5_wp)**2)**0.5_wp
@@ -35,15 +35,15 @@
         if (r < rmax) then
             q_prim_vf(momxb)%sf(i, j, 0) = -(y_cc(j) - 0.5_wp)*umax/rmax
             q_prim_vf(momxe)%sf(i, j, 0) = (x_cc(i) - 0.5_wp)*umax/rmax
-            q_prim_vf(E_idx)%sf(i, j, 0) = p0 + umax**2*((r/rmax)**2/2._wp)
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = p0 + umax**2*((r/rmax)**2/2._wp)
         else if (r < 2*rmax) then
             q_prim_vf(momxb)%sf(i, j, 0) = -((y_cc(j) - 0.5_wp)/r)*umax*(2._wp - r/rmax)
             q_prim_vf(momxe)%sf(i, j, 0) = ((x_cc(i) - 0.5_wp)/r)*umax*(2._wp - r/rmax)
-            q_prim_vf(E_idx)%sf(i, j, 0) = p0 + umax**2*((r/rmax)**2/2._wp + 4*(1 - (r/rmax) + log(r/rmax)))
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = p0 + umax**2*((r/rmax)**2/2._wp + 4*(1 - (r/rmax) + log(r/rmax)))
         else
             q_prim_vf(momxb)%sf(i, j, 0) = 0._wp
             q_prim_vf(momxe)%sf(i, j, 0) = 0._wp
-            q_prim_vf(E_idx)%sf(i, j, 0) = p0 + umax**2*(-2 + 4*log(2._wp))
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = p0 + umax**2*(-2 + 4*log(2._wp))
         end if
     case (203) ! Gresho vortex (Gouasmi et al 2022 JCP) with density correction
         r = ((x_cc(i) - 0.5_wp)**2._wp + (y_cc(j) - 0.5_wp)**2)**0.5_wp
@@ -56,18 +56,18 @@
         if (r < rmax) then
             q_prim_vf(momxb)%sf(i, j, 0) = -(y_cc(j) - 0.5_wp)*umax/rmax
             q_prim_vf(momxe)%sf(i, j, 0) = (x_cc(i) - 0.5_wp)*umax/rmax
-            q_prim_vf(E_idx)%sf(i, j, 0) = p0 + umax**2*((r/rmax)**2._wp/2._wp)
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = p0 + umax**2*((r/rmax)**2._wp/2._wp)
         else if (r < 2*rmax) then
             q_prim_vf(momxb)%sf(i, j, 0) = -((y_cc(j) - 0.5_wp)/r)*umax*(2._wp - r/rmax)
             q_prim_vf(momxe)%sf(i, j, 0) = ((x_cc(i) - 0.5_wp)/r)*umax*(2._wp - r/rmax)
-            q_prim_vf(E_idx)%sf(i, j, 0) = p0 + umax**2*((r/rmax)**2/2._wp + 4._wp*(1._wp - (r/rmax) + log(r/rmax)))
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = p0 + umax**2*((r/rmax)**2/2._wp + 4._wp*(1._wp - (r/rmax) + log(r/rmax)))
         else
             q_prim_vf(momxb)%sf(i, j, 0) = 0._wp
             q_prim_vf(momxe)%sf(i, j, 0) = 0._wp
-            q_prim_vf(E_idx)%sf(i, j, 0) = p0 + umax**2._wp*(-2._wp + 4*log(2._wp))
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = p0 + umax**2._wp*(-2._wp + 4*log(2._wp))
         end if
 
-        q_prim_vf(contxb)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)**(1._wp/gam)
+        q_prim_vf(contxb)%sf(i, j, 0) = q_prim_vf(eqn_idx%E)%sf(i, j, 0)**(1._wp/gam)
     case (204) ! Rayleigh-Taylor instability
         rhoH = 3._wp
         rhoL = 1._wp
@@ -90,14 +90,14 @@
             q_prim_vf(advxe)%sf(i, j, 0) = 1._wp - alph
             q_prim_vf(contxb)%sf(i, j, 0) = alph*rhoH
             q_prim_vf(contxe)%sf(i, j, 0) = (1._wp - alph)*rhoL
-            q_prim_vf(E_idx)%sf(i, j, 0) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
         else
             q_prim_vf(advxb)%sf(i, j, 0) = alph
             q_prim_vf(advxe)%sf(i, j, 0) = 1._wp - alph
             q_prim_vf(contxb)%sf(i, j, 0) = alph*rhoH
             q_prim_vf(contxe)%sf(i, j, 0) = (1._wp - alph)*rhoL
             pInt = pref + rhoH*9.81_wp*(1.2_wp - intH)
-            q_prim_vf(E_idx)%sf(i, j, 0) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
         end if
 
     case (205) ! 2D lung wave interaction problem
@@ -110,7 +110,7 @@
         if (y_cc(j) > intH) then
             q_prim_vf(contxb)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(1)
             q_prim_vf(contxe)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(2)
-            q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(1)%pres
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = patch_icpp(1)%pres
             q_prim_vf(advxb)%sf(i, j, 0) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
         end if
@@ -125,7 +125,7 @@
         if (x_cc(i) > intL) then        !this is the liquid
             q_prim_vf(contxb)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(1)
             q_prim_vf(contxe)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(2)
-            q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(1)%pres
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = patch_icpp(1)%pres
             q_prim_vf(advxb)%sf(i, j, 0) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
         end if
@@ -140,22 +140,22 @@
         q_prim_vf(momxb)%sf(i, j, 0) = -sin(2._wp*pi*y_cc(j))
         q_prim_vf(momxb + 1)%sf(i, j, 0) = sin(2._wp*pi*x_cc(i))
 
-        q_prim_vf(B_idx%beg)%sf(i, j, 0) = -sin(2._wp*pi*y_cc(j))/sqrt(4._wp*pi)
-        q_prim_vf(B_idx%beg + 1)%sf(i, j, 0) = sin(4._wp*pi*x_cc(i))/sqrt(4._wp*pi)
+        q_prim_vf(eqn_idx%B%beg)%sf(i, j, 0) = -sin(2._wp*pi*y_cc(j))/sqrt(4._wp*pi)
+        q_prim_vf(eqn_idx%B%beg + 1)%sf(i, j, 0) = sin(4._wp*pi*x_cc(i))/sqrt(4._wp*pi)
 
     case (251) ! RMHD Cylindrical Blast Wave [Mignone, 2006: Section 4.3.1]
 
         if (x_cc(i)**2 + y_cc(j)**2 < 0.08_wp**2) then
             q_prim_vf(contxb)%sf(i, j, 0) = 0.01
-            q_prim_vf(E_idx)%sf(i, j, 0) = 1.0
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = 1.0
         elseif (x_cc(i)**2 + y_cc(j)**2 <= 1._wp**2) then
             ! Linear interpolation between r=0.08 and r=1.0
             factor = (1.0_wp - sqrt(x_cc(i)**2 + y_cc(j)**2))/(1.0_wp - 0.08_wp)
             q_prim_vf(contxb)%sf(i, j, 0) = 0.01_wp*factor + 1.e-4_wp*(1.0_wp - factor)
-            q_prim_vf(E_idx)%sf(i, j, 0) = 1.0_wp*factor + 3.e-5_wp*(1.0_wp - factor)
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = 1.0_wp*factor + 3.e-5_wp*(1.0_wp - factor)
         else
             q_prim_vf(contxb)%sf(i, j, 0) = 1.e-4_wp
-            q_prim_vf(E_idx)%sf(i, j, 0) = 3.e-5_wp
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = 3.e-5_wp
         end if
 
     case default

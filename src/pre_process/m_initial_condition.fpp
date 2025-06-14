@@ -73,10 +73,10 @@ contains
         integer :: i, j, k, l !< generic loop iterators
 
         ! Allocating the primitive and conservative variables
-        allocate (q_prim_vf(1:sys_size))
-        allocate (q_cons_vf(1:sys_size))
+        allocate (q_prim_vf(1:eqn_idx%sys_size))
+        allocate (q_cons_vf(1:eqn_idx%sys_size))
 
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                       idwbuff(2)%beg:idwbuff(2)%end, &
                                       idwbuff(3)%beg:idwbuff(3)%end))
@@ -110,7 +110,7 @@ contains
         ! the grid the simulation component will catch the problem on start-
         ! up. The conservative variables do not need to be similarly treated
         ! since they are computed directly from the primitive variables.
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             q_cons_vf(i)%sf = dflt_real
             q_prim_vf(i)%sf = dflt_real
         end do
@@ -154,8 +154,8 @@ contains
 
         ! Initial damage state is always zero
         if (cont_damage) then
-            q_cons_vf(damage_idx)%sf = 0._wp
-            q_prim_vf(damage_idx)%sf = 0._wp
+            q_cons_vf(eqn_idx%damage)%sf = 0._wp
+            q_prim_vf(eqn_idx%damage)%sf = 0._wp
         end if
 
         ! Setting default values for patch identities bookkeeping variable.
@@ -211,7 +211,7 @@ contains
         integer :: i !< Generic loop iterator
 
         ! Dellocating the primitive and conservative variables
-        do i = 1, sys_size
+        do i = 1, eqn_idx%sys_size
             deallocate (q_prim_vf(i)%sf)
             deallocate (q_cons_vf(i)%sf)
         end do

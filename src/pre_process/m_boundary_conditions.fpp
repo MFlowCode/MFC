@@ -232,7 +232,7 @@ contains
 
     impure subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
         integer :: i
 
@@ -266,7 +266,7 @@ contains
 
     impure subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
 
         character(LEN=*), intent(in) :: step_dirpath
@@ -306,7 +306,7 @@ contains
 
     impure subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
 
         integer :: dir, loc
@@ -366,12 +366,12 @@ contains
 
     impure subroutine s_pack_boundary_condition_buffers(q_prim_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(eqn_idx%sys_size), intent(in) :: q_prim_vf
         integer :: i, j, k
 
         do k = 0, p
             do j = 0, n
-                do i = 1, sys_size
+                do i = 1, eqn_idx%sys_size
                     bc_buffers(1, -1)%sf(i, j, k) = q_prim_vf(i)%sf(0, j, k)
                     bc_buffers(1, 1)%sf(i, j, k) = q_prim_vf(i)%sf(m, j, k)
                 end do
@@ -380,7 +380,7 @@ contains
 
         if (n > 0) then
             do k = 0, p
-                do j = 1, sys_size
+                do j = 1, eqn_idx%sys_size
                     do i = 0, m
                         bc_buffers(2, -1)%sf(i, j, k) = q_prim_vf(j)%sf(i, 0, k)
                         bc_buffers(2, 1)%sf(i, j, k) = q_prim_vf(j)%sf(i, n, k)
@@ -389,7 +389,7 @@ contains
             end do
 
             if (p > 0) then
-                do k = 1, sys_size
+                do k = 1, eqn_idx%sys_size
                     do j = 0, n
                         do i = 0, m
                             bc_buffers(3, -1)%sf(i, j, k) = q_prim_vf(k)%sf(i, j, 0)
