@@ -100,6 +100,8 @@ PRE_PROCESS.update({
     'elliptic_smoothing_iters': ParamType.INT,
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
+    'lag_params%vel_model': ParamType.INT,
+    'fd_order': ParamType.INT,
 })
 
 for ib_id in range(1, 10+1):

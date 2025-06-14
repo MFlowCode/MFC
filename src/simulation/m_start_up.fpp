@@ -1338,8 +1338,8 @@ contains
 
         call s_initialize_cbc_module()
         call s_initialize_derived_variables()
-        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
 
+        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
 

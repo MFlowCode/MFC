@@ -128,7 +128,7 @@ contains
             s_coord(1:3) = lbk_s(l, 1:3, 2)
             center(1:2) = lbk_pos(l, 1:2, 2)
             if (p > 0) center(3) = lbk_pos(l, 3, 2)
-            cell = -buff_size
+            cell = fd_number - buff_size
             call s_get_cell(s_coord, cell)
             !print*, s_coord
             call s_compute_stddsv(cell, volpart, stddsv)
@@ -283,27 +283,27 @@ contains
         celloutside = .false.
 
         if (num_dims == 2) then
-            if ((cellaux(1) < -buff_size) .or. &
-                (cellaux(2) < -buff_size)) then
+            if ((cellaux(1) < fd_number - buff_size) .or. &
+                (cellaux(2) < fd_number - buff_size)) then
                 celloutside = .true.
             end if
             if (cyl_coord .and. cellaux(2) < 0) then
                 celloutside = .true.
             end if
-            if ((cellaux(2) > n + buff_size) .or. &
-                (cellaux(1) > m + buff_size)) then
+            if ((cellaux(2) > n + buff_size - fd_number) .or. &
+                (cellaux(1) > m + buff_size - fd_number)) then
                 celloutside = .true.
             end if
         else
-            if ((cellaux(3) < -buff_size) .or. &
-                (cellaux(1) < -buff_size) .or. &
-                (cellaux(2) < -buff_size)) then
+            if ((cellaux(3) < fd_number - buff_size) .or. &
+                (cellaux(1) < fd_number - buff_size) .or. &
+                (cellaux(2) < fd_number - buff_size)) then
                 celloutside = .true.
             end if
 
-            if ((cellaux(3) > p + buff_size) .or. &
-                (cellaux(2) > n + buff_size) .or. &
-                (cellaux(1) > m + buff_size)) then
+            if ((cellaux(3) > p + buff_size - fd_number) .or. &
+                (cellaux(2) > n + buff_size - fd_number) .or. &
+                (cellaux(1) > m + buff_size - fd_number)) then
                 celloutside = .true.
             end if
         end if
@@ -478,10 +478,10 @@ contains
 
     end function f_interpolate_velocity
 
-    function f_get_acceleration(pos,rad,vel,mg,mv,Re,rho,cell,i,q_prim_vf) result(a)
+    function f_get_acceleration(pos,rad,vel,mg,mv,Re,rho,cell,i,id,q_prim_vf) result(a)
 !$acc routine seq
         integer, dimension(3) :: cell
-        integer :: i
+        integer :: i, id
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         real(wp) :: a, vol, mass, force, vel, area
         real(wp) :: pos, rad, dp, v_rel, mg, mv, Re, rho, c_d
@@ -500,6 +500,15 @@ contains
                   (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
         end if
 
+        !if (i == 1 .and. id == 2) then
+            !print*, "c", proc_rank, dp, &
+                !q_prim_vf(E_idx)%sf(cell(1) - 1, cell(2), cell(3)), &
+                !q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)), &
+                !q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3)), &
+                !pos, x_cc(cell(1) + 1), x_cc(cell(1) - 1), cell
+            !call sleep(1)
+        !end if
+
         vol = (4._wp/3._wp) * pi * rad**3._wp
         force = -1._wp * vol * dp
 
@@ -517,6 +526,11 @@ contains
 
         a = force / (mg + mv)
 
+        !if (i == 1 .and. id == 2) then
+            !print*, "d", proc_rank, vol, force, v_rel, vel, v_rel - vel, a, mg, mv
+            !call sleep(1)
+        !end if
+
     end function f_get_acceleration
 
     function f_get_clift_gauvin_drag_coeff(v_rel, mu_inv, rho, rad) result(c_d)
@@ -528,7 +542,7 @@ contains
         Re_b = max(2._wp * rho * abs(v_rel) * rad * mu_inv, Re_b_min)
 
         C_d = 24._wp * (1 + 0.15_wp * Re_b ** (0.687_wp)) / Re_b
-        !C_d = C_d + 0.42_wp / (1 + (42500 / (Re_b ** 1.16_wp)))
+        C_d = C_d + 0.42_wp / (1 + (42500 / (Re_b ** 1.16_wp)))
 
     end function f_get_clift_gauvin_drag_coeff
 

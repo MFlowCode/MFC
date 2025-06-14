@@ -1185,10 +1185,14 @@ contains
             fd_number = max(1, fd_order/2)
         end if
 
+        if (bubbles_lagrange) then
+            fd_number = max(1, fd_order/2)
+        end if
+
         call s_configure_coordinate_bounds(weno_polyn, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
-                                           num_dims)
+                                           num_dims, fd_number)
         !$acc update device(idwint, idwbuff)
 
         ! Configuring Coordinate Direction Indexes

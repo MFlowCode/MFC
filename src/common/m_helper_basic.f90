@@ -76,9 +76,10 @@ contains
     end function f_is_integer
 
     subroutine s_configure_coordinate_bounds(weno_polyn, buff_size, idwint, idwbuff, &
-                                             viscous, bubbles_lagrange, m, n, p, num_dims)
+                                             viscous, bubbles_lagrange, m, n, p, &
+                                             num_dims, fd_number)
 
-        integer, intent(in) :: weno_polyn, m, n, p, num_dims
+        integer, intent(in) :: weno_polyn, m, n, p, num_dims, fd_number
         integer, intent(inout) :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
         logical, intent(in) :: viscous, bubbles_lagrange
@@ -95,7 +96,7 @@ contains
 
         ! Correction for smearing function in the lagrangian subgrid bubble model
         if (bubbles_lagrange) then
-            buff_size = max(buff_size, 6)
+            buff_size = max(buff_size + fd_number, 6 + fd_number)
         end if
 
         ! Configuring Coordinate Direction Indexes

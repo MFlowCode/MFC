@@ -149,7 +149,7 @@ contains
             n_start_old, surface_tension, hyperelasticity, pre_stress, &
             elliptic_smoothing, elliptic_smoothing_iters, &
             viscous, bubbles_lagrange, bc_x, bc_y, bc_z, num_bc_patches, &
-            patch_bc, Bx0, relativity, cont_damage
+            patch_bc, Bx0, relativity, cont_damage, fd_order, lag_params
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
