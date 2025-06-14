@@ -37,9 +37,9 @@ module m_hypoelastic
 
 contains
 
-    subroutine s_initialize_hypoelastic_module
+    impure subroutine s_initialize_hypoelastic_module
 
-        integer :: i, k, r
+        integer :: i
 
         @:ALLOCATE(Gs(1:num_fluids))
         @:ALLOCATE(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
@@ -370,7 +370,7 @@ contains
 
     end subroutine s_compute_hypoelastic_rhs
 
-    subroutine s_finalize_hypoelastic_module()
+    impure subroutine s_finalize_hypoelastic_module()
 
         @:DEALLOCATE(Gs)
         @:DEALLOCATE(rho_K_field, G_K_field)
@@ -387,7 +387,7 @@ contains
 
     end subroutine s_finalize_hypoelastic_module
 
-    subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
+    pure subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
@@ -399,7 +399,7 @@ contains
 
         if (n == 0) then
             l = 0; q = 0
-            !$acc parallel loop collapse(1) gang vector default(present)
+            !$acc parallel loop gang vector default(present)
             do k = 0, m
                 rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_star, 0._wp))**cont_damage_s
             end do

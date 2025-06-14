@@ -54,7 +54,7 @@ module m_data_output
     real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     real(wp), public, allocatable, dimension(:, :) :: c_mass
-    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf, c_mass)
 
     real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
@@ -76,7 +76,7 @@ contains
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
-    subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
+    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -97,7 +97,7 @@ contains
         if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
         else
-            call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta)
+            call s_write_parallel_data_files(q_cons_vf, t_step, beta)
         end if
 
     end subroutine s_write_data_files
@@ -108,7 +108,7 @@ contains
         !!      In general, this requires generating a table header for
         !!      those stability criteria which will be written at every
         !!      time-step.
-    subroutine s_open_run_time_information_file
+    impure subroutine s_open_run_time_information_file
 
         character(LEN=name_len), parameter :: file_name = 'run_time.inf' !<
             !! Name of the run-time information file
@@ -149,18 +149,18 @@ contains
         ! Generating table header for the stability criteria to be outputted
         if (cfl_dt) then
             if (viscous) then
-                write (1, '(A)') '     Time-steps        dt     = Time         ICFL '// &
+                write (3, '(A)') '     Time-steps        dt     = Time         ICFL '// &
                     'Max      VCFL Max        Rc Min       ='
             else
-                write (1, '(A)') '            Time-steps                dt       Time '// &
+                write (3, '(A)') '            Time-steps                dt       Time '// &
                     '               ICFL Max              '
             end if
         else
             if (viscous) then
-                write (1, '(A)') '     Time-steps        Time         ICFL '// &
+                write (3, '(A)') '     Time-steps        Time         ICFL '// &
                     'Max      VCFL Max        Rc Min        '
             else
-                write (1, '(A)') '            Time-steps                Time '// &
+                write (3, '(A)') '            Time-steps                Time '// &
                     '               ICFL Max              '
             end if
         end if
@@ -169,7 +169,7 @@ contains
 
     !>  This opens a formatted data file where the root processor
         !!      can write out the CoM information
-    subroutine s_open_com_files()
+    impure subroutine s_open_com_files()
 
         character(len=path_len + 3*name_len) :: file_path !<
             !! Relative path to the CoM file in the case directory
@@ -209,7 +209,7 @@ contains
 
     !>  This opens a formatted data file where the root processor
         !!      can write out flow probe information
-    subroutine s_open_probe_files
+    impure subroutine s_open_probe_files
 
         character(LEN=path_len + 3*name_len) :: file_path !<
             !! Relative path to the probe data file in the case directory
@@ -259,7 +259,7 @@ contains
         !!      these stability criteria extrema over all time-steps.
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time step
-    subroutine s_write_run_time_information(q_prim_vf, t_step)
+    impure subroutine s_write_run_time_information(q_prim_vf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: t_step
@@ -330,11 +330,9 @@ contains
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
                                                          vcfl_max_loc, &
-                                                         ccfl_max_loc, &
                                                          Rc_min_loc, &
                                                          icfl_max_glb, &
                                                          vcfl_max_glb, &
-                                                         ccfl_max_glb, &
                                                          Rc_min_glb)
         else
             icfl_max_glb = icfl_max_loc
@@ -353,12 +351,12 @@ contains
         ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
             if (viscous) then
-                write (1, '(6X,I8,F10.6,6X,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
+                write (3, '(6X,I8,F10.6,6X,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
                     t_step, dt, t_step*dt, icfl_max_glb, &
                     vcfl_max_glb, &
                     Rc_min_glb
             else
-                write (1, '(13X,I8,14X,F10.6,14X,F10.6,13X,F9.6)') &
+                write (3, '(13X,I8,14X,F10.6,14X,F10.6,13X,F9.6)') &
                     t_step, dt, t_step*dt, icfl_max_glb
             end if
 
@@ -388,7 +386,7 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
+    impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
@@ -783,13 +781,11 @@ contains
     !>  The goal of this subroutine is to output the grid and
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
-        !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
         !!  @param beta Eulerian void fraction from lagrangian bubbles
-    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
 
@@ -990,11 +986,11 @@ contains
     !!  @param t_step Current time-step
     !!  @param q_com Center of mass information
     !!  @param moments Higher moment information
-    subroutine s_write_com_files(t_step, c_mass)
+    impure subroutine s_write_com_files(t_step, c_mass)
 
         integer, intent(in) :: t_step
         real(wp), dimension(num_fluids, 5), intent(in) :: c_mass
-        integer :: i, j !< Generic loop iterator
+        integer :: i !< Generic loop iterator
         real(wp) :: nondim_time !< Non-dimensional time
 
         ! Non-dimensional time calculation
@@ -1041,7 +1037,7 @@ contains
         !!  @param t_step Current time-step
         !!  @param q_cons_vf Conservative variables
         !!  @param accel_mag Acceleration magnitude information
-    subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
+    impure subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
 
         integer, intent(in) :: t_step
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -1707,7 +1703,7 @@ contains
         !!      the current computation and to close the file when done.
         !!      The footer contains the stability criteria extrema over
         !!      all of the time-steps and the simulation run-time.
-    subroutine s_close_run_time_information_file
+    impure subroutine s_close_run_time_information_file
 
         real(wp) :: run_time !< Run-time of the simulation
 
@@ -1729,7 +1725,7 @@ contains
     end subroutine s_close_run_time_information_file
 
     !> Closes communication files
-    subroutine s_close_com_files()
+    impure subroutine s_close_com_files()
 
         integer :: i !< Generic loop iterator
         do i = 1, num_fluids
@@ -1739,7 +1735,7 @@ contains
     end subroutine s_close_com_files
 
     !> Closes probe files
-    subroutine s_close_probe_files
+    impure subroutine s_close_probe_files
 
         integer :: i !< Generic loop iterator
 
@@ -1752,7 +1748,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_data_output_module
+    impure subroutine s_initialize_data_output_module
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
@@ -1773,7 +1769,7 @@ contains
     end subroutine s_initialize_data_output_module
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_data_output_module
+    impure subroutine s_finalize_data_output_module
 
         if (probe_wrt) then
             @:DEALLOCATE(c_mass)

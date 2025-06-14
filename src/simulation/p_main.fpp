@@ -76,20 +76,19 @@ program p_main
 
         if (cfl_dt) then
             if (mytime >= t_stop) then
-                call s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, &
-                                                io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+                call s_save_performance_metrics(time_avg, time_final, io_time_avg, &
+                                                io_time_final, proc_time, io_proc_time, file_exists)
                 exit
             end if
         else
             if (t_step == t_step_stop) then
-                call s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, &
-                                                io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+                call s_save_performance_metrics(time_avg, time_final, io_time_avg, &
+                                                io_time_final, proc_time, io_proc_time, file_exists)
                 exit
             end if
         end if
 
-        call s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, &
-                                 proc_time, io_proc_time, file_exists, start, finish, nt)
+        call s_perform_time_step(t_step, time_avg)
 
         if (cfl_dt) then
             if (abs(mod(mytime, t_save)) < dt .or. mytime >= t_stop) then

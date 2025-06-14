@@ -38,13 +38,21 @@ cd "${MFC_ROOT_DIR}"
 cd - > /dev/null
 echo
 
-export MPICH_GPU_SUPPORT_ENABLED=1
+% if gpu:
+    export MPICH_GPU_SUPPORT_ENABLED=1
+% else:
+    export MPICH_GPU_SUPPORT_ENABLED=0
+% endif
 
 % for target in targets:
     ${helpers.run_prologue(target)}
 
     % if not mpi:
-        (set -x; ${profiler} "${target.get_install_binpath(case)}")
+        (set -x; \
+            % if target.name == 'simulation':
+            ${profiler} \
+        % endif
+            "${target.get_install_binpath(case)}")
     % else:
         (set -x; srun \
         % if engine == 'interactive':
@@ -54,7 +62,10 @@ export MPICH_GPU_SUPPORT_ENABLED=1
                 --gpus-per-task 1 --gpu-bind closest                 \
             % endif
         % endif
-                ${profiler} "${target.get_install_binpath(case)}")
+        % if target.name == 'simulation':
+                ${profiler} \
+        % endif
+                "${target.get_install_binpath(case)}")
     % endif
 
     ${helpers.run_epilogue(target)}

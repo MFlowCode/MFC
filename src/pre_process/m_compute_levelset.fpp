@@ -23,19 +23,9 @@ module m_compute_levelset
  s_cuboid_levelset, &
  s_sphere_levelset
 
-    real(wp) :: x_centroid, y_centroid, z_centroid
-    real(wp) :: length_x, length_y, length_z
-    real(wp) :: radius
-
-    type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
-        !! These variables combine the centroid and length parameters associated with
-        !! a particular patch to yield the locations of the patch boundaries in the
-        !! x-, y- and z-coordinate directions. They are used as a means to concisely
-        !! perform the actions necessary to lay out a particular patch on the grid.
-
 contains
 
-    subroutine s_circle_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_circle_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -71,13 +61,13 @@ contains
 
     end subroutine s_circle_levelset
 
-    subroutine s_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
         integer, intent(IN) :: ib_patch_id
 
-        real(wp) :: radius, dist, global_dist
+        real(wp) :: dist, global_dist
         integer :: global_id
         real(wp) :: x_centroid, y_centroid, x_act, y_act, theta
         real(wp), dimension(3) :: dist_vec
@@ -154,16 +144,18 @@ contains
 
     end subroutine s_airfoil_levelset
 
-    subroutine s_3D_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_3D_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
         integer, intent(IN) :: ib_patch_id
 
-        real(wp) :: radius, dist, dist_surf, dist_side, global_dist
+        real(wp) :: dist, dist_surf, dist_side, global_dist
         integer :: global_id
         real(wp) :: x_centroid, y_centroid, z_centroid, lz, z_max, z_min, x_act, y_act, theta
         real(wp), dimension(3) :: dist_vec
+
+        real(wp) :: length_z
 
         integer :: i, j, k, l !< Loop index variables
 
@@ -256,7 +248,7 @@ contains
     end subroutine s_3D_airfoil_levelset
 
     !>  Initialize IBM module
-    subroutine s_rectangle_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_rectangle_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -265,6 +257,9 @@ contains
         real(wp) :: top_right(2), bottom_left(2)
         real(wp) :: x, y, min_dist
         real(wp) :: side_dists(4)
+
+        real(wp) :: x_centroid, y_centroid
+        real(wp) :: length_x, length_y
 
         integer :: i, j, k !< Loop index variables
         integer :: idx !< Shortest path direction indicator
@@ -350,7 +345,7 @@ contains
 
     end subroutine s_rectangle_levelset
 
-    subroutine s_cuboid_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_cuboid_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -359,6 +354,9 @@ contains
         real(wp) :: Right, Left, Bottom, Top, Front, Back
         real(wp) :: x, y, z, min_dist
         real(wp) :: side_dists(6)
+
+        real(wp) :: x_centroid, y_centroid, z_centroid
+        real(wp) :: length_x, length_y, length_z
 
         integer :: i, j, k !< Loop index variables
 
@@ -464,7 +462,7 @@ contains
 
     end subroutine s_cuboid_levelset
 
-    subroutine s_sphere_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_sphere_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -501,16 +499,16 @@ contains
 
     end subroutine s_sphere_levelset
 
-    subroutine s_cylinder_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_cylinder_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
         integer, intent(IN) :: ib_patch_id
 
-        real(wp) :: radius, dist
+        real(wp) :: radius
         real(wp) :: x_centroid, y_centroid, z_centroid
         real(wp) :: length_x, length_y, length_z
-        real(wp), dimension(3) :: pos_vec, centroid_vec, dist_vec, dist_sides_vec, dist_surface_vec
+        real(wp), dimension(3) :: pos_vec, centroid_vec, dist_sides_vec, dist_surface_vec
         real(wp) :: dist_side, dist_surface, side_pos
         type(bounds_info) :: boundary
         integer :: i, j, k !< Loop index variables

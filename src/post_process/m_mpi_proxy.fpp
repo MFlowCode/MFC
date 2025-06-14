@@ -40,7 +40,7 @@ contains
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_mpi_proxy_module
+    impure subroutine s_initialize_mpi_proxy_module
 
 #ifdef MFC_MPI
 
@@ -81,7 +81,7 @@ contains
         !!      these are not available to the remaining processors. This
         !!      subroutine is then in charge of broadcasting the required
         !!      information.
-    subroutine s_mpi_bcast_user_inputs
+    impure subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
         integer :: i !< Generic loop iterator
@@ -102,7 +102,7 @@ contains
             & 'alt_soundspeed', 'hypoelasticity', 'mhd', 'parallel_io',        &
             & 'rho_wrt', 'E_wrt', 'pres_wrt', 'gamma_wrt', 'sim_data',         &
             & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', &
-            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt',              &
+            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt','chem_wrt_T', &
             & 'bubbles_euler', 'qbmm', 'polytropic', 'polydisperse',           &
             & 'file_per_process', 'relax', 'cf_wrt',                           &
             & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',          &
@@ -144,7 +144,7 @@ contains
         !!  @param spatial_extents Spatial extents for each processor's sub-domain. First dimension
         !!  corresponds to the minimum and maximum values, respectively, while
         !!  the second dimension corresponds to the processor rank.
-    subroutine s_mpi_gather_spatial_extents(spatial_extents)
+    impure subroutine s_mpi_gather_spatial_extents(spatial_extents)
 
         real(wp), dimension(1:, 0:), intent(INOUT) :: spatial_extents
 
@@ -263,7 +263,7 @@ contains
         !!      puts back together the grid of the entire computational
         !!      domain on the rank 0 processor. This is only done for 1D
         !!      simulations.
-    subroutine s_mpi_defragment_1d_grid_variable
+    impure subroutine s_mpi_defragment_1d_grid_variable
 
 #ifdef MFC_MPI
 
@@ -299,7 +299,7 @@ contains
         !!   First dimension of array corresponds to the former's minimum and
         !!  maximum values, respectively, while second dimension corresponds
         !!  to each processor's rank.
-    subroutine s_mpi_gather_data_extents(q_sf, data_extents)
+    impure subroutine s_mpi_gather_data_extents(q_sf, data_extents)
 
         real(wp), dimension(:, :, :), intent(in) :: q_sf
         real(wp), dimension(1:2, 0:num_procs - 1), intent(inout) :: data_extents
@@ -326,7 +326,7 @@ contains
         !!      This is only done for 1D simulations.
         !!  @param q_sf Flow variable defined on a single computational sub-domain
         !!  @param q_root_sf Flow variable defined on the entire computational domain
-    subroutine s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
+    impure subroutine s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
 
         real(wp), dimension(0:m), intent(in) :: q_sf
         real(wp), dimension(0:m), intent(inout) :: q_root_sf
@@ -345,7 +345,7 @@ contains
     end subroutine s_mpi_defragment_1d_flow_variable
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_mpi_proxy_module
+    impure subroutine s_finalize_mpi_proxy_module
 
 #ifdef MFC_MPI
 

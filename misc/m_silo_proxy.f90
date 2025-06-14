@@ -44,7 +44,7 @@ contains
 
     !> @brief  Refer to page 28 of Silo's user guide (10/2007, v4.6) for
                 !!                           information about this subroutine
-    function DBCREATE(pathname, lpathname, mode, target, &
+   impure  function DBCREATE(pathname, lpathname, mode, target, &
                       fileinfo, lfileinfo, filetype, status)
 
         integer                                                   :: DBCREATE
@@ -66,7 +66,7 @@ contains
 
     !> @brief  Refer to page 235 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBGET2DSTRLEN()
+    impure function DBGET2DSTRLEN()
 
         integer :: DBGET2DSTRLEN
 
@@ -79,7 +79,7 @@ contains
 
     !> @brief  Refer to page 234 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBSET2DSTRLEN(len)
+    impure function DBSET2DSTRLEN(len)
 
         integer                                :: DBSET2DSTRLEN
         integer, intent(IN) :: len
@@ -93,7 +93,7 @@ contains
 
     !> @brief  Refer to page 185 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBMKOPTLIST(maxopts, optlist_id)
+    impure function DBMKOPTLIST(maxopts, optlist_id)
 
         integer                                :: DBMKOPTLIST
         integer, intent(IN) :: maxopts
@@ -107,7 +107,7 @@ contains
 
     !> @brief  Refer to page 186 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBADDIOPT(optlist_id, option, ivalue)
+    impure function DBADDIOPT(optlist_id, option, ivalue)
 
         integer                                :: DBADDIOPT
         integer, intent(IN) :: optlist_id
@@ -123,7 +123,7 @@ contains
 
     !> @brief  Refer to page 186 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBADDDOPT(optlist_id, option, dvalue)
+    impure function DBADDDOPT(optlist_id, option, dvalue)
 
         integer                                                                :: DBADDDOPT
         integer, intent(IN) :: optlist_id
@@ -139,7 +139,7 @@ contains
 
     !> @brief  Refer to page 121 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBPUTMMESH(dbid, name, lname, nmesh, meshnames, &
+    impure function DBPUTMMESH(dbid, name, lname, nmesh, meshnames, &
                         lmeshnames, meshtypes, optlist_id, status)
 
         integer                                                                                 :: DBPUTMMESH
@@ -162,7 +162,7 @@ contains
 
     !> @brief  Refer to page 189 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBFREEOPTLIST(optlist_id)
+    impure function DBFREEOPTLIST(optlist_id)
 
         integer                                :: DBFREEOPTLIST
         integer, intent(IN) :: optlist_id
@@ -175,7 +175,7 @@ contains
 
     !> @brief  Refer to page 57 of Silo's user guide (10/2007, v4.6) for
                 !!                           information about this subroutine
-    function DBPUTQM(dbid, name, lname, xname, lxname, yname, lyname, &
+    impure function DBPUTQM(dbid, name, lname, xname, lxname, yname, lyname, &
                      zname, lzname, x, y, z, dims, ndims, datatype, &
                      coordtype, optlist_id, status)
 
@@ -208,7 +208,7 @@ contains
 
     !> @brief  Refer to page 46 of Silo's user guide (10/2007, v4.6) for
                 !!                           information about this subroutine
-    function DBPUTCURVE(dbid, curvename, lcurvename, xvals, yvals, &
+    impure function DBPUTCURVE(dbid, curvename, lcurvename, xvals, yvals, &
                         datatype, npoints, optlist_id, status)
 
         integer                                                                                 :: DBPUTCURVE
@@ -231,7 +231,7 @@ contains
 
     !> @brief  Refer to page 130 of Silo's user guide (10/2007, v4.6)
                 !!                           for information about this subroutine
-    function DBPUTMVAR(dbid, name, lname, nvar, varnames, lvarnames, &
+    impure function DBPUTMVAR(dbid, name, lname, nvar, varnames, lvarnames, &
                        vartypes, optlist_id, status)
 
         integer                                                                                 :: DBPUTMVAR
@@ -254,7 +254,7 @@ contains
 
     !> @brief  Refer to page 64 of Silo's user guide (10/2007, v4.6) for
                 !!                           information about this subroutine
-    function DBPUTQV1(dbid, name, lname, meshname, lmeshname, var, &
+    impure function DBPUTQV1(dbid, name, lname, meshname, lmeshname, var, &
                       dims, ndims, mixvar, mixlen, datatype, &
                       centering, optlist_id, status)
 
@@ -283,7 +283,7 @@ contains
 
     !> @brief  Refer to page 31 of Silo's user guide (10/2007, v4.6) for
                 !!                           information about this subroutine
-    function DBCLOSE(dbid)
+    impure function DBCLOSE(dbid)
 
         integer                                :: DBCLOSE
         integer, intent(IN) :: dbid

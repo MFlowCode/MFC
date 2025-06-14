@@ -332,7 +332,7 @@ contains
     !> Assigns default values to user inputs prior to reading
         !!      them in. This allows for an easier consistency check of
         !!      these parameters once they are read from the input file.
-    subroutine s_assign_default_values_to_user_inputs
+    impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i !< Generic loop iterator
 
@@ -473,7 +473,7 @@ contains
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_global_parameters_module
+    impure subroutine s_initialize_global_parameters_module
 
         integer :: i, j, fac
 
@@ -891,7 +891,7 @@ contains
     end subroutine s_initialize_global_parameters_module
 
     !> Subroutine to initialize parallel infrastructure
-    subroutine s_initialize_parallel_io
+    impure subroutine s_initialize_parallel_io
 
         num_dims = 1 + min(1, n) + min(1, p)
 
@@ -925,7 +925,7 @@ contains
     end subroutine s_initialize_parallel_io
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_global_parameters_module
+    impure subroutine s_finalize_global_parameters_module
 
         integer :: i
 
