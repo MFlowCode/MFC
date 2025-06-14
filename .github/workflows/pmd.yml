@@ -1,10 +1,10 @@
-name: PMD
+name: Source DRYness
 
 on: [push, pull_request, workflow_dispatch]
 
 jobs:    
   pmd:
-      name: PMD Analysis
+      name: PMD
       runs-on: "ubuntu-latest"
       env:
           pr_everything: 0
@@ -33,5 +33,4 @@ jobs:
               "${PMD_HOME}/bin/pmd" cpd \
                 --dir src \
                 --language fortran \
-                --minimum-tokens=10 \
-                --fail-on-violation false 
+                --minimum-tokens=40
