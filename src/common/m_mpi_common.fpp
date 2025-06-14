@@ -1077,7 +1077,7 @@ contains
             !! Remaining number of cells, in a particular coordinate direction,
             !! after the majority is divided up among the available processors
 
-        integer :: i, j !< Generic loop iterators
+        integer :: i, j, k !< Generic loop iterators
 
         integer, dimension(1:num_dims) :: neighbor_coords
 
