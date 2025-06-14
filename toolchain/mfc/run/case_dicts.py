@@ -60,6 +60,7 @@ COMMON = {
     'Bx0': ParamType.REAL,
     'relativity': ParamType.LOG,
     'cont_damage': ParamType.LOG,
+    'num_bc_patches': ParamType.INT,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -99,7 +100,6 @@ PRE_PROCESS.update({
     'surface_tension': ParamType.LOG,
     'elliptic_smoothing': ParamType.LOG,
     'elliptic_smoothing_iters': ParamType.INT,
-    'num_bc_patches': ParamType.INT,
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
 })
