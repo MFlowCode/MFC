@@ -52,7 +52,7 @@ contains
     !>  Reads the configuration file post_process.inp, in order
         !!      to populate parameters in module m_global_parameters.f90
         !!      with the user provided inputs
-    subroutine s_read_input_file
+    impure subroutine s_read_input_file
 
         character(LEN=name_len) :: file_loc !<
             !! Generic string used to store the address of a particular file
@@ -135,7 +135,7 @@ contains
         !!      individual choices are compatible with the code's options
         !!      and that the combination of these choices results into a
         !!      valid configuration for the post-process
-    subroutine s_check_input_file
+    impure subroutine s_check_input_file
 
         character(LEN=len_trim(case_dir)) :: file_loc !<
             !! Generic string used to store the address of a particular file
@@ -161,7 +161,7 @@ contains
 
     end subroutine s_check_input_file
 
-    subroutine s_perform_time_step(t_step)
+    impure subroutine s_perform_time_step(t_step)
 
         integer, intent(inout) :: t_step
         if (proc_rank == 0) then
@@ -194,7 +194,7 @@ contains
 
     end subroutine s_perform_time_step
 
-    subroutine s_save_data(t_step, varname, pres, c, H)
+    impure subroutine s_save_data(t_step, varname, pres, c, H)
 
         integer, intent(inout) :: t_step
         character(LEN=name_len), intent(inout) :: varname
@@ -676,11 +676,13 @@ contains
 
     end subroutine s_save_data
 
-    subroutine s_initialize_modules
+    impure subroutine s_initialize_modules
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
-        if (bubbles_euler .and. nb > 1) call s_simpson
+        if (bubbles_euler .and. nb > 1) then
+            call s_simpson(weight, R0)
+        end if
         if (bubbles_euler .and. .not. polytropic) then
             call s_initialize_nonpoly()
         end if
@@ -702,7 +704,7 @@ contains
         end if
     end subroutine s_initialize_modules
 
-    subroutine s_initialize_mpi_domain
+    impure subroutine s_initialize_mpi_domain
         ! Initialization of the MPI environment
         call s_mpi_initialize()
 
@@ -727,7 +729,7 @@ contains
 
     end subroutine s_initialize_mpi_domain
 
-    subroutine s_finalize_modules
+    impure subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
 

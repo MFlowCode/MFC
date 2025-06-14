@@ -55,7 +55,7 @@ module m_boundary_common
 
 contains
 
-    subroutine s_initialize_boundary_common_module()
+    impure subroutine s_initialize_boundary_common_module()
 
         @:ALLOCATE(bc_buffers(1:num_dims, -1:1))
 
@@ -80,13 +80,12 @@ contains
     !>  The purpose of this procedure is to populate the buffers
     !!      of the primitive variables, depending on the selected
     !!      boundary conditions.
-    subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb, mv)
+    impure subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb, mv)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
-        integer :: bc_loc, bc_dir
         integer :: k, l
 
         ! Population of Buffers in x-direction
@@ -98,18 +97,23 @@ contains
                 do k = 0, n
                     select case (int(bc_type(1, -1)%sf(0, k, l)))
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                        call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, -1, k, l)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 1, -1, k, l)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, pb, mv, 1, -1, k, l)
+                        call s_symmetry(q_prim_vf, 1, -1, k, l, pb, mv)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, pb, mv, 1, -1, k, l)
+                        call s_periodic(q_prim_vf, 1, -1, k, l, pb, mv)
                     case (BC_SLIP_WALL)
-                        call s_slip_wall(q_prim_vf, pb, mv, 1, -1, k, l)
+                        call s_slip_wall(q_prim_vf, 1, -1, k, l)
                     case (BC_NO_SLIP_WALL)
-                        call s_no_slip_wall(q_prim_vf, pb, mv, 1, -1, k, l)
+                        call s_no_slip_wall(q_prim_vf, 1, -1, k, l)
                     case (BC_DIRICHLET)
-                        call s_dirichlet(q_prim_vf, pb, mv, 1, -1, k, l)
+                        call s_dirichlet(q_prim_vf, 1, -1, k, l)
                     end select
+
+                    if (qbmm .and. (.not. polytropic) .and. &
+                        (bc_type(1, -1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                        call s_qbmm_extrapolation(1, -1, k, l, pb, mv)
+                    end if
                 end do
             end do
         end if
@@ -122,18 +126,23 @@ contains
                 do k = 0, n
                     select case (int(bc_type(1, 1)%sf(0, k, l)))
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP) ! Ghost-cell extrap. BC at end
-                        call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, 1, k, l)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 1, 1, k, l)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, pb, mv, 1, 1, k, l)
+                        call s_symmetry(q_prim_vf, 1, 1, k, l, pb, mv)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, pb, mv, 1, 1, k, l)
+                        call s_periodic(q_prim_vf, 1, 1, k, l, pb, mv)
                     case (BC_SLIP_WALL)
-                        call s_slip_wall(q_prim_vf, pb, mv, 1, 1, k, l)
+                        call s_slip_wall(q_prim_vf, 1, 1, k, l)
                     case (BC_NO_SLIP_WALL)
-                        call s_no_slip_wall(q_prim_vf, pb, mv, 1, 1, k, l)
+                        call s_no_slip_wall(q_prim_vf, 1, 1, k, l)
                     case (BC_DIRICHLET)
-                        call s_dirichlet(q_prim_vf, pb, mv, 1, 1, k, l)
+                        call s_dirichlet(q_prim_vf, 1, 1, k, l)
                     end select
+
+                    if (qbmm .and. (.not. polytropic) .and. &
+                        (bc_type(1, 1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                        call s_qbmm_extrapolation(1, 1, k, l, pb, mv)
+                    end if
                 end do
             end do
         end if
@@ -150,20 +159,26 @@ contains
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(2, -1)%sf(k, 0, l)))
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                        call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, -1, k, l)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 2, -1, k, l)
                     case (BC_AXIS)
-                        call s_axis(q_prim_vf, pb, mv, 2, -1, k, l)
+                        call s_axis(q_prim_vf, pb, mv, k, l)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, pb, mv, 2, -1, k, l)
+                        call s_symmetry(q_prim_vf, 2, -1, k, l, pb, mv)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, pb, mv, 2, -1, k, l)
+                        call s_periodic(q_prim_vf, 2, -1, k, l, pb, mv)
                     case (BC_SLIP_WALL)
-                        call s_slip_wall(q_prim_vf, pb, mv, 2, -1, k, l)
+                        call s_slip_wall(q_prim_vf, 2, -1, k, l)
                     case (BC_NO_SLIP_WALL)
-                        call s_no_slip_wall(q_prim_vf, pb, mv, 2, -1, k, l)
+                        call s_no_slip_wall(q_prim_vf, 2, -1, k, l)
                     case (BC_DIRICHLET)
-                        call s_dirichlet(q_prim_vf, pb, mv, 2, -1, k, l)
+                        call s_dirichlet(q_prim_vf, 2, -1, k, l)
                     end select
+
+                    if (qbmm .and. (.not. polytropic) .and. &
+                        (bc_type(2, -1)%sf(k, 0, l) <= BC_GHOST_EXTRAP) .and. &
+                        (bc_type(2, -1)%sf(k, 0, l) /= BC_AXIS)) then
+                        call s_qbmm_extrapolation(2, -1, k, l, pb, mv)
+                    end if
                 end do
             end do
         end if
@@ -176,18 +191,23 @@ contains
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(2, 1)%sf(k, 0, l)))
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                        call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, 1, k, l)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 2, 1, k, l)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, pb, mv, 2, 1, k, l)
+                        call s_symmetry(q_prim_vf, 2, 1, k, l, pb, mv)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, pb, mv, 2, 1, k, l)
+                        call s_periodic(q_prim_vf, 2, 1, k, l, pb, mv)
                     case (BC_SLIP_WALL)
-                        call s_slip_wall(q_prim_vf, pb, mv, 2, 1, k, l)
+                        call s_slip_wall(q_prim_vf, 2, 1, k, l)
                     case (BC_NO_SLIP_WALL)
-                        call s_no_slip_wall(q_prim_vf, pb, mv, 2, 1, k, l)
+                        call s_no_slip_wall(q_prim_vf, 2, 1, k, l)
                     case (BC_DIRICHLET)
-                        call s_dirichlet(q_prim_vf, pb, mv, 2, 1, k, l)
+                        call s_dirichlet(q_prim_vf, 2, 1, k, l)
                     end select
+
+                    if (qbmm .and. (.not. polytropic) .and. &
+                        (bc_type(2, 1)%sf(k, 0, l) <= BC_GHOST_EXTRAP)) then
+                        call s_qbmm_extrapolation(2, 1, k, l, pb, mv)
+                    end if
                 end do
             end do
         end if
@@ -204,18 +224,23 @@ contains
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(3, -1)%sf(k, l, 0)))
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                        call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, -1, k, l)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 3, -1, k, l)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, pb, mv, 3, -1, k, l)
+                        call s_symmetry(q_prim_vf, 3, -1, k, l, pb, mv)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, pb, mv, 3, -1, k, l)
+                        call s_periodic(q_prim_vf, 3, -1, k, l, pb, mv)
                     case (BC_SLIP_WALL)
-                        call s_slip_wall(q_prim_vf, pb, mv, 3, -1, k, l)
+                        call s_slip_wall(q_prim_vf, 3, -1, k, l)
                     case (BC_NO_SLIP_WALL)
-                        call s_no_slip_wall(q_prim_vf, pb, mv, 3, -1, k, l)
+                        call s_no_slip_wall(q_prim_vf, 3, -1, k, l)
                     case (BC_DIRICHLET)
-                        call s_dirichlet(q_prim_vf, pb, mv, 3, -1, k, l)
+                        call s_dirichlet(q_prim_vf, 3, -1, k, l)
                     end select
+
+                    if (qbmm .and. (.not. polytropic) .and. &
+                        (bc_type(3, -1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
+                        call s_qbmm_extrapolation(3, -1, k, l, pb, mv)
+                    end if
                 end do
             end do
         end if
@@ -228,18 +253,23 @@ contains
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(3, 1)%sf(k, l, 0)))
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                        call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, 1, k, l)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 3, 1, k, l)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, pb, mv, 3, 1, k, l)
+                        call s_symmetry(q_prim_vf, 3, 1, k, l, pb, mv)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, pb, mv, 3, 1, k, l)
+                        call s_periodic(q_prim_vf, 3, 1, k, l, pb, mv)
                     case (BC_SlIP_WALL)
-                        call s_slip_wall(q_prim_vf, pb, mv, 3, 1, k, l)
+                        call s_slip_wall(q_prim_vf, 3, 1, k, l)
                     case (BC_NO_SLIP_WALL)
-                        call s_no_slip_wall(q_prim_vf, pb, mv, 3, 1, k, l)
+                        call s_no_slip_wall(q_prim_vf, 3, 1, k, l)
                     case (BC_DIRICHLET)
-                        call s_dirichlet(q_prim_vf, pb, mv, 3, 1, k, l)
+                        call s_dirichlet(q_prim_vf, 3, 1, k, l)
                     end select
+
+                    if (qbmm .and. (.not. polytropic) .and. &
+                        (bc_type(3, 1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
+                        call s_qbmm_extrapolation(3, 1, k, l, pb, mv)
+                    end if
                 end do
             end do
         end if
@@ -247,24 +277,17 @@ contains
 
     end subroutine s_populate_variables_buffers
 
-    subroutine s_ghost_cell_extrapolation(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
+    pure subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_ghost_cell_extrapolation
 #else
         !$acc routine seq
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, q, i
-
-#ifndef MFC_POST_PROCESS
-        if (qbmm .and. .not. polytropic) then
-            call s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc, k, l)
-        end if
-#endif
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
@@ -318,14 +341,10 @@ contains
 
     end subroutine s_ghost_cell_extrapolation
 
-    subroutine s_symmetry(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_symmetry
-#else
+    pure subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
         !$acc routine seq
-#endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
@@ -582,14 +601,10 @@ contains
 
     end subroutine s_symmetry
 
-    subroutine s_periodic(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_periodic
-#else
+    pure subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
         !$acc routine seq
-#endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
@@ -725,15 +740,10 @@ contains
 
     end subroutine s_periodic
 
-    subroutine s_axis(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_axis
-#else
+    pure subroutine s_axis(q_prim_vf, pb, mv, k, l)
         !$acc routine seq
-#endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
-        integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
         integer :: j, q, i
@@ -789,24 +799,17 @@ contains
 
     end subroutine s_axis
 
-    subroutine s_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
+    pure subroutine s_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_slip_wall
 #else
         !$acc routine seq
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, q, i
-
-#ifndef MFC_POST_PROCESS
-        if (qbmm .and. .not. polytropic) then
-            call s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc, k, l)
-        end if
-#endif
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !< bc_x%beg
@@ -890,24 +893,17 @@ contains
 
     end subroutine s_slip_wall
 
-    subroutine s_no_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
+    pure subroutine s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_no_slip_wall
 #else
         !$acc routine seq
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, q, i
-
-#ifndef MFC_POST_PROCESS
-        if (qbmm .and. .not. polytropic) then
-            call s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc, k, l)
-        end if
-#endif
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !< bc_x%beg
@@ -1027,18 +1023,17 @@ contains
 
     end subroutine s_no_slip_wall
 
-    subroutine s_dirichlet(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
+    pure subroutine s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_dirichlet
 #else
         !$acc routine seq
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, i, q
+        integer :: j, i
 
 #ifdef MFC_SIMULATION
         if (bc_dir == 1) then !< x-direction
@@ -1091,18 +1086,14 @@ contains
             end if
         end if
 #else
-        call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, bc_dir, bc_loc, k, l)
+        call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l)
 #endif
 
     end subroutine s_dirichlet
 
-    subroutine s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc, k, l)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_qbmm_extrapolation
-#else
+    pure subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb, mv)
         !$acc routine seq
-#endif
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
@@ -1172,12 +1163,12 @@ contains
 
     end subroutine s_qbmm_extrapolation
 
-    subroutine s_populate_capillary_buffers(c_divs, bc_type)
+    impure subroutine s_populate_capillary_buffers(c_divs, bc_type)
 
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
-        integer :: i, j, k, l
+        integer :: k, l
 
         !< x-direction
         if (bc_x%beg >= 0) then
@@ -1295,7 +1286,7 @@ contains
         end if
     end subroutine s_populate_capillary_buffers
 
-    subroutine s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)
+    pure subroutine s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_periodic
 #else
@@ -1305,7 +1296,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, i, q
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
@@ -1353,7 +1344,7 @@ contains
 
     end subroutine s_color_function_periodic
 
-    subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
+    pure subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_reflective
 #else
@@ -1363,7 +1354,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, i, q
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
@@ -1435,7 +1426,7 @@ contains
 
     end subroutine s_color_function_reflective
 
-    subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
+    pure subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_ghost_cell_extrapolation
 #else
@@ -1445,7 +1436,7 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
-        integer :: j, i, q
+        integer :: j, i
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
@@ -1654,14 +1645,14 @@ contains
 
     end subroutine s_populate_F_igr_buffers
 
-    subroutine s_create_mpi_types(bc_type)
+    impure subroutine s_create_mpi_types(bc_type)
 
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
 
 #ifdef MFC_MPI
         integer :: dir, loc
         integer, dimension(3) :: sf_start_idx, sf_extents_loc
-        integer :: ifile, ierr, data_size
+        integer :: ierr
 
         do dir = 1, num_dims
             do loc = -1, 1, 2

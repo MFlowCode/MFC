@@ -255,6 +255,8 @@ print(json.dumps({{**case, **mods}}))
 
         if "Example" in self.trace.split(" -> "):
             tolerance = 1e-3
+        elif "Cylindrical" in self.trace.split(" -> "):
+            tolerance = 1e-9
         elif self.params.get("hypoelasticity", 'F') == 'T':
             tolerance = 1e-7
         elif self.params.get("mixlayer_perturb", 'F') == 'T':

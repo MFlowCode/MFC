@@ -109,7 +109,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_weno_module
+    impure subroutine s_initialize_weno_module
 
         if (weno_order == 1) return
 
@@ -639,13 +639,12 @@ contains
     end subroutine s_compute_weno_coefficients
 
     subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
-                      norm_dir, weno_dir, &
+                      weno_dir, &
                       is1_weno_d, is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
-        integer, intent(in) :: norm_dir
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
 
@@ -668,12 +667,12 @@ contains
 
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
-                                   norm_dir, weno_dir)
+                                   weno_dir)
         end if
 
         if (weno_order == 1) then
             if (weno_dir == 1) then
-                !$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -686,7 +685,7 @@ contains
                 end do
                 !$acc end parallel loop
             else if (weno_dir == 2) then
-                !$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -699,7 +698,7 @@ contains
                 end do
                 !$acc end parallel loop
             else if (weno_dir == 3) then
-                !$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -1120,11 +1119,10 @@ contains
         !! @param is2_weno Index bounds in second coordinate direction
         !! @param is3_weno Index bounds in third coordinate direction
     subroutine s_initialize_weno(v_vf, &
-                                 norm_dir, weno_dir)
+                                 weno_dir)
 
         type(scalar_field), dimension(:), intent(IN) :: v_vf
 
-        integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
 
         integer :: j, k, l, q
@@ -1235,7 +1233,7 @@ contains
         !!  @param j First-coordinate cell index
         !!  @param k Secone-coordinate cell index
         !!  @param l Thire-coordinate cell index
-    subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
+    pure subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(IN) :: v_rs_ws
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
@@ -1399,7 +1397,7 @@ contains
     end subroutine s_preserve_monotonicity
 
     !>  Module deallocation and/or disassociation procedures
-    subroutine s_finalize_weno_module()
+    impure subroutine s_finalize_weno_module()
 
         if (weno_order == 1) return
 

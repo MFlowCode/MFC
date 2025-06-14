@@ -27,13 +27,12 @@ module m_boundary_conditions
     private; public :: s_apply_boundary_patches
 
 contains
-    subroutine s_line_segment_bc(patch_id, q_prim_vf, bc_type)
+    impure subroutine s_line_segment_bc(patch_id, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
         integer, intent(in) :: patch_id
 
-        integer :: i, j, k, l
+        integer :: j
 
         ! Patch is a vertical line at x_beg or x_end
         if (patch_bc(patch_id)%dir == 1) then
@@ -77,14 +76,13 @@ contains
 
     end subroutine s_line_segment_bc
 
-    subroutine s_circle_bc(patch_id, q_prim_vf, bc_type)
+    impure subroutine s_circle_bc(patch_id, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 
         integer, intent(in) :: patch_id
 
-        integer :: i, j, k, l
+        integer :: j, k
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
             z_centroid = patch_bc(patch_id)%centroid(3)
@@ -141,13 +139,12 @@ contains
 
     end subroutine s_circle_bc
 
-    subroutine s_rectangle_bc(patch_id, q_prim_vf, bc_type)
+    impure subroutine s_rectangle_bc(patch_id, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 
         integer, intent(in) :: patch_id
-        integer :: i, j, k, l
+        integer :: j, k
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
             z_centroid = patch_bc(patch_id)%centroid(3)
@@ -231,7 +228,7 @@ contains
 
     end subroutine s_rectangle_bc
 
-    subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
+    impure subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
@@ -245,9 +242,9 @@ contains
                 end if
 
                 if (patch_bc(i)%geometry == 2) then
-                    call s_circle_bc(i, q_prim_vf, bc_type)
+                    call s_circle_bc(i, bc_type)
                 elseif (patch_bc(i)%geometry == 3) then
-                    call s_rectangle_bc(i, q_prim_vf, bc_type)
+                    call s_rectangle_bc(i, bc_type)
                 end if
             end do
             !< Apply 1D patches to 2D domain
@@ -258,7 +255,7 @@ contains
                 end if
 
                 if (patch_bc(i)%geometry == 1) then
-                    call s_line_segment_bc(i, q_prim_vf, bc_type)
+                    call s_line_segment_bc(i, bc_type)
                 end if
             end do
         end if

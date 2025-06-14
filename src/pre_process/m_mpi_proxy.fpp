@@ -32,7 +32,7 @@ contains
             !!       these are not available to the remaining processors. This
             !!       subroutine is then in charge of broadcasting the required
             !!       information.
-    subroutine s_mpi_bcast_user_inputs
+    impure subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
 

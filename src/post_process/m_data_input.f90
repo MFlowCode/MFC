@@ -37,7 +37,7 @@ module m_data_input
 
         !> Subroutine for reading data files
         !!  @param t_step Current time-step to input
-        subroutine s_read_abstract_data_files(t_step)
+        impure subroutine s_read_abstract_data_files(t_step)
 
             implicit none
 
@@ -71,7 +71,7 @@ contains
         !!      present in the corresponding time-step directory and to
         !!      populate the associated grid and conservative variables.
         !!  @param t_step Current time-step
-    subroutine s_read_serial_data_files(t_step)
+    impure subroutine s_read_serial_data_files(t_step)
 
         integer, intent(in) :: t_step
 
@@ -252,7 +252,7 @@ contains
         !!      present in the corresponding time-step directory and to
         !!      populate the associated grid and conservative variables.
         !!  @param t_step Current time-step
-    subroutine s_read_parallel_data_files(t_step)
+    impure subroutine s_read_parallel_data_files(t_step)
 
         integer, intent(in) :: t_step
 
@@ -262,7 +262,7 @@ contains
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
-        real(wp) :: start, finish
+
         integer(KIND=MPI_OFFSET_KIND) :: disp
         integer(KIND=MPI_OFFSET_KIND) :: m_MOK, n_MOK, p_MOK
         integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
@@ -504,7 +504,7 @@ contains
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_data_input_module
+    impure subroutine s_initialize_data_input_module
 
         integer :: i !< Generic loop iterator
 
@@ -615,7 +615,7 @@ contains
     end subroutine s_initialize_data_input_module
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_data_input_module
+    impure subroutine s_finalize_data_input_module
 
         integer :: i !< Generic loop iterator
 

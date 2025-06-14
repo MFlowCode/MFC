@@ -1,0 +1,82 @@
+---
+description: Full MFC project rules – consolidated for Agent Mode
+alwaysApply: true
+---
+
+# 0  Purpose & Scope
+Consolidated guidance for the MFC exascale, many-physics solver.  
+Written primarily for Fortran/Fypp; the OpenACC and style sections matter only when
+`.fpp` / `.f90` files are in view.
+
+---
+
+# 1  Global Project Context (always)
+- **Project**: *MFC* is modern Fortran 2008+ generated with **Fypp**.  
+  - Sources `src/`, tests `tests/`, examples `examples/`.  
+  - Most sources are `.fpp`; CMake transpiles them to `.f90`.  
+- **Fypp macros** live in `src/<subprogram>/include/` you should scan these first.  
+  `<subprogram>` ∈ {`simulation`,`common`,`pre_process`,`post_process`}.  
+- Only `simulation` (+ its `common` calls) is GPU-accelerated via **OpenACC**.  
+- Assume free-form Fortran 2008+, `implicit none`, explicit `intent`, and modern
+  intrinsics.  
+- Prefer `module … contains … subroutine foo()`; avoid `COMMON` blocks and
+  file-level `include` files.  
+- **Read the full codebase and docs *before* changing code.**  
+  Docs: <https://mflowcode.github.io/documentation/md_readme.html> and the respository root `README.md`.  
+
+### Incremental-change workflow
+1. Draft a step-by-step plan.  
+2. After each step, build:  
+   ```bash
+   ./mfc.sh build -t pre_process simulation -j $(nproc)
+    ```
+3. If it compiles, run focused tests:
+   ```bash
+   ./mfc.sh test -j $(nproc) -f EA8FA07E -t 9E2CA336
+   ```
+4. Roll back & fix if a step fails.
+
+* Do not run ./mfc.sh test -j $(nproc) without any other arguments (it takes too long to run all tests).
+
+---
+
+# 2  Style & Naming Conventions (for \*.fpp / \*.f90)
+
+* **Indent 2 spaces**; continuation lines align under `&`.
+* Lower-case keywords and intrinsics (`do`, `end subroutine`, …).
+* **Modules**: `m_<feature>` (e.g. `m_transport`).
+* **Public procedures**:
+  * Subroutine → `s_<verb>_<noun>` (e.g. `s_compute_flux`)
+  * Function   → `f_<verb>_<noun>`
+* Private helpers stay in the module; avoid nested procedures.
+* **Size limits**: subroutine ≤ 500 lines, helper ≤ 150, function ≤ 100,
+  module/file ≤ 1000.
+* ≤ 6 arguments per routine; otherwise pass a derived-type “params” struct.
+* No `goto` (except unavoidable legacy); no global state (`COMMON`, `save`).
+* Every variable: `intent(in|out|inout)` + appropriate `dimension` / `allocatable`
+  / `pointer`.
+* Use `s_mpi_abort(<msg>)` for errors, not `stop`.
+* Mark OpenACC-callable helpers that are called from OpenACC parallel loops immediately after declaration:
+  ```fortran
+  subroutine s_flux_update(...)
+    !$acc routine seq
+    ...
+  end subroutine
+  ```
+
+---
+
+# 3  OpenACC Programming Guidelines (for kernels)
+
+Wrap tight loops with
+
+```fortran
+!$acc parallel loop gang vector default(present) reduction(...)
+```
+* Add `collapse(n)` to merge nested loops when safe.
+* Declare loop-local variables with `private(...)`.
+* Allocate large arrays with `managed` or move them into a persistent
+  `!$acc enter data` region at start-up.
+* **Do not** place `stop` / `error stop` inside device code.
+* Must compile with Cray `ftn` and NVIDIA `nvfortran` for GPU offloading; also build CPU-only with
+  GNU `gfortran` and Intel `ifx`/`ifort`.
