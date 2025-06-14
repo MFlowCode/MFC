@@ -204,15 +204,17 @@ contains
         end if
 
         if(.not. igr) then
-            @:ACC_SETUP_VFs( q_cons_qp)
-            @:ACC_SETUP_VFs(q_prim_qp)
-        end if
+            @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 
-        if(.not. igr) then
             do l = 1, cont_idx%end
-                q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
-                !$acc enter data copyin(q_prim_qp%vf(l)%sf)
-                !$acc enter data attach(q_prim_qp%vf(l)%sf)
+                if (relativity) then
+                    ! Cons and Prim densities are different for relativity
+                    @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+                else
+                    q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
+                    !$acc enter data copyin(q_prim_qp%vf(l)%sf)
+                    !$acc enter data attach(q_prim_qp%vf(l)%sf)
+                end if
             end do
 
             do l = adv_idx%beg, adv_idx%end
