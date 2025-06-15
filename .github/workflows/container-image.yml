@@ -43,6 +43,9 @@ jobs:
           # (cd pr/.github/workflows/image && singularity build --fakeroot mfc_cpu_bench.sif Singularity.cpu_bench)
           # echo "Building Singularity GPU Benchmark Image"
           # (cd pr/.github/workflows/image && singularity build --fakeroot mfc_gpu_bench.sif Singularity.gpu_bench)
+        shell: /usr/bin/bash -e {0}
+        env:
+          SINGULARITY_ROOT: /opt/hostedtoolcache/singularity/3.8.3/x64
 
       - name: Upload images as artifacts
         uses: actions/upload-artifact@v4
