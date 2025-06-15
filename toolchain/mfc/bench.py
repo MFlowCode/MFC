@@ -149,3 +149,4 @@ def diff():
     cons.raw.print(table)
     if err:
         raise MFCException("Benchmarking failed")
+    
