@@ -31,19 +31,19 @@ jobs:
 
       - name: Build CPU image
         run: |
-          (cd .github/workflows/images && singularity build mfc_cpu.sif Singularity.cpu)
+          (cd pr/.github/workflows/images && singularity build mfc_cpu.sif Singularity.cpu)
 
       - name: Build GPU image
         run: |
-          (cd .github/workflows/images && singularity build mfc_gpu.sif Singularity.gpu)
+          (cd pr/.github/workflows/images && singularity build mfc_gpu.sif Singularity.gpu)
 
       - name: Build CPU Benchmark image
         run: |
-          (cd .github/workflows/images && singularity build mfc_cpu_bench.sif Singularity.cpu_bench)
+          (cd pr/.github/workflows/images && singularity build mfc_cpu_bench.sif Singularity.cpu_bench)
 
       - name: Build GPU Benchmark image
         run: |
-          (cd .github/workflows/images && singularity build mfc_gpu_bench.sif Singularity.gpu_bench)
+          (cd pr/.github/workflows/images && singularity build mfc_gpu_bench.sif Singularity.gpu_bench)
 
       - name: Upload images as artifacts
         uses: actions/upload-artifact@v4
