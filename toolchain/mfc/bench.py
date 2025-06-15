@@ -56,11 +56,11 @@ def bench(targets = None):
 
         with open(log_filepath, "w") as log_file:
             system(
-                ["./mfc.sh", "run", case.path] +
+                ["./mfc.sh", "run", case.path, "--case-optimization"] +
                 ["--targets"] + [t.name for t in targets] +
                 ["--output-summary", summary_filepath] +
                 case.args +
-                ["--", "--gbpp", 0.5],
+                ["--", "--gbpp", ARG('mem')],
                 stdout=log_file,
                 stderr=subprocess.STDOUT)
 
