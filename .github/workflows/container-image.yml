@@ -19,7 +19,8 @@ jobs:
         with: 
           filters: ".github/file-filter.yml"
 
-  build-singularity-images:
+  Build-singularity-images:
+    name: Build Singularity Images
     needs: file-changes
     if: needs.file-changes.outputs.checkall == 'true'
     runs-on: ubuntu-latest
@@ -32,17 +33,16 @@ jobs:
         uses: eWaterCycle/setup-singularity@v7
         with:
           singularity-version: 3.8.3
-
       - name: Build Singularity Images
         run: |
           echo "Building Singularity CPU Image"
-          (cd pr/.github/workflows/images && singularity build mfc_cpu.sif Singularity.cpu)
+          (cd pr/.github/workflows/image && singularity build mfc_cpu.sif Singularity.cpu)
           echo "Building Singularity GPU Image"
-          (cd pr/.github/workflows/images && singularity build mfc_gpu.sif Singularity.gpu)
+          (cd pr/.github/workflows/image && singularity build mfc_gpu.sif Singularity.gpu)
           echo "Building Singularity CPU Benchmark Image"
-          (cd pr/.github/workflows/images && singularity build mfc_cpu_bench.sif Singularity.cpu_bench)
+          (cd pr/.github/workflows/image && singularity build mfc_cpu_bench.sif Singularity.cpu_bench)
           echo "Building Singularity GPU Benchmark Image"
-          (cd pr/.github/workflows/images && singularity build mfc_gpu_bench.sif Singularity.gpu_bench)
+          (cd pr/.github/workflows/image && singularity build mfc_gpu_bench.sif Singularity.gpu_bench)
         shell: /usr/bin/bash -e {0}
         env:
           SINGULARITY_ROOT: /opt/hostedtoolcache/singularity/3.8.3/x64
@@ -53,7 +53,7 @@ jobs:
         with:
           name: singularity-images
           path: |
-            pr/.github/workflows/images/mfc_cpu.sif
-            pr/.github/workflows/images/mfc_gpu.sif
-            pr/.github/workflows/images/mfc_cpu_bench.sif
-            pr/.github/workflows/images/mfc_gpu_bench.sif
+            pr/.github/workflows/image/mfc_cpu.sif
+            pr/.github/workflows/image/mfc_gpu.sif
+            pr/.github/workflows/image/mfc_cpu_bench.sif
+            pr/.github/workflows/image/mfc_gpu_bench.sif
