@@ -116,9 +116,9 @@ contains
 
     end subroutine s_initialize_igr_module
 
-    subroutine s_igr_iterative_solve(q_prim_vf, bc_type, t_step)
+    subroutine s_igr_iterative_solve(q_cons_vf, bc_type, t_step)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
         integer, intent(in) :: t_step
 
@@ -147,15 +147,15 @@ contains
 
                         !$acc loop seq
                         do i = 1, num_fluids
-                            rho_lx = rho_lx + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j-1,k,l)) / 2._wp
-                            rho_rx = rho_rx + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j+1,k,l)) / 2._wp
-                            rho_ly = rho_ly + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k-1,l)) / 2._wp
-                            rho_ry = rho_ry + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k+1,l)) / 2._wp
+                            rho_lx = rho_lx + (q_cons_vf(i)%sf(j,k,l) + q_cons_vf(i)%sf(j-1,k,l)) / 2._wp
+                            rho_rx = rho_rx + (q_cons_vf(i)%sf(j,k,l) + q_cons_vf(i)%sf(j+1,k,l)) / 2._wp
+                            rho_ly = rho_ly + (q_cons_vf(i)%sf(j,k,l) + q_cons_vf(i)%sf(j,k-1,l)) / 2._wp
+                            rho_ry = rho_ry + (q_cons_vf(i)%sf(j,k,l) + q_cons_vf(i)%sf(j,k+1,l)) / 2._wp
                             if (p > 0) then
-                                rho_lz = rho_lz + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k,l-1)) / 2._wp
-                                rho_rz = rho_rz + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k,l+1)) / 2._wp
+                                rho_lz = rho_lz + (q_cons_vf(i)%sf(j,k,l) + q_cons_vf(i)%sf(j,k,l-1)) / 2._wp
+                                rho_rz = rho_rz + (q_cons_vf(i)%sf(j,k,l) + q_cons_vf(i)%sf(j,k,l+1)) / 2._wp
                             end if
-                            fd_coeff = fd_coeff + q_prim_vf(i)%sf(j,k,l)
+                            fd_coeff = fd_coeff + q_cons_vf(i)%sf(j,k,l)
                         end do
 
                         fd_coeff = 1._wp / fd_coeff + alf_igr * &
@@ -341,14 +341,14 @@ contains
 
     end function f_reconstruct_state_R
 
-    subroutine s_igr_sigma_x(q_prim_vf, rhs_vf)
+    subroutine s_igr_sigma_x(q_cons_vf, rhs_vf)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: rhs_vf
         type(scalar_field), &
             dimension(sys_size), &
-            intent(inout) :: q_prim_vf
+            intent(inout) :: q_cons_vf
 
         real(wp) :: F_L, vel_L, rho_L, F_R, vel_R, rho_R
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
@@ -361,10 +361,10 @@ contains
 
                     !$acc loop seq
                     do i = 1, num_fluids
-                        alpha_rho_L(i) = f_reconstruct_state_L(q_prim_vf(i)%sf, j, k, l, 1)
+                        alpha_rho_L(i) = f_reconstruct_state_L(q_cons_vf(i)%sf, j, k, l, 1)
                     end do
 
-                    vel_L = f_reconstruct_state_L(q_prim_vf(momxb)%sf, j, k, l, 1) / sum(alpha_rho_L)
+                    vel_L = f_reconstruct_state_L(q_cons_vf(momxb)%sf, j, k, l, 1) / sum(alpha_rho_L)
 
                     !$acc atomic
                     rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
@@ -386,10 +386,10 @@ contains
 
                     !$acc loop seq
                     do i = 1, num_fluids
-                        alpha_rho_R(i) = f_reconstruct_state_R(q_prim_vf(i)%sf, j, k, l, 1)
+                        alpha_rho_R(i) = f_reconstruct_state_R(q_cons_vf(i)%sf, j, k, l, 1)
                     end do
 
-                    vel_R = f_reconstruct_state_R(q_prim_vf(momxb)%sf, j, k, l, 1) / sum(alpha_rho_R)
+                    vel_R = f_reconstruct_state_R(q_cons_vf(momxb)%sf, j, k, l, 1) / sum(alpha_rho_R)
 
                     !$acc atomic
                     rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
@@ -412,14 +412,14 @@ contains
 
     end subroutine s_igr_sigma_x
 
-    subroutine s_igr_riemann_solver(q_prim_vf, rhs_vf, idir)
+    subroutine s_igr_riemann_solver(q_cons_vf, rhs_vf, idir)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: rhs_vf
         type(scalar_field), &
             dimension(sys_size), &
-            intent(inout) :: q_prim_vf
+            intent(inout) :: q_cons_vf
         integer, intent(in) :: idir
 
         real(wp) :: cfl
@@ -457,17 +457,17 @@ contains
                                         rho_L = 0._wp
                                         !$acc loop seq
                                         do r = 1, num_fluids
-                                            rho_L = rho_L + q_prim_vf(r)%sf(j+i+q,k,l)
+                                            rho_L = rho_L + q_cons_vf(r)%sf(j+i+q,k,l)
                                         end do
                                         rho_sf_small(i) = rho_L
                                     end do
 
                                     dvel_small(1) = (1/(2._wp*dx(j))) * ( &
-                                        1._wp*q_prim_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                        1._wp*q_prim_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                        1._wp*q_cons_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                        1._wp*q_cons_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1))
                                     dvel_small(2) = (1/(2._wp*dx(j))) * ( &
-                                        q_prim_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
 
                                     if (q == 0) dvel(:,1) = dvel_small
                                     if (q > -2 .and. viscous) then
@@ -485,17 +485,17 @@ contains
                                         rho_L = 0._wp
                                         !$acc loop seq
                                         do r = 1, num_fluids
-                                            rho_L = rho_L + q_prim_vf(r)%sf(j+q,k+i,l)
+                                            rho_L = rho_L + q_cons_vf(r)%sf(j+q,k+i,l)
                                         end do
                                         rho_sf_small(i) = rho_L
                                     end do
 
                                     dvel_small(1) = (1/(2._wp*dy(k))) * ( &
-                                        q_prim_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1))
                                     dvel_small(2) = (1/(2._wp*dy(k))) * ( &
-                                        q_prim_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
 
                                     if (q == 0) dvel(:,2) = dvel_small
 
@@ -523,17 +523,17 @@ contains
                                     rho_L = 0._wp
                                     !$acc loop seq
                                     do r = 1, num_fluids
-                                        rho_L = rho_L + q_prim_vf(r)%sf(j+i+q,k,l)
+                                        rho_L = rho_L + q_cons_vf(r)%sf(j+i+q,k,l)
                                     end do
                                     rho_sf_small(i) = rho_L
                                 end do
 
                                 dvel_small(1) = (1/(2._wp*dx(j))) * ( &
-                                    1._wp*q_prim_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                    1._wp*q_prim_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                    1._wp*q_cons_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                    1._wp*q_cons_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1))
                                 dvel_small(2) = (1/(2._wp*dx(j))) * ( &
-                                    q_prim_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
 
                                 dvel(:,1) = dvel_small
 
@@ -543,17 +543,17 @@ contains
                                     rho_L = 0._wp
                                     !$acc loop seq
                                     do r = 1, num_fluids
-                                        rho_L = rho_L + q_prim_vf(r)%sf(j+q,k+i,l)
+                                        rho_L = rho_L + q_cons_vf(r)%sf(j+q,k+i,l)
                                     end do
                                     rho_sf_small(i) = rho_L
                                 end do
 
                                 dvel_small(1) = (1/(2._wp*dy(k))) * ( &
-                                    q_prim_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                    q_cons_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1))
                                 dvel_small(2) = (1/(2._wp*dy(k))) * ( &
-                                    q_prim_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
 
                                 dvel(:,2) = dvel_small
 
@@ -564,15 +564,15 @@ contains
 
                             !$acc loop seq
                             do i = 1, num_fluids
-                                alpha_rho_L(i) = f_reconstruct_state_L(q_prim_vf(i)%sf, j, k, l, 1)
-                                alpha_rho_R(i) = f_reconstruct_state_R(q_prim_vf(i)%sf, j, k, l, 1)
+                                alpha_rho_L(i) = f_reconstruct_state_L(q_cons_vf(i)%sf, j, k, l, 1)
+                                alpha_rho_R(i) = f_reconstruct_state_R(q_cons_vf(i)%sf, j, k, l, 1)
                             end do
 
                             if(num_fluids > 1) then
                                 !$acc loop seq
                                 do i = 1, num_fluids - 1
-                                    alpha_L(i) = f_reconstruct_state_L(q_prim_vf(E_idx+i)%sf, j, k, l, 1)
-                                    alpha_R(i) = f_reconstruct_state_R(q_prim_vf(E_idx+i)%sf, j, k, l, 1)
+                                    alpha_L(i) = f_reconstruct_state_L(q_cons_vf(E_idx+i)%sf, j, k, l, 1)
+                                    alpha_R(i) = f_reconstruct_state_R(q_cons_vf(E_idx+i)%sf, j, k, l, 1)
                                 end do
 
                                 alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
@@ -592,8 +592,8 @@ contains
 
                             !$acc loop seq
                             do i = 1, num_dims
-                                vel_L(i) = f_reconstruct_state_L(q_prim_vf(momxb+i-1)%sf, j, k, l, 1) / rho_L
-                                vel_R(i) = f_reconstruct_state_R(q_prim_vf(momxb+i-1)%sf, j, k, l, 1) / rho_R
+                                vel_L(i) = f_reconstruct_state_L(q_cons_vf(momxb+i-1)%sf, j, k, l, 1) / rho_L
+                                vel_R(i) = f_reconstruct_state_R(q_cons_vf(momxb+i-1)%sf, j, k, l, 1) / rho_R
                             end do
 
                             if(viscous) then
@@ -664,8 +664,8 @@ contains
 
                             end if
 
-                            E_L = f_reconstruct_state_L(q_prim_vf(E_idx)%sf, j, k, l, 1)
-                            E_R = f_reconstruct_state_R(q_prim_vf(E_idx)%sf, j, k, l, 1)
+                            E_L = f_reconstruct_state_L(q_cons_vf(E_idx)%sf, j, k, l, 1)
+                            E_R = f_reconstruct_state_R(q_cons_vf(E_idx)%sf, j, k, l, 1)
 
                             pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp))/gamma_L
                             pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp))/gamma_R
@@ -703,7 +703,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) &
-                                    - (0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l) * vel_L(1)*(1._wp/dx(j+1)))
+                                    - (0.5_wp * q_cons_vf(advxb+i-1)%sf(j+1,k,l) * vel_L(1)*(1._wp/dx(j+1)))
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
@@ -713,7 +713,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_L(1)*(1._wp/dx(j)))
+                                    + (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k,l)  * vel_L(1)*(1._wp/dx(j)))
                                 end do
                             end if
 
@@ -777,7 +777,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) &
-                                    - (0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l)  * vel_R(1)*(1._wp/dx(j+1)))
+                                    - (0.5_wp * q_cons_vf(advxb+i-1)%sf(j+1,k,l)  * vel_R(1)*(1._wp/dx(j+1)))
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
@@ -787,7 +787,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_R(1)*(1._wp/dx(j)))
+                                    + (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k,l)  * vel_R(1)*(1._wp/dx(j)))
                                 end do
                             end if
 
@@ -851,20 +851,20 @@ contains
                                         rho_L = 0._wp
                                         !$acc loop seq
                                         do r = 1, num_fluids
-                                            rho_L = rho_L + q_prim_vf(r)%sf(j+i+q,k,l)
+                                            rho_L = rho_L + q_cons_vf(r)%sf(j+i+q,k,l)
                                         end do
                                         rho_sf_small(i) = rho_L
                                     end do
 
                                     dvel_small(1) = (1/(2._wp*dx(j))) * ( &
-                                        q_prim_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1))
                                     dvel_small(2) = (1/(2._wp*dx(j))) * ( &
-                                        q_prim_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
                                     dvel_small(3) = (1/(2._wp*dx(j))) * ( &
-                                        q_prim_vf(momxb+2)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+2)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+2)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+2)%sf(j-1+q,k,l)/rho_sf_small(-1))
 
                                     if (q == 0) dvel(:,1) = dvel_small
                                     if (q > -2 .and. viscous) then
@@ -884,20 +884,20 @@ contains
                                         rho_L = 0._wp
                                         !$acc loop seq
                                         do r = 1, num_fluids
-                                            rho_L = rho_L + q_prim_vf(r)%sf(j+q,k+i,l)
+                                            rho_L = rho_L + q_cons_vf(r)%sf(j+q,k+i,l)
                                         end do
                                         rho_sf_small(i) = rho_L
                                     end do
 
                                     dvel_small(1) = (1/(2._wp*dy(k))) * ( &
-                                        q_prim_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1))
                                     dvel_small(2) = (1/(2._wp*dy(k))) * ( &
-                                        q_prim_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
                                     if (q == 0) dvel_small(3) = (1/(2._wp*dy(k))) * ( &
-                                        q_prim_vf(momxb+2)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+2)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+2)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+2)%sf(j+q,k-1,l)/rho_sf_small(-1))
                                     if (q == 0) dvel(:,2) = dvel_small
 
                                     if (q > -2 .and. viscous) then
@@ -915,20 +915,20 @@ contains
                                         rho_L = 0._wp
                                         !$acc loop seq
                                         do r = 1, num_fluids
-                                            rho_L = rho_L + q_prim_vf(r)%sf(j+q,k,l+i)
+                                            rho_L = rho_L + q_cons_vf(r)%sf(j+q,k,l+i)
                                         end do
                                         rho_sf_small(i) = rho_L
                                     end do
 
                                     dvel_small(1) = (1/(2._wp*dz(l))) * ( &
-                                        q_prim_vf(momxb)%sf(j+q,k,l+1)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb)%sf(j+q,k,l-1)/rho_sf_small(-1))
+                                        q_cons_vf(momxb)%sf(j+q,k,l+1)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb)%sf(j+q,k,l-1)/rho_sf_small(-1))
                                     if (q == 0) dvel_small(2) = (1/(2._wp*dz(l))) * ( &
-                                        q_prim_vf(momxb+1)%sf(j+q,k,l+1)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+1)%sf(j+q,k,l-1)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+1)%sf(j+q,k,l+1)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+1)%sf(j+q,k,l-1)/rho_sf_small(-1))
                                     dvel_small(3) = (1/(2._wp*dz(l))) * ( &
-                                        q_prim_vf(momxb+2)%sf(j+q,k,l+1)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+2)%sf(j+q,k,l-1)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+2)%sf(j+q,k,l+1)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+2)%sf(j+q,k,l-1)/rho_sf_small(-1))
                                     if (q == 0) dvel(:,3) = dvel_small
                                     if (q > -2 .and. viscous) then
                                         vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(1))
@@ -957,20 +957,20 @@ contains
                                     rho_L = 0._wp
                                     !$acc loop seq
                                     do r = 1, num_fluids
-                                        rho_L = rho_L + q_prim_vf(r)%sf(j+i+q,k,l)
+                                        rho_L = rho_L + q_cons_vf(r)%sf(j+i+q,k,l)
                                     end do
                                     rho_sf_small(i) = rho_L
                                 end do
 
                                 dvel_small(1) = (1/(2._wp*dx(j))) * ( &
-                                    q_prim_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                    q_cons_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1))
                                 dvel_small(2) = (1/(2._wp*dx(j))) * ( &
-                                    q_prim_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
                                 dvel_small(3) = (1/(2._wp*dx(j))) * ( &
-                                    q_prim_vf(momxb+2)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+2)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+2)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+2)%sf(j-1+q,k,l)/rho_sf_small(-1))
 
                                 dvel(:,1) = dvel_small
 
@@ -980,20 +980,20 @@ contains
                                     rho_L = 0._wp
                                     !$acc loop seq
                                     do r = 1, num_fluids
-                                        rho_L = rho_L + q_prim_vf(r)%sf(j+q,k+i,l)
+                                        rho_L = rho_L + q_cons_vf(r)%sf(j+q,k+i,l)
                                     end do
                                     rho_sf_small(i) = rho_L
                                 end do
 
                                 dvel_small(1) = (1/(2._wp*dy(k))) * ( &
-                                    q_prim_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                    q_cons_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1))
                                 dvel_small(2) = (1/(2._wp*dy(k))) * ( &
-                                    q_prim_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
                                 dvel_small(3) = (1/(2._wp*dy(k))) * ( &
-                                    q_prim_vf(momxb+2)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+2)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+2)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+2)%sf(j+q,k-1,l)/rho_sf_small(-1))
 
                                 dvel(:,2) = dvel_small
 
@@ -1003,20 +1003,20 @@ contains
                                     rho_L = 0._wp
                                     !$acc loop seq
                                     do r = 1, num_fluids
-                                        rho_L = rho_L + q_prim_vf(r)%sf(j+q,k,l+i)
+                                        rho_L = rho_L + q_cons_vf(r)%sf(j+q,k,l+i)
                                     end do
                                     rho_sf_small(i) = rho_L
                                 end do
 
                                 dvel_small(1) = (1/(2._wp*dz(l))) * ( &
-                                    q_prim_vf(momxb)%sf(j+q,k,l+1)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb)%sf(j+q,k,l-1)/rho_sf_small(-1))
+                                    q_cons_vf(momxb)%sf(j+q,k,l+1)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb)%sf(j+q,k,l-1)/rho_sf_small(-1))
                                 dvel_small(2) = (1/(2._wp*dz(l))) * ( &
-                                    q_prim_vf(momxb+1)%sf(j+q,k,l+1)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+1)%sf(j+q,k,l-1)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+1)%sf(j+q,k,l+1)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+1)%sf(j+q,k,l-1)/rho_sf_small(-1))
                                 dvel_small(3) = (1/(2._wp*dz(l))) * ( &
-                                    q_prim_vf(momxb+2)%sf(j+q,k,l+1)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+2)%sf(j+q,k,l-1)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+2)%sf(j+q,k,l+1)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+2)%sf(j+q,k,l-1)/rho_sf_small(-1))
 
                                 dvel(:,3) = dvel_small
 
@@ -1031,15 +1031,15 @@ contains
 
                             !$acc loop seq
                             do i = 1, num_fluids
-                                alpha_rho_L(i) = f_reconstruct_state_L(q_prim_vf(i)%sf, j, k, l, 1)
-                                alpha_rho_R(i) = f_reconstruct_state_R(q_prim_vf(i)%sf, j, k, l, 1)
+                                alpha_rho_L(i) = f_reconstruct_state_L(q_cons_vf(i)%sf, j, k, l, 1)
+                                alpha_rho_R(i) = f_reconstruct_state_R(q_cons_vf(i)%sf, j, k, l, 1)
                             end do
 
                              if(num_fluids > 1) then
                                 !$acc loop seq
                                 do i = 1, num_fluids - 1
-                                    alpha_L(i) = f_reconstruct_state_L(q_prim_vf(E_idx+i)%sf, j, k, l, 1)
-                                    alpha_R(i) = f_reconstruct_state_R(q_prim_vf(E_idx+i)%sf, j, k, l, 1)
+                                    alpha_L(i) = f_reconstruct_state_L(q_cons_vf(E_idx+i)%sf, j, k, l, 1)
+                                    alpha_R(i) = f_reconstruct_state_R(q_cons_vf(E_idx+i)%sf, j, k, l, 1)
                                 end do
 
                                 alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
@@ -1059,8 +1059,8 @@ contains
 
                             !$acc loop seq
                             do i = 1, num_dims
-                                vel_L(i) = f_reconstruct_state_L(q_prim_vf(momxb+i-1)%sf, j, k, l, 1) / rho_L
-                                vel_R(i) = f_reconstruct_state_R(q_prim_vf(momxb+i-1)%sf, j, k, l, 1) / rho_R
+                                vel_L(i) = f_reconstruct_state_L(q_cons_vf(momxb+i-1)%sf, j, k, l, 1) / rho_L
+                                vel_R(i) = f_reconstruct_state_R(q_cons_vf(momxb+i-1)%sf, j, k, l, 1) / rho_R
                             end do
 
                             if(viscous) then
@@ -1159,8 +1159,8 @@ contains
 
                             endif
 
-                            E_L = f_reconstruct_state_L(q_prim_vf(E_idx)%sf, j, k, l, 1)
-                            E_R = f_reconstruct_state_R(q_prim_vf(E_idx)%sf, j, k, l, 1)
+                            E_L = f_reconstruct_state_L(q_cons_vf(E_idx)%sf, j, k, l, 1)
+                            E_R = f_reconstruct_state_R(q_cons_vf(E_idx)%sf, j, k, l, 1)
 
                             pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp))/gamma_L
                             pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp))/gamma_R
@@ -1198,7 +1198,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) &
-                                    - (0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l)  * vel_L(1)*(1._wp/dx(j+1)))
+                                    - (0.5_wp * q_cons_vf(advxb+i-1)%sf(j+1,k,l)  * vel_L(1)*(1._wp/dx(j+1)))
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
@@ -1208,7 +1208,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_L(1)*(1._wp/dx(j)))
+                                    + (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k,l)  * vel_L(1)*(1._wp/dx(j)))
                                 end do
                             end if
 
@@ -1283,7 +1283,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) &
-                                    - (0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l)  * vel_R(1)*(1._wp/dx(j+1)))
+                                    - (0.5_wp * q_cons_vf(advxb+i-1)%sf(j+1,k,l)  * vel_R(1)*(1._wp/dx(j+1)))
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
@@ -1293,7 +1293,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * vel_R(1)*(1._wp/dx(j)))
+                                    + (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k,l) * vel_R(1)*(1._wp/dx(j)))
                                 end do
                             end if
 
@@ -1368,17 +1368,17 @@ contains
                                         rho_L = 0._wp
                                         !$acc loop seq
                                         do r = 1, num_fluids
-                                            rho_L = rho_L + q_prim_vf(r)%sf(j+i,k+q,l)
+                                            rho_L = rho_L + q_cons_vf(r)%sf(j+i,k+q,l)
                                         end do
                                         rho_sf_small(i) = rho_L
                                     end do
 
                                     dvel_small(1) = (1/(2._wp*dx(j))) * ( &
-                                        q_prim_vf(momxb)%sf(j+1,k+q,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb)%sf(j-1,k+q,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb)%sf(j+1,k+q,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb)%sf(j-1,k+q,l)/rho_sf_small(-1))
                                     dvel_small(2) = (1/(2._wp*dx(j))) * ( &
-                                        q_prim_vf(momxb+1)%sf(j+1,k+q,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+1)%sf(j-1,k+q,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+1)%sf(j+1,k+q,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+1)%sf(j-1,k+q,l)/rho_sf_small(-1))
 
                                     if (q > -2) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(2))
@@ -1395,17 +1395,17 @@ contains
                                         rho_L = 0._wp
                                         !$acc loop seq
                                         do r = 1, num_fluids
-                                            rho_L = rho_L + q_prim_vf(r)%sf(j,k+i+q,l)
+                                            rho_L = rho_L + q_cons_vf(r)%sf(j,k+i+q,l)
                                         end do
                                         rho_sf_small(i) = rho_L
                                     end do
 
                                     dvel_small(1) = (1/(2._wp*dy(k))) * ( &
-                                        q_prim_vf(momxb)%sf(j,k+1+q,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb)%sf(j,k-1+q,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb)%sf(j,k+1+q,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb)%sf(j,k-1+q,l)/rho_sf_small(-1))
                                     dvel_small(2) = (1/(2._wp*dy(k))) * ( &
-                                        q_prim_vf(momxb+1)%sf(j,k+1+q,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+1)%sf(j,k-1+q,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+1)%sf(j,k+1+q,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+1)%sf(j,k-1+q,l)/rho_sf_small(-1))
 
                                     if (q > -2) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(1))
@@ -1421,15 +1421,15 @@ contains
 
                             !$acc loop seq
                             do i = 1, num_fluids
-                                alpha_rho_L(i) = f_reconstruct_state_L(q_prim_vf(i)%sf, j, k, l, 2)
-                                alpha_rho_R(i) = f_reconstruct_state_R(q_prim_vf(i)%sf, j, k, l, 2)
+                                alpha_rho_L(i) = f_reconstruct_state_L(q_cons_vf(i)%sf, j, k, l, 2)
+                                alpha_rho_R(i) = f_reconstruct_state_R(q_cons_vf(i)%sf, j, k, l, 2)
                             end do
 
                             if(num_fluids > 1) then
                                 !$acc loop seq
                                 do i = 1,num_fluids - 1
-                                    alpha_L(i) = f_reconstruct_state_L(q_prim_vf(E_idx+i)%sf, j, k, l, 2)
-                                    alpha_R(i) = f_reconstruct_state_R(q_prim_vf(E_idx+i)%sf, j, k, l, 2)
+                                    alpha_L(i) = f_reconstruct_state_L(q_cons_vf(E_idx+i)%sf, j, k, l, 2)
+                                    alpha_R(i) = f_reconstruct_state_R(q_cons_vf(E_idx+i)%sf, j, k, l, 2)
                                 end do
                                 alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids-1))
                                 alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids-1))
@@ -1448,8 +1448,8 @@ contains
 
                             !$acc loop seq
                             do i = 1, num_dims
-                                vel_L(i) = f_reconstruct_state_L(q_prim_vf(momxb+i-1)%sf, j, k, l, 2) / rho_L
-                                vel_R(i) = f_reconstruct_state_R(q_prim_vf(momxb+i-1)%sf, j, k, l, 2) / rho_R
+                                vel_L(i) = f_reconstruct_state_L(q_cons_vf(momxb+i-1)%sf, j, k, l, 2) / rho_L
+                                vel_R(i) = f_reconstruct_state_R(q_cons_vf(momxb+i-1)%sf, j, k, l, 2) / rho_R
                             end do
 
                             if(viscous) then
@@ -1523,8 +1523,8 @@ contains
                             F_L = f_reconstruct_state_L(jac, j, k, l, 2)
                             F_R = f_reconstruct_state_R(jac, j, k, l, 2)
 
-                            E_L = f_reconstruct_state_L(q_prim_vf(E_idx)%sf, j, k, l, 2)
-                            E_R = f_reconstruct_state_R(q_prim_vf(E_idx)%sf, j, k, l, 2)
+                            E_L = f_reconstruct_state_L(q_cons_vf(E_idx)%sf, j, k, l, 2)
+                            E_R = f_reconstruct_state_R(q_cons_vf(E_idx)%sf, j, k, l, 2)
 
                             pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp ))/gamma_L
                             pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp ))/gamma_R
@@ -1562,7 +1562,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) &
-                                    - (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k+1,l)  * vel_L(2)*(1._wp/dy(k+1)))
+                                    - (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k+1,l)  * vel_L(2)*(1._wp/dy(k+1)))
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
@@ -1572,7 +1572,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_L(2)*(1._wp/dy(k)))
+                                    + (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k,l)  * vel_L(2)*(1._wp/dy(k)))
                                 end do
                             end if
 
@@ -1635,7 +1635,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) &
-                                    - (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k+1,l)  * vel_R(2)*(1._wp/dy(k+1)))
+                                    - (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k+1,l)  * vel_R(2)*(1._wp/dy(k+1)))
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
@@ -1645,7 +1645,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_R(2)*(1._wp/dy(k)))
+                                    + (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k,l)  * vel_R(2)*(1._wp/dy(k)))
                                 end do
                             end if
                             !$acc atomic
@@ -1703,17 +1703,17 @@ contains
                                         rho_L = 0._wp
                                         !$acc loop seq
                                         do r = 1, num_fluids
-                                            rho_L = rho_L + q_prim_vf(r)%sf(j+i,k+q,l)
+                                            rho_L = rho_L + q_cons_vf(r)%sf(j+i,k+q,l)
                                         end do
                                         rho_sf_small(i) = rho_L
                                     end do
 
                                     dvel_small(1) = (1/(2._wp*dx(j))) * ( &
-                                        q_prim_vf(momxb)%sf(j+1,k+q,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb)%sf(j-1,k+q,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb)%sf(j+1,k+q,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb)%sf(j-1,k+q,l)/rho_sf_small(-1))
                                     dvel_small(2) = (1/(2._wp*dx(j))) * ( &
-                                        q_prim_vf(momxb+1)%sf(j+1,k+q,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+1)%sf(j-1,k+q,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+1)%sf(j+1,k+q,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+1)%sf(j-1,k+q,l)/rho_sf_small(-1))
 
                                     if (q > -2) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(2))
@@ -1730,20 +1730,20 @@ contains
                                         rho_L = 0._wp
                                         !$acc loop seq
                                         do r = 1, num_fluids
-                                            rho_L = rho_L + q_prim_vf(r)%sf(j,k+i+q,l)
+                                            rho_L = rho_L + q_cons_vf(r)%sf(j,k+i+q,l)
                                         end do
                                         rho_sf_small(i) = rho_L
                                     end do
 
                                     dvel_small(1) = (1/(2._wp*dy(k))) * ( &
-                                        q_prim_vf(momxb)%sf(j,k+1+q,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb)%sf(j,k-1+q,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb)%sf(j,k+1+q,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb)%sf(j,k-1+q,l)/rho_sf_small(-1))
                                     dvel_small(2) = (1/(2._wp*dy(k))) * ( &
-                                        q_prim_vf(momxb+1)%sf(j,k+1+q,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+1)%sf(j,k-1+q,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+1)%sf(j,k+1+q,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+1)%sf(j,k-1+q,l)/rho_sf_small(-1))
                                     dvel_small(3) = (1/(2._wp*dy(k))) * ( &
-                                        q_prim_vf(momxb+2)%sf(j,k+1+q,l)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+2)%sf(j,k-1+q,l)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+2)%sf(j,k+1+q,l)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+2)%sf(j,k-1+q,l)/rho_sf_small(-1))
 
                                     if (q > -2) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(1))
@@ -1762,17 +1762,17 @@ contains
                                         rho_L = 0._wp
                                         !$acc loop seq
                                         do r = 1, num_fluids
-                                            rho_L = rho_L + q_prim_vf(r)%sf(j,k+q,l+i)
+                                            rho_L = rho_L + q_cons_vf(r)%sf(j,k+q,l+i)
                                         end do
                                         rho_sf_small(i) = rho_L
                                     end do
 
                                     dvel_small(2) = (1/(2._wp*dz(l))) * ( &
-                                        q_prim_vf(momxb+1)%sf(j,k+q,l+1)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+1)%sf(j,k+q,l-1)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+1)%sf(j,k+q,l+1)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+1)%sf(j,k+q,l-1)/rho_sf_small(-1))
                                     dvel_small(3) = (1/(2._wp*dz(l))) * ( &
-                                        q_prim_vf(momxb+2)%sf(j,k+q,l+1)/rho_sf_small(1) - &
-                                        q_prim_vf(momxb+2)%sf(j,k+q,l-1)/rho_sf_small(-1))
+                                        q_cons_vf(momxb+2)%sf(j,k+q,l+1)/rho_sf_small(1) - &
+                                        q_cons_vf(momxb+2)%sf(j,k+q,l-1)/rho_sf_small(-1))
                                     if (q > -2) then
                                         vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(2))
                                         vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(-2._wp*dvel_small(3))/3._wp
@@ -1786,15 +1786,15 @@ contains
 
                             !$acc loop seq
                             do i = 1, num_fluids
-                                alpha_rho_L(i) = f_reconstruct_state_L(q_prim_vf(i)%sf, j, k, l, 2)
-                                alpha_rho_R(i) = f_reconstruct_state_R(q_prim_vf(i)%sf, j, k, l, 2)
+                                alpha_rho_L(i) = f_reconstruct_state_L(q_cons_vf(i)%sf, j, k, l, 2)
+                                alpha_rho_R(i) = f_reconstruct_state_R(q_cons_vf(i)%sf, j, k, l, 2)
                             end do
 
                             if(num_fluids > 1) then
                                 !$acc loop seq
                                 do i = 1,num_fluids - 1
-                                    alpha_L(i) = f_reconstruct_state_L(q_prim_vf(E_idx+i)%sf, j, k, l, 2)
-                                    alpha_R(i) = f_reconstruct_state_R(q_prim_vf(E_idx+i)%sf, j, k, l, 2)
+                                    alpha_L(i) = f_reconstruct_state_L(q_cons_vf(E_idx+i)%sf, j, k, l, 2)
+                                    alpha_R(i) = f_reconstruct_state_R(q_cons_vf(E_idx+i)%sf, j, k, l, 2)
                                 end do
                                 alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids-1))
                                 alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids-1))
@@ -1813,8 +1813,8 @@ contains
 
                             !$acc loop seq
                             do i = 1, num_dims
-                                vel_L(i) = f_reconstruct_state_L(q_prim_vf(momxb+i-1)%sf, j, k, l, 2) / rho_L
-                                vel_R(i) = f_reconstruct_state_R(q_prim_vf(momxb+i-1)%sf, j, k, l, 2) / rho_R
+                                vel_L(i) = f_reconstruct_state_L(q_cons_vf(momxb+i-1)%sf, j, k, l, 2) / rho_L
+                                vel_R(i) = f_reconstruct_state_R(q_cons_vf(momxb+i-1)%sf, j, k, l, 2) / rho_R
                             end do
 
                             if(viscous) then
@@ -1916,8 +1916,8 @@ contains
                             F_L = f_reconstruct_state_L(jac, j, k, l, 2)
                             F_R = f_reconstruct_state_R(jac, j, k, l, 2)
 
-                            E_L = f_reconstruct_state_L(q_prim_vf(E_idx)%sf, j, k, l, 2)
-                            E_R = f_reconstruct_state_R(q_prim_vf(E_idx)%sf, j, k, l, 2)
+                            E_L = f_reconstruct_state_L(q_cons_vf(E_idx)%sf, j, k, l, 2)
+                            E_R = f_reconstruct_state_R(q_cons_vf(E_idx)%sf, j, k, l, 2)
 
                             pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp ))/gamma_L
                             pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp ))/gamma_R
@@ -1955,7 +1955,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) &
-                                    - (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k+1,l)  * vel_L(2)*(1._wp/dy(k+1)))
+                                    - (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k+1,l)  * vel_L(2)*(1._wp/dy(k+1)))
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
@@ -1965,7 +1965,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_L(2)*(1._wp/dy(k)))
+                                    + (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k,l)  * vel_L(2)*(1._wp/dy(k)))
                                 end do
                             end if
 
@@ -2039,7 +2039,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) &
-                                    - (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k+1,l)  * vel_R(2)*(1._wp/dy(k+1)))
+                                    - (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k+1,l)  * vel_R(2)*(1._wp/dy(k+1)))
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
@@ -2049,7 +2049,7 @@ contains
 
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_R(2)*(1._wp/dy(k)))
+                                    + (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k,l)  * vel_R(2)*(1._wp/dy(k)))
                                 end do
                             end if
 
@@ -2123,17 +2123,17 @@ contains
                                     rho_L = 0._wp
                                     !$acc loop seq
                                     do r = 1, num_fluids
-                                        rho_L = rho_L + q_prim_vf(r)%sf(j+i,k,l+q)
+                                        rho_L = rho_L + q_cons_vf(r)%sf(j+i,k,l+q)
                                     end do
                                     rho_sf_small(i) = rho_L
                                 end do
 
                                 dvel_small(1) = (1/(2._wp*dx(j))) * ( &
-                                    q_prim_vf(momxb)%sf(j+1,k,l+q)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb)%sf(j-1,k,l+q)/rho_sf_small(-1))
+                                    q_cons_vf(momxb)%sf(j+1,k,l+q)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb)%sf(j-1,k,l+q)/rho_sf_small(-1))
                                 dvel_small(3) = (1/(2._wp*dx(j))) * ( &
-                                    q_prim_vf(momxb+2)%sf(j+1,k,l+q)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+2)%sf(j-1,k,l+q)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+2)%sf(j+1,k,l+q)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+2)%sf(j-1,k,l+q)/rho_sf_small(-1))
 
                                 if (q > -2) then
                                     vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(3))
@@ -2150,17 +2150,17 @@ contains
                                     rho_L = 0._wp
                                     !$acc loop seq
                                     do r = 1, num_fluids
-                                        rho_L = rho_L + q_prim_vf(r)%sf(j,k+i,l+q)
+                                        rho_L = rho_L + q_cons_vf(r)%sf(j,k+i,l+q)
                                     end do
                                     rho_sf_small(i) = rho_L
                                 end do
 
                                 dvel_small(2) = (1/(2._wp*dy(k))) * ( &
-                                    q_prim_vf(momxb+1)%sf(j,k+1,l+q)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+1)%sf(j,k-1,l+q)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+1)%sf(j,k+1,l+q)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+1)%sf(j,k-1,l+q)/rho_sf_small(-1))
                                 dvel_small(3) = (1/(2._wp*dy(k))) * ( &
-                                    q_prim_vf(momxb+2)%sf(j,k+1,l+q)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+2)%sf(j,k-1,l+q)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+2)%sf(j,k+1,l+q)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+2)%sf(j,k-1,l+q)/rho_sf_small(-1))
 
                                 if (q > -2) then
                                     vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(3))
@@ -2177,19 +2177,19 @@ contains
                                     rho_L = 0._wp
                                     !$acc loop seq
                                     do r = 1, num_fluids
-                                        rho_L = rho_L + q_prim_vf(r)%sf(j,k,l+i+q)
+                                        rho_L = rho_L + q_cons_vf(r)%sf(j,k,l+i+q)
                                     end do
                                     rho_sf_small(i) = rho_L
                                 end do
                                 dvel_small(1) = (1/(2._wp*dz(l))) * ( &
-                                    q_prim_vf(momxb)%sf(j,k,l+1+q)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb)%sf(j,k,l-1+q)/rho_sf_small(-1))
+                                    q_cons_vf(momxb)%sf(j,k,l+1+q)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb)%sf(j,k,l-1+q)/rho_sf_small(-1))
                                 dvel_small(2) = (1/(2._wp*dz(l))) * ( &
-                                    q_prim_vf(momxb+1)%sf(j,k,l+1+q)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+1)%sf(j,k,l-1+q)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+1)%sf(j,k,l+1+q)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+1)%sf(j,k,l-1+q)/rho_sf_small(-1))
                                 dvel_small(3) = (1/(2._wp*dz(l))) * ( &
-                                    q_prim_vf(momxb+2)%sf(j,k,l+1+q)/rho_sf_small(1) - &
-                                    q_prim_vf(momxb+2)%sf(j,k,l-1+q)/rho_sf_small(-1))
+                                    q_cons_vf(momxb+2)%sf(j,k,l+1+q)/rho_sf_small(1) - &
+                                    q_cons_vf(momxb+2)%sf(j,k,l-1+q)/rho_sf_small(-1))
                                 if (q > -2) then
                                     vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(1))
                                     vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(2))
@@ -2205,15 +2205,15 @@ contains
 
                         !$acc loop seq
                         do i = 1, num_fluids
-                            alpha_rho_L(i) = f_reconstruct_state_L(q_prim_vf(i)%sf, j, k, l, 3)
-                            alpha_rho_R(i) = f_reconstruct_state_R(q_prim_vf(i)%sf, j, k, l, 3)
+                            alpha_rho_L(i) = f_reconstruct_state_L(q_cons_vf(i)%sf, j, k, l, 3)
+                            alpha_rho_R(i) = f_reconstruct_state_R(q_cons_vf(i)%sf, j, k, l, 3)
                         end do
 
                         if(num_fluids > 1) then
                             !$acc loop seq
                             do i = 1,num_fluids - 1
-                                alpha_L(i) = f_reconstruct_state_L(q_prim_vf(E_idx+i)%sf, j, k, l, 3)
-                                alpha_R(i) = f_reconstruct_state_R(q_prim_vf(E_idx+i)%sf, j, k, l, 3)
+                                alpha_L(i) = f_reconstruct_state_L(q_cons_vf(E_idx+i)%sf, j, k, l, 3)
+                                alpha_R(i) = f_reconstruct_state_R(q_cons_vf(E_idx+i)%sf, j, k, l, 3)
                             end do
                             alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids-1))
                             alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids-1))
@@ -2232,8 +2232,8 @@ contains
 
                         !$acc loop seq
                         do i = 1, num_dims
-                            vel_L(i) = f_reconstruct_state_L(q_prim_vf(momxb+i-1)%sf, j, k, l, 3) / rho_L
-                            vel_R(i) = f_reconstruct_state_R(q_prim_vf(momxb+i-1)%sf, j, k, l, 3) / rho_R
+                            vel_L(i) = f_reconstruct_state_L(q_cons_vf(momxb+i-1)%sf, j, k, l, 3) / rho_L
+                            vel_R(i) = f_reconstruct_state_R(q_cons_vf(momxb+i-1)%sf, j, k, l, 3) / rho_R
                         end do
 
                         if(viscous) then
@@ -2335,8 +2335,8 @@ contains
                         F_L = f_reconstruct_state_L(jac, j, k, l, 3)
                         F_R = f_reconstruct_state_R(jac, j, k, l, 3)
 
-                        E_L = f_reconstruct_state_L(q_prim_vf(E_idx)%sf, j, k, l, 3)
-                        E_R = f_reconstruct_state_R(q_prim_vf(E_idx)%sf, j, k, l, 3)
+                        E_L = f_reconstruct_state_L(q_cons_vf(E_idx)%sf, j, k, l, 3)
+                        E_R = f_reconstruct_state_R(q_cons_vf(E_idx)%sf, j, k, l, 3)
 
                         pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp ))/gamma_L
                         pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp ))/gamma_R
@@ -2374,7 +2374,7 @@ contains
 
                                 !$acc atomic
                                 rhs_vf(advxb+i-1)%sf(j,k,l+1) = rhs_vf(advxb+i-1)%sf(j,k,l+1) &
-                                - (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l+1)  * vel_L(3)*(1._wp/dz(l+1)))
+                                - (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k,l+1)  * vel_L(3)*(1._wp/dz(l+1)))
 
                                 !$acc atomic
                                 rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
@@ -2384,7 +2384,7 @@ contains
 
                                 !$acc atomic
                                 rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                + (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_L(3)*(1._wp/dz(l)))
+                                + (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k,l)  * vel_L(3)*(1._wp/dz(l)))
                             end do
                         end if
 
@@ -2458,7 +2458,7 @@ contains
 
                                 !$acc atomic
                                 rhs_vf(advxb+i-1)%sf(j,k,l+1) = rhs_vf(advxb+i-1)%sf(j,k,l+1) &
-                                - (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l+1)  * vel_R(3)*(1._wp/dz(l+1)))
+                                - (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k,l+1)  * vel_R(3)*(1._wp/dz(l+1)))
 
                                 !$acc atomic
                                 rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
@@ -2468,7 +2468,7 @@ contains
 
                                 !$acc atomic
                                 rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                + (0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_R(3)*(1._wp/dz(l)))
+                                + (0.5_wp * q_cons_vf(advxb+i-1)%sf(j,k,l)  * vel_R(3)*(1._wp/dz(l)))
                             end do
                         end if
 
@@ -2523,11 +2523,11 @@ contains
 
     end subroutine s_igr_riemann_solver
 
-    subroutine s_igr_flux_add(q_prim_vf, rhs_vf, flux_vf, idir)
+    subroutine s_igr_flux_add(q_cons_vf, rhs_vf, flux_vf, idir)
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(inout) :: q_prim_vf, flux_vf, rhs_vf
+            intent(inout) :: q_cons_vf, flux_vf, rhs_vf
 
         integer, intent(in) :: idir
 
