@@ -96,7 +96,6 @@ module m_start_up
  s_read_data_files, &
  s_read_serial_data_files, &
  s_read_parallel_data_files, &
- s_populate_grid_variables_buffers, &
  s_initialize_internal_energy_equations, &
  s_initialize_modules, s_initialize_gpu_vars, &
  s_initialize_mpi_domain, s_finalize_modules, &
@@ -957,219 +956,7 @@ contains
 
     end subroutine s_read_parallel_data_files
 
-    !> The purpose of this subroutine is to populate the buffers
-        !!          of the grid variables, which are constituted of the cell-
-        !!          boundary locations and cell-width distributions, based on
-        !!          the boundary conditions.
-    impure subroutine s_populate_grid_variables_buffers
-
-        integer :: i !< Generic loop iterator
-
-        ! Population of Buffers in x-direction
-
-        ! Populating cell-width distribution buffer, at the beginning of the
-        ! coordinate direction, based on the selected boundary condition. In
-        ! order, these are the ghost-cell extrapolation, symmetry, periodic,
-        ! and processor boundary conditions.
-        if (bc_x%beg <= BC_GHOST_EXTRAP) then
-            do i = 1, buff_size
-                dx(-i) = dx(0)
-            end do
-        elseif (bc_x%beg == BC_REFLECTIVE) then
-            do i = 1, buff_size
-                dx(-i) = dx(i - 1)
-            end do
-        elseif (bc_x%beg == BC_PERIODIC) then
-            do i = 1, buff_size
-                dx(-i) = dx(m - (i - 1))
-            end do
-        else
-            call s_mpi_sendrecv_grid_variables_buffers(1, -1)
-        end if
-
-        ! Computing the cell-boundary locations buffer, at the beginning of
-        ! the coordinate direction, from the cell-width distribution buffer
-        do i = 1, buff_size
-            x_cb(-1 - i) = x_cb(-i) - dx(-i)
-        end do
-        ! Computing the cell-center locations buffer, at the beginning of
-        ! the coordinate direction, from the cell-width distribution buffer
-        do i = 1, buff_size
-            x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
-        end do
-
-        ! Populating the cell-width distribution buffer, at the end of the
-        ! coordinate direction, based on desired boundary condition. These
-        ! include, in order, ghost-cell extrapolation, symmetry, periodic,
-        ! and processor boundary conditions.
-        if (bc_x%end <= BC_GHOST_EXTRAP) then
-            do i = 1, buff_size
-                dx(m + i) = dx(m)
-            end do
-        elseif (bc_x%end == BC_REFLECTIVE) then
-            do i = 1, buff_size
-                dx(m + i) = dx(m - (i - 1))
-            end do
-        elseif (bc_x%end == BC_PERIODIC) then
-            do i = 1, buff_size
-                dx(m + i) = dx(i - 1)
-            end do
-        else
-            call s_mpi_sendrecv_grid_variables_buffers(1, 1)
-        end if
-
-        ! Populating the cell-boundary locations buffer, at the end of the
-        ! coordinate direction, from buffer of the cell-width distribution
-        do i = 1, buff_size
-            x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
-        end do
-        ! Populating the cell-center locations buffer, at the end of the
-        ! coordinate direction, from buffer of the cell-width distribution
-        do i = 1, buff_size
-            x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
-        end do
-
-        ! END: Population of Buffers in x-direction
-
-        ! Population of Buffers in y-direction
-
-        ! Populating cell-width distribution buffer, at the beginning of the
-        ! coordinate direction, based on the selected boundary condition. In
-        ! order, these are the ghost-cell extrapolation, symmetry, periodic,
-        ! and processor boundary conditions.
-        if (n == 0) then
-            return
-        elseif (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_AXIS) then
-            do i = 1, buff_size
-                dy(-i) = dy(0)
-            end do
-        elseif (bc_y%beg == BC_REFLECTIVE .or. bc_y%beg == BC_AXIS) then
-            do i = 1, buff_size
-                dy(-i) = dy(i - 1)
-            end do
-        elseif (bc_y%beg == BC_PERIODIC) then
-            do i = 1, buff_size
-                dy(-i) = dy(n - (i - 1))
-            end do
-        else
-            call s_mpi_sendrecv_grid_variables_buffers(2, -1)
-        end if
-
-        ! Computing the cell-boundary locations buffer, at the beginning of
-        ! the coordinate direction, from the cell-width distribution buffer
-        do i = 1, buff_size
-            y_cb(-1 - i) = y_cb(-i) - dy(-i)
-        end do
-        ! Computing the cell-center locations buffer, at the beginning of
-        ! the coordinate direction, from the cell-width distribution buffer
-        do i = 1, buff_size
-            y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
-        end do
-
-        ! Populating the cell-width distribution buffer, at the end of the
-        ! coordinate direction, based on desired boundary condition. These
-        ! include, in order, ghost-cell extrapolation, symmetry, periodic,
-        ! and processor boundary conditions.
-        if (bc_y%end <= BC_GHOST_EXTRAP) then
-            do i = 1, buff_size
-                dy(n + i) = dy(n)
-            end do
-        elseif (bc_y%end == BC_REFLECTIVE) then
-            do i = 1, buff_size
-                dy(n + i) = dy(n - (i - 1))
-            end do
-        elseif (bc_y%end == BC_PERIODIC) then
-            do i = 1, buff_size
-                dy(n + i) = dy(i - 1)
-            end do
-        else
-            call s_mpi_sendrecv_grid_variables_buffers(2, 1)
-        end if
-
-        ! Populating the cell-boundary locations buffer, at the end of the
-        ! coordinate direction, from buffer of the cell-width distribution
-        do i = 1, buff_size
-            y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
-        end do
-        ! Populating the cell-center locations buffer, at the end of the
-        ! coordinate direction, from buffer of the cell-width distribution
-        do i = 1, buff_size
-            y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
-        end do
-
-        ! END: Population of Buffers in y-direction
-
-        ! Population of Buffers in z-direction
-
-        ! Populating cell-width distribution buffer, at the beginning of the
-        ! coordinate direction, based on the selected boundary condition. In
-        ! order, these are the ghost-cell extrapolation, symmetry, periodic,
-        ! and processor boundary conditions.
-        if (p == 0) then
-            return
-        elseif (bc_z%beg <= BC_GHOST_EXTRAP) then
-            do i = 1, buff_size
-                dz(-i) = dz(0)
-            end do
-        elseif (bc_z%beg == BC_REFLECTIVE) then
-            do i = 1, buff_size
-                dz(-i) = dz(i - 1)
-            end do
-        elseif (bc_z%beg == BC_PERIODIC) then
-            do i = 1, buff_size
-                dz(-i) = dz(p - (i - 1))
-            end do
-        else
-            call s_mpi_sendrecv_grid_variables_buffers(3, -1)
-        end if
-
-        ! Computing the cell-boundary locations buffer, at the beginning of
-        ! the coordinate direction, from the cell-width distribution buffer
-        do i = 1, buff_size
-            z_cb(-1 - i) = z_cb(-i) - dz(-i)
-        end do
-        ! Computing the cell-center locations buffer, at the beginning of
-        ! the coordinate direction, from the cell-width distribution buffer
-        do i = 1, buff_size
-            z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
-        end do
-
-        ! Populating the cell-width distribution buffer, at the end of the
-        ! coordinate direction, based on desired boundary condition. These
-        ! include, in order, ghost-cell extrapolation, symmetry, periodic,
-        ! and processor boundary conditions.
-        if (bc_z%end <= BC_GHOST_EXTRAP) then
-            do i = 1, buff_size
-                dz(p + i) = dz(p)
-            end do
-        elseif (bc_z%end == BC_REFLECTIVE) then
-            do i = 1, buff_size
-                dz(p + i) = dz(p - (i - 1))
-            end do
-        elseif (bc_z%end == BC_PERIODIC) then
-            do i = 1, buff_size
-                dz(p + i) = dz(i - 1)
-            end do
-        else
-            call s_mpi_sendrecv_grid_variables_buffers(3, 1)
-        end if
-
-        ! Populating the cell-boundary locations buffer, at the end of the
-        ! coordinate direction, from buffer of the cell-width distribution
-        do i = 1, buff_size
-            z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
-        end do
-        ! Populating the cell-center locations buffer, at the end of the
-        ! coordinate direction, from buffer of the cell-width distribution
-        do i = 1, buff_size
-            z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
-        end do
-
-        ! END: Population of Buffers in z-direction
-
-    end subroutine s_populate_grid_variables_buffers
-
-    !> The purpose of this procedure is to initialize the
+        !> The purpose of this procedure is to initialize the
         !!      values of the internal-energy equations of each phase
         !!      from the mass of each phase, the mixture momentum and
         !!      mixture-total-energy equations.
@@ -1473,6 +1260,7 @@ contains
 
 
         call s_initialize_mpi_common_module()
+        call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
         if (grid_geometry == 3) call s_initialize_fftw_module()
         call s_initialize_riemann_solvers_module()
@@ -1679,6 +1467,7 @@ contains
         if (viscous) then
             call s_finalize_viscous_module()
         end if
+        call s_finalize_mpi_proxy_module()
 
         if (surface_tension)  call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()

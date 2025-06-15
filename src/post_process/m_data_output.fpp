@@ -1196,7 +1196,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer :: i, j, k, l, cent !< Generic loop iterators
         integer :: counter, root !< number of data points extracted to fit shape to SH perturbations
-        real(wp), parameter :: pi = 4._wp*tan(1._wp)
         real(wp), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
         real(wp) :: axp, axm, ayp, aym, tgp, euc_d, thres, maxalph_loc, maxalph_glb
 

@@ -1569,8 +1569,6 @@ contains
 
         integer :: i, j, k !< generic loop iterators
 
-        complex(wp), parameter :: cmplx_i = (0._wp, 1._wp)
-
         ! Transferring the patch's centroid and radius information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid

@@ -34,8 +34,6 @@ contains
 
     impure subroutine s_initialize_perturbation_module()
 
-        bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
-
         if (mixlayer_perturb) then
             mixlayer_bc_fd = 2
             nbp = n + 2
@@ -626,7 +624,7 @@ contains
         do q = 1, elliptic_smoothing_iters
 
             ! Communication of buffer regions and apply boundary conditions
-            call s_populate_variables_buffers(q_prim_vf, pb%sf, mv%sf, bc_type)
+            call s_populate_variables_buffers(bc_type, q_prim_vf, pb%sf, mv%sf)
 
             ! Perform smoothing and store in temp array
             if (n == 0) then
