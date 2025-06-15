@@ -7,6 +7,12 @@ This guide provides Singularity definition files for four scenarios:
 - **CPU Benchmark**: CPU build optimized for a specific benchmark  
 - **GPU Benchmark**: GPU build optimized for a specific benchmark  
 
+## Requirements
+
+**Important**: Singularity version 3.7.1 or higher is required. Versions below 3.7.1 (including 3.6.1) are not supported and will fail to build.
+
+**Alternative**: Consider using [Apptainer](https://apptainer.org/) (the open-source successor to Singularity) which is actively maintained and provides better compatibility.
+
 ## Usage
 
 ```sh
