@@ -12,6 +12,8 @@ jobs:
 
       - name: Set up Singularity
         uses: eWaterCycle/setup-singularity@v7
+        with:
+          singularity-version: 3.8.3
 
       - name: Build CPU image
         run: |
