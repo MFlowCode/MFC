@@ -69,11 +69,6 @@ def __filter(cases_) -> typing.List[TestCase]:
             if any(label in case.trace for label in skip):
                 cases.remove(case)
 
-    for case in cases[:]:
-        if ARG("rdma_mpi") and case.ppn <= 1:
-            cases.remove(case)
-            skipped_cases.append(case)
-
     if ARG("no_examples"):
         cases = [case for case in cases if not "Example" in case.trace]
 
@@ -189,8 +184,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]     SKIP     {case.trace}")
         return
    
-    if ARG("rdma_mpi"):
-        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+    if "RDMA MPI" in case.trace:
         cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices, rdma_mpi=True)
     else:
         cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
