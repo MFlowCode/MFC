@@ -1,0 +1,40 @@
+name: Build Singularity Images
+
+on:
+  push:
+
+jobs:
+  build-singularity-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Singularity
+        uses: eWaterCycle/setup-singularity@v7
+
+      - name: Build CPU image
+        run: |
+          singularity build mfc_cpu.sif Singularity.cpu
+
+      - name: Build GPU image
+        run: |
+          singularity build mfc_gpu.sif Singularity.gpu
+
+      - name: Build CPU Benchmark image
+        run: |
+          singularity build mfc_cpu_bench.sif Singularity.cpu_bench
+
+      - name: Build GPU Benchmark image
+        run: |
+          singularity build mfc_gpu_bench.sif Singularity.gpu_bench
+
+      - name: Upload images as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: singularity-images
+          path: |
+            mfc_cpu.sif
+            mfc_gpu.sif
+            mfc_cpu_bench.sif
+            mfc_gpu_bench.sif
