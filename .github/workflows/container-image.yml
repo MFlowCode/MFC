@@ -54,6 +54,6 @@ jobs:
           name: singularity-images
           path: |
             pr/.github/workflows/image/mfc_cpu.sif
-          # pr/.github/workflows/image/mfc_gpu.sif
-          # pr/.github/workflows/image/mfc_cpu_bench.sif
-          # pr/.github/workflows/image/mfc_gpu_bench.sif
+            pr/.github/workflows/image/mfc_gpu.sif
+            pr/.github/workflows/image/mfc_cpu_bench.sif
+            pr/.github/workflows/image/mfc_gpu_bench.sif
