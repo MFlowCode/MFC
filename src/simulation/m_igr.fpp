@@ -151,7 +151,7 @@ contains
                             rho_rx = rho_rx + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j+1,k,l)) / 2._wp
                             rho_ly = rho_ly + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k-1,l)) / 2._wp
                             rho_ry = rho_ry + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k+1,l)) / 2._wp
-                            if(num_dims == 3) then
+                            if (p > 0) then
                                 rho_lz = rho_lz + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k,l-1)) / 2._wp
                                 rho_rz = rho_rz + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k,l+1)) / 2._wp
                             end if
@@ -162,12 +162,12 @@ contains
                                    ((1._wp / dx(j)**2._wp) * (1._wp/rho_lx + 1._wp/rho_rx) + &
                                     (1._wp / dy(k)**2._wp) *(1._wp/rho_ly + 1._wp/rho_ry))
 
-                        if(num_dims == 3) then
+                        if (p > 0) then
                             fd_coeff = fd_coeff + alf_igr* (1._wp / dz(l)**2._wp) * (1._wp/rho_lz + 1._wp /rho_rz)
                         end if
 
                         if (igr_iter_solver == 1) then ! Jacobi iteration
-                            if(num_dims == 3) then
+                            if(p > 0) then
                                 jac(j, k, l) = (alf_igr / fd_coeff) * &
                                                        ((1._wp / dx(j)**2._wp) * (jac_old(j-1,k,l)/rho_lx + jac_old(j+1,k,l)/rho_rx) + &
                                                         (1._wp / dy(k)**2._wp) * (jac_old(j,k-1,l)/rho_ly + jac_old(j,k+1,l)/rho_ry) + &
@@ -180,7 +180,7 @@ contains
                                                         jac_rhs(j,k,l) / fd_coeff
                             end if
                         else ! Gauss Seidel iteration
-                            if(num_dims == 3) then
+                            if(p > 0) then
                                 jac(j, k, l) = (alf_igr / fd_coeff) * &
                                                        ((1._wp / dx(j)**2._wp) * ( jac(j-1,k,l)/rho_lx + jac(j+1,k,l)/rho_rx) + &
                                                         (1._wp / dy(k)**2._wp) * (jac(j,k-1,l)/rho_ly + jac(j,k+1,l)/rho_ry) + &
@@ -209,12 +209,12 @@ contains
                     end do
                 end do
             end if
-
         end do
+
     end subroutine s_igr_iterative_solve
 
-    function f_reconstruct_state_L_5th_order(q_sf, j, k, l, idir) result(q_L)
-
+    pure function f_reconstruct_state_L_5th_order(q_sf, j, k, l, idir) result(q_L)
+!$acc routine seq
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: q_sf
         integer, intent(in) :: j, k, l, idir
         real(wp) :: q_L
@@ -241,8 +241,8 @@ contains
 
     end function f_reconstruct_state_L_5th_order
 
-    function f_reconstruct_state_R_5th_order(q_sf, j, k, l, idir) result(q_R)
-
+    pure function f_reconstruct_state_R_5th_order(q_sf, j, k, l, idir) result(q_R)
+!$acc routine seq
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: q_sf
         integer, intent(in) :: j, k, l, idir
         real(wp) :: q_R
@@ -269,8 +269,8 @@ contains
 
     end function f_reconstruct_state_R_5th_order
 
-    function f_reconstruct_state_L_3rd_order(q_sf, j, k, l, idir) result(q_L)
-
+    pure function f_reconstruct_state_L_3rd_order(q_sf, j, k, l, idir) result(q_L)
+!$acc routine seq
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: q_sf
         integer, intent(in) :: j, k, l, idir
         real(wp) :: q_L
@@ -291,8 +291,8 @@ contains
 
     end function f_reconstruct_state_L_3rd_order
 
-    function f_reconstruct_state_R_3rd_order(q_sf, j, k, l, idir) result(q_R)
-
+    pure function f_reconstruct_state_R_3rd_order(q_sf, j, k, l, idir) result(q_R)
+!$acc routine seq
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: q_sf
         integer, intent(in) :: j, k, l, idir
         real(wp) :: q_R
@@ -313,29 +313,29 @@ contains
 
     end function f_reconstruct_state_R_3rd_order
 
-    function f_reconstruct_state_L(q_sf, j, k, l, idir) result(q_L)
-
+    pure function f_reconstruct_state_L(q_sf, j, k, l, idir) result(q_L)
+!$acc routine seq
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: q_sf
         integer, intent(in) :: j, k, l, idir
         real(wp) :: q_L
 
         if (igr_order == 5) then
             q_L = f_reconstruct_state_L_5th_order(q_sf, j, k, l, idir)
-        else if (igr_order == 3) then
+        elseif (igr_order == 3) then
             q_L = f_reconstruct_state_L_3rd_order(q_sf, j, k, l, idir)
         end if
 
     end function f_reconstruct_state_L
 
-    function f_reconstruct_state_R(q_sf, j, k, l, idir) result(q_R)
-
+    pure function f_reconstruct_state_R(q_sf, j, k, l, idir) result(q_R)
+!$acc routine seq
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: q_sf
         integer, intent(in) :: j, k, l, idir
         real(wp) :: q_R
 
         if (igr_order == 5) then
             q_R = f_reconstruct_state_R_5th_order(q_sf, j, k, l, idir)
-        else if (igr_order == 3) then
+        elseif (igr_order == 3) then
             q_R = f_reconstruct_state_R_3rd_order(q_sf, j, k, l, idir)
         end if
 
@@ -497,7 +497,6 @@ contains
                                         q_prim_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
                                         q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
 
-
                                     if (q == 0) dvel(:,2) = dvel_small
 
                                     if (q > -2 .and. viscous) then
@@ -608,44 +607,60 @@ contains
                                 end do
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dx(j+1))
+                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dx(j+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dx(j))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dx(j))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dx(j+1))
+                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dx(j+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dx(j))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dx(j))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dx(j+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dx(j))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dx(j+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dx(j))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j))
 
                             end if
 
@@ -658,7 +673,9 @@ contains
                             a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
                             a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
 
-                            cfl = (max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp),sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp)) + max(a_L,a_R))
+                            cfl = max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp), &
+                                      sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp)) + &
+                                  max(a_L,a_R)
 
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -1051,70 +1068,94 @@ contains
                                 mu_L = 0._wp
                                 mu_R = 0._wp
                                 !$acc loop seq
-                                do i = 1, num_fluids - 1
+                                do i = 1, num_fluids
                                     mu_L = alpha_L(i) / Res(1, i) + mu_L
                                     mu_R = alpha_R(i) / Res(1, i) + mu_R
                                 end do
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dx(j+1))
+                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dx(j+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dx(j))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dx(j))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dx(j+1))
+                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dx(j+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dx(j))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dx(j))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j))
 
                                 !$acc atomic
-                                rhs_vf(momxb+2)%sf(j+1,k,l) = rhs_vf(momxb+2)%sf(j+1,k,l) - 0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dx(j+1))
+                                rhs_vf(momxb+2)%sf(j+1,k,l) = rhs_vf(momxb+2)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dx(j+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dx(j+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dx(j))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dx(j))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dx(j))
 
                                 !$acc atomic
-                                rhs_vf(momxb+2)%sf(j+1,k,l) = rhs_vf(momxb+2)%sf(j+1,k,l) - 0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dx(j+1))
+                                rhs_vf(momxb+2)%sf(j+1,k,l) = rhs_vf(momxb+2)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dx(j+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dx(j+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dx(j))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dx(j))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dx(j))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dx(j+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dx(j))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dx(j+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dx(j))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j))
 
                             endif
 
@@ -1127,7 +1168,9 @@ contains
                             a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
                             a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
 
-                            cfl = (max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp),sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp)) + max(a_L,a_R))
+                            cfl = max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp), &
+                                      sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp)) + &
+                                  max(a_L,a_R)
 
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -1420,44 +1463,60 @@ contains
                                 end do
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dy(k+1))
+                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dy(k+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dy(k))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dy(k))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dy(k+1))
+                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dy(k+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dy(k))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dy(k))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dy(k+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dy(k))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dy(k+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dy(k))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k))
 
                             end if
 
@@ -1473,7 +1532,9 @@ contains
                             a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
                             a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
 
-                            cfl = (max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp),sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp)) + max(a_L,a_R))
+                            cfl = max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp), &
+                                      sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp)) + &
+                                  max(a_L,a_R)
 
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -1767,64 +1828,88 @@ contains
                                 end do
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dy(k+1))
+                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dy(k+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dy(k))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dy(k))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dy(k+1))
+                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dy(k+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dy(k))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dy(k))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k))
 
                                 !$acc atomic
-                                rhs_vf(momxb+2)%sf(j,k+1,l) = rhs_vf(momxb+2)%sf(j,k+1,l) - 0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+2)%sf(j,k+1,l) = rhs_vf(momxb+2)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dy(k+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dy(k+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dy(k))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dy(k))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dy(k))
 
                                 !$acc atomic
-                                rhs_vf(momxb+2)%sf(j,k+1,l) = rhs_vf(momxb+2)%sf(j,k+1,l) - 0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+2)%sf(j,k+1,l) = rhs_vf(momxb+2)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dy(k+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dy(k+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dy(k))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dy(k))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dy(k))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dy(k+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dy(k))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dy(k+1))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k+1))
 
                                 !$acc atomic
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dy(k))
                                 !$acc atomic
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                    0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k))
 
                             endif
 
@@ -1840,7 +1925,9 @@ contains
                             a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
                             a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
 
-                            cfl = (max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp),sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp)) + max(a_L,a_R))
+                            cfl = max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp), &
+                                      sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp)) + &
+                                  max(a_L,a_R)
 
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -2160,64 +2247,88 @@ contains
                             end do
 
                             !$acc atomic
-                            rhs_vf(momxb)%sf(j,k,l+1) = rhs_vf(momxb)%sf(j,k,l+1) - 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dz(l+1))
+                            rhs_vf(momxb)%sf(j,k,l+1) = rhs_vf(momxb)%sf(j,k,l+1) - &
+                                0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dz(l+1))
                             !$acc atomic
-                            rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dz(l+1))
+                            rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - &
+                                0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dz(l+1))
 
                             !$acc atomic
-                            rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dz(l))
+                            rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
+                                0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dz(l))
                             !$acc atomic
-                            rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dz(l))
+                            rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dz(l))
 
                             !$acc atomic
-                            rhs_vf(momxb)%sf(j,k,l+1) = rhs_vf(momxb)%sf(j,k,l+1) - 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dz(l+1))
+                            rhs_vf(momxb)%sf(j,k,l+1) = rhs_vf(momxb)%sf(j,k,l+1) - &
+                                0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dz(l+1))
                             !$acc atomic
-                            rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dz(l+1))
+                            rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - &
+                                0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dz(l+1))
 
                             !$acc atomic
-                            rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dz(l))
+                            rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
+                                0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dz(l))
                             !$acc atomic
-                            rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dz(l))
+                            rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dz(l))
 
                             !$acc atomic
-                            rhs_vf(momxb+1)%sf(j,k,l+1) = rhs_vf(momxb+1)%sf(j,k,l+1) - 0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dz(l+1))
+                            rhs_vf(momxb+1)%sf(j,k,l+1) = rhs_vf(momxb+1)%sf(j,k,l+1) - &
+                                0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dz(l+1))
                             !$acc atomic
-                            rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*vflux_L_arr(2)*vel_L(2)*(1._wp/dz(l+1))
+                            rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - &
+                                0.5_wp*mu_L*vflux_L_arr(2)*vel_L(2)*(1._wp/dz(l+1))
 
                             !$acc atomic
-                            rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dz(l))
+                            rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
+                                0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dz(l))
                             !$acc atomic
-                            rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(2)*vel_L(2)*(1._wp/dz(l))
+                            rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                0.5_wp*mu_L*vflux_L_arr(2)*vel_L(2)*(1._wp/dz(l))
 
                             !$acc atomic
-                            rhs_vf(momxb+1)%sf(j,k,l+1) = rhs_vf(momxb+1)%sf(j,k,l+1) - 0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dz(l+1))
+                            rhs_vf(momxb+1)%sf(j,k,l+1) = rhs_vf(momxb+1)%sf(j,k,l+1) - &
+                                0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dz(l+1))
                             !$acc atomic
-                            rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_R*vflux_R_arr(2)*vel_R(2)*(1._wp/dz(l+1))
+                            rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - &
+                                0.5_wp*mu_R*vflux_R_arr(2)*vel_R(2)*(1._wp/dz(l+1))
 
                             !$acc atomic
-                            rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dz(l))
+                            rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
+                                0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dz(l))
                             !$acc atomic
-                            rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(2)*vel_R(2)*(1._wp/dz(l))
+                            rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                0.5_wp*mu_R*vflux_R_arr(2)*vel_R(2)*(1._wp/dz(l))
 
                             !$acc atomic
-                            rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) - 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dz(l+1))
+                            rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) - &
+                                0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dz(l+1))
                             !$acc atomic
-                            rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(3)*(1._wp/dz(l+1))
+                            rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - &
+                                0.5_wp*mu_L*vflux_L_arr(3)*vel_L(3)*(1._wp/dz(l+1))
 
                             !$acc atomic
-                            rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dz(l))
+                            rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + &
+                                0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dz(l))
                             !$acc atomic
-                            rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(3)*(1._wp/dz(l))
+                            rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                0.5_wp*mu_L*vflux_L_arr(3)*vel_L(3)*(1._wp/dz(l))
 
                             !$acc atomic
-                            rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) - 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dz(l+1))
+                            rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) - &
+                                0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dz(l+1))
                             !$acc atomic
-                            rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(3)*(1._wp/dz(l+1))
+                            rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - &
+                                0.5_wp*mu_R*vflux_R_arr(3)*vel_R(3)*(1._wp/dz(l+1))
 
                             !$acc atomic
-                            rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dz(l))
+                            rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + &
+                                0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dz(l))
                             !$acc atomic
-                            rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(3)*(1._wp/dz(l))
+                            rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                                0.5_wp*mu_R*vflux_R_arr(3)*vel_R(3)*(1._wp/dz(l))
 
                         endif
 
@@ -2233,7 +2344,9 @@ contains
                         a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
                         a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
 
-                        cfl = (max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp),sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp)) + max(a_L,a_R))
+                        cfl = (max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp),&
+                                   sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp)) + &
+                               max(a_L,a_R))
 
                         !$acc loop seq
                         do i = 1, num_fluids
