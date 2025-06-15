@@ -24,6 +24,10 @@ jobs:
     if: needs.file-changes.outputs.checkall == 'true'
     runs-on: ubuntu-latest
     steps:
+      - name: Clone - PR
+        uses: actions/checkout@v4
+        with:
+          path: pr
       - name: Set up Singularity
         uses: eWaterCycle/setup-singularity@v7
         with:
@@ -51,7 +55,7 @@ jobs:
         with:
           name: singularity-images
           path: |
-            mfc_cpu.sif
-            mfc_gpu.sif
-            mfc_cpu_bench.sif
-            mfc_gpu_bench.sif
+            pr/.github/workflows/images/mfc_cpu.sif
+            pr/.github/workflows/images/mfc_gpu.sif
+            pr/.github/workflows/images/mfc_cpu_bench.sif
+            pr/.github/workflows/images/mfc_gpu_bench.sif
