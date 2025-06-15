@@ -16,7 +16,7 @@ From: ubuntu:24.04
     cd /opt
     git clone --depth 1 https://github.com/mflowcode/mfc.git MFC
     cd /opt/MFC
-    ./mfc.sh build -j $(nproc) --case-optimization
+    ./mfc.sh build -j $(nproc)
     ./mfc.sh test --dry-run -j $(nproc)
 
 %runscript
