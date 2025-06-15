@@ -124,7 +124,7 @@ class TestCase(case.Case):
         self.override_tol = override_tol
         super().__init__({**BASE_CFG.copy(), **mods})
 
-    def run(self, targets: List[Union[str, MFCTarget]], gpus: Set[int], rdma_mpi: bool = False) -> subprocess.CompletedProcess:
+    def run(self, targets: List[Union[str, MFCTarget]], gpus: Set[int]) -> subprocess.CompletedProcess:
         if gpus is not None and len(gpus) != 0:
             gpus_select = ["--gpus"] + [str(_) for _ in gpus]
         else:
@@ -146,7 +146,7 @@ class TestCase(case.Case):
             mfc_script, "run", filepath, "--no-build", *tasks, *case_optimization,
             *jobs, "-t", *target_names, *gpus_select, *ARG("--")
         ]
-        
+
         return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     def get_trace(self) -> str:
