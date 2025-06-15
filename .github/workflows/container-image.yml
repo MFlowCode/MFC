@@ -41,20 +41,20 @@ jobs:
       - name: Build Singularity Images
         run: |
           echo "Building Singularity CPU Image"
-          (cd pr/.github/workflows/image && sudo apptainer build mfc_cpu.sif Singularity.cpu)
+          (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu.sif Singularity.cpu)
           echo "Building Singularity GPU Image"
-          (cd pr/.github/workflows/image && sudo apptainer build mfc_gpu.sif Singularity.gpu)
+          (cd pr/.github/workflows/images && sudo apptainer build mfc_gpu.sif Singularity.gpu)
           echo "Building Singularity CPU Benchmark Image"
-          (cd pr/.github/workflows/image && sudo apptainer build mfc_cpu_bench.sif Singularity.cpu_bench)
+          (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu_bench.sif Singularity.cpu_bench)
           echo "Building Singularity GPU Benchmark Image"
-          (cd pr/.github/workflows/image && sudo apptainer build mfc_gpu_bench.sif Singularity.gpu_bench)
+          (cd pr/.github/workflows/images && sudo apptainer build mfc_gpu_bench.sif Singularity.gpu_bench)
       - name: Upload images as artifacts
         uses: actions/upload-artifact@v4
         if:   always()
         with:
           name: singularity-images
           path: |
-            pr/.github/workflows/image/mfc_cpu.sif
-            pr/.github/workflows/image/mfc_gpu.sif
-            pr/.github/workflows/image/mfc_cpu_bench.sif
-            pr/.github/workflows/image/mfc_gpu_bench.sif
+            pr/.github/workflows/images/mfc_cpu.sif
+            pr/.github/workflows/images/mfc_gpu.sif
+            pr/.github/workflows/images/mfc_cpu_bench.sif
+            pr/.github/workflows/images/mfc_gpu_bench.sif
