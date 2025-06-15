@@ -1,919 +1,0 @@
-mfc: Found CMake: /fastscratch/bwilfong3/software/MFC-Wilfong/build/cmake/bin/cmake.
-mfc: OK > (venv) Entered the Python 3.10.16 virtual environment (>= 3.9).
-
-      .=++*:          -+*+=.        | bwilfong3@wingtip-gpu3 [Linux]
-     :+   -*-        ==   =* .      | ------------------------------
-   :*+      ==      ++    .+-       | 
-  :*##-.....:*+   .#%+++=--+=:::.   | --jobs 32
-  -=-++-======#=--**+++==+*++=::-:. | --mpi --gpu --no-debug --no-gcov --no-unified --no-single
- .:++=----------====+*= ==..:%..... | --targets pre_process, simulation, and post_process
-  .:-=++++===--==+=-+=   +.  :=     | 
-  +#=::::::::=%=. -+:    =+   *:    | ----------------------------------------------------------
- .*=-=*=..    :=+*+:      -...--    | $ ./mfc.sh (build, run, test, clean, count, packer) --help
-
- Acquiring /fastscratch/bwilfong3/exampleCases/3D_TGV/case.py...
- Acquiring /fastscratch/bwilfong3/exampleCases/3D_TGV/case.py...
- Build | pre_process, simulation, and post_process | Case Optimized: /fastscratch/bwilfong3/exampleCases/3D_TGV/case.py
-
- Generating case.fpp.
-   * Codegen: patch_icpp(1)%vel(1) = 37.6636429464809*sin(x/1)*cos(y/1)*sin(z/1)
-   * Codegen: patch_icpp(1)%vel(2) = -37.6636429464809*cos(x/1)*sin(y/1)*sin(z/1)
-   * Codegen: patch_icpp(1)%pres = 101325 + (1*37.6636429464809**2/16)*(cos(2*x/1) + cos(2*y/1))*(cos(2*z/1) + 2)
-   Writing a (new) custom case.fpp file.
- $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/354b0dae2c --target pre_process --parallel 32 --config Release
-
-[  1%] Building Fortran object CMakeFiles/pre_process_lib.dir/modules/pre_process/m_thermochem.f90.o
-[  2%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_precision_select.f90.o
-[  3%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_nvtx.f90.o
-[  4%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_eigen_solver.f90.o
-[  5%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_constants.fpp.f90.o
-[  6%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_delay_file_access.f90.o
-[  7%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_derived_types.fpp.f90.o
-[  8%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_helper_basic.f90.o
-[  9%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_global_parameters.fpp.f90.o
-[ 10%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_mpi_common.fpp.f90.o
-[ 12%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_chemistry.fpp.f90.o
-[ 13%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_finite_differences.fpp.f90.o
-[ 14%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_patch_helper.fpp.f90.o
-[ 15%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_helper.fpp.f90.o
-[ 16%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_mpi_proxy.fpp.f90.o
-[ 18%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_variables_conversion.fpp.f90.o
-[ 18%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_compile_specific.f90.o
-[ 19%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_checker.fpp.f90.o
-[ 21%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_checker_common.fpp.f90.o
-[ 21%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_compute_levelset.fpp.f90.o
-[ 23%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_model.fpp.f90.o
-[ 24%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_perturbation.fpp.f90.o
-[ 25%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/pre_process/m_grid.f90.o
-[ 26%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_boundary_conditions.fpp.f90.o
-[ 27%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_assign_variables.fpp.f90.o
-[ 28%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_phase_change.fpp.f90.o
-[ 29%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_data_output.fpp.f90.o
-[ 30%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_patches.fpp.f90.o
-[ 31%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_check_ib_patches.fpp.f90.o
-[ 32%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_check_patches.fpp.f90.o
-[ 34%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_initial_condition.fpp.f90.o
-[ 35%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_start_up.fpp.f90.o
-[ 36%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/pre_process/p_main.f90.o
-[ 62%] Built target pre_process_lib
-[100%] Built target pre_process
-
- $ cmake --install /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/354b0dae2c
-
--- Install configuration: "Release"
--- Installing: /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/354b0dae2c/bin/pre_process
--- Set runtime path of "/fastscratch/bwilfong3/software/MFC-Wilfong/build/install/354b0dae2c/bin/pre_process" to ""
-
- Generating case.fpp.
-   Case optimization is enabled.
-   Writing a (new) custom case.fpp file.
- $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/6e1ae1482f --target simulation --parallel 32 --config Release
-
-[  1%] Building Fortran object CMakeFiles/simulation_lib.dir/src/common/m_precision_select.f90.o
-[  2%] Building Fortran object CMakeFiles/simulation_lib.dir/modules/simulation/m_thermochem.f90.o
-[  2%] Building Fortran object CMakeFiles/simulation_lib.dir/src/common/m_nvtx.f90.o
-[  3%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_constants.fpp.f90.o
-[  4%] Building Fortran object CMakeFiles/simulation_lib.dir/src/common/m_eigen_solver.f90.o
-[  5%] Building Fortran object CMakeFiles/simulation_lib.dir/src/common/m_delay_file_access.f90.o
-[  6%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_derived_types.fpp.f90.o
-[  7%] Building Fortran object CMakeFiles/simulation_lib.dir/src/common/m_helper_basic.f90.o
-[  8%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_global_parameters.fpp.f90.o
-[  9%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_mpi_common.fpp.f90.o
-[ 10%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_compute_cbc.fpp.f90.o
-[ 11%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_chemistry.fpp.f90.o
-[ 11%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_finite_differences.fpp.f90.o
-[ 12%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_signal_handler.fpp.f90.o
-[ 13%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_helper.fpp.f90.o
-[ 14%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_mpi_proxy.fpp.f90.o
-[ 15%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_hypoelastic.fpp.f90.o
-[ 16%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_variables_conversion.fpp.f90.o
-[ 17%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_checker_common.fpp.f90.o
-[ 17%] Building Fortran object CMakeFiles/simulation_lib.dir/src/common/m_compile_specific.f90.o
-[ 17%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_bubbles_EL_kernels.fpp.f90.o
-[ 18%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_checker.fpp.f90.o
-[ 18%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_fftw.fpp.f90.o
-[ 18%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_boundary_conditions.fpp.f90.o
-[ 19%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_bubbles.fpp.f90.o
-[ 20%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_body_forces.fpp.f90.o
-[ 21%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_hyperelastic.fpp.f90.o
-[ 21%] Building Fortran object CMakeFiles/simulation_lib.dir/src/simulation/m_sim_helpers.f90.o
-[ 22%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_igr.fpp.f90.o
-[ 23%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_phase_change.fpp.f90.o
-[ 24%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_qbmm.fpp.f90.o
-[ 25%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_weno.fpp.f90.o
-[ 26%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_ibm.fpp.f90.o
-[ 26%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_cbc.fpp.f90.o
-[ 27%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_acoustic_src.fpp.f90.o
-[ 28%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_bubbles_EE.fpp.f90.o
-[ 29%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_bubbles_EL.fpp.f90.o
-[ 30%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_data_output.fpp.f90.o
-[ 31%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_surface_tension.fpp.f90.o
-[ 32%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_viscous.fpp.f90.o
-[ 33%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_riemann_solvers.fpp.f90.o
-[ 33%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_rhs.fpp.f90.o
-[ 33%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_time_steppers.fpp.f90.o
-[ 34%] Building Fortran object CMakeFiles/simulation_lib.dir/src/simulation/m_derived_variables.f90.o
-[ 35%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_start_up.fpp.f90.o
-[ 36%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/p_main.fpp.f90.o
-[ 64%] Built target simulation_lib
-[100%] Built target simulation
-
- $ cmake --install /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/6e1ae1482f
-
--- Install configuration: "Release"
--- Installing: /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/6e1ae1482f/bin/simulation
--- Set runtime path of "/fastscratch/bwilfong3/software/MFC-Wilfong/build/install/6e1ae1482f/bin/simulation" to ""
-
- Generating case.fpp.
-   Writing a (new) custom case.fpp file.
- $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/26e02562fd --target post_process --parallel 32 --config Release
-
-[  1%] Building Fortran object CMakeFiles/post_process_lib.dir/src/common/m_precision_select.f90.o
-[  3%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_phase_change.fpp.f90.o
-[  4%] Building Fortran object CMakeFiles/post_process_lib.dir/modules/post_process/m_thermochem.f90.o
-[  6%] Building Fortran object CMakeFiles/post_process_lib.dir/src/common/m_nvtx.f90.o
-[  7%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_constants.fpp.f90.o
-[  9%] Building Fortran object CMakeFiles/post_process_lib.dir/src/common/m_delay_file_access.f90.o
-[ 10%] Building Fortran object CMakeFiles/post_process_lib.dir/src/common/m_eigen_solver.f90.o
-[ 12%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_derived_types.fpp.f90.o
-[ 14%] Building Fortran object CMakeFiles/post_process_lib.dir/src/common/m_helper_basic.f90.o
-[ 15%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_global_parameters.fpp.f90.o
-[ 17%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_mpi_common.fpp.f90.o
-[ 18%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_chemistry.fpp.f90.o
-[ 20%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_finite_differences.fpp.f90.o
-[ 21%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_helper.fpp.f90.o
-[ 23%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_mpi_proxy.fpp.f90.o
-[ 25%] Building Fortran object CMakeFiles/post_process_lib.dir/src/common/m_compile_specific.f90.o
-[ 26%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_checker.fpp.f90.o
-[ 28%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_checker_common.fpp.f90.o
-[ 29%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_variables_conversion.fpp.f90.o
-[ 31%] Building Fortran object CMakeFiles/post_process_lib.dir/src/post_process/m_data_input.f90.o
-[ 32%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_derived_variables.fpp.f90.o
-[ 34%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_data_output.fpp.f90.o
-[ 35%] Building Fortran object CMakeFiles/post_process_lib.dir/src/post_process/m_start_up.f90.o
-[ 37%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/p_main.fpp.f90.o
-[ 60%] Built target post_process_lib
-[100%] Built target post_process
-
- $ cmake --install /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/26e02562fd
-
--- Install configuration: "Release"
--- Installing: /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/26e02562fd/bin/post_process
--- Set runtime path of "/fastscratch/bwilfong3/software/MFC-Wilfong/build/install/26e02562fd/bin/post_process" to ""
-
- Run
-   Using queue system Interactive.
-   Using baked-in template for default.
-   Generating input files for pre_process...
-    
-     Generating pre_process.inp:
-       INFO: Forwarded 37/62 parameters.
-    
-   Generating input files for simulation...
-    
-     Generating simulation.inp:
-       INFO: Forwarded 40/62 parameters.
-    
-   Generating input files for post_process...
-    
-     Generating post_process.inp:
-       INFO: Forwarded 35/62 parameters.
-    
-   $ /bin/bash /fastscratch/bwilfong3/exampleCases/3D_TGV/MFC.sh
-
-+-----------------------------------------------------------------------------------------------------------+ 
-| MFC case # MFC @ /fastscratch/bwilfong3/exampleCases/3D_TGV/case.py:                                      |
-+-----------------------------------------------------------------------------------------------------------+ 
-| * Start-time     14:13:20                            * Start-date     14:13:20                            |
-| * Partition      N/A                                 * Walltime       01:00:00                            |
-| * Account        N/A                                 * Nodes          1                                   |
-| * Job Name       MFC                                 * Engine         interactive                         |
-| * QoS            N/A                                 * Binary         N/A                                 |
-| * Queue System   Interactive                         * Email          N/A                                 |
-+-----------------------------------------------------------------------------------------------------------+ 
-
-mfc: WARNING > This is the default template.
-mfc: WARNING > It is not intended to support all systems and execution engines.
-mfc: WARNING > Consider using a different template via the --computer option if you encounter problems.
-mfc: OK > :) Selected MPI launcher mpirun. Use --binary to override.
-mfc: OK > :) Running pre_process:
-
- Pre-processing a 100x100x100 case on 1 rank(s)
- Processing patch            1
- Elapsed Time   0.7056040763854980     
-Generating '/nethome/bwilfong3/tmp/nsys-report-42d0.qdstrm'
-[1/8] [0%                          ] report12.nsys-rep[1/8] [0%                          ] report12.nsys-rep[1/8] [=====30%                    ] report12.nsys-rep[1/8] [==============61%           ] report12.nsys-rep[1/8] [===================80%      ] report12.nsys-rep[1/8] [=====================89%    ] report12.nsys-rep[1/8] [========================100%] report12.nsys-rep[1/8] [========================100%] report12.nsys-rep
-[2/8] [0%                          ] report12.sqlite[2/8] [1%                          ] report12.sqlite[2/8] [2%                          ] report12.sqlite[2/8] [3%                          ] report12.sqlite[2/8] [4%                          ] report12.sqlite[2/8] [5%                          ] report12.sqlite[2/8] [6%                          ] report12.sqlite[2/8] [7%                          ] report12.sqlite[2/8] [8%                          ] report12.sqlite[2/8] [9%                          ] report12.sqlite[2/8] [10%                         ] report12.sqlite[2/8] [11%                         ] report12.sqlite[2/8] [12%                         ] report12.sqlite[2/8] [13%                         ] report12.sqlite[2/8] [14%                         ] report12.sqlite[2/8] [=15%                        ] report12.sqlite[2/8] [=16%                        ] report12.sqlite[2/8] [=17%                        ] report12.sqlite[2/8] [==18%                       ] report12.sqlite[2/8] [==19%                       ] report12.sqlite[2/8] [==20%                       ] report12.sqlite[2/8] [==21%                       ] report12.sqlite[2/8] [===22%                      ] report12.sqlite[2/8] [===23%                      ] report12.sqlite[2/8] [===24%                      ] report12.sqlite[2/8] [====25%                     ] report12.sqlite[2/8] [====26%                     ] report12.sqlite[2/8] [====27%                     ] report12.sqlite[2/8] [====28%                     ] report12.sqlite[2/8] [=====29%                    ] report12.sqlite[2/8] [=====30%                    ] report12.sqlite[2/8] [=====31%                    ] report12.sqlite[2/8] [=====32%                    ] report12.sqlite[2/8] [======33%                   ] report12.sqlite[2/8] [======34%                   ] report12.sqlite[2/8] [======35%                   ] report12.sqlite[2/8] [=======36%                  ] report12.sqlite[2/8] [=======37%                  ] report12.sqlite[2/8] [=======38%                  ] report12.sqlite[2/8] [=======39%                  ] report12.sqlite[2/8] [========40%                 ] report12.sqlite[2/8] [========41%                 ] report12.sqlite[2/8] [========42%                 ] report12.sqlite[2/8] [=========43%                ] report12.sqlite[2/8] [=========44%                ] report12.sqlite[2/8] [=========45%                ] report12.sqlite[2/8] [=========46%                ] report12.sqlite[2/8] [==========47%               ] report12.sqlite[2/8] [==========48%               ] report12.sqlite[2/8] [==========49%               ] report12.sqlite[2/8] [===========50%              ] report12.sqlite[2/8] [===========51%              ] report12.sqlite[2/8] [===========52%              ] report12.sqlite[2/8] [===========53%              ] report12.sqlite[2/8] [============54%             ] report12.sqlite[2/8] [============55%             ] report12.sqlite[2/8] [============56%             ] report12.sqlite[2/8] [============57%             ] report12.sqlite[2/8] [=============58%            ] report12.sqlite[2/8] [=============59%            ] report12.sqlite[2/8] [=============60%            ] report12.sqlite[2/8] [==============61%           ] report12.sqlite[2/8] [==============62%           ] report12.sqlite[2/8] [==============63%           ] report12.sqlite[2/8] [==============64%           ] report12.sqlite[2/8] [===============65%          ] report12.sqlite[2/8] [===============66%          ] report12.sqlite[2/8] [===============67%          ] report12.sqlite[2/8] [================68%         ] report12.sqlite[2/8] [================69%         ] report12.sqlite[2/8] [================70%         ] report12.sqlite[2/8] [================71%         ] report12.sqlite[2/8] [=================72%        ] report12.sqlite[2/8] [=================73%        ] report12.sqlite[2/8] [=================74%        ] report12.sqlite[2/8] [==================75%       ] report12.sqlite[2/8] [==================76%       ] report12.sqlite[2/8] [==================77%       ] report12.sqlite[2/8] [==================78%       ] report12.sqlite[2/8] [===================79%      ] report12.sqlite[2/8] [===================80%      ] report12.sqlite[2/8] [===================81%      ] report12.sqlite[2/8] [===================82%      ] report12.sqlite[2/8] [====================83%     ] report12.sqlite[2/8] [====================84%     ] report12.sqlite[2/8] [====================85%     ] report12.sqlite[2/8] [=====================86%    ] report12.sqlite[2/8] [=====================87%    ] report12.sqlite[2/8] [=====================88%    ] report12.sqlite[2/8] [=====================89%    ] report12.sqlite[2/8] [======================90%   ] report12.sqlite[2/8] [======================91%   ] report12.sqlite[2/8] [======================92%   ] report12.sqlite[2/8] [=======================93%  ] report12.sqlite[2/8] [=======================94%  ] report12.sqlite[2/8] [=======================95%  ] report12.sqlite[2/8] [=======================96%  ] report12.sqlite[2/8] [========================97% ] report12.sqlite[2/8] [========================98% ] report12.sqlite[2/8] [========================99% ] report12.sqlite[2/8] [========================100%] report12.sqlite[2/8] [========================100%] report12.sqlite
-[3/8] Executing 'nvtx_sum' stats report
-[4/8] Executing 'cuda_api_sum' stats report
-
- Time (%)  Total Time (ns)  Num Calls  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)           Name         
- --------  ---------------  ---------  --------  --------  --------  --------  -----------  ----------------------
-    100.0            2,543          1   2,543.0   2,543.0     2,543     2,543          0.0  cuModuleGetLoadingMode
-
-[5/8] Executing 'cuda_gpu_kern_sum' stats report
-[6/8] Executing 'cuda_gpu_mem_time_sum' stats report
-[7/8] Executing 'cuda_gpu_mem_size_sum' stats report
-[8/8] Executing 'openacc_sum' stats report
-Generated:
-    /fastscratch/bwilfong3/exampleCases/3D_TGV/report12.nsys-rep
-    /fastscratch/bwilfong3/exampleCases/3D_TGV/report12.sqlite
-
-mfc: OK > :) Running simulation:
-
- Simulating a case-optimized 100x100x100 case on 1 rank(s) with OpenACC offloading.
- [  0%]  Time step        1 of 11 @ t_step = 0
- [ 10%]  Time step        2 of 11 @ t_step = 1
- [ 19%]  Time step        3 of 11 @ t_step = 2
- [ 28%]  Time step        4 of 11 @ t_step = 3
- [ 37%]  Time step        5 of 11 @ t_step = 4
- [ 46%]  Time step        6 of 11 @ t_step = 5
- [ 55%]  Time step        7 of 11 @ t_step = 6
- [ 64%]  Time step        8 of 11 @ t_step = 7
- [ 73%]  Time step        9 of 11 @ t_step = 8
- [ 82%]  Time step       10 of 11 @ t_step = 9
- Performance:   0.5430735958119234      ns/gp/eq/rhs
-Generating '/nethome/bwilfong3/tmp/nsys-report-fb27.qdstrm'
-[1/8] [0%                          ] report13.nsys-rep[1/8] [0%                          ] report13.nsys-rep[1/8] [8%                          ] report13.nsys-rep[1/8] [=16%                        ] report13.nsys-rep[1/8] [8%                          ] report13.nsys-rep[1/8] [=======38%                  ] report13.nsys-rep[1/8] [================69%         ] report13.nsys-rep[1/8] [==================76%       ] report13.nsys-rep[1/8] [==================77%       ] report13.nsys-rep[1/8] [========================100%] report13.nsys-rep[1/8] [========================100%] report13.nsys-rep
-[2/8] [0%                          ] report13.sqlite[2/8] [1%                          ] report13.sqlite[2/8] [2%                          ] report13.sqlite[2/8] [3%                          ] report13.sqlite[2/8] [4%                          ] report13.sqlite[2/8] [5%                          ] report13.sqlite[2/8] [6%                          ] report13.sqlite[2/8] [7%                          ] report13.sqlite[2/8] [8%                          ] report13.sqlite[2/8] [9%                          ] report13.sqlite[2/8] [10%                         ] report13.sqlite[2/8] [11%                         ] report13.sqlite[2/8] [12%                         ] report13.sqlite[2/8] [13%                         ] report13.sqlite[2/8] [14%                         ] report13.sqlite[2/8] [=15%                        ] report13.sqlite[2/8] [=16%                        ] report13.sqlite[2/8] [=17%                        ] report13.sqlite[2/8] [==18%                       ] report13.sqlite[2/8] [==19%                       ] report13.sqlite[2/8] [==20%                       ] report13.sqlite[2/8] [==21%                       ] report13.sqlite[2/8] [===22%                      ] report13.sqlite[2/8] [===23%                      ] report13.sqlite[2/8] [===24%                      ] report13.sqlite[2/8] [====25%                     ] report13.sqlite[2/8] [====26%                     ] report13.sqlite[2/8] [====27%                     ] report13.sqlite[2/8] [====28%                     ] report13.sqlite[2/8] [=====29%                    ] report13.sqlite[2/8] [=====30%                    ] report13.sqlite[2/8] [=====31%                    ] report13.sqlite[2/8] [=====32%                    ] report13.sqlite[2/8] [======33%                   ] report13.sqlite[2/8] [======34%                   ] report13.sqlite[2/8] [======35%                   ] report13.sqlite[2/8] [=======36%                  ] report13.sqlite[2/8] [=======37%                  ] report13.sqlite[2/8] [=======38%                  ] report13.sqlite[2/8] [=======39%                  ] report13.sqlite[2/8] [========40%                 ] report13.sqlite[2/8] [========41%                 ] report13.sqlite[2/8] [========42%                 ] report13.sqlite[2/8] [=========43%                ] report13.sqlite[2/8] [=========44%                ] report13.sqlite[2/8] [=========45%                ] report13.sqlite[2/8] [=========46%                ] report13.sqlite[2/8] [==========47%               ] report13.sqlite[2/8] [==========48%               ] report13.sqlite[2/8] [==========49%               ] report13.sqlite[2/8] [===========50%              ] report13.sqlite[2/8] [===========51%              ] report13.sqlite[2/8] [===========52%              ] report13.sqlite[2/8] [===========53%              ] report13.sqlite[2/8] [============54%             ] report13.sqlite[2/8] [============55%             ] report13.sqlite[2/8] [============56%             ] report13.sqlite[2/8] [============57%             ] report13.sqlite[2/8] [=============58%            ] report13.sqlite[2/8] [=============59%            ] report13.sqlite[2/8] [=============60%            ] report13.sqlite[2/8] [==============61%           ] report13.sqlite[2/8] [==============62%           ] report13.sqlite[2/8] [==============63%           ] report13.sqlite[2/8] [==============64%           ] report13.sqlite[2/8] [===============65%          ] report13.sqlite[2/8] [===============66%          ] report13.sqlite[2/8] [===============67%          ] report13.sqlite[2/8] [================68%         ] report13.sqlite[2/8] [================69%         ] report13.sqlite[2/8] [================70%         ] report13.sqlite[2/8] [================71%         ] report13.sqlite[2/8] [=================72%        ] report13.sqlite[2/8] [=================73%        ] report13.sqlite[2/8] [=================74%        ] report13.sqlite[2/8] [==================75%       ] report13.sqlite[2/8] [==================76%       ] report13.sqlite[2/8] [==================77%       ] report13.sqlite[2/8] [==================78%       ] report13.sqlite[2/8] [===================79%      ] report13.sqlite[2/8] [===================80%      ] report13.sqlite[2/8] [===================81%      ] report13.sqlite[2/8] [===================82%      ] report13.sqlite[2/8] [====================83%     ] report13.sqlite[2/8] [====================84%     ] report13.sqlite[2/8] [====================85%     ] report13.sqlite[2/8] [=====================86%    ] report13.sqlite[2/8] [=====================87%    ] report13.sqlite[2/8] [=====================88%    ] report13.sqlite[2/8] [=====================89%    ] report13.sqlite[2/8] [======================90%   ] report13.sqlite[2/8] [======================91%   ] report13.sqlite[2/8] [======================92%   ] report13.sqlite[2/8] [=======================93%  ] report13.sqlite[2/8] [=======================94%  ] report13.sqlite[2/8] [=======================95%  ] report13.sqlite[2/8] [=======================96%  ] report13.sqlite[2/8] [========================97% ] report13.sqlite[2/8] [========================98% ] report13.sqlite[2/8] [========================99% ] report13.sqlite[2/8] [========================100%] report13.sqlite[2/8] [========================100%] report13.sqlite
-[3/8] Executing 'nvtx_sum' stats report
-
- Time (%)  Total Time (ns)  Instances     Avg (ns)         Med (ns)        Min (ns)       Max (ns)     StdDev (ns)    Style           Range        
- --------  ---------------  ---------  ---------------  ---------------  -------------  -------------  ------------  -------  ---------------------
-     34.0    1,108,107,337          1  1,108,107,337.0  1,108,107,337.0  1,108,107,337  1,108,107,337           0.0  PushPop  INIT                 
-     30.2      982,473,463          1    982,473,463.0    982,473,463.0    982,473,463    982,473,463           0.0  PushPop  INIT-MPI             
-     10.4      337,014,860          1    337,014,860.0    337,014,860.0    337,014,860    337,014,860           0.0  PushPop  SIMULATION-TIME-MARCH
-      5.3      172,195,001         10     17,219,500.1     10,190,851.0     10,125,109     80,414,625  22,204,626.2  PushPop  TIMESTEP             
-      5.1      166,974,906         30      5,565,830.2      3,254,366.0      3,224,952     27,195,088   7,039,177.4  PushPop  COMPUTE-RHS          
-      4.5      148,001,118          1    148,001,118.0    148,001,118.0    148,001,118    148,001,118           0.0  PushPop  SAVE-DATA            
-      3.6      116,319,932          1    116,319,932.0    116,319,932.0    116,319,932    116,319,932           0.0  PushPop  INIT-MODULES         
-      2.7       88,800,590         30      2,960,019.7        703,399.0        689,960     23,642,039   6,883,723.2  PushPop  IGR_Jacobi           
-      1.8       59,943,458         90        666,038.4        633,715.0        620,632        750,649      51,553.2  PushPop  IGR_RIEMANN          
-      1.5       49,287,961          1     49,287,961.0     49,287,961.0     49,287,961     49,287,961           0.0  PushPop  FINALIZE-MODULES     
-      0.3       11,125,341         30        370,844.7        326,125.0        314,894      1,667,903     245,041.1  PushPop  RHS-COMMUNICATION    
-      0.3        9,303,093          1      9,303,093.0      9,303,093.0      9,303,093      9,303,093           0.0  PushPop  INIT-GPU-VARS        
-      0.1        3,404,864         30        113,495.5        113,149.0        111,119        117,478       1,567.0  PushPop  IGR_SIGMA            
-      0.1        2,947,910         30         98,263.7         98,280.0         93,852        101,685       1,966.9  PushPop  IGR_SETUP            
-      0.0           20,325         40            508.1            397.5            220          3,037         449.0  PushPop  RHS-ELASTIC          
-
-[4/8] Executing 'cuda_api_sum' stats report
-
- Time (%)  Total Time (ns)  Num Calls    Avg (ns)      Med (ns)     Min (ns)    Max (ns)   StdDev (ns)           Name         
- --------  ---------------  ---------  ------------  ------------  ----------  ----------  -----------  ----------------------
-     47.6      128,040,550      4,333      29,550.1       6,910.0         806     718,062     92,531.1  cuStreamSynchronize   
-     17.6       47,253,080          1  47,253,080.0  47,253,080.0  47,253,080  47,253,080          0.0  cuModuleLoadDataEx    
-     12.0       32,364,125          1  32,364,125.0  32,364,125.0  32,364,125  32,364,125          0.0  cuMemHostAlloc        
-      8.2       22,055,616          5   4,411,123.2   3,845,187.0   3,013,472   6,320,797  1,452,010.2  cuMemcpyDtoHAsync_v2  
-      7.0       18,748,946      3,409       5,499.8       5,167.0       3,762      33,215      1,377.1  cuLaunchKernel        
-      4.1       10,897,770        373      29,216.5       4,648.0       3,306   1,776,543    197,494.7  cuMemcpyHtoDAsync_v2  
-      2.8        7,416,576         93      79,748.1       4,078.0       2,361   1,126,628    207,708.0  cuMemAlloc_v2         
-      0.6        1,534,074          1   1,534,074.0   1,534,074.0   1,534,074   1,534,074          0.0  cuMemAllocHost_v2     
-      0.2          407,843        134       3,043.6       2,849.0       2,225      10,339        939.0  cuMemsetD32Async      
-      0.0            2,672          3         890.7         653.0         378       1,641        664.2  cuCtxSetCurrent       
-      0.0            2,304          1       2,304.0       2,304.0       2,304       2,304          0.0  cuModuleGetLoadingMode
-      0.0            1,967          1       1,967.0       1,967.0       1,967       1,967          0.0  cuInit                
-
-[5/8] Executing 'cuda_gpu_kern_sum' stats report
-
- Time (%)  Total Time (ns)  Instances  Avg (ns)   Med (ns)   Min (ns)  Max (ns)  StdDev (ns)                              Name                            
- --------  ---------------  ---------  ---------  ---------  --------  --------  -----------  ------------------------------------------------------------
-     24.1       27,741,918        381   72,813.4   72,801.0    71,809    74,209        450.8  m_igr_s_igr_jacobi_iteration_456_gpu                        
-     18.6       21,344,732         30  711,491.1  711,798.5   709,286   713,094      1,113.5  m_igr_s_igr_riemann_solver_1380_gpu                         
-     15.8       18,150,205         30  605,006.8  605,045.0   603,334   607,237        838.3  m_igr_s_igr_riemann_solver_2887_gpu                         
-     15.7       18,012,064         30  600,402.1  600,661.0   597,317   603,109      1,587.5  m_igr_s_igr_riemann_solver_2355_gpu                         
-      6.8        7,798,014        381   20,467.2   20,449.0    20,288    20,736         83.3  m_igr_s_igr_jacobi_iteration_704_gpu                        
-      2.3        2,671,514         30   89,050.5   89,057.0    88,417    89,857        296.6  m_igr_s_igr_sigma_822_gpu                                   
-      1.5        1,758,511        381    4,615.5    4,608.0     4,288     5,088        155.2  m_igr_s_igr_jacobi_iteration_505_gpu                        
-      1.4        1,566,286        381    4,111.0    4,096.0     3,807     4,672        145.4  m_igr_s_igr_jacobi_iteration_539_gpu                        
-      1.3        1,459,303        381    3,830.2    3,808.0     3,712     4,032         56.4  m_igr_s_igr_jacobi_iteration_674_gpu                        
-      1.2        1,402,214        381    3,680.4    3,680.0     3,552     3,872         57.0  m_igr_s_igr_jacobi_iteration_605_gpu                        
-      1.2        1,382,414        381    3,628.4    3,616.0     3,520     3,840         58.8  m_igr_s_igr_jacobi_iteration_572_gpu                        
-      1.2        1,322,697        381    3,471.6    3,456.0     3,424     3,584         31.4  m_igr_s_igr_jacobi_iteration_640_gpu                        
-      1.1        1,270,030         10  127,003.0  126,946.0   125,954   127,905        526.6  m_time_steppers_s_3rd_order_tvd_rk_1051_gpu                 
-      1.1        1,264,682         10  126,468.2  126,273.0   125,665   127,394        600.0  m_time_steppers_s_3rd_order_tvd_rk_955_gpu                  
-      1.1        1,242,892         30   41,429.7   41,376.0    41,089    42,144        293.9  m_igr_s_initialize_igr_3428_gpu                             
-      1.0        1,123,467         30   37,448.9   37,328.5    36,449    40,577        750.8  m_boundary_conditions_s_populate_variables_buffers_128_gpu  
-      0.9        1,004,361         30   33,478.7   33,424.5    32,801    34,816        403.3  m_boundary_conditions_s_populate_variables_buffers_107_gpu_1
-      0.8          938,057         10   93,805.7   93,825.0    93,474    94,113        208.5  m_time_steppers_s_3rd_order_tvd_rk_858_gpu                  
-      0.8          865,833         30   28,861.1   28,864.0    28,289    29,440        305.4  m_boundary_conditions_s_populate_variables_buffers_314_gpu_1
-      0.8          863,815         30   28,793.8   28,800.0    28,321    29,441        261.5  m_boundary_conditions_s_populate_variables_buffers_291_gpu_1
-      0.7          848,005         30   28,266.8   28,240.0    27,680    28,833        344.2  m_boundary_conditions_s_populate_variables_buffers_233_gpu_1
-      0.7          830,537         30   27,684.6   27,584.5    27,264    29,121        375.3  m_boundary_conditions_s_populate_variables_buffers_210_gpu_1
-      0.0           19,936          1   19,936.0   19,936.0    19,936    19,936          0.0  m_igr_s_initialize_igr_module_177_gpu                       
-
-[6/8] Executing 'cuda_gpu_mem_time_sum' stats report
-
- Time (%)  Total Time (ns)  Count   Avg (ns)     Med (ns)    Min (ns)   Max (ns)   StdDev (ns)           Operation          
- --------  ---------------  -----  -----------  -----------  ---------  ---------  -----------  ----------------------------
-     68.7       18,282,434      5  3,656,486.8  3,113,883.0  2,399,734  5,408,112  1,348,448.5  [CUDA memcpy Device-to-Host]
-     30.7        8,177,515    373     21,923.6      1,056.0        992  1,568,526    174,152.8  [CUDA memcpy Host-to-Device]
-      0.5          139,139    134      1,038.4      1,024.0        992      1,153         28.2  [CUDA memset]               
-
-[7/8] Executing 'cuda_gpu_mem_size_sum' stats report
-
- Total (MB)  Count  Avg (MB)  Med (MB)  Min (MB)  Max (MB)  StdDev (MB)           Operation          
- ----------  -----  --------  --------  --------  --------  -----------  ----------------------------
-     67.816    373     0.182     0.000     0.000    12.813        1.476  [CUDA memcpy Host-to-Device]
-     64.065      5    12.813    12.813    12.813    12.813        0.000  [CUDA memcpy Device-to-Host]
-      0.001    134     0.000     0.000     0.000     0.000        0.000  [CUDA memset]               
-
-[8/8] Executing 'openacc_sum' stats report
-
- Time (%)  Total Time (ns)  Num Calls    Avg (ns)       Med (ns)      Min (ns)     Max (ns)    StdDev (ns)                       Name                      
- --------  ---------------  ---------  -------------  -------------  -----------  -----------  -----------  -----------------------------------------------
-     35.5      218,098,221          1  218,098,221.0  218,098,221.0  218,098,221  218,098,221          0.0  Device Init                                    
-      5.4       32,899,702        381       86,350.9       85,865.0       84,037       97,930      1,841.7  Compute Construct@m_igr.fpp:456                
-      5.0       30,624,723        762       40,189.9       39,947.5        2,529       82,483     36,780.2  Wait@m_igr.fpp:456                             
-      3.6       22,210,227          5    4,442,045.4    3,871,183.0    3,036,561    6,386,140  1,465,928.4  Update@m_start_up.fpp:1507                     
-      3.6       22,084,215          5    4,416,843.0    3,848,324.0    3,018,143    6,333,368  1,454,808.0  Enqueue Download@m_start_up.fpp:1507           
-      3.6       21,819,589         30      727,319.6      727,120.5      723,633      739,587      2,806.3  Compute Construct@m_igr.fpp:1380               
-      3.5       21,610,141         60      360,169.0      358,921.0        3,032      719,955    359,677.6  Wait@m_igr.fpp:1380                            
-      3.0       18,671,029         30      622,367.6      622,133.0      618,985      627,279      2,723.6  Compute Construct@m_igr.fpp:2887               
-      3.0       18,458,611         30      615,287.0      615,300.5      610,879      619,972      2,022.2  Compute Construct@m_igr.fpp:2355               
-      3.0       18,409,149         60      306,819.2      306,314.0        2,893      612,228    305,407.3  Wait@m_igr.fpp:2887                            
-      3.0       18,262,455         60      304,374.3      302,790.0        2,950      608,433    303,408.7  Wait@m_igr.fpp:2355                            
-      2.1       12,776,024        381       33,532.9       33,255.0       31,414       60,415      1,834.9  Compute Construct@m_igr.fpp:704                
-      1.5        9,309,103        381       24,433.3       24,471.0       22,249       37,787        825.0  Wait@m_igr.fpp:704                             
-      1.5        9,292,540         18      516,252.2       41,318.0       17,445    1,799,726    783,233.5  Update@m_start_up.fpp.f90:59                   
-      1.5        9,002,050         84      107,167.3        4,621.5        3,434    1,780,406    408,943.8  Enqueue Upload@m_start_up.fpp.f90:59           
-      1.1        6,917,828        381       18,157.0       17,922.0       15,779       23,634      1,125.9  Compute Construct@m_igr.fpp:505                
-      1.1        6,540,421        381       17,166.5       16,861.0       15,092       28,599      1,540.0  Compute Construct@m_igr.fpp:539                
-      1.0        6,345,864        381       16,655.8       16,430.0       14,920       38,491      1,412.5  Compute Construct@m_igr.fpp:674                
-      1.0        6,333,678        381       16,623.8       16,479.0       14,679       23,174        979.3  Compute Construct@m_igr.fpp:572                
-      1.0        6,296,295        381       16,525.7       16,374.0       14,528       32,195      1,200.4  Compute Construct@m_igr.fpp:605                
-      1.0        6,285,891        381       16,498.4       16,298.0       14,793       24,136      1,153.3  Compute Construct@m_igr.fpp:640                
-      0.5        3,354,680        381        8,804.9        8,876.0        4,962       11,217        573.3  Wait@m_igr.fpp:505                             
-      0.5        3,083,715        381        8,093.7        8,136.0        3,632       14,548        635.2  Wait@m_igr.fpp:539                             
-      0.5        3,081,641         30      102,721.4      102,726.5      101,393      106,046        910.4  Compute Construct@m_igr.fpp:822                
-      0.5        2,994,910        381        7,860.7        7,946.0        5,905        9,103        430.9  Wait@m_igr.fpp:674                             
-      0.5        2,938,016        381        7,711.3        7,756.0        5,515        8,818        404.0  Wait@m_igr.fpp:572                             
-      0.5        2,911,393        381        7,641.5        7,710.0        3,582       24,050        988.7  Wait@m_igr.fpp:605                             
-      0.5        2,903,603         60       48,393.4       48,511.0        3,112       94,082     45,128.0  Wait@m_igr.fpp:822                             
-      0.5        2,887,237        381        7,578.0        7,652.0        5,963        8,513        407.5  Wait@m_igr.fpp:640                             
-      0.4        2,615,416        381        6,864.6        6,322.0        4,974       15,918      1,505.8  Enqueue Launch@m_igr.fpp:456                   
-      0.4        2,581,582        381        6,775.8        6,413.0        5,029       12,378      1,066.4  Enqueue Launch@m_igr.fpp:505                   
-      0.4        2,519,406        381        6,612.6        6,213.0        4,881       18,831      1,472.5  Enqueue Launch@m_igr.fpp:539                   
-      0.4        2,507,823        381        6,582.2        6,244.0        4,940       33,894      1,685.8  Enqueue Launch@m_igr.fpp:704                   
-      0.4        2,458,236         10      245,823.6      139,663.5      106,749      650,608    191,675.6  Enter Data@m_time_steppers.fpp:216             
-      0.4        2,457,845        381        6,451.0        6,154.0        4,910       14,045      1,108.4  Enqueue Launch@m_igr.fpp:640                   
-      0.4        2,455,827        381        6,445.7        6,213.0        4,762       13,536        893.1  Enqueue Launch@m_igr.fpp:572                   
-      0.4        2,439,791        381        6,403.7        6,215.0        4,753       12,255        905.0  Enqueue Launch@m_igr.fpp:605                   
-      0.4        2,370,160        381        6,220.9        6,001.0        4,896       11,368        819.2  Enqueue Launch@m_igr.fpp:674                   
-      0.3        2,057,338        381        5,399.8        5,280.0        3,903       20,239        985.3  Enter Data@m_igr.fpp:456                       
-      0.3        1,658,578         30       55,285.9       55,170.5       54,040       56,908        745.2  Compute Construct@m_igr.fpp:3428               
-      0.3        1,616,987         30       53,899.6       52,841.5       50,519       75,938      4,578.2  Compute Construct@m_boundary_conditions.fpp:128
-      0.2        1,460,430         10      146,043.0      146,181.0      141,701      149,685      2,832.4  Compute Construct@m_time_steppers.fpp:1051     
-      0.2        1,447,555         10      144,755.5      143,870.5      141,286      150,897      2,894.0  Compute Construct@m_time_steppers.fpp:955      
-      0.2        1,431,460         60       23,857.7       23,508.5        2,053       46,323     21,636.4  Wait@m_igr.fpp:3428                            
-      0.2        1,429,329         30       47,644.3       47,599.5       46,045       51,727      1,211.4  Compute Construct@m_boundary_conditions.fpp:107
-      0.2        1,353,933         60       22,565.6       23,347.5        2,924       42,386     18,769.5  Wait@m_boundary_conditions.fpp:128             
-      0.2        1,316,343         30       43,878.1       42,413.0       41,118       86,141      8,010.2  Compute Construct@m_boundary_conditions.fpp:314
-      0.2        1,305,712         10      130,571.2      130,519.5      129,790      131,183        447.1  Wait@m_time_steppers.fpp:1051                  
-      0.2        1,302,152         10      130,215.2      130,116.5      129,070      131,345        656.4  Wait@m_time_steppers.fpp:955                   
-      0.2        1,273,174         30       42,439.1       42,346.5       41,267       44,295        783.6  Compute Construct@m_boundary_conditions.fpp:291
-      0.2        1,255,631         30       41,854.4       41,839.0       41,095       43,279        493.7  Compute Construct@m_boundary_conditions.fpp:233
-      0.2        1,234,716         30       41,157.2       41,039.0       39,512       43,491        833.2  Compute Construct@m_boundary_conditions.fpp:210
-      0.2        1,221,005         60       20,350.1       20,054.0        2,685       37,990     17,025.3  Wait@m_boundary_conditions.fpp:107             
-      0.2        1,128,838         10      112,883.8      112,798.0      108,235      120,208      3,703.8  Compute Construct@m_time_steppers.fpp:858      
-      0.2        1,088,721         60       18,145.4       17,892.0        3,220       33,748     14,766.3  Wait@m_boundary_conditions.fpp:291             
-      0.2        1,083,830         60       18,063.8       17,683.5        2,606       33,749     14,750.5  Wait@m_boundary_conditions.fpp:314             
-      0.2        1,070,551         60       17,842.5       17,700.5        2,896       33,039     14,534.8  Wait@m_boundary_conditions.fpp:233             
-      0.2        1,051,542         60       17,525.7       17,278.0        2,685       32,372     14,109.2  Wait@m_boundary_conditions.fpp:210             
-      0.2          974,402         10       97,440.2       97,337.5       96,567       98,276        496.2  Wait@m_time_steppers.fpp:858                   
-      0.1          638,453          5      127,690.6      122,437.0      117,945      146,694     12,016.0  Enter Data@m_time_steppers.fpp:427             
-      0.1          581,875         30       19,395.8       19,481.5       17,452       21,121        982.7  Update@m_igr.fpp:3423                          
-      0.1          564,612          6       94,102.0       95,141.5       83,900      106,081      8,840.6  Update@m_boundary_conditions.fpp:750           
-      0.1          499,456        381        1,310.9        1,295.0          928        3,335        227.4  Exit Data@m_igr.fpp:456                        
-      0.1          443,051         30       14,768.4       14,665.5       13,882       16,516        588.9  Update@m_igr.fpp:3426                          
-      0.1          348,215          6       58,035.8       58,528.5       50,944       66,990      6,467.8  Enqueue Upload@m_boundary_conditions.fpp:750   
-      0.0          301,937         30       10,064.6        9,923.5        8,432       12,075      1,055.8  Enqueue Upload@m_igr.fpp:3423                  
-      0.0          290,299         30        9,676.6        8,930.5        6,722       26,373      3,696.1  Enqueue Launch@m_boundary_conditions.fpp:128   
-      0.0          283,098         30        9,436.6        9,126.0        6,594       14,152      2,172.4  Enqueue Launch@m_igr.fpp:2887                  
-      0.0          255,436         30        8,514.5        6,882.5        6,009       51,116      8,069.7  Enqueue Launch@m_boundary_conditions.fpp:314   
-      0.0          231,222         30        7,707.4        7,377.5        6,538       12,211      1,181.5  Enqueue Launch@m_boundary_conditions.fpp:107   
-      0.0          229,219         30        7,640.6        7,294.5        5,269       13,974      1,517.7  Enter Data@m_boundary_conditions.fpp:128       
-      0.0          228,196         30        7,606.5        7,070.0        5,804       19,921      2,490.1  Enqueue Launch@m_igr.fpp:1380                  
-      0.0          218,198         23        9,486.9        9,579.0        6,957       12,094      1,465.6  Enqueue Upload@m_time_steppers.fpp:216         
-      0.0          217,838         30        7,261.3        6,952.5        6,082        9,631        899.4  Enqueue Launch@m_igr.fpp:2355                  
-      0.0          217,478         30        7,249.3        7,177.5        6,099        9,403        701.8  Enqueue Launch@m_igr.fpp:3428                  
-      0.0          213,038          6       35,506.3       32,260.0       24,155       63,401     14,053.5  Update@m_boundary_conditions.fpp:740           
-      0.0          210,609         30        7,020.3        6,830.5        5,855       12,265      1,274.0  Enqueue Launch@m_igr.fpp:822                   
-      0.0          209,262         30        6,975.4        6,775.5        6,018        9,476        804.7  Enqueue Launch@m_boundary_conditions.fpp:291   
-      0.0          209,129         30        6,971.0        6,982.0        6,205        8,220        467.1  Enqueue Launch@m_boundary_conditions.fpp:233   
-      0.0          208,641         30        6,954.7        6,883.5        6,035        8,849        635.1  Enqueue Launch@m_boundary_conditions.fpp:210   
-      0.0          198,031         30        6,601.0        6,552.0        6,101        7,164        282.7  Wait@m_igr.fpp:3426                            
-      0.0          195,564         30        6,518.8        6,421.5        5,507        9,092        719.1  Enter Data@m_igr.fpp:822                       
-      0.0          194,951         30        6,498.4        6,363.5        4,794        8,688        783.7  Enter Data@m_igr.fpp:2887                      
-      0.0          178,790          6       29,798.3       29,990.0       25,925       32,666      2,439.1  Wait@m_boundary_conditions.fpp:750             
-      0.0          176,066         30        5,868.9        5,888.0        4,850        6,952        405.1  Enter Data@m_igr.fpp:2355                      
-      0.0          176,035         30        5,867.8        5,753.5        4,962        7,498        583.2  Enqueue Upload@m_igr.fpp:3426                  
-      0.0          174,128         30        5,804.3        5,751.5        4,436        6,898        430.0  Enter Data@m_boundary_conditions.fpp:107       
-      0.0          173,770         30        5,792.3        5,744.5        5,366        6,308        271.7  Wait@m_igr.fpp:3423                            
-      0.0          171,521         30        5,717.4        5,673.5        4,998        7,260        422.1  Enter Data@m_boundary_conditions.fpp:291       
-      0.0          171,243         30        5,708.1        5,754.0        4,924        6,289        324.6  Enter Data@m_igr.fpp:1380                      
-      0.0          170,392         30        5,679.7        5,731.5        4,336        6,307        404.0  Enter Data@m_boundary_conditions.fpp:210       
-      0.0          167,425         30        5,580.8        5,587.5        4,395        6,609        399.4  Enter Data@m_boundary_conditions.fpp:314       
-      0.0          166,662         30        5,555.4        5,574.5        4,868        6,237        312.1  Enter Data@m_boundary_conditions.fpp:233       
-      0.0          160,164          1      160,164.0      160,164.0      160,164      160,164          0.0  Update@m_global_parameters.fpp:1222            
-      0.0          157,318         18        8,739.9        6,907.5        5,698       19,752      3,702.5  Wait@m_start_up.fpp.f90:59                     
-      0.0          145,175          1      145,175.0      145,175.0      145,175      145,175          0.0  Enter Data@m_boundary_conditions.fpp:57        
-      0.0          140,697          1      140,697.0      140,697.0      140,697      140,697          0.0  Update@m_global_parameters.fpp:1215            
-      0.0          131,098          1      131,098.0      131,098.0      131,098      131,098          0.0  Enter Data@m_boundary_conditions.fpp:64        
-      0.0          130,989         30        4,366.3        4,419.5        3,727        4,657        225.8  Enter Data@m_igr.fpp:3428                      
-      0.0          125,577         27        4,651.0        4,594.0        3,483        7,495      1,006.4  Enqueue Upload@m_global_parameters.fpp:1222    
-      0.0          121,354          6       20,225.7       18,853.0       12,372       37,231      8,800.2  Enqueue Upload@m_boundary_conditions.fpp:740   
-      0.0          115,381         10       11,538.1       11,582.0        8,154       14,459      2,177.3  Enqueue Launch@m_time_steppers.fpp:1051        
-      0.0          113,779         10       11,377.9       11,586.5        7,661       16,579      2,888.6  Enqueue Launch@m_time_steppers.fpp:858         
-      0.0          106,926         22        4,860.3        4,702.5        3,672        7,915      1,058.6  Enqueue Upload@m_global_parameters.fpp:1215    
-      0.0          106,403         15        7,093.5        6,714.0        4,561       10,604      1,803.5  Enqueue Upload@m_igr.fpp:162                   
-      0.0          106,259         10       10,625.9       10,420.5        7,626       14,796      2,128.9  Enqueue Launch@m_time_steppers.fpp:955         
-      0.0           85,683         10        8,568.3        8,504.0        7,229       10,071      1,019.1  Enqueue Upload@m_time_steppers.fpp:427         
-      0.0           83,777          7       11,968.1        9,395.0        3,962       24,538      7,460.5  Enqueue Upload@m_global_parameters.fpp:1045    
-      0.0           83,128          3       27,709.3       28,211.0       25,990       28,927      1,531.4  Enter Data@m_rhs.fpp:240                       
-      0.0           81,749          3       27,249.7       27,584.0       25,934       28,231      1,184.4  Enter Data@m_rhs.fpp:242                       
-      0.0           79,902         30        2,663.4        2,732.0        1,490        4,028        641.7  Exit Data@m_igr.fpp:1380                       
-      0.0           78,946          3       26,315.3       24,718.0       23,608       30,620      3,769.0  Enter Data@m_rhs.fpp:241                       
-      0.0           78,559          3       26,186.3       27,269.0       24,016       27,274      1,879.6  Enter Data@m_igr.fpp:162                       
-      0.0           77,979          1       77,979.0       77,979.0       77,979       77,979          0.0  Update@m_global_parameters.fpp:1045            
-      0.0           77,417          9        8,601.9        7,783.0        6,177       16,392      3,167.6  Enqueue Upload@m_igr.fpp:94                    
-      0.0           75,042          1       75,042.0       75,042.0       75,042       75,042          0.0  Compute Construct@m_igr.fpp:177                
-      0.0           74,457         30        2,481.9        2,378.0        1,846        3,816        523.6  Exit Data@m_igr.fpp:2887                       
-      0.0           73,223         30        2,440.8        2,418.5        1,502        3,506        588.5  Exit Data@m_igr.fpp:2355                       
-      0.0           72,980          1       72,980.0       72,980.0       72,980       72,980          0.0  Update@m_igr.fpp:94                            
-      0.0           69,154         30        2,305.1        2,130.5        1,440        7,998      1,109.2  Exit Data@m_boundary_conditions.fpp:128        
-      0.0           68,836          3       22,945.3       15,307.0       11,514       42,015     16,623.4  Enqueue Upload                                 
-      0.0           67,535          1       67,535.0       67,535.0       67,535       67,535          0.0  Enter Data@m_global_parameters.fpp:1051        
-      0.0           65,690         11        5,971.8        5,985.0        3,994        8,262      1,121.6  Enqueue Upload@m_variables_conversion.fpp:1590 
-      0.0           63,530          1       63,530.0       63,530.0       63,530       63,530          0.0  Update@m_variables_conversion.fpp:1590         
-      0.0           63,262         10        6,326.2        6,163.5        5,973        7,492        444.2  Wait@m_time_steppers.fpp:216                   
-      0.0           60,734          6       10,122.3       10,111.0        9,232       11,335        830.2  Wait@m_boundary_conditions.fpp:740             
-      0.0           60,651         30        2,021.7        2,025.5        1,467        2,443        225.5  Exit Data@m_igr.fpp:822                        
-      0.0           57,171          2       28,585.5       28,585.5       28,471       28,700        161.9  Enter Data@m_time_steppers.fpp:144             
-      0.0           57,069         30        1,902.3        1,948.0        1,426        2,570        248.6  Exit Data@m_boundary_conditions.fpp:107        
-      0.0           56,493          9        6,277.0        6,441.0        4,430        7,341        955.6  Enqueue Upload@m_rhs.fpp:615                   
-      0.0           56,331          9        6,259.0        6,301.0        5,200        7,286        885.4  Enqueue Upload@m_rhs.fpp:242                   
-      0.0           55,954         30        1,865.1        1,872.5        1,543        2,156        139.3  Exit Data@m_boundary_conditions.fpp:233        
-      0.0           55,792         30        1,859.7        1,848.0        1,417        2,359        188.8  Exit Data@m_boundary_conditions.fpp:210        
-      0.0           54,923         30        1,830.8        1,844.5        1,435        2,108        162.5  Exit Data@m_boundary_conditions.fpp:314        
-      0.0           54,673          6        9,112.2        8,628.0        4,681       14,153      3,804.3  Enqueue Upload@m_variables_conversion.fpp:638  
-      0.0           53,867         30        1,795.6        1,814.5        1,325        2,349        210.7  Exit Data@m_boundary_conditions.fpp:291        
-      0.0           48,140          5        9,628.0        6,338.0        5,863       22,372      7,144.5  Enqueue Upload@m_rhs.fpp:627                   
-      0.0           45,761          1       45,761.0       45,761.0       45,761       45,761          0.0  Enter Data@m_rhs.fpp:180                       
-      0.0           45,271          6        7,545.2        6,950.0        6,234       10,189      1,442.1  Enqueue Upload@m_igr.fpp:103                   
-      0.0           45,093          1       45,093.0       45,093.0       45,093       45,093          0.0  Update@m_global_parameters.fpp:1219            
-      0.0           44,606         30        1,486.9        1,514.0        1,152        1,729        138.4  Exit Data@m_igr.fpp:3428                       
-      0.0           42,561          5        8,512.2        7,739.0        6,636       11,637      1,974.8  Wait@m_start_up.fpp:1507                       
-      0.0           41,865          6        6,977.5        6,620.5        5,437        9,530      1,588.2  Enqueue Upload@m_global_parameters.fpp:1238    
-      0.0           41,259          6        6,876.5        6,449.5        5,237        9,202      1,534.1  Enqueue Upload@m_rhs.fpp:235                   
-      0.0           41,047          1       41,047.0       41,047.0       41,047       41,047          0.0  Update@m_global_parameters.fpp:1216            
-      0.0           39,896          6        6,649.3        6,440.0        5,271        8,918      1,358.7  Enqueue Upload@m_global_parameters.fpp:1236    
-      0.0           39,832          6        6,638.7        6,389.5        5,184        7,804        986.1  Enqueue Upload@m_variables_conversion.fpp:634  
-      0.0           39,711          6        6,618.5        6,570.0        5,534        7,748        940.0  Enqueue Upload@m_rhs.fpp:240                   
-      0.0           39,483          6        6,580.5        6,535.5        4,620        8,554      1,557.3  Enqueue Upload@m_mpi_proxy.fpp:138             
-      0.0           39,370          1       39,370.0       39,370.0       39,370       39,370          0.0  Enter Data@m_time_steppers.fpp:447             
-      0.0           39,306          1       39,306.0       39,306.0       39,306       39,306          0.0  Enter Data@m_rhs.fpp:621                       
-      0.0           39,215          6        6,535.8        6,598.5        5,275        8,155        980.4  Enqueue Upload@m_global_parameters.fpp:1253    
-      0.0           39,018          1       39,018.0       39,018.0       39,018       39,018          0.0  Update@m_rhs.fpp:627                           
-      0.0           38,907          6        6,484.5        6,404.0        5,186        8,007        946.3  Enqueue Upload@m_variables_conversion.fpp:636  
-      0.0           38,860          6        6,476.7        6,478.5        5,168        7,794        843.2  Enqueue Upload@m_global_parameters.fpp:1246    
-      0.0           38,489          6        6,414.8        6,224.0        5,367        7,715        981.0  Enqueue Upload@m_global_parameters.fpp:1252    
-      0.0           38,381          6        6,396.8        6,446.0        5,091        7,660        937.9  Enqueue Upload@m_variables_conversion.fpp:633  
-      0.0           38,344          6        6,390.7        5,972.0        5,202        7,769      1,003.3  Enqueue Upload@m_global_parameters.fpp:1237    
-      0.0           37,881          6        6,313.5        6,299.0        5,191        7,288        807.1  Enqueue Upload@m_rhs.fpp:614                   
-      0.0           37,316          6        6,219.3        6,634.0        5,055        6,974        864.0  Enqueue Upload@m_rhs.fpp:348                   
-      0.0           37,023          6        6,170.5        6,121.5        4,658        7,733      1,022.9  Enqueue Upload@m_variables_conversion.fpp:639  
-      0.0           36,992          6        6,165.3        6,202.0        5,120        7,290        733.3  Enqueue Upload@m_rhs.fpp:234                   
-      0.0           36,850          6        6,141.7        5,973.0        5,126        7,656        942.9  Enqueue Upload@m_variables_conversion.fpp:635  
-      0.0           36,571          1       36,571.0       36,571.0       36,571       36,571          0.0  Enqueue Launch@m_igr.fpp:177                   
-      0.0           36,552          6        6,092.0        6,087.0        4,695        7,830      1,129.7  Enqueue Upload@m_rhs.fpp:241                   
-      0.0           36,189          6        6,031.5        5,558.5        5,451        7,679        894.2  Enqueue Upload@m_global_parameters.fpp:1244    
-      0.0           36,048          6        6,008.0        5,402.5        5,236        7,783      1,075.9  Enqueue Upload@m_variables_conversion.fpp:637  
-      0.0           36,012          6        6,002.0        5,954.0        4,978        7,444        910.7  Enqueue Upload@m_rhs.fpp:621                   
-      0.0           36,003          6        6,000.5        6,092.0        5,023        6,769        701.8  Enqueue Upload@m_rhs.fpp:347                   
-      0.0           35,538          6        5,923.0        5,625.0        4,614        7,982      1,294.7  Enqueue Upload@m_rhs.fpp:637                   
-      0.0           35,496         10        3,549.6        1,012.5          885       26,201      7,959.8  Exit Data@m_time_steppers.fpp:1495             
-      0.0           35,007          6        5,834.5        5,749.5        4,955        6,838        835.2  Enqueue Upload@m_global_parameters.fpp:1245    
-      0.0           34,787          6        5,797.8        5,534.0        4,402        7,554      1,175.3  Enqueue Upload@m_rhs.fpp:340                   
-      0.0           34,498          5        6,899.6        6,370.0        5,779        8,435      1,077.3  Enqueue Upload@m_rhs.fpp:181                   
-      0.0           34,458          6        5,743.0        5,269.0        4,522        7,840      1,255.7  Enqueue Upload@m_rhs.fpp:346                   
-      0.0           33,909          6        5,651.5        5,305.5        4,867        7,347        982.9  Enqueue Upload@m_rhs.fpp:344                   
-      0.0           33,680          6        5,613.3        5,210.5        5,038        6,638        744.5  Enqueue Upload@m_rhs.fpp:343                   
-      0.0           33,562          6        5,593.7        5,297.5        4,983        6,641        673.5  Enqueue Upload@m_rhs.fpp:345                   
-      0.0           33,246          6        5,541.0        5,490.0        4,829        6,413        525.7  Enqueue Upload@m_rhs.fpp:337                   
-      0.0           32,993          6        5,498.8        5,414.0        4,800        6,456        635.3  Enqueue Upload@m_rhs.fpp:335                   
-      0.0           32,821          6        5,470.2        5,318.0        4,713        6,443        720.4  Enqueue Upload@m_rhs.fpp:336                   
-      0.0           32,747          1       32,747.0       32,747.0       32,747       32,747          0.0  Update@m_igr.fpp:103                           
-      0.0           32,373          6        5,395.5        5,378.5        4,494        6,878        886.0  Enqueue Upload@m_time_steppers.fpp:264         
-      0.0           31,999          6        5,333.2        5,248.5        4,382        6,749        893.7  Enqueue Upload@m_rhs.fpp:339                   
-      0.0           31,929          6        5,321.5        5,063.0        4,530        6,501        810.1  Enqueue Upload@m_time_steppers.fpp:338         
-      0.0           31,895          6        5,315.8        5,045.0        4,402        6,569        811.4  Enqueue Upload@m_time_steppers.fpp:370         
-      0.0           31,462          1       31,462.0       31,462.0       31,462       31,462          0.0  Enter Data@m_time_steppers.fpp:452             
-      0.0           31,348          4        7,837.0        4,960.0        4,060       17,368      6,368.2  Enqueue Upload@m_global_parameters.fpp:1219    
-      0.0           30,824          5        6,164.8        6,317.0        5,754        6,432        302.1  Wait@m_time_steppers.fpp:427                   
-      0.0           30,788          1       30,788.0       30,788.0       30,788       30,788          0.0  Update@m_variables_conversion.fpp:674          
-      0.0           30,752          5        6,150.4        5,976.0        4,836        7,831      1,181.6  Enqueue Upload@m_time_steppers.fpp:456         
-      0.0           28,970          1       28,970.0       28,970.0       28,970       28,970          0.0  Enter Data@m_rhs.fpp:181                       
-      0.0           28,929          4        7,232.3        7,225.0        6,086        8,393      1,149.5  Enqueue Upload@m_time_steppers.fpp:144         
-      0.0           28,226          4        7,056.5        6,173.5        5,028       10,851      2,672.0  Enqueue Upload@m_mpi_proxy.fpp:135             
-      0.0           28,042          1       28,042.0       28,042.0       28,042       28,042          0.0  Enter Data@m_boundary_conditions.fpp:65        
-      0.0           27,782          1       27,782.0       27,782.0       27,782       27,782          0.0  Enter Data@m_boundary_conditions.fpp:60        
-      0.0           27,724          1       27,724.0       27,724.0       27,724       27,724          0.0  Enter Data@m_time_steppers.fpp:449             
-      0.0           27,560          3        9,186.7       10,340.0        5,754       11,466      3,025.6  Enqueue Upload@m_global_parameters.fpp:1233    
-      0.0           27,258          1       27,258.0       27,258.0       27,258       27,258          0.0  Enter Data@m_igr.fpp:97                        
-      0.0           26,689          6        4,448.2        4,461.5        4,001        4,928        403.3  Enqueue Upload@m_global_parameters.fpp:1216    
-      0.0           26,675          1       26,675.0       26,675.0       26,675       26,675          0.0  Enter Data@m_global_parameters.fpp:1238        
-      0.0           26,634          1       26,634.0       26,634.0       26,634       26,634          0.0  Enter Data@m_boundary_conditions.fpp:56        
-      0.0           26,522          1       26,522.0       26,522.0       26,522       26,522          0.0  Update@m_rhs.fpp:637                           
-      0.0           26,405          3        8,801.7        9,346.0        6,255       10,804      2,322.8  Enqueue Upload@m_global_parameters.fpp:1051    
-      0.0           26,392          1       26,392.0       26,392.0       26,392       26,392          0.0  Enter Data@m_boundary_conditions.fpp:61        
-      0.0           25,666          1       25,666.0       25,666.0       25,666       25,666          0.0  Enter Data@m_variables_conversion.fpp:638      
-      0.0           25,542          1       25,542.0       25,542.0       25,542       25,542          0.0  Enter Data@m_global_parameters.fpp:1236        
-      0.0           25,496          1       25,496.0       25,496.0       25,496       25,496          0.0  Enter Data@m_time_steppers.fpp:455             
-      0.0           25,088          1       25,088.0       25,088.0       25,088       25,088          0.0  Enter Data@m_time_steppers.fpp:450             
-      0.0           24,900          1       24,900.0       24,900.0       24,900       24,900          0.0  Enter Data@m_time_steppers.fpp:453             
-      0.0           24,885          1       24,885.0       24,885.0       24,885       24,885          0.0  Enter Data@m_mpi_proxy.fpp:140                 
-      0.0           24,827          1       24,827.0       24,827.0       24,827       24,827          0.0  Enter Data@m_variables_conversion.fpp:640      
-      0.0           24,755          1       24,755.0       24,755.0       24,755       24,755          0.0  Enter Data@m_global_parameters.fpp:1246        
-      0.0           24,736          1       24,736.0       24,736.0       24,736       24,736          0.0  Enter Data@m_rhs.fpp:630                       
-      0.0           24,675          1       24,675.0       24,675.0       24,675       24,675          0.0  Enter Data@m_rhs.fpp:348                       
-      0.0           24,082          1       24,082.0       24,082.0       24,082       24,082          0.0  Enter Data@m_rhs.fpp:615                       
-      0.0           24,001          1       24,001.0       24,001.0       24,001       24,001          0.0  Enter Data@m_variables_conversion.fpp:667      
-      0.0           23,991          1       23,991.0       23,991.0       23,991       23,991          0.0  Enter Data@m_global_parameters.fpp:1237        
-      0.0           23,889          1       23,889.0       23,889.0       23,889       23,889          0.0  Enter Data@m_time_steppers.fpp:456             
-      0.0           23,856          1       23,856.0       23,856.0       23,856       23,856          0.0  Enter Data@m_time_steppers.fpp:264             
-      0.0           23,846          1       23,846.0       23,846.0       23,846       23,846          0.0  Enter Data@m_rhs.fpp:234                       
-      0.0           23,835          1       23,835.0       23,835.0       23,835       23,835          0.0  Enter Data@m_global_parameters.fpp:1244        
-      0.0           23,791          1       23,791.0       23,791.0       23,791       23,791          0.0  Enter Data@m_global_parameters.fpp:1253        
-      0.0           23,752          1       23,752.0       23,752.0       23,752       23,752          0.0  Enter Data@m_variables_conversion.fpp:636      
-      0.0           23,742          1       23,742.0       23,742.0       23,742       23,742          0.0  Enter Data@m_rhs.fpp:614                       
-      0.0           23,671          1       23,671.0       23,671.0       23,671       23,671          0.0  Enter Data@m_rhs.fpp:347                       
-      0.0           23,620          1       23,620.0       23,620.0       23,620       23,620          0.0  Enter Data@m_variables_conversion.fpp:635      
-      0.0           23,530          1       23,530.0       23,530.0       23,530       23,530          0.0  Update@m_global_parameters.fpp:1182            
-      0.0           23,438          1       23,438.0       23,438.0       23,438       23,438          0.0  Update@m_start_up.fpp:1289                     
-      0.0           23,423          1       23,423.0       23,423.0       23,423       23,423          0.0  Enter Data@m_variables_conversion.fpp:633      
-      0.0           23,209          1       23,209.0       23,209.0       23,209       23,209          0.0  Enter Data@m_time_steppers.fpp:140             
-      0.0           23,204          1       23,204.0       23,204.0       23,204       23,204          0.0  Enter Data@m_variables_conversion.fpp:637      
-      0.0           23,172          1       23,172.0       23,172.0       23,172       23,172          0.0  Enter Data@m_mpi_proxy.fpp:138                 
-      0.0           23,101          1       23,101.0       23,101.0       23,101       23,101          0.0  Enter Data@m_variables_conversion.fpp:634      
-      0.0           22,991          1       22,991.0       22,991.0       22,991       22,991          0.0  Enter Data@m_global_parameters.fpp:1245        
-      0.0           22,935          1       22,935.0       22,935.0       22,935       22,935          0.0  Update@m_global_parameters.fpp:1161            
-      0.0           22,695          1       22,695.0       22,695.0       22,695       22,695          0.0  Update@m_mpi_proxy.fpp:168                     
-      0.0           22,690          1       22,690.0       22,690.0       22,690       22,690          0.0  Enter Data@m_boundary_conditions.fpp:54        
-      0.0           22,682          1       22,682.0       22,682.0       22,682       22,682          0.0  Enter Data@m_rhs.fpp:235                       
-      0.0           22,680          1       22,680.0       22,680.0       22,680       22,680          0.0  Enter Data@m_global_parameters.fpp:1252        
-      0.0           22,570          1       22,570.0       22,570.0       22,570       22,570          0.0  Enter Data@m_global_parameters.fpp:1254        
-      0.0           22,527          1       22,527.0       22,527.0       22,527       22,527          0.0  Update@m_global_parameters.fpp:1221            
-      0.0           22,450          1       22,450.0       22,450.0       22,450       22,450          0.0  Enter Data@m_rhs.fpp:236                       
-      0.0           22,240          1       22,240.0       22,240.0       22,240       22,240          0.0  Update@m_rhs.fpp:178                           
-      0.0           22,193          1       22,193.0       22,193.0       22,193       22,193          0.0  Enter Data@m_variables_conversion.fpp:639      
-      0.0           21,987          1       21,987.0       21,987.0       21,987       21,987          0.0  Enter Data@m_rhs.fpp:335                       
-      0.0           21,915          1       21,915.0       21,915.0       21,915       21,915          0.0  Enter Data@m_rhs.fpp:344                       
-      0.0           21,820          1       21,820.0       21,820.0       21,820       21,820          0.0  Enter Data@m_rhs.fpp:340                       
-      0.0           21,805          1       21,805.0       21,805.0       21,805       21,805          0.0  Update@m_mpi_proxy.fpp:135                     
-      0.0           21,766          1       21,766.0       21,766.0       21,766       21,766          0.0  Enter Data@m_time_steppers.fpp:338             
-      0.0           21,706          1       21,706.0       21,706.0       21,706       21,706          0.0  Enter Data@m_rhs.fpp:343                       
-      0.0           21,605          1       21,605.0       21,605.0       21,605       21,605          0.0  Enter Data@m_time_steppers.fpp:370             
-      0.0           21,604          1       21,604.0       21,604.0       21,604       21,604          0.0  Enter Data@m_time_steppers.fpp:417             
-      0.0           21,551          1       21,551.0       21,551.0       21,551       21,551          0.0  Enter Data@m_rhs.fpp:336                       
-      0.0           21,532          1       21,532.0       21,532.0       21,532       21,532          0.0  Update@m_global_parameters.fpp:1181            
-      0.0           21,404          1       21,404.0       21,404.0       21,404       21,404          0.0  Enter Data@m_rhs.fpp:337                       
-      0.0           21,385          1       21,385.0       21,385.0       21,385       21,385          0.0  Exit Data@m_rhs.fpp:2198                       
-      0.0           21,149          1       21,149.0       21,149.0       21,149       21,149          0.0  Enter Data@m_rhs.fpp:345                       
-      0.0           21,003          1       21,003.0       21,003.0       21,003       21,003          0.0  Enter Data@m_rhs.fpp:339                       
-      0.0           20,969          3        6,989.7        6,916.0        6,380        7,673        649.6  Enqueue Upload@m_variables_conversion.fpp:630  
-      0.0           20,957          3        6,985.7        6,947.0        6,164        7,846        841.7  Wait@m_igr.fpp:162                             
-      0.0           20,953          1       20,953.0       20,953.0       20,953       20,953          0.0  Enter Data@m_rhs.fpp:346                       
-      0.0           20,267          3        6,755.7        6,148.0        6,116        8,003      1,080.3  Wait@m_rhs.fpp:240                             
-      0.0           20,181          3        6,727.0        6,424.0        5,430        8,327      1,472.1  Enqueue Upload@m_igr.fpp:97                    
-      0.0           19,657          3        6,552.3        6,321.0        5,620        7,716      1,067.0  Enqueue Upload@m_global_parameters.fpp:1254    
-      0.0           19,379          3        6,459.7        6,132.0        5,570        7,677      1,091.0  Enqueue Upload@m_mpi_proxy.fpp:140             
-      0.0           19,193          3        6,397.7        6,229.0        5,256        7,708      1,234.7  Enqueue Upload@m_variables_conversion.fpp:667  
-      0.0           19,181          3        6,393.7        5,977.0        5,649        7,555      1,019.0  Enqueue Upload@m_rhs.fpp:236                   
-      0.0           19,180          3        6,393.3        6,434.0        5,924        6,822        450.4  Wait@m_rhs.fpp:242                             
-      0.0           19,133          3        6,377.7        6,202.0        5,498        7,433        979.4  Enqueue Upload@m_variables_conversion.fpp:674  
-      0.0           18,932          3        6,310.7        5,853.0        5,414        7,665      1,193.2  Enqueue Upload@m_rhs.fpp:630                   
-      0.0           18,550          1       18,550.0       18,550.0       18,550       18,550          0.0  Update@m_global_parameters.fpp:1111            
-      0.0           18,280          1       18,280.0       18,280.0       18,280       18,280          0.0  Wait@m_igr.fpp:177                             
-      0.0           18,235          3        6,078.3        6,105.0        5,921        6,209        145.8  Wait@m_rhs.fpp:241                             
-      0.0           17,069          3        5,689.7        5,401.0        5,054        6,614        819.1  Enqueue Upload@m_variables_conversion.fpp:640  
-      0.0           16,730          3        5,576.7        5,210.0        4,494        7,026      1,305.2  Enqueue Upload@m_time_steppers.fpp:140         
-      0.0           16,176          2        8,088.0        8,088.0        7,376        8,800      1,006.9  Enqueue Upload@m_boundary_conditions.fpp:57    
-      0.0           16,016          2        8,008.0        8,008.0        7,281        8,735      1,028.1  Enqueue Upload@m_boundary_conditions.fpp:64    
-      0.0           15,889          2        7,944.5        7,944.5        7,351        8,538        839.3  Enqueue Upload@m_time_steppers.fpp:453         
-      0.0           15,293          3        5,097.7        4,786.0        4,666        5,841        646.5  Enqueue Upload@m_time_steppers.fpp:417         
-      0.0           15,197          3        5,065.7        4,994.0        4,502        5,701        602.7  Enqueue Upload@m_boundary_conditions.fpp:54    
-      0.0           15,193          1       15,193.0       15,193.0       15,193       15,193          0.0  Update@m_global_parameters.fpp:1121            
-      0.0           14,692          2        7,346.0        7,346.0        6,728        7,964        874.0  Enqueue Upload@m_boundary_conditions.fpp:65    
-      0.0           14,193          2        7,096.5        7,096.5        7,022        7,171        105.4  Enqueue Upload@m_global_parameters.fpp:1161    
-      0.0           14,121          1       14,121.0       14,121.0       14,121       14,121          0.0  Update@m_global_parameters.fpp:1218            
-      0.0           13,789          2        6,894.5        6,894.5        6,286        7,503        860.5  Enqueue Upload@m_rhs.fpp:180                   
-      0.0           12,923          1       12,923.0       12,923.0       12,923       12,923          0.0  Enter Data@m_rhs.fpp:177                       
-      0.0           12,047          2        6,023.5        6,023.5        4,992        7,055      1,458.8  Enqueue Upload@m_mpi_proxy.fpp:168             
-      0.0           11,914          2        5,957.0        5,957.0        5,736        6,178        312.5  Enqueue Upload@m_rhs.fpp:178                   
-      0.0           11,865          1       11,865.0       11,865.0       11,865       11,865          0.0  Enqueue Upload@m_start_up.fpp:1289             
-      0.0           11,763          2        5,881.5        5,881.5        5,279        6,484        852.1  Enqueue Upload@m_boundary_conditions.fpp:56    
-      0.0           11,755          2        5,877.5        5,877.5        4,354        7,401      2,154.6  Enqueue Upload@m_global_parameters.fpp:1181    
-      0.0           11,736          2        5,868.0        5,868.0        5,212        6,524        927.7  Enqueue Upload@m_boundary_conditions.fpp:61    
-      0.0           11,710          2        5,855.0        5,855.0        5,249        6,461        857.0  Enqueue Upload@m_boundary_conditions.fpp:60    
-      0.0           11,623          3        3,874.3        3,879.0        3,768        3,976        104.1  Enqueue Upload@m_global_parameters.fpp:1182    
-      0.0           11,527          2        5,763.5        5,763.5        5,181        6,346        823.8  Enqueue Upload@m_time_steppers.fpp:449         
-      0.0           11,324          3        3,774.7        3,648.0        3,615        4,061        248.5  Enqueue Upload@m_global_parameters.fpp:1221    
-      0.0           11,294          2        5,647.0        5,647.0        5,339        5,955        435.6  Wait@m_time_steppers.fpp:144                   
-      0.0           10,966          2        5,483.0        5,483.0        4,883        6,083        848.5  Enqueue Upload@m_time_steppers.fpp:455         
-      0.0           10,842          2        5,421.0        5,421.0        4,803        6,039        874.0  Enqueue Upload@m_time_steppers.fpp:452         
-      0.0           10,418          2        5,209.0        5,209.0        4,636        5,782        810.3  Enqueue Upload@m_time_steppers.fpp:450         
-      0.0            9,565          1        9,565.0        9,565.0        9,565        9,565          0.0  Exit Data@m_variables_conversion.fpp:1401      
-      0.0            9,195          1        9,195.0        9,195.0        9,195        9,195          0.0  Enqueue Upload@m_global_parameters.fpp:1111    
-      0.0            8,390          1        8,390.0        8,390.0        8,390        8,390          0.0  Exit Data@m_boundary_conditions.fpp:794        
-      0.0            8,309          1        8,309.0        8,309.0        8,309        8,309          0.0  Enter Data@m_global_parameters.fpp:1230        
-      0.0            8,056          1        8,056.0        8,056.0        8,056        8,056          0.0  Enter Data@m_variables_conversion.fpp:630      
-      0.0            8,030          1        8,030.0        8,030.0        8,030        8,030          0.0  Wait@m_global_parameters.fpp:1245              
-      0.0            7,626          1        7,626.0        7,626.0        7,626        7,626          0.0  Wait@m_global_parameters.fpp:1221              
-      0.0            7,626          1        7,626.0        7,626.0        7,626        7,626          0.0  Wait@m_igr.fpp:94                              
-      0.0            7,620          1        7,620.0        7,620.0        7,620        7,620          0.0  Wait@m_global_parameters.fpp:1051              
-      0.0            7,540          1        7,540.0        7,540.0        7,540        7,540          0.0  Wait@m_global_parameters.fpp:1045              
-      0.0            7,372          1        7,372.0        7,372.0        7,372        7,372          0.0  Wait@m_global_parameters.fpp:1246              
-      0.0            7,330          1        7,330.0        7,330.0        7,330        7,330          0.0  Wait@m_variables_conversion.fpp:635            
-      0.0            7,323          1        7,323.0        7,323.0        7,323        7,323          0.0  Wait@m_variables_conversion.fpp:640            
-      0.0            7,297          1        7,297.0        7,297.0        7,297        7,297          0.0  Exit Data@m_mpi_proxy.fpp:2934                 
-      0.0            7,292          1        7,292.0        7,292.0        7,292        7,292          0.0  Wait@m_global_parameters.fpp:1222              
-      0.0            7,263          1        7,263.0        7,263.0        7,263        7,263          0.0  Wait@m_variables_conversion.fpp:1590           
-      0.0            7,208          1        7,208.0        7,208.0        7,208        7,208          0.0  Exit Data@m_global_parameters.fpp:1301         
-      0.0            7,205          1        7,205.0        7,205.0        7,205        7,205          0.0  Wait@m_global_parameters.fpp:1244              
-      0.0            7,192          1        7,192.0        7,192.0        7,192        7,192          0.0  Wait@m_time_steppers.fpp:338                   
-      0.0            7,154          1        7,154.0        7,154.0        7,154        7,154          0.0  Wait@m_time_steppers.fpp:264                   
-      0.0            7,124          1        7,124.0        7,124.0        7,124        7,124          0.0  Wait@m_variables_conversion.fpp:638            
-      0.0            7,103          1        7,103.0        7,103.0        7,103        7,103          0.0  Wait@m_global_parameters.fpp:1216              
-      0.0            7,099          1        7,099.0        7,099.0        7,099        7,099          0.0  Wait@m_global_parameters.fpp:1238              
-      0.0            7,093          1        7,093.0        7,093.0        7,093        7,093          0.0  Wait@m_time_steppers.fpp:370                   
-      0.0            7,081          1        7,081.0        7,081.0        7,081        7,081          0.0  Wait@m_global_parameters.fpp:1181              
-      0.0            7,064          1        7,064.0        7,064.0        7,064        7,064          0.0  Wait@m_global_parameters.fpp:1253              
-      0.0            7,045          1        7,045.0        7,045.0        7,045        7,045          0.0  Wait@m_rhs.fpp:234                             
-      0.0            7,027          1        7,027.0        7,027.0        7,027        7,027          0.0  Wait@m_global_parameters.fpp:1182              
-      0.0            7,025          1        7,025.0        7,025.0        7,025        7,025          0.0  Wait@m_time_steppers.fpp:417                   
-      0.0            7,020          1        7,020.0        7,020.0        7,020        7,020          0.0  Wait@m_rhs.fpp:339                             
-      0.0            7,007          1        7,007.0        7,007.0        7,007        7,007          0.0  Wait@m_rhs.fpp:235                             
-      0.0            6,959          1        6,959.0        6,959.0        6,959        6,959          0.0  Wait@m_boundary_conditions.fpp:56              
-      0.0            6,941          1        6,941.0        6,941.0        6,941        6,941          0.0  Wait@m_global_parameters.fpp:1237              
-      0.0            6,900          1        6,900.0        6,900.0        6,900        6,900          0.0  Wait@m_rhs.fpp:347                             
-      0.0            6,900          1        6,900.0        6,900.0        6,900        6,900          0.0  Wait@m_rhs.fpp:621                             
-      0.0            6,865          1        6,865.0        6,865.0        6,865        6,865          0.0  Wait@m_igr.fpp:103                             
-      0.0            6,846          1        6,846.0        6,846.0        6,846        6,846          0.0  Enter Data@m_global_parameters.fpp:1229        
-      0.0            6,846          1        6,846.0        6,846.0        6,846        6,846          0.0  Wait@m_global_parameters.fpp:1218              
-      0.0            6,829          1        6,829.0        6,829.0        6,829        6,829          0.0  Wait@m_rhs.fpp:615                             
-      0.0            6,803          1        6,803.0        6,803.0        6,803        6,803          0.0  Wait@m_time_steppers.fpp:450                   
-      0.0            6,786          1        6,786.0        6,786.0        6,786        6,786          0.0  Wait@m_variables_conversion.fpp:667            
-      0.0            6,774          1        6,774.0        6,774.0        6,774        6,774          0.0  Wait@m_rhs.fpp:336                             
-      0.0            6,737          1        6,737.0        6,737.0        6,737        6,737          0.0  Wait@m_time_steppers.fpp:140                   
-      0.0            6,653          1        6,653.0        6,653.0        6,653        6,653          0.0  Wait@m_time_steppers.fpp:456                   
-      0.0            6,607          1        6,607.0        6,607.0        6,607        6,607          0.0  Enqueue Upload@m_global_parameters.fpp:1121    
-      0.0            6,585          1        6,585.0        6,585.0        6,585        6,585          0.0  Wait@m_boundary_conditions.fpp:54              
-      0.0            6,559          1        6,559.0        6,559.0        6,559        6,559          0.0  Wait@m_global_parameters.fpp:1215              
-      0.0            6,559          1        6,559.0        6,559.0        6,559        6,559          0.0  Wait@m_mpi_proxy.fpp:168                       
-      0.0            6,553          1        6,553.0        6,553.0        6,553        6,553          0.0  Wait@m_variables_conversion.fpp:674            
-      0.0            6,484          1        6,484.0        6,484.0        6,484        6,484          0.0  Wait@m_boundary_conditions.fpp:65              
-      0.0            6,483          1        6,483.0        6,483.0        6,483        6,483          0.0  Wait@m_rhs.fpp:346                             
-      0.0            6,456          1        6,456.0        6,456.0        6,456        6,456          0.0  Wait@m_variables_conversion.fpp:634            
-      0.0            6,450          1        6,450.0        6,450.0        6,450        6,450          0.0  Wait@m_global_parameters.fpp:1219              
-      0.0            6,436          1        6,436.0        6,436.0        6,436        6,436          0.0  Wait@m_rhs.fpp:343                             
-      0.0            6,414          1        6,414.0        6,414.0        6,414        6,414          0.0  Wait@m_time_steppers.fpp:455                   
-      0.0            6,403          1        6,403.0        6,403.0        6,403        6,403          0.0  Wait@m_rhs.fpp:180                             
-      0.0            6,400          1        6,400.0        6,400.0        6,400        6,400          0.0  Wait@m_global_parameters.fpp:1236              
-      0.0            6,393          1        6,393.0        6,393.0        6,393        6,393          0.0  Wait@m_rhs.fpp:627                             
-      0.0            6,373          1        6,373.0        6,373.0        6,373        6,373          0.0  Wait@m_rhs.fpp:344                             
-      0.0            6,372          1        6,372.0        6,372.0        6,372        6,372          0.0  Enqueue Upload@m_time_steppers.fpp:447         
-      0.0            6,357          1        6,357.0        6,357.0        6,357        6,357          0.0  Wait@m_rhs.fpp:637                             
-      0.0            6,355          1        6,355.0        6,355.0        6,355        6,355          0.0  Wait@m_rhs.fpp:345                             
-      0.0            6,353          1        6,353.0        6,353.0        6,353        6,353          0.0  Wait@m_mpi_proxy.fpp:138                       
-      0.0            6,339          1        6,339.0        6,339.0        6,339        6,339          0.0  Wait@m_boundary_conditions.fpp:60              
-      0.0            6,332          1        6,332.0        6,332.0        6,332        6,332          0.0  Wait@m_rhs.fpp:348                             
-      0.0            6,326          1        6,326.0        6,326.0        6,326        6,326          0.0  Wait@m_rhs.fpp:178                             
-      0.0            6,311          1        6,311.0        6,311.0        6,311        6,311          0.0  Wait@m_time_steppers.fpp:452                   
-      0.0            6,301          1        6,301.0        6,301.0        6,301        6,301          0.0  Wait@m_rhs.fpp:335                             
-      0.0            6,300          1        6,300.0        6,300.0        6,300        6,300          0.0  Wait@m_global_parameters.fpp:1111              
-      0.0            6,286          1        6,286.0        6,286.0        6,286        6,286          0.0  Wait@m_time_steppers.fpp:447                   
-      0.0            6,281          1        6,281.0        6,281.0        6,281        6,281          0.0  Wait@m_time_steppers.fpp:449                   
-      0.0            6,273          1        6,273.0        6,273.0        6,273        6,273          0.0  Wait@m_boundary_conditions.fpp:64              
-      0.0            6,271          1        6,271.0        6,271.0        6,271        6,271          0.0  Wait@m_mpi_proxy.fpp:140                       
-      0.0            6,266          1        6,266.0        6,266.0        6,266        6,266          0.0  Wait@m_boundary_conditions.fpp:61              
-      0.0            6,218          1        6,218.0        6,218.0        6,218        6,218          0.0  Wait@m_rhs.fpp:236                             
-      0.0            6,210          1        6,210.0        6,210.0        6,210        6,210          0.0  Wait@m_time_steppers.fpp:453                   
-      0.0            6,140          1        6,140.0        6,140.0        6,140        6,140          0.0  Wait@m_rhs.fpp:614                             
-      0.0            6,073          1        6,073.0        6,073.0        6,073        6,073          0.0  Wait@m_global_parameters.fpp:1252              
-      0.0            6,065          1        6,065.0        6,065.0        6,065        6,065          0.0  Wait@m_global_parameters.fpp:1121              
-      0.0            6,063          1        6,063.0        6,063.0        6,063        6,063          0.0  Wait@m_boundary_conditions.fpp:57              
-      0.0            6,042          1        6,042.0        6,042.0        6,042        6,042          0.0  Wait@m_global_parameters.fpp:1161              
-      0.0            5,989          1        5,989.0        5,989.0        5,989        5,989          0.0  Wait@m_start_up.fpp:1289                       
-      0.0            5,964          1        5,964.0        5,964.0        5,964        5,964          0.0  Wait@m_rhs.fpp:337                             
-      0.0            5,946          1        5,946.0        5,946.0        5,946        5,946          0.0  Wait@m_variables_conversion.fpp:637            
-      0.0            5,898          1        5,898.0        5,898.0        5,898        5,898          0.0  Wait@m_variables_conversion.fpp:633            
-      0.0            5,835          1        5,835.0        5,835.0        5,835        5,835          0.0  Wait@m_variables_conversion.fpp:639            
-      0.0            5,820          1        5,820.0        5,820.0        5,820        5,820          0.0  Wait@m_variables_conversion.fpp:636            
-      0.0            5,806          1        5,806.0        5,806.0        5,806        5,806          0.0  Wait@m_rhs.fpp:340                             
-      0.0            5,749          1        5,749.0        5,749.0        5,749        5,749          0.0  Wait@m_rhs.fpp:630                             
-      0.0            5,718          1        5,718.0        5,718.0        5,718        5,718          0.0  Wait@m_igr.fpp:97                              
-      0.0            5,612          1        5,612.0        5,612.0        5,612        5,612          0.0  Wait@m_rhs.fpp:181                             
-      0.0            5,582          1        5,582.0        5,582.0        5,582        5,582          0.0  Wait@m_global_parameters.fpp:1254              
-      0.0            5,580          1        5,580.0        5,580.0        5,580        5,580          0.0  Wait@m_mpi_proxy.fpp:135                       
-      0.0            5,551          1        5,551.0        5,551.0        5,551        5,551          0.0  Enqueue Upload@m_global_parameters.fpp:1218    
-      0.0            5,274          5        1,054.8          977.0          935        1,214        128.2  Exit Data@m_time_steppers.fpp:1569             
-      0.0            4,186          1        4,186.0        4,186.0        4,186        4,186          0.0  Wait@m_variables_conversion.fpp:630            
-      0.0            3,973          1        3,973.0        3,973.0        3,973        3,973          0.0  Enter Data@m_global_parameters.fpp:1233        
-      0.0            3,862          1        3,862.0        3,862.0        3,862        3,862          0.0  Enter Data@m_global_parameters.fpp:1231        
-      0.0            2,763          1        2,763.0        2,763.0        2,763        2,763          0.0  Wait@m_rhs.fpp:177                             
-      0.0            2,694          1        2,694.0        2,694.0        2,694        2,694          0.0  Wait@m_global_parameters.fpp:1230              
-      0.0            2,311          1        2,311.0        2,311.0        2,311        2,311          0.0  Wait@m_global_parameters.fpp:1229              
-      0.0            1,918          2          959.0          959.0          890        1,028         97.6  Exit Data@m_time_steppers.fpp:1498             
-      0.0            1,908          1        1,908.0        1,908.0        1,908        1,908          0.0  Wait@m_global_parameters.fpp:1231              
-      0.0            1,673          1        1,673.0        1,673.0        1,673        1,673          0.0  Wait@m_global_parameters.fpp:1233              
-      0.0            1,338          1        1,338.0        1,338.0        1,338        1,338          0.0  Exit Data@m_global_parameters.fpp:1325         
-      0.0            1,188          1        1,188.0        1,188.0        1,188        1,188          0.0  Exit Data@m_global_parameters.fpp:1328         
-      0.0            1,168          1        1,168.0        1,168.0        1,168        1,168          0.0  Exit Data@m_boundary_conditions.fpp:805        
-      0.0            1,116          1        1,116.0        1,116.0        1,116        1,116          0.0  Exit Data@m_global_parameters.fpp:1331         
-      0.0            1,091          1        1,091.0        1,091.0        1,091        1,091          0.0  Exit Data@m_boundary_conditions.fpp:795        
-      0.0            1,087          1        1,087.0        1,087.0        1,087        1,087          0.0  Exit Data@m_time_steppers.fpp:1572             
-      0.0            1,054          1        1,054.0        1,054.0        1,054        1,054          0.0  Exit Data@m_time_steppers.fpp:1502             
-      0.0            1,014          1        1,014.0        1,014.0        1,014        1,014          0.0  Exit Data@m_rhs.fpp:2291                       
-      0.0            1,012          1        1,012.0        1,012.0        1,012        1,012          0.0  Exit Data@m_rhs.fpp:2290                       
-      0.0              988          1          988.0          988.0          988          988          0.0  Exit Data@m_boundary_conditions.fpp:797        
-      0.0              946          1          946.0          946.0          946          946          0.0  Exit Data@m_time_steppers.fpp:1555             
-      0.0              777          1          777.0          777.0          777          777          0.0  Exit Data@m_boundary_conditions.fpp:798        
-      0.0              776          1          776.0          776.0          776          776          0.0  Exit Data@m_boundary_conditions.fpp:800        
-      0.0              771          1          771.0          771.0          771          771          0.0  Exit Data@m_boundary_conditions.fpp:801        
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_boundary_conditions.fpp:56             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_boundary_conditions.fpp:57             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_boundary_conditions.fpp:60             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_boundary_conditions.fpp:61             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_boundary_conditions.fpp:64             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_boundary_conditions.fpp:65             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_global_parameters.fpp:1045             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_global_parameters.fpp:1233             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_global_parameters.fpp:1236             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_global_parameters.fpp:1237             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_global_parameters.fpp:1238             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_global_parameters.fpp:1244             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_global_parameters.fpp:1245             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_global_parameters.fpp:1246             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_global_parameters.fpp:1252             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_global_parameters.fpp:1253             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_igr.fpp:103                            
-      0.0                0          2            0.0            0.0            0            0          0.0  Alloc@m_igr.fpp:162                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_igr.fpp:94                             
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_mpi_proxy.fpp:135                      
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_mpi_proxy.fpp:138                      
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:180                            
-      0.0                0          2            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:181                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:234                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:235                            
-      0.0                0          3            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:240                            
-      0.0                0          3            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:241                            
-      0.0                0          4            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:242                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:335                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:336                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:337                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:339                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:340                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:343                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:344                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:345                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:346                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:347                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:348                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:614                            
-      0.0                0          2            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:615                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:627                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_rhs.fpp:637                            
-      0.0                0          2            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:144                  
-      0.0                0         11            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:216                  
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:264                  
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:338                  
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:370                  
-      0.0                0          5            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:427                  
-      0.0                0          2            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:447                  
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:449                  
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:450                  
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:452                  
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:453                  
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:455                  
-      0.0                0          2            0.0            0.0            0            0          0.0  Alloc@m_time_steppers.fpp:456                  
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_variables_conversion.fpp:1590          
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_variables_conversion.fpp:630           
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_variables_conversion.fpp:633           
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_variables_conversion.fpp:634           
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_variables_conversion.fpp:635           
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_variables_conversion.fpp:636           
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_variables_conversion.fpp:637           
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_variables_conversion.fpp:638           
-      0.0                0          1            0.0            0.0            0            0          0.0  Alloc@m_variables_conversion.fpp:639           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_boundary_conditions.fpp:56            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_boundary_conditions.fpp:57            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_boundary_conditions.fpp:60            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_boundary_conditions.fpp:61            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_boundary_conditions.fpp:64            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_boundary_conditions.fpp:65            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_global_parameters.fpp:1045            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_global_parameters.fpp:1233            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_global_parameters.fpp:1236            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_global_parameters.fpp:1237            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_global_parameters.fpp:1238            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_global_parameters.fpp:1244            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_global_parameters.fpp:1245            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_global_parameters.fpp:1246            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_global_parameters.fpp:1252            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_global_parameters.fpp:1253            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_igr.fpp:103                           
-      0.0                0          2            0.0            0.0            0            0          0.0  Create@m_igr.fpp:162                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_igr.fpp:94                            
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_mpi_proxy.fpp:135                     
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_mpi_proxy.fpp:138                     
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:180                           
-      0.0                0          2            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:181                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:234                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:235                           
-      0.0                0          3            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:240                           
-      0.0                0          3            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:241                           
-      0.0                0          4            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:242                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:335                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:336                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:337                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:339                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:340                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:343                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:344                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:345                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:346                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:347                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:348                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:614                           
-      0.0                0          2            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:615                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:627                           
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_rhs.fpp:637                           
-      0.0                0          2            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:144                 
-      0.0                0         11            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:216                 
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:264                 
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:338                 
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:370                 
-      0.0                0          5            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:427                 
-      0.0                0          2            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:447                 
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:449                 
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:450                 
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:452                 
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:453                 
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:455                 
-      0.0                0          2            0.0            0.0            0            0          0.0  Create@m_time_steppers.fpp:456                 
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_variables_conversion.fpp:1590         
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_variables_conversion.fpp:630          
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_variables_conversion.fpp:633          
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_variables_conversion.fpp:634          
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_variables_conversion.fpp:635          
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_variables_conversion.fpp:636          
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_variables_conversion.fpp:637          
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_variables_conversion.fpp:638          
-      0.0                0          1            0.0            0.0            0            0          0.0  Create@m_variables_conversion.fpp:639          
-      0.0                0          1            0.0            0.0            0            0          0.0  Delete@m_boundary_conditions.fpp:801           
-      0.0                0          8            0.0            0.0            0            0          0.0  Delete@m_boundary_conditions.fpp:805           
-      0.0                0          3            0.0            0.0            0            0          0.0  Delete@m_global_parameters.fpp:1301            
-      0.0                0          3            0.0            0.0            0            0          0.0  Delete@m_global_parameters.fpp:1325            
-      0.0                0          3            0.0            0.0            0            0          0.0  Delete@m_global_parameters.fpp:1328            
-      0.0                0          1            0.0            0.0            0            0          0.0  Delete@m_mpi_proxy.fpp:2934                    
-      0.0                0          3            0.0            0.0            0            0          0.0  Delete@m_rhs.fpp:2198                          
-      0.0                0          3            0.0            0.0            0            0          0.0  Delete@m_rhs.fpp:2290                          
-      0.0                0          1            0.0            0.0            0            0          0.0  Delete@m_time_steppers.fpp:1498                
-      0.0                0          1            0.0            0.0            0            0          0.0  Delete@m_time_steppers.fpp:1502                
-      0.0                0          1            0.0            0.0            0            0          0.0  Delete@m_time_steppers.fpp:1569                
-      0.0                0          2            0.0            0.0            0            0          0.0  Delete@m_variables_conversion.fpp:1401         
-
-Generated:
-    /fastscratch/bwilfong3/exampleCases/3D_TGV/report13.nsys-rep
-    /fastscratch/bwilfong3/exampleCases/3D_TGV/report13.sqlite
-
-mfc: OK > :) Running post_process:
-
- Post-processing a 100x100x100 case on 1 rank(s)
- [  0%]  Saving        1 of 2 @ t_step = 0
- [ 91%]  Saving        2 of 2 @ t_step = 10
-Generating '/nethome/bwilfong3/tmp/nsys-report-14cf.qdstrm'
-[1/8] [0%                          ] report14.nsys-rep[1/8] [0%                          ] report14.nsys-rep[1/8] [6%                          ] report14.nsys-rep[1/8] [9%                          ] report14.nsys-rep[1/8] [===========52%              ] report14.nsys-rep[1/8] [=======================95%  ] report14.nsys-rep[1/8] [========================100%] report14.nsys-rep[1/8] [========================100%] report14.nsys-rep
-[2/8] [0%                          ] report14.sqlite[2/8] [1%                          ] report14.sqlite[2/8] [2%                          ] report14.sqlite[2/8] [3%                          ] report14.sqlite[2/8] [4%                          ] report14.sqlite[2/8] [5%                          ] report14.sqlite[2/8] [6%                          ] report14.sqlite[2/8] [7%                          ] report14.sqlite[2/8] [8%                          ] report14.sqlite[2/8] [9%                          ] report14.sqlite[2/8] [10%                         ] report14.sqlite[2/8] [11%                         ] report14.sqlite[2/8] [12%                         ] report14.sqlite[2/8] [13%                         ] report14.sqlite[2/8] [14%                         ] report14.sqlite[2/8] [=15%                        ] report14.sqlite[2/8] [=16%                        ] report14.sqlite[2/8] [=17%                        ] report14.sqlite[2/8] [==18%                       ] report14.sqlite[2/8] [==19%                       ] report14.sqlite[2/8] [==20%                       ] report14.sqlite[2/8] [==21%                       ] report14.sqlite[2/8] [===22%                      ] report14.sqlite[2/8] [===23%                      ] report14.sqlite[2/8] [===24%                      ] report14.sqlite[2/8] [====25%                     ] report14.sqlite[2/8] [====26%                     ] report14.sqlite[2/8] [====27%                     ] report14.sqlite[2/8] [====28%                     ] report14.sqlite[2/8] [=====29%                    ] report14.sqlite[2/8] [=====30%                    ] report14.sqlite[2/8] [=====31%                    ] report14.sqlite[2/8] [=====32%                    ] report14.sqlite[2/8] [======33%                   ] report14.sqlite[2/8] [======34%                   ] report14.sqlite[2/8] [======35%                   ] report14.sqlite[2/8] [=======36%                  ] report14.sqlite[2/8] [=======37%                  ] report14.sqlite[2/8] [=======38%                  ] report14.sqlite[2/8] [=======39%                  ] report14.sqlite[2/8] [========40%                 ] report14.sqlite[2/8] [========41%                 ] report14.sqlite[2/8] [========42%                 ] report14.sqlite[2/8] [=========43%                ] report14.sqlite[2/8] [=========44%                ] report14.sqlite[2/8] [=========45%                ] report14.sqlite[2/8] [=========46%                ] report14.sqlite[2/8] [==========47%               ] report14.sqlite[2/8] [==========48%               ] report14.sqlite[2/8] [==========49%               ] report14.sqlite[2/8] [===========50%              ] report14.sqlite[2/8] [===========51%              ] report14.sqlite[2/8] [===========52%              ] report14.sqlite[2/8] [===========53%              ] report14.sqlite[2/8] [============54%             ] report14.sqlite[2/8] [============55%             ] report14.sqlite[2/8] [============56%             ] report14.sqlite[2/8] [============57%             ] report14.sqlite[2/8] [=============58%            ] report14.sqlite[2/8] [=============59%            ] report14.sqlite[2/8] [=============60%            ] report14.sqlite[2/8] [==============61%           ] report14.sqlite[2/8] [==============62%           ] report14.sqlite[2/8] [==============63%           ] report14.sqlite[2/8] [==============64%           ] report14.sqlite[2/8] [===============65%          ] report14.sqlite[2/8] [===============66%          ] report14.sqlite[2/8] [===============67%          ] report14.sqlite[2/8] [================68%         ] report14.sqlite[2/8] [================69%         ] report14.sqlite[2/8] [================70%         ] report14.sqlite[2/8] [================71%         ] report14.sqlite[2/8] [=================72%        ] report14.sqlite[2/8] [=================73%        ] report14.sqlite[2/8] [=================74%        ] report14.sqlite[2/8] [==================75%       ] report14.sqlite[2/8] [==================76%       ] report14.sqlite[2/8] [==================77%       ] report14.sqlite[2/8] [==================78%       ] report14.sqlite[2/8] [===================79%      ] report14.sqlite[2/8] [===================80%      ] report14.sqlite[2/8] [===================81%      ] report14.sqlite[2/8] [===================82%      ] report14.sqlite[2/8] [====================83%     ] report14.sqlite[2/8] [====================84%     ] report14.sqlite[2/8] [====================85%     ] report14.sqlite[2/8] [=====================86%    ] report14.sqlite[2/8] [=====================87%    ] report14.sqlite[2/8] [=====================88%    ] report14.sqlite[2/8] [=====================89%    ] report14.sqlite[2/8] [======================90%   ] report14.sqlite[2/8] [======================91%   ] report14.sqlite[2/8] [======================92%   ] report14.sqlite[2/8] [=======================93%  ] report14.sqlite[2/8] [=======================94%  ] report14.sqlite[2/8] [=======================95%  ] report14.sqlite[2/8] [=======================96%  ] report14.sqlite[2/8] [========================97% ] report14.sqlite[2/8] [========================98% ] report14.sqlite[2/8] [========================99% ] report14.sqlite[2/8] [========================100%] report14.sqlite[2/8] [========================100%] report14.sqlite
-[3/8] Executing 'nvtx_sum' stats report
-[4/8] Executing 'cuda_api_sum' stats report
-
- Time (%)  Total Time (ns)  Num Calls  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)           Name         
- --------  ---------------  ---------  --------  --------  --------  --------  -----------  ----------------------
-    100.0            1,795          1   1,795.0   1,795.0     1,795     1,795          0.0  cuModuleGetLoadingMode
-
-[5/8] Executing 'cuda_gpu_kern_sum' stats report
-[6/8] Executing 'cuda_gpu_mem_time_sum' stats report
-[7/8] Executing 'cuda_gpu_mem_size_sum' stats report
-[8/8] Executing 'openacc_sum' stats report
-Generated:
-    /fastscratch/bwilfong3/exampleCases/3D_TGV/report14.nsys-rep
-    /fastscratch/bwilfong3/exampleCases/3D_TGV/report14.sqlite
-
-+-----------------------------------------------------------------------------------------------------------+ 
-| Finished MFC:                                                                                             |
-| * Total-time:    19s                                 * Exit Code:     0                                   |
-| * End-time:      14:13:39                            * End-date:      14:13:39                            |
-+-----------------------------------------------------------------------------------------------------------+ 
-
-mfc: (venv) Exiting the Python virtual environment.
