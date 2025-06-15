@@ -1392,7 +1392,7 @@ contains
             end if
         end if
 
-        if (bc_x%beg <= BC_GHOST_EXTRAPOLATION) then
+        if (bc_x%beg <= BC_GHOST_EXTRAP) then
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -1401,7 +1401,7 @@ contains
                 end do
             end do
         end if
-        if (bc_x%end <= BC_GHOST_EXTRAPOLATION) then
+        if (bc_x%end <= BC_GHOST_EXTRAP) then
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -1411,7 +1411,7 @@ contains
             end do
         end if
         if (n > 0) then
-            if (bc_y%beg <= BC_GHOST_EXTRAPOLATION .and. bc_y%beg /= BC_NULL) then
+            if (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_NULL) then
                 !$acc parallel loop collapse(2) gang vector default(present)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -1420,7 +1420,7 @@ contains
                     end do
                 end do
             end if
-            if (bc_y%end <= BC_GHOST_EXTRAPOLATION) then
+            if (bc_y%end <= BC_GHOST_EXTRAP) then
                 !$acc parallel loop collapse(2) gang vector default(present)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -1430,7 +1430,7 @@ contains
                 end do
             end if
             if (p > 0) then
-                if (bc_z%beg <= BC_GHOST_EXTRAPOLATION) then
+                if (bc_z%beg <= BC_GHOST_EXTRAP) then
                     !$acc parallel loop collapse(2) gang vector default(present)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -1440,7 +1440,7 @@ contains
                         end do
                     end do
                 end if
-                if (bc_z%end <= BC_GHOST_EXTRAPOLATION) then
+                if (bc_z%end <= BC_GHOST_EXTRAP) then
                     !$acc parallel loop collapse(2) gang vector default(present)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
