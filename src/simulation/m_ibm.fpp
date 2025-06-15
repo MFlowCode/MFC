@@ -18,6 +18,8 @@ module m_ibm
 
     use m_helper
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_constants
 
     implicit none
@@ -396,7 +398,7 @@ contains
                     bound = p
                 end if
 
-                if (norm(dim) == 0) then
+                if (f_approx_equal(norm(dim), 0._wp)) then
                     ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim)
                 else
                     if (norm(dim) > 0) then

@@ -39,6 +39,8 @@ module m_riemann_solvers
 
     use m_surface_tension      !< To get the capilary fluxes
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_chemistry
 
     use m_thermochem, only: &
@@ -2187,7 +2189,7 @@ contains
                                                                                                           rho_R*R3V2Rbar/R3Rbar)
                                     end if
 
-                                    if ((ptilde_L /= ptilde_L) .or. (ptilde_R /= ptilde_R)) then
+                                    if ((.not. f_approx_equal(ptilde_L, ptilde_L)) .or. (.not. f_approx_equal(ptilde_R, ptilde_R))) then
                                     end if
 
                                     rho_avg = 5e-1_wp*(rho_L + rho_R)

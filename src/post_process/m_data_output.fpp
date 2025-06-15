@@ -183,28 +183,28 @@ contains
         if (format == 1 .and. n > 0) then
             if (p > 0) then
                 if (grid_geometry == 3) then
-                    lo_offset = (/offset_y%beg, offset_z%beg, offset_x%beg/)
-                    hi_offset = (/offset_y%end, offset_z%end, offset_x%end/)
+                    lo_offset(:) = (/offset_y%beg, offset_z%beg, offset_x%beg/)
+                    hi_offset(:) = (/offset_y%end, offset_z%end, offset_x%end/)
                 else
-                    lo_offset = (/offset_x%beg, offset_y%beg, offset_z%beg/)
-                    hi_offset = (/offset_x%end, offset_y%end, offset_z%end/)
+                    lo_offset(:) = (/offset_x%beg, offset_y%beg, offset_z%beg/)
+                    hi_offset(:) = (/offset_x%end, offset_y%end, offset_z%end/)
                 end if
 
                 if (grid_geometry == 3) then
-                    dims = (/n + offset_y%beg + offset_y%end + 2, &
-                             p + offset_z%beg + offset_z%end + 2, &
-                             m + offset_x%beg + offset_x%end + 2/)
+                    dims(:) = (/n + offset_y%beg + offset_y%end + 2, &
+                                p + offset_z%beg + offset_z%end + 2, &
+                                m + offset_x%beg + offset_x%end + 2/)
                 else
-                    dims = (/m + offset_x%beg + offset_x%end + 2, &
-                             n + offset_y%beg + offset_y%end + 2, &
-                             p + offset_z%beg + offset_z%end + 2/)
+                    dims(:) = (/m + offset_x%beg + offset_x%end + 2, &
+                                n + offset_y%beg + offset_y%end + 2, &
+                                p + offset_z%beg + offset_z%end + 2/)
                 end if
             else
-                lo_offset = (/offset_x%beg, offset_y%beg/)
-                hi_offset = (/offset_x%end, offset_y%end/)
+                lo_offset(:) = (/offset_x%beg, offset_y%beg/)
+                hi_offset(:) = (/offset_x%end, offset_y%end/)
 
-                dims = (/m + offset_x%beg + offset_x%end + 2, &
-                         n + offset_y%beg + offset_y%end + 2/)
+                dims(:) = (/m + offset_x%beg + offset_x%end + 2, &
+                            n + offset_y%beg + offset_y%end + 2/)
             end if
         end if
 
@@ -710,10 +710,10 @@ contains
 
             if (precision == 1) then
                 if (p > 0) then
-                    z_cb_s = real(z_cb, sp)
+                    z_cb_s(:) = real(z_cb(:), sp)
                 end if
-                x_cb_s = real(x_cb, sp)
-                y_cb_s = real(y_cb, sp)
+                x_cb_s(:) = real(x_cb(:), sp)
+                y_cb_s(:) = real(y_cb(:), sp)
             end if
 
             #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
@@ -805,7 +805,7 @@ contains
                 if (num_procs > 1) then
                     call s_mpi_defragment_1d_grid_variable()
                 else
-                    x_root_cb = x_cb
+                    x_root_cb(:) = x_cb(:)
                 end if
 
                 if (proc_rank == 0) then
@@ -872,11 +872,11 @@ contains
             if (n == 0) then
 
                 if (precision == 1 .and. wp == dp) then
-                    x_cc_s = real(x_cc, sp)
-                    q_sf_s = real(q_sf, sp)
+                    x_cc_s(:) = real(x_cc(:), sp)
+                    q_sf_s(:, :, :) = real(q_sf(:, :, :), sp)
                 elseif (precision == 1 .and. wp == sp) then
-                    x_cc_s = x_cc
-                    q_sf_s = q_sf
+                    x_cc_s(:) = x_cc(:)
+                    q_sf_s(:, :, :) = q_sf(:, :, :)
                 end if
 
                 ! Writing the curve object associated with the local process
@@ -897,16 +897,16 @@ contains
                     call s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
 
                     if (precision == 1) then
-                        x_root_cc_s = real(x_root_cc, sp)
-                        q_root_sf_s = real(q_root_sf, sp)
+                        x_root_cc_s(:) = real(x_root_cc(:), sp)
+                        q_root_sf_s(:, :, :) = real(q_root_sf(:, :, :), sp)
                     end if
                 else
                     if (precision == 1) then
-                        x_root_cc_s = real(x_cc, sp)
-                        q_root_sf_s = real(q_sf, sp)
+                        x_root_cc_s(:) = real(x_cc(:), sp)
+                        q_root_sf_s(:, :, :) = real(q_sf(:, :, :), sp)
                     else
-                        x_root_cc = x_cc
-                        q_root_sf = q_sf
+                        x_root_cc(:) = x_cc(:)
+                        q_root_sf(:, :, :) = q_sf(:, :, :)
                     end if
                 end if
 
@@ -1069,7 +1069,7 @@ contains
                 if (num_procs > 1) then
                     call s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
                 else
-                    q_root_sf = q_sf
+                    q_root_sf(:, :, :) = q_sf(:, :, :)
                 end if
 
                 if (proc_rank == 0) then

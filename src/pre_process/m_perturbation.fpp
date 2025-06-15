@@ -16,6 +16,8 @@ module m_perturbation
 
     use m_boundary_common   ! Boundary conditions module
 
+    use m_helper_basic           !< Functions to compare floating point numbers
+
     use ieee_arithmetic
 
     implicit none
@@ -74,7 +76,7 @@ contains
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
                     !    IF ((perturb_alpha >= 25e-2_wp) .AND. (perturb_alpha <= 75e-2_wp)) THEN
-                    if ((perturb_alpha /= 0._wp) .and. (perturb_alpha /= 1._wp)) then
+                    if ((.not. f_approx_equal(perturb_alpha, 0._wp)) .and. (.not. f_approx_equal(perturb_alpha, 1._wp))) then
 
                         ! Derive new partial densities
                         do l = 1, num_fluids
@@ -599,7 +601,7 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    if (beta == 0) then
+                    if (f_approx_equal(beta, 0._wp)) then
                         ang = alpha*(x_cc(i)*xratio)
                     else
                         ang = alpha*(x_cc(i)*xratio) + beta*(z_cc(k)*xratio) + shift

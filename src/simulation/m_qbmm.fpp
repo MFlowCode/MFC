@@ -561,8 +561,7 @@ contains
 
     end subroutine s_compute_qbmm_rhs
 
-!Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
-
+    !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
     pure subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff_nonpoly

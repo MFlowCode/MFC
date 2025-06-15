@@ -66,8 +66,6 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsy_vf_l, flux_src_rsy_vf_l
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_l, flux_src_rsz_vf_l
 
-
-
     real(wp) :: dpres_ds !< Spatial derivatives in s-dir of pressure
     !$acc declare create(dpres_ds)
 

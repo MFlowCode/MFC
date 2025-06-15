@@ -244,7 +244,7 @@ contains
         rhoH = (1._wp - vfH)/ratio
         deno = 1._wp - (1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/rhoH
 
-        if (deno == 0._wp) then
+        if (f_approx_equal(deno, 0._wp)) then
             velH = 0._wp
         else
             velH = (q_prim_vf(E_idx)%sf(j, k, l) - 1._wp)/(1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/deno

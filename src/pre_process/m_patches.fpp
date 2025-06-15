@@ -550,7 +550,7 @@ contains
                         do while (airfoil_grid_u(k)%x < x_act)
                             k = k + 1
                         end do
-                        if (airfoil_grid_u(k)%x == x_act) then
+                        if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
                             if (y_act <= airfoil_grid_u(k)%y) then
                                 !!IB
                                 !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
@@ -571,7 +571,7 @@ contains
                         do while (airfoil_grid_l(k)%x < x_act)
                             k = k + 1
                         end do
-                        if (airfoil_grid_l(k)%x == x_act) then
+                        if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
                             if (y_act >= airfoil_grid_l(k)%y) then
                                 !!IB
                                 !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
@@ -719,7 +719,7 @@ contains
                                 do while (airfoil_grid_u(k)%x < x_act)
                                     k = k + 1
                                 end do
-                                if (airfoil_grid_u(k)%x == x_act) then
+                                if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
                                     if (y_act <= airfoil_grid_u(k)%y) then
                                         !!IB
                                         !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
@@ -740,7 +740,7 @@ contains
                                 do while (airfoil_grid_l(k)%x < x_act)
                                     k = k + 1
                                 end do
-                                if (airfoil_grid_l(k)%x == x_act) then
+                                if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
                                     if (y_act >= airfoil_grid_l(k)%y) then
                                         !!IB
                                         !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
