@@ -4,12 +4,26 @@ on:
   push:
 
 jobs:
-  build-singularity-images:
-    runs-on: ubuntu-latest
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
     steps:
-      - name: Checkout repository
+      - name: Clone
         uses: actions/checkout@v4
 
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+
+  build-singularity-images:
+    needs: file-changes
+    if: needs.file-changes.outputs.checkall == 'true'
+    runs-on: ubuntu-latest
+    steps:
       - name: Set up Singularity
         uses: eWaterCycle/setup-singularity@v7
         with:
@@ -17,26 +31,27 @@ jobs:
 
       - name: Build CPU image
         run: |
-          singularity build .github/workflows/images/mfc_cpu.sif .github/workflows/images/Singularity.cpu
+          (cd .github/workflows/images && singularity build mfc_cpu.sif Singularity.cpu)
 
       - name: Build GPU image
         run: |
-          singularity build .github/workflows/images/mfc_gpu.sif .github/workflows/images/Singularity.gpu
+          (cd .github/workflows/images && singularity build mfc_gpu.sif Singularity.gpu)
 
       - name: Build CPU Benchmark image
         run: |
-          singularity build .github/workflows/images/mfc_cpu_bench.sif .github/workflows/images/Singularity.cpu_bench
+          (cd .github/workflows/images && singularity build mfc_cpu_bench.sif Singularity.cpu_bench)
 
       - name: Build GPU Benchmark image
         run: |
-          singularity build .github/workflows/images/mfc_gpu_bench.sif .github/workflows/images/Singularity.gpu_bench
+          (cd .github/workflows/images && singularity build mfc_gpu_bench.sif Singularity.gpu_bench)
 
       - name: Upload images as artifacts
         uses: actions/upload-artifact@v4
+        if:   always()
         with:
           name: singularity-images
           path: |
-            .github/workflows/images/mfc_cpu.sif
-            .github/workflows/images/mfc_gpu.sif
-            .github/workflows/images/mfc_cpu_bench.sif
-            .github/workflows/images/mfc_gpu_bench.sif
+            pr/.github/workflows/images/mfc_cpu.sif
+            pr/.github/workflows/images/mfc_gpu.sif
+            pr/.github/workflows/images/mfc_cpu_bench.sif
+            pr/.github/workflows/images/mfc_gpu_bench.sif
