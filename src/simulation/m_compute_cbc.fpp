@@ -1,7 +1,8 @@
-#:include 'parallel_macros.fpp'
 !>
 !! @file m_compute_cbc.f90
 !! @brief CBC computation module
+
+#:include 'macros.fpp'
 
 module m_compute_cbc
     use m_global_parameters

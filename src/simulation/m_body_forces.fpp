@@ -1,5 +1,4 @@
 #:include 'macros.fpp'
-#:include 'parallel_macros.fpp'
 
 module m_body_forces
 

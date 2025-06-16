@@ -3,7 +3,6 @@
 !! @brief Contains module m_bubbles_EL_kernels
 
 #:include 'macros.fpp'
-#:include 'parallel_macros.fpp'
 
 !> @brief This module contains kernel functions used to map the effect of the lagrangian bubbles
 !!        in the Eulerian framework.

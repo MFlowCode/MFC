@@ -3,7 +3,6 @@
 !! @brief Contains module m_ibm
 
 #:include 'macros.fpp'
-#:include 'parallel_macros.fpp'
 
 !> @brief This module is used to handle all operations related to immersed
 !!              boundary methods (IBMs)

@@ -4,7 +4,6 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'parallel_macros.fpp'
 
 !> @brief The module contains the subroutines used to calculate the right-
 !!              hane-side (RHS) in the quasi-conservative, shock- and interface-

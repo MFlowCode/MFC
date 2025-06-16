@@ -1,4 +1,5 @@
-#:include 'parallel_macros.fpp'
+#:include 'macros.fpp'
+
 module m_sim_helpers
 
     use m_derived_types        !< Definitions of the derived types

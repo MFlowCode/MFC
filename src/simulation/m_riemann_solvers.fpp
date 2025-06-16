@@ -21,7 +21,6 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'parallel_macros.fpp'
 #:include 'inline_riemann.fpp'
 
 module m_riemann_solvers

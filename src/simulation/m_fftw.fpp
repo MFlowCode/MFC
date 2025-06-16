@@ -3,7 +3,6 @@
 !! @brief Contains module m_fftw
 
 #:include 'macros.fpp'
-#:include 'parallel_macros.fpp'
 
 !> @brief The module contains the subroutines for the FFT routines
 module m_fftw

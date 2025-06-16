@@ -1,5 +1,5 @@
 #:include 'macros.fpp'
-#:include 'parallel_macros.fpp'
+
 !>
 !! @file m_helper.f90
 !! @brief Contains module m_helper

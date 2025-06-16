@@ -4,7 +4,6 @@
 !! @author Henry Le Berre <hberre3@gatech.edu>
 
 #:include 'macros.fpp'
-#:include 'parallel_macros.fpp'
 #:include 'case.fpp'
 
 module m_chemistry

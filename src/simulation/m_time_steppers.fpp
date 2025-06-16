@@ -3,7 +3,6 @@
 !! @brief Contains module m_time_steppers
 
 #:include 'macros.fpp'
-#:include 'parallel_macros.fpp'
 
 !> @brief The following module features a variety of time-stepping schemes.
 !!              Currently, it includes the following Runge-Kutta (RK) algorithms:

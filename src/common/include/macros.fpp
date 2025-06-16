@@ -1,3 +1,5 @@
+#:include 'parallel_macros.fpp'
+
 #:def LOG(expr)
 #ifdef MFC_DEBUG
     block

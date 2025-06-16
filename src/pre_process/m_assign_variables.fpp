@@ -3,7 +3,7 @@
 !! @brief Contains module m_assign_variables
 
 #:include 'case.fpp'
-#:include 'parallel_macros.fpp'
+#:include 'macros.fpp'
 
 module m_assign_variables
 

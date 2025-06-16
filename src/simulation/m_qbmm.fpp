@@ -3,7 +3,6 @@
 !! @brief Contains module m_qbmm
 
 #:include 'case.fpp'
-#:include 'parallel_macros.fpp'
 #:include 'macros.fpp'
 
 !> @brief This module is used to compute moment inversion via qbmm

@@ -2,7 +2,8 @@
 ! @brief Contains module m_boundary_conditions
 
 !> @brief This module contains
-#:include 'parallel_macros.fpp'
+#:include 'macros.fpp'
+
 module m_boundary_conditions
 
     use m_derived_types

@@ -3,7 +3,6 @@
 !! @brief Contains module m_hypoelastic
 
 #:include 'macros.fpp'
-#:include 'parallel_macros.fpp'
 
 !> @brief This module is used to compute source terms for hypoelastic model
 module m_hypoelastic

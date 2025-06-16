@@ -7,7 +7,6 @@
 #:include '2dHardcodedIC.fpp'
 #:include '3dHardcodedIC.fpp'
 #:include 'macros.fpp'
-#:include 'parallel_macros.fpp'
 
 module m_patches
 
