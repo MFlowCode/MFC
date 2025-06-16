@@ -244,7 +244,7 @@ contains
         rhoH = (1._wp - vfH)/ratio
         deno = 1._wp - (1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/rhoH
 
-        if (deno == 0._wp) then
+        if (f_approx_equal(deno, 0._wp)) then
             velH = 0._wp
         else
             velH = (q_prim_vf(E_idx)%sf(j, k, l) - 1._wp)/(1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/deno
@@ -502,7 +502,7 @@ contains
                 theta = atan2(y_cc(k), x_cc(j))
                 phi = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
                 !spherical coord, assuming Rmax=1
-                xi_sph = (rcoord**3 - R0ref**3 + 1_wp)**(1_wp/3_wp)
+                xi_sph = (rcoord**3 - R0ref**3 + 1._wp)**(1._wp/3._wp)
                 xi_cart(1) = xi_sph*sin(phi)*cos(theta)
                 xi_cart(2) = xi_sph*sin(phi)*sin(theta)
                 xi_cart(3) = xi_sph*cos(phi)
@@ -515,7 +515,7 @@ contains
             ! assigning the reference map to the q_prim vector field
             do i = 1, num_dims
                 q_prim_vf(i + xibeg - 1)%sf(j, k, l) = eta*xi_cart(i) + &
-                                                       (1_wp - eta)*orig_prim_vf(i + xibeg - 1)
+                                                       (1._wp - eta)*orig_prim_vf(i + xibeg - 1)
             end do
         end if
 

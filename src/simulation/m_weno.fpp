@@ -95,9 +95,6 @@ module m_weno
     !
     !> @}
 
-    real(wp) :: test
-    !$acc declare create(test)
-
     !$acc declare create( &
     !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
     !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &

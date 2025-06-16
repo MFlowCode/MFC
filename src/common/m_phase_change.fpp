@@ -17,6 +17,8 @@ module m_phase_change
 
     use ieee_arithmetic
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     implicit none
 
     private; 
@@ -748,7 +750,7 @@ contains
         ! Generic loop iterators
         integer :: ns
 
-        if ((pSat == 0.0_wp) .and. (TSIn == 0.0_wp)) then
+        if ((f_approx_equal(pSat, 0.0_wp)) .and. (f_approx_equal(TSIn, 0.0_wp))) then
 
             ! assigning Saturation temperature
             TSat = 0.0_wp

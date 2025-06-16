@@ -16,6 +16,8 @@ module m_derived_variables
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_variables_conversion
 
     implicit none
@@ -286,7 +288,7 @@ contains
                     if (abs(top) < 1e-8_wp) top = 0._wp
                     if (abs(bottom) < 1e-8_wp) bottom = 0._wp
 
-                    if (top == bottom) then
+                    if (f_approx_equal(top, bottom)) then
                         slope = 1._wp
                         !       ELSEIF((top == 0._wp .AND. bottom /= 0._wp) &
                         !               .OR.            &

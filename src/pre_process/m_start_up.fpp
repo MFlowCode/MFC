@@ -775,8 +775,8 @@ contains
         end if
         !Initialize pb based on surface tension for qbmm (polytropic)
         if (qbmm .and. polytropic .and. (.not. f_is_default(Web))) then
-            pb0 = pref + 2._wp*fluid_pp(1)%ss/(R0*R0ref)
-            pb0 = pb0/pref
+            pb0(:) = pref + 2._wp*fluid_pp(1)%ss/(R0(:)*R0ref)
+            pb0(:) = pb0(:)/pref
             pref = 1._wp
         end if
         call s_initialize_mpi_common_module()

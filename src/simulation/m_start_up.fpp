@@ -103,8 +103,6 @@ module m_start_up
  s_save_performance_metrics
 
 
-    type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
-
     real(wp) :: dt_init
 
 contains
@@ -1251,7 +1249,7 @@ contains
         end if
         !Initialize pb based on surface tension for qbmm (polytropic)
         if (qbmm .and. polytropic .and. (.not. f_is_default(Web))) then
-            pb0 = pref + 2._wp*fluid_pp(1)%ss/(R0*R0ref)
+            pb0(:) = pref + 2._wp*fluid_pp(1)%ss/(R0(:)*R0ref)
             pb0 = pb0/pref
             pref = 1._wp
         end if

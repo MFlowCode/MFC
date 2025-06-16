@@ -10,6 +10,7 @@ module m_helper_basic
 
     private; 
     public :: f_approx_equal, &
+              f_approx_in_array, &
               f_is_default, &
               f_all_default, &
               f_is_integer, &
@@ -20,7 +21,7 @@ contains
     !> This procedure checks if two floating point numbers of wp are within tolerance.
     !! @param a First number.
     !! @param b Second number.
-    !! @param tol_input Relative error (default = 1e-6_wp).
+    !! @param tol_input Relative error (default = 1e-10_wp).
     !! @return Result of the comparison.
     logical pure elemental function f_approx_equal(a, b, tol_input) result(res)
         !$acc routine seq
@@ -31,7 +32,7 @@ contains
         if (present(tol_input)) then
             tol = tol_input
         else
-            tol = 1e-6_wp
+            tol = 1e-10_wp
         end if
 
         if (a == b) then
@@ -42,6 +43,35 @@ contains
             res = (abs(a - b)/min(abs(a) + abs(b), huge(a)) < tol)
         end if
     end function f_approx_equal
+
+    !> This procedure checks if the point numbers of wp belongs to another array are within tolerance.
+    !! @param a First number.
+    !! @param b Array that contains several point numbers.
+    !! @param tol_input Relative error (default = 1e-10_wp).
+    !! @return Result of the comparison.
+    logical pure function f_approx_in_array(a, b, tol_input) result(res)
+        !$acc routine seq
+        real(wp), intent(in) :: a
+        real(wp), intent(in) :: b(:)
+        real(wp), optional, intent(in) :: tol_input
+        real(wp) :: tol
+        integer :: i
+
+        res = .false.
+
+        if (present(tol_input)) then
+            tol = tol_input
+        else
+            tol = 1e-10_wp
+        end if
+
+        do i = 1, size(b)
+            if (f_approx_equal(a, b(i), tol)) then
+                res = .true.
+                exit
+            end if
+        end do
+    end function f_approx_in_array
 
     !> Checks if a real(wp) variable is of default value.
     !! @param var Variable to check.

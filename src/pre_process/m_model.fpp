@@ -327,7 +327,7 @@ contains
 
         character(kind=c_char, len=80), parameter :: header = "Model file written by MFC."
         integer(kind=c_int32_t) :: nTriangles
-        real(kind=c_float) :: normal(3), v(3)
+        real(wp) :: normal(3), v(3)
         integer(kind=c_int16_t) :: attribute
 
         open (newunit=iunit, file=filepath, action='WRITE', &

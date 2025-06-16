@@ -253,8 +253,6 @@ contains
 
         integer :: pack_offset, unpack_offset
 
-        integer, pointer :: p_i_send, p_i_recv
-
 #ifdef MFC_MPI
 
         call nvtxStartRange("IB-MARKER-COMM-PACKBUF")

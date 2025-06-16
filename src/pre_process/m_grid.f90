@@ -20,6 +20,8 @@ module m_grid
 
     use m_mpi_proxy             ! Message passing interface (MPI) module proxy
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
 #ifdef MFC_MPI
     use mpi                     ! Message passing interface (MPI) module
 #endif
@@ -83,7 +85,7 @@ contains
             end do
             x_cb = x_cb*length
 
-            x_cc = (x_cb(0:m) + x_cb(-1:m - 1))/2._wp
+            x_cc(0:m) = (x_cb(0:m) + x_cb(-1:m - 1))/2._wp
 
             dx = minval(x_cb(0:m) - x_cb(-1:m - 1))
             print *, 'Stretched grid: min/max x grid: ', minval(x_cc(:)), maxval(x_cc(:))
@@ -94,7 +96,7 @@ contains
         ! Grid Generation in the y-direction
         if (n == 0) return
 
-        if (grid_geometry == 2 .and. y_domain%beg == 0.0_wp) then
+        if (grid_geometry == 2 .and. f_approx_equal(y_domain%beg, 0.0_wp)) then
             !IF (grid_geometry == 2) THEN
 
             dy = (y_domain%end - y_domain%beg)/real(2*n + 1, wp)
@@ -137,7 +139,7 @@ contains
             end do
 
             y_cb = y_cb*length
-            y_cc = (y_cb(0:n) + y_cb(-1:n - 1))/2._wp
+            y_cc(0:m) = (y_cb(0:n) + y_cb(-1:n - 1))/2._wp
 
             dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
 
@@ -174,7 +176,7 @@ contains
             end do
 
             z_cb = z_cb*length
-            z_cc = (z_cb(0:p) + z_cb(-1:p - 1))/2._wp
+            z_cc(0:m) = (z_cb(0:p) + z_cb(-1:p - 1))/2._wp
 
             dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
 
@@ -241,7 +243,7 @@ contains
         ! Grid generation in the y-direction
         if (n_glb > 0) then
 
-            if (grid_geometry == 2 .and. y_domain%beg == 0.0_wp) then
+            if (grid_geometry == 2 .and. f_approx_equal(y_domain%beg, 0.0_wp)) then
                 dy = (y_domain%end - y_domain%beg)/real(2*n_glb + 1, wp)
                 y_cb_glb(-1) = y_domain%beg
                 do i = 1, n_glb

@@ -163,7 +163,7 @@ contains
         phi_nv = (1._wp + sqrt(mu_n/mu_v)*(M_v/M_n)**(0.25_wp))**2 &
                  /(sqrt(8._wp)*sqrt(1._wp + M_n/M_v))
         ! internal bubble pressure
-        pb0 = pl0 + 2._wp*ss/(R0ref*R0)
+        pb0(:) = pl0 + 2._wp*ss/(R0ref*R0(:))
 
         ! mass fraction of vapor
         chi_vw0 = 1._wp/(1._wp + R_v/R_n*(pb0/pv - 1._wp))
@@ -179,10 +179,10 @@ contains
         rho_m0 = pv/(chi_vw0*R_v*temp)
 
         ! mass of gas/vapor computed using dimensional quantities
-        mass_n0 = 4._wp*(pb0 - pv)*pi/(3._wp*R_n*temp*rhol0)*R0**3
-        mass_v0 = 4._wp*pv*pi/(3._wp*R_v*temp*rhol0)*R0**3
+        mass_n0(:) = 4._wp*(pb0(:) - pv)*pi/(3._wp*R_n*temp*rhol0)*R0(:)**3
+        mass_v0(:) = 4._wp*pv*pi/(3._wp*R_v*temp*rhol0)*R0(:)**3
         ! Peclet numbers
-        Pe_T = rho_m0*cp_m0*uu*R0ref/k_m0
+        Pe_T(:) = rho_m0*cp_m0(:)*uu*R0ref/k_m0(:)
         Pe_c = uu*R0ref/D_m
 
         Tw = temp
@@ -191,8 +191,8 @@ contains
         !if(.not. qbmm) then
         R_n = rhol0*R_n*temp/pl0
         R_v = rhol0*R_v*temp/pl0
-        k_n = k_n/k_m0
-        k_v = k_v/k_m0
+        k_n(:) = k_n(:)/k_m0(:)
+        k_v(:) = k_v(:)/k_m0(:)
         pb0 = pb0/pl0
         pv = pv/pl0
         Tw = 1._wp
@@ -203,7 +203,7 @@ contains
         !end if
 
         ! natural frequencies
-        omegaN = sqrt(3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/(Web*R0))/R0
+        omegaN(:) = sqrt(3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/(Web*R0))/R0
         do ir = 1, Nb
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), &
                               Re_trans_T(ir), Im_trans_T(ir))
@@ -488,7 +488,7 @@ contains
         real(wp) :: P
 
         if (l == 0) then
-            P = 1_wp
+            P = 1._wp
         else if (l == 1) then
             P = x
         else
