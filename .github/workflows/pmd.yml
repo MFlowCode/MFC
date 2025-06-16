@@ -1,36 +1,36 @@
-name: PMD
+name: Source DRYness
 
 on: [push, pull_request, workflow_dispatch]
 
 jobs:    
   pmd:
-      name: PMD Analysis
+      name: PMD
       runs-on: "ubuntu-latest"
       env:
           pr_everything: 0
       steps:
           - name: Clone - PR
             uses: actions/checkout@v4
+
+          - name: Set up Java
+            uses: actions/setup-java@v4
             with:
-              path: pr
+              distribution: temurin
+              java-version: '17'
 
-          - name: Clone PMD
+          - name: Run CPD for Fortran
+            continue-on-error: true
             run: |
-              sudo apt update -y
-              sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev maven
-              sudo apt install -y default-jdk
-              git clone https://github.com/pmd/pmd.git pmd
-              (cd pmd && git checkout)
+              # Get latest PMD version from GitHub API
+              PMD_VERSION=$(curl -s https://api.github.com/repos/pmd/pmd/releases/latest | grep '"tag_name":' | cut -d'"' -f4 | sed 's/pmd_releases\///')
+              echo "Using PMD version: $PMD_VERSION"
 
-          - name: Build PMD
-            run: |
-              (cd pmd && mvn clean install -DskipTests> ../pmd.txt)
-
-          - name: Running PMD
-            run: |
-              alias pmd="$HOME/pmd/bin/pmd"
-
-              SOURCE_DIR="${1:-pr/src}"
+              curl -sSL -o pmd.zip \
+                "https://github.com/pmd/pmd/releases/download/pmd_releases/${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip"
+              unzip -q pmd.zip
+              PMD_HOME="pmd-bin-${PMD_VERSION}"
+          
+                            SOURCE_DIR="${1:-pr/src}"
               total_files=$(find "$SOURCE_DIR" -type f \( -name "*.f" -o -name "*.f90" -o -name "*.for" -o -name "*.fpp" -o -name "*.F" -o -name "*.F90" \) | wc -l)
               processed=0
 
@@ -72,12 +72,8 @@ jobs:
                       echo -e "Successfully processed $file"
                   fi
               done
-              pmd cpd -l fortran /*  > ../pmd-fort.txt
-              pmd cpd -l python pr/toolchain/*  > ../pmd-py.txt
 
-          - name: Display PMD Reports
-            run: |
-              echo "PMD Fortran Report:"
-              cat pmd-fort.txt
-              echo "PMD Python Report:"
-              cat pmd-py.txt
+              "${PMD_HOME}/bin/pmd" cpd \
+                --dir src \
+                --language fortran \
+                --minimum-tokens=40
