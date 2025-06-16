@@ -269,26 +269,13 @@ contains
 
         !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
 
-        call sleep(proc_rank)
-        print*, "Processor", proc_rank
-        do i = 1, nBubs
-            print*, i, lag_id(i,1), mtn_pos(i, 1:3, 1)
-        end do
-
         if (num_procs > 1) then
-            call s_add_particles_to_transfer_list_IC(mtn_pos(:, :, 1), nbubs)
-            call s_mpi_send_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-                                      gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
-                                      intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
-                                      mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                                      gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts)
-            call s_mpi_recv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+            call s_add_particles_to_transfer_list(nBubs, mtn_pos(:, :, 1))
+            call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
                                       gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
                                       intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
                                       mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
                                       gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
-            !if (proc_rank == 0 .or. proc_rank == 2) print*, "b", proc_rank, mtn_pos
-            !call sleep(1)
         end if
 
         !Populate temporal variables
@@ -351,25 +338,20 @@ contains
         cell = fd_number - buff_size
         call s_locate_cell(mtn_pos(bub_id, 1:3, 1), cell, mtn_s(bub_id, 1:3, 1))
 
-         !Check if the bubble is located in the ghost cell of a symmetric boundary
-        !if ((any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(1) < 0) .or. &
-            !(any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(1) > m) .or. &
-            !(any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(2) < 0) .or. &
-            !(any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(2) > n)) then
-            !call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric or wall boundary.")
-        !end if
+        ! Check if the bubble is located in the ghost cell of a symmetric boundary
+        if ((any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(1) < 0) .or. &
+            (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(1) > m) .or. &
+            (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(2) < 0) .or. &
+            (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(2) > n)) then
+            call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric or wall boundary.")
+        end if
 
-        !if (p > 0) then
-            !if ((any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(3) < 0) .or. &
-                !(any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(3) > p)) then
-                !call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric or wall boundary.")
-            !end if
-        !end if
-
-        ! If particle is in the ghost cells, find the closest non-ghost cell
-        !cell(1) = min(max(cell(1), 0), m)
-        !cell(2) = min(max(cell(2), 0), n)
-        !if (p > 0) cell(3) = min(max(cell(3), 0), p)
+        if (p > 0) then
+            if ((any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(3) < 0) .or. &
+                (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(3) > p)) then
+                call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric or wall boundary.")
+            end if
+        end if
 
         call s_convert_to_mixture_variables(q_cons_vf, cell(1), cell(2), cell(3), &
                                             rhol, gamma, pi_inf, qv, Re)
@@ -576,12 +558,6 @@ contains
             end do
         end if
 
-        !call sleep(proc_rank)
-        !print*, proc_rank
-        !do k = 1, nBubs
-            !print*, k, lag_id(k, 1), mtn_pos(k,:,:)
-        !end do
-
         ! Radial motion model
         adap_dt_stop_max = 0
         !$acc parallel loop gang vector default(present) private(k, myalpha_rho, myalpha, Re, cell) &
@@ -659,13 +635,6 @@ contains
                     mtn_dveldt(k, l, stage) = 0._wp
                 end if
             end do
-
-            !if (lag_id(k,1) == 2) then
-                !print*, "as", proc_rank, stage, k, mtn_dposdt(k,:,stage), mtn_dveldt(k,:,stage)
-            !end if
-
-            !if (proc_rank == 0 .or. proc_rank == 2) print*, "a", proc_rank, mtn_dposdt(:,:,stage), mtn_dveldt(:,:,stage)
-            !call sleep(1)
 
             adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 
@@ -889,8 +858,6 @@ contains
                 if (scoord(i) < 0._wp) cell(i) = cell(i) - 1
             end do
         end if
-        !print*, "h", proc_rank, cell, mtn_pos(bub_id, 1:3, 2), mtn_s(bub_id, 1:3, 2)
-        !call sleep(1)
 
         if ((lag_params%cluster_type == 1)) then
             !< Getting p_cell in terms of only the current cell by interpolation
@@ -908,44 +875,17 @@ contains
 
             !< Obtain bilinear interpolation coefficients, based on the current location of the bubble.
             psi(1) = (scoord(1) - real(cell(1)))*dx(cell(1)) + x_cb(cell(1) - 1)
-            !if (cell(1) == (m + buff_size - fd_number)) then
-                !cell(1) = cell(1) - 1
-                !psi(1) = 1._wp
-            !else if (cell(1) == (fd_number - buff_size)) then
-                !psi(1) = 0._wp
-            !else
-                !if (psi(1) < x_cc(cell(1))) cell(1) = cell(1) - 1
-                psi(1) = abs((psi(1) - x_cc(cell(1)))/(x_cc(cell(1) + 1) - x_cc(cell(1))))
-            !end if
+            psi(1) = abs((psi(1) - x_cc(cell(1)))/(x_cc(cell(1) + 1) - x_cc(cell(1))))
 
             psi(2) = (scoord(2) - real(cell(2)))*dy(cell(2)) + y_cb(cell(2) - 1)
-            !if (cell(2) == (n + buff_size - fd_number)) then
-                !cell(2) = cell(2) - 1
-                !psi(2) = 1._wp
-            !else if (cell(2) == (fd_number - buff_size)) then
-                !psi(2) = 0._wp
-            !else
-                !if (psi(2) < y_cc(cell(2))) cell(2) = cell(2) - 1
-                psi(2) = abs((psi(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2))))
-            !end if
+            psi(2) = abs((psi(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2))))
 
             if (p > 0) then
                 psi(3) = (scoord(3) - real(cell(3)))*dz(cell(3)) + z_cb(cell(3) - 1)
-                !if (cell(3) == (p + buff_size - fd_number)) then
-                    !cell(3) = cell(3) - 1
-                    !psi(3) = 1._wp
-                !else if (cell(3) == (fd_number - buff_size)) then
-                    !psi(3) = 0._wp
-                !else
-                    !if (psi(3) < z_cc(cell(3))) cell(3) = cell(3) - 1
-                    psi(3) = abs((psi(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3))))
-                !end if
+                psi(3) = abs((psi(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3))))
             else
                 psi(3) = 0._wp
             end if
-
-            !print*, "i", proc_rank, cell, mtn_pos(bub_id, 1:3, 2), mtn_s(bub_id, 1:3, 2)
-            !call sleep(1)
 
             !< Perform bilinear interpolation
             if (p == 0) then  !2D
@@ -1125,10 +1065,6 @@ contains
                     mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                     gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
-                    !if (lag_id(k,1) == 2) then
-                        !print*, "g11", proc_rank, k, lag_id(k,1), mtn_dposdt(k,:,1), mtn_dveldt(k,:,1)
-                        !print*, "g12", proc_rank, k, lag_id(k,1), mtn_dposdt(k,:,2), mtn_dveldt(k,:,2)
-                    !end if
                 end do
 
                 if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=2)
@@ -1144,10 +1080,6 @@ contains
                     mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/2._wp
                     gas_p(k, 1) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/2._wp
                     gas_mv(k, 1) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2._wp
-                    !if (lag_id(k,1) == 2) then
-                        !print*, "g21", proc_rank, k, lag_id(k,1), mtn_dposdt(k,:,1), mtn_dveldt(k,:,1)
-                        !print*, "g22", proc_rank, k, lag_id(k,1), mtn_dposdt(k,:,2), mtn_dveldt(k,:,2)
-                    !end if
                 end do
 
                 if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=1)
@@ -1296,23 +1228,12 @@ contains
         end do
 
         if (num_procs > 1) then
-            call s_add_particles_to_transfer_list(mtn_pos(:, :, dest), mtn_posPrev(:, :, dest), nbubs)
-            call s_mpi_send_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-                                      gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
-                                      intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
-                                      mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                                       gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts)
-            call s_mpi_recv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+            call s_add_particles_to_transfer_list(nBubs, mtn_pos(:, :, dest), mtn_posPrev(:, :, dest))
+            call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
                                       gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
                                       intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
                                       mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
                                       gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
-            !do k = 1, nBubs
-                !if (lag_id(k,1) == 2) then
-                    !print*, "c1", proc_rank, lag_id(k, 1), mtn_dveldt(k,:,1), mtn_dposdt(k, :, 1)
-                    !print*, "c2", proc_rank, lag_id(k, 1), mtn_dveldt(k,:,2), mtn_dposdt(k, :, 2)
-                !endif
-            !end do
         end if
 
     end subroutine s_enforce_EL_bubbles_boundary_conditions
@@ -1330,18 +1251,22 @@ contains
         integer :: i
 
         do while (pos(1) < x_cb(cell(1) - 1))
+            if (cell(1) == fd_number - buff_size) print*, "xb error", proc_rank, pos
             cell(1) = cell(1) - 1
         end do
 
         do while (pos(1) >= x_cb(cell(1)))
+            if (cell(1) == m + buff_size - fd_number) print*, "xe error", proc_rank, pos
             cell(1) = cell(1) + 1
         end do
 
         do while (pos(2) < y_cb(cell(2) - 1))
+            if (cell(2) == fd_number - buff_size) print*, "yb error", proc_rank, pos
             cell(2) = cell(2) - 1
         end do
 
         do while (pos(2) >= y_cb(cell(2)))
+            if (cell(2) == n + buff_size - fd_number) print*, "ye error", proc_rank, pos
             cell(2) = cell(2) + 1
         end do
 

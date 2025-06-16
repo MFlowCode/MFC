@@ -500,15 +500,6 @@ contains
                   (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
         end if
 
-        !if (i == 1 .and. id == 2) then
-            !print*, "c", proc_rank, dp, &
-                !q_prim_vf(E_idx)%sf(cell(1) - 1, cell(2), cell(3)), &
-                !q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)), &
-                !q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3)), &
-                !pos, x_cc(cell(1) + 1), x_cc(cell(1) - 1), cell
-            !call sleep(1)
-        !end if
-
         vol = (4._wp/3._wp) * pi * rad**3._wp
         force = -1._wp * vol * dp
 
@@ -525,11 +516,6 @@ contains
         end if
 
         a = force / (mg + mv)
-
-        !if (i == 1 .and. id == 2) then
-            !print*, "d", proc_rank, vol, force, v_rel, vel, v_rel - vel, a, mg, mv
-            !call sleep(1)
-        !end if
 
     end function f_get_acceleration
 
