@@ -183,7 +183,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
     if ARG("dry_run"):
         cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]     SKIP     {case.trace}")
         return
-   
+
     if "RDMA MPI" in case.trace:
         cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices, rdma_mpi=True)
     else:
@@ -231,7 +231,6 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
     if ARG("test_all"):
         case.delete_output()
-        cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
         if ARG("rdma_mpi"):
             cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices, rdma_mpi=True)
         else:
