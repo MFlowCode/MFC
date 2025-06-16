@@ -19,7 +19,7 @@ jobs:
           filters: ".github/file-filter.yml"
 
   self:
-    name: ${{ matrix.name }} ${{ matrix.device }}
+    name: ${{ matrix.name }} (${{ matrix.device }})
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: file-changes
     strategy:
