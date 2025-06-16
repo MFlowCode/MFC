@@ -44,7 +44,7 @@ contains
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
     pure subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
         real(wp), intent(in) :: vftmp
         real(wp), dimension(nb), intent(in) :: Rtmp
         real(wp), intent(out) :: ntmp
@@ -58,7 +58,7 @@ contains
     end subroutine s_comp_n_from_prim
 
     pure subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
         real(wp), intent(in) :: vftmp
         real(wp), dimension(nb), intent(in) :: nRtmp
         real(wp), intent(out) :: ntmp

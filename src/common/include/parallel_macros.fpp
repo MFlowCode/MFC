@@ -272,7 +272,7 @@
     $:acc_directive
 #:enddef
 
-#:def GPU_LOOP(collapse=None, parallelism=["seq"], data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
+#:def GPU_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
 
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
 

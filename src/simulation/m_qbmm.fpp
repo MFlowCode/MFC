@@ -566,7 +566,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff_nonpoly
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         real(wp), intent(in) :: pres, rho, c
         real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
@@ -639,7 +639,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
 
         real(wp), intent(in) :: pres, rho, c
@@ -864,7 +864,7 @@ contains
 #ifdef _CRAYFTN
             !DIR$ INLINEALWAYS s_chyqmom
 #else
-            $:GPU_ROUTINE()
+            $:GPU_ROUTINE(parallelism=['seq'])
 #endif
             real(wp), intent(in) :: pres, rho, c
             real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
@@ -880,7 +880,7 @@ contains
 #ifdef _CRAYFTN
             !DIR$ INLINEALWAYS s_chyqmom
 #else
-            $:GPU_ROUTINE()
+            $:GPU_ROUTINE(parallelism=['seq'])
 #endif
             real(wp), dimension(nmom), intent(in) :: momin
             real(wp), dimension(nnode), intent(inout) :: wght, abscX, abscY
@@ -940,7 +940,7 @@ contains
 #ifdef _CRAYFTN
             !DIR$ INLINEALWAYS s_hyqmom
 #else
-            $:GPU_ROUTINE()
+            $:GPU_ROUTINE(parallelism=['seq'])
 #endif
             real(wp), dimension(2), intent(inout) :: frho, fup
             real(wp), dimension(3), intent(in) :: fmom
@@ -959,7 +959,7 @@ contains
         end subroutine s_hyqmom
 
         pure function f_quad(abscX, abscY, wght_in, q, r, s)
-            $:GPU_ROUTINE()
+            $:GPU_ROUTINE(parallelism=['seq'])
             real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
             real(wp), intent(in) :: q, r, s
 
@@ -975,7 +975,7 @@ contains
         end function f_quad
 
         pure function f_quad2D(abscX, abscY, wght_in, pow)
-            $:GPU_ROUTINE()
+            $:GPU_ROUTINE(parallelism=['seq'])
             real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
             real(wp), dimension(3), intent(in) :: pow
 

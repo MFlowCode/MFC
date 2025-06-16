@@ -741,7 +741,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_cson_from_pinf
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp), intent(in) :: pinf, rhol, gamma, pi_inf
@@ -811,7 +811,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_get_pinf
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         integer, intent(in) :: bub_id, ptype
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf

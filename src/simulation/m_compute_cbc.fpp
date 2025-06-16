@@ -88,7 +88,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_slip_wall_L
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
@@ -106,7 +106,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_buffer_L
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
@@ -136,7 +136,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_inflow_L
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
@@ -153,7 +153,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_outflow_L
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
@@ -177,7 +177,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_force_free_subsonic_outflow_L
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
@@ -199,7 +199,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_constant_pressure_subsonic_outflow_L
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
@@ -221,7 +221,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_supersonic_inflow_L
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         real(wp), dimension(sys_size), intent(inout) :: L
         L(1:advxe) = 0._wp
@@ -233,7 +233,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_supersonic_outflow_L
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L

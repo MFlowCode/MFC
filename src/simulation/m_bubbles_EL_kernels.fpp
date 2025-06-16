@@ -203,7 +203,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_applygaussian
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         real(wp), dimension(3), intent(in) :: center
         integer, dimension(3), intent(in) :: cellaux
@@ -273,7 +273,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_check_celloutside
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         integer, dimension(3), intent(inout) :: cellaux
         logical, intent(out) :: celloutside
@@ -309,7 +309,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_shift_cell_symmetric_bc
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         integer, dimension(3), intent(inout) :: cellaux
         integer, dimension(3), intent(in) :: cell
@@ -350,7 +350,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_stddsv
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         integer, dimension(3), intent(in) :: cell
         real(wp), intent(in) :: volpart
@@ -391,7 +391,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_get_char_vol
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         integer, intent(in) :: cellx, celly, cellz
         real(wp), intent(out) :: Charvol
@@ -416,7 +416,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_get_cell
 #else
-        $:GPU_ROUTINE()
+        $:GPU_ROUTINE(parallelism=['seq'])
 #endif
         real(wp), dimension(3), intent(in) :: s_cell
         integer, dimension(3), intent(out) :: get_cell
