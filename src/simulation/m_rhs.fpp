@@ -531,7 +531,7 @@ contains
                                  & idwbuff(2)%beg:idwbuff(2)%end, &
                                  & idwbuff(3)%beg:idwbuff(3)%end))
                     end do
-                    if (chem_params%diffusion .and. .not. viscous) then 
+                    if (chem_params%diffusion .and. .not. viscous) then
                         @:ALLOCATE(flux_src_n(i)%vf(E_idx)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
                                  & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -804,10 +804,10 @@ contains
             call nvtxEndRange
             ! RHS for diffusion
             if (chemistry .and. chem_params%diffusion) then
-                    call nvtxStartRange("RHS-CHEM-DIFFUSION")
-                    call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz)
-                    call nvtxEndRange
-             end if
+                call nvtxStartRange("RHS-CHEM-DIFFUSION")
+                call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz)
+                call nvtxEndRange
+            end if
 
             ! RHS additions for viscosity
             if (viscous .or. surface_tension .or. chem_params%diffusion) then
@@ -1437,12 +1437,12 @@ contains
                                 rhs_vf(i)%sf(j, k, l) = &
                                     rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
                                     (flux_src_n(i)%sf(j - 1, k, l) &
-                                    - flux_src_n(i)%sf(j, k, l))
+                                     - flux_src_n(i)%sf(j, k, l))
                             end do
                         end do
                     end do
                 end do
-                end if
+            end if
 
             if (chem_params%diffusion) then
                 !$acc parallel loop collapse(3) gang vector default(present)
@@ -1452,22 +1452,21 @@ contains
                             !$acc loop seq
                             do i = chemxb, chemxe
                                 rhs_vf(i)%sf(j, k, l) = &
-                                  rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
-                                  (flux_src_n(i)%sf(j - 1, k, l) &
-                                  - flux_src_n(i)%sf(j, k, l))
+                                    rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
+                                    (flux_src_n(i)%sf(j - 1, k, l) &
+                                     - flux_src_n(i)%sf(j, k, l))
                             end do
 
                             if (.not. viscous) then
                                 rhs_vf(E_idx)%sf(j, k, l) = &
-                                  rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dx(j)* &
-                                  (flux_src_n(E_idx)%sf(j - 1, k, l) &
-                                  - flux_src_n(E_idx)%sf(j, k, l))
+                                    rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dx(j)* &
+                                    (flux_src_n(E_idx)%sf(j - 1, k, l) &
+                                     - flux_src_n(E_idx)%sf(j, k, l))
                             end if
                         end do
                     end do
                 end do
             end if
-
 
         elseif (idir == 2) then ! y-direction
 
@@ -1535,7 +1534,7 @@ contains
                 end do
 
             else
-   
+
                 if (viscous .or. surface_tension) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
@@ -1546,13 +1545,13 @@ contains
                                     rhs_vf(i)%sf(j, k, l) = &
                                         rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
                                         (flux_src_n(i)%sf(j, k - 1, l) &
-                                        - flux_src_n(i)%sf(j, k, l))
+                                         - flux_src_n(i)%sf(j, k, l))
                                 end do
                             end do
                         end do
                     end do
                 end if
-            
+
                 if (chem_params%diffusion) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
@@ -1561,15 +1560,15 @@ contains
                                 !$acc loop seq
                                 do i = chemxb, chemxe
                                     rhs_vf(i)%sf(j, k, l) = &
-                                      rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
-                                      (flux_src_n(i)%sf(j, k - 1, l) &
-                                      - flux_src_n(i)%sf(j, k, l))
+                                        rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
+                                        (flux_src_n(i)%sf(j, k - 1, l) &
+                                         - flux_src_n(i)%sf(j, k, l))
                                 end do
                                 if (.not. viscous) then
                                     rhs_vf(E_idx)%sf(j, k, l) = &
-                                      rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dy(k)* &
-                                      (flux_src_n(E_idx)%sf(j, k - 1, l) &
-                                      - flux_src_n(E_idx)%sf(j, k, l))
+                                        rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dy(k)* &
+                                        (flux_src_n(E_idx)%sf(j, k - 1, l) &
+                                         - flux_src_n(E_idx)%sf(j, k, l))
                                 end if
                             end do
                         end do
@@ -1657,13 +1656,13 @@ contains
                                 rhs_vf(i)%sf(j, k, l) = &
                                     rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
                                     (flux_src_n(i)%sf(j, k, l - 1) &
-                                    - flux_src_n(i)%sf(j, k, l))
+                                     - flux_src_n(i)%sf(j, k, l))
                             end do
                         end do
                     end do
                 end do
             end if
-           
+
             if (chem_params%diffusion) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
@@ -1672,15 +1671,15 @@ contains
                             !$acc loop seq
                             do i = chemxb, chemxe
                                 rhs_vf(i)%sf(j, k, l) = &
-                                  rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
-                                  (flux_src_n(i)%sf(j , k, l - 1) &
-                                  - flux_src_n(i)%sf(j, k, l))
+                                    rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
+                                    (flux_src_n(i)%sf(j, k, l - 1) &
+                                     - flux_src_n(i)%sf(j, k, l))
                             end do
                             if (.not. viscous) then
                                 rhs_vf(E_idx)%sf(j, k, l) = &
-                                  rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dz(l)* &
-                                  (flux_src_n(E_idx)%sf(j, k, l - 1) &
-                                  - flux_src_n(E_idx)%sf(j, k, l))
+                                    rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dz(l)* &
+                                    (flux_src_n(E_idx)%sf(j, k, l - 1) &
+                                     - flux_src_n(E_idx)%sf(j, k, l))
                             end if
                         end do
                     end do

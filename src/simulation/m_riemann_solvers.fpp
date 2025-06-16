@@ -47,7 +47,6 @@ module m_riemann_solvers
         get_species_specific_heats_r, get_species_enthalpies_rt, &
         get_mixture_specific_heat_cp_mass, get_mixture_viscosity_mixavg
 
-
     implicit none
 
     private; public :: s_initialize_riemann_solvers_module, &
@@ -3865,7 +3864,7 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
-                                if (i .eq. E_idx .or. i .ge. chemxb) then
+                                if (i == E_idx .or. i >= chemxb) then
                                     flux_src_vf(i)%sf(j, k, l) = 0._wp
                                 end if
                             end do
@@ -3910,7 +3909,7 @@ contains
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
-                                if (i .eq. E_idx .or. i .ge. chemxb) then
+                                if (i == E_idx .or. i >= chemxb) then
                                     flux_src_vf(i)%sf(k, j, l) = 0._wp
                                 end if
                             end do
@@ -3954,7 +3953,7 @@ contains
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
                             do l = is3%beg, is3%end
-                                if (i .eq. E_idx .or. i .ge. chemxb) then
+                                if (i == E_idx .or. i >= chemxb) then
                                     flux_src_vf(i)%sf(l, k, j) = 0._wp
                                 end if
                             end do
