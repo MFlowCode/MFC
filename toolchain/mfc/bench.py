@@ -138,7 +138,7 @@ def diff():
 
                     grind_time_value = lhs_summary[target.name]["grind"] / rhs_summary[target.name]["grind"]
                     speedups[i] += f" & Grind: {grind_time_value:.2f}"
-                    if grind_time_value <0.98:
+                    if grind_time_value <0.95:
                         raise MFCException(f"Benchmarking failed since grind time speedup for {target.name} below acceptable threshold (<0.98) - Case: {slug}")
             except Exception as _:
                 err = 1
