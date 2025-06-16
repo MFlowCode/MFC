@@ -19,7 +19,7 @@ jobs:
           filters: ".github/file-filter.yml"
 
   self:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.name }} ${{ matrix.device }}
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: file-changes
     strategy:
@@ -40,9 +40,9 @@ jobs:
             device: gpu
             build_script: ""
           - cluster: frontier
-            name: Oak Ridge | Frontier (AMD ROCm)
-            group: frontier
-            labels: olcf
+            name: Oak Ridge | Frontier (AMD CCE)
+            group: phoenix
+            labels: frontier
             flag: f
             device: gpu
             build_script: "bash .github/workflows/frontier/build.sh gpu"
