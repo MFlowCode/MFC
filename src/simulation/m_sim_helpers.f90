@@ -10,8 +10,7 @@ module m_sim_helpers
 
     private; public :: s_compute_enthalpy, &
  s_compute_stability_from_dt, &
- s_compute_dt_from_cfl, &
- s_assign_default_bc_type
+ s_compute_dt_from_cfl
 
 contains
 
@@ -267,27 +266,5 @@ contains
         end if
 
     end subroutine s_compute_dt_from_cfl
-
-    pure subroutine s_assign_default_bc_type(bc_type)
-
-        type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
-
-        bc_type(1, -1)%sf(:, :, :) = bc_x%beg
-        bc_type(1, 1)%sf(:, :, :) = bc_x%end
-        !$acc update device(bc_type(1,-1)%sf, bc_type(1,1)%sf)
-
-        if (n > 0) then
-            bc_type(2, -1)%sf(:, :, :) = bc_y%beg
-            bc_type(2, 1)%sf(:, :, :) = bc_y%end
-            !$acc update device(bc_type(2,-1)%sf, bc_type(2,1)%sf)
-
-            if (p > 0) then
-                bc_type(3, -1)%sf(:, :, :) = bc_z%beg
-                bc_type(3, 1)%sf(:, :, :) = bc_z%end
-                !$acc update device(bc_type(3,-1)%sf, bc_type(3,1)%sf)
-            end if
-        end if
-
-    end subroutine s_assign_default_bc_type
 
 end module m_sim_helpers
