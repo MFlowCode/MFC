@@ -55,6 +55,8 @@ jobs:
                   #    - Lines starting with 'c', 'C', '*', 'd', 'D' in column 1 (fixed form comments)
                   # 2. Remove end-of-line comments (anything after '!' that isn't in a string)
                   # 3. Preserve strings containing '!' characters
+                  sed -E ' :a /[[:space:]]*&[[:space:]]*$/ { N; s/[[:space:]]*&[[:space:]]*\n[[:space:]]*/ /; ba } s/^[[:space:]]*!\$acc[[:space:]]*/!$acc / :b s/[[:space:]]+!\$acc[[:space:]]*/ /g tb ' "$file" > "$file"
+                  
                   sed -E \
                       -e '/^\s*!/s/.*//' \
                       -e '/^[cC*dD]/s/.*//' \
