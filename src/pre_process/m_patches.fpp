@@ -1648,7 +1648,7 @@ contains
 
                     if (non_axis_sym) then
                         phi = atan(((y_cc(j) - y_centroid) + eps)/((x_cc(i) - x_centroid) + eps))
-                        r = sqrt((x_cc(i) - x_centroid)**2_wp + (y_cc(j) - y_centroid)**2_wp) + eps
+                        r = sqrt((x_cc(i) - x_centroid)**2._wp + (y_cc(j) - y_centroid)**2._wp) + eps
                         x_p = (eps)/r
                         Ps(2) = spherical_harmonic_func(x_p, phi, 2, 2)
                         Ps(3) = spherical_harmonic_func(x_p, phi, 3, 3)
@@ -1659,7 +1659,7 @@ contains
                         Ps(8) = spherical_harmonic_func(x_p, phi, 8, 8)
                         Ps(9) = spherical_harmonic_func(x_p, phi, 9, 9)
                     else
-                        r = sqrt((x_cc(i) - x_centroid)**2_wp + (y_cc(j) - y_centroid)**2_wp) + eps
+                        r = sqrt((x_cc(i) - x_centroid)**2._wp + (y_cc(j) - y_centroid)**2._wp) + eps
                         x_p = abs(x_cc(i) - x_centroid + eps)/r
                         Ps(2) = unassociated_legendre(x_p, 2)
                         Ps(3) = unassociated_legendre(x_p, 3)

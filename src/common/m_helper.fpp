@@ -488,7 +488,7 @@ contains
         real(wp) :: P
 
         if (l == 0) then
-            P = 1_wp
+            P = 1._wp
         else if (l == 1) then
             P = x
         else

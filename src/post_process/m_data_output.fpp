@@ -1202,7 +1202,7 @@ contains
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
         counter = 0
-        maxalph_loc = 0_wp
+        maxalph_loc = 0._wp
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -1274,7 +1274,7 @@ contains
                         x_td(i), y_td(i), size(x_td)
                 else
                     write (211, '(F12.9,1X,F12.9,1X,F3.1)') &
-                        x_td(i), y_td(i), 0_wp
+                        x_td(i), y_td(i), 0._wp
                 end if
             end do
         end if
@@ -1289,29 +1289,29 @@ contains
         real(wp), dimension(num_fluids) :: adv
         integer :: i, j, k, l, s !looping indices
 
-        Egk = 0_wp
-        Elp = 0_wp
-        Egint = 0_wp
-        Vb = 0_wp
-        maxvel = 0_wp
-        MaxMa = 0_wp
-        Vl = 0_wp
-        Elk = 0_wp
-        Et = 0_wp
-        Vb = 0_wp
-        dV = 0_wp
-        pres_av = 0_wp
-        pres = 0_wp
+        Egk = 0._wp
+        Elp = 0._wp
+        Egint = 0._wp
+        Vb = 0._wp
+        maxvel = 0._wp
+        MaxMa = 0._wp
+        Vl = 0._wp
+        Elk = 0._wp
+        Et = 0._wp
+        Vb = 0._wp
+        dV = 0._wp
+        pres_av = 0._wp
+        pres = 0._wp
         c = 0._wp
 
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    pres = 0_wp
+                    pres = 0._wp
                     dV = dx(i)*dy(j)*dz(k)
-                    rho = 0_wp
-                    gamma = 0_wp
-                    pi_inf = 0_wp
+                    rho = 0._wp
+                    gamma = 0._wp
+                    pi_inf = 0._wp
                     pres = q_prim_vf(E_idx)%sf(i, j, k)
                     Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
                     do s = 1, num_vels
