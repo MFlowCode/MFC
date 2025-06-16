@@ -21,4 +21,4 @@ From: ubuntu:24.04
 
 %runscript
     cd /opt/MFC
-    exec ./mfc.sh "$@"
+    exec ./mfc.sh "$@
