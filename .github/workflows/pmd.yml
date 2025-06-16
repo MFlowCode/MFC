@@ -30,7 +30,7 @@ jobs:
               unzip -q pmd.zip
               PMD_HOME="pmd-bin-${PMD_VERSION}"
           
-                            SOURCE_DIR="${1:-pr/src}"
+              SOURCE_DIR="${1:-src}"
               total_files=$(find "$SOURCE_DIR" -type f \( -name "*.f" -o -name "*.f90" -o -name "*.for" -o -name "*.fpp" -o -name "*.F" -o -name "*.F90" \) | wc -l)
               processed=0
 
