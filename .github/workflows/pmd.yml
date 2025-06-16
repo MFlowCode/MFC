@@ -56,25 +56,21 @@ jobs:
                   # 2. Remove end-of-line comments (anything after '!' that isn't in a string)
                   # 3. Preserve strings containing '!' characters
                   sed -E '
-                    :a                      # ① label for looping
-                    /&$/ {                  # ② if the *current* line ends with “&”
-                          N                 #    read the *next* line into the pattern space
-                          s/&[[:space:]]*\n[[:space:]]*&/ /   # ③ delete the trailing “&”,
-                                                              #    the following newline, the
-                                                              #    leading “&” on the next line,
-                                                              #    and join them with one space
-                          ba                # ④ repeat until the next line no longer starts
-                                            #    with “&” (handles runs of many “&” lines)
+                    :a
+                    /&$/ {
+                          N
+                          s/&[[:space:]]*\n[[:space:]]*&/ /
+                          ba
                     }
-                    s/&//g                  # ⑤ finally strip any stray “&” left in the file
-                  ' "$file" > "$TMP_FILE" && mv "$TMP_FILE" "$file"
-                  
+                    s/&//g
+                  ' "$file" | \
                   sed -E \
                       -e '/^\s*!/s/.*//' \
                       -e '/^[cC*dD]/s/.*//' \
                       -e '/^[ \t]*[cC*dD]/s/.*//' \
                       -e 's/([^"'\'']*("[^"]*"[^"'\'']*|'\''[^'\'']*'\''[^"'\'']*)*[^"'\'']*)[!].*$/\1/' \
-                      "$file" > "$TMP_FILE" && mv "$TMP_FILE" "$file"
+                      > "$TMP_FILE"
+                      
                   # Check if file was actually modified before replacing
                   if cmp -s "$file" "$TMP_FILE"; then
                       echo -e "No changes needed for $file"
