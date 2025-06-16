@@ -151,7 +151,7 @@ contains
         real(wp), dimension(num_species) :: Mass_Diffu_Flux
         real(wp) :: Mass_Diffu_Energy
         real(wp) :: MW_L, MW_R, MW_cell, Rgas_L, Rgas_R, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic
-        real(wp) :: lamda_L, lamda_R, lamda_Cell, dT_dxi, grid_spacing
+        real(wp) :: lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing
 
         integer :: x, y, z, i, n, eqn
         integer, dimension(3) :: offsets
@@ -216,8 +216,8 @@ contains
                         call get_species_mass_diffusivities_mixavg(P_L, T_L, Ys_L, mass_diffusivities_mixavg1)
                         call get_species_mass_diffusivities_mixavg(P_R, T_R, Ys_R, mass_diffusivities_mixavg2)
 
-                        call get_mixture_thermal_conductivity_mixavg(T_L, Ys_L, lamda_L)
-                        call get_mixture_thermal_conductivity_mixavg(T_R, Ys_R, lamda_R)
+                        call get_mixture_thermal_conductivity_mixavg(T_L, Ys_L, lambda_L)
+                        call get_mixture_thermal_conductivity_mixavg(T_R, Ys_R, lambda_R)
 
                         call get_species_enthalpies_rt(T_L, h_l)
                         call get_species_enthalpies_rt(T_R, h_r)
@@ -240,7 +240,7 @@ contains
                                 2.0_wp*(1.0_wp - Xs_cell(i - chemxb + 1))/(1.0_wp - Ys_cell(i - chemxb + 1))
                         end do
 
-                        lamda_Cell = 0.5_wp*(lamda_R + lamda_L)
+                        lambda_Cell = 0.5_wp*(lambda_R + lambda_L)
 
                         ! Calculate mass diffusion fluxes
                         rho_Vic = 0.0_wp
@@ -262,7 +262,7 @@ contains
                         end do
 
                         ! Add thermal conduction contribution
-                        Mass_Diffu_Energy = lamda_Cell*dT_dxi + Mass_Diffu_Energy
+                        Mass_Diffu_Energy = lambda_Cell*dT_dxi + Mass_Diffu_Energy
 
                         ! Update flux arrays
                         flux_src_vf(E_idx)%sf(x, y, z) = flux_src_vf(E_idx)%sf(x, y, z) - Mass_Diffu_Energy
