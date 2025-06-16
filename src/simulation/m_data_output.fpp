@@ -54,7 +54,7 @@ module m_data_output
     real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     real(wp), public, allocatable, dimension(:, :) :: c_mass
-    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf, c_mass)
 
     real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
@@ -149,18 +149,18 @@ contains
         ! Generating table header for the stability criteria to be outputted
         if (cfl_dt) then
             if (viscous) then
-                write (1, '(A)') '     Time-steps        dt     = Time         ICFL '// &
+                write (3, '(A)') '     Time-steps        dt     = Time         ICFL '// &
                     'Max      VCFL Max        Rc Min       ='
             else
-                write (1, '(A)') '            Time-steps                dt       Time '// &
+                write (3, '(A)') '            Time-steps                dt       Time '// &
                     '               ICFL Max              '
             end if
         else
             if (viscous) then
-                write (1, '(A)') '     Time-steps        Time         ICFL '// &
+                write (3, '(A)') '     Time-steps        Time         ICFL '// &
                     'Max      VCFL Max        Rc Min        '
             else
-                write (1, '(A)') '            Time-steps                Time '// &
+                write (3, '(A)') '            Time-steps                Time '// &
                     '               ICFL Max              '
             end if
         end if
@@ -351,12 +351,12 @@ contains
         ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
             if (viscous) then
-                write (1, '(6X,I8,F10.6,6X,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
+                write (3, '(6X,I8,F10.6,6X,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
                     t_step, dt, t_step*dt, icfl_max_glb, &
                     vcfl_max_glb, &
                     Rc_min_glb
             else
-                write (1, '(13X,I8,14X,F10.6,14X,F10.6,13X,F9.6)') &
+                write (3, '(13X,I8,14X,F10.6,14X,F10.6,13X,F9.6)') &
                     t_step, dt, t_step*dt, icfl_max_glb
             end if
 
