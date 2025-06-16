@@ -6,7 +6,7 @@
 #:def Hardcoded1D()
 
     select case (patch_icpp(patch_id)%hcid)
-    case(100)
+    case (100)
         ! Put your variable assignments here
     case default
         call s_int_to_str(patch_id, iStr)
