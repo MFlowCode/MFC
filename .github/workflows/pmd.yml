@@ -55,8 +55,20 @@ jobs:
                   #    - Lines starting with 'c', 'C', '*', 'd', 'D' in column 1 (fixed form comments)
                   # 2. Remove end-of-line comments (anything after '!' that isn't in a string)
                   # 3. Preserve strings containing '!' characters
-                  TMP_FILE=$(mktemp)
-                  sed -E ' :a /[[:space:]]*&[[:space:]]*$/ { N; s/[[:space:]]*&[[:space:]]*\n[[:space:]]*/ /; ba } s/^[[:space:]]*!\$acc[[:space:]]*/!$acc / :b s/[[:space:]]+!\$acc[[:space:]]*/ /g tb ' "$file" > "$TMP_FILE" && mv "$TMP_FILE" "$file"                  
+                  sed -E '
+                    :a                      # ① label for looping
+                    /&$/ {                  # ② if the *current* line ends with “&”
+                          N                 #    read the *next* line into the pattern space
+                          s/&[[:space:]]*\n[[:space:]]*&/ /   # ③ delete the trailing “&”,
+                                                              #    the following newline, the
+                                                              #    leading “&” on the next line,
+                                                              #    and join them with one space
+                          ba                # ④ repeat until the next line no longer starts
+                                            #    with “&” (handles runs of many “&” lines)
+                    }
+                    s/&//g                  # ⑤ finally strip any stray “&” left in the file
+                  ' "$file" > "$TMP_FILE" && mv "$TMP_FILE" "$file"
+                  
                   sed -E \
                       -e '/^\s*!/s/.*//' \
                       -e '/^[cC*dD]/s/.*//' \
