@@ -5,6 +5,8 @@
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: factor
 
+    eps = 1e-9_wp
+
 #:enddef
 
 #:def Hardcoded2D()
