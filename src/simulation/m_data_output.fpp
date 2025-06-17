@@ -25,6 +25,8 @@ module m_data_output
 
     use m_helper
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_sim_helpers
 
     use m_delay_file_access
@@ -360,7 +362,7 @@ contains
                     t_step, dt, t_step*dt, icfl_max_glb
             end if
 
-            if (icfl_max_glb /= icfl_max_glb) then
+            if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
                 call s_mpi_abort('ICFL is NaN. Exiting.')
             elseif (icfl_max_glb > 1._wp) then
                 print *, 'icfl', icfl_max_glb
@@ -368,7 +370,7 @@ contains
             end if
 
             if (viscous) then
-                if (vcfl_max_glb /= vcfl_max_glb) then
+                if (.not. f_approx_equal(vcfl_max_glb, vcfl_max_glb)) then
                     call s_mpi_abort('VCFL is NaN. Exiting.')
                 elseif (vcfl_max_glb > 1._wp) then
                     print *, 'vcfl', vcfl_max_glb
