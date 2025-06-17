@@ -55,26 +55,31 @@ jobs:
                   #    - Lines starting with 'c', 'C', '*', 'd', 'D' in column 1 (fixed form comments)
                   # 2. Remove end-of-line comments (anything after '!' that isn't in a string)
                   # 3. Preserve strings containing '!' characters
-                  sed -E \
-                      -e '/^\s*!/s/.*//' \
-                      -e '/^[cC*dD]/s/.*//' \
-                      -e '/^[ \t]*[cC*dD]/s/.*//' \
-                      -e 's/([^"'\'']*("[^"]*"[^"'\'']*|'\''[^'\'']*'\''[^"'\'']*)*[^"'\'']*)[!].*$/\1/' \
-                      "$file" | \
                   sed -E '
-                      :a
-                      /\s*(\S+)\s*\n\s*([+*/=()-])/ {
-                          N
-                          s/([+*/=()-])\s*\n\s*([+*/=()-])/\1\2/
-                          s/\s*\n\s*/ /
-                          ba
-                      }
-                      /\s*\n\s*\+/ {
-                          N
-                          s/\s*\n\s*\+/ +/
-                          ba
-                      }
-                  ' > "$TMP_FILE"                      
+                    # Label for loop to handle multi-line continuations
+                    :a
+                    # If line ends with '&' (continuation character), append next line
+                    /&$/ {
+                        N
+                        # Replace '&' followed by newline, optional spaces, and another '&' with a single space
+                        s/&[[:space:]]*\n[[:space:]]*&/ /
+                        ba # Go back to label 'a' to process more continuations if present
+                    }
+                    # After handling all continuations, remove any remaining '&' characters
+                    s/&//g
+                    # Remove lines that are entirely comments:
+                    # - Lines starting with '!' (free form)
+                    /^\s*!/s/.*//
+                    # - Lines starting with 'c', 'C', '*', 'd', 'D' (fixed form, column 1)
+                    /^[cC*dD]/s/.*//
+                    # - Lines starting with space/tab and then 'c', 'C', '*', 'd', 'D' (fixed form with leading space)
+                    /^[ \t]*[cC*dD]/s/.*//
+                    
+                    # Remove end-of-line comments, preserving '!' inside strings.
+                    # This pattern looks for '!' not preceded by an odd number of quotes.
+                    # It captures everything before the '!' as group 1 and replaces the whole line with group 1.
+                    s/([^"'\''\\]*("[^"]*")?('\''[^'\'']*'\''?)?[^"'\''\\]*)[!].*$/\1/
+                  ' "$file" > "$TMP_FILE"
                   # Check if file was actually modified before replacing
                   if cmp -s "$file" "$TMP_FILE"; then
                       echo -e "No changes needed for $file"
