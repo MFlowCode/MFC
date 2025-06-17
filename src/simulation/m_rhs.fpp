@@ -600,7 +600,6 @@ contains
         real(wp), intent(inout) :: time_avg
         integer, intent(in) :: stage
 
-        real(wp), dimension(0:m, 0:n, 0:p) :: nbub
         real(wp) :: t_start, t_finish
         integer :: i, j, k, l, id !< Generic loop iterators
 
@@ -649,7 +648,7 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("RHS-COMMUNICATION")
-        call s_populate_variables_buffers(q_prim_qp%vf, pb, mv, bc_type)
+        call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb, mv)
         call nvtxEndRange
 
         call nvtxStartRange("RHS-ELASTIC")

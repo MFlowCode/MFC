@@ -327,7 +327,7 @@ contains
 
         character(kind=c_char, len=80), parameter :: header = "Model file written by MFC."
         integer(kind=c_int32_t) :: nTriangles
-        real(kind=c_float) :: normal(3), v(3)
+        real(wp) :: normal(3), v(3)
         integer(kind=c_int16_t) :: attribute
 
         open (newunit=iunit, file=filepath, action='WRITE', &
@@ -950,7 +950,7 @@ contains
                 tri(k, 2) = model%trs(i)%v(k, 2)
                 tri(k, 3) = model%trs(i)%v(k, 3)
             end do
-            tri_area = f_tri_area(tri)
+            call f_tri_area(tri, tri_area)
 
             if (tri_area > threshold_bary*cell_area_min) then
                 num_inner_vertices = Ifactor_bary_3D*ceiling(tri_area/cell_area_min)
@@ -1012,7 +1012,7 @@ contains
                 tri(k, 2) = model%trs(i)%v(k, 2)
                 tri(k, 3) = model%trs(i)%v(k, 3)
             end do
-            tri_area = f_tri_area(tri)
+            call f_tri_area(tri, tri_area)
 
             if (tri_area > threshold_bary*cell_area_min) then
                 num_inner_vertices = Ifactor_bary_3D*ceiling(tri_area/cell_area_min)
@@ -1168,6 +1168,25 @@ contains
 
     end subroutine f_normals
 
+    !> This procedure calculates the barycentric facet area
+    pure subroutine f_tri_area(tri, tri_area)
+        real(wp), dimension(1:3, 1:3), intent(in) :: tri
+        real(wp), intent(out) :: tri_area
+        t_vec3 :: AB, AC, cross
+        integer :: i !< Loop iterator
+
+        do i = 1, 3
+            AB(i) = tri(2, i) - tri(1, i)
+            AC(i) = tri(3, i) - tri(1, i)
+        end do
+
+        cross(1) = AB(2)*AC(3) - AB(3)*AC(2)
+        cross(2) = AB(3)*AC(1) - AB(1)*AC(3)
+        cross(3) = AB(1)*AC(2) - AB(2)*AC(1)
+        tri_area = 0.5_wp*sqrt(cross(1)**2 + cross(2)**2 + cross(3)**2)
+
+    end subroutine f_tri_area
+
     !> This procedure determines the levelset of interpolated 2D models.
     !! @param interpolated_boundary_v      Group of all the boundary vertices of the interpolated 2D model
     !! @param total_vertices               Total number of vertices after interpolation
@@ -1199,24 +1218,5 @@ contains
         distance = min_dist
 
     end function f_interpolated_distance
-
-    !> This procedure calculates the barycentric facet area
-    pure function f_tri_area(tri) result(tri_area)
-        real(wp), dimension(1:3, 1:3), intent(in) :: tri
-        t_vec3 :: AB, AC, cross
-        real(wp) :: tri_area
-        integer :: i !< Loop iterator
-
-        do i = 1, 3
-            AB(i) = tri(2, i) - tri(1, i)
-            AC(i) = tri(3, i) - tri(1, i)
-        end do
-
-        cross(1) = AB(2)*AC(3) - AB(3)*AC(2)
-        cross(2) = AB(3)*AC(1) - AB(1)*AC(3)
-        cross(3) = AB(1)*AC(2) - AB(2)*AC(1)
-        tri_area = 0.5_wp*sqrt(cross(1)**2 + cross(2)**2 + cross(3)**2)
-
-    end function f_tri_area
 
 end module m_model

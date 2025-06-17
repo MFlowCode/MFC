@@ -95,9 +95,6 @@ module m_weno
     !
     !> @}
 
-    real(wp) :: test
-    !$acc declare create(test)
-
     !$acc declare create( &
     !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
     !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
@@ -272,12 +269,12 @@ contains
                     ! any contributions from outside of the physical domain during
                     ! the WENO reconstruction
                     if (null_weights) then
-                        if (bc_s%beg == BC_RIEMANN_EXTRAPOLATION) then
+                        if (bc_s%beg == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (1, 0) = 0._wp; d_cbR_${XYZ}$ (0, 0) = 1._wp
                             d_cbL_${XYZ}$ (1, 0) = 0._wp; d_cbL_${XYZ}$ (0, 0) = 1._wp
                         end if
 
-                        if (bc_s%end == BC_RIEMANN_EXTRAPOLATION) then
+                        if (bc_s%end == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (0, s) = 0._wp; d_cbR_${XYZ}$ (1, s) = 1._wp
                             d_cbL_${XYZ}$ (0, s) = 0._wp; d_cbL_${XYZ}$ (1, s) = 1._wp
                         end if
@@ -418,14 +415,14 @@ contains
                     ! any contributions from outside of the physical domain during
                     ! the WENO reconstruction
                     if (null_weights) then
-                        if (bc_s%beg == BC_RIEMANN_EXTRAPOLATION) then
+                        if (bc_s%beg == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (1:2, 0) = 0._wp; d_cbR_${XYZ}$ (0, 0) = 1._wp
                             d_cbL_${XYZ}$ (1:2, 0) = 0._wp; d_cbL_${XYZ}$ (0, 0) = 1._wp
                             d_cbR_${XYZ}$ (2, 1) = 0._wp; d_cbR_${XYZ}$ (:, 1) = d_cbR_${XYZ}$ (:, 1)/sum(d_cbR_${XYZ}$ (:, 1))
                             d_cbL_${XYZ}$ (2, 1) = 0._wp; d_cbL_${XYZ}$ (:, 1) = d_cbL_${XYZ}$ (:, 1)/sum(d_cbL_${XYZ}$ (:, 1))
                         end if
 
-                        if (bc_s%end == BC_RIEMANN_EXTRAPOLATION) then
+                        if (bc_s%end == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (0, s - 1) = 0._wp; d_cbR_${XYZ}$ (:, s - 1) = d_cbR_${XYZ}$ (:, s - 1)/sum(d_cbR_${XYZ}$ (:, s - 1))
                             d_cbL_${XYZ}$ (0, s - 1) = 0._wp; d_cbL_${XYZ}$ (:, s - 1) = d_cbL_${XYZ}$ (:, s - 1)/sum(d_cbL_${XYZ}$ (:, s - 1))
                             d_cbR_${XYZ}$ (0:1, s) = 0._wp; d_cbR_${XYZ}$ (2, s) = 1._wp
