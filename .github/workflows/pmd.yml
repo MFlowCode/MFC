@@ -55,11 +55,16 @@ jobs:
                   #    - Lines starting with 'c', 'C', '*', 'd', 'D' in column 1 (fixed form comments)
                   # 2. Remove end-of-line comments (anything after '!' that isn't in a string)
                   # 3. Preserve strings containing '!' characters                  
-                    sed -E '
+                  sed -E '
                     :a
                     /&$/ {
                         N
                         s/&[[:space:]]*\n[[:space:]]*&/ /
+                        ba
+                    }
+                    /^[[:space:]]{5}[^[:space:]]/ {
+                        N
+                        s/\n([[:space:]]{5}[^[:space:]])/\1/
                         ba
                     }
                     s/&//g
@@ -68,7 +73,7 @@ jobs:
                     /^[ \t]*[cC*dD]/s/.*//
                     s/([^"'\''\\]*("[^"]*")?('\''[^'\'']*'\''?)?[^"'\''\\]*)[!].*$/\1/
                   ' "$file" > "$TMP_FILE"
-                  # Check if file was actually modified before replacing
+                  
                   if cmp -s "$file" "$TMP_FILE"; then
                       echo -e "No changes needed for $file"
                       rm "$TMP_FILE"
