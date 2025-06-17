@@ -55,21 +55,27 @@ jobs:
                   #    - Lines starting with 'c', 'C', '*', 'd', 'D' in column 1 (fixed form comments)
                   # 2. Remove end-of-line comments (anything after '!' that isn't in a string)
                   # 3. Preserve strings containing '!' characters
-                  sed -E '
-                    :a
-                    /&$/ {
-                          N
-                          s/&[[:space:]]*\n[[:space:]]*&/ /
-                          ba
-                    }
-                    s/&//g
-                  ' "$file" | \
-                  sed -E \
-                      -e '/^\s*!/s/.*//' \
-                      -e '/^[cC*dD]/s/.*//' \
-                      -e '/^[ \t]*[cC*dD]/s/.*//' \
-                      -e 's/([^"'\'']*("[^"]*"[^"'\'']*|'\''[^'\'']*'\''[^"'\'']*)*[^"'\'']*)[!].*$/\1/' \
-                      > "$TMP_FILE"
+                  sed -E '
+                    # First pass: Remove comments
+                    # Remove lines that are entirely comments
+                    /^\s*!/s/.*//
+                    /^[cC*dD]/s/.*//
+                    /^[ \t]*[cC*dD]/s/.*//
+                    # Remove end-of-line comments, preserving strings
+                    s/([^"'\'']*("[^"]*"[^"'\'']*|'\''[^'\'']*'\''[^"'\'']*)*[^"'\'']*)[!].*$/\1/
+
+                    # Second pass: Handle line continuations
+                    :a
+                    # If a line ends with '&' (possibly with trailing whitespace), read the next line
+                    /&\s*$/ {
+                          N
+                          # Replace '&' at the end of the first line, newline, and potential leading '&' on the second line with a single space
+                          s/&\s*\n\s*&/\ /
+                          ba # Loop back to 'a' to handle multiple continuations
+                    }
+                    # If a line ends with '&' but is the last line or next line doesn't start with '&', remove the trailing '&'
+                    s/&\s*$//
+                  ' "$file" > "$TMP_FILE"
                       
                   # Check if file was actually modified before replacing
                   if cmp -s "$file" "$TMP_FILE"; then
