@@ -1138,6 +1138,10 @@ contains
 
                     if (cont_damage) qK_prim_vf(damage_idx)%sf(j, k, l) = qK_cons_vf(damage_idx)%sf(j, k, l)
 
+#ifdef MFC_POST_PROCESS
+                    if (bubbles_lagrange) qK_prim_vf(beta_idx)%sf(j, k, l) = qK_cons_vf(beta_idx)%sf(j, k, l)
+#endif
+
                 end do
             end do
         end do

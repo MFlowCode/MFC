@@ -71,10 +71,6 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_l, flux_src_rsz_vf_l
     $:GPU_DECLARE(create='[flux_rsx_vf_l,flux_src_rsx_vf_l,flux_rsy_vf_l,flux_src_rsy_vf_l,flux_rsz_vf_l,flux_src_rsz_vf_l]')
 
-    real(wp) :: c           !< Cell averaged speed of sound
-    real(wp), dimension(2) :: Re          !< Cell averaged Reynolds numbers
-    $:GPU_DECLARE(create='[c,Re]')
-
     real(wp) :: dpres_ds !< Spatial derivatives in s-dir of pressure
     $:GPU_DECLARE(create='[dpres_ds]')
 

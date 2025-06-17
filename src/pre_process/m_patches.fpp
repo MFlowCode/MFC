@@ -48,7 +48,6 @@ module m_patches
     !! is to act as a pseudo volume fraction to indicate the contribution of each
     !! patch toward the composition of a cell's fluid state.
 
-    real(wp) :: r_cyl, theta_cyl, x_cart, y_cart, z_cart
     real(wp) :: cart_x, cart_y, cart_z
     real(wp) :: sph_phi !<
     !! Variables to be used to hold cell locations in Cartesian coordinates if
@@ -551,7 +550,7 @@ contains
                         do while (airfoil_grid_u(k)%x < x_act)
                             k = k + 1
                         end do
-                        if (airfoil_grid_u(k)%x == x_act) then
+                        if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
                             if (y_act <= airfoil_grid_u(k)%y) then
                                 !!IB
                                 !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
@@ -572,7 +571,7 @@ contains
                         do while (airfoil_grid_l(k)%x < x_act)
                             k = k + 1
                         end do
-                        if (airfoil_grid_l(k)%x == x_act) then
+                        if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
                             if (y_act >= airfoil_grid_l(k)%y) then
                                 !!IB
                                 !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
@@ -720,7 +719,7 @@ contains
                                 do while (airfoil_grid_u(k)%x < x_act)
                                     k = k + 1
                                 end do
-                                if (airfoil_grid_u(k)%x == x_act) then
+                                if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
                                     if (y_act <= airfoil_grid_u(k)%y) then
                                         !!IB
                                         !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
@@ -741,7 +740,7 @@ contains
                                 do while (airfoil_grid_l(k)%x < x_act)
                                     k = k + 1
                                 end do
-                                if (airfoil_grid_l(k)%x == x_act) then
+                                if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
                                     if (y_act >= airfoil_grid_l(k)%y) then
                                         !!IB
                                         !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
@@ -1570,8 +1569,6 @@ contains
 
         integer :: i, j, k !< generic loop iterators
 
-        complex(wp), parameter :: cmplx_i = (0._wp, 1._wp)
-
         ! Transferring the patch's centroid and radius information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
@@ -1651,7 +1648,7 @@ contains
 
                     if (non_axis_sym) then
                         phi = atan(((y_cc(j) - y_centroid) + eps)/((x_cc(i) - x_centroid) + eps))
-                        r = sqrt((x_cc(i) - x_centroid)**2_wp + (y_cc(j) - y_centroid)**2_wp) + eps
+                        r = sqrt((x_cc(i) - x_centroid)**2._wp + (y_cc(j) - y_centroid)**2._wp) + eps
                         x_p = (eps)/r
                         Ps(2) = spherical_harmonic_func(x_p, phi, 2, 2)
                         Ps(3) = spherical_harmonic_func(x_p, phi, 3, 3)
@@ -1662,7 +1659,7 @@ contains
                         Ps(8) = spherical_harmonic_func(x_p, phi, 8, 8)
                         Ps(9) = spherical_harmonic_func(x_p, phi, 9, 9)
                     else
-                        r = sqrt((x_cc(i) - x_centroid)**2_wp + (y_cc(j) - y_centroid)**2_wp) + eps
+                        r = sqrt((x_cc(i) - x_centroid)**2._wp + (y_cc(j) - y_centroid)**2._wp) + eps
                         x_p = abs(x_cc(i) - x_centroid + eps)/r
                         Ps(2) = unassociated_legendre(x_p, 2)
                         Ps(3) = unassociated_legendre(x_p, 3)

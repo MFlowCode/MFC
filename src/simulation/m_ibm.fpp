@@ -18,6 +18,8 @@ module m_ibm
 
     use m_helper
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_constants
 
     implicit none
@@ -85,7 +87,7 @@ contains
         $:GPU_UPDATE(device='[levelset_norm%sf]')
 
         ! Get neighboring IB variables from other processors
-        call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
+        call s_populate_ib_buffers()
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
 
@@ -107,6 +109,18 @@ contains
         $:GPU_UPDATE(device='[ghost_points]')
 
     end subroutine s_ibm_setup
+
+    subroutine s_populate_ib_buffers()
+
+        #:for DIRC, DIRI in [('x', 1), ('y', 2), ('z', 3)]
+            #:for LOCC, LOCI in [('beg', -1), ('end', 1)]
+                if (bc_${DIRC}$%${LOCC}$ >= 0) then
+                    call s_mpi_sendrecv_ib_buffers(ib_markers, ${DIRI}$, ${LOCI}$)
+                end if
+            #:endfor
+        #:endfor
+
+    end subroutine s_populate_ib_buffers
 
     !>  Subroutine that updates the conservative variables at the ghost points
         !!  @param q_cons_vf Conservative Variables
@@ -133,7 +147,7 @@ contains
         real(wp) :: qv_K
         real(wp), dimension(num_fluids) :: Gs
 
-        real(wp) :: pres_IP, coeff
+        real(wp) :: pres_IP
         real(wp), dimension(3) :: vel_IP, vel_norm_IP
         real(wp) :: c_IP
         real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
@@ -156,7 +170,7 @@ contains
             & alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, &
             & v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, &
             & gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, &
-            & j,k,l,q,coeff]')
+            & j,k,l,q]')
         do i = 1, num_gps
 
             gp = ghost_points(i)
@@ -402,7 +416,7 @@ contains
                     bound = p
                 end if
 
-                if (norm(dim) == 0) then
+                if (f_approx_equal(norm(dim), 0._wp)) then
                     ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim)
                 else
                     if (norm(dim) > 0) then

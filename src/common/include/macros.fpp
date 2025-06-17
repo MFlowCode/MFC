@@ -20,8 +20,8 @@
 
 #:def DEALLOCATE(*args)
     @:LOG({'@:DEALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
-    deallocate (${', '.join(args)}$)
     !$acc exit data delete(${', '.join(args)}$)
+    deallocate (${', '.join(args)}$)
 #:enddef DEALLOCATE
 
 #:def ACC_SETUP_VFs(*args)

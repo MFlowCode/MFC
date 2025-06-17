@@ -322,7 +322,7 @@ contains
         @:PROHIBIT(surface_tension .and. sigma < 0._wp, &
             "sigma must be greater than or equal to zero")
 
-        @:PROHIBIT(surface_tension .and. sigma == dflt_real, &
+        @:PROHIBIT(surface_tension .and. f_approx_equal(sigma, dflt_real), &
             "sigma must be set if surface_tension is enabled")
 
         @:PROHIBIT(.not. f_is_default(sigma) .and. .not. surface_tension, &
@@ -347,9 +347,12 @@ contains
         !! Called by s_check_inputs_common for all three stages
     impure subroutine s_check_inputs_moving_bc
         #:for X, VB2, VB3 in [('x', 'vb2', 'vb3'), ('y', 'vb3', 'vb1'), ('z', 'vb1', 'vb2')]
-            if (any((/bc_${X}$%vb1, bc_${X}$%vb2, bc_${X}$%vb3/) /= 0._wp)) then
+            if (.not. (f_approx_equal(bc_${X}$%vb1, 0._wp) .and. &
+                       f_approx_equal(bc_${X}$%vb2, 0._wp) .and. &
+                       f_approx_equal(bc_${X}$%vb3, 0._wp))) then
                 if (bc_${X}$%beg == BC_SLIP_WALL) then
-                    if (any((/bc_${X}$%${VB2}$, bc_${X}$%${VB3}$/) /= 0._wp)) then
+                    if (.not. (f_approx_equal(bc_${X}$%${VB2}$, 0._wp) .and. &
+                               f_approx_equal(bc_${X}$%${VB3}$, 0._wp))) then
                         call s_mpi_abort("bc_${X}$%beg must be -15 if "// &
                                          "bc_${X}$%${VB2}$ or bc_${X}$%${VB3}$ "// &
                                          "is set. Exiting.", CASE_FILE_ERROR_CODE)
@@ -362,9 +365,12 @@ contains
         #:endfor
 
         #:for X, VE2, VE3 in [('x', 've2', 've3'), ('y', 've3', 've1'), ('z', 've1', 've2')]
-            if (any((/bc_${X}$%ve1, bc_${X}$%ve2, bc_${X}$%ve3/) /= 0._wp)) then
+            if (.not. (f_approx_equal(bc_${X}$%ve1, 0._wp) .and. &
+                       f_approx_equal(bc_${X}$%ve2, 0._wp) .and. &
+                       f_approx_equal(bc_${X}$%ve3, 0._wp))) then
                 if (bc_${X}$%end == BC_SLIP_WALL) then
-                    if (any((/bc_${X}$%${VE2}$, bc_${X}$%${VE3}$/) /= 0._wp)) then
+                    if (.not. (f_approx_equal(bc_${X}$%${VE2}$, 0._wp) .and. &
+                               f_approx_equal(bc_${X}$%${VE3}$, 0._wp))) then
                         call s_mpi_abort("bc_${X}$%end must be -15 if "// &
                                          "bc_${X}$%${VE2}$ or bc_${X}$%${VE3}$ "// &
                                          "is set. Exiting.", CASE_FILE_ERROR_CODE)

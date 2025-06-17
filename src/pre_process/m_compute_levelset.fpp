@@ -14,6 +14,8 @@ module m_compute_levelset
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     implicit none
 
     private; public :: s_cylinder_levelset, s_circle_levelset, &
@@ -49,7 +51,7 @@ contains
                 dist_vec(3) = 0
                 dist = sqrt(sum(dist_vec**2))
                 levelset%sf(i, j, 0, ib_patch_id) = dist - radius
-                if (dist == 0) then
+                if (f_approx_equal(dist, 0._wp)) then
                     levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0
                 else
                     levelset_norm%sf(i, j, 0, ib_patch_id, :) = &
@@ -132,7 +134,7 @@ contains
                 end if
 
                 levelset%sf(i, j, 0, ib_patch_id) = dist
-                if (dist == 0) then
+                if (f_approx_equal(dist, 0._wp)) then
                     levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0
                 else
                     levelset_norm%sf(i, j, 0, ib_patch_id, :) = &
@@ -226,14 +228,14 @@ contains
 
                     if (dist_side < dist_surf) then
                         levelset%sf(i, j, l, ib_patch_id) = dist_side
-                        if (dist_side == abs(z_cc(l) - z_min)) then
+                        if (f_approx_equal(dist_side, abs(z_cc(l) - z_min))) then
                             levelset_norm%sf(i, j, l, ib_patch_id, :) = (/0, 0, -1/)
                         else
                             levelset_norm%sf(i, j, l, ib_patch_id, :) = (/0, 0, 1/)
                         end if
                     else
                         levelset%sf(i, j, l, ib_patch_id) = dist_surf
-                        if (dist == 0) then
+                        if (f_approx_equal(dist, 0._wp)) then
                             levelset_norm%sf(i, j, l, ib_patch_id, :) = 0
                         else
                             levelset_norm%sf(i, j, l, ib_patch_id, :) = &
@@ -300,7 +302,7 @@ contains
 
                     if (idx == 1) then
                         levelset%sf(i, j, 0, ib_patch_id) = side_dists(1)
-                        if (side_dists(1) == 0) then
+                        if (f_approx_equal(side_dists(1), 0._wp)) then
                             levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0._wp
                         else
                             levelset_norm%sf(i, j, 0, ib_patch_id, 1) = side_dists(1)/ &
@@ -309,7 +311,7 @@ contains
 
                     else if (idx == 2) then
                         levelset%sf(i, j, 0, ib_patch_id) = side_dists(2)
-                        if (side_dists(2) == 0) then
+                        if (f_approx_equal(side_dists(2), 0._wp)) then
                             levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0._wp
                         else
                             levelset_norm%sf(i, j, 0, ib_patch_id, 1) = -side_dists(2)/ &
@@ -318,7 +320,7 @@ contains
 
                     else if (idx == 3) then
                         levelset%sf(i, j, 0, ib_patch_id) = side_dists(3)
-                        if (side_dists(3) == 0) then
+                        if (f_approx_equal(side_dists(3), 0._wp)) then
 
                             levelset_norm%sf(i, j, 0, ib_patch_id, 2) = 0._wp
                         else
@@ -328,7 +330,7 @@ contains
 
                     else if (idx == 4) then
                         levelset%sf(i, j, 0, ib_patch_id) = side_dists(4)
-                        if (side_dists(4) == 0) then
+                        if (f_approx_equal(side_dists(4), 0._wp)) then
 
                             levelset_norm%sf(i, j, 0, ib_patch_id, 2) = 0._wp
                         else
@@ -398,54 +400,54 @@ contains
 
                         min_dist = minval(abs(side_dists))
 
-                        if (min_dist == abs(side_dists(1))) then
+                        if (f_approx_equal(min_dist, abs(side_dists(1)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(1)
-                            if (side_dists(1) == 0) then
+                            if (f_approx_equal(side_dists(1), 0._wp)) then
                                 levelset_norm%sf(i, j, k, ib_patch_id, 1) = 0._wp
                             else
                                 levelset_norm%sf(i, j, k, ib_patch_id, 1) = side_dists(1)/ &
                                                                             abs(side_dists(1))
                             end if
 
-                        else if (min_dist == abs(side_dists(2))) then
+                        else if (f_approx_equal(min_dist, abs(side_dists(2)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(2)
-                            if (side_dists(2) == 0) then
+                            if (f_approx_equal(side_dists(2), 0._wp)) then
                                 levelset_norm%sf(i, j, k, ib_patch_id, 1) = 0._wp
                             else
                                 levelset_norm%sf(i, j, k, ib_patch_id, 1) = -side_dists(2)/ &
                                                                             abs(side_dists(2))
                             end if
 
-                        else if (min_dist == abs(side_dists(3))) then
+                        else if (f_approx_equal(min_dist, abs(side_dists(3)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(3)
-                            if (side_dists(3) == 0) then
+                            if (f_approx_equal(side_dists(3), 0._wp)) then
                                 levelset_norm%sf(i, j, k, ib_patch_id, 2) = 0._wp
                             else
                                 levelset_norm%sf(i, j, k, ib_patch_id, 2) = side_dists(3)/ &
                                                                             abs(side_dists(3))
                             end if
 
-                        else if (min_dist == abs(side_dists(4))) then
+                        else if (f_approx_equal(min_dist, abs(side_dists(4)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(4)
-                            if (side_dists(4) == 0) then
+                            if (f_approx_equal(side_dists(4), 0._wp)) then
                                 levelset_norm%sf(i, j, k, ib_patch_id, 2) = 0._wp
                             else
                                 levelset_norm%sf(i, j, k, ib_patch_id, 2) = -side_dists(4)/ &
                                                                             abs(side_dists(4))
                             end if
 
-                        else if (min_dist == abs(side_dists(5))) then
+                        else if (f_approx_equal(min_dist, abs(side_dists(5)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(5)
-                            if (side_dists(5) == 0) then
+                            if (f_approx_equal(side_dists(5), 0._wp)) then
                                 levelset_norm%sf(i, j, k, ib_patch_id, 3) = 0._wp
                             else
                                 levelset_norm%sf(i, j, k, ib_patch_id, 3) = side_dists(5)/ &
                                                                             abs(side_dists(5))
                             end if
 
-                        else if (min_dist == abs(side_dists(6))) then
+                        else if (f_approx_equal(min_dist, abs(side_dists(6)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(6)
-                            if (side_dists(6) == 0) then
+                            if (f_approx_equal(side_dists(6), 0._wp)) then
                                 levelset_norm%sf(i, j, k, ib_patch_id, 3) = 0._wp
                             else
                                 levelset_norm%sf(i, j, k, ib_patch_id, 3) = -side_dists(6)/ &
@@ -487,7 +489,7 @@ contains
                     dist_vec(3) = z_cc(k) - z_centroid
                     dist = sqrt(sum(dist_vec**2))
                     levelset%sf(i, j, k, ib_patch_id) = dist - radius
-                    if (dist == 0) then
+                    if (f_approx_equal(dist, 0._wp)) then
                         levelset_norm%sf(i, j, k, ib_patch_id, :) = (/1, 0, 0/)
                     else
                         levelset_norm%sf(i, j, k, ib_patch_id, :) = &
@@ -521,17 +523,17 @@ contains
         length_y = patch_ib(ib_patch_id)%length_y
         length_z = patch_ib(ib_patch_id)%length_z
 
-        if (length_x /= 0._wp) then
+        if (.not. f_approx_equal(length_x, 0._wp)) then
             boundary%beg = x_centroid - 0.5_wp*length_x
             boundary%end = x_centroid + 0.5_wp*length_x
             dist_sides_vec = (/1, 0, 0/)
             dist_surface_vec = (/0, 1, 1/)
-        else if (length_y /= 0._wp) then
+        else if (.not. f_approx_equal(length_y, 0._wp)) then
             boundary%beg = y_centroid - 0.5_wp*length_y
             boundary%end = y_centroid + 0.5_wp*length_y
             dist_sides_vec = (/0, 1, 0/)
             dist_surface_vec = (/1, 0, 1/)
-        else if (length_z /= 0._wp) then
+        else if (.not. f_approx_equal(length_z, 0._wp)) then
             boundary%beg = z_centroid - 0.5_wp*length_z
             boundary%end = z_centroid + 0.5_wp*length_z
             dist_sides_vec = (/0, 0, 1/)
@@ -552,7 +554,7 @@ contains
 
                     if (dist_side < abs(dist_surface)) then
                         levelset%sf(i, j, k, ib_patch_id) = -dist_side
-                        if (dist_side == abs(side_pos - boundary%beg)) then
+                        if (f_approx_equal(dist_side, abs(side_pos - boundary%beg))) then
                             levelset_norm%sf(i, j, k, ib_patch_id, :) = -dist_sides_vec
                         else
                             levelset_norm%sf(i, j, k, ib_patch_id, :) = dist_sides_vec
