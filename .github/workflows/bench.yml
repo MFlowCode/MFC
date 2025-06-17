@@ -40,7 +40,7 @@ jobs:
             device: gpu
             build_script: ""
           - cluster: frontier
-            name: Oak Ridge | Frontier (AMD CCE)
+            name: Oak Ridge | Frontier (CCE)
             group: phoenix
             labels: frontier
             flag: f
