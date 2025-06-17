@@ -55,7 +55,7 @@ contains
         real(wp), dimension(3) :: s_coord
         integer :: l
 
-        $:GPU_PARALLEL_LOOP(private=["l","s_coord","cell"])
+        $:GPU_PARALLEL_LOOP(private='[l,s_coord,cell]')
         do l = 1, nBubs
 
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
@@ -120,7 +120,7 @@ contains
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
-        $:GPU_PARALLEL_LOOP(private=["nodecoord","l","s_coord","cell","center"], copyin=["smearGrid","smearGridz"])
+        $:GPU_PARALLEL_LOOP(private='[nodecoord,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
         do l = 1, nBubs
             nodecoord(1:3) = 0
             center(1:3) = 0._wp

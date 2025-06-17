@@ -40,7 +40,7 @@ module m_phase_change
     real(wp) :: A, B, C, D
     !> @}
 
-    $:GPU_DECLARE(create=["max_iter","pCr","TCr","mixM","lp","vp","A","B","C","D"])
+    $:GPU_DECLARE(create='[max_iter,pCr,TCr,mixM,lp,vp,A,B,C,D]')
 
 contains
 
@@ -87,20 +87,20 @@ contains
         real(wp) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
         real(wp) :: TvF !< total volume fraction
 
-        $:GPU_DECLARE(create=["pS","pSOV","pSSL","TS","TSOV","TSSL","TSatOV","TSatSL"])
-        $:GPU_DECLARE(create=["rhoe","dynE","rhos","rho","rM","m1","m2","MCT","TvF"])
+        $:GPU_DECLARE(create='[pS,pSOV,pSSL,TS,TSOV,TSSL,TSatOV,TSatSL]')
+        $:GPU_DECLARE(create='[rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
 
         real(wp), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
-        $:GPU_DECLARE(create=["p_infOV","p_infpT","p_infSL","sk","hk","gk","ek","rhok"])
+        $:GPU_DECLARE(create='[p_infOV,p_infpT,p_infSL,sk,hk,gk,ek,rhok]')
 
         !< Generic loop iterators
         integer :: i, j, k, l
 
         ! starting equilibrium solver
-        $:GPU_PARALLEL_LOOP(collapse=3, private=["p_infOV", "p_infpT", "p_infSL", &
-            "sk", "hk", "gk", "ek", "rhok", "pS", "pSOV", "pSSL", &
-            "TS", "TSOV", "TSatOV", "TSatSL", "TSSL", "rhoe", &
-            "dynE", "rhos", "rho", "rM", "m1", "m2", "MCT", "TvF"])
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[p_infOV, p_infpT, p_infSL, &
+            sk, hk, gk, ek, rhok,pS, pSOV, pSSL, &
+            TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, &
+            dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
         do j = 0, m
             do k = 0, n
                 do l = 0, p

@@ -25,21 +25,21 @@ module m_qbmm
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff, s_compute_qbmm_rhs
 
     real(wp), allocatable, dimension(:, :, :, :, :) :: momrhs
-    $:GPU_DECLARE(create=["momrhs"])
+    $:GPU_DECLARE(create='[momrhs]')
 
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: nterms = ${nterms}$
     #:else
         integer :: nterms
-        $:GPU_DECLARE(create=["nterms"])
+        $:GPU_DECLARE(create='[nterms]')
     #:endif
 
     type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
-    $:GPU_DECLARE(create=["is1_qbmm","is2_qbmm","is3_qbmm"])
+    $:GPU_DECLARE(create='[is1_qbmm,is2_qbmm,is3_qbmm]')
 
     integer, allocatable, dimension(:) :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
-    $:GPU_DECLARE(create=["bubrs","bubmoms"])
+    $:GPU_DECLARE(create='[bubrs,bubmoms]')
 
 contains
 
@@ -57,8 +57,8 @@ contains
                 nterms = 7
             end if
 
-            $:GPU_ENTER_DATA(copyin=["nterms"])
-            $:GPU_UPDATE(device=["nterms"])
+            $:GPU_ENTER_DATA(copyin='[nterms]')
+            $:GPU_UPDATE(device='[nterms]')
 
         #:endif
 
@@ -392,7 +392,7 @@ contains
             end do
         end if
 
-        $:GPU_UPDATE(device=["momrhs"])
+        $:GPU_UPDATE(device='[momrhs]')
 
         @:ALLOCATE(bubrs(1:nb))
         @:ALLOCATE(bubmoms(1:nb, 1:nmom))
@@ -400,14 +400,14 @@ contains
         do i = 1, nb
             bubrs(i) = bub_idx%rs(i)
         end do
-        $:GPU_UPDATE(device=["bubrs"])
+        $:GPU_UPDATE(device='[bubrs]')
 
         do j = 1, nmom
             do i = 1, nb
                 bubmoms(i, j) = bub_idx%moms(i, j)
             end do
         end do
-        $:GPU_UPDATE(device=["bubmoms"])
+        $:GPU_UPDATE(device='[bubmoms]')
 
     end subroutine s_initialize_qbmm_module
 
@@ -433,7 +433,7 @@ contains
         end select
 
         if (.not. polytropic) then
-            $:GPU_PARALLEL_LOOP(collapse=5,private=["nb_q","nR","nR2","R","R2","nb_dot","nR_dot","nR2_dot","var","AX"])
+            $:GPU_PARALLEL_LOOP(collapse=5,private='[nb_q,nR,nR2,R,R2,nb_dot,nR_dot,nR2_dot,var,AX]')
             do i = 1, nb
                 do q = 1, nnode
                     do l = 0, p
@@ -715,12 +715,12 @@ contains
         integer :: id1, id2, id3, i1, i2, j, q, r
 
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
-        $:GPU_UPDATE(device=["is1_qbmm","is2_qbmm","is3_qbmm"])
+        $:GPU_UPDATE(device='[is1_qbmm,is2_qbmm,is3_qbmm]')
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private=["moms", "msum", "wght", "abscX", &
-            "abscY", "wght_pb", "wght_mv", "wght_ht", "coeff", "ht", "r", "q", &
-            "n_tait", "B_tait", "pres", "rho", "nbub", "c", "alf", "momsum", &
-            "drdt", "drdt2", "chi_vw", "x_vw", "rho_mw", "k_mw", "T_bar", "grad_T"])
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, &
+            & abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, &
+            & n_tait, B_tait, pres, rho, nbub, c, alf, momsum, &
+            & drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')
         do id3 = is3_qbmm%beg, is3_qbmm%end
             do id2 = is2_qbmm%beg, is2_qbmm%end
                 do id1 = is1_qbmm%beg, is1_qbmm%end

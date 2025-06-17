@@ -42,7 +42,7 @@ module m_weno
     !> @{
     real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
     !> @}
-    $:GPU_DECLARE(create=["v_rs_ws_x","v_rs_ws_y","v_rs_ws_z"])
+    $:GPU_DECLARE(create='[v_rs_ws_x,v_rs_ws_y,v_rs_ws_z]')
 
     ! WENO Coefficients
 
@@ -59,8 +59,8 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
     !> @}
-    $:GPU_DECLARE(create=["poly_coef_cbL_x","poly_coef_cbL_y","poly_coef_cbL_z"])
-    $:GPU_DECLARE(create=["poly_coef_cbR_x","poly_coef_cbR_y","poly_coef_cbR_z"])
+    $:GPU_DECLARE(create='[poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z]')
+    $:GPU_DECLARE(create='[poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z]')
 
     !> @name The ideal weights at the left and the right cell-boundaries and at the
     !! left and the right quadrature points, in x-, y- and z-directions. Note
@@ -75,7 +75,7 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_y
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_z
     !> @}
-    $:GPU_DECLARE(create=["d_cbL_x","d_cbL_y","d_cbL_z","d_cbR_x","d_cbR_y","d_cbR_z"])
+    $:GPU_DECLARE(create='[d_cbL_x,d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z]')
 
     !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
     !! that the first array dimension identifies the smoothness indicator, the
@@ -86,22 +86,22 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_y
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_z
     !> @}
-    $:GPU_DECLARE(create=["beta_coef_x","beta_coef_y","beta_coef_z"])
+    $:GPU_DECLARE(create='[beta_coef_x,beta_coef_y,beta_coef_z]')
 
     ! END: WENO Coefficients
 
     integer :: v_size !< Number of WENO-reconstructed cell-average variables
-    $:GPU_DECLARE(create=["v_size"])
+    $:GPU_DECLARE(create='[v_size]')
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
     type(int_bounds_info) :: is1_weno, is2_weno, is3_weno
-    $:GPU_DECLARE(create=["is1_weno","is2_weno","is3_weno"])
+    $:GPU_DECLARE(create='[is1_weno,is2_weno,is3_weno]')
     !
     !> @}
 
     real(wp) :: test
-    $:GPU_DECLARE(create=["test"])
+    $:GPU_DECLARE(create='[test]')
 
 contains
 
@@ -624,11 +624,11 @@ contains
         #:endfor
 
         if (weno_dir == 1) then
-            $:GPU_UPDATE(device=["poly_coef_cbL_x","poly_coef_cbR_x","d_cbL_x","d_cbR_x","beta_coef_x"])
+            $:GPU_UPDATE(device='[poly_coef_cbL_x,poly_coef_cbR_x,d_cbL_x,d_cbR_x,beta_coef_x]')
         elseif (weno_dir == 2) then
-            $:GPU_UPDATE(device=["poly_coef_cbL_y","poly_coef_cbR_y","d_cbL_y","d_cbR_y","beta_coef_y"])
+            $:GPU_UPDATE(device='[poly_coef_cbL_y,poly_coef_cbR_y,d_cbL_y,d_cbR_y,beta_coef_y]')
         else
-            $:GPU_UPDATE(device=["poly_coef_cbL_z","poly_coef_cbR_z","d_cbL_z","d_cbR_z","beta_coef_z"])
+            $:GPU_UPDATE(device='[poly_coef_cbL_z,poly_coef_cbR_z,d_cbL_z,d_cbR_z,beta_coef_z]')
         end if
 
         ! Nullifying WENO coefficients and cell-boundary locations pointers
@@ -662,7 +662,7 @@ contains
         is2_weno = is2_weno_d
         is3_weno = is3_weno_d
 
-        $:GPU_UPDATE(device=["is1_weno","is2_weno","is3_weno"])
+        $:GPU_UPDATE(device='[is1_weno,is2_weno,is3_weno]')
 
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
@@ -713,7 +713,7 @@ contains
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    $:GPU_PARALLEL_LOOP(collapse=4,private=["beta","dvd","poly","omega","alpha","tau"])
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[beta,dvd,poly,omega,alpha,tau]')
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -792,7 +792,7 @@ contains
         elseif (weno_order == 5) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    $:GPU_PARALLEL_LOOP(collapse=3,private=["dvd","poly","beta","alpha","omega","tau","delta"])
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -912,7 +912,7 @@ contains
         elseif (weno_order == 7) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    $:GPU_PARALLEL_LOOP(collapse=3,private=["poly","beta","alpha","omega","tau","delta","dvd","v"])
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[poly,beta,alpha,omega,tau,delta,dvd,v]')
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -1132,7 +1132,7 @@ contains
         ! as to reshape the inputted data in the coordinate direction of
         ! the WENO reconstruction
         v_size = ubound(v_vf, 1)
-        $:GPU_UPDATE(device=["v_size"])
+        $:GPU_UPDATE(device='[v_size]')
 
         if (weno_dir == 1) then
             $:GPU_PARALLEL_LOOP(collapse=4)
@@ -1266,7 +1266,7 @@ contains
         real(wp), parameter :: alpha_mp = 2._wp
         real(wp), parameter :: beta_mp = 4._wp/3._wp
 
-        $:GPU_PARALLEL_LOOP(collapse=4,private=["d"])
+        $:GPU_PARALLEL_LOOP(collapse=4,private='[d]')
         do l = is3_weno%beg, is3_weno%end
             do k = is2_weno%beg, is2_weno%end
                 do j = is1_weno%beg, is1_weno%end

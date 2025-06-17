@@ -20,7 +20,7 @@ module m_boundary_common
     implicit none
 
     type(scalar_field), dimension(:, :), allocatable :: bc_buffers
-    $:GPU_DECLARE(create=["bc_buffers"])
+    $:GPU_DECLARE(create='[bc_buffers]')
 
     real(wp) :: bcxb, bcxe, bcyb, bcye, bczb, bcze
 

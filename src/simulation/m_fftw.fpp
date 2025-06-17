@@ -46,12 +46,12 @@ module m_fftw
     !! Filtered complex data in Fourier space
 
 #if defined(MFC_OpenACC)
-    $:GPU_DECLARE(create=["real_size","cmplx_size","x_size","batch_size","Nfq"])
+    $:GPU_DECLARE(create='[real_size,cmplx_size,x_size,batch_size,Nfq]')
 
     real(dp), allocatable, target :: data_real_gpu(:)
     complex(dp), allocatable, target :: data_cmplx_gpu(:)
     complex(dp), allocatable, target :: data_fltr_cmplx_gpu(:)
-    $:GPU_DECLARE(create=["data_real_gpu","data_cmplx_gpu","data_fltr_cmplx_gpu"])
+    $:GPU_DECLARE(create='[data_real_gpu,data_cmplx_gpu,data_fltr_cmplx_gpu]')
 
 #if defined(__PGI)
     integer :: fwd_plan_gpu, bwd_plan_gpu
@@ -89,8 +89,8 @@ contains
         gpu_fft_size(1) = real_size; 
         iembed(1) = 0
         oembed(1) = 0
-        $:GPU_ENTER_DATA(copyin=["real_size","cmplx_size","x_size","sys_size","batch_size","Nfq"])
-        $:GPU_UPDATE(device=["real_size","cmplx_size","x_size","sys_size","batch_size"])
+        $:GPU_ENTER_DATA(copyin='[real_size,cmplx_size,x_size,sys_size,batch_size,Nfq]')
+        $:GPU_UPDATE(device='[real_size,cmplx_size,x_size,sys_size,batch_size]')
 #else
         ! Allocate input and output DFT data sizes
         fftw_real_data = fftw_alloc_real(int(real_size, c_size_t))
@@ -171,7 +171,7 @@ contains
 #endif
         !$acc end host_data
         Nfq = 3
-        $:GPU_UPDATE(device=["Nfq"])
+        $:GPU_UPDATE(device='[Nfq]')
 
         $:GPU_PARALLEL_LOOP(collapse=3)
         do k = 1, sys_size
@@ -212,7 +212,7 @@ contains
                 end do
             end do
 
-            $:GPU_PARALLEL_LOOP(collapse=3, firstprivate=["i"])
+            $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
@@ -231,7 +231,7 @@ contains
             !$acc end host_data
 
             Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
-            $:GPU_UPDATE(device=["Nfq"])
+            $:GPU_UPDATE(device='[Nfq]')
 
             $:GPU_PARALLEL_LOOP(collapse=3)
             do k = 1, sys_size
@@ -251,7 +251,7 @@ contains
 #endif
             !$acc end host_data
 
-            $:GPU_PARALLEL_LOOP(collapse=3, firstprivate=["i"])
+            $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p

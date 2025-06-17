@@ -22,7 +22,7 @@ module m_body_forces
               s_finalize_body_forces_module
 
     real(wp), allocatable, dimension(:, :, :) :: rhoM
-    $:GPU_DECLARE(create=["rhoM"])
+    $:GPU_DECLARE(create='[rhoM]')
 
 contains
 
@@ -67,7 +67,7 @@ contains
             end if
         end if
 
-        $:GPU_UPDATE(device=["accel_bf"])
+        $:GPU_UPDATE(device='[accel_bf]')
 
     end subroutine s_compute_acceleration
 

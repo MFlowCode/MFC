@@ -276,17 +276,17 @@ contains
 
         bc_type(1, -1)%sf(:, :, :) = bc_x%beg
         bc_type(1, 1)%sf(:, :, :) = bc_x%end
-        $:GPU_UPDATE(device=["bc_type(1,-1)%sf","bc_type(1,1)%sf"])
+        $:GPU_UPDATE(device='[bc_type(1,-1)%sf,bc_type(1,1)%sf]')
 
         if (n > 0) then
             bc_type(2, -1)%sf(:, :, :) = bc_y%beg
             bc_type(2, 1)%sf(:, :, :) = bc_y%end
-            $:GPU_UPDATE(device=["bc_type(2,-1)%sf","bc_type(2,1)%sf"])
+            $:GPU_UPDATE(device='[bc_type(2,-1)%sf,bc_type(2,1)%sf]')
 
             if (p > 0) then
                 bc_type(3, -1)%sf(:, :, :) = bc_z%beg
                 bc_type(3, 1)%sf(:, :, :) = bc_z%end
-                $:GPU_UPDATE(device=["bc_type(3,-1)%sf","bc_type(3,1)%sf"])
+                $:GPU_UPDATE(device='[bc_type(3,-1)%sf,bc_type(3,1)%sf]')
             end if
         end if
 

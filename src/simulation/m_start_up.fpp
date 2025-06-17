@@ -1263,12 +1263,12 @@ contains
         if (cfl_dt) then
             if ((mytime + dt) >= t_stop) then
                 dt = t_stop - mytime
-                $:GPU_UPDATE(device=["dt"])
+                $:GPU_UPDATE(device='[dt]')
             end if
         else
             if ((mytime + dt) >= finaltime) then
                 dt = finaltime - mytime
-                $:GPU_UPDATE(device=["dt"])
+                $:GPU_UPDATE(device='[dt]')
             end if
         end if
 
@@ -1292,7 +1292,7 @@ contains
 
         if (probe_wrt) then
             do i = 1, sys_size
-                $:GPU_UPDATE(host=["q_cons_ts(1)%vf(i)%sf"])
+                $:GPU_UPDATE(host='[q_cons_ts(1)%vf(i)%sf]')
             end do
         end if
 
@@ -1395,7 +1395,7 @@ contains
         call cpu_time(start)
         call nvtxStartRange("SAVE-DATA")
         do i = 1, sys_size
-            $:GPU_UPDATE(host=["q_cons_ts(1)%vf(i)%sf"])
+            $:GPU_UPDATE(host='[q_cons_ts(1)%vf(i)%sf]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -1409,8 +1409,8 @@ contains
         end do
 
         if (qbmm .and. .not. polytropic) then
-            $:GPU_UPDATE(host=["pb_ts(1)%sf"])
-            $:GPU_UPDATE(host=["mv_ts(1)%sf"])
+            $:GPU_UPDATE(host='[pb_ts(1)%sf]')
+            $:GPU_UPDATE(host='[mv_ts(1)%sf]')
         end if
 
         if (cfl_dt) then
@@ -1420,16 +1420,16 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            $:GPU_UPDATE(host=["intfc_rad"])
+            $:GPU_UPDATE(host='[intfc_rad]')
             do i = 1, nBubs
                 if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
                     call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
                 end if
             end do
 
-            $:GPU_UPDATE(host=["q_beta%vf(1)%sf"])
+            $:GPU_UPDATE(host='[q_beta%vf(1)%sf]')
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, q_beta%vf(1))
-            $:GPU_UPDATE(host=["Rmax_stats","Rmin_stats","gas_p","gas_mv","intfc_vel"])
+            $:GPU_UPDATE(host='[Rmax_stats,Rmin_stats,gas_p,gas_mv,intfc_vel]')
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
@@ -1626,44 +1626,44 @@ contains
         integer :: i
         !Update GPU DATA
         do i = 1, sys_size
-            $:GPU_UPDATE(device=["q_cons_ts(1)%vf(i)%sf"])
+            $:GPU_UPDATE(device='[q_cons_ts(1)%vf(i)%sf]')
         end do
 
         if (qbmm .and. .not. polytropic) then
-            $:GPU_UPDATE(device=["pb_ts(1)%sf","mv_ts(1)%sf"])
+            $:GPU_UPDATE(device='[pb_ts(1)%sf,mv_ts(1)%sf]')
         end if
         if (chemistry) then
-            $:GPU_UPDATE(device=["q_T_sf%sf"])
+            $:GPU_UPDATE(device='[q_T_sf%sf]')
         end if
-        $:GPU_UPDATE(device=["nb","R0ref","Ca","Web","Re_inv","weight","R0","V0", &
-            & "bubbles_euler","polytropic","polydisperse","qbmm","R0_type", &
-            & "ptil","bubble_model","thermal","poly_sigma","adv_n","adap_dt", &
-            & "adap_dt_tol","n_idx","pi_fac","low_Mach"])
-        $:GPU_UPDATE(device=["R_n","R_v","phi_vn","phi_nv","Pe_c","Tw","pv","M_n", &
-            & "M_v","k_n","k_v","pb0","mass_n0","mass_v0","Pe_T","Re_trans_T", &
-            & "Re_trans_c","Im_trans_T","Im_trans_c","omegaN","mul0","ss", &
-            & "gamma_v","mu_v","gamma_m","gamma_n","mu_n","gam"])
+        $:GPU_UPDATE(device='[nb,R0ref,Ca,Web,Re_inv,weight,R0,V0, &
+            & bubbles_euler,polytropic,polydisperse,qbmm,R0_type, &
+            & ptil,bubble_model,thermal,poly_sigma,adv_n,adap_dt, &
+            & adap_dt_tol,n_idx,pi_fac,low_Mach]')
+        $:GPU_UPDATE(device='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,pv,M_n, &
+            & M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T,Re_trans_T, &
+            & Re_trans_c,Im_trans_T,Im_trans_c,omegaN,mul0,ss, &
+            & gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
 
-        $:GPU_UPDATE(device=["acoustic_source", "num_source"])
-        $:GPU_UPDATE(device=["sigma", "surface_tension"])
+        $:GPU_UPDATE(device='[acoustic_source, num_source]')
+        $:GPU_UPDATE(device='[sigma, surface_tension]')
 
-        $:GPU_UPDATE(device=["dx","dy","dz","x_cb","x_cc","y_cb","y_cc","z_cb","z_cc"])
+        $:GPU_UPDATE(device='[dx,dy,dz,x_cb,x_cc,y_cb,y_cc,z_cb,z_cc]')
 
-        $:GPU_UPDATE(device=["bc_x%vb1","bc_x%vb2","bc_x%vb3","bc_x%ve1","bc_x%ve2","bc_x%ve3"])
-        $:GPU_UPDATE(device=["bc_y%vb1","bc_y%vb2","bc_y%vb3","bc_y%ve1","bc_y%ve2","bc_y%ve3"])
-        $:GPU_UPDATE(device=["bc_z%vb1","bc_z%vb2","bc_z%vb3","bc_z%ve1","bc_z%ve2","bc_z%ve3"])
+        $:GPU_UPDATE(device='[bc_x%vb1,bc_x%vb2,bc_x%vb3,bc_x%ve1,bc_x%ve2,bc_x%ve3]')
+        $:GPU_UPDATE(device='[bc_y%vb1,bc_y%vb2,bc_y%vb3,bc_y%ve1,bc_y%ve2,bc_y%ve3]')
+        $:GPU_UPDATE(device='[bc_z%vb1,bc_z%vb2,bc_z%vb3,bc_z%ve1,bc_z%ve2,bc_z%ve3]')
 
-        $:GPU_UPDATE(device=["bc_x%grcbc_in","bc_x%grcbc_out","bc_x%grcbc_vel_out"])
-        $:GPU_UPDATE(device=["bc_y%grcbc_in","bc_y%grcbc_out","bc_y%grcbc_vel_out"])
-        $:GPU_UPDATE(device=["bc_z%grcbc_in","bc_z%grcbc_out","bc_z%grcbc_vel_out"])
+        $:GPU_UPDATE(device='[bc_x%grcbc_in,bc_x%grcbc_out,bc_x%grcbc_vel_out]')
+        $:GPU_UPDATE(device='[bc_y%grcbc_in,bc_y%grcbc_out,bc_y%grcbc_vel_out]')
+        $:GPU_UPDATE(device='[bc_z%grcbc_in,bc_z%grcbc_out,bc_z%grcbc_vel_out]')
 
-        $:GPU_UPDATE(device=["relax", "relax_model"])
+        $:GPU_UPDATE(device='[relax, relax_model]')
         if (relax) then
-            $:GPU_UPDATE(device=["palpha_eps", "ptgalpha_eps"])
+            $:GPU_UPDATE(device='[palpha_eps, ptgalpha_eps]')
         end if
 
         if (ib) then
-            $:GPU_UPDATE(device=["ib_markers%sf"])
+            $:GPU_UPDATE(device='[ib_markers%sf]')
         end if
     end subroutine s_initialize_gpu_vars
 

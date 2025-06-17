@@ -23,43 +23,43 @@ module m_acoustic_src
     private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
 
     integer, allocatable, dimension(:) :: pulse, support
-    $:GPU_DECLARE(create=["pulse","support"])
+    $:GPU_DECLARE(create='[pulse,support]')
 
     logical, allocatable, dimension(:) :: dipole
-    $:GPU_DECLARE(create=["dipole"])
+    $:GPU_DECLARE(create='[dipole]')
 
     real(wp), allocatable, target, dimension(:, :) :: loc_acoustic
-    $:GPU_DECLARE(create=["loc_acoustic"])
+    $:GPU_DECLARE(create='[loc_acoustic]')
 
     real(wp), allocatable, dimension(:) :: mag, length, height, wavelength, frequency
     real(wp), allocatable, dimension(:) :: gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay
-    $:GPU_DECLARE(create=["mag","length","height","wavelength","frequency"])
-    $:GPU_DECLARE(create=["gauss_sigma_dist","gauss_sigma_time","npulse","dir","delay"])
+    $:GPU_DECLARE(create='[mag,length,height,wavelength,frequency]')
+    $:GPU_DECLARE(create='[gauss_sigma_dist,gauss_sigma_time,npulse,dir,delay]')
 
     real(wp), allocatable, dimension(:) :: foc_length, aperture
-    $:GPU_DECLARE(create=["foc_length","aperture"])
+    $:GPU_DECLARE(create='[foc_length,aperture]')
 
     real(wp), allocatable, dimension(:) :: element_spacing_angle, element_polygon_ratio, rotate_angle
-    $:GPU_DECLARE(create=["element_spacing_angle","element_polygon_ratio","rotate_angle"])
+    $:GPU_DECLARE(create='[element_spacing_angle,element_polygon_ratio,rotate_angle]')
 
     real(wp), allocatable, dimension(:) :: bb_bandwidth, bb_lowest_freq
-    $:GPU_DECLARE(create=["bb_bandwidth","bb_lowest_freq"])
+    $:GPU_DECLARE(create='[bb_bandwidth,bb_lowest_freq]')
 
     integer, allocatable, dimension(:) :: num_elements, element_on, bb_num_freq
-    $:GPU_DECLARE(create=["num_elements","element_on","bb_num_freq"])
+    $:GPU_DECLARE(create='[num_elements,element_on,bb_num_freq]')
 
     !> @name Acoustic source terms
     !> @{
     real(wp), allocatable, dimension(:, :, :) :: mass_src, e_src
     real(wp), allocatable, dimension(:, :, :, :) :: mom_src
     !> @}
-    $:GPU_DECLARE(create=["mass_src","e_src","mom_src"])
+    $:GPU_DECLARE(create='[mass_src,e_src,mom_src]')
 
     integer, dimension(:), allocatable :: source_spatials_num_points !< Number of non-zero source grid points for each source
-    $:GPU_DECLARE(create=["source_spatials_num_points"])
+    $:GPU_DECLARE(create='[source_spatials_num_points]')
 
     type(source_spatial_type), dimension(:), allocatable :: source_spatials !< Data of non-zero source grid points for each source
-    $:GPU_DECLARE(create=["source_spatials"])
+    $:GPU_DECLARE(create='[source_spatials]')
 
 contains
 
@@ -110,12 +110,12 @@ contains
                 delay(i) = acoustic(i)%delay
             end if
         end do
-        $:GPU_UPDATE(device=["loc_acoustic","mag","dipole","support","length", &
-            & "height","wavelength","frequency","gauss_sigma_dist", &
-            & "gauss_sigma_time","foc_length","aperture","npulse","pulse", &
-            & "dir","delay","element_polygon_ratio","rotate_angle", &
-            & "element_spacing_angle","num_elements","element_on", &
-            & "bb_num_freq","bb_bandwidth","bb_lowest_freq"])
+        $:GPU_UPDATE(device='[loc_acoustic,mag,dipole,support,length, &
+            & height,wavelength,frequency,gauss_sigma_dist, &
+            & gauss_sigma_time,foc_length,aperture,npulse,pulse, &
+            & dir,delay,element_polygon_ratio,rotate_angle, &
+            & element_spacing_angle,num_elements,element_on, &
+            & bb_num_freq,bb_bandwidth,bb_lowest_freq]')
 
         @:ALLOCATE(mass_src(0:m, 0:n, 0:p))
         @:ALLOCATE(mom_src(1:num_vels, 0:m, 0:n, 0:p))
@@ -219,7 +219,7 @@ contains
 
             deallocate (phi_rn)
 
-            $:GPU_PARALLEL_LOOP(private=["myalpha","myalpha_rho"])
+            $:GPU_PARALLEL_LOOP(private='[myalpha,myalpha_rho]')
             do i = 1, num_points
                 j = source_spatials(ai)%coord(1, i)
                 k = source_spatials(ai)%coord(2, i)
@@ -473,14 +473,14 @@ contains
                 call s_mpi_abort('Fatal Error: Inconsistent allocation of source_spatials')
             end if
 
-            $:GPU_UPDATE(device=["source_spatials(ai)%coord"])
-            $:GPU_UPDATE(device=["source_spatials(ai)%val"])
+            $:GPU_UPDATE(device='[source_spatials(ai)%coord]')
+            $:GPU_UPDATE(device='[source_spatials(ai)%val]')
             if (support(ai) >= 5) then
                 if (dim == 2) then
-                    $:GPU_UPDATE(device=["source_spatials(ai)%angle"])
+                    $:GPU_UPDATE(device='[source_spatials(ai)%angle]')
                 end if
                 if (dim == 3) then
-                    $:GPU_UPDATE(device=["source_spatials(ai)%xyz_to_r_ratios"])
+                    $:GPU_UPDATE(device='[source_spatials(ai)%xyz_to_r_ratios]')
                 end if
             end if
 

@@ -65,7 +65,7 @@ module m_riemann_solvers
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
-    $:GPU_DECLARE(create=["flux_rsx_vf","flux_src_rsx_vf","flux_rsy_vf","flux_src_rsy_vf","flux_rsz_vf","flux_src_rsz_vf"])
+    $:GPU_DECLARE(create='[flux_rsx_vf,flux_src_rsx_vf,flux_rsy_vf,flux_src_rsy_vf,flux_rsz_vf,flux_src_rsz_vf]')
     !> @}
 
     !> The cell-boundary values of the geometrical source flux that are computed
@@ -76,7 +76,7 @@ module m_riemann_solvers
     real(wp), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsx_vf !<
     real(wp), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsy_vf !<
     real(wp), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsz_vf !<
-    $:GPU_DECLARE(create=["flux_gsrc_rsx_vf","flux_gsrc_rsy_vf","flux_gsrc_rsz_vf"])
+    $:GPU_DECLARE(create='[flux_gsrc_rsx_vf,flux_gsrc_rsy_vf,flux_gsrc_rsz_vf]')
     !> @}
 
     ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
@@ -85,17 +85,17 @@ module m_riemann_solvers
     real(wp), allocatable, dimension(:, :, :, :) :: vel_src_rsx_vf
     real(wp), allocatable, dimension(:, :, :, :) :: vel_src_rsy_vf
     real(wp), allocatable, dimension(:, :, :, :) :: vel_src_rsz_vf
-    $:GPU_DECLARE(create=["vel_src_rsx_vf","vel_src_rsy_vf","vel_src_rsz_vf"])
+    $:GPU_DECLARE(create='[vel_src_rsx_vf,vel_src_rsy_vf,vel_src_rsz_vf]')
 
     real(wp), allocatable, dimension(:, :, :, :) :: mom_sp_rsx_vf
     real(wp), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf
     real(wp), allocatable, dimension(:, :, :, :) :: mom_sp_rsz_vf
-    $:GPU_DECLARE(create=["mom_sp_rsx_vf","mom_sp_rsy_vf","mom_sp_rsz_vf"])
+    $:GPU_DECLARE(create='[mom_sp_rsx_vf,mom_sp_rsy_vf,mom_sp_rsz_vf]')
 
     real(wp), allocatable, dimension(:, :, :, :) :: Re_avg_rsx_vf
     real(wp), allocatable, dimension(:, :, :, :) :: Re_avg_rsy_vf
     real(wp), allocatable, dimension(:, :, :, :) :: Re_avg_rsz_vf
-    $:GPU_DECLARE(create=["Re_avg_rsx_vf","Re_avg_rsy_vf","Re_avg_rsz_vf"])
+    $:GPU_DECLARE(create='[Re_avg_rsx_vf,Re_avg_rsy_vf,Re_avg_rsz_vf]')
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
@@ -103,13 +103,13 @@ module m_riemann_solvers
     type(int_bounds_info) :: isx, isy, isz
     !> @}
 
-    $:GPU_DECLARE(create=["is1","is2","is3","isx","isy","isz"])
+    $:GPU_DECLARE(create='[is1,is2,is3,isx,isy,isz]')
 
     real(wp), allocatable, dimension(:) :: Gs
-    $:GPU_DECLARE(create=["Gs"])
+    $:GPU_DECLARE(create='[Gs]')
 
     real(wp), allocatable, dimension(:, :) :: Res
-    $:GPU_DECLARE(create=["Res"])
+    $:GPU_DECLARE(create='[Res]')
 
 contains
 
@@ -354,14 +354,14 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private=["alpha_rho_L", "alpha_rho_R", &
-                    "vel_L", "vel_R", "alpha_L", "alpha_R", "tau_e_L", "tau_e_R", &
-                    "G_L", "G_R", "Re_L", "Re_R", "rho_avg", "h_avg", "gamma_avg", &
-                    "s_L", "s_R", "s_S", "Ys_L", "Ys_R", "xi_field_L", "xi_field_R", &
-                    "Cp_iL", "Cp_iR", "Xs_L", "Xs_R", "Gamma_iL", "Gamma_iR", &
-                    "Yi_avg", "Phi_avg", "h_iL", "h_iR", "h_avg_2", "c_fast", &
-                    "pres_mag", "B", "Ga", "vdotB", "B2", "b4", "cm", "pcorr", &
-                    "zcoef", "vel_L_tmp", "vel_R_tmp"])
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, &
+                    & vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R, &
+                    & G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, &
+                    & s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, &
+                    & Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, &
+                    & Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, &
+                    & pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, &
+                    & zcoef, vel_L_tmp, vel_R_tmp]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -1283,14 +1283,14 @@ contains
                 ! 6-EQUATION MODEL WITH HLLC
                 if (model_eqns == 3) then
                     !ME3
-                    $:GPU_PARALLEL_LOOP(collapse=3, private=["vel_L", "vel_R", &
-                        "vel_K_Star", "Re_L", "Re_R", "rho_avg", "h_avg", &
-                        "gamma_avg", "s_L", "s_R", "s_S", "vel_avg_rms", &
-                        "alpha_L", "alpha_R", "Ys_L", "Ys_R", "Xs_L", "Xs_R", &
-                        "Gamma_iL", "Gamma_iR", "Cp_iL", "Cp_iR", "Yi_avg", &
-                        "Phi_avg", "h_iL", "h_iR", "h_avg_2", "tau_e_L", &
-                        "tau_e_R", "G_L", "G_R", "flux_ene_e", "xi_field_L", &
-                        "xi_field_R", "pcorr", "zcoef", "vel_L_tmp", "vel_R_tmp"])
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, &
+                        & vel_K_Star, Re_L, Re_R, rho_avg, h_avg, &
+                        & gamma_avg, s_L, s_R, s_S, vel_avg_rms, &
+                        & alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R, &
+                        & Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, &
+                        & Phi_avg, h_iL, h_iR, h_avg_2, tau_e_L, &
+                        & tau_e_R, G_L, G_R, flux_ene_e, xi_field_L, &
+                        & xi_field_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1716,10 +1716,10 @@ contains
 
                 elseif (model_eqns == 4) then
                     !ME4
-                    $:GPU_PARALLEL_LOOP(collapse=3, private=["alpha_rho_L", &
-                        "alpha_rho_R", "vel_L", "vel_R", "alpha_L", "alpha_R", &
-                        "rho_avg", "h_avg", "gamma_avg", "s_L", "s_R", "s_S", &
-                        "vel_avg_rms", "nbub_L", "nbub_R", "ptilde_L", "ptilde_R"])
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, &
+                        & alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
+                        & rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, &
+                        & vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1969,12 +1969,12 @@ contains
                     !$acc end parallel loop
 
                 elseif (model_eqns == 2 .and. bubbles_euler) then
-                    $:GPU_PARALLEL_LOOP(collapse=3, private=["R0_L", "R0_R", "V0_L", &
-                        "V0_R", "P0_L", "P0_R", "pbw_L", "pbw_R", "vel_L", &
-                        "vel_R", "rho_avg", "alpha_L", "alpha_R", "h_avg", &
-                        "gamma_avg", "s_L", "s_R", "s_S", "nbub_L", "nbub_R", &
-                        "ptilde_L", "ptilde_R", "vel_avg_rms", "Re_L", "Re_R", &
-                        "pcorr", "zcoef", "vel_L_tmp", "vel_R_tmp"])
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[R0_L, R0_R, V0_L, &
+                        & V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, &
+                        & vel_R, rho_avg, alpha_L, alpha_R, h_avg, &
+                        & gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, &
+                        & ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, &
+                        & pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2440,15 +2440,15 @@ contains
                     !$acc end parallel loop
                 else
                     ! 5-EQUATION MODEL WITH HLLC
-                    $:GPU_PARALLEL_LOOP(collapse=3, private=["vel_L", "vel_R", &
-                        "Re_L", "Re_R", "rho_avg", "h_avg", "gamma_avg", &
-                        "alpha_L", "alpha_R", "s_L", "s_R", "s_S", &
-                        "vel_avg_rms", "pcorr", "zcoef", "vel_L_tmp", &
-                        "vel_R_tmp", "Ys_L", "Ys_R", "Xs_L", "Xs_R", &
-                        "Gamma_iL", "Gamma_iR", "Cp_iL", "Cp_iR", "tau_e_L", &
-                        "tau_e_R", "xi_field_L", "xi_field_R", "Yi_avg", &
-                        "Phi_avg", "h_iL", "h_iR", "h_avg_2"], &
-                        copyin=["is1", "is2", "is3"])
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, &
+                        & Re_L, Re_R, rho_avg, h_avg, gamma_avg, &
+                        & alpha_L, alpha_R, s_L, s_R, s_S, &
+                        & vel_avg_rms, pcorr, zcoef, vel_L_tmp, &
+                        & vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, &
+                        & Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, &
+                        & tau_e_R, xi_field_L, xi_field_R, Yi_avg, &
+                        & Phi_avg, h_iL, h_iR, h_avg_2]', &
+                        & copyin='[is1, is2, is3]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -3065,12 +3065,12 @@ contains
 
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private=["alpha_rho_L", &
-                    "alpha_rho_R", "vel", "alpha_L", "alpha_R", "rho", "pres", &
-                    "E", "H_no_mag", "gamma", "pi_inf", "qv", "vel_rms", "B", &
-                    "c", "c_fast", "pres_mag", "U_L", "U_R", "U_starL", &
-                    "U_starR", "U_doubleL", "U_doubleR", "F_L", "F_R", &
-                    "F_starL", "F_starR", "F_hlld"])
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, &
+                    & alpha_rho_R, vel, alpha_L, alpha_R, rho, pres, &
+                    & E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, &
+                    & c, c_fast, pres_mag, U_L, U_R, U_starL, &
+                    & U_starR, U_doubleL, U_doubleR, F_L, F_R, &
+                    & F_starL, F_starR, F_hlld]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -3322,7 +3322,7 @@ contains
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
         end do
-        $:GPU_UPDATE(device=["Gs"])
+        $:GPU_UPDATE(device='[Gs]')
 
         if (viscous) then
             @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
@@ -3334,10 +3334,10 @@ contains
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-            $:GPU_UPDATE(device=["Res","Re_idx","Re_size"])
+            $:GPU_UPDATE(device='[Res,Re_idx,Re_size]')
         end if
 
-        $:GPU_ENTER_DATA(copyin=["is1","is2","is3","isx","isy","isz"])
+        $:GPU_ENTER_DATA(copyin='[is1,is2,is3,isx,isy,isz]')
 
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
@@ -3480,7 +3480,7 @@ contains
             dir_idx = (/3, 1, 2/); dir_flg = (/0._wp, 0._wp, 1._wp/)
         end if
 
-        $:GPU_UPDATE(device=["is1","is2","is3"])
+        $:GPU_UPDATE(device='[is1,is2,is3]')
 
         if (elasticity) then
             if (norm_dir == 1) then
@@ -3494,9 +3494,9 @@ contains
 
         isx = ix; isy = iy; isz = iz
         ! for stuff in the same module
-        $:GPU_UPDATE(device=["isx","isy","isz"])
+        $:GPU_UPDATE(device='[isx,isy,isz]')
         ! for stuff in different modules
-        $:GPU_UPDATE(device=["dir_idx","dir_flg","dir_idx_tau"])
+        $:GPU_UPDATE(device='[dir_idx,dir_flg,dir_idx_tau]')
 
         ! Population of Buffers in x-direction
         if (norm_dir == 1) then
@@ -3984,10 +3984,10 @@ contains
         integer :: i_vel             !!< Loop iterator for velocity components.
         integer :: idx_rp(3)         !!< Indices $(j,k,l)$ of 'right' point for averaging.
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private=["idx_rp", "avg_v_int", &
-            "avg_dvdx_int", "avg_dvdy_int", "avg_dvdz_int", "Re_s", "Re_b", &
-            "vel_src_int", "r_eff", "divergence_cyl", "stress_vector_shear", &
-            "stress_normal_bulk", "div_v_term_const"])
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_rp, avg_v_int, &
+            & avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, Re_s, Re_b, &
+            & vel_src_int, r_eff, divergence_cyl, stress_vector_shear, &
+            & stress_normal_bulk, div_v_term_const]')
         do l = iz%beg, iz%end
             do k = iy%beg, iy%end
                 do j = ix%beg, ix%end
@@ -4147,9 +4147,9 @@ contains
 
         real(wp) :: divergence_v   !< Velocity divergence at interface.
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private=["idx_right_phys", "vel_grad_avg", &
-            "current_tau_shear", "current_tau_bulk", "vel_src_at_interface", &
-            "Re_shear", "Re_bulk", "divergence_v", "i_dim", "vel_comp_idx"])
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, &
+            & current_tau_shear, current_tau_bulk, vel_src_at_interface, &
+            & Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx]')
         do l_loop = isz%beg, isz%end
             do k_loop = isy%beg, isy%end
                 do j_loop = isx%beg, isx%end

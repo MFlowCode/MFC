@@ -35,15 +35,15 @@ module m_ibm
     type(integer_field), public :: ib_markers
     type(levelset_field), public :: levelset
     type(levelset_norm_field), public :: levelset_norm
-    $:GPU_DECLARE(create=["ib_markers","levelset","levelset_norm"])
+    $:GPU_DECLARE(create='[ib_markers,levelset,levelset_norm]')
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
     type(ghost_point), dimension(:), allocatable :: inner_points
-    $:GPU_DECLARE(create=["ghost_points","inner_points"])
+    $:GPU_DECLARE(create='[ghost_points,inner_points]')
 
     integer :: num_gps !< Number of ghost points
     integer :: num_inner_gps !< Number of ghost points
-    $:GPU_DECLARE(create=["gp_layers","num_gps","num_inner_gps"])
+    $:GPU_DECLARE(create='[gp_layers,num_gps,num_inner_gps]')
 
 contains
 
@@ -70,7 +70,7 @@ contains
         @:ACC_SETUP_SFs(levelset)
         @:ACC_SETUP_SFs(levelset_norm)
 
-        $:GPU_ENTER_DATA(copyin=["num_gps","num_inner_gps"])
+        $:GPU_ENTER_DATA(copyin='[num_gps,num_inner_gps]')
 
     end subroutine s_initialize_ibm_module
 
@@ -80,31 +80,31 @@ contains
 
         integer :: i, j, k
 
-        $:GPU_UPDATE(device=["ib_markers%sf"])
-        $:GPU_UPDATE(device=["levelset%sf"])
-        $:GPU_UPDATE(device=["levelset_norm%sf"])
+        $:GPU_UPDATE(device='[ib_markers%sf]')
+        $:GPU_UPDATE(device='[levelset%sf]')
+        $:GPU_UPDATE(device='[levelset_norm%sf]')
 
         ! Get neighboring IB variables from other processors
         call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
 
-        $:GPU_UPDATE(host=["ib_markers%sf"])
+        $:GPU_UPDATE(host='[ib_markers%sf]')
 
         call s_find_num_ghost_points(num_gps, num_inner_gps)
 
-        $:GPU_UPDATE(device=["num_gps", "num_inner_gps"])
+        $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
         @:ALLOCATE(ghost_points(1:num_gps))
         @:ALLOCATE(inner_points(1:num_inner_gps))
 
-        $:GPU_ENTER_DATA(copyin=["ghost_points","inner_points"])
+        $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
 
         call s_find_ghost_points(ghost_points, inner_points)
-        $:GPU_UPDATE(device=["ghost_points", "inner_points"])
+        $:GPU_UPDATE(device='[ghost_points, inner_points]')
 
         call s_compute_image_points(ghost_points, levelset, levelset_norm)
-        $:GPU_UPDATE(device=["ghost_points"])
+        $:GPU_UPDATE(device='[ghost_points]')
 
         call s_compute_interpolation_coeffs(ghost_points)
-        $:GPU_UPDATE(device=["ghost_points"])
+        $:GPU_UPDATE(device='[ghost_points]')
 
     end subroutine s_ibm_setup
 
@@ -152,11 +152,11 @@ contains
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
 
-        $:GPU_PARALLEL_LOOP(private=["physical_loc","dyn_pres","alpha_rho_IP", &
-            & "alpha_IP","pres_IP","vel_IP","vel_g","vel_norm_IP","r_IP", &
-            & "v_IP","pb_IP","mv_IP","nmom_IP","presb_IP","massv_IP","rho", &
-            & "gamma","pi_inf","Re_K","G_K","Gs","gp","innerp","norm","buf", &
-            & "j","k","l","q","coeff"])
+        $:GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, &
+            & alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, &
+            & v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, &
+            & gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, &
+            & j,k,l,q,coeff]')
         do i = 1, num_gps
 
             gp = ghost_points(i)
@@ -300,9 +300,9 @@ contains
         end do
 
         !Correct the state of the inner points in IBs
-        $:GPU_PARALLEL_LOOP(private=["physical_loc","dyn_pres","alpha_rho_IP", &
-            & "alpha_IP","vel_g","rho","gamma","pi_inf","Re_K","innerp", &
-            & "j","k","l","q"])
+        $:GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, &
+            & alpha_IP,vel_g,rho,gamma,pi_inf,Re_K,innerp, &
+            & j,k,l,q]')
         do i = 1, num_inner_gps
 
             vel_g = 0._wp

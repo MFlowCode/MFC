@@ -1,3 +1,4 @@
+
 #:def ASSERT_LIST(data, datatype)
     #:assert data is not None
     #:assert isinstance(data, list)
@@ -5,9 +6,28 @@
     #:assert all(isinstance(element, datatype) for element in data)
 #:enddef
 
-#:def GEN_PARENTHESES_CLAUSE(clause_name, clause_list)
+#:def GEN_PARENTHESES_CLAUSE(clause_name, clause_str)
+    #:set clause_regex = re.compile(',(?![^(]*\\))')
+
     #:assert isinstance(clause_name, str)
-    #:if clause_list is not None
+    #:if clause_str is not None
+        #:set count = 0
+        #:assert isinstance(clause_str, str)
+        #:assert clause_str[0] == '[' and clause_str[-1] == ']'
+        #:for c in clause_str
+            #:if c == '('
+                #:set count = count + 1
+            #:elif c == ')'
+                #:set count = count - 1
+            #:endif
+            #:if count > 1
+                #:stop 'Nested parentheses is not supported. Incorrect clause: {}'.format(clause_str)
+            #:elif count < 0
+                #:stop 'Missing parentheses. Incorrect clause: {}'.format(clause_str)
+            #:endif
+        #:endfor
+        #:set clause_str = re.sub(clause_regex, ';', clause_str)
+        #:set clause_list = [x.strip() for x in clause_str.strip('[]').split(';')]
         $:ASSERT_LIST(clause_list, str)
         #:set clause_str = clause_name + '(' + ', '.join(clause_list) + ') '
     #:else
@@ -33,15 +53,10 @@
 
 #:def GEN_COPYIN_STR(copyin, readonly)
     #:assert isinstance(readonly, bool)
-    #:if copyin is not None
-        $:ASSERT_LIST(copyin, str)
-        #:if readonly == True
-            #:set copyin_val = 'copyin(readonly:' + ', '.join(copyin) + ') '
-        #:else
-            #:set copyin_val = 'copyin(' + ', '.join(copyin) + ') '
-        #:endif
-    #:else
-        #:set copyin_val = ''
+    #:set copyin_val = GEN_PARENTHESES_CLAUSE('copyin', copyin)
+    #:if copyin is not None and readonly == True
+        #:set index = copyin_val.find('copyin(') + len('copyin(')
+        #:set copyin_val = copyin_val[:index] + 'readonly:' + copyin_val[index:]
     #:endif
     $:copyin_val
 #:enddef
@@ -137,21 +152,26 @@
 
 #:def GEN_REDUCTION_STR(reduction, reductionOp)
     #:if reduction is not None and reductionOp is not None
-        #:if isinstance(reduction, list) and isinstance(reductionOp, list)
-            $:ASSERT_LIST(reduction, list)
-            $:ASSERT_LIST(reductionOp, str)
-            #:assert all(len(element) != 0 for element in reduction)
-            #:assert all(isinstance(element, str) for sublist in reduction for element in sublist)
-            #:assert len(reduction) == len(reductionOp)
-            #:set reduction_list = ['reduction(' + op + ':' + ', '.join(red) + ') ' for (red, op) in zip(reduction, reductionOp)]
-            #:set reduction_val = ' '. join(reduction_list) + ' '
-        #:elif isinstance(reduction, list) and isinstance(reductionOp, str)
-            $:ASSERT_LIST(reduction, str)
-            #:assert isinstance(reductionOp, str)
-            #:set reduction_val = 'reduction(' + reductionOp + ':' + ', '.join(reduction) + ') '
-        #:else
-            #:stop 'Invalid datatypes for reduction or reductionOp. Must be list of lists and lists or list and str respectively'
-        #:endif
+        #:assert isinstance(reduction, str)
+        #:assert isinstance(reductionOp, str)
+        #:assert reduction[0] == '[' and reduction[-1] == ']'
+        #:assert reductionOp[0] == '[' and reductionOp[-1] == ']'
+        #:set reduction = reduction.replace(' ', '')
+        #:set reduction = reduction[1:-1]
+        #:set reduction_list = reduction.split('],')
+        #:set reduction_list = [str + ']' for str in reduction_list]
+        #:assert all(str[0] == '[' and str[-1] == ']' for str in reduction_list)
+
+        #:set reductionOp_list = [x.strip() for x in reductionOp.strip('[]').split(',')]
+        $:ASSERT_LIST(reduction_list, str)
+        $:ASSERT_LIST(reductionOp_list, str)
+        #:assert len(reduction_list) == len(reductionOp_list)
+        #:set reduction_val = ''
+        #:for i in range(len(reduction_list))
+            #:set temp_clause = GEN_PARENTHESES_CLAUSE('reduction', reduction_list[i]).strip('\n')
+            #:set ind = temp_clause.find('reduction(') + len('reduction(')
+            #:set reduction_val = reduction_val.strip('\n') + temp_clause[:ind] + reductionOp_list[i] + ':' + temp_clause[ind:]
+        #:endfor
     #:elif reduction is not None or reductionOp is not None
         #:stop 'Cannot set the reduction list or reduction operation without setting the other'
     #:else
@@ -235,12 +255,9 @@
         #:if not isinstance(function_name, str)
             #:stop "When inlining for Cray Compiler, function name must be given and given as a string"
         #:endif
-#ifdef _CRAYFTN
         #:set cray_directive = ('!DIR$ INLINEALWAYS ' + function_name).strip('\n')
+        #:set cray_directive = '#ifdef _CRAYFTN\n' + cray_directive + '\n#else\n' + acc_directive + '\n#endif'
         $:cray_directive
-#else
-        $:acc_directive
-#endif
     #:else
         $:acc_directive
     #:endif

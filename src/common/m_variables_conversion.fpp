@@ -50,16 +50,16 @@ module m_variables_conversion
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
     real(wp), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    $:GPU_DECLARE(create=["gammas","gs_min","pi_infs","ps_inf","cvs","qvs","qvps"])
+    $:GPU_DECLARE(create='[gammas,gs_min,pi_infs,ps_inf,cvs,qvs,qvps]')
 #endif
 
     real(wp), allocatable, dimension(:) :: Gs
     integer, allocatable, dimension(:) :: bubrs
     real(wp), allocatable, dimension(:, :) :: Res
-    $:GPU_DECLARE(create=["bubrs","Gs","Res"])
+    $:GPU_DECLARE(create='[bubrs,Gs,Res]')
 
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
-    $:GPU_DECLARE(create=["is1b","is2b","is3b","is1e","is2e","is3e"])
+    $:GPU_DECLARE(create='[is1b,is2b,is3b,is1e,is2e,is3e]')
 
     real(wp), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
     real(wp), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
@@ -610,7 +610,7 @@ contains
 
         integer :: i, j
 
-        $:GPU_ENTER_DATA(copyin=["is1b","is1e","is2b","is2e","is3b","is3e"])
+        $:GPU_ENTER_DATA(copyin='[is1b,is1e,is2b,is2e,is3b,is3e]')
 
 #ifdef MFC_SIMULATION
         @:ALLOCATE(gammas (1:num_fluids))
@@ -642,7 +642,7 @@ contains
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
         end do
-        $:GPU_UPDATE(device=["gammas","gs_min","pi_infs","ps_inf","cvs","qvs","qvps","Gs"])
+        $:GPU_UPDATE(device='[gammas,gs_min,pi_infs,ps_inf,cvs,qvs,qvps,Gs]')
 
 #ifdef MFC_SIMULATION
 
@@ -654,7 +654,7 @@ contains
                 end do
             end do
 
-            $:GPU_UPDATE(device=["Res","Re_idx","Re_size"])
+            $:GPU_UPDATE(device='[Res,Re_idx,Re_size]')
         end if
 #endif
 
@@ -668,7 +668,7 @@ contains
             do i = 1, nb
                 bubrs(i) = bub_idx%rs(i)
             end do
-            $:GPU_UPDATE(device=["bubrs"])
+            $:GPU_UPDATE(device='[bubrs]')
         end if
 
 #ifdef MFC_POST_PROCESS
@@ -869,9 +869,9 @@ contains
             end if
         #:endif
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private=["alpha_K", "alpha_rho_K", "Re_K", &
-            "nRtmp", "rho_K", "gamma_K", "pi_inf_K", "qv_K", &
-            "dyn_pres_K", "rhoYks", "B"])
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, &
+            & nRtmp, rho_K, gamma_K, pi_inf_K,qv_K, &
+            & dyn_pres_K, rhoYks, B]')
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -1461,13 +1461,13 @@ contains
         is2b = is2%beg; is2e = is2%end
         is3b = is3%beg; is3e = is3%end
 
-        $:GPU_UPDATE(device=["is1b","is2b","is3b","is1e","is2e","is3e"])
+        $:GPU_UPDATE(device='[is1b,is2b,is3b,is1e,is2e,is3e]')
 
         ! Computing the flux variables from the primitive variables, without
         ! accounting for the contribution of either viscosity or capillarity
 #ifdef MFC_SIMULATION
-        $:GPU_PARALLEL_LOOP(collapse=3, private=["alpha_rho_K", "vel_K", &
-            "alpha_K", "Re_K", "Y_K"])
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, &
+            & alpha_K, Re_K, Y_K]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e

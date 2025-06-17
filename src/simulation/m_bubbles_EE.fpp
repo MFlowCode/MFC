@@ -21,13 +21,13 @@ module m_bubbles_EE
 
     real(wp), allocatable, dimension(:, :, :) :: bub_adv_src
     real(wp), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
-    $:GPU_DECLARE(create=["bub_adv_src","bub_r_src","bub_v_src","bub_p_src","bub_m_src"])
+    $:GPU_DECLARE(create='[bub_adv_src,bub_r_src,bub_v_src,bub_p_src,bub_m_src]')
 
     type(scalar_field) :: divu !< matrix for div(u)
-    $:GPU_DECLARE(create=["divu"])
+    $:GPU_DECLARE(create='[divu]')
 
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
-    $:GPU_DECLARE(create=["rs","vs","ms","ps"])
+    $:GPU_DECLARE(create='[rs,vs,ms,ps]')
 
 contains
 
@@ -51,9 +51,9 @@ contains
             end if
         end do
 
-        $:GPU_UPDATE(device=["rs", "vs"])
+        $:GPU_UPDATE(device='[rs, vs]')
         if (.not. polytropic) then
-            $:GPU_UPDATE(device=["ps", "ms"])
+            $:GPU_UPDATE(device='[ps, ms]')
         end if
 
         @:ALLOCATE(divu%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
@@ -190,9 +190,9 @@ contains
         end do
 
         adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(collapse=3, private=["Rtmp", "Vtmp", "myalpha_rho", "myalpha"], &
-            reduction=["adap_dt_stop_max"], reductionOp="MAX", &
-            copy=["adap_dt_stop_max"])
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[Rtmp, Vtmp, myalpha_rho, myalpha]', &
+            & reduction='[[adap_dt_stop_max]]', reductionOp='[MAX]', &
+            & copy='[adap_dt_stop_max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m

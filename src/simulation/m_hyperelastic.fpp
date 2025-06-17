@@ -26,14 +26,14 @@ module m_hyperelastic
     !! The btensor at the cell-interior Gaussian quadrature points.
     !! These tensor is needed to be calculated once and make the code DRY.
     type(vector_field) :: btensor !<
-    $:GPU_DECLARE(create=["btensor"])
+    $:GPU_DECLARE(create='[btensor]')
 
     real(wp), allocatable, dimension(:, :) :: fd_coeff_x
     real(wp), allocatable, dimension(:, :) :: fd_coeff_y
     real(wp), allocatable, dimension(:, :) :: fd_coeff_z
-    $:GPU_DECLARE(create=["fd_coeff_x","fd_coeff_y", "fd_coeff_z"])
+    $:GPU_DECLARE(create='[fd_coeff_x,fd_coeff_y, fd_coeff_z]')
     real(wp), allocatable, dimension(:) :: Gs
-    $:GPU_DECLARE(create=["Gs"])
+    $:GPU_DECLARE(create='[Gs]')
 
 contains
 
@@ -59,7 +59,7 @@ contains
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
         end do
-        $:GPU_UPDATE(device=["Gs"])
+        $:GPU_UPDATE(device='[Gs]')
 
         @:ALLOCATE(fd_coeff_x(-fd_number:fd_number, 0:m))
         if (n > 0) then
@@ -72,16 +72,16 @@ contains
         ! Computing centered finite difference coefficients
         call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
                                                       fd_number, fd_order)
-        $:GPU_UPDATE(device=["fd_coeff_x"])
+        $:GPU_UPDATE(device='[fd_coeff_x]')
         if (n > 0) then
             call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
                                                           fd_number, fd_order)
-            $:GPU_UPDATE(device=["fd_coeff_y"])
+            $:GPU_UPDATE(device='[fd_coeff_y]')
         end if
         if (p > 0) then
             call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
                                                           fd_number, fd_order)
-            $:GPU_UPDATE(device=["fd_coeff_z"])
+            $:GPU_UPDATE(device='[fd_coeff_z]')
         end if
 
     end subroutine s_initialize_hyperelastic_module
@@ -106,8 +106,8 @@ contains
         real(wp) :: G
         integer :: j, k, l, i, r
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private=["alpha_K", "alpha_rho_K", "rho", &
-            "gamma", "pi_inf", "qv", "G", "Re", "tensora", "tensorb"])
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, rho, &
+            & gamma, pi_inf, qv, G, Re, tensora, tensorb]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m

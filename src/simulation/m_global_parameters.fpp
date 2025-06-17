@@ -53,7 +53,7 @@ module m_global_parameters
     logical :: cyl_coord
     integer :: grid_geometry
     !> @}
-    $:GPU_DECLARE(create=["cyl_coord","grid_geometry"])
+    $:GPU_DECLARE(create='[cyl_coord,grid_geometry]')
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
@@ -76,7 +76,7 @@ module m_global_parameters
 
     real(wp) :: dt !< Size of the time-step
 
-    $:GPU_DECLARE(create=["x_cb","y_cb","z_cb","x_cc","y_cc","z_cc","dx","dy","dz","dt","m","n","p"])
+    $:GPU_DECLARE(create='[x_cb,y_cb,z_cb,x_cc,y_cc,z_cc,dx,dy,dz,dt,m,n,p]')
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number
     !! of time-step iterations between successive solution backups, respectively
@@ -90,7 +90,7 @@ module m_global_parameters
     real(wp) :: t_stop, t_save, cfl_target
     integer :: n_start
     !> @}
-    $:GPU_DECLARE(create=["cfl_target"])
+    $:GPU_DECLARE(create='[cfl_target]')
 
     logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
 
@@ -158,7 +158,7 @@ module m_global_parameters
     logical :: bulk_stress   !< Bulk stresses
     logical :: cont_damage   !< Continuum damage modeling
 
-    $:GPU_DECLARE(create=["chemistry"])
+    $:GPU_DECLARE(create='[chemistry]')
 
     logical :: bodyForces
     logical :: bf_x, bf_y, bf_z !< body force toggle in three directions
@@ -169,27 +169,27 @@ module m_global_parameters
         #:endfor
     #:endfor
     real(wp), dimension(3) :: accel_bf
-    $:GPU_DECLARE(create=["accel_bf"])
+    $:GPU_DECLARE(create='[accel_bf]')
 
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        $:GPU_DECLARE(create=["num_dims","num_vels","weno_polyn","weno_order"])
-        $:GPU_DECLARE(create=["weno_num_stencils","num_fluids","wenojs"])
-        $:GPU_DECLARE(create=["mapped_weno", "wenoz","teno","wenoz_q","mhd","relativity"])
+        $:GPU_DECLARE(create='[num_dims,num_vels,weno_polyn,weno_order]')
+        $:GPU_DECLARE(create='[weno_num_stencils,num_fluids,wenojs]')
+        $:GPU_DECLARE(create='[mapped_weno, wenoz,teno,wenoz_q,mhd,relativity]')
     #:endif
 
-    $:GPU_DECLARE(create=["mpp_lim","model_eqns","mixture_err","alt_soundspeed"])
-    $:GPU_DECLARE(create=["avg_state","mp_weno","weno_eps","teno_CT","hypoelasticity"])
-    $:GPU_DECLARE(create=["hyperelasticity","hyper_model","elasticity","low_Mach"])
-    $:GPU_DECLARE(create=["viscous","shear_stress","bulk_stress","cont_damage"])
+    $:GPU_DECLARE(create='[mpp_lim,model_eqns,mixture_err,alt_soundspeed]')
+    $:GPU_DECLARE(create='[avg_state,mp_weno,weno_eps,teno_CT,hypoelasticity]')
+    $:GPU_DECLARE(create='[hyperelasticity,hyper_model,elasticity,low_Mach]')
+    $:GPU_DECLARE(create='[viscous,shear_stress,bulk_stress,cont_damage]')
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
     real(wp) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
     real(wp) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
 
-    $:GPU_DECLARE(create=["relax", "relax_model", "palpha_eps","ptgalpha_eps"])
+    $:GPU_DECLARE(create='[relax, relax_model, palpha_eps,ptgalpha_eps]')
 
     integer :: num_bc_patches
     logical :: bc_io
@@ -199,9 +199,9 @@ module m_global_parameters
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
-    $:GPU_DECLARE(create=["bc_x%vb1", "bc_x%vb2", "bc_x%vb3", "bc_x%ve1", "bc_x%ve2", "bc_x%ve3"])
-    $:GPU_DECLARE(create=["bc_y%vb1", "bc_y%vb2", "bc_y%vb3", "bc_y%ve1", "bc_y%ve2", "bc_y%ve3"])
-    $:GPU_DECLARE(create=["bc_z%vb1", "bc_z%vb2", "bc_z%vb3", "bc_z%ve1", "bc_z%ve2", "bc_z%ve3"])
+    $:GPU_DECLARE(create='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
+    $:GPU_DECLARE(create='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
+    $:GPU_DECLARE(create='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
 
     type(bounds_info) :: x_domain, y_domain, z_domain
     real(wp) :: x_a, y_a, z_a
@@ -255,20 +255,20 @@ module m_global_parameters
     integer :: c_idx                                   !< Index of color function
     integer :: damage_idx                              !< Index of damage state variable (D) for continuum damage model
     !> @}
-    $:GPU_DECLARE(create=["sys_size","E_idx","n_idx","bub_idx","alf_idx","gamma_idx"])
-    $:GPU_DECLARE(create=["pi_inf_idx","B_idx","stress_idx","xi_idx","b_size"])
-    $:GPU_DECLARE(create=["tensor_size","species_idx","c_idx"])
+    $:GPU_DECLARE(create='[sys_size,E_idx,n_idx,bub_idx,alf_idx,gamma_idx]')
+    $:GPU_DECLARE(create='[pi_inf_idx,B_idx,stress_idx,xi_idx,b_size]')
+    $:GPU_DECLARE(create='[tensor_size,species_idx,c_idx]')
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
     ! Stands for "InDices With INTerior".
     type(int_bounds_info) :: idwint(1:3)
-    $:GPU_DECLARE(create=["idwint"])
+    $:GPU_DECLARE(create='[idwint]')
 
     ! Cell Indices for the entire (local) domain. In simulation and post_process,
     ! this includes the buffer region. idwbuff and idwint are the same otherwise.
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
-    $:GPU_DECLARE(create=["idwbuff"])
+    $:GPU_DECLARE(create='[idwbuff]')
 
     !> @name The number of fluids, along with their identifying indexes, respectively,
     !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
@@ -278,7 +278,7 @@ module m_global_parameters
     integer, allocatable, dimension(:, :) :: Re_idx
     !> @}
 
-    $:GPU_DECLARE(create=["Re_size","Re_idx"])
+    $:GPU_DECLARE(create='[Re_size,Re_idx]')
 
     ! The WENO average (WA) flag regulates whether the calculation of any cell-
     ! average spatial derivatives is carried out in each cell by utilizing the
@@ -289,7 +289,7 @@ module m_global_parameters
     real(wp) :: wa_flg
     !> @{
 
-    $:GPU_DECLARE(create=["wa_flg"])
+    $:GPU_DECLARE(create='[wa_flg]')
 
     !> @name The coordinate direction indexes and flags (flg), respectively, for which
     !! the configurations will be determined with respect to a working direction
@@ -301,14 +301,14 @@ module m_global_parameters
     integer, dimension(3) :: dir_idx_tau !!used for hypoelasticity=true
     !> @}
 
-    $:GPU_DECLARE(create=["dir_idx","dir_flg","dir_idx_tau"])
+    $:GPU_DECLARE(create='[dir_idx,dir_flg,dir_idx_tau]')
 
     integer :: buff_size !<
     !! The number of cells that are necessary to be able to store enough boundary
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
-    $:GPU_DECLARE(create=["buff_size"])
+    $:GPU_DECLARE(create='[buff_size]')
 
     integer :: shear_num !! Number of shear stress components
     integer, dimension(3) :: shear_indices !<
@@ -319,7 +319,7 @@ module m_global_parameters
     !! Indices of shear stress components to reflect for boundary conditions.
     !! Size: (1:3, 1:shear_BC_flip_num) for (x/y/z, [indices])
 
-    $:GPU_DECLARE(create=["shear_num","shear_indices","shear_BC_flip_num","shear_BC_flip_indices"])
+    $:GPU_DECLARE(create='[shear_num,shear_indices,shear_BC_flip_num,shear_BC_flip_indices]')
 
     ! END: Simulation Algorithm Parameters
 
@@ -339,7 +339,7 @@ module m_global_parameters
     !! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
     !! it is a measure of the half-size of the finite-difference stencil for the
     !! selected order of accuracy.
-    $:GPU_DECLARE(create=["fd_order","fd_number"])
+    $:GPU_DECLARE(create='[fd_order,fd_number]')
 
     logical :: probe_wrt
     logical :: integral_wrt
@@ -352,7 +352,7 @@ module m_global_parameters
     !> @{
     real(wp) :: rhoref, pref
     !> @}
-    $:GPU_DECLARE(create=["rhoref","pref"])
+    $:GPU_DECLARE(create='[rhoref,pref]')
 
     !> @name Immersed Boundaries
     !> @{
@@ -367,7 +367,7 @@ module m_global_parameters
     !! the maximum allowable number of patches, num_patches_max, may be changed
     !! in the module m_derived_types.f90.
 
-    $:GPU_DECLARE(create=["ib","num_ibs","patch_ib"])
+    $:GPU_DECLARE(create='[ib,num_ibs,patch_ib]')
     !> @}
 
     !> @name Bubble modeling
@@ -382,31 +382,31 @@ module m_global_parameters
     real(wp) :: Ca       !< Cavitation number
     real(wp) :: Web      !< Weber number
     real(wp) :: Re_inv   !< Inverse Reynolds number
-    $:GPU_DECLARE(create=["R0ref","Ca","Web","Re_inv"])
+    $:GPU_DECLARE(create='[R0ref,Ca,Web,Re_inv]')
 
     real(wp), dimension(:), allocatable :: weight !< Simpson quadrature weights
     real(wp), dimension(:), allocatable :: R0     !< Bubble sizes
     real(wp), dimension(:), allocatable :: V0     !< Bubble velocities
-    $:GPU_DECLARE(create=["weight","R0","V0"])
+    $:GPU_DECLARE(create='[weight,R0,V0]')
 
     logical :: bubbles_euler      !< Bubbles euler on/off
     logical :: polytropic   !< Polytropic  switch
     logical :: polydisperse !< Polydisperse bubbles
-    $:GPU_DECLARE(create=["bubbles_euler","polytropic","polydisperse"])
+    $:GPU_DECLARE(create='[bubbles_euler,polytropic,polydisperse]')
 
     logical :: adv_n        !< Solve the number density equation and compute alpha from number density
     logical :: adap_dt      !< Adaptive step size control
     real(wp) :: adap_dt_tol !< Tolerance to control adaptive step size
-    $:GPU_DECLARE(create=["adv_n","adap_dt","adap_dt_tol"])
+    $:GPU_DECLARE(create='[adv_n,adap_dt,adap_dt_tol]')
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
-    $:GPU_DECLARE(create=["bubble_model","thermal"])
+    $:GPU_DECLARE(create='[bubble_model,thermal]')
 
     real(wp), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
 
     real(wp) :: poly_sigma  !< log normal sigma for polydisperse PDF
-    $:GPU_DECLARE(create=["ptil", "poly_sigma"])
+    $:GPU_DECLARE(create='[ptil, poly_sigma]')
 
     logical :: qbmm      !< Quadrature moment method
     integer, parameter :: nmom = 6 !< Number of carried moments per R0 location
@@ -415,39 +415,39 @@ module m_global_parameters
     integer :: R0_type
 
     real(wp) :: pi_fac   !< Factor for artificial pi_inf
-    $:GPU_DECLARE(create=["qbmm", "nmomsp","nmomtot","R0_type","pi_fac"])
+    $:GPU_DECLARE(create='[qbmm, nmomsp,nmomtot,R0_type,pi_fac]')
 
     #:if not MFC_CASE_OPTIMIZATION
-        $:GPU_DECLARE(create=["nb"])
+        $:GPU_DECLARE(create='[nb]')
     #:endif
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
-    $:GPU_DECLARE(create=["mom_sp","mom_3d"])
+    $:GPU_DECLARE(create='[mom_sp,mom_3d]')
 
     !> @}
 
     type(chemistry_parameters) :: chem_params
-    $:GPU_DECLARE(create=["chem_params"])
+    $:GPU_DECLARE(create='[chem_params]')
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
 
     real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_vl, k_nl, cp_n, cp_v
-    $:GPU_DECLARE(create=["R_n","R_v","phi_vn","phi_nv","Pe_c","Tw",])
-    $:GPU_DECLARE(create=["pv","M_n", "M_v","k_vl","k_nl","cp_n","cp_v"])
+    $:GPU_DECLARE(create='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw]')
+    $:GPU_DECLARE(create='[pv,M_n, M_v,k_vl,k_nl,cp_n,cp_v]')
 
     real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    $:GPU_DECLARE(create=["k_n","k_v","pb0","mass_n0","mass_v0","Pe_T"])
-    $:GPU_DECLARE(create=["Re_trans_T","Re_trans_c","Im_trans_T","Im_trans_c","omegaN"])
+    $:GPU_DECLARE(create='[k_n,k_v,pb0,mass_n0,mass_v0,Pe_T]')
+    $:GPU_DECLARE(create='[Re_trans_T,Re_trans_c,Im_trans_T,Im_trans_c,omegaN]')
 
     real(wp) :: mul0, ss, gamma_v, mu_v
     real(wp) :: gamma_m, gamma_n, mu_n
     real(wp) :: gam
     !> @}
 
-    $:GPU_DECLARE(create=["mul0","ss","gamma_v","mu_v","gamma_m","gamma_n","mu_n","gam"])
+    $:GPU_DECLARE(create='[mul0,ss,gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
 
     !> @name Acoustic acoustic_source parameters
     !> @{
@@ -455,14 +455,14 @@ module m_global_parameters
     type(acoustic_parameters), dimension(num_probes_max) :: acoustic !< Acoustic source parameters
     integer :: num_source !< Number of acoustic sources
     !> @}
-    $:GPU_DECLARE(create=["acoustic_source","acoustic","num_source"])
+    $:GPU_DECLARE(create='[acoustic_source,acoustic,num_source]')
 
     !> @name Surface tension parameters
     !> @{
 
     real(wp) :: sigma
     logical :: surface_tension
-    $:GPU_DECLARE(create=["sigma","surface_tension"])
+    $:GPU_DECLARE(create='[sigma,surface_tension]')
     !> @}
 
     integer :: momxb, momxe
@@ -473,13 +473,13 @@ module m_global_parameters
     integer :: strxb, strxe
     integer :: chemxb, chemxe
     integer :: xibeg, xiend
-    $:GPU_DECLARE(create=["momxb","momxe","advxb","advxe","contxb","contxe"])
-    $:GPU_DECLARE(create=["intxb","intxe", "bubxb","bubxe"])
-    $:GPU_DECLARE(create=["strxb","strxe","chemxb","chemxe"])
-    $:GPU_DECLARE(create=["xibeg","xiend"])
+    $:GPU_DECLARE(create='[momxb,momxe,advxb,advxe,contxb,contxe]')
+    $:GPU_DECLARE(create='[intxb,intxe, bubxb,bubxe]')
+    $:GPU_DECLARE(create='[strxb,strxe,chemxb,chemxe]')
+    $:GPU_DECLARE(create='[xibeg,xiend]')
 
     real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    $:GPU_DECLARE(create=["gammas","gs_min","pi_infs","ps_inf","cvs","qvs","qvps"])
+    $:GPU_DECLARE(create='[gammas,gs_min,pi_infs,ps_inf,cvs,qvs,qvps]')
 
     real(wp) :: mytime       !< Current simulation time
     real(wp) :: finaltime    !< Final simulation time
@@ -490,25 +490,25 @@ module m_global_parameters
 
     type(pres_field), allocatable, dimension(:) :: mv_ts
 
-    $:GPU_DECLARE(create=["pb_ts","mv_ts"])
+    $:GPU_DECLARE(create='[pb_ts,mv_ts]')
 
     !> @name lagrangian subgrid bubble parameters
     !> @{!
     logical :: bubbles_lagrange                         !< Lagrangian subgrid bubble model switch
     type(bubbles_lagrange_parameters) :: lag_params     !< Lagrange bubbles' parameters
-    $:GPU_DECLARE(create=["bubbles_lagrange","lag_params"])
+    $:GPU_DECLARE(create='[bubbles_lagrange,lag_params]')
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
     logical :: powell !< Powell‐correction for div B = 0
-    $:GPU_DECLARE(create=["Bx0","powell"])
+    $:GPU_DECLARE(create='[Bx0,powell]')
 
     !> @name Continuum damage model parameters
     !> @{!
     real(wp) :: tau_star        !< Stress threshold for continuum damage modeling
     real(wp) :: cont_damage_s   !< Exponent s for continuum damage modeling
     real(wp) :: alpha_bar       !< Damage rate factor for continuum damage modeling
-    $:GPU_DECLARE(create=["tau_star","cont_damage_s","alpha_bar"])
+    $:GPU_DECLARE(create='[tau_star,cont_damage_s,alpha_bar]')
     !> @}
 
 contains
@@ -801,10 +801,10 @@ contains
             else
                 weno_num_stencils = weno_polyn
             end if
-            $:GPU_UPDATE(device=["weno_polyn"])
-            $:GPU_UPDATE(device=["weno_num_stencils"])
-            $:GPU_UPDATE(device=["nb"])
-            $:GPU_UPDATE(device=["num_dims","num_vels","num_fluids"])
+            $:GPU_UPDATE(device='[weno_polyn]')
+            $:GPU_UPDATE(device='[weno_num_stencils]')
+            $:GPU_UPDATE(device='[nb]')
+            $:GPU_UPDATE(device='[num_dims,num_vels,num_fluids]')
         #:endif
 
         ! Initializing the number of fluids for which viscous effects will
@@ -1040,7 +1040,7 @@ contains
             if (Re_size(1) > 0._wp) shear_stress = .true.
             if (Re_size(2) > 0._wp) bulk_stress = .true.
 
-            $:GPU_UPDATE(device=["Re_size","viscous","shear_stress","bulk_stress"])
+            $:GPU_UPDATE(device='[Re_size,viscous,shear_stress,bulk_stress]')
 
             ! Bookkeeping the indexes of any viscous fluids and any pairs of
             ! fluids whose interface will support effects of surface tension
@@ -1096,7 +1096,7 @@ contains
                     ! y-dir: flip tau_xy and tau_yz
                     ! z-dir: flip tau_xz and tau_yz
                 end if
-                $:GPU_UPDATE(device=["shear_num","shear_indices","shear_BC_flip_num","shear_BC_flip_indices"])
+                $:GPU_UPDATE(device='[shear_num,shear_indices,shear_BC_flip_num,shear_BC_flip_indices]')
             end if
 
             if (hyperelasticity) then
@@ -1163,7 +1163,7 @@ contains
         ! cell-boundary values or otherwise, the unaltered left and right,
         ! WENO-reconstructed, cell-boundary values
         wa_flg = 0._wp; if (weno_avg) wa_flg = 1._wp
-        $:GPU_UPDATE(device=["wa_flg"])
+        $:GPU_UPDATE(device='[wa_flg]')
 
         ! Resort to default WENO-JS if no other WENO scheme is selected
         #:if not MFC_CASE_OPTIMIZATION
@@ -1173,7 +1173,7 @@ contains
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
         Np = 0
 
-        $:GPU_UPDATE(device=["Re_size"])
+        $:GPU_UPDATE(device='[Re_size]')
 
         if (elasticity) then
             fd_number = max(1, fd_order/2)
@@ -1191,7 +1191,7 @@ contains
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
                                            num_dims)
-        $:GPU_UPDATE(device=["idwint", "idwbuff"])
+        $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Configuring Coordinate Direction Indexes
         if (bubbles_euler) then
@@ -1201,7 +1201,7 @@ contains
                 & idwbuff(3)%beg:idwbuff(3)%end))
         end if
 
-        $:GPU_UPDATE(device=["fd_order", "fd_number"])
+        $:GPU_UPDATE(device='[fd_order, fd_number]')
 
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
@@ -1228,44 +1228,44 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        $:GPU_UPDATE(device=["momxb","momxe","advxb","advxe","contxb","contxe", &
-            & "bubxb","bubxe","intxb","intxe","sys_size","buff_size","E_idx", &
-            & "alf_idx","n_idx","adv_n","adap_dt","pi_fac","strxb","strxe", &
-            & "chemxb","chemxe","c_idx"])
-        $:GPU_UPDATE(device=["b_size","xibeg","xiend","tensor_size"])
+        $:GPU_UPDATE(device='[momxb,momxe,advxb,advxe,contxb,contxe, &
+            & bubxb,bubxe,intxb,intxe,sys_size,buff_size,E_idx, &
+            & alf_idx,n_idx,adv_n,adap_dt,pi_fac,strxb,strxe, &
+            & chemxb,chemxe,c_idx]')
+        $:GPU_UPDATE(device='[b_size,xibeg,xiend,tensor_size]')
 
-        $:GPU_UPDATE(device=["species_idx"])
-        $:GPU_UPDATE(device=["cfl_target","m","n","p"])
+        $:GPU_UPDATE(device='[species_idx]')
+        $:GPU_UPDATE(device='[cfl_target,m,n,p]')
 
-        $:GPU_UPDATE(device=["alt_soundspeed","acoustic_source","num_source"])
-        $:GPU_UPDATE(device=["dt","sys_size","buff_size","pref","rhoref", &
-            & "gamma_idx","pi_inf_idx","E_idx","alf_idx","stress_idx", &
-            & "mpp_lim","bubbles_euler","hypoelasticity","alt_soundspeed", &
-            & "avg_state","num_fluids","model_eqns","num_dims","num_vels", &
-            & "mixture_err","grid_geometry","cyl_coord","mp_weno","weno_eps", &
-            & "teno_CT","hyperelasticity","hyper_model","elasticity","xi_idx", &
-            & "B_idx","low_Mach"])
+        $:GPU_UPDATE(device='[alt_soundspeed,acoustic_source,num_source]')
+        $:GPU_UPDATE(device='[dt,sys_size,buff_size,pref,rhoref, &
+            & gamma_idx,pi_inf_idx,E_idx,alf_idx,stress_idx, &
+            & mpp_lim,bubbles_euler,hypoelasticity,alt_soundspeed, &
+            & avg_state,num_fluids,model_eqns,num_dims,num_vels, &
+            & mixture_err,grid_geometry,cyl_coord,mp_weno,weno_eps, &
+            & teno_CT,hyperelasticity,hyper_model,elasticity,xi_idx, &
+            & B_idx,low_Mach]')
 
-        $:GPU_UPDATE(device=["Bx0", "powell"])
+        $:GPU_UPDATE(device='[Bx0, powell]')
 
-        $:GPU_UPDATE(device=["cont_damage","tau_star","cont_damage_s","alpha_bar"])
+        $:GPU_UPDATE(device='[cont_damage,tau_star,cont_damage_s,alpha_bar]')
 
         #:if not MFC_CASE_OPTIMIZATION
-            $:GPU_UPDATE(device=["wenojs","mapped_weno","wenoz","teno"])
-            $:GPU_UPDATE(device=["wenoz_q"])
-            $:GPU_UPDATE(device=["mhd", "relativity"])
+            $:GPU_UPDATE(device='[wenojs,mapped_weno,wenoz,teno]')
+            $:GPU_UPDATE(device='[wenoz_q]')
+            $:GPU_UPDATE(device='[mhd, relativity]')
         #:endif
 
-        $:GPU_ENTER_DATA(copyin=["nb","R0ref","Ca","Web","Re_inv","weight","R0", &
-            & "V0","bubbles_euler","polytropic","polydisperse","qbmm","R0_type", &
-            & "ptil","bubble_model","thermal","poly_sigma"])
-        $:GPU_ENTER_DATA(copyin=["R_n","R_v","phi_vn","phi_nv","Pe_c","Tw","pv", &
-            & "M_n","M_v","k_n","k_v","pb0","mass_n0","mass_v0","Pe_T", &
-            & "Re_trans_T","Re_trans_c","Im_trans_T","Im_trans_c","omegaN", &
-            & "mul0","ss","gamma_v","mu_v","gamma_m","gamma_n","mu_n","gam"])
-        $:GPU_ENTER_DATA(copyin=["dir_idx","dir_flg","dir_idx_tau"])
+        $:GPU_ENTER_DATA(copyin='[nb,R0ref,Ca,Web,Re_inv,weight,R0, &
+            & V0,bubbles_euler,polytropic,polydisperse,qbmm,R0_type, &
+            & ptil,bubble_model,thermal,poly_sigma]')
+        $:GPU_ENTER_DATA(copyin='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,pv, &
+            & M_n,M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T, &
+            & Re_trans_T,Re_trans_c,Im_trans_T,Im_trans_c,omegaN, &
+            & mul0,ss,gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
+        $:GPU_ENTER_DATA(copyin='[dir_idx,dir_flg,dir_idx_tau]')
 
-        $:GPU_ENTER_DATA(copyin=["relax","relax_model","palpha_eps","ptgalpha_eps"])
+        $:GPU_ENTER_DATA(copyin='[relax,relax_model,palpha_eps,ptgalpha_eps]')
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))

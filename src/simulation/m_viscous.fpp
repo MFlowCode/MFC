@@ -24,10 +24,10 @@ module m_viscous
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
-    $:GPU_DECLARE(create=["is1_viscous","is2_viscous","is3_viscous","iv"])
+    $:GPU_DECLARE(create='[is1_viscous,is2_viscous,is3_viscous,iv]')
 
     real(wp), allocatable, dimension(:, :) :: Res_viscous
-    $:GPU_DECLARE(create=["Res_viscous"])
+    $:GPU_DECLARE(create='[Res_viscous]')
 
 contains
 
@@ -42,8 +42,8 @@ contains
                 Res_viscous(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
             end do
         end do
-        $:GPU_UPDATE(device=["Res_viscous","Re_idx","Re_size"])
-        $:GPU_ENTER_DATA(copyin=["is1_viscous","is2_viscous","is3_viscous","iv"])
+        $:GPU_UPDATE(device='[Res_viscous,Re_idx,Re_size]')
+        $:GPU_ENTER_DATA(copyin='[is1_viscous,is2_viscous,is3_viscous,iv]')
 
     end subroutine s_initialize_viscous_module
 
@@ -75,7 +75,7 @@ contains
 
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
-        $:GPU_UPDATE(device=["is1_viscous","is2_viscous","is3_viscous"])
+        $:GPU_UPDATE(device='[is1_viscous,is2_viscous,is3_viscous]')
 
         $:GPU_PARALLEL_LOOP(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end
@@ -89,8 +89,8 @@ contains
             end do
         end do
         if (shear_stress) then    ! Shear stresses
-            $:GPU_PARALLEL_LOOP(collapse=3, private=["alpha_visc", &
-                "alpha_rho_visc", "Re_visc", "tau_Re"])
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, &
+                & alpha_rho_visc, Re_visc, tau_Re]')
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -197,8 +197,8 @@ contains
         end if
 
         if (bulk_stress) then    ! Bulk stresses
-            $:GPU_PARALLEL_LOOP(collapse=3, private=["alpha_visc", &
-                "alpha_rho_visc", "Re_visc", "tau_Re"])
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, &
+                & alpha_rho_visc, Re_visc, tau_Re]')
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -302,8 +302,8 @@ contains
         if (p == 0) return
 
         if (shear_stress) then    ! Shear stresses
-            $:GPU_PARALLEL_LOOP(collapse=3, private=["alpha_visc", &
-                "alpha_rho_visc", "Re_visc", "tau_Re"])
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, &
+                & alpha_rho_visc, Re_visc, tau_Re]')
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -411,8 +411,8 @@ contains
         end if
 
         if (bulk_stress) then    ! Bulk stresses
-            $:GPU_PARALLEL_LOOP(collapse=3, private=["alpha_visc", &
-                "alpha_rho_visc", "Re_visc", "tau_Re"])
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, &
+                & alpha_rho_visc, Re_visc, tau_Re]')
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -549,7 +549,7 @@ contains
 
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
 
-            $:GPU_UPDATE(device=["iv"])
+            $:GPU_UPDATE(device='[iv]')
 
             call s_reconstruct_cell_boundary_values_visc( &
                 q_prim_qp%vf(iv%beg:iv%end), &
@@ -587,11 +587,11 @@ contains
         else ! Compute velocity gradient at cell centers using finite differences
 
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
-            $:GPU_UPDATE(device=["iv"])
+            $:GPU_UPDATE(device='[iv]')
 
             is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
-            $:GPU_UPDATE(device=["is1_viscous","is2_viscous","is3_viscous"])
+            $:GPU_UPDATE(device='[is1_viscous,is2_viscous,is3_viscous]')
 
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
@@ -1319,7 +1319,7 @@ contains
 
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
-        $:GPU_UPDATE(device=["is1_viscous","is2_viscous","is3_viscous"])
+        $:GPU_UPDATE(device='[is1_viscous,is2_viscous,is3_viscous]')
 
         $:GPU_PARALLEL_LOOP(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end
