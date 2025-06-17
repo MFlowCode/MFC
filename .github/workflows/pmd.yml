@@ -85,6 +85,27 @@ jobs:
                     s/[[:space:]]*\/[[:space:]]*/\//g
                     s/[[:space:]]*\*\*[[:space:]]*/\*\*/g
                     
+                    # Remove spaces in common Fortran constructs (array indexing, function calls)
+                    s/\([[:space:]]*([^,)[:space:]]+)[[:space:]]*,/(\1,/g      # First argument
+                    s/,[[:space:]]*([^,)[:space:]]+)[[:space:]]*,/,\1,/g       # Middle arguments
+                    s/,[[:space:]]*([^,)[:space:]]+)[[:space:]]*\)/,\1)/g      # Last argument
+                    s/\([[:space:]]*([^,)[:space:]]+)[[:space:]]*\)/(\1)/g     # Single argument
+                    
+                    # Remove spaces around brackets and parentheses
+                    s/\[[[:space:]]*/</g
+                    s/\[[[:space:]]*/>/g
+                    s/\[[[:space:]]*/</g
+                    s/[[:space:]]*\]/]/g
+                    s/\([[:space:]]*/(/g
+                    s/[[:space:]]*\)/)/g
+
+                    # Remove spaces around comparison operators
+                    s/[[:space:]]*<=[[:space:]]*/</g
+                    s/[[:space:]]*>=[[:space:]]*/>/g
+                    s/[[:space:]]*<[[:space:]]*/</g
+                    s/[[:space:]]*>[[:space:]]*/>/g
+                    s/[[:space:]]*==[[:space:]]*/==/g
+
                     # Remove full-line comments
                     /^\s*!/d
                     /^[cC*dD]/d
