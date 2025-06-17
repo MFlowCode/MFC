@@ -54,8 +54,8 @@ jobs:
                   #    - Lines starting with '!' (free form comments)
                   #    - Lines starting with 'c', 'C', '*', 'd', 'D' in column 1 (fixed form comments)
                   # 2. Remove end-of-line comments (anything after '!' that isn't in a string)
-                  # 3. Preserve strings containing '!' characters
-                  sed -E '
+                  # 3. Preserve strings containing '!' characters                  
+                    sed -E '
                     :a
                     /&$/ {
                         N
