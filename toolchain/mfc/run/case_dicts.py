@@ -62,6 +62,7 @@ COMMON = {
     'cont_damage': ParamType.LOG,
     'num_bc_patches': ParamType.INT,
     'igr': ParamType.LOG,
+    'igr_order': ParamType.INT,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -301,7 +302,6 @@ SIMULATION.update({
     'num_igr_warm_start_iters': ParamType.INT,
     'alf_factor': ParamType.REAL,
     'igr_iter_solver': ParamType.INT,
-    'igr_order': ParamType.INT,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',

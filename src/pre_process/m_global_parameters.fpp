@@ -95,6 +95,7 @@ module m_global_parameters
     logical :: pre_stress            !< activate pre_stressed domain
     logical :: cont_damage           !< continuum damage modeling
     logical :: igr                   !< Use information geometric regularization
+    integer :: igr_order             !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
@@ -339,6 +340,7 @@ contains
         num_fluids = dflt_int
         weno_order = dflt_int
         igr = .false.
+        igr_order = dflt_int
 
         hypoelasticity = .false.
         hyperelasticity = .false.

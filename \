@@ -35,27 +35,28 @@ contains
         call s_check_total_cells
 #endif
 
+#ifndef MFC_POST_PROCESS
+        call s_check_inputs_bubbles_euler
+        call s_check_inputs_qbmm_and_polydisperse
+        call s_check_inputs_adv_n
+        call s_check_inputs_hypoelasticity
+        call s_check_inputs_phase_change
+        call s_check_inputs_ibm
+#endif
+
         ! Run by all three stages
         call s_check_inputs_simulation_domain
         call s_check_inputs_model_eqns_and_num_fluids
         if (igr) then
             call s_check_inputs_igr
         else
-#ifndef MFC_POST_PROCESS
-            call s_check_inputs_bubbles_euler
-            call s_check_inputs_qbmm_and_polydisperse
-            call s_check_inputs_adv_n
-            call s_check_inputs_hypoelasticity
-            call s_check_inputs_phase_change
-            call s_check_inputs_ibm
-#endif
             call s_check_inputs_weno
-            call s_check_inputs_surface_tension
-            call s_check_inputs_mhd
         end if
         call s_check_inputs_bc
         call s_check_inputs_stiffened_eos
+        call s_check_inputs_surface_tension
         call s_check_inputs_moving_bc
+        call s_check_inputs_mhd
 
     end subroutine s_check_inputs_common
 
@@ -207,15 +208,6 @@ contains
         @:PROHIBIT(model_eqns == 3 .and. cyl_coord .and. p /= 0, &
             "6-equation model (model_eqns = 3) does not support cylindrical coordinates (cyl_coord = T and p != 0)")
     end subroutine s_check_inputs_model_eqns_and_num_fluids
-
-    !> Checks constraints regarding IGR order.
-        !! Called by s_check_inputs_common for all three stages
-    impure subroutine s_check_inputs_igr
-        @:PROHIBIT(all(igr_order /= (/3, 5/)), "igr_order must be 3 or 5")
-        @:PROHIBIT(m + 1 < igr_order, "m must be at least igr_order - 1")
-        @:PROHIBIT(n > 0 .and. n + 1 < igr_order, "n must be at least igr_order - 1")
-        @:PROHIBIT(p > 0 .and. p + 1 < igr_order, "p must be at least igr_order - 1")
-    end subroutine s_check_inputs_igr
 
     !> Checks constraints regarding WENO order.
         !! Called by s_check_inputs_common for all three stages
