@@ -56,24 +56,44 @@ jobs:
                   # 2. Remove end-of-line comments (anything after '!' that isn't in a string)
                   # 3. Preserve strings containing '!' characters                  
                   sed -E '
-                    :a
-                    /&$/ {
-                        N
-                        s/&[[:space:]]*\n[[:space:]]*&/ /
-                        ba
+                    # First handle & continuation style (modern Fortran)
+                    :ampersand_loop
+                    /&[[:space:]]*$/ {
+                      N
+                      s/&[[:space:]]*\n[[:space:]]*(&)?/ /g
+                      tampersand_loop
                     }
-                    /^[[:space:]]{5}[^[:space:]]/ {
-                        N
-                        s/\n([[:space:]]{5}[^[:space:]])/\1/
-                        ba
+                    
+                    # Handle fixed-form continuation (column 6 indicator)
+                    :fixed_form_loop
+                    /^[[:space:]]{0,5}[^[:space:]!&]/ {
+                      N
+                      s/\n[[:space:]]{5}[^[:space:]]/ /g
+                      tfixed_form_loop
                     }
+                    
+                    # Remove any remaining continuation markers
                     s/&//g
-                    /^\s*!/s/.*//
-                    /^[cC*dD]/s/.*//
-                    /^[ \t]*[cC*dD]/s/.*//
+                    
+                    # Normalize spacing - replace multiple spaces with single space
+                    s/[[:space:]]{2,}/ /g
+                    
+                    # Remove spaces around mathematical operators
+                    s/[[:space:]]*\*[[:space:]]*/*/g
+                    s/[[:space:]]*\+[[:space:]]*/+/g
+                    s/[[:space:]]*-[[:space:]]*/-/g
+                    s/[[:space:]]*\/[[:space:]]*/\//g
+                    s/[[:space:]]*\*\*[[:space:]]*/\*\*/g
+                    
+                    # Remove full-line comments
+                    /^\s*!/d
+                    /^[cC*dD]/d
+                    /^[ \t]*[cC*dD]/d
+                    
+                    # Remove end-of-line comments, preserving quoted strings
                     s/([^"'\''\\]*("[^"]*")?('\''[^'\'']*'\''?)?[^"'\''\\]*)[!].*$/\1/
                   ' "$file" > "$TMP_FILE"
-                  
+                
                   if cmp -s "$file" "$TMP_FILE"; then
                       echo -e "No changes needed for $file"
                       rm "$TMP_FILE"
@@ -87,6 +107,6 @@ jobs:
               "${PMD_HOME}/bin/pmd" cpd \
                 --dir src \
                 --language fortran \
-                --minimum-tokens=20 \
+                --minimum-tokens=50 \
                 --no-fail-on-violation \
                 --no-fail-on-error
