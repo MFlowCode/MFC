@@ -15,6 +15,8 @@ module m_bubbles
 
     use m_variables_conversion !< State variables type conversion procedures
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     implicit none
 
     real(wp) :: chi_vw  !< Bubble wall properties (Ando 2010)
@@ -569,7 +571,7 @@ contains
             end do
 
             ! Exit the loop if the final time reached dt
-            if (t_new == 0.5_wp*dt .or. iter_count >= adap_dt_max_iters) exit
+            if (f_approx_equal(t_new, 0.5_wp*dt) .or. iter_count >= adap_dt_max_iters) exit
 
         end do
 

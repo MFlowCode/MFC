@@ -318,7 +318,7 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Spherical harmonic patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Spherical harmonic patch "//trim(iStr)//": y_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Spherical harmonic patch "//trim(iStr)//": z_centroid must be set")
-        @:PROHIBIT(all(patch_icpp(patch_id)%epsilon /= (/1._wp, 2._wp, 3._wp, 4._wp, 5._wp/)), &
+        @:PROHIBIT(.not. f_approx_in_array(patch_icpp(patch_id)%epsilon, (/1._wp, 2._wp, 3._wp, 4._wp, 5._wp/)), &
             "Spherical harmonic patch "//trim(iStr)//": epsilon must be one of 1, 2, 3, 4, 5")
         @:PROHIBIT(patch_icpp(patch_id)%beta < 0._wp, &
             "Spherical harmonic patch "//trim(iStr)//": beta must be greater than or equal to zero")
@@ -514,11 +514,11 @@ contains
 
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%vel(1)), &
             "Patch "//trim(iStr)//": vel(1) must be set")
-        @:PROHIBIT(n == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(2))) .and. patch_icpp(patch_id)%vel(2) /= 0 .and. (.not. mhd), &
+        @:PROHIBIT(n == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(2))) .and. (.not. f_approx_equal(patch_icpp(patch_id)%vel(2) , 0._wp)) .and. (.not. mhd), &
             "Patch "//trim(iStr)//": vel(2) must not be set when n = 0")
         @:PROHIBIT(n > 0 .and. f_is_default(patch_icpp(patch_id)%vel(2)), &
             "Patch "//trim(iStr)//": vel(2) must be set when n > 0")
-        @:PROHIBIT(p == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(3))) .and. patch_icpp(patch_id)%vel(3) /= 0 .and. (.not. mhd), &
+        @:PROHIBIT(p == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(3))) .and. (.not. f_approx_equal(patch_icpp(patch_id)%vel(3) , 0._wp)) .and. (.not. mhd), &
             "Patch "//trim(iStr)//": vel(3) must not be set when p = 0")
         @:PROHIBIT(p > 0 .and. f_is_default(patch_icpp(patch_id)%vel(3)), &
             "Patch "//trim(iStr)//": vel(3) must be set when p > 0")

@@ -608,8 +608,6 @@ contains
 
         integer :: pack_offset, unpack_offset
 
-        real(wp), pointer :: p_send, p_recv
-
 #ifdef MFC_MPI
 
         call nvtxStartRange("RHS-COMM-PACKBUF")

@@ -21,6 +21,8 @@ module m_bubbles_EL
 
     use m_boundary_common
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_sim_helpers
 
     use m_helper
@@ -348,7 +350,7 @@ contains
 
         ! Initial particle pressure
         gas_p(bub_id, 1) = pliq + 2._wp*(1._wp/Web)/bub_R0(bub_id)
-        if ((1._wp/Web) /= 0._wp) then
+        if (.not. f_approx_equal((1._wp/Web), 0._wp)) then
             pcrit = pv - 4._wp*(1._wp/Web)/(3._wp*sqrt(3._wp*gas_p(bub_id, 1)*bub_R0(bub_id)**3._wp/(2._wp*(1._wp/Web))))
             pref = gas_p(bub_id, 1)
         else
