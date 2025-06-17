@@ -49,8 +49,6 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
 
-    type(scalar_field), allocatable, dimension(:) :: F_rs_vf, F_src_rs_vf !<
-
     !! Cell-average fluxes (src - source). These are directly determined from the
     !! cell-average primitive variables, q_prims_rs_vf, and not a Riemann solver.
 
@@ -67,10 +65,6 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsx_vf_l, flux_src_rsx_vf_l !<
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsy_vf_l, flux_src_rsy_vf_l
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_l, flux_src_rsz_vf_l
-
-    real(wp) :: c           !< Cell averaged speed of sound
-    real(wp), dimension(2) :: Re          !< Cell averaged Reynolds numbers
-    !$acc declare create(c, Re)
 
     real(wp) :: dpres_ds !< Spatial derivatives in s-dir of pressure
     !$acc declare create(dpres_ds)
