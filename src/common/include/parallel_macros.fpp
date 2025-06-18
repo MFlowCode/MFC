@@ -193,6 +193,11 @@
     $:device_val
 #:enddef
 
+#:def GEN_USE_DEVICE_STR(use_device)
+    #:set use_device_val = GEN_PARENTHESES_CLAUSE('use_device', use_device)
+    $:use_device_val
+#:enddef
+
 
 #:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
@@ -348,6 +353,15 @@
         & deviceptr_val.strip('\n') + attach_val.strip('\n') + &
         & default_val.strip('\n')
     #:set acc_directive = '!$acc data ' + clause_val + extraAccArgs_val.strip('\n')
+    $:acc_directive
+#:enddef
+
+#:def GPU_HOST_DATA(use_device=None, extraAccArgs=None)
+    #:set use_device_val = GEN_USE_DEVICE_STR(use_device)
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+
+    #:set clause_val = use_device_val.strip('\n')
+    #:set acc_directive = '!$acc host_data ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
 #:enddef
 
