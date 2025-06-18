@@ -164,7 +164,7 @@ contains
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
             nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, &
-            num_fluids, mhd, relativity, igr, igr_order, &
+            num_fluids, mhd, relativity, igr_order, viscous, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
@@ -179,12 +179,11 @@ contains
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target, &
-            viscous, surface_tension, &
-            bubbles_lagrange, lag_params, &
+            surface_tension, bubbles_lagrange, lag_params, &
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar, &
             alf_factor, num_igr_iters, igr_iter_solver, &
-            num_igr_warm_start_iters
+            num_igr_warm_start_iters, igr
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.

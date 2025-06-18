@@ -334,7 +334,7 @@ contains
         if (idir == 1) then
             if(p == 0) then
                 !$acc parallel loop collapse(3) gang vector default(present) &
-                !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L, &
+                !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
                 !$acc alpha_L,alpha_R,alpha_rho_L,cfl,dvel,F_L,E_L,mu_R,rho_sf_small, &
                 !$acc alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
                 do l = 0, p
@@ -806,7 +806,7 @@ contains
                 end do
             else
                 !$acc parallel loop collapse(3) gang vector default(present) &
-                !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L, &
+                !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
                 !$acc alpha_L,alpha_R,alpha_rho_L,cfl,dvel,F_L,E_L,mu_R,rho_sf_small, &
                 !$acc alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
                 do l = 0, p
@@ -1399,7 +1399,7 @@ contains
         else if (idir == 2) then
             if(p == 0) then
                 !$acc parallel loop collapse(3) gang vector default(present) &
-                !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L, &
+                !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
                 !$acc alpha_L,alpha_R,alpha_rho_L,cfl,dvel,F_L,F_R,E_L,mu_R, &
                 !$acc rho_sf_small, alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
                 do l = 0, p
@@ -1822,7 +1822,7 @@ contains
                 end do
             else
                 !$acc parallel loop collapse(3) gang vector default(present) &
-                !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L, &
+                !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
                 !$acc alpha_L,alpha_R,alpha_rho_L,cfl,dvel,F_L,F_R,E_L,mu_R, &
                 !$acc rho_sf_small, alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
                 do l = 0, p
@@ -2333,7 +2333,7 @@ contains
             end if
         elseif (idir == 3) then
             !$acc parallel loop collapse(3) gang vector default(present) &
-            !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L, &
+            !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
             !$acc alpha_L,alpha_R,alpha_rho_L,cfl,dvel,F_L,F_R,E_L,mu_R, &
             !$acc rho_sf_small,alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
             do l = -1, p
