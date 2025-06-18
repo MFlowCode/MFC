@@ -6,4 +6,4 @@ if [ "$1" == "gpu" ]; then
 fi
 
 . ./mfc.sh load -c f -m g
-./mfc.sh test --dry-run -j 8 $build_opts
+./mfc.sh test --dry-run -j 1 $build_opts
