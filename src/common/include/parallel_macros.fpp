@@ -20,8 +20,8 @@
             #:elif c == ')'
                 #:set count = count - 1
             #:endif
-            #:if count > 1
-                #:stop 'Nested parentheses is not supported. Incorrect clause: {}'.format(clause_str)
+            #:if c == ',' and count > 1
+                #:stop 'Nested parentheses with comma inside is not supported. Incorrect clause: {}'.format(clause_str)
             #:elif count < 0
                 #:stop 'Missing parentheses. Incorrect clause: {}'.format(clause_str)
             #:endif
@@ -289,7 +289,7 @@
     $:acc_directive
 #:enddef
 
-#:def GPU_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
+#:def GPU_LOOP(collapse=None, parallelism=['seq'], data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
 
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
 

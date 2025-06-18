@@ -100,9 +100,9 @@ contains
 
         ! starting equilibrium solver
         $:GPU_PARALLEL_LOOP(collapse=3, private='[p_infOV, p_infpT, p_infSL, &
-            sk, hk, gk, ek, rhok,pS, pSOV, pSSL, &
-            TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, &
-            dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
+            & sk, hk, gk, ek, rhok,pS, pSOV, pSSL, &
+            & TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, &
+            & dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
         do j = 0, m
             do k = 0, n
                 do l = 0, p
