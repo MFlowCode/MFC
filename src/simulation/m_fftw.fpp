@@ -162,7 +162,7 @@ contains
         p_fltr_cmplx => data_fltr_cmplx_gpu
 
 $:GPU_DATA(attach='[p_real, p_cmplx, p_fltr_cmplx]')
-!$acc host_data use_device(p_real, p_cmplx, p_fltr_cmplx)
+$:GPU_HOST_DATA(use_device='[p_real, p_cmplx, p_fltr_cmplx]')
 #if defined(__PGI)
         ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
@@ -182,7 +182,7 @@ $:GPU_DATA(attach='[p_real, p_cmplx, p_fltr_cmplx]')
             end do
         end do
 
-!$acc host_data use_device(p_real, p_fltr_cmplx)
+$:GPU_HOST_DATA(use_device='[p_real, p_fltr_cmplx]')
 #if defined(__PGI)
         ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #else
@@ -221,7 +221,7 @@ $:GPU_DATA(attach='[p_real, p_cmplx, p_fltr_cmplx]')
                 end do
             end do
 
-!$acc host_data use_device(p_real, p_cmplx)
+$:GPU_HOST_DATA(use_device='[p_real, p_cmplx]')
 #if defined(__PGI)
             ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
@@ -242,7 +242,7 @@ $:GPU_DATA(attach='[p_real, p_cmplx, p_fltr_cmplx]')
                 end do
             end do
 
-!$acc host_data use_device(p_real, p_fltr_cmplx)
+$:GPU_HOST_DATA(use_device='[p_real, p_fltr_cmplx]')
 #if defined(__PGI)
             ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #else
