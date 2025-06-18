@@ -276,7 +276,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_ghost_cell_extrapolation
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: bc_dir, bc_loc
@@ -337,7 +337,7 @@ contains
     end subroutine s_ghost_cell_extrapolation
 
     pure subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
@@ -597,7 +597,7 @@ contains
     end subroutine s_symmetry
 
     pure subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
@@ -736,7 +736,7 @@ contains
     end subroutine s_periodic
 
     pure subroutine s_axis(q_prim_vf, pb, mv, k, l)
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: k, l
@@ -798,7 +798,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_slip_wall
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: bc_dir, bc_loc
@@ -892,7 +892,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_no_slip_wall
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: bc_dir, bc_loc
@@ -1022,7 +1022,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_dirichlet
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: bc_dir, bc_loc
@@ -1087,7 +1087,7 @@ contains
     end subroutine s_dirichlet
 
     pure subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb, mv)
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
@@ -1285,7 +1285,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_periodic
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         integer, intent(in) :: bc_dir, bc_loc
@@ -1343,7 +1343,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_reflective
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         integer, intent(in) :: bc_dir, bc_loc
@@ -1425,7 +1425,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_color_function_ghost_cell_extrapolation
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         integer, intent(in) :: bc_dir, bc_loc

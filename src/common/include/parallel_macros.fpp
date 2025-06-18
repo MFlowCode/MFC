@@ -118,10 +118,13 @@
 
 #:def GEN_PARALLELISM_STR(parallelism)
     #:if parallelism is not None
-        $:ASSERT_LIST(parallelism, str)
+        #:assert isinstance(parallelism, str)
+        #:assert parallelism[0] == '[' and parallelism[-1] == ']'
+        #:set parallelism_list = [x.strip() for x in parallelism.strip('[]').split(',')]
+        $:ASSERT_LIST(parallelism_list, str)
         #:assert all((element == 'gang' or element == 'worker' or &
-            & element == 'vector' or element == 'seq') for element in parallelism)
-        #:set parallelism_val = ' '.join(parallelism) + ' '
+            & element == 'vector' or element == 'seq') for element in parallelism_list)
+        #:set parallelism_val = ' '.join(parallelism_list) + ' '
     #:else
         #:set parallelism_val = ''
     #:endif
@@ -191,7 +194,7 @@
 #:enddef
 
 
-#:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism=['gang', 'vector'], &
+#:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None)
@@ -235,7 +238,7 @@
     $:acc_directive
 #:enddef
 
-#:def GPU_ROUTINE(function_name=None, parallelism=['seq'], nohost=False, cray_inline=False, extraAccArgs=None)
+#:def GPU_ROUTINE(function_name=None, parallelism='[seq]', nohost=False, cray_inline=False, extraAccArgs=None)
     #:assert isinstance(cray_inline, bool)
     #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
 
@@ -289,7 +292,7 @@
     $:acc_directive
 #:enddef
 
-#:def GPU_LOOP(collapse=None, parallelism=['seq'], data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
+#:def GPU_LOOP(collapse=None, parallelism='[seq]', data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
 
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
 

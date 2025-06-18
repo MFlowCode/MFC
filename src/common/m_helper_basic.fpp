@@ -26,7 +26,7 @@ contains
     !! @param tol_input Relative error (default = 1e-10_wp).
     !! @return Result of the comparison.
     logical pure elemental function f_approx_equal(a, b, tol_input) result(res)
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a, b
         real(wp), optional, intent(in) :: tol_input
         real(wp) :: tol
@@ -78,7 +78,7 @@ contains
     !> Checks if a real(wp) variable is of default value.
     !! @param var Variable to check.
     logical pure elemental function f_is_default(var) result(res)
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: var
 
         res = f_approx_equal(var, dflt_real)
@@ -103,7 +103,7 @@ contains
     !> Checks if a real(wp) variable is an integer.
     !! @param var Variable to check.
     logical pure elemental function f_is_integer(var) result(res)
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: var
 
         res = f_approx_equal(var, real(nint(var), wp))

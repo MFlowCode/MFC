@@ -120,7 +120,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_pressure
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
 
         real(wp), intent(in) :: energy, alf
@@ -461,7 +461,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_acc
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
 
         real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
@@ -542,7 +542,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_bubbles_acc
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
 
         real(wp), intent(inout) :: rho_K, gamma_K, pi_inf_K, qv_K
@@ -1607,7 +1607,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_speed_of_sound
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
 
         real(wp), intent(in) :: pres
@@ -1677,7 +1677,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_fast_magnetosonic_speed
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
 
         real(wp), intent(in) :: B(3), rho, c

@@ -291,7 +291,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_infinite_pt_relaxation_k
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
 
         ! initializing variables
@@ -395,7 +395,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_infinite_ptg_relaxation_k
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
 
         integer, intent(in) :: j, k, l
@@ -520,7 +520,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_correct_partial_densities
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
 
         !> @name variables for the correction of the reacting partial densities
@@ -583,7 +583,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_jacobian_matrix
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
 
         real(wp), dimension(2, 2), intent(out) :: InvJac
@@ -690,7 +690,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_pTg_residue
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
 
         integer, intent(in) :: j, k, l
@@ -741,7 +741,7 @@ contains
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_TSat
 #else
-        $:GPU_ROUTINE(parallelism=['seq'])
+        $:GPU_ROUTINE(parallelism='[seq]')
 #endif
 
         real(wp), intent(in) :: pSat
