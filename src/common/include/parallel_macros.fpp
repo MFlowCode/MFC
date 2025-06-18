@@ -389,7 +389,7 @@
     $:acc_directive
 #:enddef
 
-#:def GPU_ATOMIC(atomic='update', extraAccArgs=None)
+#:def GPU_ATOMIC(atomic, extraAccArgs=None)
     #:assert isinstance(atomic, str)
     #:assert (atomic == 'read' or atomic == 'write' or atomic == 'update' or atomic == 'capture')
 
@@ -414,11 +414,11 @@
     $:acc_directive
 #:enddef
 
-#:def GPU_WAIT(host=None, device=None, extraAccArgs=None)
+#:def GPU_WAIT(extraAccArgs=None)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
 
-    #:set clause_val = host_val.strip('\n') + device_val.strip('\n')
-    #:set acc_directive = '!$acc update ' + clause_val + extraAccArgs_val.strip('\n')
+    #:set clause_val = ''
+    #:set acc_directive = '!$acc wait ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
 #:enddef
 ! New line at end of file is required for FYPP
