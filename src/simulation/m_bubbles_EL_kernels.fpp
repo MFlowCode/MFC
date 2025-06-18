@@ -74,19 +74,19 @@ contains
 
             !Update void fraction field
             addFun1 = strength_vol/Vol
-            !$acc atomic update
+            $:GPU_ATOMIC(atomic='update')
             updatedvar%vf(1)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(1)%sf(cell(1), cell(2), cell(3)) + addFun1
 
             !Update time derivative of void fraction
             addFun2 = strength_vel/Vol
-            !$acc atomic update
+            $:GPU_ATOMIC(atomic='update')
             updatedvar%vf(2)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(2)%sf(cell(1), cell(2), cell(3)) + addFun2
 
             !Product of two smeared functions
             !Update void fraction * time derivative of void fraction
             if (lag_params%cluster_type >= 4) then
                 addFun3 = (strength_vol*strength_vel)/Vol
-                !$acc atomic update
+                $:GPU_ATOMIC(atomic='update')
                 updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) + addFun3
             end if
         end do
@@ -170,14 +170,14 @@ contains
 
                         !Update void fraction field
                         addFun1 = func*strength_vol
-                        !$acc atomic update
+                        $:GPU_ATOMIC(atomic='update')
                         updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                             updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                             + addFun1
 
                         !Update time derivative of void fraction
                         addFun2 = func*strength_vel
-                        !$acc atomic update
+                        $:GPU_ATOMIC(atomic='update')
                         updatedvar%vf(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                             updatedvar%vf(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                             + addFun2
@@ -186,7 +186,7 @@ contains
                         !Update void fraction * time derivative of void fraction
                         if (lag_params%cluster_type >= 4) then
                             addFun3 = func2*strength_vol*strength_vel
-                            !$acc atomic update
+                            $:GPU_ATOMIC(atomic='update')
                             updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                                 updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                                 + addFun3
