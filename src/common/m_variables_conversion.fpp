@@ -1145,7 +1145,6 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
 
     end subroutine s_convert_conservative_to_primitive_variables
 

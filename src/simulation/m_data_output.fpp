@@ -297,7 +297,6 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
 
         ! end: Computing Stability Criteria at Current Time-step
 

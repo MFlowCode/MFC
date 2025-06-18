@@ -679,7 +679,6 @@ contains
                         end do
                     end do
                 end do
-                !$acc end parallel loop
             else if (weno_dir == 2) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
@@ -692,7 +691,6 @@ contains
                         end do
                     end do
                 end do
-                !$acc end parallel loop
             else if (weno_dir == 3) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
@@ -705,7 +703,6 @@ contains
                         end do
                     end do
                 end do
-                !$acc end parallel loop
             end if
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
@@ -783,7 +780,6 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
                 end if
             #:endfor
         elseif (weno_order == 5) then
@@ -898,7 +894,6 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
 
                     if (mp_weno) then
                         call s_preserve_monotonicity(v_rs_ws_${XYZ}$, vL_rs_vf_${XYZ}$, &
@@ -1094,7 +1089,6 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
 
                 end if
             #:endfor
@@ -1142,7 +1136,6 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in y-direction
@@ -1157,7 +1150,6 @@ contains
 
                         $:GPU_HOST_DATA(use_device='[v_rs_ws_x, v_rs_ws_y]')
                         v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1, sys_size], order=[2, 1, 3, 4])
-                        !$acc end host_data
                     end block
                 else
                     block
@@ -1165,7 +1157,6 @@ contains
 
                         $:GPU_HOST_DATA(use_device='[v_rs_ws_x, v_rs_ws_y]')
                         v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1 + 2*buff_size, sys_size], order=[2, 1, 3, 4])
-                        !$acc end host_data
                     end block
                 end if
             else
@@ -1180,7 +1171,6 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
 #if MFC_cuTENSOR
             end if
 #endif
@@ -1196,7 +1186,6 @@ contains
 
                     $:GPU_HOST_DATA(use_device='[v_rs_ws_x, v_rs_ws_z]')
                     v_rs_ws_z = reshape(v_rs_ws_x, shape=[p + 1 + 2*buff_size, n + 2*buff_size + 1, m + 2*buff_size + 1, sys_size], order=[3, 2, 1, 4])
-                    !$acc end host_data
                 end block
             else
 #endif
@@ -1210,7 +1199,6 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
 #if MFC_cuTENSOR
             end if
 #endif
@@ -1388,7 +1376,6 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
 
     end subroutine s_preserve_monotonicity
 

@@ -1742,7 +1742,6 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
         else if (recon_dir == 2) then
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
@@ -1755,7 +1754,6 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
         else if (recon_dir == 3) then
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
@@ -1768,7 +1766,6 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
         end if
 
     end subroutine s_reconstruct_cell_boundary_values_first_order

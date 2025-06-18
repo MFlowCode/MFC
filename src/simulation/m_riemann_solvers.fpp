@@ -1968,7 +1968,6 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
 
                 elseif (model_eqns == 2 .and. bubbles_euler) then
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[R0_L, R0_R, V0_L, &
@@ -2439,7 +2438,6 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
                 else
                     ! 5-EQUATION MODEL WITH HLLC
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, &
@@ -2954,7 +2952,6 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
                 end if
             end if
         #:endfor
@@ -3301,7 +3298,6 @@ contains
                         end do
                     end do
                 end do
-                !$acc end parallel loop
             end if
         #:endfor
 
@@ -4095,7 +4091,6 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
 
     end subroutine s_compute_cylindrical_viscous_source_flux
 
@@ -4232,7 +4227,6 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
 
     end subroutine s_compute_cartesian_viscous_source_flux
 

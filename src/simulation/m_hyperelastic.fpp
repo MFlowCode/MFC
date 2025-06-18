@@ -208,7 +208,6 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
     end subroutine s_hyperelastic_rmt_stress_update
 
     !>  The following subroutine handles the calculation of the btensor.

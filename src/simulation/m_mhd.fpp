@@ -129,7 +129,6 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
 
     end subroutine s_compute_mhd_powell_rhs
 

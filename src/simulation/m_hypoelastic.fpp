@@ -112,7 +112,6 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
 
             $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
@@ -127,7 +126,6 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
 
             if (ndirs > 1) then
                 $:GPU_PARALLEL_LOOP(collapse=3)
@@ -138,7 +136,6 @@ contains
                         end do
                     end do
                 end do
-                !$acc end parallel loop
 
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do q = 0, p
@@ -156,7 +153,6 @@ contains
                         end do
                     end do
                 end do
-                !$acc end parallel loop
 
                 ! 3D
                 if (ndirs == 3) then
@@ -170,7 +166,6 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
 
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do q = 0, p
@@ -192,7 +187,6 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
                 end if
             end if
 
