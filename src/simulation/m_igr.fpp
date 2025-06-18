@@ -322,8 +322,8 @@ contains
         integer, intent(in) :: idir
 
         real(wp) :: cfl
-        real(wp) :: rho_L, gamma_L, pi_inf_L, E_L, mu_L, F_L, pres_L, a_L
-        real(wp) :: rho_R, gamma_R, pi_inf_R, E_R, mu_R, F_R, pres_R, a_R
+        real(wp) :: rho_L, gamma_L, pi_inf_L, E_L, mu_L, F_L, pres_L
+        real(wp) :: rho_R, gamma_R, pi_inf_R, E_R, mu_R, F_R, pres_R
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_L, alpha_R, alpha_rho_R
         real(wp), dimension(num_dims) :: vel_L, vel_R
         real(wp), dimension(-1:1) :: rho_sf_small
@@ -463,15 +463,9 @@ contains
                                                         2._wp * q_cons_vf(E_idx)%sf(j-2, k, l))
                             endif
 
-                            pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp))/gamma_L
-                            pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp))/gamma_R
-
-                            a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
-                            a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
-
-                            cfl = max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp), &
-                                      sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp)) + &
-                                  max(a_L,a_R)
+                            call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
+                                                      E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
+                                                      pres_L, pres_R, cfl)
 
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -941,15 +935,9 @@ contains
                                                         2._wp * q_cons_vf(E_idx)%sf(j-2, k, l))
                             endif
 
-                            pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp))/gamma_L
-                            pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp))/gamma_R
-
-                            a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
-                            a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
-
-                            cfl = max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp), &
-                                      sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp)) + &
-                                  max(a_L,a_R)
+                            call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
+                                                      E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
+                                                      pres_L, pres_R, cfl)
 
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -1557,15 +1545,9 @@ contains
                                                         2._wp * q_cons_vf(E_idx)%sf(j, k-2, l))
                             end if
 
-                            pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp ))/gamma_L
-                            pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp ))/gamma_R
-
-                            a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
-                            a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
-
-                            cfl = max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp), &
-                                      sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp)) + &
-                                  max(a_L,a_R)
+                            call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
+                                                      E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
+                                                      pres_L, pres_R, cfl)
 
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -1987,15 +1969,9 @@ contains
                                                         2._wp * q_cons_vf(E_idx)%sf(j, k-2, l))
                             end if
 
-                            pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp ))/gamma_L
-                            pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp ))/gamma_R
-
-                            a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
-                            a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
-
-                            cfl = max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp), &
-                                      sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp)) + &
-                                  max(a_L,a_R)
+                            call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
+                                                      E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
+                                                      pres_L, pres_R, cfl)
 
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -2504,15 +2480,9 @@ contains
                                                     2._wp * q_cons_vf(E_idx)%sf(j, k, l-2))
                         end if
 
-                        pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp ))/gamma_L
-                        pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp ))/gamma_R
-
-                        a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
-                        a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
-
-                        cfl = (max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp),&
-                                   sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp)) + &
-                               max(a_L,a_R))
+                        call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
+                                                  E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
+                                                  pres_L, pres_R, cfl)
 
                         !$acc loop seq
                         do i = 1, num_fluids
@@ -2873,6 +2843,41 @@ contains
         end if
 
     end subroutine s_igr_riemann_solver
+
+    pure subroutine s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
+                                         E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
+                                         pres_L, pres_R, cfl)
+!$acc routine seq
+        real(wp), intent(in) :: E_L, gamma_L, pi_inf_L, rho_L
+        real(wp), intent(in) :: E_R, gamma_R, pi_inf_R, rho_R
+        real(wp), dimension(num_dims), intent(in) :: vel_L, vel_R
+        real(wp), intent(out) :: pres_L, pres_R, cfl
+
+        real(wp) :: a_L, a_R
+
+        if (num_dims == 2) then
+            pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp))/gamma_L
+            pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp))/gamma_R
+
+            a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
+            a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
+
+            cfl = max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp), &
+                      sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp)) + &
+                  max(a_L,a_R)
+        elseif (num_dims == 3) then
+            pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp))/gamma_L
+            pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp))/gamma_R
+
+            a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
+            a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
+
+            cfl = max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp), &
+                      sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp)) + &
+                  max(a_L,a_R)
+        end if
+
+    end subroutine s_get_derived_states
 
     subroutine s_igr_flux_add(q_cons_vf, rhs_vf, flux_vf, idir)
 
