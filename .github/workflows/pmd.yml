@@ -110,7 +110,9 @@ jobs:
                     /^\s*!/d
                     /^[cC*dD]/d
                     /^[ \t]*[cC*dD]/d
-                    
+                    /^[Cc*]/d
+                     /^[[:blank:]]*!/
+
                     # Remove end-of-line comments, preserving quoted strings
                     s/([^"'\''\\]*("[^"]*")?('\''[^'\'']*'\''?)?[^"'\''\\]*)[!].*$/\1/
                   ' "$file" > "$TMP_FILE"
