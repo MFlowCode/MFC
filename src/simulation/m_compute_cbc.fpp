@@ -20,7 +20,7 @@ module m_compute_cbc
 contains
     !> Base L1 calculation
     pure function f_base_L1(lambda, rho, c, dpres_ds, dvel_ds) result(L1)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), intent(in) :: rho, c, dpres_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
@@ -30,7 +30,7 @@ contains
 
     !> Fill density L variables
     pure subroutine s_fill_density_L(L, lambda_factor, lambda2, c, mf, dalpha_rho_ds, dpres_ds)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: lambda_factor, lambda2, c
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
@@ -44,7 +44,7 @@ contains
 
     !> Fill velocity L variables
     pure subroutine s_fill_velocity_L(L, lambda_factor, lambda2, dvel_ds)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: lambda_factor, lambda2
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
@@ -57,7 +57,7 @@ contains
 
     !> Fill advection L variables
     pure subroutine s_fill_advection_L(L, lambda_factor, lambda2, dadv_ds)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: lambda_factor, lambda2
         real(wp), dimension(num_fluids), intent(in) :: dadv_ds
@@ -70,7 +70,7 @@ contains
 
     !> Fill chemistry L variables
     pure subroutine s_fill_chemistry_L(L, lambda_factor, lambda2, dYs_ds)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: lambda_factor, lambda2
         real(wp), dimension(num_species), intent(in) :: dYs_ds

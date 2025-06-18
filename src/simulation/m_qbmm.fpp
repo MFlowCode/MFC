@@ -538,13 +538,13 @@ contains
 
         ! The following block is not repeated and is left as is
         if (idir == 1) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do q = 0, n
                     do i = 0, m
                         rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + mom_sp(2)%sf(i, q, l)
                         j = bubxb
-                        !$acc loop seq
+                        $:GPU_LOOP()
                         do k = 1, nb
                             rhs_vf(j)%sf(i, q, l) = rhs_vf(j)%sf(i, q, l) + mom_3d(0, 0, k)%sf(i, q, l)
                             rhs_vf(j + 1)%sf(i, q, l) = rhs_vf(j + 1)%sf(i, q, l) + mom_3d(1, 0, k)%sf(i, q, l)

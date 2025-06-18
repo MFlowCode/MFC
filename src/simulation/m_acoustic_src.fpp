@@ -205,7 +205,7 @@ contains
                 call s_mpi_send_random_number(phi_rn, bb_num_freq(ai))
             end if
 
-            !$acc loop reduction(+:sum_BB)
+            $:GPU_LOOP(reduction='[[sum_BB]]', reductionOp='[+]')
             do k = 1, bb_num_freq(ai)
                 ! Acoustic period of the wave at each discrete frequency
                 period_BB = 1._wp/(bb_lowest_freq(ai) + k*bb_bandwidth(ai))
@@ -230,7 +230,7 @@ contains
                 B_tait = 0._wp
                 small_gamma = 0._wp
 
-                !$acc loop
+                $:GPU_LOOP()
                 do q = 1, num_fluids
                     myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
                     myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)

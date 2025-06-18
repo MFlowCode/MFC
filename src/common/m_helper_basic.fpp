@@ -52,7 +52,7 @@ contains
     !! @param tol_input Relative error (default = 1e-10_wp).
     !! @return Result of the comparison.
     logical pure function f_approx_in_array(a, b, tol_input) result(res)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a
         real(wp), intent(in) :: b(:)
         real(wp), optional, intent(in) :: tol_input

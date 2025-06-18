@@ -134,7 +134,7 @@ contains
             strength_vol = volpart
             strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
 
-            !$acc loop collapse(3) private(cellaux, nodecoord)
+            $:GPU_LOOP(collapse=3,private='[cellaux,nodecoord]')
             do i = 1, smearGrid
                 do j = 1, smearGrid
                     do k = 1, smearGridz
