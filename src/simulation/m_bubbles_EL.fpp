@@ -21,6 +21,8 @@ module m_bubbles_EL
 
     use m_boundary_common
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_sim_helpers
 
     use m_helper
@@ -348,7 +350,7 @@ contains
 
         ! Initial particle pressure
         gas_p(bub_id, 1) = pliq + 2._wp*(1._wp/Web)/bub_R0(bub_id)
-        if ((1._wp/Web) /= 0._wp) then
+        if (.not. f_approx_equal((1._wp/Web), 0._wp)) then
             pcrit = pv - 4._wp*(1._wp/Web)/(3._wp*sqrt(3._wp*gas_p(bub_id, 1)*bub_R0(bub_id)**3._wp/(2._wp*(1._wp/Web))))
             pref = gas_p(bub_id, 1)
         else
@@ -497,12 +499,10 @@ contains
         !! @param rhs_vf Calculated change of conservative variables
         !! @param t_step Current time step
         !! @param stage Current stage in the time-stepper algorithm
-    subroutine s_compute_bubble_EL_dynamics(q_cons_vf, q_prim_vf, t_step, rhs_vf, stage)
+    subroutine s_compute_bubble_EL_dynamics(q_prim_vf, stage)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        integer, intent(in) :: t_step, stage
+        integer, intent(in) :: stage
 
         real(wp) :: myVapFlux
         real(wp) :: preterm1, term2, paux, pint, Romega, term1_fac
@@ -575,8 +575,8 @@ contains
                 myalpha(i) = q_prim_vf(E_idx + i)%sf(cell(1), cell(2), cell(3))
             end do
             call s_convert_species_to_mixture_variables_acc(myRho, gamma, pi_inf, qv, myalpha, &
-                                                            myalpha_rho, Re, cell(1), cell(2), cell(3))
-            call s_compute_cson_from_pinf(k, q_prim_vf, myPinf, cell, myRho, gamma, pi_inf, myCson)
+                                                            myalpha_rho, Re)
+            call s_compute_cson_from_pinf(q_prim_vf, myPinf, cell, myRho, gamma, pi_inf, myCson)
 
             ! Adaptive time stepping
             adap_dt_stop = 0
@@ -733,13 +733,12 @@ contains
         !! @param gamma Liquid specific heat ratio
         !! @param pi_inf Liquid stiffness
         !! @param cson Calculated speed of sound
-    pure subroutine s_compute_cson_from_pinf(bub_id, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
+    pure subroutine s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_cson_from_pinf
 #else
         !$acc routine seq
 #endif
-        integer, intent(in) :: bub_id
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp), intent(in) :: pinf, rhol, gamma, pi_inf
         integer, dimension(3), intent(in) :: cell

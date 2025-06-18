@@ -95,9 +95,6 @@ module m_weno
     !
     !> @}
 
-    real(wp) :: test
-    !$acc declare create(test)
-
     !$acc declare create( &
     !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
     !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
@@ -272,12 +269,12 @@ contains
                     ! any contributions from outside of the physical domain during
                     ! the WENO reconstruction
                     if (null_weights) then
-                        if (bc_s%beg == BC_RIEMANN_EXTRAPOLATION) then
+                        if (bc_s%beg == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (1, 0) = 0._wp; d_cbR_${XYZ}$ (0, 0) = 1._wp
                             d_cbL_${XYZ}$ (1, 0) = 0._wp; d_cbL_${XYZ}$ (0, 0) = 1._wp
                         end if
 
-                        if (bc_s%end == BC_RIEMANN_EXTRAPOLATION) then
+                        if (bc_s%end == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (0, s) = 0._wp; d_cbR_${XYZ}$ (1, s) = 1._wp
                             d_cbL_${XYZ}$ (0, s) = 0._wp; d_cbL_${XYZ}$ (1, s) = 1._wp
                         end if
@@ -418,14 +415,14 @@ contains
                     ! any contributions from outside of the physical domain during
                     ! the WENO reconstruction
                     if (null_weights) then
-                        if (bc_s%beg == BC_RIEMANN_EXTRAPOLATION) then
+                        if (bc_s%beg == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (1:2, 0) = 0._wp; d_cbR_${XYZ}$ (0, 0) = 1._wp
                             d_cbL_${XYZ}$ (1:2, 0) = 0._wp; d_cbL_${XYZ}$ (0, 0) = 1._wp
                             d_cbR_${XYZ}$ (2, 1) = 0._wp; d_cbR_${XYZ}$ (:, 1) = d_cbR_${XYZ}$ (:, 1)/sum(d_cbR_${XYZ}$ (:, 1))
                             d_cbL_${XYZ}$ (2, 1) = 0._wp; d_cbL_${XYZ}$ (:, 1) = d_cbL_${XYZ}$ (:, 1)/sum(d_cbL_${XYZ}$ (:, 1))
                         end if
 
-                        if (bc_s%end == BC_RIEMANN_EXTRAPOLATION) then
+                        if (bc_s%end == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (0, s - 1) = 0._wp; d_cbR_${XYZ}$ (:, s - 1) = d_cbR_${XYZ}$ (:, s - 1)/sum(d_cbR_${XYZ}$ (:, s - 1))
                             d_cbL_${XYZ}$ (0, s - 1) = 0._wp; d_cbL_${XYZ}$ (:, s - 1) = d_cbL_${XYZ}$ (:, s - 1)/sum(d_cbL_${XYZ}$ (:, s - 1))
                             d_cbR_${XYZ}$ (0:1, s) = 0._wp; d_cbR_${XYZ}$ (2, s) = 1._wp
@@ -639,13 +636,12 @@ contains
     end subroutine s_compute_weno_coefficients
 
     subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
-                      norm_dir, weno_dir, &
+                      weno_dir, &
                       is1_weno_d, is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
-        integer, intent(in) :: norm_dir
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
 
@@ -668,12 +664,12 @@ contains
 
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
-                                   norm_dir, weno_dir)
+                                   weno_dir)
         end if
 
         if (weno_order == 1) then
             if (weno_dir == 1) then
-                !$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -686,7 +682,7 @@ contains
                 end do
                 !$acc end parallel loop
             else if (weno_dir == 2) then
-                !$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -699,7 +695,7 @@ contains
                 end do
                 !$acc end parallel loop
             else if (weno_dir == 3) then
-                !$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -1120,11 +1116,10 @@ contains
         !! @param is2_weno Index bounds in second coordinate direction
         !! @param is3_weno Index bounds in third coordinate direction
     subroutine s_initialize_weno(v_vf, &
-                                 norm_dir, weno_dir)
+                                 weno_dir)
 
         type(scalar_field), dimension(:), intent(IN) :: v_vf
 
-        integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
 
         integer :: j, k, l, q

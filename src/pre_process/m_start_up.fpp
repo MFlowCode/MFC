@@ -775,8 +775,8 @@ contains
         end if
         !Initialize pb based on surface tension for qbmm (polytropic)
         if (qbmm .and. polytropic .and. (.not. f_is_default(Web))) then
-            pb0 = pref + 2._wp*fluid_pp(1)%ss/(R0*R0ref)
-            pb0 = pb0/pref
+            pb0(:) = pref + 2._wp*fluid_pp(1)%ss/(R0(:)*R0ref)
+            pb0(:) = pb0(:)/pref
             pref = 1._wp
         end if
         call s_initialize_mpi_common_module()
@@ -826,12 +826,9 @@ contains
 
     end subroutine s_read_grid
 
-    impure subroutine s_apply_initial_condition(start, finish, proc_time, time_avg, time_final, file_exists)
+    impure subroutine s_apply_initial_condition(start, finish)
 
         real(wp), intent(inout) :: start, finish
-        real(wp), dimension(:), intent(inout) :: proc_time
-        real(wp), intent(inout) :: time_avg, time_final
-        logical, intent(inout) :: file_exists
 
         ! Setting up the grid and the initial condition. If the grid is read in from
         ! preexisting grid data files, it is checked for consistency. If the grid is

@@ -24,14 +24,11 @@ module m_boundary_conditions
     real(wp) :: radius
     type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
 
-    private; public :: s_apply_boundary_patches, &
- s_write_serial_boundary_condition_files, &
- s_write_parallel_boundary_condition_files
+    private; public :: s_apply_boundary_patches
 
 contains
-    impure subroutine s_line_segment_bc(patch_id, q_prim_vf, bc_type)
+    impure subroutine s_line_segment_bc(patch_id, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
         integer, intent(in) :: patch_id
 
@@ -79,9 +76,8 @@ contains
 
     end subroutine s_line_segment_bc
 
-    impure subroutine s_circle_bc(patch_id, q_prim_vf, bc_type)
+    impure subroutine s_circle_bc(patch_id, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 
         integer, intent(in) :: patch_id
@@ -143,9 +139,8 @@ contains
 
     end subroutine s_circle_bc
 
-    impure subroutine s_rectangle_bc(patch_id, q_prim_vf, bc_type)
+    impure subroutine s_rectangle_bc(patch_id, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
 
         integer, intent(in) :: patch_id
@@ -247,9 +242,9 @@ contains
                 end if
 
                 if (patch_bc(i)%geometry == 2) then
-                    call s_circle_bc(i, q_prim_vf, bc_type)
+                    call s_circle_bc(i, bc_type)
                 elseif (patch_bc(i)%geometry == 3) then
-                    call s_rectangle_bc(i, q_prim_vf, bc_type)
+                    call s_rectangle_bc(i, bc_type)
                 end if
             end do
             !< Apply 1D patches to 2D domain
@@ -260,149 +255,11 @@ contains
                 end if
 
                 if (patch_bc(i)%geometry == 1) then
-                    call s_line_segment_bc(i, q_prim_vf, bc_type)
+                    call s_line_segment_bc(i, bc_type)
                 end if
             end do
         end if
 
     end subroutine s_apply_boundary_patches
-
-    impure subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath)
-
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
-
-        character(LEN=*), intent(in) :: step_dirpath
-
-        integer :: dir, loc
-        character(len=path_len) :: file_path
-
-        character(len=10) :: status
-
-        if (old_grid) then
-            status = 'old'
-        else
-            status = 'new'
-        end if
-
-        call s_pack_boundary_condition_buffers(q_prim_vf)
-
-        file_path = trim(step_dirpath)//'/bc_type.dat'
-        open (1, FILE=trim(file_path), FORM='unformatted', STATUS=status)
-        do dir = 1, num_dims
-            do loc = -1, 1, 2
-                write (1) bc_type(dir, loc)%sf
-            end do
-        end do
-        close (1)
-
-        file_path = trim(step_dirpath)//'/bc_buffers.dat'
-        open (1, FILE=trim(file_path), FORM='unformatted', STATUS=status)
-        do dir = 1, num_dims
-            do loc = -1, 1, 2
-                write (1) bc_buffers(dir, loc)%sf
-            end do
-        end do
-        close (1)
-
-    end subroutine s_write_serial_boundary_condition_files
-
-    impure subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
-
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
-
-        integer :: dir, loc
-        character(len=path_len) :: file_loc, file_path
-
-#ifdef MFC_MPI
-        integer :: ierr
-        integer :: file_id
-        integer :: offset
-        character(len=7) :: proc_rank_str
-        logical :: dir_check
-
-        call s_pack_boundary_condition_buffers(q_prim_vf)
-
-        file_loc = trim(case_dir)//'/restart_data/boundary_conditions'
-        if (proc_rank == 0) then
-            call my_inquire(file_loc, dir_check)
-            if (dir_check .neqv. .true.) then
-                call s_create_directory(trim(file_loc))
-            end if
-        end if
-
-        call s_create_mpi_types(bc_type)
-
-        call s_mpi_barrier()
-
-        call DelayFileAccess(proc_rank)
-
-        write (proc_rank_str, '(I7.7)') proc_rank
-        file_path = trim(file_loc)//'/bc_'//trim(proc_rank_str)//'.dat'
-        call MPI_File_open(MPI_COMM_SELF, trim(file_path), MPI_MODE_CREATE + MPI_MODE_WRONLY, MPI_INFO_NULL, file_id, ierr)
-
-        offset = 0
-
-        ! Write bc_types
-        do dir = 1, num_dims
-            do loc = -1, 1, 2
-                call MPI_File_set_view(file_id, int(offset, KIND=MPI_ADDRESS_KIND), MPI_INTEGER, MPI_BC_TYPE_TYPE(dir, loc), 'native', MPI_INFO_NULL, ierr)
-                call MPI_File_write_all(file_id, bc_type(dir, loc)%sf, 1, MPI_BC_TYPE_TYPE(dir, loc), MPI_STATUS_IGNORE, ierr)
-                offset = offset + sizeof(bc_type(dir, loc)%sf)
-            end do
-        end do
-
-        ! Write bc_buffers
-        do dir = 1, num_dims
-            do loc = -1, 1, 2
-                call MPI_File_set_view(file_id, int(offset, KIND=MPI_ADDRESS_KIND), mpi_p, MPI_BC_BUFFER_TYPE(dir, loc), 'native', MPI_INFO_NULL, ierr)
-                call MPI_File_write_all(file_id, bc_buffers(dir, loc)%sf, 1, MPI_BC_BUFFER_TYPE(dir, loc), MPI_STATUS_IGNORE, ierr)
-                offset = offset + sizeof(bc_buffers(dir, loc)%sf)
-            end do
-        end do
-
-        call MPI_File_close(file_id, ierr)
-#endif
-
-    end subroutine s_write_parallel_boundary_condition_files
-
-    impure subroutine s_pack_boundary_condition_buffers(q_prim_vf)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        integer :: i, j, k
-
-        do k = 0, p
-            do j = 0, n
-                do i = 1, sys_size
-                    bc_buffers(1, -1)%sf(i, j, k) = q_prim_vf(i)%sf(0, j, k)
-                    bc_buffers(1, 1)%sf(i, j, k) = q_prim_vf(i)%sf(m, j, k)
-                end do
-            end do
-        end do
-
-        if (n > 0) then
-            do k = 0, p
-                do j = 1, sys_size
-                    do i = 0, m
-                        bc_buffers(2, -1)%sf(i, j, k) = q_prim_vf(j)%sf(i, 0, k)
-                        bc_buffers(2, 1)%sf(i, j, k) = q_prim_vf(j)%sf(i, n, k)
-                    end do
-                end do
-            end do
-
-            if (p > 0) then
-                do k = 1, sys_size
-                    do j = 0, n
-                        do i = 0, m
-                            bc_buffers(3, -1)%sf(i, j, k) = q_prim_vf(k)%sf(i, j, 0)
-                            bc_buffers(3, 1)%sf(i, j, k) = q_prim_vf(k)%sf(i, j, p)
-                        end do
-                    end do
-                end do
-            end if
-        end if
-
-    end subroutine s_pack_boundary_condition_buffers
 
 end module m_boundary_conditions
