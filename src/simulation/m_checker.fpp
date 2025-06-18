@@ -14,6 +14,8 @@ module m_checker
 
     use m_helper
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     implicit none
 
     private; public :: s_check_inputs
@@ -73,9 +75,9 @@ contains
             "weno_order != 1, but weno_eps is not set. A typical value of weno_eps is 1e-6")
 
         @:PROHIBIT(weno_eps <= 0._wp, "weno_eps must be positive. A typical value of weno_eps is 1e-6")
-        @:PROHIBIT(wenoz .and. weno_order == real(7, wp) .and. f_is_default(real(wenoz_q, wp)), &
+        @:PROHIBIT(wenoz .and. weno_order == 7 .and. f_is_default(real(wenoz_q, wp)), &
             "wenoz is used at 7th order, but wenoz_q is not set. It should be either 2, 3, or 4")
-        @:PROHIBIT(wenoz .and. weno_order == real(7, wp) .and. .not. (f_approx_equal(real(wenoz_q, wp), real(2, wp)) .or. &
+        @:PROHIBIT(wenoz .and. weno_order == 7 .and. .not. (f_approx_equal(real(wenoz_q, wp), real(2, wp)) .or. &
             f_approx_equal(real(wenoz_q, wp), real(3, wp)) .or. f_approx_equal(real(wenoz_q, wp), real(4, wp))), &
             "wenoz_q must be either 2, 3, or 4")
         @:PROHIBIT(teno .and. f_is_default(teno_CT), "teno is used, but teno_CT is not set. A typical value of teno_CT is 1e-6")
