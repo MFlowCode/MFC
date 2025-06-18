@@ -107,7 +107,11 @@ jobs:
                     s/[[:space:]]*==[[:space:]]*/==/g
 
                     # Remove full-line comments
-                    /^[[:space:]]*[!cC*dD]/d
+                    /^\s*!/d
+                    /^[cC*dD]/d
+                    /^[ \t]*[cC*dD]/d
+                    /^[[:space:]]*$/d
+
                     # Remove end-of-line comments, preserving quoted strings
                     s/([^"'\''\\]*("[^"]*")?('\''[^'\'']*'\''?)?[^"'\''\\]*)[!].*$/\1/
                   ' "$file" > "$TMP_FILE"
