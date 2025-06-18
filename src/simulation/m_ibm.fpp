@@ -147,7 +147,7 @@ contains
         real(wp) :: qv_K
         real(wp), dimension(num_fluids) :: Gs
 
-        real(wp) :: pres_IP, coeff
+        real(wp) :: pres_IP
         real(wp), dimension(3) :: vel_IP, vel_norm_IP
         real(wp) :: c_IP
         real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
