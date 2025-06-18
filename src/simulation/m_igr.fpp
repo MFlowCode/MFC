@@ -269,7 +269,7 @@ contains
                                                 47._wp * q_cons_vf(i)%sf(j+1, k, l) -   &
                                                 13._wp * q_cons_vf(i)%sf(j+2, k, l) + &
                                                 2._wp * q_cons_vf(i)%sf(j+3, k, l))
-                            alpha_rho_L(i) = (1._wp/60._wp) * (-3._wp * q_cons_vf(i)%sf(j+2, k, l) + &
+                            alpha_rho_R(i) = (1._wp/60._wp) * (-3._wp * q_cons_vf(i)%sf(j+2, k, l) + &
                                                 27._wp * q_cons_vf(i)%sf(j+1, k, l) + &
                                                 47._wp * q_cons_vf(i)%sf(j, k, l) -   &
                                                 13._wp * q_cons_vf(i)%sf(j-1, k, l) + &
