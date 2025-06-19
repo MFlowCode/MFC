@@ -1298,7 +1298,8 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
-        integer :: i
+        integer :: i, j, k
+
         ! Placeholders for the cell boundary values
         real(wp) :: pi_inf, gamma, lit_gamma
         @:HardcodedDimensionsExtrusion()
@@ -1307,6 +1308,8 @@ contains
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1._wp + gamma)/gamma
+        j = 0.0_wp
+        k = 0.0_wp
 
         ! Transferring the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1413,7 +1416,7 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        integer :: i, j !< generic loop iterators
+        integer :: i, j, k !< generic loop iterators
 
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
         real(wp) :: l, U0 !< Taylor Green Vortex parameters
@@ -1423,6 +1426,8 @@ contains
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1._wp + gamma)/gamma
+
+        k = 0.0_wp
 
         ! Transferring the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
