@@ -717,8 +717,8 @@ contains
                                         rho_R*(s_R - vel_R(dir_idx(1))))
                             elseif (wave_speeds == 2) then
                                 pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                   (vel_L(dir_idx(1)) - &
-                                                    vel_R(dir_idx(1))))
+                                                    (vel_L(dir_idx(1)) - &
+                                                     vel_R(dir_idx(1))))
 
                                 pres_SR = pres_SL
 
@@ -733,8 +733,8 @@ contains
                                 s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
                                 s_S = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                                               (pres_L - pres_R)/ &
-                                               (rho_avg*c_avg))
+                                                (pres_L - pres_R)/ &
+                                                (rho_avg*c_avg))
                             end if
 
                             s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
@@ -1492,10 +1492,10 @@ contains
                                     if (elasticity) then
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                            (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                                                                                                                                                           (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
+                                                                                                                                                            (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
                                         s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
                                                                            (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                                                                                                                                                           (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                                                                                                                                            (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + &
                                                tau_e_L(dir_idx_tau(1)) + rho_L*vel_L(idx1)*(s_L - vel_L(idx1)) - &
                                                rho_R*vel_R(idx1)*(s_R - vel_R(idx1)))/(rho_L*(s_L - vel_L(idx1)) - &
@@ -1510,8 +1510,8 @@ contains
                                     end if
                                 elseif (wave_speeds == 2) then
                                     pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                       (vel_L(dir_idx(1)) - &
-                                                        vel_R(dir_idx(1))))
+                                                        (vel_L(dir_idx(1)) - &
+                                                         vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL
 
@@ -1526,8 +1526,8 @@ contains
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
                                     s_S = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                                                   (pres_L - pres_R)/ &
-                                                   (rho_avg*c_avg))
+                                                    (pres_L - pres_R)/ &
+                                                    (rho_avg*c_avg))
                                 end if
 
                                 ! follows Einfeldt et al.
@@ -1810,8 +1810,8 @@ contains
                                             rho_R*(s_R - vel_R(dir_idx(1))))
                                 elseif (wave_speeds == 2) then
                                     pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                       (vel_L(dir_idx(1)) - &
-                                                        vel_R(dir_idx(1))))
+                                                        (vel_L(dir_idx(1)) - &
+                                                         vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL
 
@@ -1826,8 +1826,8 @@ contains
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
                                     s_S = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                                                   (pres_L - pres_R)/ &
-                                                   (rho_avg*c_avg))
+                                                    (pres_L - pres_R)/ &
+                                                    (rho_avg*c_avg))
                                 end if
 
                                 ! follows Einfeldt et al.
@@ -2239,8 +2239,8 @@ contains
                                             rho_R*(s_R - vel_R(dir_idx(1))))
                                 elseif (wave_speeds == 2) then
                                     pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                       (vel_L(dir_idx(1)) - &
-                                                        vel_R(dir_idx(1))))
+                                                        (vel_L(dir_idx(1)) - &
+                                                         vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL
 
@@ -2255,8 +2255,8 @@ contains
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
                                     s_S = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                                                   (pres_L - pres_R)/ &
-                                                   (rho_avg*c_avg))
+                                                    (pres_L - pres_R)/ &
+                                                    (rho_avg*c_avg))
                                 end if
 
                                 ! follows Einfeldt et al.
@@ -2700,10 +2700,10 @@ contains
                                     if (elasticity) then
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                            (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                                                                                                                                                           (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
+                                                                                                                                                            (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
                                         s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
                                                                            (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                                                                                                                                                           (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                                                                                                                                            (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + &
                                                tau_e_L(dir_idx_tau(1)) + rho_L*vel_L(idx1)*(s_L - vel_L(idx1)) - &
                                                rho_R*vel_R(idx1)*(s_R - vel_R(idx1)))/(rho_L*(s_L - vel_L(idx1)) - &
@@ -2718,8 +2718,8 @@ contains
                                     end if
                                 elseif (wave_speeds == 2) then
                                     pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                       (vel_L(idx1) - &
-                                                        vel_R(idx1)))
+                                                        (vel_L(idx1) - &
+                                                         vel_R(idx1)))
 
                                     pres_SR = pres_SL
 
@@ -2734,8 +2734,8 @@ contains
                                     s_R = vel_R(idx1) + c_R*Ms_R
 
                                     s_S = 5.e-1_wp*((vel_L(idx1) + vel_R(idx1)) + &
-                                                   (pres_L - pres_R)/ &
-                                                   (rho_avg*c_avg))
+                                                    (pres_L - pres_R)/ &
+                                                    (rho_avg*c_avg))
                                 end if
 
                                 ! follows Einfeldt et al.

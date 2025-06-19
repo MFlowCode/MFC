@@ -1183,8 +1183,8 @@ contains
 
                 if (patch_icpp(patch_id)%smoothen) then
                     eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx, dy) &
-                                                 *(a*x_cc(i) + b*y_cc(j) + c) &
-                                                 /sqrt(a**2 + b**2))
+                                                   *(a*x_cc(i) + b*y_cc(j) + c) &
+                                                   /sqrt(a**2 + b**2))
                 end if
 
                 if ((a*x_cc(i) + b*y_cc(j) + c >= 0._wp &
@@ -2091,10 +2091,10 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
                         eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx, dy, dz) &
-                                                     *(a*x_cc(i) + &
-                                                       b*cart_y + &
-                                                       c*cart_z + d) &
-                                                     /sqrt(a**2 + b**2 + c**2))
+                                                       *(a*x_cc(i) + &
+                                                         b*cart_y + &
+                                                         c*cart_z + d) &
+                                                       /sqrt(a**2 + b**2 + c**2))
                     end if
 
                     if ((a*x_cc(i) + b*cart_y + c*cart_z + d >= 0._wp &
