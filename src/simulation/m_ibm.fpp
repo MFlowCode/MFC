@@ -207,7 +207,7 @@ contains
             dyn_pres = 0._wp
 
             ! Set q_prim_vf params at GP so that mixture vars calculated properly
-            $:GPU_LOOP()
+            $:GPU_LOOP(parallelism='[seq]')
             do q = 1, num_fluids
                 q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
                 q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
@@ -243,7 +243,7 @@ contains
             end if
 
             ! Set momentum
-            $:GPU_LOOP()
+            $:GPU_LOOP(parallelism='[seq]')
             do q = momxb, momxe
                 q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - momxb + 1)
                 dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)* &
@@ -251,7 +251,7 @@ contains
             end do
 
             ! Set continuity and adv vars
-            $:GPU_LOOP()
+            $:GPU_LOOP(parallelism='[seq]')
             do q = 1, num_fluids
                 q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
                 q_cons_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
@@ -305,7 +305,7 @@ contains
             end if
 
             if (model_eqns == 3) then
-                $:GPU_LOOP()
+                $:GPU_LOOP(parallelism='[seq]')
                 do q = intxb, intxe
                     q_cons_vf(q)%sf(j, k, l) = alpha_IP(q - intxb + 1)*(gammas(q - intxb + 1)*pres_IP &
                                                                         + pi_infs(q - intxb + 1))
@@ -333,7 +333,7 @@ contains
                 physical_loc = [x_cc(j), y_cc(k), 0._wp]
             end if
 
-            $:GPU_LOOP()
+            $:GPU_LOOP(parallelism='[seq]')
             do q = 1, num_fluids
                 q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
                 q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
@@ -348,7 +348,7 @@ contains
 
             dyn_pres = 0._wp
 
-            $:GPU_LOOP()
+            $:GPU_LOOP(parallelism='[seq]')
             do q = momxb, momxe
                 q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - momxb + 1)
                 dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)* &
@@ -817,11 +817,11 @@ contains
             end if
         end if
 
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = i1, i2
-            $:GPU_LOOP()
+            $:GPU_LOOP(parallelism='[seq]')
             do j = j1, j2
-                $:GPU_LOOP()
+                $:GPU_LOOP(parallelism='[seq]')
                 do k = k1, k2
 
                     coeff = gp%interp_coeffs(i - i1 + 1, j - j1 + 1, k - k1 + 1)
@@ -829,13 +829,13 @@ contains
                     pres_IP = pres_IP + coeff* &
                               q_prim_vf(E_idx)%sf(i, j, k)
 
-                    $:GPU_LOOP()
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = momxb, momxe
                         vel_IP(q + 1 - momxb) = vel_IP(q + 1 - momxb) + coeff* &
                                                 q_prim_vf(q)%sf(i, j, k)
                     end do
 
-                    $:GPU_LOOP()
+                    $:GPU_LOOP(parallelism='[seq]')
                     do l = contxb, contxe
                         alpha_rho_IP(l) = alpha_rho_IP(l) + coeff* &
                                           q_prim_vf(l)%sf(i, j, k)
@@ -848,7 +848,7 @@ contains
                     end if
 
                     if (bubbles_euler .and. .not. qbmm) then
-                        $:GPU_LOOP()
+                        $:GPU_LOOP(parallelism='[seq]')
                         do l = 1, nb
                             if (polytropic) then
                                 r_IP(l) = r_IP(l) + coeff*q_prim_vf(bubxb + (l - 1)*2)%sf(i, j, k)

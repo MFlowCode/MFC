@@ -230,7 +230,7 @@ contains
                 B_tait = 0._wp
                 small_gamma = 0._wp
 
-                $:GPU_LOOP()
+                $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
                     myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
                     myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
@@ -238,7 +238,7 @@ contains
 
                 if (bubbles_euler) then
                     if (num_fluids > 2) then
-                        $:GPU_LOOP()
+                        $:GPU_LOOP(parallelism='[seq]')
                         do q = 1, num_fluids - 1
                             myRho = myRho + myalpha_rho(q)
                             B_tait = B_tait + myalpha(q)*pi_infs(q)
@@ -252,7 +252,7 @@ contains
                 end if
 
                 if ((.not. bubbles_euler) .or. (mpp_lim .and. (num_fluids > 2))) then
-                    $:GPU_LOOP()
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
                         myRho = myRho + myalpha_rho(q)
                         B_tait = B_tait + myalpha(q)*pi_infs(q)
@@ -323,11 +323,11 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    $:GPU_LOOP()
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = contxb, contxe
                         rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)
                     end do
-                    $:GPU_LOOP()
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = momxb, momxe
                         rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mom_src(q - contxe, j, k, l)
                     end do

@@ -626,11 +626,11 @@ contains
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         alf_sum%sf(j, k, l) = 0._wp
-                        $:GPU_LOOP()
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = advxb, advxe - 1
                             alf_sum%sf(j, k, l) = alf_sum%sf(j, k, l) + q_cons_qp%vf(i)%sf(j, k, l)
                         end do
-                        $:GPU_LOOP()
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = advxb, advxe - 1
                             q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1._wp - q_cons_qp%vf(alf_idx)%sf(j, k, l)) &
                                                           /alf_sum%sf(j, k, l)
@@ -1429,7 +1429,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        $:GPU_LOOP()
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = momxb, E_idx
                             rhs_vf(i)%sf(j, k, l) = &
                                 rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
@@ -1478,7 +1478,7 @@ contains
                     $:GPU_PARALLEL_LOOP(collapse=2)
                     do l = 0, p
                         do j = 0, m
-                            $:GPU_LOOP()
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = momxb, E_idx
                                 rhs_vf(i)%sf(j, 0, l) = &
                                     rhs_vf(i)%sf(j, 0, l) + 1._wp/(y_cc(1) - y_cc(-1))* &
@@ -1494,7 +1494,7 @@ contains
                 do l = 0, p
                     do k = 1, n
                         do j = 0, m
-                            $:GPU_LOOP()
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = momxb, E_idx
                                 rhs_vf(i)%sf(j, k, l) = &
                                     rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
@@ -1510,7 +1510,7 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            $:GPU_LOOP()
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = momxb, E_idx
                                 rhs_vf(i)%sf(j, k, l) = &
                                     rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
@@ -1531,7 +1531,7 @@ contains
                     do l = 0, p
                         do k = 1, n
                             do j = 0, m
-                                $:GPU_LOOP()
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, k, l) = &
                                         rhs_vf(i)%sf(j, k, l) - 5e-1_wp/y_cc(k)* &
@@ -1546,7 +1546,7 @@ contains
                         $:GPU_PARALLEL_LOOP(collapse=2)
                         do l = 0, p
                             do j = 0, m
-                                $:GPU_LOOP()
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, 0, l) = &
                                         rhs_vf(i)%sf(j, 0, l) - 1._wp/y_cc(0)* &
@@ -1561,7 +1561,7 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
-                                $:GPU_LOOP()
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, k, l) = &
                                         rhs_vf(i)%sf(j, k, l) - 5e-1_wp/y_cc(k)* &
@@ -1596,7 +1596,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        $:GPU_LOOP()
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = momxb, E_idx
                             rhs_vf(i)%sf(j, k, l) = &
                                 rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &

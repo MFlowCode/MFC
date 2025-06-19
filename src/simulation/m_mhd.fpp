@@ -82,16 +82,16 @@ contains
                 do k = 0, m
 
                     divB = 0._wp
-                    $:GPU_LOOP()
+                    $:GPU_LOOP(parallelism='[seq]')
                     do r = -fd_number, fd_number
                         divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
                     end do
-                    $:GPU_LOOP()
+                    $:GPU_LOOP(parallelism='[seq]')
                     do r = -fd_number, fd_number
                         divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
                     end do
                     if (p > 0) then
-                        $:GPU_LOOP()
+                        $:GPU_LOOP(parallelism='[seq]')
                         do r = -fd_number, fd_number
                             divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
                         end do

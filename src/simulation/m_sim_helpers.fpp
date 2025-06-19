@@ -31,11 +31,8 @@ contains
         !! @param k y index
         !! @param l z index
     pure subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_enthalpy
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', &
+            & cray_inline=True)
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         real(wp), intent(inout), dimension(num_fluids) :: alpha
@@ -49,7 +46,7 @@ contains
 
         integer :: i
 
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
             alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
@@ -64,13 +61,13 @@ contains
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
 
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_vels
             vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
         end do
 
         vel_sum = 0._wp
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_vels
             vel_sum = vel_sum + vel(i)**2._wp
         end do

@@ -544,7 +544,7 @@ contains
                     do i = 0, m
                         rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + mom_sp(2)%sf(i, q, l)
                         j = bubxb
-                        $:GPU_LOOP()
+                        $:GPU_LOOP(parallelism='[seq]')
                         do k = 1, nb
                             rhs_vf(j)%sf(i, q, l) = rhs_vf(j)%sf(i, q, l) + mom_3d(0, 0, k)%sf(i, q, l)
                             rhs_vf(j + 1)%sf(i, q, l) = rhs_vf(j + 1)%sf(i, q, l) + mom_3d(1, 0, k)%sf(i, q, l)
@@ -563,11 +563,9 @@ contains
 
     !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
     pure subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_coeff_nonpoly
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_coeff_nonpoly',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), intent(in) :: pres, rho, c
         real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
 
@@ -636,11 +634,9 @@ contains
 
 !Coefficient array for polytropic model (pb for each R0 bin accounted for in wght_pb)
     pure subroutine s_coeff(pres, rho, c, coeffs)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_coeff
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_coeff',parallelism='[seq]', &
+            & cray_inline=True)
+
 
         real(wp), intent(in) :: pres, rho, c
         real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
@@ -740,10 +736,10 @@ contains
 
                     if (alf > small_alf) then
                         nbub = q_cons_vf(bubxb)%sf(id1, id2, id3)
-                        $:GPU_LOOP()
+                        $:GPU_LOOP(parallelism='[seq]')
                         do q = 1, nb
                             ! Gather moments for this bubble bin
-                            $:GPU_LOOP()
+                            $:GPU_LOOP(parallelism='[seq]')
                             do r = 2, nmom
                                 moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
                             end do
@@ -751,12 +747,12 @@ contains
                             call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
 
                             if (polytropic) then
-                                $:GPU_LOOP()
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do j = 1, nnode
                                     wght_pb(j, q) = wght(j, q)*(pb0(q) - pv)
                                 end do
                             else
-                                $:GPU_LOOP()
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do j = 1, nnode
                                     chi_vw = 1._wp/(1._wp + R_v/R_n*(pb(id1, id2, id3, j, q)/pv - 1._wp))
                                     x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
@@ -775,13 +771,13 @@ contains
 
                             ! Compute change in moments due to bubble dynamics
                             r = 1
-                            $:GPU_LOOP()
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i2 = 0, 2
-                                $:GPU_LOOP()
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i1 = 0, 2
                                     if ((i1 + i2) <= 2) then
                                         momsum = 0._wp
-                                        $:GPU_LOOP()
+                                        $:GPU_LOOP(parallelism='[seq]')
                                         do j = 1, nterms
                                             select case (bubble_model)
                                             case (3)
@@ -811,7 +807,7 @@ contains
 
                             ! Compute change in pb and mv for non-polytropic model
                             if (.not. polytropic) then
-                                $:GPU_LOOP()
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do j = 1, nnode
                                     drdt = msum(2)
                                     drdt2 = merge(-1._wp, 1._wp, j == 1 .or. j == 2)/(2._wp*sqrt(merge(moms(4) - moms(2)**2._wp, verysmall, moms(4) - moms(2)**2._wp > 0._wp)))
@@ -839,11 +835,11 @@ contains
                             end if
                         end if
                     else
-                        $:GPU_LOOP()
+                        $:GPU_LOOP(parallelism='[seq]')
                         do q = 1, nb
-                            $:GPU_LOOP()
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i1 = 0, 2
-                                $:GPU_LOOP()
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i2 = 0, 2
                                     moms3d(i1, i2, q)%sf(id1, id2, id3) = 0._wp
                                 end do
@@ -861,11 +857,9 @@ contains
     contains
         ! Helper to select the correct coefficient routine
         subroutine s_coeff_selector(pres, rho, c, coeff, polytropic)
-#ifdef _CRAYFTN
-            !DIR$ INLINEALWAYS s_chyqmom
-#else
-            $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+            $:GPU_ROUTINE(function_name='s_coeff_selector',parallelism='[seq]', &
+                & cray_inline=True)
+
             real(wp), intent(in) :: pres, rho, c
             real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
             logical, intent(in) :: polytropic
@@ -877,11 +871,9 @@ contains
         end subroutine s_coeff_selector
 
         pure subroutine s_chyqmom(momin, wght, abscX, abscY)
-#ifdef _CRAYFTN
-            !DIR$ INLINEALWAYS s_chyqmom
-#else
-            $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+            $:GPU_ROUTINE(function_name='s_chyqmom',parallelism='[seq]', &
+                & cray_inline=True)
+
             real(wp), dimension(nmom), intent(in) :: momin
             real(wp), dimension(nnode), intent(inout) :: wght, abscX, abscY
 
@@ -937,11 +929,9 @@ contains
         end subroutine s_chyqmom
 
         pure subroutine s_hyqmom(frho, fup, fmom)
-#ifdef _CRAYFTN
-            !DIR$ INLINEALWAYS s_hyqmom
-#else
-            $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+            $:GPU_ROUTINE(function_name='s_hyqmom',parallelism='[seq]', &
+                & cray_inline=True)
+
             real(wp), dimension(2), intent(inout) :: frho, fup
             real(wp), dimension(3), intent(in) :: fmom
 

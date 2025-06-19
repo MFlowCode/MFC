@@ -789,7 +789,7 @@ contains
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
-                                $:GPU_LOOP()
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, v_size
                                     ! reconstruct from left side
 
@@ -908,7 +908,7 @@ contains
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
-                                $:GPU_LOOP()
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, v_size
 
                                     if (teno) v = v_rs_ws_${XYZ}$ (j - 3:j + 3, k, l, i) ! temporary field value array for clarity

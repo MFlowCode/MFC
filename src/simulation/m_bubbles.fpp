@@ -465,11 +465,9 @@ contains
                                    fntait, fBtait, f_bub_adv_src, f_divu, &
                                    bub_id, fmass_v, fmass_n, fbeta_c, &
                                    fbeta_t, fCson, adap_dt_stop)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_advance_step
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_advance_step',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), intent(inout) :: fR, fV, fpb, fmass_v
         real(wp), intent(in) :: fRho, fP, fR0, fpbdot, alf
         real(wp), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu
@@ -599,11 +597,9 @@ contains
     pure subroutine s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                         fntait, fBtait, f_bub_adv_src, f_divu, &
                                         fCson, h)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_initial_substep_h
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_initial_substep_h',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
         real(wp), intent(IN) :: fCson
@@ -685,11 +681,9 @@ contains
                                       bub_id, fmass_v, fmass_n, fbeta_c, &
                                       fbeta_t, fCson, h, &
                                       myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_advance_substep
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_advance_substep',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), intent(OUT) :: err
         real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu, h

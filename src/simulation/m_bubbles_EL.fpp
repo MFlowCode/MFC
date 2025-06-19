@@ -575,7 +575,7 @@ contains
             call s_get_pinf(k, q_prim_vf, 1, myPinf, cell, aux1, aux2)
 
             ! Obtain liquid density and computing speed of sound from pinf
-            $:GPU_LOOP()
+            $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_fluids
                 myalpha_rho(i) = q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
                 myalpha(i) = q_prim_vf(E_idx + i)%sf(cell(1), cell(2), cell(3))
@@ -740,11 +740,9 @@ contains
         !! @param pi_inf Liquid stiffness
         !! @param cson Calculated speed of sound
     pure subroutine s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_cson_from_pinf
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_cson_from_pinf', &
+            & parallelism='[seq]', cray_inline=True)
+
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp), intent(in) :: pinf, rhol, gamma, pi_inf
         integer, dimension(3), intent(in) :: cell
@@ -754,7 +752,7 @@ contains
         real(wp), dimension(num_dims) :: vel
         integer :: i
 
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_dims
             vel(i) = q_prim_vf(i + contxe)%sf(cell(1), cell(2), cell(3))
         end do
@@ -810,11 +808,9 @@ contains
         !! @param cell Bubble cell
         !! @param Romega Control volume radius
     pure subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_get_pinf
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_get_pinf',parallelism='[seq]', &
+            & cray_inline=True)
+
         integer, intent(in) :: bub_id, ptype
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp), intent(out) :: f_pinfl
@@ -835,7 +831,7 @@ contains
 
         !< Find current bubble cell
         cell(:) = int(scoord(:))
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_dims
             if (scoord(i) < 0._wp) cell(i) = cell(i) - 1
         end do
@@ -926,11 +922,11 @@ contains
             charpres2 = 0._wp
             vol = 0._wp
 
-            $:GPU_LOOP()
+            $:GPU_LOOP(parallelism='[seq]')
             do i = 1, smearGrid
-                $:GPU_LOOP()
+                $:GPU_LOOP(parallelism='[seq]')
                 do j = 1, smearGrid
-                    $:GPU_LOOP()
+                    $:GPU_LOOP(parallelism='[seq]')
                     do k = 1, smearGridz
                         cellaux(1) = cell(1) + i - (mapCells + 1)
                         cellaux(2) = cell(2) + j - (mapCells + 1)
@@ -1652,7 +1648,7 @@ contains
 
         integer :: i
 
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = bub_id, nBubs - 1
             lag_id(i, 1) = lag_id(i + 1, 1)
             bub_R0(i) = bub_R0(i + 1)

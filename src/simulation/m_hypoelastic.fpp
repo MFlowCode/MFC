@@ -117,7 +117,7 @@ contains
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        $:GPU_LOOP()
+                        $:GPU_LOOP(parallelism='[seq]')
                         do r = -fd_number, fd_number
                             du_dx(k, l, q) = du_dx(k, l, q) &
                                              + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
@@ -141,7 +141,7 @@ contains
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
-                            $:GPU_LOOP()
+                            $:GPU_LOOP(parallelism='[seq]')
                             do r = -fd_number, fd_number
                                 du_dy(k, l, q) = du_dy(k, l, q) &
                                                  + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
@@ -171,7 +171,7 @@ contains
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                                $:GPU_LOOP()
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do r = -fd_number, fd_number
                                     du_dz(k, l, q) = du_dz(k, l, q) &
                                                      + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z_h(r, q)

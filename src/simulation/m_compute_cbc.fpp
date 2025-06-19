@@ -85,11 +85,9 @@ contains
 
     !> Slip wall CBC (Thompson 1990, pg. 451)
     pure subroutine s_compute_slip_wall_L(lambda, L, rho, c, dpres_ds, dvel_ds)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_slip_wall_L
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_slip_wall_L',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c, dpres_ds
@@ -103,11 +101,9 @@ contains
 
     !> Nonreflecting subsonic buffer CBC (Thompson 1987, pg. 13)
     pure subroutine s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_buffer_L
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_nonreflecting_subsonic_buffer_L', &
+            & parallelism='[seq]', cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
@@ -133,11 +129,9 @@ contains
 
     !> Nonreflecting subsonic inflow CBC (Thompson 1990, pg. 455)
     pure subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, dpres_ds, dvel_ds)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_inflow_L
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_nonreflecting_subsonic_inflow_L', &
+            & parallelism='[seq]', cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c, dpres_ds
@@ -150,11 +144,9 @@ contains
 
     !> Nonreflecting subsonic outflow CBC (Thompson 1990, pg. 454)
     pure subroutine s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_outflow_L
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_nonreflecting_subsonic_outflow_L', &
+            & parallelism='[seq]', cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
@@ -174,11 +166,9 @@ contains
 
     !> Force-free subsonic outflow CBC (Thompson 1990, pg. 454)
     pure subroutine s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_force_free_subsonic_outflow_L
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_force_free_subsonic_outflow_L', &
+            & parallelism='[seq]', cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
@@ -196,11 +186,9 @@ contains
 
     !> Constant pressure subsonic outflow CBC (Thompson 1990, pg. 455)
     pure subroutine s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_constant_pressure_subsonic_outflow_L
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_constant_pressure_subsonic_outflow_L', &
+            & parallelism='[seq]', cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c
@@ -218,11 +206,9 @@ contains
 
     !> Supersonic inflow CBC (Thompson 1990, pg. 453)
     pure subroutine s_compute_supersonic_inflow_L(L)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_supersonic_inflow_L
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_supersonic_inflow_L', &
+            & parallelism='[seq]', cray_inline=True)
+
         real(wp), dimension(sys_size), intent(inout) :: L
         L(1:advxe) = 0._wp
         if (chemistry) L(chemxb:chemxe) = 0._wp
@@ -230,11 +216,9 @@ contains
 
     !> Supersonic outflow CBC (Thompson 1990, pg. 453)
     pure subroutine s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_supersonic_outflow_L
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_supersonic_outflow_L', &
+            & parallelism='[seq]', cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), dimension(sys_size), intent(inout) :: L
         real(wp), intent(in) :: rho, c

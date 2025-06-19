@@ -110,7 +110,7 @@ contains
         integer :: i
 
         s_needs_pressure_relaxation = .true.
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > (1._wp - sgm_eps)) then
                 s_needs_pressure_relaxation = .false.
@@ -129,7 +129,7 @@ contains
         integer :: i
 
         sum_alpha = 0._wp
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             if ((q_cons_vf(i + contxb - 1)%sf(j, k, l) < 0._wp) .or. &
                 (q_cons_vf(i + advxb - 1)%sf(j, k, l) < 0._wp)) then
@@ -142,7 +142,7 @@ contains
             sum_alpha = sum_alpha + q_cons_vf(i + advxb - 1)%sf(j, k, l)
         end do
 
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + advxb - 1)%sf(j, k, l)/sum_alpha
         end do
@@ -164,7 +164,7 @@ contains
 
         ! Initialize pressures
         pres_relax = 0._wp
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
                 pres_K_init(i) = (q_cons_vf(i + intxb - 1)%sf(j, k, l)/ &
@@ -180,7 +180,7 @@ contains
         ! Newton-Raphson iteration
         f_pres = 1e-9_wp
         df_pres = 1e9_wp
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do iter = 0, MAX_ITER - 1
             if (abs(f_pres) > TOLERANCE) then
                 pres_relax = pres_relax - f_pres/df_pres
@@ -194,7 +194,7 @@ contains
                 ! Newton-Raphson step
                 f_pres = -1._wp
                 df_pres = 0._wp
-                $:GPU_LOOP()
+                $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, num_fluids
                     if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
                         rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
@@ -210,7 +210,7 @@ contains
         end do
 
         ! Update volume fractions
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) &
                 q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/rho_K_s(i)
@@ -230,7 +230,7 @@ contains
         real(wp), dimension(2) :: Re
         integer :: i, q
 
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             alpha_rho(i) = q_cons_vf(i)%sf(j, k, l)
             alpha(i) = q_cons_vf(E_idx + i)%sf(j, k, l)
@@ -243,14 +243,14 @@ contains
 
         if (bubbles_euler) then
             if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
-                $:GPU_LOOP()
+                $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, num_fluids
                     rho = rho + alpha_rho(i)
                     gamma = gamma + alpha(i)*gammas(i)
                     pi_inf = pi_inf + alpha(i)*pi_infs(i)
                 end do
             else if ((model_eqns == 2) .and. (num_fluids > 2)) then
-                $:GPU_LOOP()
+                $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, num_fluids - 1
                     rho = rho + alpha_rho(i)
                     gamma = gamma + alpha(i)*gammas(i)
@@ -264,7 +264,7 @@ contains
         else
             sum_alpha = 0._wp
             if (mpp_lim) then
-                $:GPU_LOOP()
+                $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, num_fluids
                     alpha_rho(i) = max(0._wp, alpha_rho(i))
                     alpha(i) = min(max(0._wp, alpha(i)), 1._wp)
@@ -273,7 +273,7 @@ contains
                 alpha = alpha/max(sum_alpha, sgm_eps)
             end if
 
-            $:GPU_LOOP()
+            $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_fluids
                 rho = rho + alpha_rho(i)
                 gamma = gamma + alpha(i)*gammas(i)
@@ -281,11 +281,11 @@ contains
             end do
 
             if (viscous) then
-                $:GPU_LOOP()
+                $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, 2
                     Re(i) = dflt_real
                     if (Re_size(i) > 0) Re(i) = 0._wp
-                    $:GPU_LOOP()
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, Re_size(i)
                         Re(i) = alpha(Re_idx(i, q))/Res(i, q) + Re(i)
                     end do
@@ -296,7 +296,7 @@ contains
 
         ! Compute dynamic pressure and update internal energies
         dyn_pres = 0._wp
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = momxb, momxe
             dyn_pres = dyn_pres + 5e-1_wp*q_cons_vf(i)%sf(j, k, l)* &
                        q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
@@ -304,7 +304,7 @@ contains
 
         pres_relax = (q_cons_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
 
-        $:GPU_LOOP()
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             q_cons_vf(i + intxb - 1)%sf(j, k, l) = &
                 q_cons_vf(i + advxb - 1)%sf(j, k, l)*(gammas(i)*pres_relax + pi_infs(i))

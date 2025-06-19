@@ -1,4 +1,3 @@
-
 #:def ASSERT_LIST(data, datatype)
     #:assert data is not None
     #:assert isinstance(data, list)
@@ -243,7 +242,7 @@
     $:acc_directive
 #:enddef
 
-#:def GPU_ROUTINE(function_name=None, parallelism='[seq]', nohost=False, cray_inline=False, extraAccArgs=None)
+#:def GPU_ROUTINE(function_name=None, parallelism=None, nohost=False, cray_inline=False, extraAccArgs=None)
     #:assert isinstance(cray_inline, bool)
     #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
 
@@ -264,8 +263,11 @@
             #:stop "When inlining for Cray Compiler, function name must be given and given as a string"
         #:endif
         #:set cray_directive = ('!DIR$ INLINEALWAYS ' + function_name).strip('\n')
-        #:set cray_directive = '#ifdef _CRAYFTN\n' + cray_directive + '\n#else\n' + acc_directive + '\n#endif'
+#ifdef _CRAYFTN
         $:cray_directive
+#else
+        $:acc_directive
+#endif
     #:else
         $:acc_directive
     #:endif
@@ -297,7 +299,7 @@
     $:acc_directive
 #:enddef
 
-#:def GPU_LOOP(collapse=None, parallelism='[seq]', data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
+#:def GPU_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
 
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
 

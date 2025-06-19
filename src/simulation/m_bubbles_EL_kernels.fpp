@@ -200,11 +200,9 @@ contains
 
     !> The purpose of this subroutine is to apply the gaussian kernel function for each bubble (Maeda and Colonius, 2018)).
     pure subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_applygaussian
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_applygaussian',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: center
         integer, dimension(3), intent(in) :: cellaux
         real(wp), dimension(3), intent(in) :: nodecoord
@@ -270,11 +268,9 @@ contains
             !! @param cellaux Tested cell to smear the bubble effect in.
             !! @param celloutside If true, then cellaux is outside the computational domain.
     pure subroutine s_check_celloutside(cellaux, celloutside)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_check_celloutside
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
+            & cray_inline=True)
+
         integer, dimension(3), intent(inout) :: cellaux
         logical, intent(out) :: celloutside
 
@@ -306,11 +302,9 @@ contains
             !! @param cell Cell of the current bubble
             !! @param cellaux Cell to map the bubble effect in.
     pure subroutine s_shift_cell_symmetric_bc(cellaux, cell)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_shift_cell_symmetric_bc
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_shift_cell_symmetric_bc', &
+            & parallelism='[seq]', cray_inline=True)
+
         integer, dimension(3), intent(inout) :: cellaux
         integer, dimension(3), intent(in) :: cell
 
@@ -347,11 +341,9 @@ contains
             !! @param volpart Volume of the bubble
             !! @param stddsv Standard deviaton
     pure subroutine s_compute_stddsv(cell, volpart, stddsv)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_stddsv
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_stddsv',parallelism='[seq]', &
+            & cray_inline=True)
+
         integer, dimension(3), intent(in) :: cell
         real(wp), intent(in) :: volpart
         real(wp), intent(out) :: stddsv
@@ -388,11 +380,9 @@ contains
             !! @param cell Computational coordinates (x, y, z)
             !! @param Charvol Characteristic volume
     pure elemental subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_get_char_vol
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_get_char_vol',parallelism='[seq]', &
+            & cray_inline=True)
+
         integer, intent(in) :: cellx, celly, cellz
         real(wp), intent(out) :: Charvol
 
@@ -413,11 +403,9 @@ contains
             !! @param s Computational coordinates of the bubble, real type
             !! @param get_cell Computational coordinates of the bubble, integer type
     pure subroutine s_get_cell(s_cell, get_cell)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_get_cell
-#else
-        $:GPU_ROUTINE(parallelism='[seq]')
-#endif
+        $:GPU_ROUTINE(function_name='s_get_cell',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: s_cell
         integer, dimension(3), intent(out) :: get_cell
         integer :: i
