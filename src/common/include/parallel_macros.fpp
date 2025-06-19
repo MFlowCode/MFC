@@ -132,6 +132,7 @@
 
 #:def GEN_COLLAPSE_STR(collapse)
     #:if collapse is not None
+        #:set collapse = int(collapse)
         #:assert isinstance(collapse, int)
         #:assert collapse > 1
         #:set collapse_val = 'collapse(' + str(collapse) + ') '
@@ -327,8 +328,13 @@
     $:acc_directive
 #:enddef
 
-#:def GPU_DATA(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, deviceptr=None, attach=None, default=None, extraAccArgs=None)
-    
+#:def GPU_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, deviceptr=None, attach=None, default=None, extraAccArgs=None)
+    #:assert code is not None
+    #:assert isinstance(code, str)
+    #:if code == '' or code.isspace()
+        #:stop 'GPU_DATA macro has no effect on the code as it is not surrounding any code'
+    #:endif
+
     #:set copy_val = GEN_COPY_STR(copy)
 
     #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
@@ -355,21 +361,27 @@
         & deviceptr_val.strip('\n') + attach_val.strip('\n') + &
         & default_val.strip('\n')
     #:set acc_directive = '!$acc data ' + clause_val + extraAccArgs_val.strip('\n')
+    #:set end_acc_directive = '!$acc end data'
     $:acc_directive
+    $:code
+    $:end_acc_directive
 #:enddef
 
-#:def GPU_HOST_DATA(use_device=None, extraAccArgs=None)
+#:def GPU_HOST_DATA(code, use_device=None, extraAccArgs=None)
+    #:assert code is not None
+    #:assert isinstance(code, str)
+    #:if code == '' or code.isspace()
+        #:stop 'GPU_HOST_DATA macro has no effect on the code as it is not surrounding any code'
+    #:endif
     #:set use_device_val = GEN_USE_DEVICE_STR(use_device)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
 
     #:set clause_val = use_device_val.strip('\n')
     #:set acc_directive = '!$acc host_data ' + clause_val + extraAccArgs_val.strip('\n')
+    #:set end_acc_directive = '!$acc end host_data'
     $:acc_directive
-#:enddef
-
-#:def GPU_END_HOST_DATA()
-    #:set acc_directive = '!$acc end host_data'
-    $:acc_directive
+    $:code
+    $:end_acc_directive
 #:enddef
 
 #:def GPU_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraAccArgs=None)

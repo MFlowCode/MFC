@@ -161,15 +161,15 @@ contains
         p_cmplx => data_cmplx_gpu
         p_fltr_cmplx => data_fltr_cmplx_gpu
 
-        $:GPU_DATA(attach='[p_real, p_cmplx, p_fltr_cmplx]')
-        $:GPU_HOST_DATA(use_device='[p_real, p_cmplx, p_fltr_cmplx]')
+        #:call GPU_DATA(attach='[p_real, p_cmplx, p_fltr_cmplx]')
+        #:call GPU_HOST_DATA(use_device='[p_real, p_cmplx, p_fltr_cmplx]')
 #if defined(__PGI)
         ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
         ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(p_real), c_loc(p_cmplx))
         call hipCheck(hipDeviceSynchronize())
 #endif
-        $:GPU_END_HOST_DATA()
+        #:endcall GPU_HOST_DATA
         Nfq = 3
         $:GPU_UPDATE(device='[Nfq]')
 
@@ -182,14 +182,14 @@ contains
             end do
         end do
 
-        $:GPU_HOST_DATA(use_device='[p_real, p_fltr_cmplx]')
+        #:call GPU_HOST_DATA(use_device='[p_real, p_fltr_cmplx]')
 #if defined(__PGI)
         ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #else
         ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(p_fltr_cmplx), c_loc(p_real))
         call hipCheck(hipDeviceSynchronize())
 #endif
-        $:GPU_END_HOST_DATA()
+        #:endcall GPU_HOST_DATA
 
         $:GPU_PARALLEL_LOOP(collapse=3)
         do k = 1, sys_size
@@ -221,14 +221,14 @@ contains
                 end do
             end do
 
-            $:GPU_HOST_DATA(use_device='[p_real, p_cmplx]')
+            #:call GPU_HOST_DATA(use_device='[p_real, p_cmplx]')
 #if defined(__PGI)
             ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
             ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(p_real), c_loc(p_cmplx))
             call hipCheck(hipDeviceSynchronize())
 #endif
-            $:GPU_END_HOST_DATA()
+            #:endcall GPU_HOST_DATA
 
             Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
             $:GPU_UPDATE(device='[Nfq]')
@@ -242,14 +242,14 @@ contains
                 end do
             end do
 
-            $:GPU_HOST_DATA(use_device='[p_real, p_fltr_cmplx]')
+            #:call GPU_HOST_DATA(use_device='[p_real, p_fltr_cmplx]')
 #if defined(__PGI)
             ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #else
             ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(p_fltr_cmplx), c_loc(p_real))
             call hipCheck(hipDeviceSynchronize())
 #endif
-            $:GPU_END_HOST_DATA()
+            #:endcall GPU_HOST_DATA
 
             $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
             do k = 1, sys_size
@@ -293,7 +293,7 @@ contains
             end do
         end do
 #endif
-!$acc end data
+#:endcall GPU_DATA
     end subroutine s_apply_fourier_filter
 
     !>  The purpose of this subroutine is to destroy the fftw plan
