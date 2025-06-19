@@ -25,6 +25,8 @@ module m_data_output
 
     use m_helper
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_sim_helpers
 
     use m_delay_file_access
@@ -54,7 +56,7 @@ module m_data_output
     real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     real(wp), public, allocatable, dimension(:, :) :: c_mass
-    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf, c_mass)
 
     real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
@@ -97,7 +99,7 @@ contains
         if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
         else
-            call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta)
+            call s_write_parallel_data_files(q_cons_vf, t_step, beta)
         end if
 
     end subroutine s_write_data_files
@@ -149,18 +151,18 @@ contains
         ! Generating table header for the stability criteria to be outputted
         if (cfl_dt) then
             if (viscous) then
-                write (1, '(A)') '     Time-steps        dt     = Time         ICFL '// &
+                write (3, '(A)') '     Time-steps        dt     = Time         ICFL '// &
                     'Max      VCFL Max        Rc Min       ='
             else
-                write (1, '(A)') '            Time-steps                dt       Time '// &
+                write (3, '(A)') '            Time-steps                dt       Time '// &
                     '               ICFL Max              '
             end if
         else
             if (viscous) then
-                write (1, '(A)') '     Time-steps        Time         ICFL '// &
+                write (3, '(A)') '     Time-steps        Time         ICFL '// &
                     'Max      VCFL Max        Rc Min        '
             else
-                write (1, '(A)') '            Time-steps                Time '// &
+                write (3, '(A)') '            Time-steps                Time '// &
                     '               ICFL Max              '
             end if
         end if
@@ -330,11 +332,9 @@ contains
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
                                                          vcfl_max_loc, &
-                                                         ccfl_max_loc, &
                                                          Rc_min_loc, &
                                                          icfl_max_glb, &
                                                          vcfl_max_glb, &
-                                                         ccfl_max_glb, &
                                                          Rc_min_glb)
         else
             icfl_max_glb = icfl_max_loc
@@ -353,16 +353,16 @@ contains
         ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
             if (viscous) then
-                write (1, '(6X,I8,F10.6,6X,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
+                write (3, '(6X,I8,F10.6,6X,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
                     t_step, dt, t_step*dt, icfl_max_glb, &
                     vcfl_max_glb, &
                     Rc_min_glb
             else
-                write (1, '(13X,I8,14X,F10.6,14X,F10.6,13X,F9.6)') &
+                write (3, '(13X,I8,14X,F10.6,14X,F10.6,13X,F9.6)') &
                     t_step, dt, t_step*dt, icfl_max_glb
             end if
 
-            if (icfl_max_glb /= icfl_max_glb) then
+            if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
                 call s_mpi_abort('ICFL is NaN. Exiting.')
             elseif (icfl_max_glb > 1._wp) then
                 print *, 'icfl', icfl_max_glb
@@ -370,7 +370,7 @@ contains
             end if
 
             if (viscous) then
-                if (vcfl_max_glb /= vcfl_max_glb) then
+                if (.not. f_approx_equal(vcfl_max_glb, vcfl_max_glb)) then
                     call s_mpi_abort('VCFL is NaN. Exiting.')
                 elseif (vcfl_max_glb > 1._wp) then
                     print *, 'vcfl', vcfl_max_glb
@@ -781,13 +781,11 @@ contains
     !>  The goal of this subroutine is to output the grid and
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
-        !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
         !!  @param beta Eulerian void fraction from lagrangian bubbles
-    impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
 

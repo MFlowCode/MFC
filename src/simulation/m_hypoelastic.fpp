@@ -165,8 +165,8 @@ contains
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                                du_dz(k, l, q) = 0_wp; dv_dz(k, l, q) = 0_wp; dw_dx(k, l, q) = 0_wp; 
-                                dw_dy(k, l, q) = 0_wp; dw_dz(k, l, q) = 0_wp; 
+                                du_dz(k, l, q) = 0._wp; dv_dz(k, l, q) = 0._wp; dw_dx(k, l, q) = 0._wp; 
+                                dw_dy(k, l, q) = 0._wp; dw_dz(k, l, q) = 0._wp; 
                             end do
                         end do
                     end do
@@ -399,7 +399,7 @@ contains
 
         if (n == 0) then
             l = 0; q = 0
-            !$acc parallel loop collapse(1) gang vector default(present)
+            !$acc parallel loop gang vector default(present)
             do k = 0, m
                 rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_star, 0._wp))**cont_damage_s
             end do

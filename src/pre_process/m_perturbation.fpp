@@ -16,6 +16,8 @@ module m_perturbation
 
     use m_boundary_common   ! Boundary conditions module
 
+    use m_helper_basic           !< Functions to compare floating point numbers
+
     use ieee_arithmetic
 
     implicit none
@@ -31,8 +33,6 @@ module m_perturbation
 contains
 
     impure subroutine s_initialize_perturbation_module()
-
-        bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
 
         if (mixlayer_perturb) then
             mixlayer_bc_fd = 2
@@ -74,7 +74,7 @@ contains
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
                     !    IF ((perturb_alpha >= 25e-2_wp) .AND. (perturb_alpha <= 75e-2_wp)) THEN
-                    if ((perturb_alpha /= 0._wp) .and. (perturb_alpha /= 1._wp)) then
+                    if ((.not. f_approx_equal(perturb_alpha, 0._wp)) .and. (.not. f_approx_equal(perturb_alpha, 1._wp))) then
 
                         ! Derive new partial densities
                         do l = 1, num_fluids
@@ -352,7 +352,7 @@ contains
         call cg(mixlayer_nvar*n - n_bc_skip, mixlayer_nvar*n - n_bc_skip, hr, hi, wr, wi, zr, zi, fv1, fv2, fv3, ierr)
 
         ! Generate instability wave
-        call s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
+        call s_generate_wave(wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
 
     end subroutine s_solve_linear_system
 
@@ -494,8 +494,8 @@ contains
     !>  This subroutine generates an instability wave using the most unstable
         !!              eigenvalue and corresponding eigenvector among the
         !!              given set of eigenvalues and eigenvectors.
-    pure subroutine s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
-        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: wr, wi !< eigenvalues
+    pure subroutine s_generate_wave(wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: wi !< eigenvalues
         real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: zr, zi !< eigenvectors
         real(wp), intent(in) :: rho_mean
         real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave
@@ -599,7 +599,7 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    if (beta == 0) then
+                    if (f_approx_equal(beta, 0._wp)) then
                         ang = alpha*(x_cc(i)*xratio)
                     else
                         ang = alpha*(x_cc(i)*xratio) + beta*(z_cc(k)*xratio) + shift
@@ -624,7 +624,7 @@ contains
         do q = 1, elliptic_smoothing_iters
 
             ! Communication of buffer regions and apply boundary conditions
-            call s_populate_variables_buffers(q_prim_vf, pb%sf, mv%sf, bc_type)
+            call s_populate_variables_buffers(bc_type, q_prim_vf, pb%sf, mv%sf)
 
             ! Perform smoothing and store in temp array
             if (n == 0) then
