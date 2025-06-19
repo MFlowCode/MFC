@@ -365,6 +365,11 @@
     $:acc_directive
 #:enddef
 
+#:def GPU_END_HOST_DATA()
+    #:set acc_directive = '!$acc end host_data'
+    $:acc_directive
+#:enddef
+
 #:def GPU_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraAccArgs=None)
     #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
 
