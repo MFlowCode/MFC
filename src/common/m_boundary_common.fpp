@@ -1625,7 +1625,7 @@ contains
             !$acc parallel loop gang vector collapse(2) default(present)
             do l = idwbuff(2)%beg, idwbuff(2)%end
                 do k = idwbuff(1)%beg, idwbuff(1)%end
-                    select case (bc_type(3, -1)%sf(k, l, 0))
+                    select case (bc_type(3, 1)%sf(k, l, 0))
                     case (BC_PERIODIC)
                         do j = 1, buff_size
                             jac(k,l,p+j) = jac(k,l,j-1)
