@@ -109,7 +109,7 @@ contains
                         do j = 0, m
                             divu%sf(j, k, l) = 0._wp
                             divu%sf(j, k, l) = &
-                                5e-1_wp/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &
+                                5.e-1_wp/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &
                                                q_prim_vf(contxe + idir)%sf(j - 1, k, l))
 
                         end do
@@ -124,7 +124,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         divu%sf(j, k, l) = divu%sf(j, k, l) + &
-                                           5e-1_wp/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
+                                           5.e-1_wp/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
                                                           q_prim_vf(contxe + idir)%sf(j, k - 1, l))
 
                     end do
@@ -138,7 +138,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         divu%sf(j, k, l) = divu%sf(j, k, l) + &
-                                           5e-1_wp/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
+                                           5.e-1_wp/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
                                                           q_prim_vf(contxe + idir)%sf(j, k, l - 1))
 
                     end do

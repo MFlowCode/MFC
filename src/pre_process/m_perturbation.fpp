@@ -73,7 +73,7 @@ contains
                     perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
-                    !    IF ((perturb_alpha >= 25e-2_wp) .AND. (perturb_alpha <= 75e-2_wp)) THEN
+                    !    IF ((perturb_alpha >= 25.e-2_wp) .AND. (perturb_alpha <= 75.e-2_wp)) THEN
                     if ((.not. f_approx_equal(perturb_alpha, 0._wp)) .and. (.not. f_approx_equal(perturb_alpha, 1._wp))) then
 
                         ! Derive new partial densities
@@ -199,7 +199,7 @@ contains
             f0 = (Ca + 2._wp/Web)*(fR0/fR)**(3._wp*gam_b) - 2._wp/(Web*fR) + 1._wp - Ca - fP
             f1 = -3._wp*gam_b*(Ca + 2._wp/Web)*(fR0/fR)**(3._wp*gam_b + 1._wp) + 2._wp/(Web*fR**2._wp)
 
-            if (abs(f0) <= 1e-10_wp) then
+            if (abs(f0) <= 1.e-10_wp) then
                 ! Converged
                 exit
             else
@@ -589,8 +589,8 @@ contains
         xci = 0._wp
         do i = 1, mixlayer_nvar
             do k = 0, n
-                xcr((i - 1)*(nbp - 1) + k) = 5e-1_wp*(xbr((i - 1)*nbp + k) + xbr((i - 1)*nbp + k + 1))
-                xci((i - 1)*(nbp - 1) + k) = 5e-1_wp*(xbi((i - 1)*nbp + k) + xbi((i - 1)*nbp + k + 1))
+                xcr((i - 1)*(nbp - 1) + k) = 5.e-1_wp*(xbr((i - 1)*nbp + k) + xbr((i - 1)*nbp + k + 1))
+                xci((i - 1)*(nbp - 1) + k) = 5.e-1_wp*(xbi((i - 1)*nbp + k) + xbi((i - 1)*nbp + k + 1))
             end do
         end do
 

@@ -642,13 +642,13 @@ contains
 
                 interp_coeffs = 0._wp
 
-                if (dist(1, 1, 1) <= 1e-16_wp) then
+                if (dist(1, 1, 1) <= 1.e-16_wp) then
                     interp_coeffs(1, 1, 1) = 1._wp
-                else if (dist(2, 1, 1) <= 1e-16_wp) then
+                else if (dist(2, 1, 1) <= 1.e-16_wp) then
                     interp_coeffs(2, 1, 1) = 1._wp
-                else if (dist(1, 2, 1) <= 1e-16_wp) then
+                else if (dist(1, 2, 1) <= 1.e-16_wp) then
                     interp_coeffs(1, 2, 1) = 1._wp
-                else if (dist(2, 2, 1) <= 1e-16_wp) then
+                else if (dist(2, 2, 1) <= 1.e-16_wp) then
                     interp_coeffs(2, 2, 1) = 1._wp
                 else
                     eta(:, :, 1) = 1._wp/dist(:, :, 1)**2
@@ -713,21 +713,21 @@ contains
                                 (z_cc(k2) - gp%ip_loc(3))**2)
                 interp_coeffs = 0._wp
                 buf = 1._wp
-                if (dist(1, 1, 1) <= 1e-16_wp) then
+                if (dist(1, 1, 1) <= 1.e-16_wp) then
                     interp_coeffs(1, 1, 1) = 1._wp
-                else if (dist(2, 1, 1) <= 1e-16_wp) then
+                else if (dist(2, 1, 1) <= 1.e-16_wp) then
                     interp_coeffs(2, 1, 1) = 1._wp
-                else if (dist(1, 2, 1) <= 1e-16_wp) then
+                else if (dist(1, 2, 1) <= 1.e-16_wp) then
                     interp_coeffs(1, 2, 1) = 1._wp
-                else if (dist(2, 2, 1) <= 1e-16_wp) then
+                else if (dist(2, 2, 1) <= 1.e-16_wp) then
                     interp_coeffs(2, 2, 1) = 1._wp
-                else if (dist(1, 1, 2) <= 1e-16_wp) then
+                else if (dist(1, 1, 2) <= 1.e-16_wp) then
                     interp_coeffs(1, 1, 2) = 1._wp
-                else if (dist(2, 1, 2) <= 1e-16_wp) then
+                else if (dist(2, 1, 2) <= 1.e-16_wp) then
                     interp_coeffs(2, 1, 2) = 1._wp
-                else if (dist(1, 2, 2) <= 1e-16_wp) then
+                else if (dist(1, 2, 2) <= 1.e-16_wp) then
                     interp_coeffs(1, 2, 2) = 1._wp
-                else if (dist(2, 2, 2) <= 1e-16_wp) then
+                else if (dist(2, 2, 2) <= 1.e-16_wp) then
                     interp_coeffs(2, 2, 2) = 1._wp
                 else
                     eta = 1._wp/dist**2
