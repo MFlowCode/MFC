@@ -115,15 +115,6 @@ jobs:
                     # Remove end-of-line comments, preserving quoted strings
                     s/([^"'\''\\]*("[^"]*")?('\''[^'\'']*'\''?)?[^"'\''\\]*)[!].*$/\1/
                   ' "$file" > "$TMP_FILE"
-                
-                  if cmp -s "$file" "$TMP_FILE"; then
-                      echo -e "No changes needed for $file"
-                      rm "$TMP_FILE"
-                  else
-                      # Overwrite the original file with the processed content
-                      mv "$TMP_FILE" "$file"
-                      echo -e "Successfully processed $file"
-                  fi
               done
 
               "${PMD_HOME}/bin/pmd" cpd \
