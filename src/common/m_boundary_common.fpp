@@ -24,8 +24,7 @@ module m_boundary_common
     implicit none
 
     type(scalar_field), dimension(:, :), allocatable :: bc_buffers
-!$acc declare create(bc_buffers)
-
+    !$acc declare create(bc_buffers)
 
     type(scalar_field), dimension(1) :: jac_sf
 !$acc declare create(jac_sf)
@@ -1487,7 +1486,7 @@ contains
     subroutine s_populate_F_igr_buffers(bc_type, jac)
 
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
-        real(wp), target, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(inout) :: jac
+        real(wp), target, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(inout) :: jac
 
         integer :: j, k, l
 
@@ -1495,24 +1494,24 @@ contains
         jac_sf(1)%sf => jac
         !$acc end kernels
 
-        if(bc_x%beg >= 0) then
+        if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 1, -1, 1)
         else
             !$acc parallel loop gang vector collapse(2) default(present)
             do l = 0, p
                 do k = 0, n
-                    select case(bc_type(1, -1)%sf(0, k, l))
+                    select case (bc_type(1, -1)%sf(0, k, l))
                     case (BC_PERIODIC)
                         do j = 1, buff_size
-                            jac(-j, k, l) = jac(m-j+1,k,l)
+                            jac(-j, k, l) = jac(m - j + 1, k, l)
                         end do
                     case (BC_REFLECTIVE)
                         do j = 1, buff_size
-                            jac(-j, k, l) = jac(j - 1,k,l)
+                            jac(-j, k, l) = jac(j - 1, k, l)
                         end do
                     case default
                         do j = 1, buff_size
-                            jac(-j, k, l) = jac(0,k,l)
+                            jac(-j, k, l) = jac(0, k, l)
                         end do
                     end select
                 end do
@@ -1525,18 +1524,18 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = 0, p
                 do k = 0, n
-                    select case(bc_type(1, 1)%sf(0, k, l))
+                    select case (bc_type(1, 1)%sf(0, k, l))
                     case (BC_PERIODIC)
                         do j = 1, buff_size
-                            jac(m+j, k, l) = jac(j-1,k,l)
+                            jac(m + j, k, l) = jac(j - 1, k, l)
                         end do
                     case (BC_REFLECTIVE)
                         do j = 1, buff_size
-                            jac(m+j, k, l) = jac(m - (j - 1),k,l)
+                            jac(m + j, k, l) = jac(m - (j - 1), k, l)
                         end do
                     case default
                         do j = 1, buff_size
-                            jac(m+j, k, l) = jac(m,k,l)
+                            jac(m + j, k, l) = jac(m, k, l)
                         end do
                     end select
                 end do
@@ -1554,22 +1553,22 @@ contains
                     select case (bc_type(2, -1)%sf(k, 0, l))
                     case (BC_PERIODIC)
                         do j = 1, buff_size
-                            jac(k,-j,l) = jac(k,n-j+1,l)
+                            jac(k, -j, l) = jac(k, n - j + 1, l)
                         end do
                     case (BC_REFLECTIVE)
                         do j = 1, buff_size
-                            jac(k,-j,l) = jac(k,j-1,l)
+                            jac(k, -j, l) = jac(k, j - 1, l)
                         end do
                     case default
                         do j = 1, buff_size
-                            jac(k,-j,l) = jac(k,0,l)
+                            jac(k, -j, l) = jac(k, 0, l)
                         end do
                     end select
                 end do
             end do
         end if
 
-        if(bc_y%end >= 0) then
+        if (bc_y%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 2, 1, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1578,15 +1577,15 @@ contains
                     select case (bc_type(2, 1)%sf(k, 0, l))
                     case (BC_PERIODIC)
                         do j = 1, buff_size
-                            jac(k,n+j,l) = jac(k,j-1,l)
+                            jac(k, n + j, l) = jac(k, j - 1, l)
                         end do
                     case (BC_REFLECTIVE)
                         do j = 1, buff_size
-                            jac(k,n+j,l) = jac(k,n - (j-1),l)
+                            jac(k, n + j, l) = jac(k, n - (j - 1), l)
                         end do
                     case default
                         do j = 1, buff_size
-                            jac(k,n+j,l) = jac(k,n,l)
+                            jac(k, n + j, l) = jac(k, n, l)
                         end do
                     end select
                 end do
@@ -1595,7 +1594,7 @@ contains
 
         if (p == 0) then
             return
-        else if(bc_z%beg >= 0) then
+        else if (bc_z%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 3, -1, 1)
         else
             !$acc parallel loop collapse(2) gang vector default(present)
@@ -1604,22 +1603,22 @@ contains
                     select case (bc_type(3, -1)%sf(k, l, 0))
                     case (BC_PERIODIC)
                         do j = 1, buff_size
-                            jac(k,l,-j) = jac(k,l,p-j+1)
+                            jac(k, l, -j) = jac(k, l, p - j + 1)
                         end do
                     case (BC_REFLECTIVE)
                         do j = 1, buff_size
-                            jac(k,l,-j) = jac(k,l,j - 1)
+                            jac(k, l, -j) = jac(k, l, j - 1)
                         end do
                     case default
                         do j = 1, buff_size
-                            jac(k,l,-j) = jac(k,l,0)
+                            jac(k, l, -j) = jac(k, l, 0)
                         end do
                     end select
                 end do
             end do
         end if
 
-        if(bc_z%end >= 0) then
+        if (bc_z%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 3, 1, 1)
         else
             !$acc parallel loop gang vector collapse(2) default(present)
@@ -1628,15 +1627,15 @@ contains
                     select case (bc_type(3, 1)%sf(k, l, 0))
                     case (BC_PERIODIC)
                         do j = 1, buff_size
-                            jac(k,l,p+j) = jac(k,l,j-1)
+                            jac(k, l, p + j) = jac(k, l, j - 1)
                         end do
                     case (BC_REFLECTIVE)
                         do j = 1, buff_size
-                            jac(k,l,p+j) = jac(k,l,p - (j-1))
+                            jac(k, l, p + j) = jac(k, l, p - (j - 1))
                         end do
                     case default
                         do j = 1, buff_size
-                            jac(k,l,p+j) = jac(k,l,p)
+                            jac(k, l, p + j) = jac(k, l, p)
                         end do
                     end select
                 end do

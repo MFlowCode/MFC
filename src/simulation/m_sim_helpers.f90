@@ -76,10 +76,10 @@ contains
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
 
-        if(igr) then
+        if (igr) then
             !$acc loop seq
             do i = 1, num_dims
-                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l) / rho
+                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)/rho
             end do
         else
             !$acc loop seq
@@ -94,7 +94,7 @@ contains
             vel_sum = vel_sum + vel(i)**2._wp
         end do
 
-        if(igr) then
+        if (igr) then
             E = q_prim_vf(E_idx)%sf(j, k, l)
             pres = (E - pi_inf - qv - 5e-1_wp*rho*vel_sum)/gamma
         else

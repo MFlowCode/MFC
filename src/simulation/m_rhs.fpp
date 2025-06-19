@@ -179,7 +179,7 @@ contains
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
 
-        if(.not. igr) then
+        if (.not. igr) then
             do l = 1, sys_size
                 @:ALLOCATE(q_cons_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             end do
@@ -203,7 +203,7 @@ contains
 
         end if
 
-        if(.not. igr) then
+        if (.not. igr) then
             @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 
             do l = 1, cont_idx%end
@@ -242,7 +242,7 @@ contains
             @:ALLOCATE(flux_src_n(i)%vf(1:sys_size))
             @:ALLOCATE(flux_gsrc_n(i)%vf(1:sys_size))
 
-            if(.not. igr) then
+            if (.not. igr) then
 
                 if (i == 1) then
                     do l = 1, sys_size
@@ -250,7 +250,7 @@ contains
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
                                  & idwbuff(2)%beg:idwbuff(2)%end, &
                                  & idwbuff(3)%beg:idwbuff(3)%end))
-                        if(.not. igr) then
+                        if (.not. igr) then
                             @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
                                     & idwbuff(1)%beg:idwbuff(1)%end, &
                                     & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -259,7 +259,7 @@ contains
                     end do
 
                     if (viscous .or. surface_tension) then
-                        if(.not. igr) then
+                        if (.not. igr) then
                             do l = mom_idx%beg, E_idx
                                 @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                          & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -269,7 +269,7 @@ contains
                         end if
                     end if
 
-                    if(.not. igr) then
+                    if (.not. igr) then
                         @:ALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
                                  & idwbuff(2)%beg:idwbuff(2)%end, &
@@ -295,7 +295,7 @@ contains
                     end if
 
                 else
-                    if(.not. igr) then
+                    if (.not. igr) then
                         do l = 1, sys_size
                             @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
                                 idwbuff(1)%beg:idwbuff(1)%end, &
@@ -306,7 +306,7 @@ contains
                 end if
 
                 @:ACC_SETUP_VFs(flux_n(i))
-                if(.not. igr) then
+                if (.not. igr) then
                     @:ACC_SETUP_VFs(flux_src_n(i), flux_gsrc_n(i))
                 end if
 
@@ -321,7 +321,7 @@ contains
                     do l = 1, sys_size
                         flux_n(i)%vf(l)%sf => flux_n(1)%vf(l)%sf
                         !$acc enter data attach(flux_n(i)%vf(l)%sf)
-                        if(.not. igr) then
+                        if (.not. igr) then
                             flux_src_n(i)%vf(l)%sf => flux_src_n(1)%vf(l)%sf
                             !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
                         end if
@@ -391,8 +391,7 @@ contains
 
             end if
 
-
-            if(.not. viscous) then
+            if (.not. viscous) then
                 do i = 1, num_dims
                     @:ALLOCATE(dqL_prim_dx_n(i)%vf(1:sys_size))
                     @:ALLOCATE(dqL_prim_dy_n(i)%vf(1:sys_size))
@@ -648,7 +647,7 @@ contains
 
         call cpu_time(t_start)
 
-        if(.not. igr) then
+        if (.not. igr) then
             ! Association/Population of Working Variables
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
@@ -682,9 +681,9 @@ contains
                     end do
                 end do
             end if
-        endif
+        end if
 
-        if(igr) then
+        if (igr) then
             call nvtxStartRange("RHS-COMMUNICATION")
             call s_populate_variables_buffers(bc_type, q_cons_vf, pb, mv)
             call nvtxEndRange
@@ -741,11 +740,11 @@ contains
 
                 if (id == 1) then
                     !$acc parallel loop collapse(3) gang vector default(present)
-                    do l = -1, p+1
-                       do k = -1, n+1
-                            do j = -1,m+1
+                    do l = -1, p + 1
+                        do k = -1, n + 1
+                            do j = -1, m + 1
                                 do i = 1, sys_size
-                                    rhs_vf(i)%sf(j,k,l) = 0._wp
+                                    rhs_vf(i)%sf(j, k, l) = 0._wp
                                 end do
                             end do
                         end do
@@ -753,12 +752,12 @@ contains
                 end if
 
                 call nvtxStartRange("IGR_RIEMANN")
-                call s_igr_riemann_solver(q_cons_vf,rhs_vf,id)
+                call s_igr_riemann_solver(q_cons_vf, rhs_vf, id)
                 call nvtxEndRange
 
-                if(id == 1) then
+                if (id == 1) then
                     call nvtxStartRange("IGR_Jacobi")
-                    call s_igr_iterative_solve(q_cons_vf,bc_type,t_step)
+                    call s_igr_iterative_solve(q_cons_vf, bc_type, t_step)
                     call nvtxEndRange
 
                     call nvtxStartRange("IGR_SIGMA")
@@ -859,7 +858,6 @@ contains
                                       flux_gsrc_n(id)%vf, &
                                       id, irx, iry, irz)
                 call nvtxEndRange
-
 
                 ! Additional physics and source terms
                 ! RHS addition for advection source
@@ -987,7 +985,7 @@ contains
         ! END: Additional pphysics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
-            if(.not. igr) then
+            if (.not. igr) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size
                     do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -1973,12 +1971,12 @@ contains
         @:DEALLOCATE(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
         @:DEALLOCATE(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
 
-        if(.not. igr) then
+        if (.not. igr) then
             do i = num_dims, 1, -1
                 if (i /= 1) then
                     do l = 1, sys_size
                         nullify (flux_n(i)%vf(l)%sf)
-                        if(.not. igr) then
+                        if (.not. igr) then
                             nullify (flux_src_n(i)%vf(l)%sf)
                             @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
                         end if
@@ -1986,7 +1984,7 @@ contains
                 else
                     do l = 1, sys_size
                         @:DEALLOCATE(flux_n(i)%vf(l)%sf)
-                        if(.not. igr) then
+                        if (.not. igr) then
                             @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
                         end if
                     end do
@@ -1997,7 +1995,7 @@ contains
                         end do
                     end if
 
-                    if(.not. igr) then
+                    if (.not. igr) then
                         if (riemann_solver == 1) then
                             do l = adv_idx%beg + 1, adv_idx%end
                                 @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
@@ -2009,7 +2007,7 @@ contains
                         end if
                     end if
 
-                    if(.not. igr) then
+                    if (.not. igr) then
                         @:DEALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf)
                     end if
                 end if

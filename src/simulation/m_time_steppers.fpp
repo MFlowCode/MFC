@@ -367,7 +367,7 @@ contains
 #endif
 
         if (run_time_info) then
-            if(igr) then
+            if (igr) then
                 call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
             else
                 call s_write_run_time_information(q_prim_vf, t_step)
@@ -477,7 +477,7 @@ contains
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
 
         if (run_time_info) then
-            if(igr) then
+            if (igr) then
                 call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
             else
                 call s_write_run_time_information(q_prim_vf, t_step)
@@ -663,7 +663,7 @@ contains
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
 
         if (run_time_info) then
-            if(igr) then
+            if (igr) then
                 call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
             else
                 call s_write_run_time_information(q_prim_vf, t_step)
