@@ -1149,7 +1149,7 @@ contains
                         use CuTensorEx
 
                         #:call GPU_HOST_DATA(use_device='[v_rs_ws_x, v_rs_ws_y]')
-                        v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1, sys_size], order=[2, 1, 3, 4])
+                            v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1, sys_size], order=[2, 1, 3, 4])
                         #:endcall GPU_HOST_DATA
                     end block
                 else
@@ -1157,7 +1157,7 @@ contains
                         use CuTensorEx
 
                         #:call GPU_HOST_DATA(use_device='[v_rs_ws_x, v_rs_ws_y]')
-                        v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1 + 2*buff_size, sys_size], order=[2, 1, 3, 4])
+                            v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1 + 2*buff_size, sys_size], order=[2, 1, 3, 4])
                         #:endcall GPU_HOST_DATA
                     end block
                 end if
@@ -1187,7 +1187,7 @@ contains
                     use CuTensorEx
 
                     #:call GPU_HOST_DATA(use_device='[v_rs_ws_x, v_rs_ws_z]')
-                    v_rs_ws_z = reshape(v_rs_ws_x, shape=[p + 1 + 2*buff_size, n + 2*buff_size + 1, m + 2*buff_size + 1, sys_size], order=[3, 2, 1, 4])
+                        v_rs_ws_z = reshape(v_rs_ws_x, shape=[p + 1 + 2*buff_size, n + 2*buff_size + 1, m + 2*buff_size + 1, sys_size], order=[3, 2, 1, 4])
                     #:endcall
                 end block
             else

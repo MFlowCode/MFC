@@ -1,3 +1,5 @@
+#:mute
+
 #:def ASSERT_LIST(data, datatype)
     #:assert data is not None
     #:assert isinstance(data, list)
@@ -7,7 +9,6 @@
 
 #:def GEN_PARENTHESES_CLAUSE(clause_name, clause_str)
     #:set clause_regex = re.compile(',(?![^(]*\\))')
-
     #:assert isinstance(clause_name, str)
     #:if clause_str is not None
         #:set count = 0
@@ -203,35 +204,20 @@
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None)
-
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
-    
     #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
-
     #:set default_val = GEN_DEFAULT_STR(default)
-
     #:set private_val = GEN_PRIVATE_STR(private, False).strip('\n') + GEN_PRIVATE_STR(firstprivate, True).strip('\n')
-
     #:set reduction_val = GEN_REDUCTION_STR(reduction, reductionOp)
-
     #:set copy_val = GEN_COPY_STR(copy)
-
     #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
-    
     #:set copyout_val = GEN_COPYOUT_STR(copyout)
-
     #:set create_val = GEN_CREATE_STR(create)
-
     #:set no_create_val = GEN_NOCREATE_STR(no_create)
-
     #:set present_val = GEN_PRESENT_STR(present)
-
     #:set deviceptr_val = GEN_DEVICEPTR_STR(deviceptr)
-
     #:set attach_val = GEN_ATTACH_STR(attach)
-
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-
     #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
         & default_val.strip('\n') + private_val.strip('\n') + reduction_val.strip('\n') + &
         & copy_val.strip('\n') + copyin_val.strip('\n') + &
@@ -246,16 +232,13 @@
 #:def GPU_ROUTINE(function_name=None, parallelism=None, nohost=False, cray_inline=False, extraAccArgs=None)
     #:assert isinstance(cray_inline, bool)
     #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
-
     #:assert isinstance(nohost, bool)
     #:if nohost == True
         #:set nohost_val = 'nohost'
     #:else
         #:set nohost_val = ''
     #:endif
-
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-
     #:set clause_val = parallelism_val.strip('\n') + nohost_val.strip('\n')
     #:set acc_directive = '!$acc routine ' + &
         & clause_val + extraAccArgs_val.strip('\n')
@@ -275,23 +258,14 @@
 #:enddef
 
 #:def GPU_DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, link=None, extraAccArgs=None)
-    
     #:set copy_val = GEN_COPY_STR(copy)
-
     #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
-
     #:set copyout_val = GEN_COPYOUT_STR(copyout)
-
     #:set create_val = GEN_CREATE_STR(create)
-
     #:set present_val = GEN_PRESENT_STR(present)
-
     #:set deviceptr_val = GEN_DEVICEPTR_STR(deviceptr)
-
     #:set link_val = GEN_LINK_STR(link)
-
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-
     #:set clause_val = copy_val.strip('\n') + copyin_val.strip('\n') + &
         & copyout_val.strip('\n') + create_val.strip('\n') + &
         & present_val.strip('\n') + deviceptr_val.strip('\n') + &
@@ -301,11 +275,8 @@
 #:enddef
 
 #:def GPU_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
-
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
-
     #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
-
     #:if data_dependency is not None
         #:assert isinstance(data_dependency, str)
         #:assert (data_dependency == 'auto' or data_dependency == 'independent')
@@ -313,13 +284,9 @@
     #:else
         #:set data_dependency_val = ''
     #:endif
-    
     #:set private_val = GEN_PRIVATE_STR(private, False)
-
     #:set reduction_val = GEN_REDUCTION_STR(reduction, reductionOp)
-
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-
     #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
         & data_dependency_val.strip('\n') + private_val.strip('\n') + &
         & reduction_val.strip('\n')
@@ -334,27 +301,16 @@
     #:if code == '' or code.isspace()
         #:stop 'GPU_DATA macro has no effect on the code as it is not surrounding any code'
     #:endif
-
     #:set copy_val = GEN_COPY_STR(copy)
-
     #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
-
     #:set copyout_val = GEN_COPYOUT_STR(copyout)
-
     #:set create_val = GEN_CREATE_STR(create)
-
     #:set no_create_val = GEN_NOCREATE_STR(no_create)
-
     #:set present_val = GEN_PRESENT_STR(present)
-
     #:set deviceptr_val = GEN_DEVICEPTR_STR(deviceptr)
-
     #:set attach_val = GEN_ATTACH_STR(attach)
-
     #:set default_val = GEN_DEFAULT_STR(default)
-
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-
     #:set clause_val = copy_val.strip('\n') + copyin_val.strip('\n') + &
         & copyout_val.strip('\n') + create_val.strip('\n') + &
         & no_create_val.strip('\n') + present_val.strip('\n') + & 
@@ -375,7 +331,6 @@
     #:endif
     #:set use_device_val = GEN_USE_DEVICE_STR(use_device)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-
     #:set clause_val = use_device_val.strip('\n')
     #:set acc_directive = '!$acc host_data ' + clause_val + extraAccArgs_val.strip('\n')
     #:set end_acc_directive = '!$acc end host_data'
@@ -386,13 +341,9 @@
 
 #:def GPU_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraAccArgs=None)
     #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
-
     #:set create_val = GEN_CREATE_STR(create)
-
     #:set attach_val = GEN_ATTACH_STR(attach)
-
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-
     #:set clause_val = copyin_val.strip('\n') + create_val.strip('\n') + attach_val.strip('\n')
     #:set acc_directive = '!$acc enter data ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
@@ -400,13 +351,9 @@
 
 #:def GPU_EXIT_DATA(copyout=None, delete=None, detach=None, extraAccArgs=None)
     #:set copyout_val = GEN_COPYOUT_STR(copyout)
-
     #:set delete_val = GEN_DELETE_STR(delete)
-
     #:set detach_val = GEN_DETACH_STR(detach)
-
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-
     #:set clause_val = copyout_val.strip('\n') + delete_val.strip('\n') + detach_val.strip('\n')
     #:set acc_directive = '!$acc exit data ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
@@ -414,9 +361,7 @@
 
 #:def GPU_CACHE(cache, extraAccArgs=None)
     #:set cache_val = GEN_PARENTHESES_CLAUSE('cache', cache)
-
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-
     #:set clause_val = cache_val.strip('\n')
     #:set acc_directive = '!$acc ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
@@ -425,11 +370,8 @@
 #:def GPU_ATOMIC(atomic, extraAccArgs=None)
     #:assert isinstance(atomic, str)
     #:assert (atomic == 'read' or atomic == 'write' or atomic == 'update' or atomic == 'capture')
-
     #:set atomic_val = atomic
-
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-
     #:set clause_val = atomic_val.strip('\n')
     #:set acc_directive = '!$acc atomic ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
@@ -437,11 +379,8 @@
 
 #:def GPU_UPDATE(host=None, device=None, extraAccArgs=None)
     #:set host_val = GEN_HOST_STR(host)
-
     #:set device_val = GEN_DEVICE_STR(device)
-
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-
     #:set clause_val = host_val.strip('\n') + device_val.strip('\n')
     #:set acc_directive = '!$acc update ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
@@ -449,9 +388,10 @@
 
 #:def GPU_WAIT(extraAccArgs=None)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-
     #:set clause_val = ''
     #:set acc_directive = '!$acc wait ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
 #:enddef
+
+#:endmute
 ! New line at end of file is required for FYPP

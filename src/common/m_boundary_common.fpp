@@ -1405,7 +1405,7 @@ contains
     end subroutine s_color_function_reflective
 
     pure subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
-        $:GPU_ROUTINE(function_name='s_color_function_ghost_cell_extrapolation', & 
+        $:GPU_ROUTINE(function_name='s_color_function_ghost_cell_extrapolation', &
             & parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         integer, intent(in) :: bc_dir, bc_loc

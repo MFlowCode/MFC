@@ -637,7 +637,6 @@ contains
         $:GPU_ROUTINE(function_name='s_coeff',parallelism='[seq]', &
             & cray_inline=True)
 
-
         real(wp), intent(in) :: pres, rho, c
         real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
 

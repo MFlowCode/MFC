@@ -457,7 +457,6 @@ contains
         $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_acc', &
             & parallelism='[seq]', cray_inline=True)
 
-
         real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
 
         real(wp), dimension(num_fluids), intent(inout) :: alpha_rho_K, alpha_K !<
@@ -1597,7 +1596,6 @@ contains
         $:GPU_ROUTINE(function_name='s_compute_speed_of_sound', &
             & parallelism='[seq]', cray_inline=True)
 
-
         real(wp), intent(in) :: pres
         real(wp), intent(in) :: rho, gamma, pi_inf
         real(wp), intent(in) :: H
@@ -1664,7 +1662,6 @@ contains
     pure subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
         $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', &
             & parallelism='[seq]', cray_inline=True)
-
 
         real(wp), intent(in) :: B(3), rho, c
         real(wp), intent(in) :: h ! only used for relativity
