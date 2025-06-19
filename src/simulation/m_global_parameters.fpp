@@ -121,6 +121,7 @@ module m_global_parameters
         real(wp), parameter :: wenoz_q = ${wenoz_q}$                !< Power constant for WENO-Z
         logical, parameter :: mhd = (${mhd}$ /= 0)                  !< Magnetohydrodynamics
         logical, parameter :: relativity = (${relativity}$ /= 0)    !< Relativity (only for MHD)
+        integer, parameter :: igr_iter_solver = ${igr_iter_solver}$ !< IGR elliptic solver
         integer, parameter :: igr_order = ${igr_order}$             !< Reconstruction order for IGR
         logical, parameter :: viscous = (${viscous}$ /= 0)          !< Viscous effects
     #:else
@@ -135,6 +136,7 @@ module m_global_parameters
         real(wp) :: wenoz_q       !< Power constant for WENO-Z
         logical :: mhd            !< Magnetohydrodynamics
         logical :: relativity     !< Relativity (only for MHD)
+        integer :: igr_iter_solver!< IGR elliptic solver
         integer :: igr_order      !< Reconstruction order for IGR
         logical :: viscous        !< Viscous effects
     #:endif
@@ -161,7 +163,6 @@ module m_global_parameters
     logical :: bulk_stress   !< Bulk stresses
     logical :: cont_damage   !< Continuum damage modeling
     logical :: igr            !< Use information geometric regularization
-    integer :: igr_iter_solver !< IGR elliptic solver
     integer :: num_igr_iters !< number of iterations for elliptic solve
     integer :: num_igr_warm_start_iters !< number of warm start iterations for elliptic solve
     real(wp) :: alf_factor  !< alpha factor for IGR
@@ -184,7 +185,7 @@ module m_global_parameters
     #:if not MFC_CASE_OPTIMIZATION
         !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, &
         !$acc num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity, &
-        !$acc igr_order, viscous)
+        !$acc igr_iter_solver, igr_order, viscous)
     #:endif
 
     !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, &
@@ -579,7 +580,6 @@ contains
         shear_stress = .false.
         bulk_stress = .false.
         cont_damage = .false.
-        igr_iter_solver = 1
         num_igr_iters = dflt_num_igr_iters
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor
@@ -592,6 +592,7 @@ contains
             wenoz_q = dflt_real
             igr_order = dflt_int
             viscous = .false.
+            igr_iter_solver = 1
         #:endif
 
         chem_params%diffusion = .false.
@@ -807,7 +808,7 @@ contains
             !$acc update device(weno_num_stencils)
             !$acc update device(nb)
             !$acc update device(num_dims, num_vels, num_fluids)
-            !$acc update device(igr, igr_order)
+            !$acc update device(igr, igr_order, igr_iter_solver)
         #:endif
 
         ! Initializing the number of fluids for which viscous effects will

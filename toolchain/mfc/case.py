@@ -227,6 +227,7 @@ class Case:
 #:set wenoz_q               = {self.params.get("wenoz_q", -1)}
 #:set mhd                   = {mhd}
 #:set relativity            = {relativity}
+#:set igr_iter_solver       = {self.params.get("igr_iter_solver", 1)}
 #:set igr_order             = {self.params.get("igr_order", -1)}
 #:set viscous               = {viscous}
 """

@@ -165,6 +165,7 @@ contains
 #:if not MFC_CASE_OPTIMIZATION
             nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, &
             num_fluids, mhd, relativity, igr_order, viscous, &
+            igr_iter_solver, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
@@ -182,7 +183,7 @@ contains
             surface_tension, bubbles_lagrange, lag_params, &
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar, &
-            alf_factor, num_igr_iters, igr_iter_solver, &
+            alf_factor, num_igr_iters, &
             num_igr_warm_start_iters, igr
 
         ! Checking that an input file has been provided by the user. If it

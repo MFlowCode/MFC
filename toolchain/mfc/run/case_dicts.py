@@ -477,7 +477,8 @@ ALL.update(SIMULATION)
 ALL.update(POST_PROCESS)
 
 CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order", 
-                     "num_fluids", "mhd", "relativity", "igr_order", "viscous"]
+                     "num_fluids", "mhd", "relativity", "igr_order", "viscous", 
+                     "igr_iter_solver"]
 
 _properties = { k: v.value for k, v in ALL.items() }
 
