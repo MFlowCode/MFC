@@ -169,7 +169,7 @@ $:GPU_HOST_DATA(use_device='[p_real, p_cmplx, p_fltr_cmplx]')
         ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(p_real), c_loc(p_cmplx))
         call hipCheck(hipDeviceSynchronize())
 #endif
-        !$acc end host_data
+        $:GPU_END_HOST_DATA()
         Nfq = 3
         $:GPU_UPDATE(device='[Nfq]')
 
@@ -189,7 +189,7 @@ $:GPU_HOST_DATA(use_device='[p_real, p_fltr_cmplx]')
         ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(p_fltr_cmplx), c_loc(p_real))
         call hipCheck(hipDeviceSynchronize())
 #endif
-        !$acc end host_data
+        $:GPU_END_HOST_DATA()
 
         $:GPU_PARALLEL_LOOP(collapse=3)
         do k = 1, sys_size
@@ -228,7 +228,7 @@ $:GPU_HOST_DATA(use_device='[p_real, p_cmplx]')
             ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(p_real), c_loc(p_cmplx))
             call hipCheck(hipDeviceSynchronize())
 #endif
-            !$acc end host_data
+            $:GPU_END_HOST_DATA()
 
             Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
             $:GPU_UPDATE(device='[Nfq]')
@@ -249,7 +249,7 @@ $:GPU_HOST_DATA(use_device='[p_real, p_fltr_cmplx]')
             ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(p_fltr_cmplx), c_loc(p_real))
             call hipCheck(hipDeviceSynchronize())
 #endif
-            !$acc end host_data
+            $:GPU_END_HOST_DATA()
 
             $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
             do k = 1, sys_size
