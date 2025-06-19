@@ -73,7 +73,7 @@ contains
                     perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
-                    !    IF ((perturb_alpha >= 25.e-2_wp) .AND. (perturb_alpha <= 75.e-2_wp)) THEN
+                    !    IF ((perturb_alpha >= 25e-2_wp) .AND. (perturb_alpha <= 75e-2_wp)) THEN
                     if ((.not. f_approx_equal(perturb_alpha, 0._wp)) .and. (.not. f_approx_equal(perturb_alpha, 1._wp))) then
 
                         ! Derive new partial densities

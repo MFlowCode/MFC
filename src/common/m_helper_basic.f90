@@ -47,7 +47,7 @@ contains
     !> This procedure checks if the point numbers of wp belongs to another array are within tolerance.
     !! @param a First number.
     !! @param b Array that contains several point numbers.
-    !! @param tol_input Relative error (default = 1.e-10_wp).
+    !! @param tol_input Relative error (default = 1e-10_wp).
     !! @return Result of the comparison.
     logical pure function f_approx_in_array(a, b, tol_input) result(res)
         !$acc routine seq
@@ -62,7 +62,7 @@ contains
         if (present(tol_input)) then
             tol = tol_input
         else
-            tol = 1.e-10_wp
+            tol = 1e-10_wp
         end if
 
         do i = 1, size(b)
