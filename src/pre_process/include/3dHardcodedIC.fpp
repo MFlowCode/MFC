@@ -3,7 +3,8 @@
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
 
     real(wp) :: eps
-    eps = 1e-9_wp
+
+    eps = 1.e-9_wp
 #:enddef
 
 #:def Hardcoded3D()
@@ -21,7 +22,7 @@
 
         intH = amp*(sin(2._wp*pi*x_cc(i)/lam - pi/2._wp) + sin(2._wp*pi*z_cc(k)/lam - pi/2._wp)) + h
 
-        alph = 5e-1_wp*(1._wp + tanh((y_cc(j) - intH)/2.5e-3_wp))
+        alph = 5.e-1_wp*(1._wp + tanh((y_cc(j) - intH)/2.5e-3_wp))
 
         if (alph < eps) alph = eps
         if (alph > 1._wp - eps) alph = 1._wp - eps
