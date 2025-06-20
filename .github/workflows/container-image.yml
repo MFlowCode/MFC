@@ -4,25 +4,8 @@ on:
   push:
 
 jobs:
-  file-changes:
-    name: Detect File Changes
-    runs-on: 'ubuntu-latest'
-    outputs: 
-      checkall: ${{ steps.changes.outputs.checkall }}
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-
-      - name: Detect Changes
-        uses: dorny/paths-filter@v3
-        id: changes
-        with: 
-          filters: ".github/file-filter.yml"
-
   Build-singularity-images:
     name: Build Singularity Images
-    needs: file-changes
-    if: needs.file-changes.outputs.checkall == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Clone - PR
@@ -42,12 +25,7 @@ jobs:
         run: |
           echo "Building Singularity CPU Image"
           (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu.sif Singularity.cpu)
-          echo "Building Singularity GPU Image"
-          (cd pr/.github/workflows/images && sudo apptainer build mfc_gpu.sif Singularity.gpu)
-          echo "Building Singularity CPU Benchmark Image"
-          (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu_bench.sif Singularity.cpu_bench)
-          echo "Building Singularity GPU Benchmark Image"
-          (cd pr/.github/workflows/images && sudo apptainer build mfc_gpu_bench.sif Singularity.gpu_bench)
+          apptainer run --fakeroot mfc_cpu.sif test -a --no-build --no-mpi
       - name: Upload images as artifacts
         uses: actions/upload-artifact@v4
         if:   always()
@@ -55,6 +33,3 @@ jobs:
           name: singularity-images
           path: |
             pr/.github/workflows/images/mfc_cpu.sif
-            pr/.github/workflows/images/mfc_gpu.sif
-            pr/.github/workflows/images/mfc_cpu_bench.sif
-            pr/.github/workflows/images/mfc_gpu_bench.sif
