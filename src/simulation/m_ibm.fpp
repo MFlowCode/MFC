@@ -313,40 +313,14 @@ contains
         !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, vel_g, rho, gamma, pi_inf, Re_K, innerp, j, k, l, q)
         do i = 1, num_inner_gps
 
-            vel_g = 0._wp
             innerp = inner_points(i)
             j = innerp%loc(1)
             k = innerp%loc(2)
             l = innerp%loc(3)
-            patch_id = inner_points(i)%ib_patch_id
-
-            ! Calculate physical location of GP
-            if (p > 0) then
-                physical_loc = [x_cc(j), y_cc(k), z_cc(l)]
-            else
-                physical_loc = [x_cc(j), y_cc(k), 0._wp]
-            end if
-
-            !$acc loop seq
-            do q = 1, num_fluids
-                q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
-            end do
-
-            if (surface_tension) then
-                q_prim_vf(c_idx)%sf(j, k, l) = c_IP
-            end if
-
-            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
-                                                            alpha_rho_IP, Re_K)
-
-            dyn_pres = 0._wp
 
             !$acc loop seq
             do q = momxb, momxe
-                q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - momxb + 1)
-                dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)* &
-                           vel_g(q - momxb + 1)/2._wp
+                q_cons_vf(q)%sf(j, k, l) = 0._wp
             end do
         end do
 
