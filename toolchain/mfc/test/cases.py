@@ -224,7 +224,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if len(dimInfo[0]) > 1:
                 alter_igr()
 
-            
+
             if num_fluids == 1:
 
                 stack.push("Viscous", {
@@ -835,7 +835,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             for couplingMethod in [1, 2]:
                 stack.push("Lagrange Bubbles", {"bubbles_lagrange": 'T',
                     'dt': 1e-06, 'lag_params%pressure_corrector': 'T', 'bubble_model': 2,
-                    'num_fluids': 2, 'lag_params%heatTransfer_model': 'T', 'lag_params%massTransfer_model': 'T', 
+                    'num_fluids': 2, 'lag_params%heatTransfer_model': 'T', 'lag_params%massTransfer_model': 'T',
                     'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'fluid_pp(2)%gamma': 2.5,
                     'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002, 'fluid_pp(1)%ss' : 0.07275,
                     'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33, 'fluid_pp(1)%M_v' : 18.02,
@@ -847,7 +847,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'patch_icpp(2)%alpha(2)': 0.,  'patch_icpp(3)%alpha_rho(1)': 0.96, 'patch_icpp(3)%alpha(1)': 4e-02,
                     'patch_icpp(3)%alpha_rho(2)': 0., 'patch_icpp(3)%alpha(2)': 0.,'patch_icpp(1)%pres': 1.0,
                     'patch_icpp(2)%pres': 1.0, 'patch_icpp(3)%pres': 1.0, 'acoustic_source': 'T', 'acoustic(1)%loc(2)': 0.5,
-                    'acoustic(1)%wavelength': 0.25, 'acoustic(1)%support': 3, 'acoustic(1)%height': 1e10, 
+                    'acoustic(1)%wavelength': 0.25, 'acoustic(1)%support': 3, 'acoustic(1)%height': 1e10,
                     'acoustic(1)%mag': 2e+04, 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50
                 })
                 if couplingMethod==1:
@@ -889,7 +889,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         if len(dimInfo[0]) > 2:
             for direc in [1,2,3]:
                 stack.push('Circle' ,{
-                        'patch_bc(1)%geometry': 2, 'patch_bc(1)%dir': direc, 
+                        'patch_bc(1)%geometry': 2, 'patch_bc(1)%dir': direc,
                         'patch_bc(1)%type': -17, 'patch_bc(1)%loc': -1
                 })
 
@@ -910,7 +910,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         elif len(dimInfo[0]) > 1:
             for direc in [1,2]:
                 stack.push('Line Segment' ,{
-                        'patch_bc(1)%geometry': 1, 'patch_bc(1)%dir': direc, 
+                        'patch_bc(1)%geometry': 1, 'patch_bc(1)%dir': direc,
                         'patch_bc(1)%type': -17, 'patch_bc(1)%loc': -1
                 })
 
@@ -982,7 +982,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 continue
 
             # # List of currently broken examples -> currently attempting to fix!
-            brokenCases = ["2D_ibm_cfl_dt", "1D_sodHypo", "2D_viscous", "2D_laplace_pressure_jump", "2D_bubbly_steady_shock", "2D_advection", "2D_hardcodied_ic", "2D_ibm_multiphase", "2D_acoustic_broadband", "1D_inert_shocktube", "1D_reactive_shocktube", "2D_ibm_steady_shock", "3D_performance_test", "3D_ibm_stl_ellipsoid", "3D_sphbubcollapse", "2D_ibm_stl_wedge", "3D_ibm_stl_pyramid", "3D_ibm_bowshock", "3D_turb_mixing", "2D_mixing_artificial_Ma", "2D_lagrange_bubblescreen", "3D_lagrange_bubblescreen", "2D_triple_point"]
+            brokenCases = ["2D_ibm_cfl_dt", "1D_sodHypo", "2D_viscous", "2D_laplace_pressure_jump",
+                    "2D_bubbly_steady_shock", "2D_advection", "2D_hardcodied_ic", "2D_ibm_multiphase",
+                    "2D_acoustic_broadband", "1D_inert_shocktube", "1D_reactive_shocktube",
+                    "2D_ibm_steady_shock", "3D_performance_test", "3D_ibm_stl_ellipsoid",
+                    "3D_sphbubcollapse", "2D_ibm_stl_wedge", "3D_ibm_stl_pyramid", "3D_ibm_bowshock",
+                    "3D_turb_mixing", "2D_mixing_artificial_Ma", "2D_lagrange_bubblescreen",
+                    "3D_lagrange_bubblescreen", "2D_triple_point"]
             if path in brokenCases:
                 continue
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"

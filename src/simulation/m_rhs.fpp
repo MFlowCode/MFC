@@ -739,7 +739,7 @@ contains
             if (igr) then
 
                 if (id == 1) then
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do l = -1, p + 1
                         do k = -1, n + 1
                             do j = -1, m + 1

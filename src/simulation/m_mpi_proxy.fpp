@@ -103,7 +103,7 @@ contains
             & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',  'fd_order',     &
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
             & 'R0_type', 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
-            & 'num_bc_patches', 'num_igr_iters']
+            & 'num_bc_patches', 'num_igr_iters', 'num_igr_warm_start_iters']
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -118,7 +118,7 @@ contains
             & 'bc_y%grcbc_in', 'bc_y%grcbc_out', 'bc_y%grcbc_vel_out',          &
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
-            & 'viscous', 'shear_stress', 'bulk_stress', 'bubbles_lagrange',     &
+            & 'shear_stress', 'bulk_stress', 'bubbles_lagrange',     &
             & 'hyperelasticity', 'bc_io', 'powell', 'cont_damage' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
@@ -181,6 +181,9 @@ contains
             call MPI_BCAST(relativity, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(igr, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(igr_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(igr_pres_lim, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(igr_iter_solver, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(viscous, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endif
 
         do i = 1, num_fluids_max

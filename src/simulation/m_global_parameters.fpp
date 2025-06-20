@@ -123,6 +123,8 @@ module m_global_parameters
         logical, parameter :: relativity = (${relativity}$ /= 0)    !< Relativity (only for MHD)
         integer, parameter :: igr_iter_solver = ${igr_iter_solver}$ !< IGR elliptic solver
         integer, parameter :: igr_order = ${igr_order}$             !< Reconstruction order for IGR
+        logical, parameter :: igr = (${igr}$ /= 0)                   !< use information geometric regularization
+        logical, parameter :: igr_pres_lim = (${igr_pres_lim}$ /= 0)!< Limit to positive pressures for IGR
         logical, parameter :: viscous = (${viscous}$ /= 0)          !< Viscous effects
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
@@ -138,6 +140,8 @@ module m_global_parameters
         logical :: relativity     !< Relativity (only for MHD)
         integer :: igr_iter_solver!< IGR elliptic solver
         integer :: igr_order      !< Reconstruction order for IGR
+        logical :: igr            !< Use information geometric regularization
+        logical :: igr_pres_lim   !< Limit to positive pressures for IGR
         logical :: viscous        !< Viscous effects
     #:endif
 
@@ -162,7 +166,6 @@ module m_global_parameters
     logical :: shear_stress  !< Shear stresses
     logical :: bulk_stress   !< Bulk stresses
     logical :: cont_damage   !< Continuum damage modeling
-    logical :: igr            !< Use information geometric regularization
     integer :: num_igr_iters !< number of iterations for elliptic solve
     integer :: num_igr_warm_start_iters !< number of warm start iterations for elliptic solve
     real(wp) :: alf_factor  !< alpha factor for IGR
@@ -185,12 +188,12 @@ module m_global_parameters
     #:if not MFC_CASE_OPTIMIZATION
         !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, &
         !$acc num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity, &
-        !$acc igr_iter_solver, igr_order, viscous)
+        !$acc igr_iter_solver, igr_order, viscous, igr_pres_lim, igr)
     #:endif
 
     !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, &
     !$acc weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, &
-    !$acc shear_stress, bulk_stress, cont_damage, igr)
+    !$acc shear_stress, bulk_stress, cont_damage)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -583,14 +586,15 @@ contains
         num_igr_iters = dflt_num_igr_iters
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor
-        igr = .false.
 
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.
             wenoz = .false.
             teno = .false.
             wenoz_q = dflt_real
+            igr = .false.
             igr_order = dflt_int
+            igr_pres_lim = .false.
             viscous = .false.
             igr_iter_solver = 1
         #:endif

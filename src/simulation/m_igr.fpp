@@ -72,12 +72,12 @@ module m_igr
             real(wp), parameter :: coeff_L(0:2) = [ &
                                    2._wp/6._wp, & ! Index 0
                                    5._wp/6._wp, & ! Index 1
-                                   -1._wp/6._wp, & ! Index 2
+                                   -1._wp/6._wp & ! Index 2
                                    ]
             real(wp), parameter :: coeff_R(-1:1) = [ &
                                    -1._wp/6._wp, & ! Index -1
                                    5._wp/6._wp, & ! Index 0
-                                   2._wp/6._wp, & ! Index 1
+                                   2._wp/6._wp & ! Index 1
                                    ]
         #:endif
 #endif
@@ -2940,6 +2940,11 @@ contains
             pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp))/gamma_L
             pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp))/gamma_R
 
+            if (igr_pres_lim) then
+                pres_L = max(pres_L, 0._wp)
+                pres_R = max(pres_R, 0._wp)
+            end if
+
             a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L/gamma_L)/rho_L)
             a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R/gamma_R)/rho_R)
 
@@ -2949,6 +2954,11 @@ contains
         elseif (num_dims == 3) then
             pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp))/gamma_L
             pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp))/gamma_R
+
+            if (igr_pres_lim) then
+                pres_L = max(pres_L, 0._wp)
+                pres_R = max(pres_R, 0._wp)
+            end if
 
             a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L/gamma_L)/rho_L)
             a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R/gamma_R)/rho_R)

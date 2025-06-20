@@ -994,17 +994,23 @@ contains
         real(wp) :: dt_local
         integer :: j, k, l !< Generic loop iterators
 
-        call s_convert_conservative_to_primitive_variables( &
-            q_cons_ts(1)%vf, &
-            q_T_sf, &
-            q_prim_vf, &
-            idwint)
+        if (.not. igr) then
+            call s_convert_conservative_to_primitive_variables( &
+                q_cons_ts(1)%vf, &
+                q_T_sf, &
+                q_prim_vf, &
+                idwint)
+        end if
 
         !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+                    if (igr) then
+                        call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+                    else
+                        call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+                    end if
 
                     ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
