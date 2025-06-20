@@ -25,7 +25,7 @@ jobs:
         run: |
           echo "Building Singularity CPU Image"
           (cd pr/.github/workflows/images && sudo apptainer build pr/.github/workflows/images/mfc_cpu.sif Singularity.cpu)
-          apptainer run --fakeroot pr/.github/workflows/images/mfc_cpu.sif test -a --no-build --no-mpi
+          apptainer run --fakeroot mfc_cpu.sif test -a --no-build --no-mpi
       - name: Upload images as artifacts
         uses: actions/upload-artifact@v4
         if:   always()
