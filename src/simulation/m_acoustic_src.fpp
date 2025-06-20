@@ -388,8 +388,8 @@ contains
             source = mag(ai)*sign(1._wp, sine_wave)
 
             ! Prevent max-norm differences due to compilers to pass CI
-            if (abs(sine_wave) < 1e-2_wp) then
-                source = mag(ai)*sine_wave*1e2_wp
+            if (abs(sine_wave) < 1.e-2_wp) then
+                source = mag(ai)*sine_wave*1.e2_wp
             end if
 
         elseif (pulse(ai) == 4) then ! Broadband wave
@@ -403,7 +403,7 @@ contains
         integer :: count
         integer :: dim
         real(wp) :: source_spatial, angle, xyz_to_r_ratios(3)
-        real(wp), parameter :: threshold = 1e-10_wp
+        real(wp), parameter :: threshold = 1.e-10_wp
 
         if (n == 0) then
             dim = 1
