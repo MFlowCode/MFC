@@ -138,7 +138,7 @@ def diff():
                     grind_time_value = lhs_summary[target.name]["grind"] / rhs_summary[target.name]["grind"]
                     speedups[i] += f" & Grind: {grind_time_value:.2f}"
                     if grind_time_value <0.95:
-                        cons.print(f"[bold red]Error[/bold red]: Benchmarking failed since grind time speedup for {target.name} below acceptable threshold (<0.98) - Case: {slug}")
+                        cons.print(f"[bold red]Error[/bold red]: Benchmarking failed since grind time speedup for {target.name} below acceptable threshold (<0.95) - Case: {slug}")
                         err = 1
             except Exception as _:
                 pass
