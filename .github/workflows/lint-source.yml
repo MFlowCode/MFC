@@ -42,6 +42,10 @@ jobs:
       run: |
         ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
 
+    - name: Looking for false integers
+      run: |
+        ! grep -onRP '(?<![0-9.eE\-])\b[0-9]*_wp\b' src/
+
     - name: Looking for junk comments in examples
       run: |
         ! grep -R '# ===' ./benchmarks **/*.py

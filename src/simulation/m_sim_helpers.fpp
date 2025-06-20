@@ -74,7 +74,7 @@ contains
 
         pres = q_prim_vf(E_idx)%sf(j, k, l)
 
-        E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_sum + qv
+        E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
 
         ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
         if (hyperelasticity) then

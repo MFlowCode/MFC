@@ -1055,8 +1055,8 @@ contains
         t_vec3 :: dist_buffer !< Distance between the cell center and the vertices
         integer :: i, j, tri_idx !< Iterator
 
-        dist_min = 1e12_wp
-        dist_min_normal = 1e12_wp
+        dist_min = 1.e12_wp
+        dist_min_normal = 1.e12_wp
         distance = 0._wp
 
         tri_idx = 0

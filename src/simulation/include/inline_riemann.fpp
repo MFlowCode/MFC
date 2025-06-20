@@ -1,13 +1,13 @@
 #:def arithmetic_avg()
-    rho_avg = 5e-1_wp*(rho_L + rho_R)
+    rho_avg = 5.e-1_wp*(rho_L + rho_R)
     vel_avg_rms = 0._wp
     $:GPU_LOOP(parallelism='[seq]')
     do i = 1, num_vels
-        vel_avg_rms = vel_avg_rms + (5e-1_wp*(vel_L(i) + vel_R(i)))**2._wp
+        vel_avg_rms = vel_avg_rms + (5.e-1_wp*(vel_L(i) + vel_R(i)))**2._wp
     end do
 
-    H_avg = 5e-1_wp*(H_L + H_R)
-    gamma_avg = 5e-1_wp*(gamma_L + gamma_R)
+    H_avg = 5.e-1_wp*(H_L + H_R)
+    gamma_avg = 5.e-1_wp*(gamma_L + gamma_R)
 
 #:enddef arithmetic_avg
 
@@ -80,7 +80,7 @@
 
     if (riemann_solver == 1) then
 
-        zcoef = min(1._wp, max(vel_L_rms**5e-1_wp/c_L, vel_R_rms**5e-1_wp/c_R))
+        zcoef = min(1._wp, max(vel_L_rms**5.e-1_wp/c_L, vel_R_rms**5.e-1_wp/c_R))
         pcorr = 0._wp
 
         if (low_Mach == 1) then
@@ -88,7 +88,7 @@
         end if
 
     else if (riemann_solver == 2) then
-        zcoef = min(1._wp, max(vel_L_rms**5e-1_wp/c_L, vel_R_rms**5e-1_wp/c_R))
+        zcoef = min(1._wp, max(vel_L_rms**5.e-1_wp/c_L, vel_R_rms**5.e-1_wp/c_R))
         pcorr = 0._wp
 
         if (low_Mach == 1) then
@@ -97,8 +97,8 @@
                     (rho_R*(s_R - vel_R(dir_idx(1))) - rho_L*(s_L - vel_L(dir_idx(1))))* &
                     (zcoef - 1._wp)
         else if (low_Mach == 2) then
-            vel_L_tmp = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + zcoef*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
-            vel_R_tmp = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + zcoef*(vel_R(dir_idx(1)) - vel_L(dir_idx(1))))
+            vel_L_tmp = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + zcoef*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
+            vel_R_tmp = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + zcoef*(vel_R(dir_idx(1)) - vel_L(dir_idx(1))))
             vel_L(dir_idx(1)) = vel_L_tmp
             vel_R(dir_idx(1)) = vel_R_tmp
         end if

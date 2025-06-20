@@ -1765,7 +1765,7 @@ contains
             @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
 
             vcfl_max = 0._wp
-            Rc_min = 1e3_wp
+            Rc_min = 1.e3_wp
         end if
 
     end subroutine s_initialize_data_output_module

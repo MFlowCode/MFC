@@ -319,40 +319,14 @@ contains
             & j,k,l,q]')
         do i = 1, num_inner_gps
 
-            vel_g = 0._wp
             innerp = inner_points(i)
             j = innerp%loc(1)
             k = innerp%loc(2)
             l = innerp%loc(3)
-            patch_id = inner_points(i)%ib_patch_id
-
-            ! Calculate physical location of GP
-            if (p > 0) then
-                physical_loc = [x_cc(j), y_cc(k), z_cc(l)]
-            else
-                physical_loc = [x_cc(j), y_cc(k), 0._wp]
-            end if
-
-            $:GPU_LOOP(parallelism='[seq]')
-            do q = 1, num_fluids
-                q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
-            end do
-
-            if (surface_tension) then
-                q_prim_vf(c_idx)%sf(j, k, l) = c_IP
-            end if
-
-            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
-                                                            alpha_rho_IP, Re_K)
-
-            dyn_pres = 0._wp
 
             $:GPU_LOOP(parallelism='[seq]')
             do q = momxb, momxe
-                q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - momxb + 1)
-                dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)* &
-                           vel_g(q - momxb + 1)/2._wp
+                q_cons_vf(q)%sf(j, k, l) = 0._wp
             end do
         end do
 
@@ -648,13 +622,13 @@ contains
 
                 interp_coeffs = 0._wp
 
-                if (dist(1, 1, 1) <= 1e-16_wp) then
+                if (dist(1, 1, 1) <= 1.e-16_wp) then
                     interp_coeffs(1, 1, 1) = 1._wp
-                else if (dist(2, 1, 1) <= 1e-16_wp) then
+                else if (dist(2, 1, 1) <= 1.e-16_wp) then
                     interp_coeffs(2, 1, 1) = 1._wp
-                else if (dist(1, 2, 1) <= 1e-16_wp) then
+                else if (dist(1, 2, 1) <= 1.e-16_wp) then
                     interp_coeffs(1, 2, 1) = 1._wp
-                else if (dist(2, 2, 1) <= 1e-16_wp) then
+                else if (dist(2, 2, 1) <= 1.e-16_wp) then
                     interp_coeffs(2, 2, 1) = 1._wp
                 else
                     eta(:, :, 1) = 1._wp/dist(:, :, 1)**2
@@ -719,21 +693,21 @@ contains
                                 (z_cc(k2) - gp%ip_loc(3))**2)
                 interp_coeffs = 0._wp
                 buf = 1._wp
-                if (dist(1, 1, 1) <= 1e-16_wp) then
+                if (dist(1, 1, 1) <= 1.e-16_wp) then
                     interp_coeffs(1, 1, 1) = 1._wp
-                else if (dist(2, 1, 1) <= 1e-16_wp) then
+                else if (dist(2, 1, 1) <= 1.e-16_wp) then
                     interp_coeffs(2, 1, 1) = 1._wp
-                else if (dist(1, 2, 1) <= 1e-16_wp) then
+                else if (dist(1, 2, 1) <= 1.e-16_wp) then
                     interp_coeffs(1, 2, 1) = 1._wp
-                else if (dist(2, 2, 1) <= 1e-16_wp) then
+                else if (dist(2, 2, 1) <= 1.e-16_wp) then
                     interp_coeffs(2, 2, 1) = 1._wp
-                else if (dist(1, 1, 2) <= 1e-16_wp) then
+                else if (dist(1, 1, 2) <= 1.e-16_wp) then
                     interp_coeffs(1, 1, 2) = 1._wp
-                else if (dist(2, 1, 2) <= 1e-16_wp) then
+                else if (dist(2, 1, 2) <= 1.e-16_wp) then
                     interp_coeffs(2, 1, 2) = 1._wp
-                else if (dist(1, 2, 2) <= 1e-16_wp) then
+                else if (dist(1, 2, 2) <= 1.e-16_wp) then
                     interp_coeffs(1, 2, 2) = 1._wp
-                else if (dist(2, 2, 2) <= 1e-16_wp) then
+                else if (dist(2, 2, 2) <= 1.e-16_wp) then
                     interp_coeffs(2, 2, 2) = 1._wp
                 else
                     eta = 1._wp/dist**2

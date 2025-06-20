@@ -290,7 +290,7 @@ contains
                 @:analytical()
 
                 ! Updating the patch identities bookkeeping variable
-                if (1._wp - eta < 1e-16_wp) patch_id_fp(i, 0, 0) = patch_id
+                if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, 0, 0) = patch_id
 
             end if
         end do
@@ -354,7 +354,7 @@ contains
                     @:analytical()
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
                 end if
             end do
         end do
@@ -825,7 +825,7 @@ contains
                     @:analytical()
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
 
                     q_prim_vf(alf_idx)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
                                                      exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
@@ -888,7 +888,7 @@ contains
                         @:analytical()
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
 
                         q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
                                                          exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
@@ -959,7 +959,7 @@ contains
                     @:analytical()
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
                 end if
             end do
         end do
@@ -1039,7 +1039,7 @@ contains
                         @:analytical()
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
                     end if
                 end do
             end do
@@ -1129,7 +1129,7 @@ contains
                             end if
 
                             ! Updating the patch identities bookkeeping variable
-                            if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                            if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
 
                         end if
                     end if
@@ -1182,9 +1182,9 @@ contains
             do i = 0, m
 
                 if (patch_icpp(patch_id)%smoothen) then
-                    eta = 5e-1_wp + 5e-1_wp*tanh(smooth_coeff/min(dx, dy) &
-                                                 *(a*x_cc(i) + b*y_cc(j) + c) &
-                                                 /sqrt(a**2 + b**2))
+                    eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx, dy) &
+                                                   *(a*x_cc(i) + b*y_cc(j) + c) &
+                                                   /sqrt(a**2 + b**2))
                 end if
 
                 if ((a*x_cc(i) + b*y_cc(j) + c >= 0._wp &
@@ -1199,7 +1199,7 @@ contains
                     @:analytical()
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
                 end if
 
             end do
@@ -1269,7 +1269,7 @@ contains
                     @:analytical()
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
 
                     ! Assign Parameters
                     q_prim_vf(mom_idx%beg)%sf(i, j, 0) = U0*sin(x_cc(i)/L0)*cos(y_cc(j)/L0)
@@ -1336,7 +1336,7 @@ contains
                 @:Hardcoded1D()
 
                 ! Updating the patch identities bookkeeping variable
-                if (1._wp - eta < 1e-16_wp) patch_id_fp(i, 0, 0) = patch_id
+                if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, 0, 0) = patch_id
 
             end if
         end do
@@ -1459,7 +1459,7 @@ contains
 
                     @:Hardcoded2D()
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
 
                 end if
             end do
@@ -1541,7 +1541,7 @@ contains
                         @:Hardcoded3D()
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
 
                     end if
 
@@ -1874,7 +1874,7 @@ contains
                                 @:analytical()
 
                                 ! Updating the patch identities bookkeeping variable
-                                if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                                if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
 
                             end if
                         end if
@@ -2028,7 +2028,7 @@ contains
                             @:analytical()
 
                             ! Updating the patch identities bookkeeping variable
-                            if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                            if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
                         end if
                     end if
                 end do
@@ -2090,11 +2090,11 @@ contains
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta = 5e-1_wp + 5e-1_wp*tanh(smooth_coeff/min(dx, dy, dz) &
-                                                     *(a*x_cc(i) + &
-                                                       b*cart_y + &
-                                                       c*cart_z + d) &
-                                                     /sqrt(a**2 + b**2 + c**2))
+                        eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx, dy, dz) &
+                                                       *(a*x_cc(i) + &
+                                                         b*cart_y + &
+                                                         c*cart_z + d) &
+                                                       /sqrt(a**2 + b**2 + c**2))
                     end if
 
                     if ((a*x_cc(i) + b*cart_y + c*cart_z + d >= 0._wp &
@@ -2110,7 +2110,7 @@ contains
                         @:analytical()
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
                     end if
 
                 end do
@@ -2241,11 +2241,11 @@ contains
             !call s_model_write("__out__.stl", model)
             !call s_model_write("__out__.obj", model)
 
-            grid_mm(1, :) = (/minval(x_cc) - 0e5_wp*dx, maxval(x_cc) + 0e5_wp*dx/)
-            grid_mm(2, :) = (/minval(y_cc) - 0e5_wp*dy, maxval(y_cc) + 0e5_wp*dy/)
+            grid_mm(1, :) = (/minval(x_cc) - 0.e5_wp*dx, maxval(x_cc) + 0.e5_wp*dx/)
+            grid_mm(2, :) = (/minval(y_cc) - 0.e5_wp*dy, maxval(y_cc) + 0.e5_wp*dy/)
 
             if (p > 0) then
-                grid_mm(3, :) = (/minval(z_cc) - 0e5_wp*dz, maxval(z_cc) + 0e5_wp*dz/)
+                grid_mm(3, :) = (/minval(z_cc) - 0.e5_wp*dz, maxval(z_cc) + 0.e5_wp*dz/)
             else
                 grid_mm(3, :) = (/0._wp, 0._wp/)
             end if

@@ -639,7 +639,7 @@ contains
         d_norms(3) = sqrt(((myV_tmp(2) - myV_tmp(1))**2._wp + (myA_tmp(2) - myA_tmp(1))**2._wp)/2._wp)/h_size(1)
 
         ! Set h1 = (0.01/max(d_1,d_2))^{1/(p+1)}
-        !      if max(d_1,d_2) < 1e-15_wp, h_size(2) = max(1e-6_wp, h0*1e-3_wp)
+        !      if max(d_1,d_2) < 1.e-15_wp, h_size(2) = max(1.e-6_wp, h0*1.e-3_wp)
         if (max(d_norms(2), d_norms(3)) < threshold_second_guess) then
             h_size(2) = max(small_guess, h_size(1)*scale_first_guess)
         else

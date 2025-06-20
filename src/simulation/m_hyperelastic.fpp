@@ -121,7 +121,7 @@ contains
                                                                     alpha_rho_k, Re, G, Gs)
                     rho = max(rho, sgm_eps)
                     G = max(G, sgm_eps)
-                    !if ( G <= verysmall ) G_K = 0_wp
+                    !if ( G <= verysmall ) G_K = 0._wp
 
                     if (G > verysmall) then
                         $:GPU_LOOP(parallelism='[seq]')

@@ -23,7 +23,7 @@ contains
     !> This procedure checks if two floating point numbers of wp are within tolerance.
     !! @param a First number.
     !! @param b Second number.
-    !! @param tol_input Relative error (default = 1e-10_wp).
+    !! @param tol_input Relative error (default = 1.e-10_wp).
     !! @return Result of the comparison.
     logical pure elemental function f_approx_equal(a, b, tol_input) result(res)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -34,7 +34,7 @@ contains
         if (present(tol_input)) then
             tol = tol_input
         else
-            tol = 1e-10_wp
+            tol = 1.e-10_wp
         end if
 
         if (a == b) then

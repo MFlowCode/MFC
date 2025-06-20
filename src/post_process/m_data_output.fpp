@@ -1329,7 +1329,7 @@ contains
                         rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
                     end do
 
-                    H = ((gamma + 1_wp)*pres + pi_inf)/rho
+                    H = ((gamma + 1._wp)*pres + pi_inf)/rho
 
                     call s_compute_speed_of_sound(pres, rho, &
                                                   gamma, pi_inf, &
