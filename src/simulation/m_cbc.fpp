@@ -50,7 +50,6 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
     $:GPU_DECLARE(create='[q_prim_rsx_vf,q_prim_rsy_vf,q_prim_rsz_vf]')
 
-    type(scalar_field), allocatable, dimension(:) :: F_rs_vf, F_src_rs_vf !<
 
     !! Cell-average fluxes (src - source). These are directly determined from the
     !! cell-average primitive variables, q_prims_rs_vf, and not a Riemann solver.
