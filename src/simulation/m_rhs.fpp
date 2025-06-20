@@ -600,7 +600,6 @@ contains
         real(wp), intent(inout) :: time_avg
         integer, intent(in) :: stage
 
-        real(wp), dimension(0:m, 0:n, 0:p) :: nbub
         real(wp) :: t_start, t_finish
         integer :: i, j, k, l, id !< Generic loop iterators
 
@@ -1055,7 +1054,7 @@ contains
                                 if (cyl_coord) then
                                     rhs_vf(i_fluid_loop + intxb - 1)%sf(q, k, l) = &
                                         rhs_vf(i_fluid_loop + intxb - 1)%sf(q, k, l) - &
-                                        5e-1_wp/y_cc(k)*advected_qty_val*pressure_val*(flux_face1 + flux_face2)
+                                        5.e-1_wp/y_cc(k)*advected_qty_val*pressure_val*(flux_face1 + flux_face2)
                                 end if
                             end do
                         end do
@@ -1072,7 +1071,7 @@ contains
                                 flux_face1 = flux_gsrc_n(2)%vf(j)%sf(q, k - 1, l)
                                 flux_face2 = flux_gsrc_n(2)%vf(j)%sf(q, k, l)
                                 rhs_vf(j)%sf(q, k, l) = rhs_vf(j)%sf(q, k, l) - &
-                                                        5e-1_wp/y_cc(k)*(flux_face1 + flux_face2)
+                                                        5.e-1_wp/y_cc(k)*(flux_face1 + flux_face2)
                             end do
                         end do
                     end do
@@ -1114,7 +1113,7 @@ contains
                                 flux_face1 = flux_gsrc_n(3)%vf(j)%sf(l, q, k - 1)
                                 flux_face2 = flux_gsrc_n(3)%vf(j)%sf(l, q, k)
                                 rhs_vf(j)%sf(l, q, k) = rhs_vf(j)%sf(l, q, k) - &
-                                                        5e-1_wp/y_cc(q)*(flux_face1 + flux_face2)
+                                                        5.e-1_wp/y_cc(q)*(flux_face1 + flux_face2)
                             end do
                         end do
                     end do
@@ -1524,7 +1523,7 @@ contains
                                 !$acc loop seq
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) - 5e-1_wp/y_cc(k)* &
+                                        rhs_vf(i)%sf(j, k, l) - 5.e-1_wp/y_cc(k)* &
                                         (flux_src_n(i)%sf(j, k - 1, l) &
                                          + flux_src_n(i)%sf(j, k, l))
                                 end do
@@ -1554,7 +1553,7 @@ contains
                                 !$acc loop seq
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) - 5e-1_wp/y_cc(k)* &
+                                        rhs_vf(i)%sf(j, k, l) - 5.e-1_wp/y_cc(k)* &
                                         (flux_src_n(i)%sf(j, k - 1, l) &
                                          + flux_src_n(i)%sf(j, k, l))
                                 end do
@@ -1603,12 +1602,12 @@ contains
                     do k = 0, n
                         do j = 0, m
                             rhs_vf(momxb + 1)%sf(j, k, l) = &
-                                rhs_vf(momxb + 1)%sf(j, k, l) + 5e-1_wp* &
+                                rhs_vf(momxb + 1)%sf(j, k, l) + 5.e-1_wp* &
                                 (flux_src_n(momxe)%sf(j, k, l - 1) &
                                  + flux_src_n(momxe)%sf(j, k, l))
 
                             rhs_vf(momxe)%sf(j, k, l) = &
-                                rhs_vf(momxe)%sf(j, k, l) - 5e-1_wp* &
+                                rhs_vf(momxe)%sf(j, k, l) - 5.e-1_wp* &
                                 (flux_src_n(momxb + 1)%sf(j, k, l - 1) &
                                  + flux_src_n(momxb + 1)%sf(j, k, l))
                         end do

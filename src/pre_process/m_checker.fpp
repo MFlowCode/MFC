@@ -88,11 +88,11 @@ contains
             "n must be positive (2D or 3D) for cylindrical coordinates")
         @:PROHIBIT(cyl_coord .and. (f_is_default(y_domain%beg) .or. f_is_default(y_domain%end)), &
             "y_domain%beg and y_domain%end must be set for n = 0 (2D cylindrical coordinates)")
-        @:PROHIBIT(cyl_coord .and. (y_domain%beg /= 0._wp .or. y_domain%end <= 0._wp), &
+        @:PROHIBIT(cyl_coord .and. ((.not. f_approx_equal(y_domain%beg , 0._wp)) .or. y_domain%end <= 0._wp), &
             "y_domain%beg must be 0 and y_domain%end must be positive for cylindrical coordinates")
         @:PROHIBIT(cyl_coord .and. p == 0 .and. ((.not. f_is_default(z_domain%beg)) .or. (.not. f_is_default(z_domain%end))), &
             "z_domain%beg and z_domain%end are not supported for p = 0 (2D cylindrical coordinates)")
-        @:PROHIBIT(cyl_coord .and. p > 0 .and. (z_domain%beg /= 0._wp .or. z_domain%end /= 2._wp*pi), &
+        @:PROHIBIT(cyl_coord .and. p > 0 .and. (.not. (f_approx_equal(z_domain%beg, 0._wp) .and. f_approx_equal(z_domain%end, 2._wp*pi))), &
             "z_domain%beg must be 0 and z_domain%end must be 2*pi for 3D cylindrical coordinates")
 
         @:PROHIBIT(num_patches < 0)

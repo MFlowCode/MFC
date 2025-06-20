@@ -327,7 +327,7 @@ contains
 
         character(kind=c_char, len=80), parameter :: header = "Model file written by MFC."
         integer(kind=c_int32_t) :: nTriangles
-        real(kind=c_float) :: normal(3), v(3)
+        real(wp) :: normal(3), v(3)
         integer(kind=c_int16_t) :: attribute
 
         open (newunit=iunit, file=filepath, action='WRITE', &
@@ -1055,8 +1055,8 @@ contains
         t_vec3 :: dist_buffer !< Distance between the cell center and the vertices
         integer :: i, j, tri_idx !< Iterator
 
-        dist_min = 1e12_wp
-        dist_min_normal = 1e12_wp
+        dist_min = 1.e12_wp
+        dist_min_normal = 1.e12_wp
         distance = 0._wp
 
         tri_idx = 0

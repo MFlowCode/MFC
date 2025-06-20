@@ -39,6 +39,8 @@ module m_riemann_solvers
 
     use m_surface_tension      !< To get the capilary fluxes
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_chemistry
 
     use m_thermochem, only: &
@@ -541,8 +543,8 @@ contains
                                 call get_mixture_energy_mass(T_L, Ys_L, E_L)
                                 call get_mixture_energy_mass(T_R, Ys_R, E_R)
 
-                                E_L = rho_L*E_L + 5e-1*rho_L*vel_L_rms
-                                E_R = rho_R*E_R + 5e-1*rho_R*vel_R_rms
+                                E_L = rho_L*E_L + 5.e-1*rho_L*vel_L_rms
+                                E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                             elseif (mhd .and. relativity) then
@@ -584,8 +586,8 @@ contains
                                 H_L = (E_L + pres_L - pres_mag%L)/rho_L
                                 H_R = (E_R + pres_R - pres_mag%R)/rho_R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
                             else
-                                E_L = gamma_L*pres_L + pi_inf_L + 5e-1*rho_L*vel_L_rms + qv_L
-                                E_R = gamma_R*pres_R + pi_inf_R + 5e-1*rho_R*vel_R_rms + qv_R
+                                E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
+                                E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                             end if
@@ -633,7 +635,7 @@ contains
                             !        G_R = G_R + alpha_R(i)*Gs(i)
                             !    end do
                             !    ! Elastic contribution to energy if G large enough
-                            !    if ((G_L > 1e-3_wp) .and. (G_R > 1e-3_wp)) then
+                            !    if ((G_L > 1.e-3_wp) .and. (G_R > 1.e-3_wp)) then
                             !    E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
                             !    E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
                             !    !$acc loop seq
@@ -643,8 +645,8 @@ contains
                             !    end do
                             !    !$acc loop seq
                             !    do i = 1, b_size-1
-                            !        tau_e_L(i) = 0_wp
-                            !        tau_e_R(i) = 0_wp
+                            !        tau_e_L(i) = 0._wp
+                            !        tau_e_R(i) = 0._wp
                             !    end do
                             !    !$acc loop seq
                             !    do i = 1, num_dims
@@ -698,10 +700,10 @@ contains
                                                                          (((4._wp*G_L)/3._wp) + &
                                                                           tau_e_L(dir_idx_tau(1)))/rho_L))
                                 else if (hyperelasticity) then
-                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4_wp*G_L/3_wp)/rho_L) &
-                                              , vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4_wp*G_R/3_wp)/rho_R))
-                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4_wp*G_R/3_wp)/rho_R) &
-                                              , vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4_wp*G_L/3_wp)/rho_L))
+                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L) &
+                                              , vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R))
+                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R) &
+                                              , vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L))
                                 else
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
@@ -714,35 +716,35 @@ contains
                                       /(rho_L*(s_L - vel_L(dir_idx(1))) - &
                                         rho_R*(s_R - vel_R(dir_idx(1))))
                             elseif (wave_speeds == 2) then
-                                pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                   (vel_L(dir_idx(1)) - &
-                                                    vel_R(dir_idx(1))))
+                                pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
+                                                    (vel_L(dir_idx(1)) - &
+                                                     vel_R(dir_idx(1))))
 
                                 pres_SR = pres_SL
 
-                                Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
+                                Ms_L = max(1._wp, sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))* &
                                                        (pres_SL/pres_L - 1._wp)*pres_L/ &
                                                        ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
+                                Ms_R = max(1._wp, sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))* &
                                                        (pres_SR/pres_R - 1._wp)*pres_R/ &
                                                        ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                 s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                 s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
-                                s_S = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                                               (pres_L - pres_R)/ &
-                                               (rho_avg*c_avg))
+                                s_S = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
+                                                (pres_L - pres_R)/ &
+                                                (rho_avg*c_avg))
                             end if
 
                             s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
-                            xi_M = (5e-1_wp + sign(5e-1_wp, s_L)) &
-                                   + (5e-1_wp - sign(5e-1_wp, s_L)) &
-                                   *(5e-1_wp + sign(5e-1_wp, s_R))
-                            xi_P = (5e-1_wp - sign(5e-1_wp, s_R)) &
-                                   + (5e-1_wp - sign(5e-1_wp, s_L)) &
-                                   *(5e-1_wp + sign(5e-1_wp, s_R))
+                            xi_M = (5.e-1_wp + sign(5.e-1_wp, s_L)) &
+                                   + (5.e-1_wp - sign(5.e-1_wp, s_L)) &
+                                   *(5.e-1_wp + sign(5.e-1_wp, s_R))
+                            xi_P = (5.e-1_wp - sign(5.e-1_wp, s_R)) &
+                                   + (5.e-1_wp - sign(5.e-1_wp, s_L)) &
+                                   *(5.e-1_wp + sign(5.e-1_wp, s_R))
 
                             ! Low Mach correction
                             if (low_Mach == 1) then
@@ -1399,9 +1401,9 @@ contains
                                     end do
                                 end if
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5e-1_wp*rho_L*vel_L_rms + qv_L
+                                E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5e-1_wp*rho_R*vel_R_rms + qv_R
+                                E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
 
                                 ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
                                 if (hypoelasticity) then
@@ -1410,7 +1412,7 @@ contains
                                         tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
                                         tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                                     end do
-                                    G_L = 0_wp; G_R = 0_wp
+                                    G_L = 0._wp; G_R = 0._wp
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         G_L = G_L + alpha_L(i)*Gs(i)
@@ -1420,12 +1422,12 @@ contains
                                     do i = 1, strxe - strxb + 1
                                         ! Elastic contribution to energy if G large enough
                                         if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R)
+                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                             ! Additional terms in 2D and 3D
                                             if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R)
+                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                             end if
                                         end if
                                     end do
@@ -1438,7 +1440,7 @@ contains
                                         xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
                                         xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                                     end do
-                                    G_L = 0_wp; G_R = 0_wp; 
+                                    G_L = 0._wp; G_R = 0._wp; 
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         ! Mixture left and right shear modulus
@@ -1489,11 +1491,11 @@ contains
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
-                                                                           (((4_wp*G_L)/3_wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                                                                                                                                                          (((4_wp*G_R)/3_wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
+                                                                           (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
+                                                                                                                                                            (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
                                         s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
-                                                                           (((4_wp*G_R)/3_wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                                                                                                                                                          (((4_wp*G_L)/3_wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                                                           (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
+                                                                                                                                                            (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + &
                                                tau_e_L(dir_idx_tau(1)) + rho_L*vel_L(idx1)*(s_L - vel_L(idx1)) - &
                                                rho_R*vel_R(idx1)*(s_R - vel_R(idx1)))/(rho_L*(s_L - vel_L(idx1)) - &
@@ -1507,25 +1509,25 @@ contains
 
                                     end if
                                 elseif (wave_speeds == 2) then
-                                    pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                       (vel_L(dir_idx(1)) - &
-                                                        vel_R(dir_idx(1))))
+                                    pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
+                                                        (vel_L(dir_idx(1)) - &
+                                                         vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL
 
-                                    Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
+                                    Ms_L = max(1._wp, sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))* &
                                                            (pres_SL/pres_L - 1._wp)*pres_L/ &
                                                            ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                    Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
+                                    Ms_R = max(1._wp, sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))* &
                                                            (pres_SR/pres_R - 1._wp)*pres_R/ &
                                                            ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                     s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
-                                    s_S = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                                                   (pres_L - pres_R)/ &
-                                                   (rho_avg*c_avg))
+                                    s_S = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
+                                                    (pres_L - pres_R)/ &
+                                                    (rho_avg*c_avg))
                                 end if
 
                                 ! follows Einfeldt et al.
@@ -1539,8 +1541,8 @@ contains
 
                                 ! goes with numerical star velocity in x/y/z directions
                                 ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
-                                xi_M = (5e-1_wp + sign(0.5_wp, s_S))
-                                xi_P = (5e-1_wp - sign(0.5_wp, s_S))
+                                xi_M = (5.e-1_wp + sign(0.5_wp, s_S))
+                                xi_P = (5.e-1_wp - sign(0.5_wp, s_S))
 
                                 ! goes with the numerical velocity in x/y/z directions
                                 ! xi_P/M (pressure) = min/max(0. sgn(1,sL/sR))
@@ -1557,7 +1559,7 @@ contains
                                 rho_Star = xi_M*(rho_L*(xi_MP*xi_L + 1._wp - xi_MP)) + &
                                            xi_P*(rho_R*(xi_PP*xi_R + 1._wp - xi_PP))
 
-                                vel_K_Star = vel_L(idx1)*(1_wp - xi_MP) + xi_MP*vel_R(idx1) + &
+                                vel_K_Star = vel_L(idx1)*(1._wp - xi_MP) + xi_MP*vel_R(idx1) + &
                                              xi_MP*xi_PP*(s_S - vel_R(idx1))
 
                                 ! Low Mach correction
@@ -1582,7 +1584,7 @@ contains
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = rho_Star*vel_K_Star* &
-                                                                                (dir_flg(idxi)*vel_K_Star + (1_wp - dir_flg(idxi))*(xi_M*vel_L(idxi) + xi_P*vel_R(idxi))) + dir_flg(idxi)*p_Star &
+                                                                                (dir_flg(idxi)*vel_K_Star + (1._wp - dir_flg(idxi))*(xi_M*vel_L(idxi) + xi_P*vel_R(idxi))) + dir_flg(idxi)*p_Star &
                                                                                 + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
                                 end do
 
@@ -1593,7 +1595,7 @@ contains
 
                                 ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
-                                    flux_ene_e = 0_wp; 
+                                    flux_ene_e = 0._wp; 
                                     !$acc loop seq
                                     do i = 1, num_dims
                                         idxi = dir_idx(i)
@@ -1632,10 +1634,10 @@ contains
                                 ! K-th pressure and velocity in preparation for the internal energy flux
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    p_K_Star = xi_M*(xi_MP*((pres_L + pi_infs(i)/(1_wp + gammas(i)))* &
-                                                            xi_L**(1_wp/gammas(i) + 1_wp) - pi_infs(i)/(1_wp + gammas(i)) - pres_L) + pres_L) + &
-                                               xi_P*(xi_PP*((pres_R + pi_infs(i)/(1_wp + gammas(i)))* &
-                                                            xi_R**(1_wp/gammas(i) + 1_wp) - pi_infs(i)/(1_wp + gammas(i)) - pres_R) + pres_R)
+                                    p_K_Star = xi_M*(xi_MP*((pres_L + pi_infs(i)/(1._wp + gammas(i)))* &
+                                                            xi_L**(1._wp/gammas(i) + 1._wp) - pi_infs(i)/(1._wp + gammas(i)) - pres_L) + pres_L) + &
+                                               xi_P*(xi_PP*((pres_R + pi_infs(i)/(1._wp + gammas(i)))* &
+                                                            xi_R**(1._wp/gammas(i) + 1._wp) - pi_infs(i)/(1._wp + gammas(i)) - pres_R) + pres_R)
 
                                     flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
                                         ((xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1))* &
@@ -1694,7 +1696,7 @@ contains
                                         ! Geometrical source of the void fraction(s) is zero
                                         !$acc loop seq
                                         do i = advxb, advxe
-                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0_wp
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                         end do
                                     end if
                                 #:endif
@@ -1702,7 +1704,7 @@ contains
                                     if (grid_geometry == 3) then
                                         !$acc loop seq
                                         do i = 1, sys_size
-                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0_wp
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                         end do
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) = &
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
@@ -1775,9 +1777,9 @@ contains
                                     qv_R = qv_R + alpha_rho_R(i)*qvs(i)
                                 end do
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5e-1_wp*rho_L*vel_L_rms + qv_L
+                                E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5e-1_wp*rho_R*vel_R_rms + qv_R
+                                E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -1807,25 +1809,25 @@ contains
                                           /(rho_L*(s_L - vel_L(dir_idx(1))) - &
                                             rho_R*(s_R - vel_R(dir_idx(1))))
                                 elseif (wave_speeds == 2) then
-                                    pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                       (vel_L(dir_idx(1)) - &
-                                                        vel_R(dir_idx(1))))
+                                    pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
+                                                        (vel_L(dir_idx(1)) - &
+                                                         vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL
 
-                                    Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
+                                    Ms_L = max(1._wp, sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))* &
                                                            (pres_SL/pres_L - 1._wp)*pres_L/ &
                                                            ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                    Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
+                                    Ms_R = max(1._wp, sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))* &
                                                            (pres_SR/pres_R - 1._wp)*pres_R/ &
                                                            ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                     s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
-                                    s_S = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                                                   (pres_L - pres_R)/ &
-                                                   (rho_avg*c_avg))
+                                    s_S = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
+                                                    (pres_L - pres_R)/ &
+                                                    (rho_avg*c_avg))
                                 end if
 
                                 ! follows Einfeldt et al.
@@ -1839,8 +1841,8 @@ contains
 
                                 ! goes with numerical velocity in x/y/z directions
                                 ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
-                                xi_M = (5e-1_wp + sign(5e-1_wp, s_S))
-                                xi_P = (5e-1_wp - sign(5e-1_wp, s_S))
+                                xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))
+                                xi_P = (5.e-1_wp - sign(5.e-1_wp, s_S))
 
                                 !$acc loop seq
                                 do i = 1, contxe
@@ -2085,9 +2087,9 @@ contains
                                     end if
                                 end if
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5e-1_wp*rho_L*vel_L_rms
+                                E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5e-1_wp*rho_R*vel_R_rms
+                                E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -2187,17 +2189,17 @@ contains
                                                                                                           rho_R*R3V2Rbar/R3Rbar)
                                     end if
 
-                                    if ((ptilde_L /= ptilde_L) .or. (ptilde_R /= ptilde_R)) then
+                                    if ((.not. f_approx_equal(ptilde_L, ptilde_L)) .or. (.not. f_approx_equal(ptilde_R, ptilde_R))) then
                                     end if
 
-                                    rho_avg = 5e-1_wp*(rho_L + rho_R)
-                                    H_avg = 5e-1_wp*(H_L + H_R)
-                                    gamma_avg = 5e-1_wp*(gamma_L + gamma_R)
+                                    rho_avg = 5.e-1_wp*(rho_L + rho_R)
+                                    H_avg = 5.e-1_wp*(H_L + H_R)
+                                    gamma_avg = 5.e-1_wp*(gamma_L + gamma_R)
                                     vel_avg_rms = 0._wp
 
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        vel_avg_rms = vel_avg_rms + (5e-1_wp*(vel_L(i) + vel_R(i)))**2._wp
+                                        vel_avg_rms = vel_avg_rms + (5.e-1_wp*(vel_L(i) + vel_R(i)))**2._wp
                                     end do
 
                                 end if
@@ -2236,25 +2238,25 @@ contains
                                           /(rho_L*(s_L - vel_L(dir_idx(1))) - &
                                             rho_R*(s_R - vel_R(dir_idx(1))))
                                 elseif (wave_speeds == 2) then
-                                    pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                       (vel_L(dir_idx(1)) - &
-                                                        vel_R(dir_idx(1))))
+                                    pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
+                                                        (vel_L(dir_idx(1)) - &
+                                                         vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL
 
-                                    Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
+                                    Ms_L = max(1._wp, sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))* &
                                                            (pres_SL/pres_L - 1._wp)*pres_L/ &
                                                            ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                    Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
+                                    Ms_R = max(1._wp, sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))* &
                                                            (pres_SR/pres_R - 1._wp)*pres_R/ &
                                                            ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                     s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
-                                    s_S = 5e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                                                   (pres_L - pres_R)/ &
-                                                   (rho_avg*c_avg))
+                                    s_S = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
+                                                    (pres_L - pres_R)/ &
+                                                    (rho_avg*c_avg))
                                 end if
 
                                 ! follows Einfeldt et al.
@@ -2268,8 +2270,8 @@ contains
 
                                 ! goes with numerical velocity in x/y/z directions
                                 ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
-                                xi_M = (5e-1_wp + sign(5e-1_wp, s_S))
-                                xi_P = (5e-1_wp - sign(5e-1_wp, s_S))
+                                xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))
+                                xi_P = (5.e-1_wp - sign(5.e-1_wp, s_S))
 
                                 ! Low Mach correction
                                 if (low_Mach == 1) then
@@ -2597,14 +2599,14 @@ contains
                                     call get_mixture_energy_mass(T_L, Ys_L, E_L)
                                     call get_mixture_energy_mass(T_R, Ys_R, E_R)
 
-                                    E_L = rho_L*E_L + 5e-1*rho_L*vel_L_rms
-                                    E_R = rho_R*E_R + 5e-1*rho_R*vel_R_rms
+                                    E_L = rho_L*E_L + 5.e-1*rho_L*vel_L_rms
+                                    E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
                                 else
-                                    E_L = gamma_L*pres_L + pi_inf_L + 5e-1*rho_L*vel_L_rms + qv_L
+                                    E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
 
-                                    E_R = gamma_R*pres_R + pi_inf_R + 5e-1*rho_R*vel_R_rms + qv_R
+                                    E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
 
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
@@ -2617,8 +2619,8 @@ contains
                                         tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
                                         tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                                     end do
-                                    G_L = 0_wp
-                                    G_R = 0_wp
+                                    G_L = 0._wp
+                                    G_R = 0._wp
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         G_L = G_L + alpha_L(i)*Gs(i)
@@ -2628,12 +2630,12 @@ contains
                                     do i = 1, strxe - strxb + 1
                                         ! Elastic contribution to energy if G large enough
                                         if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R)
+                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                             ! Additional terms in 2D and 3D
                                             if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R)
+                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                             end if
                                         end if
                                     end do
@@ -2646,8 +2648,8 @@ contains
                                         xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
                                         xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                                     end do
-                                    G_L = 0_wp
-                                    G_R = 0_wp
+                                    G_L = 0._wp
+                                    G_R = 0._wp
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         ! Mixture left and right shear modulus
@@ -2697,11 +2699,11 @@ contains
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
-                                                                           (((4_wp*G_L)/3_wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                                                                                                                                                          (((4_wp*G_R)/3_wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
+                                                                           (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
+                                                                                                                                                            (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
                                         s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
-                                                                           (((4_wp*G_R)/3_wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                                                                                                                                                          (((4_wp*G_L)/3_wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                                                           (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
+                                                                                                                                                            (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + &
                                                tau_e_L(dir_idx_tau(1)) + rho_L*vel_L(idx1)*(s_L - vel_L(idx1)) - &
                                                rho_R*vel_R(idx1)*(s_R - vel_R(idx1)))/(rho_L*(s_L - vel_L(idx1)) - &
@@ -2715,25 +2717,25 @@ contains
 
                                     end if
                                 elseif (wave_speeds == 2) then
-                                    pres_SL = 5e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
-                                                       (vel_L(idx1) - &
-                                                        vel_R(idx1)))
+                                    pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg* &
+                                                        (vel_L(idx1) - &
+                                                         vel_R(idx1)))
 
                                     pres_SR = pres_SL
 
-                                    Ms_L = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_L)/(1._wp + gamma_L))* &
+                                    Ms_L = max(1._wp, sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))* &
                                                            (pres_SL/pres_L - 1._wp)*pres_L/ &
                                                            ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                    Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
+                                    Ms_R = max(1._wp, sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))* &
                                                            (pres_SR/pres_R - 1._wp)*pres_R/ &
                                                            ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                     s_L = vel_L(idx1) - c_L*Ms_L
                                     s_R = vel_R(idx1) + c_R*Ms_R
 
-                                    s_S = 5e-1_wp*((vel_L(idx1) + vel_R(idx1)) + &
-                                                   (pres_L - pres_R)/ &
-                                                   (rho_avg*c_avg))
+                                    s_S = 5.e-1_wp*((vel_L(idx1) + vel_R(idx1)) + &
+                                                    (pres_L - pres_R)/ &
+                                                    (rho_avg*c_avg))
                                 end if
 
                                 ! follows Einfeldt et al.
@@ -2747,8 +2749,8 @@ contains
 
                                 ! goes with numerical velocity in x/y/z directions
                                 ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
-                                xi_M = (5e-1_wp + sign(5e-1_wp, s_S))
-                                xi_P = (5e-1_wp - sign(5e-1_wp, s_S))
+                                xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))
+                                xi_P = (5.e-1_wp - sign(5.e-1_wp, s_S))
 
                                 ! Low Mach correction
                                 if (low_Mach == 1) then
@@ -2804,7 +2806,7 @@ contains
 
                                 ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
-                                    flux_ene_e = 0_wp
+                                    flux_ene_e = 0._wp
                                     !$acc loop seq
                                     do i = 1, num_dims
                                         idxi = dir_idx(i)

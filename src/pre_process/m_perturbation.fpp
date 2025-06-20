@@ -50,7 +50,7 @@ contains
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
                     !    IF ((perturb_alpha >= 25e-2_wp) .AND. (perturb_alpha <= 75e-2_wp)) THEN
-                    if ((perturb_alpha /= 0._wp) .and. (perturb_alpha /= 1._wp)) then
+                    if ((.not. f_approx_equal(perturb_alpha, 0._wp)) .and. (.not. f_approx_equal(perturb_alpha, 1._wp))) then
 
                         ! Derive new partial densities
                         do l = 1, num_fluids

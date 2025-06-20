@@ -95,9 +95,6 @@ module m_weno
     !
     !> @}
 
-    real(wp) :: test
-    !$acc declare create(test)
-
     !$acc declare create( &
     !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
     !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
@@ -1303,11 +1300,11 @@ contains
 
                         vL_MD = (v_rs_ws(j, k, l, i) &
                                  + v_rs_ws(j - 1, k, l, i) &
-                                 - d_MD)*5e-1_wp
+                                 - d_MD)*5.e-1_wp
 
                         vL_LC = v_rs_ws(j, k, l, i) &
                                 - (v_rs_ws(j + 1, k, l, i) &
-                                   - v_rs_ws(j, k, l, i))*5e-1_wp + beta_mp*d_LC
+                                   - v_rs_ws(j, k, l, i))*5.e-1_wp + beta_mp*d_LC
 
                         vL_min = max(min(v_rs_ws(j, k, l, i), &
                                          v_rs_ws(j - 1, k, l, i), &
@@ -1324,8 +1321,8 @@ contains
                                          vL_LC))
 
                         vL_rs_vf(j, k, l, i) = vL_rs_vf(j, k, l, i) &
-                                               + (sign(5e-1_wp, vL_min - vL_rs_vf(j, k, l, i)) &
-                                                  + sign(5e-1_wp, vL_max - vL_rs_vf(j, k, l, i))) &
+                                               + (sign(5.e-1_wp, vL_min - vL_rs_vf(j, k, l, i)) &
+                                                  + sign(5.e-1_wp, vL_max - vL_rs_vf(j, k, l, i))) &
                                                *min(abs(vL_min - vL_rs_vf(j, k, l, i)), &
                                                     abs(vL_max - vL_rs_vf(j, k, l, i)))
                         ! END: Left Monotonicity Preserving Bound
@@ -1362,11 +1359,11 @@ contains
 
                         vR_MD = (v_rs_ws(j, k, l, i) &
                                  + v_rs_ws(j + 1, k, l, i) &
-                                 - d_MD)*5e-1_wp
+                                 - d_MD)*5.e-1_wp
 
                         vR_LC = v_rs_ws(j, k, l, i) &
                                 + (v_rs_ws(j, k, l, i) &
-                                   - v_rs_ws(j - 1, k, l, i))*5e-1_wp + beta_mp*d_LC
+                                   - v_rs_ws(j - 1, k, l, i))*5.e-1_wp + beta_mp*d_LC
 
                         vR_min = max(min(v_rs_ws(j, k, l, i), &
                                          v_rs_ws(j + 1, k, l, i), &
@@ -1383,8 +1380,8 @@ contains
                                          vR_LC))
 
                         vR_rs_vf(j, k, l, i) = vR_rs_vf(j, k, l, i) &
-                                               + (sign(5e-1_wp, vR_min - vR_rs_vf(j, k, l, i)) &
-                                                  + sign(5e-1_wp, vR_max - vR_rs_vf(j, k, l, i))) &
+                                               + (sign(5.e-1_wp, vR_min - vR_rs_vf(j, k, l, i)) &
+                                                  + sign(5.e-1_wp, vR_max - vR_rs_vf(j, k, l, i))) &
                                                *min(abs(vR_min - vR_rs_vf(j, k, l, i)), &
                                                     abs(vR_max - vR_rs_vf(j, k, l, i)))
                         ! END: Right Monotonicity Preserving Bound

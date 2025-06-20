@@ -159,7 +159,7 @@ contains
         real(wp) :: pres_relax, f_pres, df_pres
         real(wp), dimension(num_fluids) :: pres_K_init, rho_K_s
         integer, parameter :: MAX_ITER = 50
-        real(wp), parameter :: TOLERANCE = 1e-10_wp
+        real(wp), parameter :: TOLERANCE = 1.e-10_wp
         integer :: iter, i
 
         ! Initialize pressures
@@ -169,8 +169,8 @@ contains
             if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
                 pres_K_init(i) = (q_cons_vf(i + intxb - 1)%sf(j, k, l)/ &
                                   q_cons_vf(i + advxb - 1)%sf(j, k, l) - pi_infs(i))/gammas(i)
-                if (pres_K_init(i) <= -(1._wp - 1e-8_wp)*pres_inf(i) + 1e-8_wp) &
-                    pres_K_init(i) = -(1._wp - 1e-8_wp)*pres_inf(i) + 1e-8_wp
+                if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*pres_inf(i) + 1.e-8_wp) &
+                    pres_K_init(i) = -(1._wp - 1.e-8_wp)*pres_inf(i) + 1.e-8_wp
             else
                 pres_K_init(i) = 0._wp
             end if
@@ -178,8 +178,8 @@ contains
         end do
 
         ! Newton-Raphson iteration
-        f_pres = 1e-9_wp
-        df_pres = 1e9_wp
+        f_pres = 1.e-9_wp
+        df_pres = 1.e9_wp
         !$acc loop seq
         do iter = 0, MAX_ITER - 1
             if (abs(f_pres) > TOLERANCE) then
@@ -187,8 +187,8 @@ contains
 
                 ! Enforce pressure bounds
                 do i = 1, num_fluids
-                    if (pres_relax <= -(1._wp - 1e-8_wp)*pres_inf(i) + 1e-8_wp) &
-                        pres_relax = -(1._wp - 1e-8_wp)*pres_inf(i) + 1._wp
+                    if (pres_relax <= -(1._wp - 1.e-8_wp)*pres_inf(i) + 1.e-8_wp) &
+                        pres_relax = -(1._wp - 1.e-8_wp)*pres_inf(i) + 1._wp
                 end do
 
                 ! Newton-Raphson step
@@ -298,7 +298,7 @@ contains
         dyn_pres = 0._wp
         !$acc loop seq
         do i = momxb, momxe
-            dyn_pres = dyn_pres + 5e-1_wp*q_cons_vf(i)%sf(j, k, l)* &
+            dyn_pres = dyn_pres + 5.e-1_wp*q_cons_vf(i)%sf(j, k, l)* &
                        q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
         end do
 

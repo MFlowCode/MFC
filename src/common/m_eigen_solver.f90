@@ -10,6 +10,8 @@ module m_eigen_solver
 
     use m_precision_select
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     implicit none
 
     private; 
@@ -124,7 +126,7 @@ contains
 
             do 110 i = 1, l
                 if (i == j) go to 110
-                if (ar(j, i) /= 0.0_wp .or. ai(j, i) /= 0.0_wp) go to 120
+                if (.not. f_approx_equal(ar(j, i), 0.0_wp) .or. .not. f_approx_equal(ai(j, i), 0.0_wp)) go to 120
 110         end do
 
             ml = l
@@ -140,7 +142,7 @@ contains
 
             do 150 i = k, l
                 if (i == j) go to 150
-                if (ar(i, j) /= 0.0_wp .or. ai(i, j) /= 0.0_wp) go to 170
+                if (.not. f_approx_equal(ar(i, j), 0.0_wp) .or. .not. f_approx_equal(ai(i, j), 0.0_wp)) go to 170
 150         end do
 
             ml = k
@@ -164,7 +166,7 @@ contains
                 r = r + abs(ar(i, j)) + abs(ai(i, j))
 200         end do
 !     guard against zero c or r due to underflow
-            if (c == 0.0_wp .or. r == 0.0_wp) go to 270
+            if (f_approx_equal(c, 0.0_wp) .or. f_approx_equal(r, 0.0_wp)) go to 270
             g = r/radix
             f = 1.0_wp
             s = c + r
@@ -242,7 +244,7 @@ contains
             do 90 i = ml, igh
                 scale = scale + abs(ar(i, ml - 1)) + abs(ai(i, ml - 1))
 90          end do
-            if (scale == 0._wp) go to 180
+            if (f_approx_equal(scale, 0._wp)) go to 180
             mp = ml + igh
 !     for i=igh step -1 until ml do
             do 100 ii = ml, igh
@@ -254,7 +256,7 @@ contains
 
             g = sqrt(h)
             call pythag(ortr(ml), orti(ml), f)
-            if (f == 0._wp) go to 103
+            if (f_approx_equal(f, 0._wp)) go to 103
             h = h + f*g
             g = g/f
             ortr(ml) = (1.0_wp + g)*ortr(ml)
@@ -374,8 +376,8 @@ contains
 !     for i=igh-1 step -1 until low+1 do
 105     do 140 ii = 1, iend
             i = igh - ii
-            if (abs(ortr(i)) == 0._wp .and. abs(orti(i)) == 0._wp) go to 140
-            if (abs(hr(i, i - 1)) == 0._wp .and. abs(hi(i, i - 1)) == 0._wp) go to 140
+            if (f_approx_equal(abs(ortr(i)), 0._wp) .and. f_approx_equal(abs(orti(i)), 0._wp)) go to 140
+            if (f_approx_equal(abs(hr(i, i - 1)), 0._wp) .and. f_approx_equal(abs(hi(i, i - 1)), 0._wp)) go to 140
 !     norm below is negative of h formed in corth
             norm = hr(i, i - 1)*ortr(i) + hi(i, i - 1)*orti(i)
             ip1 = i + 1
@@ -410,7 +412,7 @@ contains
 
         do 170 i = l, igh
             ll = min0(i + 1, igh)
-            if (abs(hi(i, i - 1)) == 0._wp) go to 170
+            if (f_approx_equal(abs(hi(i, i - 1)), 0._wp)) go to 170
             call pythag(hr(i, i - 1), hi(i, i - 1), norm)
             yr = hr(i, i - 1)/norm
             yi = hi(i, i - 1)/norm
@@ -458,7 +460,7 @@ contains
             tst1 = abs(hr(l - 1, l - 1)) + abs(hi(l - 1, l - 1)) &
                    + abs(hr(l, l)) + abs(hi(l, l))
             tst2 = tst1 + abs(hr(l, l - 1))
-            if (tst2 == tst1) go to 300
+            if (f_approx_equal(tst2, tst1)) go to 300
 260     end do
 !     form shift
 300     if (l == en) go to 660
@@ -468,7 +470,7 @@ contains
         si = hi(en, en)
         xr = hr(enm1, en)*hr(en, enm1)
         xi = hi(enm1, en)*hr(en, enm1)
-        if (xr == 0.0_wp .and. xi == 0.0_wp) go to 340
+        if (f_approx_equal(xr, 0.0_wp) .and. f_approx_equal(xi, 0.0_wp)) go to 340
         yr = (hr(enm1, enm1) - sr)/2.0_wp
         yi = (hi(enm1, enm1) - si)/2.0_wp
         call csroot(yr**2 - yi**2 + xr, 2.0_wp*yr*yi + xi, zzr, zzi)
@@ -522,7 +524,7 @@ contains
 500     end do
 
         si = hi(en, en)
-        if (abs(si) == 0._wp) go to 540
+        if (f_approx_equal(abs(si), 0._wp)) go to 540
         call pythag(hr(en, en), si, norm)
         sr = hr(en, en)/norm
         si = si/norm
@@ -567,7 +569,7 @@ contains
 590         end do
 600     end do
 
-        if (abs(si) == 0._wp) go to 240
+        if (f_approx_equal(abs(si), 0._wp)) go to 240
 
         do 630 i = 1, en
             yr = hr(i, en)
@@ -602,7 +604,7 @@ contains
             end do
         end do
 
-        if (nl == 1 .or. norm == 0._wp) go to 1001
+        if (nl == 1 .or. f_approx_equal(norm, 0._wp)) go to 1001
 !     for en=nl step -1 until 2 do
         do 800 nn = 2, nl
             en = nl + 2 - nn
@@ -625,7 +627,7 @@ contains
 
                 yr = xr - wr(i)
                 yi = xi - wi(i)
-                if (yr /= 0.0_wp .or. yi /= 0.0_wp) go to 765
+                if (.not. f_approx_equal(yr, 0.0_wp) .or. .not. f_approx_equal(yi, 0.0_wp)) go to 765
                 tst1 = norm
                 yr = tst1
 760             yr = 0.01_wp*yr
@@ -635,7 +637,7 @@ contains
                 call cdiv(zzr, zzi, yr, yi, hr(i, en), hi(i, en))
 !     overflow control
                 tr = abs(hr(i, en)) + abs(hi(i, en))
-                if (tr == 0.0_wp) go to 780
+                if (f_approx_equal(tr, 0.0_wp)) go to 780
                 tst1 = tr
                 tst2 = tst1 + 1.0_wp/tst1
                 if (tst2 > tst1) go to 780
@@ -796,11 +798,11 @@ contains
 
         real(wp) :: p, r, s, t, u
         p = max(abs(a), abs(b))
-        if (p == 0.0_wp) go to 20
+        if (f_approx_equal(p, 0.0_wp)) go to 20
         r = (min(abs(a), abs(b))/p)**2
 10      continue
         t = 4.0_wp + r
-        if (t == 4.0_wp) go to 20
+        if (f_approx_equal(t, 4.0_wp)) go to 20
         s = r/t
         u = 1.0_wp + 2.0_wp*s
         p = u*p
