@@ -663,8 +663,6 @@ contains
                             if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                                 .or. &
                                 ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                                .or. &
-                                ((i >= chemxb) .and. (i <= chemxe)) &
                                 ) then
                                 write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
                             else
@@ -1765,7 +1763,7 @@ contains
             @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
 
             vcfl_max = 0._wp
-            Rc_min = 1e3_wp
+            Rc_min = 1.e3_wp
         end if
 
     end subroutine s_initialize_data_output_module

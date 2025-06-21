@@ -1,11 +1,10 @@
 #:def Hardcoded3DVariables()
     ! Place any declaration of intermediate variables here
-
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
 
     real(wp) :: eps
 
-    eps = 1e-9_wp
+    eps = 1.e-9_wp
 #:enddef
 
 #:def Hardcoded3D()
@@ -23,7 +22,7 @@
 
         intH = amp*(sin(2._wp*pi*x_cc(i)/lam - pi/2._wp) + sin(2._wp*pi*z_cc(k)/lam - pi/2._wp)) + h
 
-        alph = 5e-1_wp*(1._wp + tanh((y_cc(j) - intH)/2.5e-3_wp))
+        alph = 5.e-1_wp*(1._wp + tanh((y_cc(j) - intH)/2.5e-3_wp))
 
         if (alph < eps) alph = eps
         if (alph > 1._wp - eps) alph = 1._wp - eps
@@ -56,7 +55,10 @@
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
 
-        ! Put your variable assignments here
+    case (370)
+        ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
+        @: HardcodedReadValues()
+
     case default
         call s_int_to_str(patch_id, iStr)
         call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))
