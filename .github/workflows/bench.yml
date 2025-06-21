@@ -1,6 +1,9 @@
 name: 'Benchmark'
 
-on: workflow_dispatch
+on: 
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
 
 jobs:
   file-changes:
@@ -20,7 +23,7 @@ jobs:
 
   self:
     name: Georgia Tech | Phoenix (NVHPC)
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && ${{ github.event.review.state == 'approved' }}
     needs: file-changes
     strategy:
       matrix:
