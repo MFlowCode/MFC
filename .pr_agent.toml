@@ -11,4 +11,5 @@ Focus on duplicate code, the possibility of bugs, and if the PR added appropriat
 """
 
 [pr_code_suggestions]
-commitable_code_suggestions = true      # always emit patch blocks
+commitable_code_suggestions = false   # purely advisory, no write ops
+apply_suggestions_checkbox  = false   # hides the “Apply/Chat” boxes
