@@ -1007,6 +1007,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 },
                 override_tol=1
             ))
+        cases.append(define_case_f(
+             f'1D -> Chemistry -> MultiComponent_Diffusion ',
+             'examples/1D_MultiComponent_Diffusion',
+             mods=common_mods
+        ))
 
     foreach_dimension()
 
