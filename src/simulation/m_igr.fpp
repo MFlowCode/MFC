@@ -725,8 +725,8 @@ contains
 
                                     if (q == 0) then
                                         jac_rhs(j, k, l) = alf_igr*(2._wp*(dvel(1, 2)*dvel(2, 1)) &
-                                                                    + dvel(1, 1)**2_wp + dvel(2, 2)**2_wp &
-                                                                    + (dvel(1, 1) + dvel(2, 2))**2_wp)
+                                                                    + dvel(1, 1)**2._wp + dvel(2, 2)**2._wp &
+                                                                    + (dvel(1, 1) + dvel(2, 2))**2._wp)
                                     end if
                                 end do
 
@@ -838,8 +838,8 @@ contains
                                 dvel(:, 2) = dvel_small
 
                                 jac_rhs(j, k, l) = alf_igr*(2._wp*(dvel(1, 2)*dvel(2, 1)) &
-                                                            + dvel(1, 1)**2_wp + dvel(2, 2)**2_wp &
-                                                            + (dvel(1, 1) + dvel(2, 2))**2_wp)
+                                                            + dvel(1, 1)**2._wp + dvel(2, 2)**2._wp &
+                                                            + (dvel(1, 1) + dvel(2, 2))**2._wp)
 
                             end if
                         end do
@@ -1257,9 +1257,9 @@ contains
                                         jac_rhs(j, k, l) = alf_igr*(2._wp*(dvel(1, 2)*dvel(2, 1) &
                                                                            + dvel(1, 3)*dvel(3, 1) &
                                                                            + dvel(2, 3)*dvel(3, 2)) &
-                                                                    + dvel(1, 1)**2_wp + dvel(2, 2)**2_wp &
-                                                                    + dvel(3, 3)**2_wp &
-                                                                    + (dvel(1, 1) + dvel(2, 2) + dvel(3, 3))**2_wp)
+                                                                    + dvel(1, 1)**2._wp + dvel(2, 2)**2._wp &
+                                                                    + dvel(3, 3)**2._wp &
+                                                                    + (dvel(1, 1) + dvel(2, 2) + dvel(3, 3))**2._wp)
                                     end if
                                 end do
 
@@ -1429,9 +1429,9 @@ contains
                                 jac_rhs(j, k, l) = alf_igr*(2._wp*(dvel(1, 2)*dvel(2, 1) &
                                                                    + dvel(1, 3)*dvel(3, 1) &
                                                                    + dvel(2, 3)*dvel(3, 2)) &
-                                                            + dvel(1, 1)**2_wp + dvel(2, 2)**2_wp &
-                                                            + dvel(3, 3)**2_wp &
-                                                            + (dvel(1, 1) + dvel(2, 2) + dvel(3, 3))**2_wp)
+                                                            + dvel(1, 1)**2._wp + dvel(2, 2)**2._wp &
+                                                            + dvel(3, 3)**2._wp &
+                                                            + (dvel(1, 1) + dvel(2, 2) + dvel(3, 3))**2._wp)
                             end if
                         end do
                     end do
