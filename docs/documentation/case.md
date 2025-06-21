@@ -414,7 +414,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `igr_pres_lim`         | Logical | Limit IGR pressure to avoid negative values (default F) |
 | `igr_iter_solver`      | Integer | Solution method for IGR elliptic solve [1] Jacobi [2] Gauss-Seidel |
 | `num_igr_iters`        | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
-| `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (defualt 50) |
+| `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.

@@ -5,7 +5,7 @@
     real(wp) :: eps
 
     ! Case 302 - IGR Jet
-    real(wp) :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth, x0, SS, VV
+    real(wp) :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth
 
     eps = 1e-9_wp
 
