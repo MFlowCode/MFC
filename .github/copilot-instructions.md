@@ -28,17 +28,18 @@ Copilot, when reviewing:
 
 ## 3  Style & Naming Conventions (*.fpp / *.f90)
 
-Element	Rule
-Indentation	2 spaces; continuation lines align beneath &.
-Case	Lower-case keywords & intrinsics (do, end subroutine, …).
-Modules	m_<feature> (e.g. m_transport).
-Public subroutines	s_<verb>_<noun> (s_compute_flux).
-Public functions	f_<verb>_<noun>.
-Routine size	subroutine ≤ 500 lines, helper ≤ 150, function ≤ 100, file ≤ 1000.
-Arguments	≤ 6; else use a derived-type params struct.
-Forbidden	goto (except legacy), COMMON, save globals.
-Variables	Every arg has explicit intent; use dimension/allocatable/pointer as appropriate.
-Errors	Call s_mpi_abort(<msg>), never stop or error stop.
+| Element | Rule |
+|---------|------|
+| Indentation | 2 spaces; continuation lines align beneath &. |
+| Case | Lower-case keywords & intrinsics (do, end subroutine, …). |
+| Modules | m_<feature> (e.g. m_transport). |
+| Public subroutines | s_<verb>_<noun> (s_compute_flux). |
+| Public functions | f_<verb>_<noun>. |
+| Routine size | subroutine ≤ 500 lines, helper ≤ 150, function ≤ 100, file ≤ 1000. |
+| Arguments | ≤ 6; else use a derived-type params struct. |
+| Forbidden | goto (except legacy), COMMON, save globals. |
+| Variables | Every arg has explicit intent; use dimension/allocatable/pointer as appropriate. |
+| Errors | Call s_mpi_abort(<msg>), never stop or error stop. |
 
 Copilot, when reviewing:
 * Flag violations of any cell above.
@@ -51,18 +52,15 @@ Copilot, when reviewing:
 
 Wrap tight loops:
 
+```fortran
 !$acc parallel loop gang vector default(present) reduction(...)
+```
 
-*	Add collapse(n) when safe.
-*	Declare loop-local variables with private(...).
-*	Allocate large arrays with managed or move them into a persistent !$acc enter data region at start-up.
-*	Avoid stop/error stop inside device code.
-*	Code must compile with Cray ftn, NVIDIA nvfortran, GNU gfortran, and Intel ifx/ifort.
-
-Copilot, when reviewing:
-* Verify directives and data-movement are correct.
-* Point out host-device violations, missing private, or illegal stops.
-* Check that helper routines called from accelerated regions include !$acc routine seq.
+* Add collapse(n) when safe.
+* Declare loop-local variables with private(...).
+* Allocate large arrays with managed or move them into a persistent !$acc enter data region at start-up.
+* Avoid stop/error stop inside device code.
+* Code must compile with Cray ftn, NVIDIA nvfortran, GNU gfortran, and Intel ifx/ifort.
 
 ---
 
