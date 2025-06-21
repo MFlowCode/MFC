@@ -343,8 +343,8 @@ contains
 
         ! Newton Solver for the pT-equilibrium
         ns = 0
-        ! change this relative error metric. 1e4_wp is just arbitrary
-        do while ((abs(pS - pO) > palpha_eps) .and. (abs((pS - pO)/pO) > palpha_eps/1e4_wp) .or. (ns == 0))
+        ! change this relative error metric. 1.e4_wp is just arbitrary
+        do while ((abs(pS - pO) > palpha_eps) .and. (abs((pS - pO)/pO) > palpha_eps/1.e4_wp) .or. (ns == 0))
 
             ! increasing counter
             ns = ns + 1
@@ -438,7 +438,7 @@ contains
         R2D(1) = 0.0_wp; R2D(2) = 0.0_wp
         DeltamP(1) = 0.0_wp; DeltamP(2) = 0.0_wp
         do while (((sqrt(R2D(1)**2 + R2D(2)**2) > ptgalpha_eps) &
-                   .and. ((sqrt(R2D(1)**2 + R2D(2)**2)/rhoe) > (ptgalpha_eps/1e6_wp))) &
+                   .and. ((sqrt(R2D(1)**2 + R2D(2)**2)/rhoe) > (ptgalpha_eps/1.e6_wp))) &
                   .or. (ns == 0))
 
             ! Updating counter for the iterative procedure
