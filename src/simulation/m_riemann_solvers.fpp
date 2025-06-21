@@ -47,7 +47,7 @@ module m_riemann_solvers
         gas_constant, get_mixture_molecular_weight, &
         get_mixture_specific_heat_cv_mass, get_mixture_energy_mass, &
         get_species_specific_heats_r, get_species_enthalpies_rt, &
-        get_mixture_specific_heat_cp_mass, get_mixture_viscosity_mixavg
+        get_mixture_specific_heat_cp_mass
 
     implicit none
 
@@ -677,10 +677,7 @@ contains
 
                             if (viscous) then
                                 if (chemistry) then
-                                    call get_mixture_viscosity_mixavg(T_L, Ys_L, Re_L(1))
-                                    call get_mixture_viscosity_mixavg(T_R, Ys_R, Re_R(1))
-                                    Re_L(1) = 1.0_wp/Re_L(1)
-                                    Re_R(1) = 1.0_wp/Re_R(1)
+                                    call compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L(1), Re_R(1))
                                 end if
                                 !$acc loop seq
                                 do i = 1, 2
@@ -2692,10 +2689,7 @@ contains
 
                                 if (viscous) then
                                     if (chemistry) then
-                                        call get_mixture_viscosity_mixavg(T_L, Ys_L, Re_L(1))
-                                        call get_mixture_viscosity_mixavg(T_R, Ys_R, Re_R(1))
-                                        Re_L(1) = 1.0_wp/Re_L(1)
-                                        Re_R(1) = 1.0_wp/Re_R(1)
+                                        call compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L(1), Re_R(1))
                                     end if
                                     !$acc loop seq
                                     do i = 1, 2

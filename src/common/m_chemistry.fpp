@@ -12,7 +12,8 @@ module m_chemistry
         num_species, molecular_weights, get_temperature, get_net_production_rates, &
         get_mole_fractions, get_species_binary_mass_diffusivities, &
         get_species_mass_diffusivities_mixavg, gas_constant, get_mixture_molecular_weight, &
-        get_mixture_energy_mass, get_mixture_thermal_conductivity_mixavg, get_species_enthalpies_rt
+        get_mixture_energy_mass, get_mixture_thermal_conductivity_mixavg, get_species_enthalpies_rt, &
+        get_mixture_viscosity_mixavg
 
     use m_global_parameters
 
@@ -24,6 +25,18 @@ module m_chemistry
     integer, dimension(3) :: offsets
     !$acc declare create(offsets)
 contains
+
+    subroutine compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L, Re_R)
+
+        real(wp), intent(inout) :: T_L, T_R, Re_L, Re_R
+        real(wp), dimension(num_species), intent(inout) :: Ys_R, Ys_L
+
+        call get_mixture_viscosity_mixavg(T_L, Ys_L, Re_L)
+        call get_mixture_viscosity_mixavg(T_R, Ys_R, Re_R)
+        Re_L = 1.0_wp/Re_L
+        Re_R = 1.0_wp/Re_R
+
+    end subroutine compute_viscosity_and_inversion
 
     subroutine s_compute_q_T_sf(q_T_sf, q_cons_vf, bounds)
 

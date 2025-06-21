@@ -1984,6 +1984,10 @@ contains
                     end do
                 end if
 
+                if (chem_params%diffusion .and. .not. viscous)
+                    @:DEALLOCATE(flux_src_n(i)%vf(E_idx)%sf)
+                end if
+
                 if (riemann_solver == 1 .or. riemann_solver == 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)

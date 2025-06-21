@@ -1,0 +1,108 @@
+description: |-
+  GRI-Mech Version 3.0 7/30/99  CHEMKIN-II format
+  See README30 file at anonymous FTP site unix.sri.com, directory gri;
+  WorldWideWeb home page http://www.me.berkeley.edu/gri_mech/ or
+  through http://www.gri.org , under 'Basic  Research',
+  for additional information, contacts, and disclaimer
+
+  Updated webpage at http://combustion.berkeley.edu/gri-mech/version30/text30.html
+
+generator: ck2yaml
+input-files: [gri30.inp, gri30_thermo.dat, gri30_tran.dat]
+cantera-version: 2.5.0
+date: Wed, 11 Dec 2019 16:59:02 -0500
+
+units: {length: cm, time: s, quantity: mol, activation-energy: cal/mol}
+
+phases:
+- name: gri30
+  thermo: ideal-gas
+  elements: [O, H, C, N]
+  species: [O2, H2O, CH4, N2]
+  kinetics: gas
+  transport: mixture-averaged
+  state: {T: 300.0, P: 1 atm}
+
+species:
+- name: O2
+  composition: {O: 2}
+  thermo:
+    model: NASA7
+    temperature-ranges: [200.0, 1000.0, 3500.0]
+    data:
+    - [3.78245636, -2.99673416e-03, 9.84730201e-06, -9.68129509e-09, 3.24372837e-12,
+      -1063.94356, 3.65767573]
+    - [3.28253784, 1.48308754e-03, -7.57966669e-07, 2.09470555e-10, -2.16717794e-14,
+      -1088.45772, 5.45323129]
+    note: TPIS89
+  transport:
+    model: gas
+    geometry: linear
+    well-depth: 107.4
+    diameter: 3.458
+    polarizability: 1.6
+    rotational-relaxation: 3.8
+- name: H2O
+  composition: {H: 2, O: 1}
+  thermo:
+    model: NASA7
+    temperature-ranges: [200.0, 1000.0, 3500.0]
+    data:
+    - [4.19864056, -2.0364341e-03, 6.52040211e-06, -5.48797062e-09, 1.77197817e-12,
+      -3.02937267e+04, -0.849032208]
+    - [3.03399249, 2.17691804e-03, -1.64072518e-07, -9.7041987e-11, 1.68200992e-14,
+      -3.00042971e+04, 4.9667701]
+    note: L8/89
+  transport:
+    model: gas
+    geometry: nonlinear
+    well-depth: 572.4
+    diameter: 2.605
+    dipole: 1.844
+    rotational-relaxation: 4.0
+- name: CH4
+  composition: {C: 1, H: 4}
+  thermo:
+    model: NASA7
+    temperature-ranges: [200.0, 1000.0, 3500.0]
+    data:
+    - [5.14987613, -0.0136709788, 4.91800599e-05, -4.84743026e-08, 1.66693956e-11,
+      -1.02466476e+04, -4.64130376]
+    - [0.074851495, 0.0133909467, -5.73285809e-06, 1.22292535e-09, -1.0181523e-13,
+      -9468.34459, 18.437318]
+    note: L8/88
+  transport:
+    model: gas
+    geometry: nonlinear
+    well-depth: 141.4
+    diameter: 3.746
+    polarizability: 2.6
+    rotational-relaxation: 13.0
+- name: N2
+  composition: {N: 2}
+  thermo:
+    model: NASA7
+    temperature-ranges: [300.0, 1000.0, 5000.0]
+    data:
+    - [3.298677, 1.4082404e-03, -3.963222e-06, 5.641515e-09, -2.444854e-12,
+      -1020.8999, 3.950372]
+    - [2.92664, 1.4879768e-03, -5.68476e-07, 1.0097038e-10, -6.753351e-15,
+      -922.7977, 5.980528]
+    note: '121286'
+  transport:
+    model: gas
+    geometry: linear
+    well-depth: 97.53
+    diameter: 3.621
+    polarizability: 1.76
+    rotational-relaxation: 4.0
+
+reactions:
+- equation: CH4 <=>  CH4  # Reaction 1
+  rate-constant: {A: 1.927e+13, b: -0.32, Ea: 0.0}
+- equation: N2 <=>  N2  # Reaction 2
+  rate-constant: {A: 1.927e+13, b: -0.32, Ea: 0.0}
+- equation: H2O <=>  H2O # Reaction 3
+  rate-constant: {A: 1.927e+13, b: -0.32, Ea: 0.0}
+- equation: O2 <=>  O2  # Reaction 4
+  rate-constant: {A: 1.927e+13, b: -0.32, Ea: 0.0}
