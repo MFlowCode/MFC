@@ -1,12 +1,11 @@
 #:def Hardcoded2DVariables()
-
+    ! Place any declaration of intermediate variables here
     real(wp) :: eps
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: factor
 
-    eps = 1e-9_wp
-
+    eps = 1.e-9_wp
 #:enddef
 
 #:def Hardcoded2D()
@@ -35,7 +34,7 @@
         if (r < rmax) then
             q_prim_vf(momxb)%sf(i, j, 0) = -(y_cc(j) - 0.5_wp)*umax/rmax
             q_prim_vf(momxe)%sf(i, j, 0) = (x_cc(i) - 0.5_wp)*umax/rmax
-            q_prim_vf(E_idx)%sf(i, j, 0) = p0 + umax**2*((r/rmax)**2/2._wp)
+            q_prim_vf(E_idx)%sf(i, j, 0) = p0 + umax**2*((r/rmax)**2._wp/2._wp)
         else if (r < 2*rmax) then
             q_prim_vf(momxb)%sf(i, j, 0) = -((y_cc(j) - 0.5_wp)/r)*umax*(2._wp - r/rmax)
             q_prim_vf(momxe)%sf(i, j, 0) = ((x_cc(i) - 0.5_wp)/r)*umax*(2._wp - r/rmax)
@@ -157,6 +156,10 @@
             q_prim_vf(contxb)%sf(i, j, 0) = 1.e-4_wp
             q_prim_vf(E_idx)%sf(i, j, 0) = 3.e-5_wp
         end if
+
+    case (270)
+        ! This hardcoded case extrudes a 1D profile to initialize a 2D simulation domain
+        @: HardcodedReadValues()
 
     case default
         if (proc_rank == 0) then

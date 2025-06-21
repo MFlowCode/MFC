@@ -181,7 +181,7 @@ contains
         end if
 
         ! Updating the patch identities bookkeeping variable
-        if (1._wp - eta < 1e-16_wp) patch_id_fp(j, k, l) = patch_id
+        if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_mixture_primitive_variables
 
@@ -199,8 +199,8 @@ contains
         real(wp) :: pres_mag, loc, n_tait, B_tait, p0
         real(wp) :: R3bar, n0, ratio, nH, vfH, velH, rhoH, deno
 
-        p0 = 101325
-        pres_mag = 1e-1_wp
+        p0 = 101325._wp
+        pres_mag = 1.e-1_wp
         loc = x_cc(177)
         n_tait = fluid_pp(1)%gamma
         B_tait = fluid_pp(1)%pi_inf
@@ -214,7 +214,7 @@ contains
 
         if (qbmm) then
             do i = 1, nb
-                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - fluid_pp(1)%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - fluid_pp(1)%pv))**(1/3._wp)
+                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - fluid_pp(1)%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - fluid_pp(1)%pv))**(1._wp/3._wp)
             end do
         end if
 
@@ -687,7 +687,7 @@ contains
         end if
 
         ! Updating the patch identities bookkeeping variable
-        if (1._wp - eta < 1e-16_wp) patch_id_fp(j, k, l) = patch_id
+        if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_species_primitive_variables
 
