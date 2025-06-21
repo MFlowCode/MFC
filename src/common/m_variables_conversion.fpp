@@ -280,7 +280,7 @@ contains
                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
             end do
 
-            alpha_K = alpha_K/max(sum(alpha_K), 1e-16_wp)
+            alpha_K = alpha_K/max(sum(alpha_K), 1.e-16_wp)
 
         end if
 
@@ -405,7 +405,7 @@ contains
                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
             end do
 
-            alpha_K = alpha_K/max(sum(alpha_K), 1e-16_wp)
+            alpha_K = alpha_K/max(sum(alpha_K), 1.e-16_wp)
 
         end if
 
@@ -960,7 +960,7 @@ contains
 
                             dW = -f/df_dW
                             W = W + dW
-                            if (abs(dW) < 1e-12*W) exit
+                            if (abs(dW) < 1.e-12_wp*W) exit
                         end do
 
                         ! Recalculate pressure using converged W
@@ -1014,7 +1014,7 @@ contains
                         if (model_eqns /= 4) then
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
                                                         /rho_K
-                            dyn_pres_K = dyn_pres_K + 5e-1_wp*qK_cons_vf(i)%sf(j, k, l) &
+                            dyn_pres_K = dyn_pres_K + 5.e-1_wp*qK_cons_vf(i)%sf(j, k, l) &
                                          *qK_prim_vf(i)%sf(j, k, l)
                         else
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
@@ -1520,11 +1520,11 @@ contains
                         R_gas = gas_constant/mix_mol_weight
                         T_K = pres_K/rho_K/R_gas
                         call get_mixture_energy_mass(T_K, Y_K, E_K)
-                        E_K = rho_K*E_K + 5e-1_wp*rho_K*vel_K_sum
+                        E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
                     else
                         ! Computing the energy from the pressure
                         E_K = gamma_K*pres_K + pi_inf_K &
-                              + 5e-1_wp*rho_K*vel_K_sum + qv_K
+                              + 5.e-1_wp*rho_K*vel_K_sum + qv_K
                     end if
 
                     ! mass flux, this should be \alpha_i \rho_i u_i
@@ -1659,7 +1659,7 @@ contains
                         (rho*(1._wp - adv(num_fluids)))
                 end if
             else
-                c = ((H - 5e-1*vel_sum)/gamma)
+                c = ((H - 5.e-1*vel_sum)/gamma)
             end if
 
             if (mixture_err .and. c < 0._wp) then
