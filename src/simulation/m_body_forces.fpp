@@ -22,7 +22,7 @@ module m_body_forces
               s_finalize_body_forces_module
 
     real(wp), allocatable, dimension(:, :, :) :: rhoM
-    !$acc declare create(rhoM)
+    $:GPU_DECLARE(create='[rhoM]')
 
 contains
 
@@ -67,7 +67,7 @@ contains
             end if
         end if
 
-        !$acc update device(accel_bf)
+        $:GPU_UPDATE(device='[accel_bf]')
 
     end subroutine s_compute_acceleration
 
@@ -79,7 +79,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer :: i, j, k, l !< standard iterators
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -109,7 +109,7 @@ contains
         call s_compute_acceleration(mytime)
         call s_compute_mixture_density(q_cons_vf)
 
-        !$acc parallel loop collapse(4) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(collapse=4)
         do i = momxb, E_idx
             do l = 0, p
                 do k = 0, n
@@ -122,7 +122,7 @@ contains
 
         if (bf_x) then ! x-direction body forces
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -137,7 +137,7 @@ contains
 
         if (bf_y) then ! y-direction body forces
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -152,7 +152,7 @@ contains
 
         if (bf_z) then ! z-direction body forces
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
