@@ -388,11 +388,11 @@ def copy_input_lagrange(path_example_input, path_test):
 
 def input_chemistry_diffusion(self):
     if "MultiComponent_Diffusion" in self.trace:
-        copy_input_lagrange(f'/1D_MultiComponent_Diffusion',f'{self.get_dirpath()}')
+        copy_input_diffusion(f'/1D_MultiComponent_Diffusion',f'{self.get_dirpath()}')
 
 def create_input_diffusion(path_test):
-    folder_path_lagrange = path_test
-    file_path_lagrange = folder_path_lagrange + '/grigri.yaml'
+    folder_path_diffusion = path_test
+    file_path_diffusion = folder_path_diffusion + '/grigri.yaml'
 
 def copy_input_diffusion(path_example_input, path_test):
     folder_path_dest = path_test 

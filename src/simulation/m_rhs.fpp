@@ -1984,7 +1984,7 @@ contains
                     end do
                 end if
 
-                if (chem_params%diffusion .and. .not. viscous)
+                if (chem_params%diffusion .and. .not. viscous) then
                     @:DEALLOCATE(flux_src_n(i)%vf(E_idx)%sf)
                 end if
 
