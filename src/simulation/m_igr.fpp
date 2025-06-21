@@ -43,16 +43,7 @@ module m_igr
         #:if igr_order == 5
             integer, parameter :: vidxb = -2
             integer, parameter :: vidxe = 3
-        #:elif igr_order == 3
-            integer, parameter :: vidxb = -1
-            integer, parameter :: vidxe = 2
-        #:endif
 
-#ifdef _CRAYFTN
-        real(wp), allocatable, dimension(:) :: coeff_L, coeff_R
-        !$acc declare create(coeff_L, coeff_R)
-#else
-        #:if igr_order == 5
             real(wp), parameter :: coeff_L(-1:3) = [ &
                                    -3._wp/60._wp, &  ! Index -1
                                    27._wp/60._wp, &  ! Index 0
@@ -69,6 +60,9 @@ module m_igr
                                    -3._wp/60._wp &  ! Index 2
                                    ]
         #:elif igr_order == 3
+            integer, parameter :: vidxb = -1
+            integer, parameter :: vidxe = 2
+
             real(wp), parameter :: coeff_L(0:2) = [ &
                                    2._wp/6._wp, & ! Index 0
                                    5._wp/6._wp, & ! Index 1
@@ -79,8 +73,8 @@ module m_igr
                                    5._wp/6._wp, & ! Index 0
                                    2._wp/6._wp & ! Index 1
                                    ]
+
         #:endif
-#endif
     #:endif
 
     integer :: i, j, k, l, q, r
@@ -126,78 +120,44 @@ contains
         end if
         !$acc update device(alf_igr)
 
-        if (igr_order == 3) then
-            #:if not MFC_CASE_OPTIMIZATION
-                vidxb = -1; vidxe = 2; 
-                !$acc update device(vidxb, vidxe)
+        #:if not MFC_CASE_OPTIMIZATION
+            if (igr_order == 3) then
+                    vidxb = -1; vidxe = 2; 
+                    !$acc update device(vidxb, vidxe)
 
-                @:ALLOCATE(coeff_L(0:2))
-                coeff_L(0) = (2._wp/6._wp)
-                coeff_L(1) = (5._wp/6._wp)
-                coeff_L(2) = (-1._wp/6._wp)
-                !$acc update device(coeff_L)
+                    @:ALLOCATE(coeff_L(0:2))
+                    coeff_L(0) = (2._wp/6._wp)
+                    coeff_L(1) = (5._wp/6._wp)
+                    coeff_L(2) = (-1._wp/6._wp)
+                    !$acc update device(coeff_L)
 
-                @:ALLOCATE(coeff_R(-1:1))
-                coeff_R(1) = (2._wp/6._wp)
-                coeff_R(0) = (5._wp/6._wp)
-                coeff_R(-1) = (-1._wp/6._wp)
-                !$acc update device(coeff_R)
-            #:else
-#ifdef _CRAYFTN
-                @:ALLOCATE(coeff_L(0:2))
-                coeff_L(0) = (2._wp/6._wp)
-                coeff_L(1) = (5._wp/6._wp)
-                coeff_L(2) = (-1._wp/6._wp)
-                !$acc update device(coeff_L)
+                    @:ALLOCATE(coeff_R(-1:1))
+                    coeff_R(1) = (2._wp/6._wp)
+                    coeff_R(0) = (5._wp/6._wp)
+                    coeff_R(-1) = (-1._wp/6._wp)
+                    !$acc update device(coeff_R)
 
-                @:ALLOCATE(coeff_R(-1:1))
-                coeff_R(1) = (2._wp/6._wp)
-                coeff_R(0) = (5._wp/6._wp)
-                coeff_R(-1) = (-1._wp/6._wp)
-                !$acc update device(coeff_R)
-#endif
-            #:endif
+            elseif (igr_order == 5) then
+                    vidxb = -2; vidxe = 3; 
+                    !$acc update device(vidxb, vidxe)
 
-        elseif (igr_order == 5) then
-            #:if not MFC_CASE_OPTIMIZATION
-                vidxb = -2; vidxe = 3; 
-                !$acc update device(vidxb, vidxe)
+                    @:ALLOCATE(coeff_L(-1:3))
+                    coeff_L(-1) = (-3._wp/60._wp)
+                    coeff_L(0) = (27._wp/60._wp)
+                    coeff_L(1) = (47._wp/60._wp)
+                    coeff_L(2) = (-13._wp/60._wp)
+                    coeff_L(3) = (2._wp/60._wp)
+                    !$acc update device(coeff_L)
 
-                @:ALLOCATE(coeff_L(-1:3))
-                coeff_L(-1) = (-3._wp/60._wp)
-                coeff_L(0) = (27._wp/60._wp)
-                coeff_L(1) = (47._wp/60._wp)
-                coeff_L(2) = (-13._wp/60._wp)
-                coeff_L(3) = (2._wp/60._wp)
-                !$acc update device(coeff_L)
-
-                @:ALLOCATE(coeff_R(-2:2))
-                coeff_R(2) = (-3._wp/60._wp)
-                coeff_R(1) = (27._wp/60._wp)
-                coeff_R(0) = (47._wp/60._wp)
-                coeff_R(-1) = (-13._wp/60._wp)
-                coeff_R(-2) = (2._wp/60._wp)
-                !$acc update device(coeff_R)
-            #:else
-#ifdef _CRAYFTN
-                @:ALLOCATE(coeff_L(-1:3))
-                coeff_L(-1) = (-3._wp/60._wp)
-                coeff_L(0) = (27._wp/60._wp)
-                coeff_L(1) = (47._wp/60._wp)
-                coeff_L(2) = (-13._wp/60._wp)
-                coeff_L(3) = (2._wp/60._wp)
-                !$acc update device(coeff_L)
-
-                @:ALLOCATE(coeff_R(-2:2))
-                coeff_R(2) = (-3._wp/60._wp)
-                coeff_R(1) = (27._wp/60._wp)
-                coeff_R(0) = (47._wp/60._wp)
-                coeff_R(-1) = (-13._wp/60._wp)
-                coeff_R(-2) = (2._wp/60._wp)
-                !$acc update device(coeff_R)
-#endif
-            #:endif
-        end if
+                    @:ALLOCATE(coeff_R(-2:2))
+                    coeff_R(2) = (-3._wp/60._wp)
+                    coeff_R(1) = (27._wp/60._wp)
+                    coeff_R(0) = (47._wp/60._wp)
+                    coeff_R(-1) = (-13._wp/60._wp)
+                    coeff_R(-2) = (2._wp/60._wp)
+                    !$acc update device(coeff_R)
+            end if
+        #:endif
 
     end subroutine s_initialize_igr_module
 
@@ -3037,10 +2997,6 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             @:DEALLOCATE(coeff_L, coeff_R)
-        #:else
-#ifdef _CRAYFTN
-            @:DEALLOCATE(coeff_L, coeff_R)
-#endif
         #:endif
 
     end subroutine s_finalize_igr_module

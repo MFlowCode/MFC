@@ -194,6 +194,10 @@ class Case:
             weno_order = int(self.params.get("weno_order",1))
             weno_polyn = int((self.params.get("weno_order",1) - 1) / 2)
 
+            if self.params.get("igr", "F"):
+                weno_order = 5
+                weno_polyn = 5
+
             if teno:
                 weno_num_stencils = weno_order - 3
             else:
