@@ -236,6 +236,16 @@ and use `patch_icpp(i)%%geometry = 7` and `patch_icpp(i)%%hcid = 200` in the inp
 Additional variables can be declared in `Hardcoded1[2,3]DVariables` and used in `hardcoded1[2,3]D`.
 As a convention, any hard coded patches that are part of the MFC master branch should be identified as 1[2,3]xx where the first digit indicates the number of dimensions.
 
+The code provides three pre-built patches for dimensional extrusion of initial conditions:
+
+- `case(170)`: Load 1D profile from data files
+- `case(270)`: Extrude 1D data to 2D domain
+- `case(370)`: Extrude 2D data to 3D domain
+
+Setup: Only requires specifying `init_dir` and filename pattern via `zeros_default`. Grid dimensions are automatically detected from the data files.
+Implementation: All variables and file handling are managed in `src/pre_process/include/ExtrusionHardcodedIC.fpp` with no manual grid configuration needed.
+Usage: Ideal for initializing simulations from lower-dimensional solutions, enabling users to add perturbations or modifications to the base extruded fields for flow instability studies.
+
 #### Parameter Descriptions
 
 - `num_patches` defines the total number of patches defined in the domain.

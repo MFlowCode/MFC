@@ -1,6 +1,9 @@
 name: 'Benchmark'
 
-on: pull_request
+on: 
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
 
 jobs:
   file-changes:
@@ -20,11 +23,12 @@ jobs:
 
   self:
     name: Georgia Tech | Phoenix (NVHPC)
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && ${{ github.event.review.state == 'approved' }}
     needs: file-changes
     strategy:
       matrix:
         device: ['cpu', 'gpu']
+      fail-fast: false
     runs-on:
       group:  phoenix
       labels: gt
@@ -56,6 +60,12 @@ jobs:
           (cd pr && . ./mfc.sh load -c p -m g)
           (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml)
 
+      - name: Print Logs
+        if:   always()
+        run: |
+          cat pr/bench-${{ matrix.device }}.* 2>/dev/null || true
+          cat master/bench-${{ matrix.device }}.* 2>/dev/null || true
+      
       - name: Archive Logs
         uses: actions/upload-artifact@v4
         if:   always()
