@@ -15,7 +15,7 @@ parser.add_argument("--no-chem", dest="chemistry", default=True, action="store_f
 
 args = parser.parse_args()
 
-ctfile = "grigri.yaml"
+ctfile = "input/grigri.yaml"
 
 L = 0.05
 Nx = 100
