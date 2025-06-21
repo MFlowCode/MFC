@@ -1,7 +1,7 @@
 # .pr_agent.toml
 [github_app]
 # Run these tools automatically on every new PR:
-pr_commands = ["/describe", "/review"]
+pr_commands = ["/describe", "/review", "/improve"]
 
 [pr_reviewer]                # (all fields optional)
 num_max_findings        = 5  # how many items to surface
@@ -9,3 +9,6 @@ require_tests_review     = true
 extra_instructions = """
 Focus on duplicate code, the possibility of bugs, and if the PR added appropriate tests if it added a simulation feature.
 """
+
+[pr_code_suggestions]
+commitable_code_suggestions = true      # always emit patch blocks
