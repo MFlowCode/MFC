@@ -1,6 +1,6 @@
 name: 'Benchmark'
 
-on: pull_request
+on: workflow_dispatch
 
 jobs:
   file-changes:
@@ -25,6 +25,7 @@ jobs:
     strategy:
       matrix:
         device: ['cpu', 'gpu']
+      fail-fast: false
     runs-on:
       group:  phoenix
       labels: gt
