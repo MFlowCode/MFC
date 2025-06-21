@@ -56,14 +56,18 @@ def __filter(cases_) -> typing.List[TestCase]:
         if case.ppn > 1 and not ARG("mpi"):
             cases.remove(case)
             skipped_cases.append(case)
-    
+
+    for case in cases[:]:
+        if "RDMA MPI" in case.trace and not ARG("rdma_mpi"):
+            cases.remove(case)
+            skipped_cases.append(case)
+
     for case in cases[:]:
         if ARG("single"):
             skip = ['low_Mach', 'Hypoelasticity', 'teno', 'Chemistry', 'Phase Change model 6'
             ,'Axisymmetric', 'Transducer', 'Transducer Array', 'Cylindrical', 'HLLD', 'Example']
             if any(label in case.trace for label in skip):
                 cases.remove(case)
-
 
     if ARG("no_examples"):
         cases = [case for case in cases if not "Example" in case.trace]
@@ -180,7 +184,11 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]     SKIP     {case.trace}")
         return
 
-    cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+    if "RDMA MPI" in case.trace:
+        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices, rdma_mpi=True)
+    else:
+        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
     common.file_write(out_filepath, cmd.stdout)
@@ -223,6 +231,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
     if ARG("test_all"):
         case.delete_output()
+        # if ARG("rdma_mpi"):
+        #     cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices, rdma_mpi=True)
+        # else:
         cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
         out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
         common.file_write(out_filepath, cmd.stdout)
