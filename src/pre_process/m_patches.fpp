@@ -3,6 +3,7 @@
 !! @brief Contains module m_patches
 
 #:include 'case.fpp'
+#:include 'ExtrusionHardcodedIC.fpp'
 #:include '1dHardcodedIC.fpp'
 #:include '2dHardcodedIC.fpp'
 #:include '3dHardcodedIC.fpp'
@@ -1296,15 +1297,18 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
-        integer :: i
+        integer :: i, j, k
+
         ! Placeholders for the cell boundary values
         real(wp) :: pi_inf, gamma, lit_gamma
-
+        @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1._wp + gamma)/gamma
+        j = 0.0_wp
+        k = 0.0_wp
 
         ! Transferring the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1340,6 +1344,8 @@ contains
 
             end if
         end do
+
+        @:HardcodedDellacation()
 
     end subroutine s_1D_analytical
 
@@ -1409,16 +1415,18 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        integer :: i, j !< generic loop iterators
+        integer :: i, j, k !< generic loop iterators
 
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
         real(wp) :: l, U0 !< Taylor Green Vortex parameters
-
+        @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1._wp + gamma)/gamma
+
+        k = 0.0_wp
 
         ! Transferring the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1465,6 +1473,8 @@ contains
             end do
         end do
 
+        @:HardcodedDellacation()
+
     end subroutine s_2D_analytical
 
     !> This patch assigns the primitive variables as analytical
@@ -1480,7 +1490,7 @@ contains
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
-
+        @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
@@ -1549,6 +1559,7 @@ contains
             end do
         end do
 
+        @:HardcodedDellacation()
     end subroutine s_3D_analytical
 
     !> This patch generates the shape of the spherical harmonics
