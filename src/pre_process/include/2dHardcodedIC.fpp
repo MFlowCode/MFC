@@ -4,7 +4,7 @@
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: factor
-    
+
     eps = 1.e-9_wp
 #:enddef
 
