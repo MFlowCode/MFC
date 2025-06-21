@@ -105,8 +105,6 @@ module m_start_up
  s_save_performance_metrics
 
 
-    type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
-
     real(wp) :: dt_init
 
 contains
@@ -998,7 +996,7 @@ contains
 
                     dyn_pres = 0._wp
                     do i = mom_idx%beg, mom_idx%end
-                        dyn_pres = dyn_pres + 5e-1_wp*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l) &
+                        dyn_pres = dyn_pres + 5.e-1_wp*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l) &
                                    /max(rho, sgm_eps)
                     end do
 
@@ -1045,7 +1043,7 @@ contains
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
+            if (dt < 1.e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
                 print*, "Delta t = ", dt
                 call s_mpi_abort("Delta t has become too small")
             end if
@@ -1256,7 +1254,7 @@ contains
         end if
         !Initialize pb based on surface tension for qbmm (polytropic)
         if (qbmm .and. polytropic .and. (.not. f_is_default(Web))) then
-            pb0 = pref + 2._wp*fluid_pp(1)%ss/(R0*R0ref)
+            pb0(:) = pref + 2._wp*fluid_pp(1)%ss/(R0(:)*R0ref)
             pb0 = pb0/pref
             pref = 1._wp
         end if

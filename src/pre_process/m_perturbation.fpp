@@ -16,6 +16,8 @@ module m_perturbation
 
     use m_boundary_common   ! Boundary conditions module
 
+    use m_helper_basic           !< Functions to compare floating point numbers
+
     use ieee_arithmetic
 
     implicit none
@@ -72,7 +74,7 @@ contains
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
                     !    IF ((perturb_alpha >= 25e-2_wp) .AND. (perturb_alpha <= 75e-2_wp)) THEN
-                    if ((perturb_alpha /= 0._wp) .and. (perturb_alpha /= 1._wp)) then
+                    if ((.not. f_approx_equal(perturb_alpha, 0._wp)) .and. (.not. f_approx_equal(perturb_alpha, 1._wp))) then
 
                         ! Derive new partial densities
                         do l = 1, num_fluids
@@ -197,7 +199,7 @@ contains
             f0 = (Ca + 2._wp/Web)*(fR0/fR)**(3._wp*gam_b) - 2._wp/(Web*fR) + 1._wp - Ca - fP
             f1 = -3._wp*gam_b*(Ca + 2._wp/Web)*(fR0/fR)**(3._wp*gam_b + 1._wp) + 2._wp/(Web*fR**2._wp)
 
-            if (abs(f0) <= 1e-10_wp) then
+            if (abs(f0) <= 1.e-10_wp) then
                 ! Converged
                 exit
             else
@@ -350,7 +352,7 @@ contains
         call cg(mixlayer_nvar*n - n_bc_skip, mixlayer_nvar*n - n_bc_skip, hr, hi, wr, wi, zr, zi, fv1, fv2, fv3, ierr)
 
         ! Generate instability wave
-        call s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
+        call s_generate_wave(wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
 
     end subroutine s_solve_linear_system
 
@@ -492,8 +494,8 @@ contains
     !>  This subroutine generates an instability wave using the most unstable
         !!              eigenvalue and corresponding eigenvector among the
         !!              given set of eigenvalues and eigenvectors.
-    pure subroutine s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
-        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: wr, wi !< eigenvalues
+    pure subroutine s_generate_wave(wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: wi !< eigenvalues
         real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: zr, zi !< eigenvectors
         real(wp), intent(in) :: rho_mean
         real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave
@@ -587,8 +589,8 @@ contains
         xci = 0._wp
         do i = 1, mixlayer_nvar
             do k = 0, n
-                xcr((i - 1)*(nbp - 1) + k) = 5e-1_wp*(xbr((i - 1)*nbp + k) + xbr((i - 1)*nbp + k + 1))
-                xci((i - 1)*(nbp - 1) + k) = 5e-1_wp*(xbi((i - 1)*nbp + k) + xbi((i - 1)*nbp + k + 1))
+                xcr((i - 1)*(nbp - 1) + k) = 5.e-1_wp*(xbr((i - 1)*nbp + k) + xbr((i - 1)*nbp + k + 1))
+                xci((i - 1)*(nbp - 1) + k) = 5.e-1_wp*(xbi((i - 1)*nbp + k) + xbi((i - 1)*nbp + k + 1))
             end do
         end do
 
@@ -597,7 +599,7 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    if (beta == 0) then
+                    if (f_approx_equal(beta, 0._wp)) then
                         ang = alpha*(x_cc(i)*xratio)
                     else
                         ang = alpha*(x_cc(i)*xratio) + beta*(z_cc(k)*xratio) + shift

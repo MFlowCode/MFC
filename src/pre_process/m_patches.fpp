@@ -3,6 +3,7 @@
 !! @brief Contains module m_patches
 
 #:include 'case.fpp'
+#:include 'ExtrusionHardcodedIC.fpp'
 #:include '1dHardcodedIC.fpp'
 #:include '2dHardcodedIC.fpp'
 #:include '3dHardcodedIC.fpp'
@@ -50,7 +51,6 @@ module m_patches
     !! is to act as a pseudo volume fraction to indicate the contribution of each
     !! patch toward the composition of a cell's fluid state.
 
-    real(wp) :: r_cyl, theta_cyl, x_cart, y_cart, z_cart
     real(wp) :: cart_x, cart_y, cart_z
     real(wp) :: sph_phi !<
     !! Variables to be used to hold cell locations in Cartesian coordinates if
@@ -293,7 +293,7 @@ contains
                 @:analytical()
 
                 ! Updating the patch identities bookkeeping variable
-                if (1._wp - eta < 1e-16_wp) patch_id_fp(i, 0, 0) = patch_id
+                if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, 0, 0) = patch_id
 
             end if
         end do
@@ -357,7 +357,7 @@ contains
                     @:analytical()
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
                 end if
             end do
         end do
@@ -553,7 +553,7 @@ contains
                         do while (airfoil_grid_u(k)%x < x_act)
                             k = k + 1
                         end do
-                        if (airfoil_grid_u(k)%x == x_act) then
+                        if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
                             if (y_act <= airfoil_grid_u(k)%y) then
                                 !!IB
                                 !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
@@ -574,7 +574,7 @@ contains
                         do while (airfoil_grid_l(k)%x < x_act)
                             k = k + 1
                         end do
-                        if (airfoil_grid_l(k)%x == x_act) then
+                        if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
                             if (y_act >= airfoil_grid_l(k)%y) then
                                 !!IB
                                 !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
@@ -722,7 +722,7 @@ contains
                                 do while (airfoil_grid_u(k)%x < x_act)
                                     k = k + 1
                                 end do
-                                if (airfoil_grid_u(k)%x == x_act) then
+                                if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
                                     if (y_act <= airfoil_grid_u(k)%y) then
                                         !!IB
                                         !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
@@ -743,7 +743,7 @@ contains
                                 do while (airfoil_grid_l(k)%x < x_act)
                                     k = k + 1
                                 end do
-                                if (airfoil_grid_l(k)%x == x_act) then
+                                if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
                                     if (y_act >= airfoil_grid_l(k)%y) then
                                         !!IB
                                         !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
@@ -828,7 +828,7 @@ contains
                     @:analytical()
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
 
                     q_prim_vf(alf_idx)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
                                                      exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
@@ -891,7 +891,7 @@ contains
                         @:analytical()
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
 
                         q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
                                                          exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
@@ -962,7 +962,7 @@ contains
                     @:analytical()
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
                 end if
             end do
         end do
@@ -1042,7 +1042,7 @@ contains
                         @:analytical()
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
                     end if
                 end do
             end do
@@ -1132,7 +1132,7 @@ contains
                             end if
 
                             ! Updating the patch identities bookkeeping variable
-                            if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                            if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
 
                         end if
                     end if
@@ -1185,9 +1185,9 @@ contains
             do i = 0, m
 
                 if (patch_icpp(patch_id)%smoothen) then
-                    eta = 5e-1_wp + 5e-1_wp*tanh(smooth_coeff/min(dx, dy) &
-                                                 *(a*x_cc(i) + b*y_cc(j) + c) &
-                                                 /sqrt(a**2 + b**2))
+                    eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx, dy) &
+                                                   *(a*x_cc(i) + b*y_cc(j) + c) &
+                                                   /sqrt(a**2 + b**2))
                 end if
 
                 if ((a*x_cc(i) + b*y_cc(j) + c >= 0._wp &
@@ -1202,7 +1202,7 @@ contains
                     @:analytical()
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
                 end if
 
             end do
@@ -1272,7 +1272,7 @@ contains
                     @:analytical()
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
 
                     ! Assign Parameters
                     q_prim_vf(mom_idx%beg)%sf(i, j, 0) = U0*sin(x_cc(i)/L0)*cos(y_cc(j)/L0)
@@ -1299,15 +1299,18 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
-        integer :: i
+        integer :: i, j, k
+
         ! Placeholders for the cell boundary values
         real(wp) :: pi_inf, gamma, lit_gamma
-
+        @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1._wp + gamma)/gamma
+        j = 0.0_wp
+        k = 0.0_wp
 
         ! Transferring the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1339,10 +1342,12 @@ contains
                 @:Hardcoded1D()
 
                 ! Updating the patch identities bookkeeping variable
-                if (1._wp - eta < 1e-16_wp) patch_id_fp(i, 0, 0) = patch_id
+                if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, 0, 0) = patch_id
 
             end if
         end do
+
+        @:HardcodedDellacation()
 
     end subroutine s_1D_analytical
 
@@ -1412,16 +1417,18 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        integer :: i, j !< generic loop iterators
+        integer :: i, j, k !< generic loop iterators
 
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
         real(wp) :: l, U0 !< Taylor Green Vortex parameters
-
+        @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1._wp + gamma)/gamma
+
+        k = 0.0_wp
 
         ! Transferring the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1462,11 +1469,13 @@ contains
 
                     @:Hardcoded2D()
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
 
                 end if
             end do
         end do
+
+        @:HardcodedDellacation()
 
     end subroutine s_2D_analytical
 
@@ -1483,7 +1492,7 @@ contains
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
-
+        @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
@@ -1544,7 +1553,7 @@ contains
                         @:Hardcoded3D()
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
 
                     end if
 
@@ -1552,6 +1561,7 @@ contains
             end do
         end do
 
+        @:HardcodedDellacation()
     end subroutine s_3D_analytical
 
     !> This patch generates the shape of the spherical harmonics
@@ -1571,8 +1581,6 @@ contains
         logical :: non_axis_sym
 
         integer :: i, j, k !< generic loop iterators
-
-        complex(wp), parameter :: cmplx_i = (0._wp, 1._wp)
 
         ! Transferring the patch's centroid and radius information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1653,7 +1661,7 @@ contains
 
                     if (non_axis_sym) then
                         phi = atan(((y_cc(j) - y_centroid) + eps)/((x_cc(i) - x_centroid) + eps))
-                        r = sqrt((x_cc(i) - x_centroid)**2_wp + (y_cc(j) - y_centroid)**2_wp) + eps
+                        r = sqrt((x_cc(i) - x_centroid)**2._wp + (y_cc(j) - y_centroid)**2._wp) + eps
                         x_p = (eps)/r
                         Ps(2) = spherical_harmonic_func(x_p, phi, 2, 2)
                         Ps(3) = spherical_harmonic_func(x_p, phi, 3, 3)
@@ -1664,7 +1672,7 @@ contains
                         Ps(8) = spherical_harmonic_func(x_p, phi, 8, 8)
                         Ps(9) = spherical_harmonic_func(x_p, phi, 9, 9)
                     else
-                        r = sqrt((x_cc(i) - x_centroid)**2_wp + (y_cc(j) - y_centroid)**2_wp) + eps
+                        r = sqrt((x_cc(i) - x_centroid)**2._wp + (y_cc(j) - y_centroid)**2._wp) + eps
                         x_p = abs(x_cc(i) - x_centroid + eps)/r
                         Ps(2) = unassociated_legendre(x_p, 2)
                         Ps(3) = unassociated_legendre(x_p, 3)
@@ -1879,7 +1887,7 @@ contains
                                 @:analytical()
 
                                 ! Updating the patch identities bookkeeping variable
-                                if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                                if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
 
                             end if
                         end if
@@ -2033,7 +2041,7 @@ contains
                             @:analytical()
 
                             ! Updating the patch identities bookkeeping variable
-                            if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                            if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
                         end if
                     end if
                 end do
@@ -2095,11 +2103,11 @@ contains
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta = 5e-1_wp + 5e-1_wp*tanh(smooth_coeff/min(dx, dy, dz) &
-                                                     *(a*x_cc(i) + &
-                                                       b*cart_y + &
-                                                       c*cart_z + d) &
-                                                     /sqrt(a**2 + b**2 + c**2))
+                        eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx, dy, dz) &
+                                                       *(a*x_cc(i) + &
+                                                         b*cart_y + &
+                                                         c*cart_z + d) &
+                                                       /sqrt(a**2 + b**2 + c**2))
                     end if
 
                     if ((a*x_cc(i) + b*cart_y + c*cart_z + d >= 0._wp &
@@ -2115,7 +2123,7 @@ contains
                         @:analytical()
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
                     end if
 
                 end do
@@ -2246,11 +2254,11 @@ contains
             !call s_model_write("__out__.stl", model)
             !call s_model_write("__out__.obj", model)
 
-            grid_mm(1, :) = (/minval(x_cc) - 0e5_wp*dx, maxval(x_cc) + 0e5_wp*dx/)
-            grid_mm(2, :) = (/minval(y_cc) - 0e5_wp*dy, maxval(y_cc) + 0e5_wp*dy/)
+            grid_mm(1, :) = (/minval(x_cc) - 0.e5_wp*dx, maxval(x_cc) + 0.e5_wp*dx/)
+            grid_mm(2, :) = (/minval(y_cc) - 0.e5_wp*dy, maxval(y_cc) + 0.e5_wp*dy/)
 
             if (p > 0) then
-                grid_mm(3, :) = (/minval(z_cc) - 0e5_wp*dz, maxval(z_cc) + 0e5_wp*dz/)
+                grid_mm(3, :) = (/minval(z_cc) - 0.e5_wp*dz, maxval(z_cc) + 0.e5_wp*dz/)
             else
                 grid_mm(3, :) = (/0._wp, 0._wp/)
             end if

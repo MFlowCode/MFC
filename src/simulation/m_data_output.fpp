@@ -25,6 +25,8 @@ module m_data_output
 
     use m_helper
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_sim_helpers
 
     use m_delay_file_access
@@ -360,7 +362,7 @@ contains
                     t_step, dt, t_step*dt, icfl_max_glb
             end if
 
-            if (icfl_max_glb /= icfl_max_glb) then
+            if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
                 call s_mpi_abort('ICFL is NaN. Exiting.')
             elseif (icfl_max_glb > 1._wp) then
                 print *, 'icfl', icfl_max_glb
@@ -368,7 +370,7 @@ contains
             end if
 
             if (viscous) then
-                if (vcfl_max_glb /= vcfl_max_glb) then
+                if (.not. f_approx_equal(vcfl_max_glb, vcfl_max_glb)) then
                     call s_mpi_abort('VCFL is NaN. Exiting.')
                 elseif (vcfl_max_glb > 1._wp) then
                     print *, 'vcfl', vcfl_max_glb
@@ -661,8 +663,6 @@ contains
                             if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                                 .or. &
                                 ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                                .or. &
-                                ((i >= chemxb) .and. (i <= chemxe)) &
                                 ) then
                                 write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
                             else
@@ -1763,7 +1763,7 @@ contains
             @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
 
             vcfl_max = 0._wp
-            Rc_min = 1e3_wp
+            Rc_min = 1.e3_wp
         end if
 
     end subroutine s_initialize_data_output_module

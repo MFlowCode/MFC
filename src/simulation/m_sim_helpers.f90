@@ -96,10 +96,10 @@ contains
 
         if (igr) then
             E = q_prim_vf(E_idx)%sf(j, k, l)
-            pres = (E - pi_inf - qv - 5e-1_wp*rho*vel_sum)/gamma
+            pres = (E - pi_inf - qv - 5.e-1_wp*rho*vel_sum)/gamma
         else
             pres = q_prim_vf(E_idx)%sf(j, k, l)
-            E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_sum + qv
+            E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
         end if
 
         ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY

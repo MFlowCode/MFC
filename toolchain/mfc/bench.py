@@ -81,11 +81,10 @@ def bench(targets = None):
 # pylint: disable=too-many-branches
 def diff():
     lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
-
     cons.print(f"[bold]Comparing Benchmarks: Speedups from [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] to [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] are displayed below. Thus, numbers > 1 represent increases in performance.[/bold]")
+
     if lhs["metadata"] != rhs["metadata"]:
-        def _lock_to_str(lock):
-            return ' '.join([f"{k}={v}" for k, v in lock.items()])
+        _lock_to_str = lambda lock: ' '.join([f"{k}={v}" for k, v in lock.items()])
 
         cons.print(f"""\
 [bold yellow]Warning[/bold yellow]: Metadata in lhs and rhs are not equal.
@@ -114,56 +113,38 @@ def diff():
     table.add_column("[bold]Post Process[/bold]", justify="right")
 
     err = 0
-
     for slug in slugs:
-        lhs_summary = lhs["cases"][slug]["output_summary"]
-        rhs_summary = rhs["cases"][slug]["output_summary"]
-
+        lhs_summary, rhs_summary = lhs["cases"][slug]["output_summary"], rhs["cases"][slug]["output_summary"]
         speedups = ['N/A', 'N/A', 'N/A']
 
         for i, target in enumerate(sorted(DEFAULT_TARGETS, key=lambda t: t.runOrder)):
             if (target.name not in lhs_summary) or (target.name not in rhs_summary):
-
-                err = 1
-
-                if target.name not in lhs_summary:
-                    cons.print(f"{target.name} not present in lhs_summary - Case: {slug}")
-
-                if target.name not in rhs_summary:
-                    cons.print(f"{target.name} not present in rhs_summary - Case: {slug}")
-
-                continue
+                cons.print(f"{target.name} not present in lhs_summary or rhs_summary - Case: {slug}")
+                err = 1; continue
 
             if not math.isfinite(lhs_summary[target.name]["exec"]) or not math.isfinite(rhs_summary[target.name]["exec"]):
                 err = 1
                 cons.print(f"lhs_summary or rhs_summary reports non-real exec time for {target.name} - Case: {slug}")
-
-            exec_time_speedup = "N/A"
             try:
-                exec_time_speedup = f'{lhs_summary[target.name]["exec"] / rhs_summary[target.name]["exec"]:.2f}'
+                exec_time_value = lhs_summary[target.name]["exec"] / rhs_summary[target.name]["exec"]
+                if exec_time_value < 0.9:
+                    cons.print(f"[bold yellow]Warning[/bold yellow]: Exec time speedup for {target.name} is less than 0.9 - Case: {slug}")
+                speedups[i] = f"Exec: {exec_time_value:.2f}"
+                if target == SIMULATION:
+                    if not math.isfinite(lhs_summary[target.name]["grind"]) or not math.isfinite(rhs_summary[target.name]["grind"]):
+                        err = 1
+                        cons.print(f"lhs_summary or rhs_summary reports non-real grind time for {target.name} - Case: {slug}")
+
+                    grind_time_value = lhs_summary[target.name]["grind"] / rhs_summary[target.name]["grind"]
+                    speedups[i] += f" & Grind: {grind_time_value:.2f}"
+                    if grind_time_value <0.95:
+                        cons.print(f"[bold red]Error[/bold red]: Benchmarking failed since grind time speedup for {target.name} below acceptable threshold (<0.95) - Case: {slug}")
+                        err = 1
             except Exception as _:
-                err = 1
-                cons.print(f"lhs_summary or rhs_summary reports non-real exec time for {target.name} - Case: {slug}")
-
-            speedups[i] = f"Exec: {exec_time_speedup}"
-
-            if target == SIMULATION:
-                grind_time_speedup = "N/A"
-                if not math.isfinite(lhs_summary[target.name]["grind"]) or not math.isfinite(rhs_summary[target.name]["grind"]):
-                    err = 1
-                    cons.print(f"lhs_summary or rhs_summary reports non-real grind time for {target.name} - Case: {slug}")
-
-                try:
-                    grind_time_speedup = f'{lhs_summary[target.name]["grind"] / rhs_summary[target.name]["grind"]:.2f}'
-                except Exception as _:
-                    err = 1
-                    cons.print(f"lhs_summary or rhs_summary reports non-real grind time for {target.name} - Case: {slug}")
-
-                speedups[i] += f" & Grind: {grind_time_speedup}"
+                pass
 
         table.add_row(f"[magenta]{slug}[/magenta]", *speedups)
 
     cons.raw.print(table)
-
-    if err != 0:
+    if err:
         raise MFCException("Benchmarking failed")

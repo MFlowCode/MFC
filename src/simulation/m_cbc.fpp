@@ -49,8 +49,6 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
 
-    type(scalar_field), allocatable, dimension(:) :: F_rs_vf, F_src_rs_vf !<
-
     !! Cell-average fluxes (src - source). These are directly determined from the
     !! cell-average primitive variables, q_prims_rs_vf, and not a Riemann solver.
 
@@ -67,10 +65,6 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsx_vf_l, flux_src_rsx_vf_l !<
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsy_vf_l, flux_src_rsy_vf_l
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_l, flux_src_rsz_vf_l
-
-    real(wp) :: c           !< Cell averaged speed of sound
-    real(wp), dimension(2) :: Re          !< Cell averaged Reynolds numbers
-    !$acc declare create(c, Re)
 
     real(wp) :: dpres_ds !< Spatial derivatives in s-dir of pressure
     !$acc declare create(dpres_ds)
@@ -495,7 +489,7 @@ contains
 
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
                     fd_coef_${XYZ}$ (0, cbc_loc_in) = -50._wp/(25._wp*ds(0) + 2._wp*ds(1) &
-                                                               - 1e1_wp*ds(2) + 1e1_wp*ds(3) &
+                                                               - 1.e1_wp*ds(2) + 1.e1_wp*ds(3) &
                                                                - 3._wp*ds(4))
                     fd_coef_${XYZ}$ (1, cbc_loc_in) = -48._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
                     fd_coef_${XYZ}$ (2, cbc_loc_in) = 36._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
@@ -822,7 +816,7 @@ contains
                             T = pres/rho/R_gas
                             call get_mixture_specific_heat_cp_mass(T, Ys, Cp)
                             call get_mixture_energy_mass(T, Ys, e_mix)
-                            E = rho*e_mix + 5e-1_wp*rho*vel_K_sum
+                            E = rho*e_mix + 5.e-1_wp*rho*vel_K_sum
                             if (chem_params%gamma_method == 1) then
                                 !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
                                 call get_mole_fractions(Mw, Ys, Xs)
@@ -835,7 +829,7 @@ contains
                                 gamma = 1.0_wp/(Cp/Cv - 1.0_wp)
                             end if
                         else
-                            E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_K_sum
+                            E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_K_sum
                         end if
 
                         H = (E + pres)/rho
@@ -966,10 +960,10 @@ contains
 
                         ! Be careful about the cylindrical coordinate!
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                            dpres_dt = -5e-1_wp*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
+                            dpres_dt = -5.e-1_wp*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
                                        /y_cc(n)
                         else
-                            dpres_dt = -5e-1_wp*(L(advxe) + L(1))
+                            dpres_dt = -5.e-1_wp*(L(advxe) + L(1))
                         end if
 
                         !$acc loop seq
@@ -1065,7 +1059,7 @@ contains
                                                                             + dpi_inf_dt &
                                                                             + dqv_dt &
                                                                             + rho*vel_dv_dt_sum &
-                                                                            + 5e-1_wp*drho_dt*vel_K_sum)
+                                                                            + 5.e-1_wp*drho_dt*vel_K_sum)
                         end if
 
                         if (riemann_solver == 1) then

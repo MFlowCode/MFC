@@ -116,16 +116,16 @@ contains
         real(wp), dimension(num_species), intent(in) :: dYs_ds
         real(wp) :: lambda_factor
 
-        lambda_factor = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(1)))
+        lambda_factor = (5.e-1_wp - 5.e-1_wp*sign(1._wp, lambda(1)))
         L(1) = lambda_factor*lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
 
-        lambda_factor = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(2)))
+        lambda_factor = (5.e-1_wp - 5.e-1_wp*sign(1._wp, lambda(2)))
         call s_fill_density_L(L, lambda_factor, lambda(2), c, mf, dalpha_rho_ds, dpres_ds)
         call s_fill_velocity_L(L, lambda_factor, lambda(2), dvel_ds)
         call s_fill_advection_L(L, lambda_factor, lambda(2), dadv_ds)
         call s_fill_chemistry_L(L, lambda_factor, lambda(2), dYs_ds)
 
-        lambda_factor = (5e-1_wp - 5e-1_wp*sign(1._wp, lambda(3)))
+        lambda_factor = (5.e-1_wp - 5.e-1_wp*sign(1._wp, lambda(3)))
         L(advxe) = lambda_factor*lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
     end subroutine s_compute_nonreflecting_subsonic_buffer_L
 
