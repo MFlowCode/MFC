@@ -64,6 +64,11 @@ def __filter(cases_) -> typing.List[TestCase]:
             if any(label in case.trace for label in skip):
                 cases.remove(case)
 
+    for case in cases[:]:
+        if ARG("gpu"):
+            skip = ['Gauss Seidel']
+            if any(label in case.trace for label in skip):
+                cases.remove(case)
 
     if ARG("no_examples"):
         cases = [case for case in cases if not "Example" in case.trace]
