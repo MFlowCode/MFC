@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3
 # References:
 # + DOI: 10.2514/6.2020-1751: IV.B. Multi-component diffusion
 
@@ -15,7 +15,7 @@ parser.add_argument("--no-chem", dest="chemistry", default=True, action="store_f
 
 args = parser.parse_args()
 
-ctfile = "input/grigri.yaml"
+ctfile = "input/grigri.dat"
 
 L = 0.05
 Nx = 100
