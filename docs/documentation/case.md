@@ -408,6 +408,13 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `surface_tension`      | Logical | Activate surface tension |
 | `viscous`              | Logical | Activate viscosity |
 | `hypoelasticity`       | Logical | Activate hypoelasticity* |
+| `igr`                  | Logical | Enable solution via information geometric regularization (IGR) [Cao (2024)](references.md) |
+| `igr_order`            | Integer | Order of reconstruction for IGR [3,5] |
+| `alf_factor`           | Real    | Alpha factor for IGR entropic pressure (default 10) |
+| `igr_pres_lim`         | Logical | Limit IGR pressure to avoid negative values (default F) |
+| `igr_iter_solver`      | Integer | Solution method for IGR elliptic solve [1] Jacobi [2] Gauss-Seidel |
+| `num_igr_iters`        | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
+| `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (defualt 50) |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.
@@ -501,7 +508,7 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 | `type`*                | Integer | The geometry of the patch. [1]: Line [2]: Circle [3]: Rectangle |
 | `x[y,z]_centroid`*     | Real    | Centroid of the boundary patch in the x[y,z]-direction          |
 | `length_x[y,z]`*       | Real    | Length of the boundary patch in the x[y,z]-direction            |
-| `radius`*              | Real    | Radius of the boundary patch                                    |
+| `radiue`*              | Real    | Radius of the boundary patch                                    |
 *: These parameters should be prepended with `patch_bc(j)%` where $j$ is the patch index.
 
 Boundary condition patches can be used with the following boundary condition types:

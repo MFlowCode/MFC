@@ -122,40 +122,40 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             if (igr_order == 3) then
-                    vidxb = -1; vidxe = 2; 
-                    !$acc update device(vidxb, vidxe)
+                vidxb = -1; vidxe = 2; 
+                !$acc update device(vidxb, vidxe)
 
-                    @:ALLOCATE(coeff_L(0:2))
-                    coeff_L(0) = (2._wp/6._wp)
-                    coeff_L(1) = (5._wp/6._wp)
-                    coeff_L(2) = (-1._wp/6._wp)
-                    !$acc update device(coeff_L)
+                @:ALLOCATE(coeff_L(0:2))
+                coeff_L(0) = (2._wp/6._wp)
+                coeff_L(1) = (5._wp/6._wp)
+                coeff_L(2) = (-1._wp/6._wp)
+                !$acc update device(coeff_L)
 
-                    @:ALLOCATE(coeff_R(-1:1))
-                    coeff_R(1) = (2._wp/6._wp)
-                    coeff_R(0) = (5._wp/6._wp)
-                    coeff_R(-1) = (-1._wp/6._wp)
-                    !$acc update device(coeff_R)
+                @:ALLOCATE(coeff_R(-1:1))
+                coeff_R(1) = (2._wp/6._wp)
+                coeff_R(0) = (5._wp/6._wp)
+                coeff_R(-1) = (-1._wp/6._wp)
+                !$acc update device(coeff_R)
 
             elseif (igr_order == 5) then
-                    vidxb = -2; vidxe = 3; 
-                    !$acc update device(vidxb, vidxe)
+                vidxb = -2; vidxe = 3; 
+                !$acc update device(vidxb, vidxe)
 
-                    @:ALLOCATE(coeff_L(-1:3))
-                    coeff_L(-1) = (-3._wp/60._wp)
-                    coeff_L(0) = (27._wp/60._wp)
-                    coeff_L(1) = (47._wp/60._wp)
-                    coeff_L(2) = (-13._wp/60._wp)
-                    coeff_L(3) = (2._wp/60._wp)
-                    !$acc update device(coeff_L)
+                @:ALLOCATE(coeff_L(-1:3))
+                coeff_L(-1) = (-3._wp/60._wp)
+                coeff_L(0) = (27._wp/60._wp)
+                coeff_L(1) = (47._wp/60._wp)
+                coeff_L(2) = (-13._wp/60._wp)
+                coeff_L(3) = (2._wp/60._wp)
+                !$acc update device(coeff_L)
 
-                    @:ALLOCATE(coeff_R(-2:2))
-                    coeff_R(2) = (-3._wp/60._wp)
-                    coeff_R(1) = (27._wp/60._wp)
-                    coeff_R(0) = (47._wp/60._wp)
-                    coeff_R(-1) = (-13._wp/60._wp)
-                    coeff_R(-2) = (2._wp/60._wp)
-                    !$acc update device(coeff_R)
+                @:ALLOCATE(coeff_R(-2:2))
+                coeff_R(2) = (-3._wp/60._wp)
+                coeff_R(1) = (27._wp/60._wp)
+                coeff_R(0) = (47._wp/60._wp)
+                coeff_R(-1) = (-13._wp/60._wp)
+                coeff_R(-2) = (2._wp/60._wp)
+                !$acc update device(coeff_R)
             end if
         #:endif
 
