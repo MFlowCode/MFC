@@ -305,7 +305,7 @@ function [SS S11 S12 S13 S22 S23 S33] = f_compute_strain_rate_tensor(dvel_ds);
     S23 = squeeze(0.5*(dvel_ds(2,3,:,:,:) + dvel_ds(3,2,:,:,:)));
     S33 = squeeze(dvel_ds(3,3,:,:,:));
 
-    SS = S11.^2 + S12.^2 + S13.^2 + S12.^2 + S22.^2 + S23.^2 + S13.^2 + S23.^2 + S33.^2;
+    SS = S11.^2 + 2*S12.^2 + 2*S13.^2 + S22.^2 + 2*S23.^2 + S33.^2;
 end
 
 % Compute TKE budget
