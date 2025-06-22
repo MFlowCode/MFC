@@ -6,25 +6,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  file-changes:
-    name: Detect File Changes
-    runs-on: 'ubuntu-latest'
-    outputs: 
-      checkall: ${{ steps.changes.outputs.checkall }}
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-
-      - name: Detect Changes
-        uses: dorny/paths-filter@v3
-        id: changes
-        with: 
-          filters: ".github/file-filter.yml"
-
   self:
     name: ${{ matrix.name }} (${{ matrix.device }})
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && ${{ github.event.review.state == 'approved' }}
-    needs: file-changes
+    if: github.repository == 'MFlowCode/MFC'
     strategy:
       fail-fast: false
       matrix:
