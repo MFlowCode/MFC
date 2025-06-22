@@ -78,12 +78,12 @@ contains
 
         if (igr) then
             !$acc loop seq
-            do i = 1, num_dims
+            do i = 1, num_vels
                 vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)/rho
             end do
         else
             !$acc loop seq
-            do i = 1, num_dims
+            do i = 1, num_vels
                 vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
             end do
         end if
