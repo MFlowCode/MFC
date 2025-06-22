@@ -29,20 +29,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - cluster: phoenix
-            name: Georgia Tech | Phoenix (NVHPC)
-            group: phoenix
-            labels: gt
-            flag: p
-            device: cpu
-            build_script: ""
-          - cluster: phoenix
-            name: Georgia Tech | Phoenix (NVHPC)
-            group: phoenix
-            labels: gt
-            flag: p
-            device: gpu
-            build_script: ""
           - cluster: frontier
             name: Oak Ridge | Frontier (CCE)
             group: phoenix
