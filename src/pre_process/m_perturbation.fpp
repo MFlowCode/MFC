@@ -221,8 +221,7 @@ contains
                 do l = 0, p
                     do j = 0, m
                         q = sqrt(Ek(i)/Eksum)
-                        alpha = k(i)*(khat(1)*x_cc(j) + khat(2)*y_cc(r) +
-khat(3)*z_cc(l)) + 2._wp*pi*phi
+                        alpha = k(i)*(khat(1)*x_cc(j) + khat(2)*y_cc(r) + khat(3)*z_cc(l)) + 2._wp*pi*phi
                         velfluc = 2._wp*q*sig*cos(alpha)
                         velfluc = matmul(Lmat, velfluc)
                         q_prim_vf(momxb)%sf(j, r, l) = q_prim_vf(momxb)%sf(j, r, l) + velfluc(1)
