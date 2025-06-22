@@ -437,14 +437,23 @@ contains
 
     end subroutine s_get_cell
 
-    function f_interpolate_velocity(pos, cell, i, q_prim_vf) result(v)
+    !! This function interpolates the velocity of Eulerian field at the position
+            !! of the bubble.
+            !! @param pos Position of the bubble in directiion i
+            !! @param cell Computational coordinates of the bubble
+            !! @param i Direction of the velocity (1: x, 2: y, 3: z)
+            !! @param q_prim_vf Eulerian field with primitive variables
+            !! @return v Interpolated velocity at the position of the bubble
+    pure function f_interpolate_velocity(pos, cell, i, q_prim_vf) result(v)
 !$acc routine seq
-        integer, dimension(3) :: cell
-        integer :: i
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        real(wp), intent(in) :: pos
+        integer, dimension(3), intent(in) :: cell
+        integer, intent(in) :: i
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+
         real(wp) :: v
         real(wp) :: L1, L2, L3
-        real(wp) :: pos, x1, x2, x3
+        real(wp) :: x1, x2, x3
         real(wp) :: y1, y2, y3
 
         if (i == 1) then
@@ -478,13 +487,28 @@ contains
 
     end function f_interpolate_velocity
 
-    function f_get_acceleration(pos,rad,vel,mg,mv,Re,rho,cell,i,id,q_prim_vf) result(a)
+    !! This function calculates the acceleration of the bubble
+            !!      based on the pressure gradient, velocity, and drag model.
+            !! @param pos Position of the bubble in direction i
+            !! @param rad Radius of the bubble
+            !! @param vel Velocity of the bubble
+            !! @param mg Mass of the gas in the bubble
+            !! @param mv Mass of the liquid in the bubble
+            !! @param Re Reynolds number
+            !! @param rho Density of the fluid
+            !! @param cell Computational coordinates of the bubble
+            !! @param i Direction of the velocity (1: x, 2: y, 3: z)
+            !! @param q_prim_vf Eulerian field with primitive variables
+            !! @return a Acceleration of the bubble in direction i
+    pure function f_get_acceleration(pos,rad,vel,mg,mv,Re,rho,cell,i,q_prim_vf) result(a)
 !$acc routine seq
-        integer, dimension(3) :: cell
-        integer :: i, id
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(wp) :: a, vol, mass, force, vel, area
-        real(wp) :: pos, rad, dp, v_rel, mg, mv, Re, rho, c_d
+        real(wp), intent(in) :: pos, rad, vel, mg, mv, Re, rho
+        integer, dimension(3), intent(in) :: cell
+        integer, intent(in) :: i
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+
+        real(wp) :: a
+        real(wp) :: dp, vol, force, v_rel
 
         if (i == 1) then
             dp = (q_prim_vf(E_idx)%sf(cell(1) + 1,cell(2),cell(3)) - &
@@ -509,27 +533,10 @@ contains
             force = force - (4._wp * pi * rad * v_rel) / Re
         else if (lag_params%drag_model == 2) then ! No slip Stokes drag
             force = force - (6._wp * pi * rad * v_rel) / Re
-        elseif (lag_params%drag_model == 3) then ! Clift and Gauvin (1971) Cd fit
-            area = pi * rad**2._wp
-            c_d = f_get_clift_gauvin_drag_coeff(v_rel, Re, rho, rad)
-            force = force - 0.5_wp * sign(1._wp, v_rel) * rho * (v_rel ** 2._wp) * c_d * area
         end if
 
         a = force / (mg + mv)
 
     end function f_get_acceleration
-
-    function f_get_clift_gauvin_drag_coeff(v_rel, mu_inv, rho, rad) result(c_d)
-!$acc routine seq
-        real(wp) :: v_rel, mu_inv, rho, rad
-        real(wp) :: c_d
-        real(wp) :: Re_b ! Bubble Reynolds number
-
-        Re_b = max(2._wp * rho * abs(v_rel) * rad * mu_inv, Re_b_min)
-
-        C_d = 24._wp * (1 + 0.15_wp * Re_b ** (0.687_wp)) / Re_b
-        C_d = C_d + 0.42_wp / (1 + (42500 / (Re_b ** 1.16_wp)))
-
-    end function f_get_clift_gauvin_drag_coeff
 
 end module m_bubbles_EL_kernels

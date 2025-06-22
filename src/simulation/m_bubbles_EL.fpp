@@ -617,24 +617,24 @@ contains
                 gas_dmvdt(k, stage) = myMvdot
                 gas_dpdt(k, stage) = myPbdot
 
-            end if
+                do l = 1, num_dims
+                    if (lag_params%vel_model == 1) then
+                        mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,2), &
+                                                    cell, l, q_prim_vf)
+                        mtn_dveldt(k, l, stage) = 0._wp
+                    elseif (lag_params%vel_model == 2) then
+                        mtn_dposdt(k, l, stage) = mtn_vel(k,l,2)
+                        mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,2), &
+                                                    intfc_rad(k,2), mtn_vel(k,l,2), &
+                                                    gas_mg(k), gas_mv(k, 2), &
+                                                    Re(1), myRho, cell, l, q_prim_vf)
+                    else
+                        mtn_dposdt(k, l, stage) = 0._wp
+                        mtn_dveldt(k, l, stage) = 0._wp
+                    end if
+                end do
 
-            do l = 1, num_dims
-                if (lag_params%vel_model == 1) then
-                    mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,2), &
-                                                cell, l, q_prim_vf)
-                    mtn_dveldt(k, l, stage) = 0._wp
-                elseif (lag_params%vel_model == 2) then
-                    mtn_dposdt(k, l, stage) = mtn_vel(k,l,2)
-                    mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,2), &
-                                                intfc_rad(k,2), mtn_vel(k,l,2), &
-                                                gas_mg(k), gas_mv(k, 2), &
-                                                Re(1), myRho, cell, l, lag_id(k,1), q_prim_vf)
-                else
-                    mtn_dposdt(k, l, stage) = 0._wp
-                    mtn_dveldt(k, l, stage) = 0._wp
-                end if
-            end do
+            end if
 
             adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 
@@ -1155,7 +1155,8 @@ contains
     end subroutine s_update_lagrange_tdv_rk
 
     !> This subroutine enforces reflective and wall boundary conditions for EL bubbles
-    subroutine s_enforce_EL_bubbles_boundary_conditions(dest)
+        !! @param dest Destination for the bubble position update
+    impure subroutine s_enforce_EL_bubbles_boundary_conditions(dest)
 
         integer, intent(in) :: dest
         integer :: k, i, patch_id
