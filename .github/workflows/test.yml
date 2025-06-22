@@ -1,0 +1,131 @@
+name: 'Test Suite'
+
+on: [push, pull_request, workflow_dispatch]
+    
+jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+
+  github:
+    name: Github
+    if: needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
+    strategy:
+      matrix:
+        os:    ['ubuntu', 'macos']
+        mpi:   ['mpi']
+        precision: ['']
+        debug: ['debug', 'no-debug']
+        intel: [true, false]
+        exclude:
+          - os:    macos
+            intel: true
+
+        include:
+          - os:    ubuntu
+            mpi:   no-mpi
+            precision: single
+            debug: no-debug
+            intel: false
+
+      fail-fast: false
+    continue-on-error: true
+    runs-on: ${{ matrix.os }}-latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Setup MacOS
+        if:   matrix.os == 'macos'
+        run:  |
+          brew update
+          brew upgrade
+          brew install coreutils python cmake fftw hdf5 gcc@14 boost open-mpi
+          echo "FC=gfortran-14" >> $GITHUB_ENV
+          echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
+
+      - name: Setup Ubuntu
+        if:   matrix.os == 'ubuntu' && matrix.intel == false
+        run: |
+           sudo apt update -y
+           sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
+                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev
+
+      - name: Setup Ubuntu (Intel)
+        if:   matrix.os == 'ubuntu' && matrix.intel == true
+        run: |
+          wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          sudo add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
+          sudo apt-get update
+          sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel
+          source /opt/intel/oneapi/setvars.sh
+          printenv >> $GITHUB_ENV
+
+
+      - name: Build
+        run:  |
+          /bin/bash mfc.sh test --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} 
+
+      - name: Test
+        run:  |
+          /bin/bash mfc.sh test --max-attempts 3 -j $(nproc) $OPT1 $OPT2
+        env:
+          OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
+          OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
+
+  self:
+    name: Self Hosted
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
+    continue-on-error: false
+    timeout-minutes: 1400
+    strategy:
+      matrix:
+        device: ['cpu', 'gpu']
+        lbl: ['gt', 'frontier']
+    runs-on:
+      group:  phoenix
+      labels: ${{ matrix.lbl }}
+    env:
+      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Build & Test
+        if:   matrix.lbl == 'gt'
+        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }}
+
+      - name: Build
+        if:   matrix.lbl == 'frontier'
+        run:  bash .github/workflows/frontier/build.sh ${{ matrix.device }}
+
+      - name: Test
+        if:   matrix.lbl == 'frontier'
+        run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}}
+
+      - name: Print Logs
+        if:   always()
+        run:  cat test-${{ matrix.device }}.out
+
+      - name: Archive Logs
+        uses: actions/upload-artifact@v4
+        if:   always()
+        with:
+          name: logs-${{ strategy.job-index }}-${{ matrix.device }}
+          path: test-${{ matrix.device }}.out

@@ -1,0 +1,54 @@
+name: Lines of Code
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+
+  sz:
+    name: Core MFC Line Difference
+    if: needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code from PR branch
+        uses: actions/checkout@v4
+        with:
+          path: pr
+
+      - name: Checkout code from MFC master
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.repository }}
+          ref:        ${{ github.event.pull_request.base.ref }}
+          path:       base
+          # repository: MFlowCode/MFC
+          # ref:        master
+          # path:       base
+
+      - name: Get Line Diff
+        run: |
+          BASE="$GITHUB_WORKSPACE/base"
+          PR="$GITHUB_WORKSPACE/pr"
+          cd $BASE
+          export MFC_PR=$PR
+          pwd
+          ./mfc.sh init &> tmp.txt
+          ./mfc.sh count_diff
+

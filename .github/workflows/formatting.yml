@@ -1,0 +1,19 @@
+name: Pretty
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  docs:
+    name:    Formatting
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: MFC Python setup
+      run: ./mfc.sh init
+
+    - name: Check formatting
+      run: |
+        ./mfc.sh format -j $(nproc)
+        git diff --exit-code

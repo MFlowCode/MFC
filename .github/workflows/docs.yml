@@ -1,0 +1,76 @@
+name: Documentation
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # This runs every day at midnight UTC
+  workflow_dispatch:
+  push:
+  pull_request:
+
+jobs:
+  docs:
+    name:    Build & Publish
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # We build doxygen from source because of
+    # https://github.com/doxygen/doxygen/issues/9016
+    - name: Build Doxygen
+      run:  |
+        sudo apt update -y
+        sudo apt install -y cmake ninja-build graphviz graphviz
+        git clone https://github.com/doxygen/doxygen.git ../doxygen
+        cd ../doxygen
+        git checkout 26b5403
+        cd -
+        cmake -S ../doxygen -B ../doxygen/build -G Ninja
+        sudo ninja -C ../doxygen/build install
+
+    - name: Build Documentation
+      run:  |
+        pip3 install fypp
+        cmake -S . -B build -G Ninja --install-prefix=$(pwd)/build/install -D MFC_DOCUMENTATION=ON
+        ninja -C build install
+
+    # From here https://github.com/cicirello/generate-sitemap
+    - name: Generate the sitemap
+      id: sitemap
+      uses: cicirello/generate-sitemap@v1
+      with:
+        base-url-path: https://mflowcode.github.io/
+        path-to-root: build/install/docs/mfc
+        include-pdf: false
+        sitemap-format: txt
+
+    - name: Output stats
+      run: |
+        echo "sitemap-path = ${{ steps.sitemap.outputs.sitemap-path }}"
+        echo "url-count = ${{ steps.sitemap.outputs.url-count }}"
+        echo "excluded-count = ${{ steps.sitemap.outputs.excluded-count }}"
+
+    - name: Linkcheck - Lychee
+      uses: lycheeverse/lychee-action@v2
+      with:
+        args: -c .lychee.toml build/install/docs/mfc/
+        fail: false
+
+    - name: Publish Documentation
+      if:   github.repository == 'MFlowCode/MFC' && github.ref == 'refs/heads/master' &&  (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' )
+      run:  |
+        set +e
+        git ls-remote "${{ secrets.DOC_PUSH_URL }}" -q
+        if [ "$?" -ne "0" ]; then exit 0; fi
+        set -e
+        git config --global user.name  'MFC Action'
+        git config --global user.email '<>'
+        git clone "${{ secrets.DOC_PUSH_URL }}" ../www
+        rm -rf ../www/*
+        mv build/install/docs/mfc/* ../www/
+        git -C ../www add -A
+        git -C ../www commit -m "Docs @ ${GITHUB_SHA::7}" || true
+        git -C ../www push
+
+# DOC_PUSH_URL should be of the format:
+# --> https://<username>:<token>@github.com/<username>/<repository>
