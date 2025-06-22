@@ -167,7 +167,7 @@ contains
         dk = 1._wp/mixlayer_perturb_nk
 
         ! Compute prescribed energy spectra
-        Eksum = 0_wp
+        Eksum = 0._wp
         do i = 1, mixlayer_perturb_nk
             k(i) = dk*i
             Ek(i) = (k(i)/mixlayer_perturb_k0)**4._wp*exp(-2._wp*(k(i)/mixlayer_perturb_k0)**2._wp)
@@ -178,9 +178,9 @@ contains
         do r = 0, n
             ! Compute prescribed Reynolds stress tensor with about half
             ! magnitude of its self-similar value
-            Rij(:, :) = 0_wp
+            Rij(:, :) = 0._wp
             uu0 = patch_icpp(1)%vel(1)**2._wp &
-                  *(1_wp - tanh(y_cc(r)*mixlayer_vel_coef)**2._wp)
+                  *(1._wp - tanh(y_cc(r)*mixlayer_vel_coef)**2._wp)
             Rij(1, 1) = 0.05_wp*uu0
             Rij(2, 2) = 0.03_wp*uu0
             Rij(3, 3) = 0.03_wp*uu0
@@ -192,11 +192,11 @@ contains
             Lmat(1, 1) = sqrt(Rij(1, 1))
             if (abs(Lmat(1, 1)) < sgm_eps) Lmat(1, 1) = sgm_eps
             Lmat(2, 1) = Rij(2, 1)/Lmat(1, 1)
-            Lmat(2, 2) = sqrt(Rij(2, 2) - Lmat(2, 1)**2_wp)
+            Lmat(2, 2) = sqrt(Rij(2, 2) - Lmat(2, 1)**2._wp)
             if (abs(Lmat(2, 2)) < sgm_eps) Lmat(2, 2) = sgm_eps
             Lmat(3, 1) = Rij(3, 1)/Lmat(1, 1)
             Lmat(3, 2) = (Rij(3, 2) - Lmat(3, 1)*Lmat(2, 1))/Lmat(2, 2)
-            Lmat(3, 3) = sqrt(Rij(3, 3) - Lmat(3, 1)**2_wp - Lmat(3, 2)**2_wp)
+            Lmat(3, 3) = sqrt(Rij(3, 3) - Lmat(3, 1)**2._wp - Lmat(3, 2)**2._wp)
 
             ! Compute perturbation for each Fourier component
             do i = 1, mixlayer_perturb_nk
@@ -221,8 +221,9 @@ contains
                 do l = 0, p
                     do j = 0, m
                         q = sqrt(Ek(i)/Eksum)
-                        alpha = k(i)*(khat(1)*x_cc(j) + khat(2)*y_cc(r) + khat(3)*z_cc(l)) + 2_wp*pi*phi
-                        velfluc = 2_wp*q*sig*cos(alpha)
+                        alpha = k(i)*(khat(1)*x_cc(j) + khat(2)*y_cc(r) +
+khat(3)*z_cc(l)) + 2._wp*pi*phi
+                        velfluc = 2._wp*q*sig*cos(alpha)
                         velfluc = matmul(Lmat, velfluc)
                         q_prim_vf(momxb)%sf(j, r, l) = q_prim_vf(momxb)%sf(j, r, l) + velfluc(1)
                         q_prim_vf(momxb + 1)%sf(j, r, l) = q_prim_vf(momxb + 1)%sf(j, r, l) + velfluc(2)
@@ -243,7 +244,7 @@ contains
         integer :: seed, kfac, yfac
 
         kfac = ik*amplifier
-        yfac = nint((sin(yloc) + 1_wp)*amplifier)
+        yfac = nint((sin(yloc) + 1._wp)*amplifier)
         seed = nint(0.5_wp*modmul(kfac) + 0.5_wp*modmul(yfac))
 
         call s_prng(theta, seed)
