@@ -50,15 +50,15 @@ function dfunds = f_compute_derivative_1d(fun,s)
 
     dfunds = zeros(size(fun));    % initialize discrete derivative vector
 
-    for j = 1:length(s) % for each index in s
-        % if at bottom boundary, use 1-sided derivative
-        dfunds(1) = (fun(2) - fun(1)) / (s(2) - s(1));
-        % if at top boundary, use 1-sided derivative
-        dfunds(end) = (fun(end) - fun(end-1)) / (s(end) - s(end-1));
-        % otherwise, if in the interior of the domain, 2-sided derivative
-        for i = 2:length(s)-1
-            dfunds(i) = (fun(i+1) - fun(i-1)) / (s(i+1) - s(i-1));
-        end
+    % Compute one-sided derivative at the bottom boundary
+    dfunds(1) = (fun(2) - fun(1)) / (s(2) - s(1));
+    
+    % Compute one-sided derivative at the top boundary
+    dfunds(end) = (fun(end) - fun(end-1)) / (s(end) - s(end-1));
+    
+    % Compute two-sided derivatives for interior points
+    for i = 2:length(s)-1
+        dfunds(i) = (fun(i+1) - fun(i-1)) / (s(i+1) - s(i-1));
     end
 end
 
