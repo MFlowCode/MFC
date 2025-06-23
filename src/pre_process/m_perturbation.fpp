@@ -214,7 +214,7 @@ contains
 
                 ! Compute mode direction by two-time cross product
                 sig_tmp = f_cross(xi, khat)
-                sig_tmp = sig_tmp/sqrt(sum(sig_tmp**2))
+                sig_tmp = sig_tmp/sqrt(sum(sig_tmp**2._wp))
                 sig = f_cross(khat, sig_tmp)
 
                 ! Compute perturbation for each grid
@@ -264,8 +264,8 @@ contains
         real(wp) :: zeta, xi
         real(wp), dimension(3) :: vec
 
-        xi = 2.0_wp*pi*theta
-        zeta = acos(2.0_wp*eta - 1.0_wp)
+        xi = 2._wp*pi*theta
+        zeta = acos(2._wp*eta - 1._wp)
         vec(1) = sin(zeta)*cos(xi)
         vec(2) = sin(zeta)*sin(xi)
         vec(3) = cos(zeta)
