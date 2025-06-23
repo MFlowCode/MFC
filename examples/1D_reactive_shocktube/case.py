@@ -37,7 +37,7 @@ u_l = 0
 u_r = -487.34
 
 L = 0.12
-Nx = 100 * args.scale
+Nx = 400 * args.scale
 dx = L / Nx
 dt = dx / abs(u_r) * 0.02
 Tend = 230e-6
@@ -50,20 +50,16 @@ case = {
     # Logistics
     "run_time_info": "T",
     # Computational Domain Parameters
-    "x_domain%beg": -L / 2,
-    "x_domain%end": L / 2,
-    "stretch_x": "T",
-    "a_x": 20,
-    "x_a": -L / 8,
-    "x_b": L / 8,
+    "x_domain%beg": 0,
+    "x_domain%end": L,
     "m": Nx,
     "n": 0,
     "p": 0,
     "dt": float(dt),
     "t_step_start": 0,
-    "t_step_stop": 1,
-    "t_step_save": 1,
-    "t_step_print": 1,
+    "t_step_stop": NT,
+    "t_step_save": NS,
+    "t_step_print": NS,
     "parallel_io": "F" if args.mfc.get("mpi", True) else "F",
     # Simulation Algorithm Parameters
     "model_eqns": 2,
@@ -100,7 +96,7 @@ case = {
     "patch_icpp(1)%alpha(1)": 1,
     "patch_icpp(1)%alpha_rho(1)": sol_L.density,
     "patch_icpp(2)%geometry": 1,
-    "patch_icpp(2)%x_centroid": -L / 4,
+    "patch_icpp(2)%x_centroid": 3 * L / 4,
     "patch_icpp(2)%length_x": L / 2,
     "patch_icpp(2)%vel(1)": u_r,
     "patch_icpp(2)%pres": sol_R.P,

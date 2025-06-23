@@ -1,10 +1,43 @@
-This file was created on 2025-06-23 17:04:56.555265.
+This file was created on 2025-06-23 17:13:45.641940.
 
 mfc.sh:
 
     Invocation: test -o MultiComponent_Diffusion --generate
     Lock:       mpi=Yes & gpu=No & debug=Yes & gcov=No & unified=No & single=No
-    Git:        17b91944f46c4cfdca99897ff9b62a2c0089253f on Diffusion (dirty)
+    Git:        61734eff67d0d38aafc2d0862fe158e7e554b36e on Diffusion (dirty)
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on UchihaMadara
+    
+        C       : GNU v14.2.0 (/usr/bin/gcc-14)
+        Fortran : GNU v14.2.0 (/usr/bin/gfortran-14)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/pain/MFC-Adam/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Debug
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/gcc-14
+        CXX      : /usr/bin/g++-14
+        FC       : /usr/bin/gfortran-14
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 syscheck:
 
@@ -50,39 +83,6 @@ simulation:
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/pain/MFC-Adam/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/gcc-14
-        CXX      : /usr/bin/g++-14
-        FC       : /usr/bin/gfortran-14
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.28.3 on UchihaMadara
-    
-        C       : GNU v14.2.0 (/usr/bin/gcc-14)
-        Fortran : GNU v14.2.0 (/usr/bin/gfortran-14)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
