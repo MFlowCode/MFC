@@ -138,9 +138,6 @@ class TestCase(case.Case):
         if self.params.get("bubbles_lagrange", 'F') == 'T':
             input_bubbles_lagrange(self)
 
-        if self.params.get("MultiComponent_Diffusion", 'F') == 'T':
-            input_chemistry_diffusion(self)
-
         mfc_script = ".\\mfc.bat" if os.name == 'nt' else "./mfc.sh"
 
         target_names = [ get_target(t).name for t in targets ]
@@ -385,12 +382,3 @@ def copy_input_lagrange(path_example_input, path_test):
         os.mkdir(folder_path_dest)
 
     shutil.copyfile(file_path_src, fite_path_dest)
-
-def input_chemistry_diffusion(self):
-    if "MultiComponent_Diffusion" in self.trace:
-        copy_input_diffusion(f'/1D_MultiComponent_Diffusion',f'{self.get_dirpath()}')
-
-def copy_input_diffusion(path_example_input, path_test):
-    folder_path_dest = path_test + '/input/'
-    file_path_dest = folder_path_dest + 'grigri.yaml'
-    file_path_src = common.MFC_EXAMPLE_DIRPATH + path_example_input + '/input/grigri.yaml'
