@@ -123,7 +123,7 @@ module m_global_parameters
         logical, parameter :: relativity = (${relativity}$ /= 0)    !< Relativity (only for MHD)
         integer, parameter :: igr_iter_solver = ${igr_iter_solver}$ !< IGR elliptic solver
         integer, parameter :: igr_order = ${igr_order}$             !< Reconstruction order for IGR
-        logical, parameter :: igr = (${igr}$ /= 0)                   !< use information geometric regularization
+        logical, parameter :: igr = (${igr}$ /= 0)                  !< use information geometric regularization
         logical, parameter :: igr_pres_lim = (${igr_pres_lim}$ /= 0)!< Limit to positive pressures for IGR
         logical, parameter :: viscous = (${viscous}$ /= 0)          !< Viscous effects
     #:else
