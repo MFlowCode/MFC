@@ -136,7 +136,7 @@ contains
 
         E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
 
-        ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
+        ! Adjust energy for hyperelasticity
         if (hyperelasticity) then
             E = E + G*q_prim_vf(xiend + 1)%sf(j, k, l)
         end if
@@ -152,8 +152,8 @@ contains
         !! @param j x index
         !! @param k y index
         !! @param l z index
-        !! @param icfl_sf cell centered inviscid cfl number
-        !! @param vcfl_sf (optional) cell centered viscous cfl number
+        !! @param icfl_sf cell-centered inviscid cfl number
+        !! @param vcfl_sf (optional) cell-centered viscous CFL number
         !! @param Rc_sf (optional) cell centered Rc
     pure subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         !$acc routine seq
@@ -168,20 +168,19 @@ contains
 
         ! Inviscid CFL calculation
         if (p > 0 .or. n > 0) then
-            ! 2D/3D cases
+            ! 2D/3D
             icfl_sf(j, k, l) = dt/f_compute_multidim_cfl_terms(vel, c, j, k, l)
         else
-            ! 1D case - exact original logic
+            ! 1D
             icfl_sf(j, k, l) = (dt/dx(j))*(abs(vel(1)) + c)
         end if
 
         ! Viscous calculations
         if (viscous) then
-            fltr_dtheta = f_compute_filtered_dtheta(k, l)
-
             if (p > 0) then
                 !3D
                 if (grid_geometry == 3) then
+                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
                     vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
                                        /min(dx(j), dy(k), fltr_dtheta)**2._wp
                     Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
@@ -235,17 +234,16 @@ contains
             ! 2D/3D cases
             icfl_dt = cfl_target*f_compute_multidim_cfl_terms(vel, c, j, k, l)
         else
-            ! 1D case - exact original logic
+            ! 1D case
             icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
         end if
 
         ! Viscous calculations
         if (viscous) then
-            fltr_dtheta = f_compute_filtered_dtheta(k, l)
-
             if (p > 0) then
                 !3D
                 if (grid_geometry == 3) then
+                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp) &
                               /minval(1/(rho*Re_l))
                 else
@@ -261,7 +259,7 @@ contains
             end if
         end if
 
-        if (any(re_size > 0)) then
+        if (any(Re_size > 0)) then
             max_dt(j, k, l) = min(icfl_dt, vcfl_dt)
         else
             max_dt(j, k, l) = icfl_dt
