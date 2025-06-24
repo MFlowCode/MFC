@@ -33,7 +33,9 @@ Note: Ordering is not guarennteed or stable, so use key-value pairing when using
 - When data is referred to being attached, it means that the device pointer attaches to target if it not already attached. If pointer is already attached, then the attachment counter is just incremented
 - When data is referred to being detached, it means that the attachment counter is decremented. If attachment counter is zero, then actually detached
 
-### Creating new/overwriting existing stubs & proxy configs
+------------------------------------------------------------------------------------------
+
+### Computation Macros
 
 <details>
  <summary><code>GPU_PARALLEL_LOOP</code> <code>(Execute the following loop on the GPU in parallel)</code></summary>
@@ -69,9 +71,9 @@ Uses FYPP eval directive using `$:`
 
 | name        | Restricted range                                  |
 |-------------|---------------------------------------------------|
-| collapse    | Must be greater than 1                            |
-| parallelism | Valid elements: 'gang', 'worker', 'vector', 'seq' |
-| default     | 'present' or 'none'                               |
+| `collapse`    | Must be greater than 1                            |
+| `parallelism` | Valid elements: 'gang', 'worker', 'vector', 'seq' |
+| `default`     | 'present' or 'none'                               |
 
 #### Additional information
 
@@ -86,89 +88,6 @@ Uses FYPP eval directive using `$:`
 > ```python
 >  $:GPU_PARALLEL_LOOP(collapse=3, private='[tmp, r]', reduction='[[vol, avg], [max_val]]', reductionOp='[+, MAX]')
 >  $:GPU_PARALLEL_LOOP(collapse=2, private='[sum_holder]', copyin='[starting_sum]', copyout='[eigenval,C]')
-> ```
-
-</details>
-
-------------------------------------------------------------------------------------------
-
-### Listing existing stubs & proxy configs as YAML string
-
-<details>
- <summary><code>GPU_ROUTINE</code> <code>(Compile a procedure for the GPU)</code></summary>
-
-#### Macro Invocation
-
-Uses FYPP eval directive using `$:`
-> `$:GPU_ROUTINE(...)`
-
-
-#### Parameters
-
-| name            | data type   | Default Value | description                                                  |
-|-----------------|-------------|---------------|--------------------------------------------------------------|
-| `function_name` | string      | None          | Name of subroutine/function                                  |
-| `parallelism`   | string list | None          | Parallelism granularity to use for this routine              |
-| `nohost`        | boolean     | False         | Do not compile procedure code for CPU                        |
-| `cray_inline`   | boolean     | False         | Inline procedure on cray compiler                            |
-| `extraAccArgs`  | string      | None          | String of any extra arguments added to the OpenACC directive |
-
-#### Parameter Restrictions
-
-| name        | Restricted range                                  |
-|-------------|---------------------------------------------------|
-| parallelism | Valid elements: 'gang', 'worker', 'vector', 'seq' |
-
-#### Additional information
-
-- Function name only needs to be given when cray_inline is True
-- Future capability is to parse function header for function name
-- Routine parallelism is most commonly `'[seq]'`
-
-#### Example
-
-> ```python
->  $:GPU_ROUTINE(parallelism='[seq]')
->  $:GPU_ROUTINE(function_name='s_matmult', parallelism='[seq]', cray_inline=True)
-> ```
-
-</details>
-
-<details>
- <summary><code>GPU_DECLARE</code> <code>(Allocate module variables on GPU or for implicit data region )</code></summary>
-
-#### Macro Invocation
-
-Uses FYPP eval directive using `$:`
-> `$:GPU_DECLARE(...)`
-
-#### Parameters
-
-| name             | data type   | Default Value | description                                                                                  |
-|------------------|-------------|---------------|----------------------------------------------------------------------------------------------|
-| `copy`           | string list | None          | Allocates and copies data to GPU on entrance, then deallocated and copies to CPU on exit |
-| `copyin`         | string list | None          | Allocates and copies data to GPU on entrance and then deallocated on exit              |
-| `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU and then deallocated on exit                 |
-| `copyout`        | string list | None          | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit       |
-| `create`         | string list | None          | Allocates data on GPU on entrance and then deallocates on exit                         |
-| `present`        | string list | None          | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit    |
-| `deviceptr`      | string list | None          | Pointer variables that are already allocated on GPU memory                                   |
-| `link`           | string list | None          | Declare global link, and only allocate when variable used in data clause.                    |
-| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive                                 |
-
-#### Additional information
-
-- An implicit data region is created at the start of each procedure
-and ends after the last executable statement in that procedure.
-- Use only create, copyin, device_resident or link clauses for module variables
-- GPU_DECLARE exit is the end of the implicit data region
-- Link is useful for large global static data objects
-
-#### Example
-
-> ```python
->  $:GPU_DECLARE(create='[x_cb,y_cb,z_cb,x_cc,y_cc,z_cc,dx,dy,dz,dt,m,n,p]')
->  $:GPU_DECLARE(create='[x_cb,y_cb,z_cb]', copyin='[x_cc,y_cc,z_cc]', link='[dx,dy,dz,dt,m,n,p]')
 > ```
 
 </details>
@@ -197,9 +116,9 @@ Uses FYPP eval directive using `$:`
 
 | name            | Restricted range                                  |
 |-----------------|---------------------------------------------------|
-| collapse        | Must be greater than 1                            |
-| parallelism     | Valid elements: 'gang', 'worker', 'vector', 'seq' |
-| data_dependency | 'auto' or 'independent'                           |
+| `collapse`        | Must be greater than 1                            |
+| `parallelism`     | Valid elements: 'gang', 'worker', 'vector', 'seq' |
+| `data_dependency` | 'auto' or 'independent'                           |
 
 #### Additional information
 
@@ -216,50 +135,9 @@ Uses FYPP eval directive using `$:`
 
 </details>
 
-<details>
- <summary><code>GPU_HOST_DATA</code> <code>(Make GPU memory address available on CPU)</code></summary>
+------------------------------------------------------------------------------------------
 
-#### Macro Invocation
-
-Uses FYPP call directive using `#:call`
-> ```C
->
-> #:call GPU_HOST_DATA(...)
->    {code}
-> #:endcall GPU_HOST_DATA 
->```
-> 
-
-#### Parameters
-
-| name           | data type   | Default Value | description                                                      |
-|----------------|-------------|---------------|------------------------------------------------------------------|
-| `code`         | code        | Required      | Region of code where GPU memory addresses is accessible          |
-| `use_device`   | string list | None          | Use GPU memory address of variable instead of CPU memory address |
-| `extraAccArgs` | string      | None          | String of any extra arguments added to the OpenACC directive     |
-
-#### Parameter Restrictions
-
-| name | Restricted range                                 |
-|------|--------------------------------------------------|
-| code | Do not assign it manually with key-value pairing |
-
-#### Additional information
-
-#### Example
-
-> ```C
->  #:call GPU_HOST_DATA(use_device='[addr1, addr2]')
->       {code}
->       ...
->  #:endcall GPU_HOST_DATA
->  #:call GPU_HOST_DATA(use_device='[display_arr]')
->       {code}
->       ...
->   #:endcall
-> ```
-
-</details>
+### Data Control Macros
 
 <details>
  <summary><code>GPU_DATA</code> <code>(Make data accessible on GPU in specified region)</code></summary>
@@ -296,7 +174,7 @@ Uses FYPP call directive using `#:call`
 
 | name            | Restricted range                                  |
 |-----------------|---------------------------------------------------|
-| code        | Do not assign it manually with key-value pairing                            |
+| `code`        | Do not assign it manually with key-value pairing                            |
 
 #### Additional information
 
@@ -373,74 +251,40 @@ Uses FYPP eval directive using `$:`
 </details>
 
 <details>
- <summary><code>GPU_CACHE</code> <code>(Data to be cache in software-managed cache)</code></summary>
+ <summary><code>GPU_DECLARE</code> <code>(Allocate module variables on GPU or for implicit data region )</code></summary>
 
 #### Macro Invocation
 
 Uses FYPP eval directive using `$:`
-> `$:GPU_CACHE(...)`
+> `$:GPU_DECLARE(...)`
 
 #### Parameters
 
-| name             | data type   | Default Value | description                                                  |
-|------------------|-------------|---------------|--------------------------------------------------------------|
-| `cache`         | string list | Required          | Data that should to stored in cache           |
-| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
+| name             | data type   | Default Value | description                                                                                  |
+|------------------|-------------|---------------|----------------------------------------------------------------------------------------------|
+| `copy`           | string list | None          | Allocates and copies data to GPU on entrance, then deallocated and copies to CPU on exit |
+| `copyin`         | string list | None          | Allocates and copies data to GPU on entrance and then deallocated on exit              |
+| `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU and then deallocated on exit                 |
+| `copyout`        | string list | None          | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit       |
+| `create`         | string list | None          | Allocates data on GPU on entrance and then deallocates on exit                         |
+| `present`        | string list | None          | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit    |
+| `deviceptr`      | string list | None          | Pointer variables that are already allocated on GPU memory                                   |
+| `link`           | string list | None          | Declare global link, and only allocate when variable used in data clause.                    |
+| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive                                 |
 
 #### Additional information
+
+- An implicit data region is created at the start of each procedure
+and ends after the last executable statement in that procedure.
+- Use only create, copyin, device_resident or link clauses for module variables
+- GPU_DECLARE exit is the end of the implicit data region
+- Link is useful for large global static data objects
 
 #### Example
 
 > ```python
->  $:GPU_CACHE(cache='[pixels_arr]')
-> ```
-
-</details>
-
-<details>
- <summary><code>GPU_ATOMIC</code> <code>(Do an atomic operation on the GPU)</code></summary>
-
-#### Macro Invocation
-
-Uses FYPP eval directive using `$:`
-> `$:GPU_ATOMIC(...)`
-
-#### Parameters
-
-| name           | data type | Default Value | description                                                  |
-|----------------|-----------|---------------|--------------------------------------------------------------|
-| `atomic`       | string    | Required      | Which atomic operation is performed                          |
-| `extraAccArgs` | string    | None          | String of any extra arguments added to the OpenACC directive |
-
-#### Parameter Restrictions
-
-| name            | Restricted range                                  |
-|-----------------|---------------------------------------------------|
-| atomic        | 'read', 'write', 'update', or 'capture'                            |
-
-#### Additional information
-
-- read atomic is reading in a value
-    - Ex: `v=x`
-- write atomic is writing a value to a variable
-    - Ex:`x=square(tmp)`
-- update atomic is updating a variable in-place
-    - Ex:`x= x .and. 1`
-- Capture is a pair of read/write/update operations with one dependent on the other
-    - Ex: ```
-        `x=x .and. 1`
-        `v=x`
-    ```
-    
-
-#### Example
-
-> ```python
->  $:GPU_ATOMIC(atomic='update')
->  x = square(x)
->  $:GPU_ATOMIC(atomic='capture')
->  x = square(x)
->  v = x
+>  $:GPU_DECLARE(create='[x_cb,y_cb,z_cb,x_cc,y_cc,z_cc,dx,dy,dz,dt,m,n,p]')
+>  $:GPU_DECLARE(create='[x_cb,y_cb,z_cb]', copyin='[x_cc,y_cc,z_cc]', link='[dx,dy,dz,dt,m,n,p]')
 > ```
 
 </details>
@@ -473,6 +317,55 @@ Uses FYPP eval directive using `$:`
 </details>
 
 <details>
+ <summary><code>GPU_HOST_DATA</code> <code>(Make GPU memory address available on CPU)</code></summary>
+
+#### Macro Invocation
+
+Uses FYPP call directive using `#:call`
+> ```C
+>
+> #:call GPU_HOST_DATA(...)
+>    {code}
+> #:endcall GPU_HOST_DATA 
+>```
+> 
+
+#### Parameters
+
+| name           | data type   | Default Value | description                                                      |
+|----------------|-------------|---------------|------------------------------------------------------------------|
+| `code`         | code        | Required      | Region of code where GPU memory addresses is accessible          |
+| `use_device`   | string list | None          | Use GPU memory address of variable instead of CPU memory address |
+| `extraAccArgs` | string      | None          | String of any extra arguments added to the OpenACC directive     |
+
+#### Parameter Restrictions
+
+| name | Restricted range                                 |
+|------|--------------------------------------------------|
+| `code` | Do not assign it manually with key-value pairing |
+
+#### Additional information
+
+#### Example
+
+> ```C
+>  #:call GPU_HOST_DATA(use_device='[addr1, addr2]')
+>       {code}
+>       ...
+>  #:endcall GPU_HOST_DATA
+>  #:call GPU_HOST_DATA(use_device='[display_arr]')
+>       {code}
+>       ...
+>   #:endcall
+> ```
+
+</details>
+
+------------------------------------------------------------------------------------------
+
+### Synchronization Macros
+
+<details>
  <summary><code>GPU_WAIT</code> <code>(Makes CPU wait for async GPU activities)</code></summary>
 
 #### Macro Invocation
@@ -495,4 +388,121 @@ Uses FYPP eval directive using `$:`
 > ```
 
 </details>
+
+<details>
+ <summary><code>GPU_ATOMIC</code> <code>(Do an atomic operation on the GPU)</code></summary>
+
+#### Macro Invocation
+
+Uses FYPP eval directive using `$:`
+> `$:GPU_ATOMIC(...)`
+
+#### Parameters
+
+| name           | data type | Default Value | description                                                  |
+|----------------|-----------|---------------|--------------------------------------------------------------|
+| `atomic`       | string    | Required      | Which atomic operation is performed                          |
+| `extraAccArgs` | string    | None          | String of any extra arguments added to the OpenACC directive |
+
+#### Parameter Restrictions
+
+| name            | Restricted range                                  |
+|-----------------|---------------------------------------------------|
+| `atomic`        | 'read', 'write', 'update', or 'capture'                            |
+
+#### Additional information
+
+- read atomic is reading in a value
+    - Ex: `v=x`
+- write atomic is writing a value to a variable
+    - Ex:`x=square(tmp)`
+- update atomic is updating a variable in-place
+    - Ex:`x= x .and. 1`
+- Capture is a pair of read/write/update operations with one dependent on the other
+    - Ex: ```
+        `x=x .and. 1`
+        `v=x`
+    ```
+    
+
+#### Example
+
+> ```python
+>  $:GPU_ATOMIC(atomic='update')
+>  x = square(x)
+>  $:GPU_ATOMIC(atomic='capture')
+>  x = square(x)
+>  v = x
+> ```
+
+</details>
+
+------------------------------------------------------------------------------------------
+
+### Miscellaneous Macros
+
+<details>
+ <summary><code>GPU_ROUTINE</code> <code>(Compile a procedure for the GPU)</code></summary>
+
+#### Macro Invocation
+
+Uses FYPP eval directive using `$:`
+> `$:GPU_ROUTINE(...)`
+
+#### Parameters
+
+| name            | data type   | Default Value | description                                                  |
+|-----------------|-------------|---------------|--------------------------------------------------------------|
+| `function_name` | string      | None          | Name of subroutine/function                                  |
+| `parallelism`   | string list | None          | Parallelism granularity to use for this routine              |
+| `nohost`        | boolean     | False         | Do not compile procedure code for CPU                        |
+| `cray_inline`   | boolean     | False         | Inline procedure on cray compiler                            |
+| `extraAccArgs`  | string      | None          | String of any extra arguments added to the OpenACC directive |
+
+#### Parameter Restrictions
+
+| name        | Restricted range                                  |
+|-------------|---------------------------------------------------|
+| `parallelism` | Valid elements: 'gang', 'worker', 'vector', 'seq' |
+
+#### Additional information
+
+- Function name only needs to be given when cray_inline is True
+- Future capability is to parse function header for function name
+- Routine parallelism is most commonly `'[seq]'`
+
+#### Example
+
+> ```python
+>  $:GPU_ROUTINE(parallelism='[seq]')
+>  $:GPU_ROUTINE(function_name='s_matmult', parallelism='[seq]', cray_inline=True)
+> ```
+
+</details>
+
+<details>
+ <summary><code>GPU_CACHE</code> <code>(Data to be cache in software-managed cache)</code></summary>
+
+#### Macro Invocation
+
+Uses FYPP eval directive using `$:`
+> `$:GPU_CACHE(...)`
+
+#### Parameters
+
+| name             | data type   | Default Value | description                                                  |
+|------------------|-------------|---------------|--------------------------------------------------------------|
+| `cache`         | string list | Required          | Data that should to stored in cache           |
+| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
+
+#### Additional information
+
+#### Example
+
+> ```python
+>  $:GPU_CACHE(cache='[pixels_arr]')
+> ```
+
+</details>
+
 ------------------------------------------------------------------------------------------
