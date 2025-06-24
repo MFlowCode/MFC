@@ -69,11 +69,11 @@ Uses FYPP eval directive using `$:`
 
 #### Parameter Restrictions
 
-| name        | Restricted range                                  |
-|-------------|---------------------------------------------------|
-| `collapse`    | Must be greater than 1                            |
-| `parallelism` | Valid elements: 'gang', 'worker', 'vector', 'seq' |
-| `default`     | 'present' or 'none'                               |
+> | name          | Restricted range                                  |
+> |---------------|---------------------------------------------------|
+> | `collapse`    | Must be greater than 1                            |
+> | `parallelism` | Valid elements: 'gang', 'worker', 'vector', 'seq' |
+> | `default`     | 'present' or 'none'                               |
 
 #### Additional information
 
@@ -102,23 +102,23 @@ Uses FYPP eval directive using `$:`
 
 #### Parameters
 
-| name              | data type           | Default Value | description                                                                                      |
-|-------------------|---------------------|---------------|--------------------------------------------------------------------------------------------------|
-| `collapse`        | integer             | None          | Number of loops to combine into 1 loop                                                           |
-| `parallelism`     | string list         | None          | Parallelism granularity to use for this loop                                                     |
-| `data_dependency` | string              | None          | 'independent'-> assert loop iterations are independent, 'auto->let compiler analyze dependencies |
-| `private`         | string list         | None          | Variables that are private to each iteration/thread                                              |
-| `reduction`       | 2-level string list | None          | Variables unique to each iteration and reduced at the end                                        |
-| `reductionOp`     | string list         | None          | Operator that each list of reduction will reduce with                                            |
-| `extraAccArgs`    | string              | None          | String of any extra arguments added to the OpenACC directive                                     |
+> | name              | data type           | Default Value | description                                                                                      |
+> |-------------------|---------------------|---------------|--------------------------------------------------------------------------------------------------|
+> | `collapse`        | integer             | None          | Number of loops to combine into 1 loop                                                           |
+> | `parallelism`     | string list         | None          | Parallelism granularity to use for this loop                                                     |
+> | `data_dependency` | string              | None          | 'independent'-> assert loop iterations are independent, 'auto->let compiler analyze dependencies |
+> | `private`         | string list         | None          | Variables that are private to each iteration/thread                                              |
+> | `reduction`       | 2-level string list | None          | Variables unique to each iteration and reduced at the end                                        |
+> | `reductionOp`     | string list         | None          | Operator that each list of reduction will reduce with                                            |
+> | `extraAccArgs`    | string              | None          | String of any extra arguments added to the OpenACC directive                                     |
 
 #### Parameter Restrictions
 
-| name            | Restricted range                                  |
-|-----------------|---------------------------------------------------|
-| `collapse`        | Must be greater than 1                            |
-| `parallelism`     | Valid elements: 'gang', 'worker', 'vector', 'seq' |
-| `data_dependency` | 'auto' or 'independent'                           |
+> | name              | Restricted range                                  |
+> |-------------------|---------------------------------------------------|
+> | `collapse`        | Must be greater than 1                            |
+> | `parallelism`     | Valid elements: 'gang', 'worker', 'vector', 'seq' |
+> | `data_dependency` | 'auto' or 'independent'                           |
 
 #### Additional information
 
@@ -145,38 +145,35 @@ Uses FYPP eval directive using `$:`
 #### Macro Invocation
 
 Uses FYPP call directive using `#:call`
+
 > ```C
->
 > #:call GPU_DATA(...)
 >    {code}
 > #:endcall GPU_DATA 
 >```
-> 
 
 #### Parameters
 
-| name             | data type   | Default Value | description                                                                                  |
-|------------------|-------------|---------------|----------------------------------------------------------------------------------------------|
-| `code`           | code        | Required      | Region of code where defined data is accessible                                              |
-| `copy`           | string list | None          | Allocates and copies variable to GPU on entrance, then deallocated and copies to CPU on exit |
-| `copyin`         | string list | None          | Allocates and copies data to GPU on entrance and then deallocated on exit              |
-| `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU and then deallocated on exit                 |
-| `copyout`        | string list | None          | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit       |
-| `create`         | string list | None          | Allocates data on GPU on entrance and then deallocates on exit                         |
-| `no_create`      | string list | None          | Use data in CPU memory unless data is already in GPU memory                                  |
-| `present`        | string list | None          | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit    |
-| `deviceptr`      | string list | None          | Pointer variables that are already allocated on GPU memory                                   |
-| `attach`         | string list | None          | Attaches device pointer to device targets on entrance, then detach on exit                   |
-| `default`        | string      | None          | Implicit assumptions compiler should make                                                    |
-| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive                                 |
+> | name             | data type   | Default Value | description                                                                                  |
+> |------------------|-------------|---------------|----------------------------------------------------------------------------------------------|
+> | `code`           | code        | Required      | Region of code where defined data is accessible                                              |
+> | `copy`           | string list | None          | Allocates and copies variable to GPU on entrance, then deallocated and copies to CPU on exit |
+> | `copyin`         | string list | None          | Allocates and copies data to GPU on entrance and then deallocated on exit                    |
+> | `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU and then deallocated on exit                 |
+> | `copyout`        | string list | None          | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit             |
+> | `create`         | string list | None          | Allocates data on GPU on entrance and then deallocates on exit                               |
+> | `no_create`      | string list | None          | Use data in CPU memory unless data is already in GPU memory                                  |
+> | `present`        | string list | None          | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit    |
+> | `deviceptr`      | string list | None          | Pointer variables that are already allocated on GPU memory                                   |
+> | `attach`         | string list | None          | Attaches device pointer to device targets on entrance, then detach on exit                   |
+> | `default`        | string      | None          | Implicit assumptions compiler should make                                                    |
+> | `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive                                 |
 
 #### Parameter Restrictions
 
-| name            | Restricted range                                  |
-|-----------------|---------------------------------------------------|
-| `code`        | Do not assign it manually with key-value pairing                            |
-
-#### Additional information
+> | name   | Restricted range                                 |
+> |--------|--------------------------------------------------|
+> | `code` | Do not assign it manually with key-value pairing |
 
 #### Example
 
@@ -188,7 +185,7 @@ Uses FYPP call directive using `#:call`
 >  #:call GPU_DATA(create='[pixel_arr]', copyin='[initial_index]')
 >       {code}
 >       ...
->   #:endcall
+>  #:endcall
 > ```
 
 </details>
@@ -203,15 +200,13 @@ Uses FYPP eval directive using `$:`
 
 #### Parameters
 
-| name             | data type   | Default Value | description                                                  |
-|------------------|-------------|---------------|--------------------------------------------------------------|
-| `copyin`         | string list | None          | Allocates and copies data to GPU on entrance           |
-| `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU on entrance  |
-| `create`         | string list | None          | Allocates data on GPU on entrance                      |
-| `attach`         | string list | None          | Attaches device pointer to device targets on entrance        |
-| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
-
-#### Additional information
+> | name             | data type   | Default Value | description                                                  |
+> |------------------|-------------|---------------|--------------------------------------------------------------|
+> | `copyin`         | string list | None          | Allocates and copies data to GPU on entrance                 |
+> | `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU on entrance  |
+> | `create`         | string list | None          | Allocates data on GPU on entrance                            |
+> | `attach`         | string list | None          | Attaches device pointer to device targets on entrance        |
+> | `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
 
 #### Example
 
@@ -232,14 +227,12 @@ Uses FYPP eval directive using `$:`
 
 #### Parameters
 
-| name             | data type   | Default Value | description                                                  |
-|------------------|-------------|---------------|--------------------------------------------------------------|
-| `copyout`         | string list | None          | Deallocates and copies data from GPU to CPU on exit           |
-| `delete`         | string list | None          | Deallocates data on GPU on exit                      |
-| `detach`         | string list | None          | Detach device pointer from device targets on exit        |
-| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
-
-#### Additional information
+> | name           | data type   | Default Value | description                                                  |
+> |----------------|-------------|---------------|--------------------------------------------------------------|
+> | `copyout`      | string list | None          | Deallocates and copies data from GPU to CPU on exit          |
+> | `delete`       | string list | None          | Deallocates data on GPU on exit                              |
+> | `detach`       | string list | None          | Detach device pointer from device targets on exit            |
+> | `extraAccArgs` | string      | None          | String of any extra arguments added to the OpenACC directive |
 
 #### Example
 
@@ -260,22 +253,21 @@ Uses FYPP eval directive using `$:`
 
 #### Parameters
 
-| name             | data type   | Default Value | description                                                                                  |
-|------------------|-------------|---------------|----------------------------------------------------------------------------------------------|
-| `copy`           | string list | None          | Allocates and copies data to GPU on entrance, then deallocated and copies to CPU on exit |
-| `copyin`         | string list | None          | Allocates and copies data to GPU on entrance and then deallocated on exit              |
-| `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU and then deallocated on exit                 |
-| `copyout`        | string list | None          | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit       |
-| `create`         | string list | None          | Allocates data on GPU on entrance and then deallocates on exit                         |
-| `present`        | string list | None          | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit    |
-| `deviceptr`      | string list | None          | Pointer variables that are already allocated on GPU memory                                   |
-| `link`           | string list | None          | Declare global link, and only allocate when variable used in data clause.                    |
-| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive                                 |
+> | name             | data type   | Default Value | description                                                                               |
+> |------------------|-------------|---------------|-------------------------------------------------------------------------------------------|
+> | `copy`           | string list | None          | Allocates and copies data to GPU on entrance, then deallocated and copies to CPU on exit  |
+> | `copyin`         | string list | None          | Allocates and copies data to GPU on entrance and then deallocated on exit                 |
+> | `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU and then deallocated on exit              |
+> | `copyout`        | string list | None          | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit          |
+> | `create`         | string list | None          | Allocates data on GPU on entrance and then deallocates on exit                            |
+> | `present`        | string list | None          | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit |
+> | `deviceptr`      | string list | None          | Pointer variables that are already allocated on GPU memory                                |
+> | `link`           | string list | None          | Declare global link, and only allocate when variable used in data clause.                 |
+> | `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive                              |
 
 #### Additional information
 
-- An implicit data region is created at the start of each procedure
-and ends after the last executable statement in that procedure.
+- An implicit data region is created at the start of each procedure and ends after the last executable statement in that procedure.
 - Use only create, copyin, device_resident or link clauses for module variables
 - GPU_DECLARE exit is the end of the implicit data region
 - Link is useful for large global static data objects
@@ -299,13 +291,11 @@ Uses FYPP eval directive using `$:`
 
 #### Parameters
 
-| name           | data type | Default Value | description                                                  |
-|----------------|-----------|---------------|--------------------------------------------------------------|
-| `host`       | string list   | None      | Updates data from GPU to CPU                         |
-| `device`       | string list   | None      | Updates data from CPU to GPU     |
-| `extraAccArgs` | string    | None          | String of any extra arguments added to the OpenACC directive |
-
-#### Additional information
+> | name           | data type   | Default Value | description                                                  |
+> |----------------|-------------|---------------|--------------------------------------------------------------|
+> | `host`         | string list | None          | Updates data from GPU to CPU                                 |
+> | `device`       | string list | None          | Updates data from CPU to GPU                                 |
+> | `extraAccArgs` | string      | None          | String of any extra arguments added to the OpenACC directive |
 
 #### Example
 
@@ -322,27 +312,26 @@ Uses FYPP eval directive using `$:`
 #### Macro Invocation
 
 Uses FYPP call directive using `#:call`
+
 > ```C
->
 > #:call GPU_HOST_DATA(...)
 >    {code}
 > #:endcall GPU_HOST_DATA 
 >```
-> 
 
 #### Parameters
 
-| name           | data type   | Default Value | description                                                      |
-|----------------|-------------|---------------|------------------------------------------------------------------|
-| `code`         | code        | Required      | Region of code where GPU memory addresses is accessible          |
-| `use_device`   | string list | None          | Use GPU memory address of variable instead of CPU memory address |
-| `extraAccArgs` | string      | None          | String of any extra arguments added to the OpenACC directive     |
+> | name           | data type   | Default Value | description                                                      |
+> |----------------|-------------|---------------|------------------------------------------------------------------|
+> | `code`         | code        | Required      | Region of code where GPU memory addresses is accessible          |
+> | `use_device`   | string list | None          | Use GPU memory address of variable instead of CPU memory address |
+> | `extraAccArgs` | string      | None          | String of any extra arguments added to the OpenACC directive     |
 
 #### Parameter Restrictions
 
-| name | Restricted range                                 |
-|------|--------------------------------------------------|
-| `code` | Do not assign it manually with key-value pairing |
+> | name   | Restricted range                                 |
+> |--------|--------------------------------------------------|
+> | `code` | Do not assign it manually with key-value pairing |
 
 #### Additional information
 
@@ -375,11 +364,9 @@ Uses FYPP eval directive using `$:`
 
 #### Parameters
 
-| name           | data type | Default Value | description                                                  |
-|----------------|-----------|---------------|--------------------------------------------------------------|
-| `extraAccArgs` | string    | None          | String of any extra arguments added to the OpenACC directive |
-
-#### Additional information
+> | name           | data type | Default Value | description                                                  |
+> |----------------|-----------|---------------|--------------------------------------------------------------|
+> | `extraAccArgs` | string    | None          | String of any extra arguments added to the OpenACC directive |
 
 #### Example
 
@@ -399,31 +386,32 @@ Uses FYPP eval directive using `$:`
 
 #### Parameters
 
-| name           | data type | Default Value | description                                                  |
-|----------------|-----------|---------------|--------------------------------------------------------------|
-| `atomic`       | string    | Required      | Which atomic operation is performed                          |
-| `extraAccArgs` | string    | None          | String of any extra arguments added to the OpenACC directive |
+> | name           | data type | Default Value | description                                                  |
+> |----------------|-----------|---------------|--------------------------------------------------------------|
+> | `atomic`       | string    | Required      | Which atomic operation is performed                          |
+> | `extraAccArgs` | string    | None          | String of any extra arguments added to the OpenACC directive |
 
 #### Parameter Restrictions
 
-| name            | Restricted range                                  |
-|-----------------|---------------------------------------------------|
-| `atomic`        | 'read', 'write', 'update', or 'capture'                            |
+> | name     | Restricted range                        |
+> |----------|-----------------------------------------|
+> | `atomic` | 'read', 'write', 'update', or 'capture' |
 
 #### Additional information
 
 - read atomic is reading in a value
-    - Ex: `v=x`
+  - Ex: `v=x`
 - write atomic is writing a value to a variable
-    - Ex:`x=square(tmp)`
+  - Ex:`x=square(tmp)`
 - update atomic is updating a variable in-place
-    - Ex:`x= x .and. 1`
+  - Ex:`x= x .and. 1`
 - Capture is a pair of read/write/update operations with one dependent on the other
-    - Ex: ```
-        `x=x .and. 1`
-        `v=x`
-    ```
-    
+  - Ex:
+
+  ```Fortran
+      x=x .and. 1
+      v=x
+  ```
 
 #### Example
 
@@ -451,19 +439,19 @@ Uses FYPP eval directive using `$:`
 
 #### Parameters
 
-| name            | data type   | Default Value | description                                                  |
-|-----------------|-------------|---------------|--------------------------------------------------------------|
-| `function_name` | string      | None          | Name of subroutine/function                                  |
-| `parallelism`   | string list | None          | Parallelism granularity to use for this routine              |
-| `nohost`        | boolean     | False         | Do not compile procedure code for CPU                        |
-| `cray_inline`   | boolean     | False         | Inline procedure on cray compiler                            |
-| `extraAccArgs`  | string      | None          | String of any extra arguments added to the OpenACC directive |
+> | name            | data type   | Default Value | description                                                  |
+> |-----------------|-------------|---------------|--------------------------------------------------------------|
+> | `function_name` | string      | None          | Name of subroutine/function                                  |
+> | `parallelism`   | string list | None          | Parallelism granularity to use for this routine              |
+> | `nohost`        | boolean     | False         | Do not compile procedure code for CPU                        |
+> | `cray_inline`   | boolean     | False         | Inline procedure on cray compiler                            |
+> | `extraAccArgs`  | string      | None          | String of any extra arguments added to the OpenACC directive |
 
 #### Parameter Restrictions
 
-| name        | Restricted range                                  |
-|-------------|---------------------------------------------------|
-| `parallelism` | Valid elements: 'gang', 'worker', 'vector', 'seq' |
+> | name          | Restricted range                                  |
+> |---------------|---------------------------------------------------|
+> | `parallelism` | Valid elements: 'gang', 'worker', 'vector', 'seq' |
 
 #### Additional information
 
@@ -490,12 +478,10 @@ Uses FYPP eval directive using `$:`
 
 #### Parameters
 
-| name             | data type   | Default Value | description                                                  |
-|------------------|-------------|---------------|--------------------------------------------------------------|
-| `cache`         | string list | Required          | Data that should to stored in cache           |
-| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
-
-#### Additional information
+> | name             | data type   | Default Value | description                                                  |
+> |------------------|-------------|---------------|--------------------------------------------------------------|
+> | `cache`          | string list | Required      | Data that should to stored in cache                          |
+> | `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
 
 #### Example
 
