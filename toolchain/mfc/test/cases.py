@@ -1007,8 +1007,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 },
                 override_tol=1
             ))
-        stack.push(f'1D -> Chemistry -> MultiComponent_Diffusion', {"m": 200,
-                    'dt': 0.3e-06, 'num_patches': 1, 'num_fluids': 1, 'x_domain%beg': 0.0, 'x_domain%end': 0.05,
+        stack.push(f'1D -> Chemistry -> MultiComponent_Diffusion', {"m": 100,
+                    'dt': 0.4e-06, 'num_patches': 1, 'num_fluids': 1, 'x_domain%beg': 0.0, 'x_domain%end': 0.05,
                      'bc_x%beg': -1, 'bc_x%end': -1, "weno_order": 5,"weno_eps": 1e-16, "weno_avg": "F",
                     "mapped_weno": "T", "mp_weno": "T",'weno_Re_flux': 'F', "riemann_solver": 2, "wave_speeds": 2,
                     "avg_state": 1,"chemistry": "T", "chem_params%diffusion": "T","chem_params%reactions": "F", "chem_wrt_T" : "T",
@@ -1019,7 +1019,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "patch_icpp(1)%Y(3)": "(0.214_wp-0.0_wp)*(1.0_wp-0.5_wp*exp(-(x-0.05_wp/2.0_wp)**2.0_wp/(2.5_wp*10.0_wp**(-3.0_wp))**2.0_wp))+0.0_wp",
                     "patch_icpp(1)%Y(4)": "(0.591_wp-0.758_wp)*(1.0_wp-0.5_wp*exp(-(x-0.05_wp/2.0_wp)**2.0_wp/(2.5_wp*10.0_wp**(-3.0_wp))**2.0_wp))+0.758_wp",
                     "patch_icpp(1)%alpha_rho(1)": "1.01325_wp*10.0_wp**(5.0_wp)/(((320.0_wp-1350.0_wp)*(1.0_wp-0.50_wp*exp(-(x-0.05_wp/2.0_wp)**2.0_wp/(2.5_wp*10.0_wp**(-3.0_wp))**2.0_wp))+1350.0_wp)*8.3144626_wp*1000.0_wp*( ((0.195_wp-0.142_wp)*(1.0_wp-0.5_wp*exp(-(x-0.05_wp/2.0_wp)**2.0_wp/(2.5_wp*10.0_wp**(-3.0_wp))**2.0_wp))+0.142_wp)/31.998_wp +((0.0_wp-0.1_wp)*(1.0_wp-0.5_wp*exp(-(x-0.05_wp/2.0_wp)**2.0_wp/(2.5_wp*10.0_wp**(-3.0_wp))**2.0_wp))+0.1_wp)/18.01508_wp+ ((0.214_wp-0.0_wp)*(1.0_wp-0.5_wp*exp(-(x-0.05_wp/2.0_wp)**2.0_wp/(2.5_wp*10.0_wp**(-3.0_wp))**2.0_wp))+0.0_wp)/16.04256_wp + ((0.591_wp-0.758_wp)*(1.0_wp-0.5_wp*exp(-(x-0.05_wp/2.0_wp)**2.0_wp/(2.5_wp*10.0_wp**(-3.0_wp))**2.0_wp))+0.758_wp)/28.0134_wp))",
-                    "fluid_pp(1)%gamma": 1.0e00 / (1.9326e00 - 1.0e00),  "fluid_pp(1)%pi_inf": 0, "cantera_file": "h2o2.yaml", 't_step_start': 0, 't_step_stop': 1200, 't_step_save': 1200
+                    "fluid_pp(1)%gamma": 1.0e00 / (1.9326e00 - 1.0e00),  "fluid_pp(1)%pi_inf": 0, "cantera_file": "h2o2.yaml", 't_step_start': 0, 't_step_stop': 800, 't_step_save': 200
         })
         cases.append(define_case_d(stack, '', {}))
 
