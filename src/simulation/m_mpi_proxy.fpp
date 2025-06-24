@@ -457,9 +457,45 @@ contains
                     if (f_crosses_boundary(k, 2, -1, pos, posPrev)) then
                         call s_add_particle_to_direction(k, -1, -1, 0)
                         call s_add_particle_to_direction(k, 0, -1, 0)
+                        if (p > 0) then
+                            if (f_crosses_boundary(k, 3, -1, pos, posPrev)) then
+                                call s_add_particle_to_direction(k, -1, -1, -1)
+                                call s_add_particle_to_direction(k, 0, -1, -1)
+                                call s_add_particle_to_direction(k, -1, 0, -1)
+                                call s_add_particle_to_direction(k, 0, 0, -1)
+                            elseif (f_crosses_boundary(k, 3, 1, pos, posPrev)) then
+                                call s_add_particle_to_direction(k, -1, -1, 1)
+                                call s_add_particle_to_direction(k, 0, -1, 1)
+                                call s_add_particle_to_direction(k, -1, 0, 1)
+                                call s_add_particle_to_direction(k, 0, 0, 1)
+                            end if
+                        end if
                     elseif (f_crosses_boundary(k, 2, 1, pos, posPrev)) then
                         call s_add_particle_to_direction(k, -1, 1, 0)
                         call s_add_particle_to_direction(k, 0, 1, 0)
+                        if (p > 0) then
+                            if (f_crosses_boundary(k, 3, -1, pos, posPrev)) then
+                                call s_add_particle_to_direction(k, -1, 1, -1)
+                                call s_add_particle_to_direction(k, 0, 1, -1)
+                                call s_add_particle_to_direction(k, -1, 0, -1)
+                                call s_add_particle_to_direction(k, 0, 0, -1)
+                            elseif (f_crosses_boundary(k, 3, 1, pos, posPrev)) then
+                                call s_add_particle_to_direction(k, -1, 1, 1)
+                                call s_add_particle_to_direction(k, 0, 1, 1)
+                                call s_add_particle_to_direction(k, -1, 0, 1)
+                                call s_add_particle_to_direction(k, 0, 0, 1)
+                            end if
+                        end if
+                    else
+                        if (p > 0) then
+                            if (f_crosses_boundary(k, 3, -1, pos, posPrev)) then
+                                call s_add_particle_to_direction(k, -1, 0, -1)
+                                call s_add_particle_to_direction(k, 0, 0, -1)
+                            elseif (f_crosses_boundary(k, 3, 1, pos, posPrev)) then
+                                call s_add_particle_to_direction(k, -1, 0, 1)
+                                call s_add_particle_to_direction(k, 0, 0, 1)
+                            end if
+                        end if
                     end if
                 end if
             elseif (f_crosses_boundary(k, 1, 1, pos, posPrev)) then
@@ -468,15 +504,75 @@ contains
                     if (f_crosses_boundary(k, 2, -1, pos, posPrev)) then
                         call s_add_particle_to_direction(k, 1, -1, 0)
                         call s_add_particle_to_direction(k, 0, -1, 0)
+                        if (p > 0) then
+                            if (f_crosses_boundary(k, 3, -1, pos, posPrev)) then
+                                call s_add_particle_to_direction(k, 1, -1, -1)
+                                call s_add_particle_to_direction(k, 0, -1, -1)
+                                call s_add_particle_to_direction(k, 1, 0, -1)
+                                call s_add_particle_to_direction(k, 0, 0, -1)
+                            elseif (f_crosses_boundary(k, 3, 1, pos, posPrev)) then
+                                call s_add_particle_to_direction(k, 1, -1, 1)
+                                call s_add_particle_to_direction(k, 0, -1, 1)
+                                call s_add_particle_to_direction(k, 1, 0, 1)
+                                call s_add_particle_to_direction(k, 0, 0, 1)
+                            end if
+                        end if
                     elseif (f_crosses_boundary(k, 2, 1, pos, posPrev)) then
                         call s_add_particle_to_direction(k, 1, 1, 0)
                         call s_add_particle_to_direction(k, 0, 1, 0)
+                        if (p > 0) then
+                            if (f_crosses_boundary(k, 3, -1, pos, posPrev)) then
+                                call s_add_particle_to_direction(k, 1, 1, -1)
+                                call s_add_particle_to_direction(k, 0, 1, -1)
+                                call s_add_particle_to_direction(k, 1, 0, -1)
+                                call s_add_particle_to_direction(k, 0, 0, -1)
+                            elseif (f_crosses_boundary(k, 3, 1, pos, posPrev)) then
+                                call s_add_particle_to_direction(k, 1, 1, 1)
+                                call s_add_particle_to_direction(k, 0, 1, 1)
+                                call s_add_particle_to_direction(k, 1, 0, 1)
+                                call s_add_particle_to_direction(k, 0, 0, 1)
+                            end if
+                        end if
+                    else
+                        if (p > 0) then
+                            if (f_crosses_boundary(k, 3, -1, pos, posPrev)) then
+                                call s_add_particle_to_direction(k, 1, 0, -1)
+                                call s_add_particle_to_direction(k, 0, 0, -1)
+                            elseif (f_crosses_boundary(k, 3, 1, pos, posPrev)) then
+                                call s_add_particle_to_direction(k, 1, 0, 1)
+                                call s_add_particle_to_direction(k, 0, 0, 1)
+                            end if
+                        end if
                     end if
                 end if
             elseif (f_crosses_boundary(k, 2, -1, pos, posPrev)) then
                 call s_add_particle_to_direction(k, 0, -1, 0)
+                if (p > 0) then
+                    if (f_crosses_boundary(k, 3, -1, pos, posPrev)) then
+                        call s_add_particle_to_direction(k, 0, -1, -1)
+                        call s_add_particle_to_direction(k, 0, 0, -1)
+                    elseif (f_crosses_boundary(k, 3, 1, pos, posPrev)) then
+                        call s_add_particle_to_direction(k, 0, -1, 1)
+                        call s_add_particle_to_direction(k, 0, 0, 1)
+                    end if
+                end if
             elseif (f_crosses_boundary(k, 2, 1, pos, posPrev)) then
                 call s_add_particle_to_direction(k, 0, 1, 0)
+                if (p > 0) then
+                    if (f_crosses_boundary(k, 3, -1, pos, posPrev)) then
+                        call s_add_particle_to_direction(k, 0, 1, -1)
+                        call s_add_particle_to_direction(k, 0, 0, -1)
+                    elseif (f_crosses_boundary(k, 3, 1, pos, posPrev)) then
+                        call s_add_particle_to_direction(k, 0, 1, 1)
+                        call s_add_particle_to_direction(k, 0, 0, 1)
+                    end if
+                end if
+            elseif (p > 0) then
+                if (f_crosses_boundary(k, 3, -1, pos, posPrev)) then
+                    call s_add_particle_to_direction(k, 0, 0, -1)
+                elseif (f_crosses_boundary(k, 3, 1, pos, posPrev)) then
+                    call s_add_particle_to_direction(k, 0, 0, 1)
+                end if
             end if
         end do
 
