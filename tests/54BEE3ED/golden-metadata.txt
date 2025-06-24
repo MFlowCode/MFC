@@ -1,10 +1,10 @@
-This file was created on 2025-06-23 19:10:24.829634.
+This file was created on 2025-06-23 21:46:35.321090.
 
 mfc.sh:
 
     Invocation: test -o MultiComponent_Diffusion --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        68cf1b3554aa25003a3c910a5f383f42f423153d on Diffusion (dirty)
+    Git:        7172f7c14bf89eeef15c8c0583b4e7ec4e026e05 on Diffusion (dirty)
 
 CPU:
 
