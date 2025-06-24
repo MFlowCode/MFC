@@ -1,43 +1,10 @@
-This file was created on 2025-06-24 01:06:49.747649.
+This file was created on 2025-06-24 01:21:13.691960.
 
 mfc.sh:
 
     Invocation: test -o mixlayer_perturb --generate -- -c carpenter
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        8a2b5304b397177956868021f9c745dd580e14e4 on mixlayer (dirty)
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.28.1 on carpenter07
-    
-        C       : GNU v7.5.0 (/usr/bin/gcc)
-        Fortran : GNU v7.5.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /p/global/hyeoksu/MFC/MFC-Caltech/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/gcc
-        CXX      : /usr/bin/g++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        4a1b90d63c3d4c93438f98f29309684f28e5c1c0 on mixlayer (dirty)
 
 simulation:
 
@@ -50,39 +17,6 @@ simulation:
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /p/global/hyeoksu/MFC/MFC-Caltech/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/gcc
-        CXX      : /usr/bin/g++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.28.1 on carpenter07
-    
-        C       : GNU v7.5.0 (/usr/bin/gcc)
-        Fortran : GNU v7.5.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -118,6 +52,72 @@ syscheck:
         SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /p/global/hyeoksu/MFC/MFC-Caltech/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/gcc
+        CXX      : /usr/bin/g++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.28.1 on carpenter07
+    
+        C       : GNU v7.5.0 (/usr/bin/gcc)
+        Fortran : GNU v7.5.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /p/global/hyeoksu/MFC/MFC-Caltech/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/gcc
+        CXX      : /usr/bin/g++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.28.1 on carpenter07
+    
+        C       : GNU v7.5.0 (/usr/bin/gcc)
+        Fortran : GNU v7.5.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     

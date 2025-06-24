@@ -634,7 +634,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_mixlayer_perturb(dimInfo):
         if len(dimInfo[0]) == 3:
             cases.append(define_case_d(stack,'mixlayer_perturb',{
-                'm': 24, 'n': 48, 'p': 24, 'num_patches': 1, 'num_fluids': 1,
+                'm': 24, 'n': 48, 'p': 24, 'dt': 1e-2,
+                'num_patches': 1, 'num_fluids': 1,
                 'x_domain%beg': 0.0, 'x_domain%end': 32.0, 'bc_x%beg': -1, 'bc_x%end': -1,
                 'y_domain%beg': -16.0, 'y_domain%end': 16.0, 'bc_y%beg': -6, 'bc_y%end': -6,
                 'z_domain%beg': 0.0, 'z_domain%end': 8.0, 'bc_z%beg': -1, 'bc_z%end': -1,
