@@ -28,10 +28,10 @@ Note: Ordering is not guarennteed or stable, so use key-value pairing when using
 ### Data Flow
 
 - Data on the GPU has a reference counter
-- When a variable is referred to being allocated, it means that GPU memory is allocated if it is not already present in GPU memory. If a variable is already present, the reference counter is just incremented.
-- When a variable is referred to being dellocated, it means that the reference counter is decremented. If the reference counter is zero, then the data is actually deallocated from GPU memory
-- When a variable is referred to being attached, it means that the device pointer attaches to target if it not already attached. If pointer is already attached, then the attachment counter is just incremented
-- When a variable is referred to being detached, it means that the attachment counter is decremented. If attachment counter is zero, then actually detached
+- When data is referred to being allocated, it means that GPU memory is allocated if it is not already present in GPU memory. If a variable is already present, the reference counter is just incremented.
+- When data is referred to being dellocated, it means that the reference counter is decremented. If the reference counter is zero, then the data is actually deallocated from GPU memory
+- When data is referred to being attached, it means that the device pointer attaches to target if it not already attached. If pointer is already attached, then the attachment counter is just incremented
+- When data is referred to being detached, it means that the attachment counter is decremented. If attachment counter is zero, then actually detached
 
 ### Creating new/overwriting existing stubs & proxy configs
 
@@ -45,25 +45,25 @@ Uses FYPP eval directive using `$:`
 
 #### Parameters
 
-> | name             | data type           | Default Value     | description                                                                                  |
-> |------------------|---------------------|-------------------|----------------------------------------------------------------------------------------------|
-> | `collapse`       | integer             | None              | Number of loops to combine into 1 loop                                                       |
-> | `parallelism`    | string list         | '\[gang,vector\]' | Parallelism granularity to use for this loop                                                 |
-> | `default`        | string              | 'present'         | Implicit assumptions compiler should make                                                    |
-> | `private`        | string list         | None              | Variables that are private to each iteration/thread                                          |
-> | `firstprivate`   | string list         | None              | Initialized variables that are private to each iteration/thread                              |
-> | `reduction`      | 2-level string list | None              | Variables unique to each iteration and reduced at the end                                    |
-> | `reductionOp`    | string list         | None              | Operator that each list of reduction will reduce with                                        |
-> | `copy`           | string list         | None              | Allocates and copies data to GPU on entrance, then deallocated and copies to CPU on exit |
-> | `copyin`         | string list         | None              | Allocates and copies data to GPU on entrance and then deallocated on exit              |
-> | `copyinReadOnly` | string list         | None              | Allocates and copies readonly data to GPU and then deallocated on exit                 |
-> | `copyout`        | string list         | None              | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit       |
-> | `create`         | string list         | None              | Allocates data on GPU on entrance and then deallocates on exit                         |
-> | `no_create`      | string list         | None              | Use data in CPU memory unless data is already in GPU memory                                  |
-> | `present`        | string list         | None              | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit    |
-> | `deviceptr`      | string list         | None              | Pointer variables that are already allocated on GPU memory                                   |
-> | `attach`         | string list         | None              | Attaches device pointer to device targets on entrance, then detach on exit                   |
-> | `extraAccArgs`   | string              | None              | String of any extra arguments added to the OpenACC directive                                 |
+> | name             | data type           | Default Value     | description                                                                               |
+> |------------------|---------------------|-------------------|-------------------------------------------------------------------------------------------|
+> | `collapse`       | integer             | None              | Number of loops to combine into 1 loop                                                    |
+> | `parallelism`    | string list         | '\[gang,vector\]' | Parallelism granularity to use for this loop                                              |
+> | `default`        | string              | 'present'         | Implicit assumptions compiler should make                                                 |
+> | `private`        | string list         | None              | Variables that are private to each iteration/thread                                       |
+> | `firstprivate`   | string list         | None              | Initialized variables that are private to each iteration/thread                           |
+> | `reduction`      | 2-level string list | None              | Variables unique to each iteration and reduced at the end                                 |
+> | `reductionOp`    | string list         | None              | Operator that each list of reduction will reduce with                                     |
+> | `copy`           | string list         | None              | Allocates and copies data to GPU on entrance, then deallocated and copies to CPU on exit  |
+> | `copyin`         | string list         | None              | Allocates and copies data to GPU on entrance and then deallocated on exit                 |
+> | `copyinReadOnly` | string list         | None              | Allocates and copies readonly data to GPU and then deallocated on exit                    |
+> | `copyout`        | string list         | None              | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit          |
+> | `create`         | string list         | None              | Allocates data on GPU on entrance and then deallocates on exit                            |
+> | `no_create`      | string list         | None              | Use data in CPU memory unless data is already in GPU memory                               |
+> | `present`        | string list         | None              | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit |
+> | `deviceptr`      | string list         | None              | Pointer variables that are already allocated on GPU memory                                |
+> | `attach`         | string list         | None              | Attaches device pointer to device targets on entrance, then detach on exit                |
+> | `extraAccArgs`   | string              | None              | String of any extra arguments added to the OpenACC directive                              |
 
 #### Parameter Restrictions
 
@@ -217,7 +217,7 @@ Uses FYPP eval directive using `$:`
 </details>
 
 <details>
- <summary><code>GPU_HOST_DATA</code> <code>(Make GPU memory address avaliable on CPU)</code></summary>
+ <summary><code>GPU_HOST_DATA</code> <code>(Make GPU memory address available on CPU)</code></summary>
 
 #### Macro Invocation
 
@@ -303,11 +303,11 @@ Uses FYPP call directive using `#:call`
 #### Example
 
 > ```C
->  #:call GPU_DATA(copy='[pixel_arr]', copyin='[starting_pixels, inital_index]',attach='[p_real, p_cmplx, p_fltr_cmplx]')
+>  #:call GPU_DATA(copy='[pixel_arr]', copyin='[starting_pixels, initial_index]',attach='[p_real, p_cmplx, p_fltr_cmplx]')
 >       {code}
 >       ...
 >  #:endcall GPU_DATA
->  #:call GPU_DATA(create='[pixel_arr]', copyin='[inital_index]')
+>  #:call GPU_DATA(create='[pixel_arr]', copyin='[initial_index]')
 >       {code}
 >       ...
 >   #:endcall
@@ -338,8 +338,8 @@ Uses FYPP eval directive using `$:`
 #### Example
 
 > ```python
->  $:GPU_ENTER_DATA(copyin='[pixels_arr]', copyinReadOnly='[starting_pixels, inital_index]')
->  $:GPU_ENTER_DATA(create='[bc_buffers(1:num_dims, -1:1)]', copyin='[inital_index]')
+>  $:GPU_ENTER_DATA(copyin='[pixels_arr]', copyinReadOnly='[starting_pixels, initial_index]')
+>  $:GPU_ENTER_DATA(create='[bc_buffers(1:num_dims, -1:1)]', copyin='[initial_index]')
 > ```
 
 </details>
@@ -366,8 +366,8 @@ Uses FYPP eval directive using `$:`
 #### Example
 
 > ```python
->  $:GPU_EXIT_DATA(copyout='[pixels_arr]', delete='[starting_pixels, inital_index]')
->  $:GPU_EXIT_DATA(delete='[bc_buffers(1:num_dims, -1:1)]', copyout='[inital_index]')
+>  $:GPU_EXIT_DATA(copyout='[pixels_arr]', delete='[starting_pixels, initial_index]')
+>  $:GPU_EXIT_DATA(delete='[bc_buffers(1:num_dims, -1:1)]', copyout='[initial_index]')
 > ```
 
 </details>
@@ -397,8 +397,6 @@ Uses FYPP eval directive using `$:`
 
 </details>
 
-GPU_ATOMIC(atomic, extraAccArgs=None)
-
 <details>
  <summary><code>GPU_ATOMIC</code> <code>(Do an atomic operation on the GPU)</code></summary>
 
@@ -409,10 +407,10 @@ Uses FYPP eval directive using `$:`
 
 #### Parameters
 
-| name             | data type   | Default Value | description                                                  |
-|------------------|-------------|---------------|--------------------------------------------------------------|
-| `atomic`         | string | Required          | Which atomic operation is performed           |
-| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
+| name           | data type | Default Value | description                                                  |
+|----------------|-----------|---------------|--------------------------------------------------------------|
+| `atomic`       | string    | Required      | Which atomic operation is performed                          |
+| `extraAccArgs` | string    | None          | String of any extra arguments added to the OpenACC directive |
 
 #### Parameter Restrictions
 
@@ -438,11 +436,62 @@ Uses FYPP eval directive using `$:`
 #### Example
 
 > ```python
->  $:GPU_CACHE(cache='[update]')
+>  $:GPU_ATOMIC(atomic='update')
 >  x = square(x)
->  $:GPU_CACHE(cache='[capture]')
+>  $:GPU_ATOMIC(atomic='capture')
 >  x = square(x)
 >  v = x
+> ```
+
+</details>
+
+<details>
+ <summary><code>GPU_UPDATE</code> <code>(Updates data from CPU to GPU or GPU to CPU)</code></summary>
+
+#### Macro Invocation
+
+Uses FYPP eval directive using `$:`
+> `$:GPU_UPDATE(...)`
+
+#### Parameters
+
+| name           | data type | Default Value | description                                                  |
+|----------------|-----------|---------------|--------------------------------------------------------------|
+| `host`       | string list   | None      | Updates data from GPU to CPU                         |
+| `device`       | string list   | None      | Updates data from CPU to GPU     |
+| `extraAccArgs` | string    | None          | String of any extra arguments added to the OpenACC directive |
+
+#### Additional information
+
+#### Example
+
+> ```python
+>  $:GPU_UPDATE(host='[arr1, arr2]')
+>  $:GPU_UPDATE(host='[updated_gpu_val]', device='[updated_cpu_val]')
+> ```
+
+</details>
+
+<details>
+ <summary><code>GPU_WAIT</code> <code>(Makes CPU wait for async GPU activities)</code></summary>
+
+#### Macro Invocation
+
+Uses FYPP eval directive using `$:`
+> `$:GPU_WAIT(...)`
+
+#### Parameters
+
+| name           | data type | Default Value | description                                                  |
+|----------------|-----------|---------------|--------------------------------------------------------------|
+| `extraAccArgs` | string    | None          | String of any extra arguments added to the OpenACC directive |
+
+#### Additional information
+
+#### Example
+
+> ```python
+>  $:GPU_WAIT()
 > ```
 
 </details>
