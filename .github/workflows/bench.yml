@@ -23,7 +23,7 @@ jobs:
 
   self:
     name: Georgia Tech | Phoenix (NVHPC)
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && ${{ github.event.review.state == 'approved' }}
+    if: ${{ github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && (github.event.review.state == 'approved' || github.event.pull_request.user.login == 'sbryngelson') }}
     needs: file-changes
     strategy:
       matrix:
