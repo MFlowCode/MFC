@@ -54,11 +54,11 @@ Uses FYPP eval directive using `$:`
 > | `firstprivate`   | string list         | None              | Initialized variables that are private to each iteration/thread                              |
 > | `reduction`      | 2-level string list | None              | Variables unique to each iteration and reduced at the end                                    |
 > | `reductionOp`    | string list         | None              | Operator that each list of reduction will reduce with                                        |
-> | `copy`           | string list         | None              | Allocates and copies variable to GPU on entrance, then deallocated and copies to CPU on exit |
-> | `copyin`         | string list         | None              | Allocates and copies a variable to GPU on entrance and then deallocated on exit              |
-> | `copyinReadOnly` | string list         | None              | Allocates and copies a readonly variable to GPU and then deallocated on exit                 |
-> | `copyout`        | string list         | None              | Allocates a variable on GPU on entrance and then deallocates and copies to CPU on exit       |
-> | `create`         | string list         | None              | Allocates a variable on GPU on entrance and then deallocates on exit                         |
+> | `copy`           | string list         | None              | Allocates and copies data to GPU on entrance, then deallocated and copies to CPU on exit |
+> | `copyin`         | string list         | None              | Allocates and copies data to GPU on entrance and then deallocated on exit              |
+> | `copyinReadOnly` | string list         | None              | Allocates and copies readonly data to GPU and then deallocated on exit                 |
+> | `copyout`        | string list         | None              | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit       |
+> | `create`         | string list         | None              | Allocates data on GPU on entrance and then deallocates on exit                         |
 > | `no_create`      | string list         | None              | Use data in CPU memory unless data is already in GPU memory                                  |
 > | `present`        | string list         | None              | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit    |
 > | `deviceptr`      | string list         | None              | Pointer variables that are already allocated on GPU memory                                   |
@@ -146,11 +146,11 @@ Uses FYPP eval directive using `$:`
 
 | name             | data type   | Default Value | description                                                                                  |
 |------------------|-------------|---------------|----------------------------------------------------------------------------------------------|
-| `copy`           | string list | None          | Allocates and copies variable to GPU on entrance, then deallocated and copies to CPU on exit |
-| `copyin`         | string list | None          | Allocates and copies a variable to GPU on entrance and then deallocated on exit              |
+| `copy`           | string list | None          | Allocates and copies data to GPU on entrance, then deallocated and copies to CPU on exit |
+| `copyin`         | string list | None          | Allocates and copies data to GPU on entrance and then deallocated on exit              |
 | `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU and then deallocated on exit                 |
-| `copyout`        | string list | None          | Allocates a variable on GPU on entrance and then deallocates and copies to CPU on exit       |
-| `create`         | string list | None          | Allocates a variable on GPU on entrance and then deallocates on exit                         |
+| `copyout`        | string list | None          | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit       |
+| `create`         | string list | None          | Allocates data on GPU on entrance and then deallocates on exit                         |
 | `present`        | string list | None          | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit    |
 | `deviceptr`      | string list | None          | Pointer variables that are already allocated on GPU memory                                   |
 | `link`           | string list | None          | Declare global link, and only allocate when variable used in data clause.                    |
@@ -217,7 +217,52 @@ Uses FYPP eval directive using `$:`
 </details>
 
 <details>
- <summary><code>GPU_DATA</code> <code>(Allocate module variables on GPU or for implicit data region )</code></summary>
+ <summary><code>GPU_HOST_DATA</code> <code>(Make GPU memory address avaliable on CPU)</code></summary>
+
+#### Macro Invocation
+
+Uses FYPP call directive using `#:call`
+> ```C
+>
+> #:call GPU_HOST_DATA(...)
+>    {code}
+> #:endcall GPU_HOST_DATA 
+>```
+> 
+
+#### Parameters
+
+| name           | data type   | Default Value | description                                                      |
+|----------------|-------------|---------------|------------------------------------------------------------------|
+| `code`         | code        | Required      | Region of code where GPU memory addresses is accessible          |
+| `use_device`   | string list | None          | Use GPU memory address of variable instead of CPU memory address |
+| `extraAccArgs` | string      | None          | String of any extra arguments added to the OpenACC directive     |
+
+#### Parameter Restrictions
+
+| name | Restricted range                                 |
+|------|--------------------------------------------------|
+| code | Do not assign it manually with key-value pairing |
+
+#### Additional information
+
+#### Example
+
+> ```C
+>  #:call GPU_HOST_DATA(use_device='[addr1, addr2]')
+>       {code}
+>       ...
+>  #:endcall GPU_HOST_DATA
+>  #:call GPU_HOST_DATA(use_device='[display_arr]')
+>       {code}
+>       ...
+>   #:endcall
+> ```
+
+</details>
+
+<details>
+ <summary><code>GPU_DATA</code> <code>(Make data accessible on GPU in specified region)</code></summary>
 
 #### Macro Invocation
 
@@ -236,10 +281,10 @@ Uses FYPP call directive using `#:call`
 |------------------|-------------|---------------|----------------------------------------------------------------------------------------------|
 | `code`           | code        | Required      | Region of code where defined data is accessible                                              |
 | `copy`           | string list | None          | Allocates and copies variable to GPU on entrance, then deallocated and copies to CPU on exit |
-| `copyin`         | string list | None          | Allocates and copies a variable to GPU on entrance and then deallocated on exit              |
+| `copyin`         | string list | None          | Allocates and copies data to GPU on entrance and then deallocated on exit              |
 | `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU and then deallocated on exit                 |
-| `copyout`        | string list | None          | Allocates a variable on GPU on entrance and then deallocates and copies to CPU on exit       |
-| `create`         | string list | None          | Allocates a variable on GPU on entrance and then deallocates on exit                         |
+| `copyout`        | string list | None          | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit       |
+| `create`         | string list | None          | Allocates data on GPU on entrance and then deallocates on exit                         |
 | `no_create`      | string list | None          | Use data in CPU memory unless data is already in GPU memory                                  |
 | `present`        | string list | None          | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit    |
 | `deviceptr`      | string list | None          | Pointer variables that are already allocated on GPU memory                                   |
@@ -261,7 +306,7 @@ Uses FYPP call directive using `#:call`
 >  #:call GPU_DATA(copy='[pixel_arr]', copyin='[starting_pixels, inital_index]',attach='[p_real, p_cmplx, p_fltr_cmplx]')
 >       {code}
 >       ...
->  #:endcall
+>  #:endcall GPU_DATA
 >  #:call GPU_DATA(create='[pixel_arr]', copyin='[inital_index]')
 >       {code}
 >       ...
@@ -271,58 +316,134 @@ Uses FYPP call directive using `#:call`
 </details>
 
 <details>
- <summary><code>GPU_DATA</code> <code>(Allocate module variables on GPU or for implicit data region )</code></summary>
+ <summary><code>GPU_ENTER_DATA</code> <code>(Allocate/move data to GPU until matching GPU_EXIT_DATA or program termination)</code></summary>
 
 #### Macro Invocation
 
-Uses FYPP call directive using `#:call`
-> ```C
->
-> #:call GPU_DATA(...)
->    {code}
-> #:endcall GPU_DATA 
->```
-> 
+Uses FYPP eval directive using `$:`
+> `$:GPU_ENTER_DATA(...)`
 
 #### Parameters
 
-| name             | data type   | Default Value | description                                                                                  |
-|------------------|-------------|---------------|----------------------------------------------------------------------------------------------|
-| `code`           | code        | Required      | Region of code where defined data is accessible                                              |
-| `copy`           | string list | None          | Allocates and copies variable to GPU on entrance, then deallocated and copies to CPU on exit |
-| `copyin`         | string list | None          | Allocates and copies a variable to GPU on entrance and then deallocated on exit              |
-| `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU and then deallocated on exit                 |
-| `copyout`        | string list | None          | Allocates a variable on GPU on entrance and then deallocates and copies to CPU on exit       |
-| `create`         | string list | None          | Allocates a variable on GPU on entrance and then deallocates on exit                         |
-| `no_create`      | string list | None          | Use data in CPU memory unless data is already in GPU memory                                  |
-| `present`        | string list | None          | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit    |
-| `deviceptr`      | string list | None          | Pointer variables that are already allocated on GPU memory                                   |
-| `attach`         | string list | None          | Attaches device pointer to device targets on entrance, then detach on exit                   |
-| `default`        | string      | None          | Implicit assumptions compiler should make                                                    |
-| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive                                 |
-
-#### Parameter Restrictions
-
-| name            | Restricted range                                  |
-|-----------------|---------------------------------------------------|
-| code        | Do not assign it manually with key-value pairing                            |
+| name             | data type   | Default Value | description                                                  |
+|------------------|-------------|---------------|--------------------------------------------------------------|
+| `copyin`         | string list | None          | Allocates and copies data to GPU on entrance           |
+| `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU on entrance  |
+| `create`         | string list | None          | Allocates data on GPU on entrance                      |
+| `attach`         | string list | None          | Attaches device pointer to device targets on entrance        |
+| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
 
 #### Additional information
 
 #### Example
 
-> ```C
->  #:call GPU_DATA(copy='[pixel_arr]', copyin='[starting_pixels, inital_index]',attach='[p_real, p_cmplx, p_fltr_cmplx]')
->       {code}
->       ...
->  #:endcall
->  #:call GPU_DATA(create='[pixel_arr]', copyin='[inital_index]')
->       {code}
->       ...
->   #:endcall
+> ```python
+>  $:GPU_ENTER_DATA(copyin='[pixels_arr]', copyinReadOnly='[starting_pixels, inital_index]')
+>  $:GPU_ENTER_DATA(create='[bc_buffers(1:num_dims, -1:1)]', copyin='[inital_index]')
 > ```
 
 </details>
 
+<details>
+ <summary><code>GPU_EXIT_DATA</code> <code>(Deallocate/move data from GPU created by GPU_ENTER_DATA)</code></summary>
 
+#### Macro Invocation
+
+Uses FYPP eval directive using `$:`
+> `$:GPU_EXIT_DATA(...)`
+
+#### Parameters
+
+| name             | data type   | Default Value | description                                                  |
+|------------------|-------------|---------------|--------------------------------------------------------------|
+| `copyout`         | string list | None          | Deallocates and copies data from GPU to CPU on exit           |
+| `delete`         | string list | None          | Deallocates data on GPU on exit                      |
+| `detach`         | string list | None          | Detach device pointer from device targets on exit        |
+| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
+
+#### Additional information
+
+#### Example
+
+> ```python
+>  $:GPU_EXIT_DATA(copyout='[pixels_arr]', delete='[starting_pixels, inital_index]')
+>  $:GPU_EXIT_DATA(delete='[bc_buffers(1:num_dims, -1:1)]', copyout='[inital_index]')
+> ```
+
+</details>
+
+<details>
+ <summary><code>GPU_CACHE</code> <code>(Data to be cache in software-managed cache)</code></summary>
+
+#### Macro Invocation
+
+Uses FYPP eval directive using `$:`
+> `$:GPU_CACHE(...)`
+
+#### Parameters
+
+| name             | data type   | Default Value | description                                                  |
+|------------------|-------------|---------------|--------------------------------------------------------------|
+| `cache`         | string list | Required          | Data that should to stored in cache           |
+| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
+
+#### Additional information
+
+#### Example
+
+> ```python
+>  $:GPU_CACHE(cache='[pixels_arr]')
+> ```
+
+</details>
+
+GPU_ATOMIC(atomic, extraAccArgs=None)
+
+<details>
+ <summary><code>GPU_ATOMIC</code> <code>(Do an atomic operation on the GPU)</code></summary>
+
+#### Macro Invocation
+
+Uses FYPP eval directive using `$:`
+> `$:GPU_ATOMIC(...)`
+
+#### Parameters
+
+| name             | data type   | Default Value | description                                                  |
+|------------------|-------------|---------------|--------------------------------------------------------------|
+| `atomic`         | string | Required          | Which atomic operation is performed           |
+| `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
+
+#### Parameter Restrictions
+
+| name            | Restricted range                                  |
+|-----------------|---------------------------------------------------|
+| atomic        | 'read', 'write', 'update', or 'capture'                            |
+
+#### Additional information
+
+- read atomic is reading in a value
+    - Ex: `v=x`
+- write atomic is writing a value to a variable
+    - Ex:`x=square(tmp)`
+- update atomic is updating a variable in-place
+    - Ex:`x= x .and. 1`
+- Capture is a pair of read/write/update operations with one dependent on the other
+    - Ex: ```
+        `x=x .and. 1`
+        `v=x`
+    ```
+    
+
+#### Example
+
+> ```python
+>  $:GPU_CACHE(cache='[update]')
+>  x = square(x)
+>  $:GPU_CACHE(cache='[capture]')
+>  x = square(x)
+>  v = x
+> ```
+
+</details>
 ------------------------------------------------------------------------------------------
