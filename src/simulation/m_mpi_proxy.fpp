@@ -579,6 +579,7 @@ contains
     contains
 
         logical function f_crosses_boundary(particle_id, dir, loc, pos, posPrev)
+
             integer, intent(in) :: particle_id, dir, loc
             real(wp), dimension(:,:), intent(in) :: pos
             real(wp), dimension(:,:), optional, intent(in) :: posPrev
@@ -661,126 +662,97 @@ contains
 
         integer :: i, j, k, l, q
 
-        #:for rdma_mpi in [False, True]
-            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
-                #:if rdma_mpi
-                    !$acc host_data use_device(lag_id, bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-                    !$acc gas_betaC, bub_dphidt, gas_p, gas_mv, rad, rvel, pos, posPrev, vel, scoord, &
-                    !$acc drad, drvel, dgasp, dgasmv, dpos, dvel)
-                    call nvtxStartRange("LAG-COMM-SENDRECV-RDMA")
-                #:else
-                    call nvtxStartRange("LAG-COMM-DEV2HOST")
-                    !$acc update host(lag_id, bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-                    !$acc gas_betaC, bub_dphidt, gas_p, gas_mv, rad, rvel, pos, posPrev, vel, scoord, &
-                    !$acc drad, drvel, dgasp, dgasmv, dpos, dvel)
-                    call nvtxEndRange
-                    call nvtxStartRange("LAG-COMM-SENDRECV-NO-RMDA")
-                #:endif
+        do k = nidx(3)%beg, nidx(3)%end
+            do j = nidx(2)%beg, nidx(2)%end
+                do i = nidx(1)%beg, nidx(1)%end
+                    if (abs(i) + abs(j) + abs(k) > 0) then
 
-                do k = nidx(3)%beg, nidx(3)%end
-                    do j = nidx(2)%beg, nidx(2)%end
-                        do i = nidx(1)%beg, nidx(1)%end
-                            if (abs(i) + abs(j) + abs(k) > 0) then
+                        partner = neighbor_ranks(i,j,k)
 
-                                partner = neighbor_ranks(i,j,k)
+                        send_tag = neighbor_tag(i, j, k)
+                        recv_tag = neighbor_tag(-i, -j, -k)
 
-                                send_tag = neighbor_tag(i, j, k)
-                                recv_tag = neighbor_tag(-i, -j, -k)
+                        call MPI_Sendrecv(p_send_counts(i,j,k), 1, MPI_INTEGER, partner, send_tag,  &
+                                          p_recv_counts(i,j,k), 1, MPI_INTEGER, partner, recv_tag, &
+                                          MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                                call MPI_Sendrecv(p_send_counts(i,j,k), 1, MPI_INTEGER, partner, send_tag,  &
-                                                  p_recv_counts(i,j,k), 1, MPI_INTEGER, partner, recv_tag, &
-                                                  MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        p_recv_size = p_recv_counts(i,j,k) * p_var_size
 
-                                p_recv_size = p_recv_counts(i,j,k) * p_var_size
-
-                                position = 0
-                                do l = 0, p_send_counts(i,j,k) - 1
-                                    bub_id = p_send_ids(i,j,k,l)
-                                    call MPI_Pack(lag_id(bub_id, 1), 1, MPI_INTEGER, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                    call MPI_Pack(bub_R0(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                    call MPI_Pack(Rmax_stats(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                    call MPI_Pack(Rmin_stats(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                    call MPI_Pack(gas_mg(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                    call MPI_Pack(gas_betaT(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                    call MPI_Pack(gas_betaC(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                    call MPI_Pack(bub_dphidt(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                    do q = 1, 2
-                                        call MPI_Pack(gas_p(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                        call MPI_Pack(gas_mv(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                        call MPI_Pack(rad(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                        call MPI_Pack(rvel(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                        call MPI_Pack(pos(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                        call MPI_Pack(posPrev(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                        call MPI_Pack(vel(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                        call MPI_Pack(scoord(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                    end do
-                                    do q = 1, lag_num_ts
-                                        call MPI_Pack(drad(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                        call MPI_Pack(drvel(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                        call MPI_Pack(dgasp(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                        call MPI_Pack(dgasmv(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                        call MPI_Pack(dpos(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                        call MPI_Pack(dvel(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
-                                    end do
-                                end do
-
-                                send_tag = send_tag + max(num_procs, n_neighbor)
-                                recv_tag = recv_tag + max(num_procs, n_neighbor)
-
-                                call MPI_Sendrecv(p_send_buff, position, MPI_PACKED, partner, send_tag,  &
-                                                  p_recv_buff, p_recv_size, MPI_PACKED, partner, recv_tag, &
-                                                  MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                                position = 0
-                                do l = 0, p_recv_counts(i,j,k) - 1
-                                    nbubs = nbubs + 1
-                                    bub_id = nbubs
-                                    call MPI_Unpack(p_recv_buff, p_recv_size, position, lag_id(bub_id, 1), 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                                    call MPI_Unpack(p_recv_buff, p_recv_size, position, bub_R0(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                    call MPI_Unpack(p_recv_buff, p_recv_size, position, Rmax_stats(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                    call MPI_Unpack(p_recv_buff, p_recv_size, position, Rmin_stats(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                    call MPI_Unpack(p_recv_buff, p_recv_size, position, gas_mg(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                    call MPI_Unpack(p_recv_buff, p_recv_size, position, gas_betaT(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                    call MPI_Unpack(p_recv_buff, p_recv_size, position, gas_betaC(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                    call MPI_Unpack(p_recv_buff, p_recv_size, position, bub_dphidt(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                    do q = 1, 2
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, gas_p(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, gas_mv(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, rad(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, rvel(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, pos(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, posPrev(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, vel(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, scoord(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
-                                    end do
-                                    do q = 1, lag_num_ts
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, drad(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, drvel(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, dgasp(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, dgasmv(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, dpos(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
-                                        call MPI_Unpack(p_recv_buff, p_recv_size, position, dvel(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
-                                    end do
-                                    lag_id(bub_id, 2) = bub_id
-
-                                end do
-                            end if
+                        position = 0
+                        do l = 0, p_send_counts(i,j,k) - 1
+                            bub_id = p_send_ids(i,j,k,l)
+                            call MPI_Pack(lag_id(bub_id, 1), 1, MPI_INTEGER, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                            call MPI_Pack(bub_R0(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                            call MPI_Pack(Rmax_stats(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                            call MPI_Pack(Rmin_stats(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                            call MPI_Pack(gas_mg(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                            call MPI_Pack(gas_betaT(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                            call MPI_Pack(gas_betaC(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                            call MPI_Pack(bub_dphidt(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                            do q = 1, 2
+                                call MPI_Pack(gas_p(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(gas_mv(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(rad(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(rvel(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(pos(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(posPrev(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(vel(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(scoord(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                            end do
+                            do q = 1, lag_num_ts
+                                call MPI_Pack(drad(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(drvel(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(dgasp(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(dgasmv(bub_id, q), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(dpos(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                                call MPI_Pack(dvel(bub_id, :, q), 3, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
+                            end do
                         end do
-                    end do
-                end do
 
-                #:if rdma_mpi
-                    !$acc end host_data
-                    !$acc wait
-                #:else
-                    call nvtxStartRange("RHS-COMM-HOST2DEV")
-                    !$acc update host(lag_id, bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-                    !$acc gas_betaC, bub_dphidt, gas_p, gas_mv, rad, rvel, pos, posPrev, vel, scoord, &
-                    !$acc drad, drvel, dgasp, dgasmv, dpos, dvel)
-                    call nvtxEndRange
-                #:endif
-            end if
-        #:endfor
+                        send_tag = send_tag + max(num_procs, n_neighbor)
+                        recv_tag = recv_tag + max(num_procs, n_neighbor)
+
+                        call MPI_Sendrecv(p_send_buff, position, MPI_PACKED, partner, send_tag,  &
+                                          p_recv_buff, p_recv_size, MPI_PACKED, partner, recv_tag, &
+                                          MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                        position = 0
+                        do l = 0, p_recv_counts(i,j,k) - 1
+                            nbubs = nbubs + 1
+                            bub_id = nbubs
+                            call MPI_Unpack(p_recv_buff, p_recv_size, position, lag_id(bub_id, 1), 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                            call MPI_Unpack(p_recv_buff, p_recv_size, position, bub_R0(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                            call MPI_Unpack(p_recv_buff, p_recv_size, position, Rmax_stats(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                            call MPI_Unpack(p_recv_buff, p_recv_size, position, Rmin_stats(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                            call MPI_Unpack(p_recv_buff, p_recv_size, position, gas_mg(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                            call MPI_Unpack(p_recv_buff, p_recv_size, position, gas_betaT(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                            call MPI_Unpack(p_recv_buff, p_recv_size, position, gas_betaC(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                            call MPI_Unpack(p_recv_buff, p_recv_size, position, bub_dphidt(bub_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                            do q = 1, 2
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, gas_p(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, gas_mv(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, rad(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, rvel(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, pos(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, posPrev(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, vel(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, scoord(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
+                            end do
+                            do q = 1, lag_num_ts
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, drad(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, drvel(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, dgasp(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, dgasmv(bub_id, q), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, dpos(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
+                                call MPI_Unpack(p_recv_buff, p_recv_size, position, dvel(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
+                            end do
+                            lag_id(bub_id, 2) = bub_id
+
+                        end do
+                    end if
+                end do
+            end do
+        end do
 
     end subroutine s_mpi_sendrecv_particles
 

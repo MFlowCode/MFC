@@ -73,6 +73,11 @@ module m_bubbles_EL
 
     !$acc declare create(nBubs, Rmax_glb, Rmin_glb, q_beta, q_beta_idx)
 
+
+    integer, allocatable, dimension(:) :: keep_bubble, prefix_sum
+    integer :: active_bubs
+    !$acc declare create(keep_bubble, prefix_sum, active_bubs)
+
 contains
 
     !> Initializes the lagrangian subgrid bubble solver
@@ -138,6 +143,8 @@ contains
         @:ALLOCATE(gas_dmvdt(1:nBubs_glb, 1:lag_num_ts))
         @:ALLOCATE(mtn_dposdt(1:nBubs_glb, 1:3, 1:lag_num_ts))
         @:ALLOCATE(mtn_dveldt(1:nBubs_glb, 1:3, 1:lag_num_ts))
+
+        @:ALLOCATE(keep_bubble(1:nBubs_glb), prefix_sum(1:nBubs_glb))
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
@@ -257,6 +264,15 @@ contains
             if (bub_id == 0) call s_mpi_abort('No bubbles in the domain. Check input/lag_bubbles.dat')
         end if
 
+        if (num_procs > 1) then
+            call s_add_particles_to_transfer_list(nBubs, mtn_pos(:, :, 1))
+            call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+                                      gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
+                                      intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
+                                      mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
+                                      gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
+        end if
+
         !$acc update device(bubbles_lagrange, lag_params)
 
         !$acc update device(lag_id, bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC,   &
@@ -268,15 +284,6 @@ contains
         !$acc update device(Rmax_glb, Rmin_glb)
 
         !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
-
-        if (num_procs > 1) then
-            call s_add_particles_to_transfer_list(nBubs, mtn_pos(:, :, 1))
-            call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-                                      gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
-                                      intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
-                                      mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                                      gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
-        end if
 
         !Populate temporal variables
         call s_transfer_data_to_tmp()
@@ -1159,13 +1166,12 @@ contains
     impure subroutine s_enforce_EL_bubbles_boundary_conditions(dest)
 
         integer, intent(in) :: dest
-        integer :: k, i, patch_id
+        integer :: k, i, patch_id, offset
         integer, dimension(3) :: cell
-        logical, dimension(1:nBubs) :: remove_bubble
 
         !$acc parallel loop gang vector default(present) private(cell)
         do k = 1, nBubs
-            remove_bubble(k) = .false.
+            keep_bubble(k) = 1
 
             if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                 .and. mtn_pos(k,1,dest) < x_cb(-1) + intfc_rad(k,dest)) then
@@ -1174,9 +1180,9 @@ contains
                 .and. mtn_pos(k,1,dest) > x_cb(m) - intfc_rad(k,dest)) then
                 mtn_pos(k, 1, dest) = x_cb(m) - intfc_rad(k,dest)
             elseif (mtn_pos(k, 1, dest) >= x_cb(m + buff_size - fd_number)) then
-                remove_bubble(k) = .true.
+                keep_bubble(k) = 0
             elseif (mtn_pos(k, 1, dest) < x_cb(fd_number - buff_size - 1)) then
-                remove_bubble(k) = .true.
+                keep_bubble(k) = 0
             end if
 
             if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
@@ -1186,9 +1192,9 @@ contains
                 .and. mtn_pos(k,2,dest) > y_cb(n) - intfc_rad(k,dest)) then
                 mtn_pos(k, 2, dest) = y_cb(n) - intfc_rad(k,dest)
             elseif (mtn_pos(k, 2, dest) >= y_cb(n + buff_size - fd_number)) then
-                remove_bubble(k) = .true.
+                keep_bubble(k) = 0
             elseif (mtn_pos(k, 2, dest) < y_cb(fd_number - buff_size - 1)) then
-                remove_bubble(k) = .true.
+                keep_bubble(k) = 0
             end if
 
             if (p > 0) then
@@ -1199,9 +1205,9 @@ contains
                     .and. mtn_pos(k,3,dest) > z_cb(p) - intfc_rad(k,dest)) then
                     mtn_pos(k, 3, dest) = z_cb(p) - intfc_rad(k,dest)
                 elseif (mtn_pos(k, 3, dest) >= z_cb(p + buff_size - fd_number)) then
-                    remove_bubble(k) = .true.
+                    keep_bubble(k) = 0
                 elseif (mtn_pos(k, 3, dest) < z_cb(fd_number - buff_size - 1)) then
-                    remove_bubble(k) = .true.
+                    keep_bubble(k) = 0
                 end if
             end if
 
@@ -1223,19 +1229,75 @@ contains
             end if
         end do
 
-        !$acc loop seq
-        do k = nBubs, 1, -1
-            if (remove_bubble(k)) call s_remove_lag_bubble(k)
+        call nvtxStartRange("LAG-BC-DEV2HOST")
+        !$acc update host(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+        !$acc gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
+        !$acc intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
+        !$acc mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
+        !$acc gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, &
+        !$acc keep_bubble, nBubs)
+        call nvtxEndRange
+
+        do k = 1, nBubs
+            if (k == 1) then
+                prefix_sum(k) = keep_bubble(k)
+            else
+                prefix_sum(k) =  prefix_sum(k - 1) + keep_bubble(k)
+            end if
+            if (k == nBubs) active_bubs = prefix_sum(k)
+        end do
+
+        do k = 1, nBubs
+            if (keep_bubble(k) == 1) then
+                if (prefix_sum(k) /= k) then
+                    bub_R0(prefix_sum(k)) = bub_R0(k)
+                    Rmax_stats(prefix_sum(k)) = Rmax_stats(k)
+                    Rmin_stats(prefix_sum(k)) = Rmin_stats(k)
+                    gas_mg(prefix_sum(k)) = gas_mg(k)
+                    gas_betaT(prefix_sum(k)) = gas_betaT(k)
+                    gas_betaC(prefix_sum(k)) = gas_betaC(k)
+                    bub_dphidt(prefix_sum(k)) = bub_dphidt(k)
+                    lag_id(prefix_sum(k), 1) = lag_id(k, 1)
+                    gas_p(prefix_sum(k), 1:2) = gas_p(k, 1:2)
+                    gas_mv(prefix_sum(k), 1:2) = gas_mv(k, 1:2)
+                    intfc_rad(prefix_sum(k), 1:2) = intfc_rad(k, 1:2)
+                    intfc_vel(prefix_sum(k), 1:2) = intfc_vel(k, 1:2)
+                    mtn_pos(prefix_sum(k), 1:3, 1:2) = mtn_pos(k, 1:3, 1:2)
+                    mtn_posPrev(prefix_sum(k), 1:3, 1:2) = mtn_posPrev(k, 1:3, 1:2)
+                    mtn_vel(prefix_sum(k), 1:3, 1:2) = mtn_vel(k, 1:3, 1:2)
+                    mtn_s(prefix_sum(k), 1:3, 1:2) = mtn_s(k, 1:3, 1:2)
+                    intfc_draddt(prefix_sum(k), 1:lag_num_ts) = intfc_draddt(k, 1:lag_num_ts)
+                    intfc_dveldt(prefix_sum(k), 1:lag_num_ts) = intfc_dveldt(k, 1:lag_num_ts)
+                    gas_dpdt(prefix_sum(k), 1:lag_num_ts) = gas_dpdt(k, 1:lag_num_ts)
+                    gas_dmvdt(prefix_sum(k), 1:lag_num_ts) = gas_dmvdt(k, 1:lag_num_ts)
+                    mtn_dposdt(prefix_sum(k), 1:3, 1:lag_num_ts) = mtn_dposdt(k, 1:3, 1:lag_num_ts)
+                    mtn_dveldt(prefix_sum(k), 1:3, 1:lag_num_ts) = mtn_dveldt(k, 1:3, 1:lag_num_ts)
+                end if
+            end if
+            if (k == nBubs) nBubs = active_bubs
         end do
 
         if (num_procs > 1) then
+            call nvtxStartRange("LAG-BC-TRANSFER-LIST")
             call s_add_particles_to_transfer_list(nBubs, mtn_pos(:, :, dest), mtn_posPrev(:, :, dest))
+            call nvtxEndRange
+
+            call nvtxStartRange("LAG-BC-SENDRECV")
             call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
                                       gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
                                       intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
                                       mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
                                       gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
+            call nvtxEndRange
         end if
+
+        call nvtxStartRange("LAG-BC-HOST2DEV")
+        !$acc update device(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+        !$acc gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
+        !$acc intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
+        !$acc mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
+        !$acc gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
+        call nvtxEndRange
 
     end subroutine s_enforce_EL_bubbles_boundary_conditions
 
@@ -1252,22 +1314,18 @@ contains
         integer :: i
 
         do while (pos(1) < x_cb(cell(1) - 1))
-            if (cell(1) == fd_number - buff_size) print*, "xb error", proc_rank, pos
             cell(1) = cell(1) - 1
         end do
 
         do while (pos(1) >= x_cb(cell(1)))
-            if (cell(1) == m + buff_size - fd_number) print*, "xe error", proc_rank, pos
             cell(1) = cell(1) + 1
         end do
 
         do while (pos(2) < y_cb(cell(2) - 1))
-            if (cell(2) == fd_number - buff_size) print*, "yb error", proc_rank, pos
             cell(2) = cell(2) - 1
         end do
 
         do while (pos(2) >= y_cb(cell(2)))
-            if (cell(2) == n + buff_size - fd_number) print*, "ye error", proc_rank, pos
             cell(2) = cell(2) + 1
         end do
 
