@@ -1,12 +1,12 @@
-This file was created on 2025-06-24 01:21:13.691960.
+This file was created on 2025-06-24 15:11:29.660192.
 
 mfc.sh:
 
     Invocation: test -o mixlayer_perturb --generate -- -c carpenter
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        4a1b90d63c3d4c93438f98f29309684f28e5c1c0 on mixlayer (dirty)
+    Git:        b68d4c628647a4447c1f5daad1d3ff2a7840e9f0 on mixlayer (dirty)
 
-simulation:
+pre_process:
 
     CMake Configuration:
     
@@ -15,8 +15,8 @@ simulation:
         C       : GNU v7.5.0 (/usr/bin/gcc)
         Fortran : GNU v7.5.0 (/usr/bin/gfortran)
     
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -72,7 +72,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+simulation:
 
     CMake Configuration:
     
@@ -82,8 +82,8 @@ post_process:
         Fortran : GNU v7.5.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -105,7 +105,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+post_process:
 
     CMake Configuration:
     
@@ -114,9 +114,9 @@ pre_process:
         C       : GNU v7.5.0 (/usr/bin/gcc)
         Fortran : GNU v7.5.0 (/usr/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -159,7 +159,7 @@ CPU:
     Frequency boost:                      enabled
     CPU max MHz:                          3707.8120
     CPU min MHz:                          1500.0000
-    BogoMIPS:                             4792.34
+    BogoMIPS:                             4792.49
     Flags:                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 invpcid_single hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd amd_ppin cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid overflow_recov succor smca fsrm flush_l1d
     Virtualization:                       AMD-V
     L1d cache:                            6 MiB (192 instances)
