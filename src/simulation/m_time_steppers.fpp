@@ -800,12 +800,13 @@ contains
             call s_compute_interphase_momentum_exchange_term(pres_visc_stress_filtered, mag_F_IMET)
         end if
         
-        if (t_step > 5) then
-            n_step = t_step - 5
-            print *, n_step
+
+        call s_autocorrelation_function(t_step+1, q_cons_ts(1)%vf)
+        if (t_step > 10) then
+            n_step = t_step - 10
             call s_compute_s_order_statistics(mag_div_Ru, n_step, R_u_stat, 1)
-            !call s_compute_s_order_statistics(mag_div_R_mu, n_step, R_mu_stat, 2)
-            !call s_compute_s_order_statistics(mag_F_IMET, n_step, F_IMET_stat, 3)
+            call s_compute_s_order_statistics(mag_div_R_mu, n_step, R_mu_stat, 2)
+            call s_compute_s_order_statistics(mag_F_IMET, n_step, F_IMET_stat, 3)
         end if
 
 

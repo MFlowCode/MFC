@@ -189,7 +189,7 @@ contains
             cont_damage, tau_star, cont_damage_s, alpha_bar, & 
             periodic_ibs, compute_CD, mu_visc, u_inf_ref, rho_inf_ref, T_inf_ref, & 
             periodic_forcing, fourier_transform_filtering, store_levelset, & 
-            slab_domain_decomposition
+            slab_domain_decomposition, compute_autocorrelation
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.

@@ -307,6 +307,7 @@ SIMULATION.update({
     'T_inf_ref': ParamType.REAL,
     'periodic_forcing': ParamType.LOG,
     'fourier_transform_filtering': ParamType.LOG,
+    'compute_autocorrelation': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',

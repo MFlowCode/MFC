@@ -25,23 +25,28 @@ mu = rho*v1*D/Re # dynamic viscosity for current case
 #print('Kn = ' + str( np.sqrt(np.pi*gam_a/2)*(M/Re) )) # Kn < 0.01 = continuum flow
 
 dt = 4.0E-06
-Nt = 31
+Nt = 10
 t_save = 1
 
-Nx = 63
-Ny = 63
-Nz = 63
+Nx = 99
+Ny = 99
+Nz = 99
+
+# load initial sphere locations
+sphere_loc = np.loadtxt('sphere_array_locations.txt')
+N_sphere = len(sphere_loc)
 
 # immersed boundary dictionary
 ib_dict = {}
-ib_dict.update({
-    f"patch_ib({1})%geometry": 8,
-    f"patch_ib({1})%x_centroid": 0.0,
-    f"patch_ib({1})%y_centroid": 0.0,
-    f"patch_ib({1})%z_centroid": 0.0,
-    f"patch_ib({1})%radius": D / 2,
-    f"patch_ib({1})%slip": "F",
-    })
+for i in range(N_sphere):
+    ib_dict.update({
+        f"patch_ib({i+1})%geometry": 8,
+        f"patch_ib({i+1})%x_centroid": sphere_loc[i, 0],
+        f"patch_ib({i+1})%y_centroid": sphere_loc[i, 1],
+        f"patch_ib({i+1})%z_centroid": sphere_loc[i, 2],
+        f"patch_ib({i+1})%radius": D / 2,
+        f"patch_ib({i+1})%slip": "F",
+        })
 
 # Configuring case dictionary
 case_dict = {
@@ -102,7 +107,7 @@ case_dict = {
     "bc_z%end": -1,
     # Set IB to True and add 1 patch
     "ib": "T",
-    "num_ibs": 1,
+    "num_ibs": N_sphere,
     "viscous": "T",
     # Formatted Database Files Structure Parameters
     "format": 1,

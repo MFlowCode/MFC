@@ -19,7 +19,8 @@ module m_additional_forcing
 
     real(wp), allocatable, dimension(:) :: q_bar ! 1:3 rho*u, 4 rho, 5 T
     type(scalar_field), allocatable, dimension(:) :: q_periodic_force
-    real(wp), allocatable, dimension(:) :: q_spatial_avg, q_spatial_avg_glb ! 1:3 rho*u, 4 rho, 5 T
+    real(wp), allocatable, dimension(:) :: q_spatial_avg
+    real(wp), allocatable, dimension(:), public :: q_spatial_avg_glb ! 1:3 rho*u, 4 rho, 5 T
     real(wp) :: volfrac_phi
     integer :: N_x_total_glb
 

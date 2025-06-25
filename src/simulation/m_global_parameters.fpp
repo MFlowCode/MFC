@@ -511,6 +511,7 @@ module m_global_parameters
     logical :: fourier_transform_filtering
     logical :: store_levelset
     logical :: slab_domain_decomposition
+    logical :: compute_autocorrelation
 
     !$acc declare create(mu_visc, u_inf_ref, rho_inf_ref, T_inf_ref)
 
@@ -799,6 +800,7 @@ contains
         fourier_transform_filtering = .false.
         store_levelset = .true.
         slab_domain_decomposition = .false.
+        compute_autocorrelation = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 

@@ -52,13 +52,13 @@ if (__name__ == '__main__'):
     print('running 3D...')
 
     # setup 
-    phi = 0.05
-    str_phi = '005'
+    phi = 0.1
+    str_phi = '01'
 
     D = 0.1
     L = 10*D
 
-    output_dir = '../examples/phi'+str_phi
+    output_dir = '../runs/phi'+str_phi
     if os.path.exists(output_dir) == False:
         os.mkdir(output_dir)
 
