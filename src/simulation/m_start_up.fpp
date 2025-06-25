@@ -1261,7 +1261,6 @@ contains
         call acc_present_dump()
 #endif
 
-
         call s_initialize_mpi_common_module()
         call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()

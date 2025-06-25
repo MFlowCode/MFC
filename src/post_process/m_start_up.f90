@@ -89,7 +89,11 @@ contains
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
             cfl_target, surface_tension, bubbles_lagrange, &
             sim_data, hyperelasticity, Bx0, relativity, cont_damage, &
-            num_bc_patches
+            num_bc_patches, lag_header, lag_txt_wrt, lag_db_wrt, &
+            lag_id_wrt, lag_pos_wrt, lag_pos_prev_wrt, lag_vel_wrt, &
+            lag_rad_wrt, lag_rvel_wrt, lag_r0_wrt, lag_rmax_wrt, &
+            lag_rmin_wrt, lag_dphidt_wrt, lag_pres_wrt, lag_mv_wrt, &
+            lag_mg_wrt, lag_betaT_wrt, lag_betaC_wrt
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -663,7 +667,8 @@ contains
             call s_write_variable_to_formatted_database_file(varname, t_step)
             varname(:) = ' '
 
-            call s_write_lag_bubbles_results(t_step) !! Individual bubble evolution
+            if (lag_txt_wrt) call s_write_lag_bubbles_results_to_text(t_step) !! Individual bubble evolution
+            if (lag_db_wrt) call s_write_lag_bubbles_to_formatted_database_file(t_step)
         end if
 
         if (sim_data .and. proc_rank == 0) then
