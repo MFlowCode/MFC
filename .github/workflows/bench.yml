@@ -49,7 +49,7 @@ jobs:
             labels: frontier
             flag: f
             device: gpu
-            build_script: "bash .github/workflows/frontier/build.sh gpu"
+            build_script: "bash .github/workflows/frontier/build.sh gpu bench"
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
