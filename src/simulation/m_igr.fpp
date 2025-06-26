@@ -662,7 +662,13 @@ contains
                                 vflux_L_arr = 0._wp
                                 vflux_R_arr = 0._wp
 
-                                !DIR$ unroll 6
+                                #:if MFC_CASE_OPTIMIZATION
+                                    #:if igr_order == 5
+                                        !DIR$ unroll 6
+                                    #:elif igr_irder == 3
+                                        !DIR$ unroll 4
+                                    #:endif
+                                #:endif
                                 !$acc loop seq
                                 do q = vidxb, vidxe
                                     dvel_small = 0._wp
@@ -1154,7 +1160,13 @@ contains
                                 vflux_L_arr = 0._wp
                                 vflux_R_arr = 0._wp
 
-                                !DIR$ unroll 6
+                                #:if MFC_CASE_OPTIMIZATION
+                                    #:if igr_order == 5
+                                        !DIR$ unroll 6
+                                    #:elif igr_irder == 3
+                                        !DIR$ unroll 4
+                                    #:endif
+                                #:endif
                                 !$acc loop seq
                                 do q = vidxb, vidxe
                                     dvel_small = 0._wp
@@ -1735,7 +1747,13 @@ contains
                                 vflux_L_arr = 0._wp
                                 vflux_R_arr = 0._wp
 
-                                !DIR$ unroll 6
+                                #:if MFC_CASE_OPTIMIZATION
+                                    #:if igr_order == 5
+                                        !DIR$ unroll 6
+                                    #:elif igr_irder == 3
+                                        !DIR$ unroll 4
+                                    #:endif
+                                #:endif
                                 !$acc loop seq
                                 do q = vidxb, vidxe
                                     dvel_small = 0._wp
@@ -2186,7 +2204,13 @@ contains
                                 vflux_L_arr = 0._wp
                                 vflux_R_arr = 0._wp
 
-                                !DIR$ unroll 6
+                                #:if MFC_CASE_OPTIMIZATION
+                                    #:if igr_order == 5
+                                        !DIR$ unroll 6
+                                    #:elif igr_irder == 3
+                                        !DIR$ unroll 4
+                                    #:endif
+                                #:endif
                                 !$acc loop seq
                                 do q = vidxb, vidxe
                                     dvel_small = 0._wp
@@ -2697,7 +2721,13 @@ contains
                             vflux_L_arr = 0._wp
                             vflux_R_arr = 0._wp
 
-                            !DIR$ unroll 6
+                            #:if MFC_CASE_OPTIMIZATION
+                                #:if igr_order == 5
+                                    !DIR$ unroll 6
+                                #:elif igr_irder == 3
+                                    !DIR$ unroll 4
+                                #:endif
+                            #:endif
                             !$acc loop seq
                             do q = vidxb, vidxe
                                 dvel_small = 0._wp
