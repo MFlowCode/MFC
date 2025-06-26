@@ -37,7 +37,7 @@ def __filter(cases_) -> typing.List[TestCase]:
             # Do not "continue" because "--to" might be the same as "--from"
         if bFoundFrom and case.get_uuid() == ARG("to"):
             cases    = cases[from_i:i+1]
-            skipped_cases += [case for case in cases_ if case not in cases]
+            skipped_cases = [case for case in cases_ if case not in cases]
             bFoundTo = True
             break
 
@@ -69,8 +69,9 @@ def __filter(cases_) -> typing.List[TestCase]:
 
 
     if ARG("no_examples"):
-        skipped_cases += [case for case in cases if "Example" in case.trace]
-        cases = [case for case in cases if not "Example" in case.trace]
+        example_cases = [case for case in cases if "Example" in case.trace]
+        skipped_cases += example_cases
+        cases = [case for case in cases if case not in example_cases]
 
     if ARG("percent") == 100:
         return cases, skipped_cases
