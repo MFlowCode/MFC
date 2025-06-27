@@ -153,30 +153,36 @@ contains
 
         if (.not. ib) return
 
-        write (file_loc, '(A)') trim(file_loc_base)//'/ib.dat'
+        if (parallel_io) then
+            write (file_loc, '(A)') trim(file_loc_base)//'ib.dat'
+        else
+            write (file_loc, '(A)') trim(file_loc_base)//'/ib.dat'
+        end if
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
         if (file_exist) then
+            if (parallel_io) then
 #ifdef MFC_MPI
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-            data_size = (m + 1)*(n + 1)*(p + 1)
-            disp = 0
+                data_size = (m + 1)*(n + 1)*(p + 1)
+                disp = 0
 
-            call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
-                                   'native', mpi_info_int, ierr)
-            call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
-                               MPI_INTEGER, status, ierr)
+                call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                       'native', mpi_info_int, ierr)
+                call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                   MPI_INTEGER, status, ierr)
 
-            call MPI_FILE_CLOSE(ifile, ierr)
-#else
-            open (2, FILE=trim(file_loc), &
-                  FORM='unformatted', &
-                  ACTION='read', &
-                  STATUS='old')
-            read (2) ib_markers%sf(0:m, 0:n, 0:p)
-            close (2)
+                call MPI_FILE_CLOSE(ifile, ierr)
 #endif
+            else
+                open (2, FILE=trim(file_loc), &
+                      FORM='unformatted', &
+                      ACTION='read', &
+                      STATUS='old')
+                read (2) ib_markers%sf(0:m, 0:n, 0:p)
+                close (2)
+            end if
         else
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
         end if
