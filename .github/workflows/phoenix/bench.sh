@@ -17,4 +17,6 @@ else
     ./mfc.sh bench --mem 1 -j $(nproc) -o "$job_slug.yaml" -- -c phoenix-bench $device_opts -n $n_ranks
 fi
 
+rm -rf $TMPDIR || true
+
 unset TMPDIR
