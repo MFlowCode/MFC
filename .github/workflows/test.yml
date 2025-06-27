@@ -35,7 +35,7 @@ jobs:
 
         include:
           - os:    ubuntu
-            mpi:   mpi
+            mpi:   no-mpi
             precision: single
             debug: no-debug
             intel: false
