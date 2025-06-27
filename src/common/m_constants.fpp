@@ -66,9 +66,10 @@ module m_constants
 
     ! Pseudo-random number generator
     integer, parameter :: modulus = 2**30 - 1
-    integer, parameter :: multiplier = 1103515245
-    integer, parameter :: increment = 12345
+    integer, parameter :: multiplier = 1664525
+    integer, parameter :: increment = 1013904223
     integer, parameter :: amplifier = 3**13
+    real(wp), parameter :: decimal_trim = 1.e5_wp
 
     ! System constants
     integer, parameter :: CASE_FILE_ERROR_CODE = 22

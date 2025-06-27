@@ -286,12 +286,12 @@ contains
 
     function modmul(a) result(val)
         integer, intent(in) :: a
-        integer :: xint, val
-        real(wp) :: x
+        integer :: val
+        real(wp) :: x, y
 
         x = (multiplier/real(modulus, wp))*a + (increment/real(modulus, wp))
-        xint = floor(x)
-        val = nint((x - xint)*modulus)
+        y = nint((x - floor(x))*decimal_trim)/decimal_trim
+        val = nint(y*modulus)
 
     end function modmul
 
