@@ -70,10 +70,14 @@ dai-all python cmake nvhpc-openmpi3/24.3 cuda
 dai-all CC=nvc CXX=nvc++ FC=nvfortran
 dai-gpu MFC_CUDA_CC=89,90
 
-c     DoD Carpenter
+c     DoD Carpenter (GNU)
 c-all python/3.12.1
 c-cpu compiler-rt/2024.2.0 ifort/2024.2.0 icc/2023.1.0 mpi/latest cmake/3.28.1-intel-2023.0.0
 c-cpu CC=gcc CXX=g++ FC=gfortran
+
+cc     DoD Carpenter (Cray)
+cc-all cray-python/3.11.7 craype-x86-rome 
+cc-cpu PrgEnv-cray/8.5.0 cray-fftw/3.3.10.8 cray-hdf5/1.14.3.1 cray-pals/1.4.0 cray-libpals/1.4.0
 
 n     DoD Nautilus
 n-all slurm
