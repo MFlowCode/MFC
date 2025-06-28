@@ -37,15 +37,15 @@ module m_ibm
     type(integer_field), public :: ib_markers
     type(levelset_field), public :: levelset
     type(levelset_norm_field), public :: levelset_norm
-    !$acc declare create(ib_markers, levelset, levelset_norm)
+    $:GPU_DECLARE(create='[ib_markers,levelset,levelset_norm]')
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
     type(ghost_point), dimension(:), allocatable :: inner_points
-    !$acc declare create(ghost_points, inner_points)
+    $:GPU_DECLARE(create='[ghost_points,inner_points]')
 
     integer :: num_gps !< Number of ghost points
     integer :: num_inner_gps !< Number of ghost points
-    !$acc declare create(gp_layers, num_gps, num_inner_gps)
+    $:GPU_DECLARE(create='[gp_layers,num_gps,num_inner_gps]')
 
 contains
 
@@ -72,7 +72,7 @@ contains
         @:ACC_SETUP_SFs(levelset)
         @:ACC_SETUP_SFs(levelset_norm)
 
-        !$acc enter data copyin(num_gps, num_inner_gps)
+        $:GPU_ENTER_DATA(copyin='[num_gps,num_inner_gps]')
 
     end subroutine s_initialize_ibm_module
 
@@ -82,31 +82,31 @@ contains
 
         integer :: i, j, k
 
-        !$acc update device(ib_markers%sf)
-        !$acc update device(levelset%sf)
-        !$acc update device(levelset_norm%sf)
+        $:GPU_UPDATE(device='[ib_markers%sf]')
+        $:GPU_UPDATE(device='[levelset%sf]')
+        $:GPU_UPDATE(device='[levelset_norm%sf]')
 
         ! Get neighboring IB variables from other processors
         call s_populate_ib_buffers()
 
-        !$acc update host(ib_markers%sf)
+        $:GPU_UPDATE(host='[ib_markers%sf]')
 
         call s_find_num_ghost_points(num_gps, num_inner_gps)
 
-        !$acc update device(num_gps, num_inner_gps)
+        $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
         @:ALLOCATE(ghost_points(1:num_gps))
         @:ALLOCATE(inner_points(1:num_inner_gps))
 
-        !$acc enter data copyin(ghost_points, inner_points)
+        $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
 
         call s_find_ghost_points(ghost_points, inner_points)
-        !$acc update device(ghost_points, inner_points)
+        $:GPU_UPDATE(device='[ghost_points, inner_points]')
 
         call s_compute_image_points(ghost_points, levelset, levelset_norm)
-        !$acc update device(ghost_points)
+        $:GPU_UPDATE(device='[ghost_points]')
 
         call s_compute_interpolation_coeffs(ghost_points)
-        !$acc update device(ghost_points)
+        $:GPU_UPDATE(device='[ghost_points]')
 
     end subroutine s_ibm_setup
 
@@ -166,7 +166,11 @@ contains
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
 
-        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, innerp, norm, buf, j, k, l, q)
+        $:GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, &
+            & alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, &
+            & v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, &
+            & gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, &
+            & j,k,l,q]')
         do i = 1, num_gps
 
             gp = ghost_points(i)
@@ -203,7 +207,7 @@ contains
             dyn_pres = 0._wp
 
             ! Set q_prim_vf params at GP so that mixture vars calculated properly
-            !$acc loop seq
+            $:GPU_LOOP(parallelism='[seq]')
             do q = 1, num_fluids
                 q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
                 q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
@@ -239,7 +243,7 @@ contains
             end if
 
             ! Set momentum
-            !$acc loop seq
+            $:GPU_LOOP(parallelism='[seq]')
             do q = momxb, momxe
                 q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - momxb + 1)
                 dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)* &
@@ -247,7 +251,7 @@ contains
             end do
 
             ! Set continuity and adv vars
-            !$acc loop seq
+            $:GPU_LOOP(parallelism='[seq]')
             do q = 1, num_fluids
                 q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
                 q_cons_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
@@ -301,7 +305,7 @@ contains
             end if
 
             if (model_eqns == 3) then
-                !$acc loop seq
+                $:GPU_LOOP(parallelism='[seq]')
                 do q = intxb, intxe
                     q_cons_vf(q)%sf(j, k, l) = alpha_IP(q - intxb + 1)*(gammas(q - intxb + 1)*pres_IP &
                                                                         + pi_infs(q - intxb + 1))
@@ -310,7 +314,9 @@ contains
         end do
 
         !Correct the state of the inner points in IBs
-        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, vel_g, rho, gamma, pi_inf, Re_K, innerp, j, k, l, q)
+        $:GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, &
+            & alpha_IP,vel_g,rho,gamma,pi_inf,Re_K,innerp, &
+            & j,k,l,q]')
         do i = 1, num_inner_gps
 
             innerp = inner_points(i)
@@ -318,7 +324,7 @@ contains
             k = innerp%loc(2)
             l = innerp%loc(3)
 
-            !$acc loop seq
+            $:GPU_LOOP(parallelism='[seq]')
             do q = momxb, momxe
                 q_cons_vf(q)%sf(j, k, l) = 0._wp
             end do
@@ -732,7 +738,7 @@ contains
     !> Function that uses the interpolation coefficients and the current state
     !! at the cell centers in order to estimate the state at the image point
     pure subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_prim_vf !< Primitive Variables
@@ -785,11 +791,11 @@ contains
             end if
         end if
 
-        !$acc loop seq
+        $:GPU_LOOP(parallelism='[seq]')
         do i = i1, i2
-            !$acc loop seq
+            $:GPU_LOOP(parallelism='[seq]')
             do j = j1, j2
-                !$acc loop seq
+                $:GPU_LOOP(parallelism='[seq]')
                 do k = k1, k2
 
                     coeff = gp%interp_coeffs(i - i1 + 1, j - j1 + 1, k - k1 + 1)
@@ -797,13 +803,13 @@ contains
                     pres_IP = pres_IP + coeff* &
                               q_prim_vf(E_idx)%sf(i, j, k)
 
-                    !$acc loop seq
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = momxb, momxe
                         vel_IP(q + 1 - momxb) = vel_IP(q + 1 - momxb) + coeff* &
                                                 q_prim_vf(q)%sf(i, j, k)
                     end do
 
-                    !$acc loop seq
+                    $:GPU_LOOP(parallelism='[seq]')
                     do l = contxb, contxe
                         alpha_rho_IP(l) = alpha_rho_IP(l) + coeff* &
                                           q_prim_vf(l)%sf(i, j, k)
@@ -816,7 +822,7 @@ contains
                     end if
 
                     if (bubbles_euler .and. .not. qbmm) then
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do l = 1, nb
                             if (polytropic) then
                                 r_IP(l) = r_IP(l) + coeff*q_prim_vf(bubxb + (l - 1)*2)%sf(i, j, k)

@@ -29,16 +29,16 @@ module m_surface_tension
     !> @{
     type(scalar_field), allocatable, dimension(:) :: c_divs
     !> @)
-    !$acc declare create(c_divs)
+    $:GPU_DECLARE(create='[c_divs]')
 
     !> @name cell boundary reconstructed gradient components and magnitude
     !> @{
     real(wp), allocatable, dimension(:, :, :, :) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !> @}
-    !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
+    $:GPU_DECLARE(create='[gL_x,gR_x,gL_y,gR_y,gL_z,gR_z]')
 
     type(int_bounds_info) :: is1, is2, is3, iv
-    !$acc declare create(is1, is2, is3, iv)
+    $:GPU_DECLARE(create='[is1,is2,is3,iv]')
 
 contains
 
@@ -85,8 +85,9 @@ contains
         integer :: j, k, l, i
 
         if (id == 1) then
-            !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, &
+                & w1R, w2R, w3R, w1, w2, w3, normWL, &
+                & normWR, normW]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -131,8 +132,9 @@ contains
 
         elseif (id == 2) then
 
-            !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, &
+                & w1R, w2R, w3R, w1, w2, w3, normWL, normWR, &
+                & normW]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -177,8 +179,9 @@ contains
 
         elseif (id == 3) then
 
-            !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, &
+                & w1R, w2R, w3R, w1, w2, w3, normWL, normWR, &
+                & normW]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -240,7 +243,7 @@ contains
         isx%end = m; isy%end = n; isz%end = p
 
         ! compute gradient components
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -250,7 +253,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -261,7 +264,7 @@ contains
         end do
 
         if (p > 0) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -272,7 +275,7 @@ contains
             end do
         end if
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -332,10 +335,10 @@ contains
 
         end if
 
-        !$acc update device(is1, is2, is3, iv)
+        $:GPU_UPDATE(device='[is1,is2,is3,iv]')
 
         if (recon_dir == 1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -346,9 +349,8 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
         else if (recon_dir == 2) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -359,9 +361,8 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
         else if (recon_dir == 3) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -372,7 +373,6 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
         end if
 
     end subroutine s_reconstruct_cell_boundary_values_capillary
