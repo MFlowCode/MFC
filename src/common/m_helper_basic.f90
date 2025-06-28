@@ -21,7 +21,7 @@ contains
     !> This procedure checks if two floating point numbers of wp are within tolerance.
     !! @param a First number.
     !! @param b Second number.
-    !! @param tol_input Relative error (default = 1.e-10_wp).
+    !! @param tol_input Relative error (default = 1.e-10_wp for double precision and 1e-6 for single).
     !! @return Result of the comparison.
     logical pure elemental function f_approx_equal(a, b, tol_input) result(res)
         !$acc routine seq
@@ -32,7 +32,11 @@ contains
         if (present(tol_input)) then
             tol = tol_input
         else
-            tol = 1.e-10_wp
+            if (wp == selected_real_kind(15, 307)) then
+                tol = 1.e-10_wp  ! Double Precision
+            else if (wp == selected_real_kind(6, 37)) then
+                tol = 1.e-6_wp   ! Single Precision
+            end if
         end if
 
         if (a == b) then
@@ -47,7 +51,7 @@ contains
     !> This procedure checks if the point numbers of wp belongs to another array are within tolerance.
     !! @param a First number.
     !! @param b Array that contains several point numbers.
-    !! @param tol_input Relative error (default = 1e-10_wp).
+    !! @param tol_input Relative error (default = 1.e-10_wp for double precision and 1e-6 for single).
     !! @return Result of the comparison.
     logical pure function f_approx_in_array(a, b, tol_input) result(res)
         !$acc routine seq
@@ -62,7 +66,11 @@ contains
         if (present(tol_input)) then
             tol = tol_input
         else
-            tol = 1e-10_wp
+            if (wp == selected_real_kind(15, 307)) then
+                tol = 1.e-10_wp  ! Double Precision
+            else if (wp == selected_real_kind(6, 37)) then
+                tol = 1.e-6_wp   ! Single Precision
+            end if
         end if
 
         do i = 1, size(b)

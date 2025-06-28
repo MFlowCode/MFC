@@ -55,19 +55,24 @@ contains
 
     subroutine nvtxStartRange(name, id)
         character(kind=c_char, len=*), intent(IN) :: name
-        integer, intent(IN), optional :: id
+        integer, intent(in), optional :: id
+        integer :: id_color
+#if defined(MFC_OpenACC) && defined(__PGI)
         type(nvtxEventAttributes) :: event
+#endif
+        if (present(id)) then
+            id_color = col(mod(id, 7) + 1)
+        end if
+        tempName = trim(name)//c_null_char
 
 #if defined(MFC_OpenACC) && defined(__PGI)
 
-        tempName = trim(name)//c_null_char
-
-        if (.not. present(id)) then
-            call nvtxRangePush(tempName)
-        else
-            event%color = col(mod(id, 7) + 1)
+        if (present(id)) then
+            event%color = id_color
             event%message = c_loc(tempName)
             call nvtxRangePushEx(event)
+        else
+            call nvtxRangePush(tempName)
         end if
 
 #endif

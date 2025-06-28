@@ -80,8 +80,6 @@ contains
     !! image points.
     impure subroutine s_ibm_setup()
 
-        integer :: i, j, k
-
         !$acc update device(ib_markers%sf)
         !$acc update device(levelset%sf)
         !$acc update device(levelset_norm%sf)

@@ -316,8 +316,9 @@ contains
     !> Checks constraints on the surface tension parameters.
         !! Called by s_check_inputs_common for all three stages
     impure subroutine s_check_inputs_surface_tension
-
+#ifdef MFC_PRE_PROCESS
         integer :: i
+#endif MFC_PRE_PROCESS
 
         @:PROHIBIT(surface_tension .and. sigma < 0._wp, &
             "sigma must be greater than or equal to zero")
