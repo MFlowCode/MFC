@@ -14,10 +14,10 @@ s-gpu nvhpc/22.11 cuda/nvhpc
 s-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 b     PSC Bridges2
-b-all python/3.8.6
+b-all python/3.8.6 hdf5 anaconda3
 b-cpu allocations/1.0 gcc/10.2.0 openmpi/4.0.5-gcc10.2.0
-b-gpu openmpi/4.0.5-nvhpc22.9 nvhpc/22.9 cuda
-b-gpu CC=nvc CXX=nvc++ FC=nvfortran
+b-gpu nvhpc/22.9 cuda/11.7 openmpi/4.0.5-nvhpc22.9
+b-gpu MFC_CUDA_CC=70,75,80 NVHPC_CUDA_HOME=$CUDA_HOME CC=nvc CXX=nvc++ FC=nvfortran
 
 a     OLCF Ascent
 a-all python cmake/3.22.2
