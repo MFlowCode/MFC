@@ -25,9 +25,9 @@ sbatch_gpu_opts="\
 #SBATCH -G2\
 "
 
-if [ "$2" == "cpu" ]; then
+if [ "$2" = "cpu" ]; then
     sbatch_device_opts="$sbatch_cpu_opts"
-elif [ "$2" == "gpu" ]; then
+elif [ "$2" = "gpu" ]; then
     sbatch_device_opts="$sbatch_gpu_opts"
 else
     usage

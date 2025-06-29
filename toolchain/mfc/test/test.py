@@ -37,6 +37,7 @@ def __filter(cases_) -> typing.List[TestCase]:
             # Do not "continue" because "--to" might be the same as "--from"
         if bFoundFrom and case.get_uuid() == ARG("to"):
             cases    = cases[from_i:i+1]
+            skipped_cases = [case for case in cases_ if case not in cases]
             bFoundTo = True
             break
 
@@ -51,6 +52,7 @@ def __filter(cases_) -> typing.List[TestCase]:
             checkCase.append(case.get_uuid())
             if not set(ARG("only")).issubset(set(checkCase)):
                 cases.remove(case)
+                skipped_cases.append(case)
 
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
@@ -63,10 +65,13 @@ def __filter(cases_) -> typing.List[TestCase]:
             ,'Axisymmetric', 'Transducer', 'Transducer Array', 'Cylindrical', 'HLLD', 'Example']
             if any(label in case.trace for label in skip):
                 cases.remove(case)
+                skipped_cases.append(case)
 
 
     if ARG("no_examples"):
-        cases = [case for case in cases if not "Example" in case.trace]
+        example_cases = [case for case in cases if "Example" in case.trace]
+        skipped_cases += example_cases
+        cases = [case for case in cases if case not in example_cases]
 
     if ARG("percent") == 100:
         return cases, skipped_cases
@@ -74,7 +79,7 @@ def __filter(cases_) -> typing.List[TestCase]:
     seed(time.time())
 
     selected_cases = sample(cases, k=int(len(cases)*ARG("percent")/100.0))
-    skipped_cases = [item for item in cases if item not in selected_cases]
+    skipped_cases += [item for item in cases if item not in selected_cases]
 
     return selected_cases, skipped_cases
 

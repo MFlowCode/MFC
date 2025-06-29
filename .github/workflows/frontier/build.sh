@@ -1,7 +1,7 @@
 #!/bin/bash
 
 build_opts=""
-if [ "$1" == "gpu" ]; then
+if [ "$1" = "gpu" ]; then
     build_opts="--gpu"
 fi
 

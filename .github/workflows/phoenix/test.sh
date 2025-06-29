@@ -1,7 +1,7 @@
 #!/bin/bash
 
 build_opts=""
-if [ "$job_device" == "gpu" ]; then
+if [ "$job_device" = "gpu" ]; then
     build_opts="--gpu"
 fi
 
@@ -9,7 +9,7 @@ fi
 
 n_test_threads=8
 
-if [ "$job_device" == "gpu" ]; then
+if [ "$job_device" = "gpu" ]; then
     gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
     gpu_ids=$(seq -s ' ' 0 $(($gpu_count-1))) # 0,1,2,...,gpu_count-1
     device_opts="-g $gpu_ids"
