@@ -33,9 +33,9 @@ contains
             tol = tol_input
         else
             if (wp == selected_real_kind(15, 307)) then
-                tol = 1.e-10_wp  ! Double
+                tol = 1.e-10_wp
             else if (wp == selected_real_kind(6, 37)) then
-                tol = 1.e-6_wp   ! Single
+                tol = 1.e-6_wp 
             end if
         end if
 
@@ -51,7 +51,7 @@ contains
     !> This procedure checks if the point numbers of wp belongs to another array are within tolerance.
     !! @param a First number.
     !! @param b Array that contains several point numbers.
-    !! @param tol_input Relative error (default = 1.e-10_wp for double precision and 1e-6 for single).
+    !! @param tol_input Relative error (default = 1.e-10_wp for double and 1e-6 for single).
     !! @return Result of the comparison.
     logical pure function f_approx_in_array(a, b, tol_input) result(res)
         !$acc routine seq
@@ -67,9 +67,9 @@ contains
             tol = tol_input
         else
             if (wp == selected_real_kind(15, 307)) then
-                tol = 1.e-10_wp  ! Double Precision
+                tol = 1.e-10_wp
             else if (wp == selected_real_kind(6, 37)) then
-                tol = 1.e-6_wp   ! Single Precision
+                tol = 1.e-6_wp
             end if
         end if
 
