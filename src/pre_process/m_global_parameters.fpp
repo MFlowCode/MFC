@@ -28,6 +28,9 @@ module m_global_parameters
     logical :: old_ic, non_axis_sym               !< Use existing IC data
     integer :: t_step_old, t_step_start           !< Existing IC/grid folder
 
+    character(LEN=path_len) :: interface_file
+    real(wp) :: normFac, normMag, g0, p0
+
     logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
     integer :: n_start, n_start_old
 
@@ -314,6 +317,11 @@ contains
         old_ic = .false.
         t_step_old = dflt_int
         t_step_start = dflt_int
+        interface_file = '.'
+        normFac = dflt_real
+        normMag = dflt_real
+        g0 = dflt_real
+        p0 = dflt_real
 
         cfl_adap_dt = .false.
         cfl_const_dt = .false.

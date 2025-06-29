@@ -1275,6 +1275,8 @@ contains
         real(wp), dimension(1:1, 1:lag_io_vars) :: dummy
         character(LEN=4*name_len), dimension(num_procs) :: meshnames
         integer, dimension(num_procs) :: meshtypes
+        real(wp) :: dummy_data
+
 
         integer :: i, j
 
@@ -1284,6 +1286,7 @@ contains
         real(wp), dimension(:), allocatable :: pressure, mv, mg, betaT, betaC
 
         dummy = 0._wp
+        dummy_data = 0._wp
 
         ! Construct file path
         write(file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
@@ -1437,97 +1440,212 @@ contains
                          DB_DOUBLE, DB_F77NULL, ierr)
 
             if (lag_id_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_id', bub_id, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_id', t_step, bub_id, nBub)
             end if
 
             if (lag_vel_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_vel1', vx, nBub, t_step)
-                call s_write_lag_variable_to_formatted_database_file('part_vel2', vy, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_vel1', t_step, vx, nBub)
+                call s_write_lag_variable_to_formatted_database_file('part_vel2', t_step, vy, nBub)
                 if (p > 0) then
-                    call s_write_lag_variable_to_formatted_database_file('part_vel3', vz, nBub, t_step)
+                    call s_write_lag_variable_to_formatted_database_file('part_vel3', t_step, vz, nBub)
                 end if
             end if
 
             if (lag_rad_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_radius', radius, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_radius', t_step, radius, nBub)
             end if
 
             if (lag_rvel_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rdot', rvel, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_rdot', t_step, rvel, nBub)
             end if
 
             if (lag_r0_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_r0', rnot, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_r0', t_step, rnot, nBub)
             end if
 
             if (lag_rmax_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rmax', rmax, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_rmax', t_step, rmax, nBub)
             end if
 
             if (lag_rmin_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rmin', rmin, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_rmin', t_step, rmin, nBub)
             end if
 
             if (lag_dphidt_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_dphidt', dphidt, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_dphidt', t_step, dphidt, nBub)
             end if
 
             if (lag_pres_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_pressure', pressure, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_pressure', t_step, pressure, nBub)
             end if
 
             if (lag_mv_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_mv', mv, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_mv', t_step, mv, nBub)
             end if
 
             if (lag_mg_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_mg', mg, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_mg', t_step, mg, nBub)
             end if
 
             if (lag_betaT_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_betaT', betaT, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step, betaT, nBub)
             end if
 
             if (lag_betaC_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_betaC', betaC, nBub, t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step, betaC, nBub)
             end if
 
             deallocate(bub_id, px, py, pz, ppx, ppy, ppz, vx, vy, vz, radius, &
                        rvel, rnot, rmax, rmin, dphidt, pressure, mv, mg,    &
                        betaT, betaC)
-        end if
+            deallocate (MPI_IO_DATA_lg_bubbles)
+        else
+            call MPI_TYPE_CONTIGUOUS(0, mpi_p, view, ierr)
+            call MPI_TYPE_COMMIT(view, ierr)
 
-        deallocate (MPI_IO_DATA_lg_bubbles)
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, &
+                               mpi_info_int, ifile, ierr)
+
+            ! Skip extended header
+            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) + &
+                      file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
+
+            call MPI_FILE_READ_ALL(ifile, dummy, 0, mpi_p, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+            call MPI_TYPE_FREE(view, ierr)
+
+            if (proc_rank == 0) then
+
+                do i = 1, num_procs
+                    write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                        '/', t_step, '.silo:lag_bubbles'
+                    meshtypes(i) = DB_POINTMESH
+                end do
+                err = DBSET2DSTRLEN(len(meshnames(1)))
+                err = DBPUTMMESH(dbroot, 'lag_bubbles', 16, &
+                                 num_procs, meshnames, &
+                                 len_trim(meshnames), &
+                                 meshtypes, DB_F77NULL, ierr)
+            end if
+
+            err = DBSETEMPTYOK(1)
+            err = DBPUTPM(dbfile, 'lag_bubbles', 11, 3, &
+                         dummy_data, dummy_data, dummy_data, 0, &
+                         DB_DOUBLE, DB_F77NULL, ierr)
+
+            if (lag_id_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_id', t_step)
+            end if
+
+            if (lag_vel_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_vel1', t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_vel2', t_step)
+                if (p > 0) then
+                    call s_write_lag_variable_to_formatted_database_file('part_vel3', t_step)
+                end if
+            end if
+
+            if (lag_rad_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_radius', t_step)
+            end if
+
+            if (lag_rvel_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_rdot', t_step)
+            end if
+
+            if (lag_r0_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_r0', t_step)
+            end if
+
+            if (lag_rmax_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_rmax', t_step)
+            end if
+
+            if (lag_rmin_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_rmin', t_step)
+            end if
+
+            if (lag_dphidt_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_dphidt', t_step)
+            end if
+
+            if (lag_pres_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_pressure', t_step)
+            end if
+
+            if (lag_mv_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_mv', t_step)
+            end if
+
+            if (lag_mg_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_mg', t_step)
+            end if
+
+            if (lag_betaT_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step)
+            end if
+
+            if (lag_betaC_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step)
+            end if
+
+        end if
 
 #endif
 
     end subroutine s_write_lag_bubbles_to_formatted_database_file
 
-    subroutine s_write_lag_variable_to_formatted_database_file(varname, data, nBubs, t_step)
+    subroutine s_write_lag_variable_to_formatted_database_file(varname, t_step, data, nBubs)
 
         character(len=*), intent(in) :: varname
-        real(wp), dimension(1:nBubs), intent(in) :: data
-        integer, intent(in) :: nBubs, t_step
+        integer, intent(in) :: t_step
+        real(wp), dimension(1:nBubs), intent(in), optional :: data
+        integer, intent(in), optional :: nBubs
 
         character(len=64), dimension(num_procs) :: var_names
         integer, dimension(num_procs) :: var_types
+        real(wp) :: dummy_data
         integer :: i
 
-        if (proc_rank == 0) then
-            do i = 1, num_procs
-                write (var_names(i), '(A,I0,A,I0,A)') '../p', i - 1, &
-                    '/', t_step, '.silo:'//trim(varname)
-                var_types(i) = DB_POINTVAR
-            end do
-            err = DBSET2DSTRLEN(len(var_names(1)))
-            err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), &
-                        num_procs, var_names, &
-                        len_trim(var_names), &
-                        var_types, DB_F77NULL, ierr)
-        end if
+        dummy_data = 0._wp
 
-        err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), &
-                    'lag_bubbles', 11, data, nBubs, DB_DOUBLE, DB_F77NULL, ierr)
+        if (present(nBubs) .and. present(data)) then
+            if (proc_rank == 0) then
+                do i = 1, num_procs
+                    write (var_names(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                        '/', t_step, '.silo:'//trim(varname)
+                    var_types(i) = DB_POINTVAR
+                end do
+                err = DBSET2DSTRLEN(len(var_names(1)))
+                err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), &
+                            num_procs, var_names, &
+                            len_trim(var_names), &
+                            var_types, DB_F77NULL, ierr)
+            end if
+
+            err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), &
+                        'lag_bubbles', 11, data, nBubs, DB_DOUBLE, DB_F77NULL, ierr)
+        else
+            if (proc_rank == 0) then
+                do i = 1, num_procs
+                    write (var_names(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                        '/', t_step, '.silo:'//trim(varname)
+                    var_types(i) = DB_POINTVAR
+                end do
+                err = DBSET2DSTRLEN(len(var_names(1)))
+                err = DBSETEMPTYOK(1)
+                err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), &
+                            num_procs, var_names, &
+                            len_trim(var_names), &
+                            var_types, DB_F77NULL, ierr)
+            end if
+
+            err = DBSETEMPTYOK(1)
+            err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), &
+                        'lag_bubbles', 11, dummy_data, 0, DB_DOUBLE, DB_F77NULL, ierr)
+        end if
 
     end subroutine s_write_lag_variable_to_formatted_database_file
 

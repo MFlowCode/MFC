@@ -5,7 +5,38 @@
 
     real(wp) :: eps
 
+    real(wp) :: pres
+    real(wp), dimension(0:m_glb, 0:p_glb) :: ih
+    integer :: i, j, pos, start, end
+    character(len=10000) :: line
+    character(len=25) :: value
+
+    if (interface_file /= '.') then
+        open(unit=10, file=trim(interface_file), status="old", action="read")
+        do i = 0, m_glb
+            read(10, '(A)') line  ! Read a full line as a string
+            start = 1
+
+            do j = 0, p_glb
+                end = index(line(start:), ',')  ! Find the next comma
+                if (end == 0) then
+                    value = trim(adjustl(line(start:)))  ! Last value in the line
+                else
+                    value = trim(adjustl(line(start:start+end-2)))  ! Extract substring
+                    start = start + end  ! Move to next value
+                end if
+                read(value, *) ih(i, j)  ! Convert string to numeric value
+                if (.not. f_is_default(normMag)) ih(i,j )= ih(i,j) * normMag
+                if (.not. f_is_default(normFac)) ih(i,j) = ih(i,j) / normFac
+            end do
+        end do
+        close(10)
+
+        print*, "Interface file "//trim(interface_file)//" read"
+    end if
+
     eps = 1e-9_wp
+
 #:enddef
 
 #:def Hardcoded3D()
@@ -55,6 +86,23 @@
             q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
+
+    case (302) ! (3D Perlin Noise Interface)
+
+        alph = 0.5_wp * (1 + (1._wp - 2._wp * eps) * &
+                    tanh((ih(start_idx(1) + i,start_idx(3) + k)  - y_cc(j))*100._wp))
+
+        q_prim_vf(advxb)%sf(i,j,k) = alph
+        q_prim_vf(advxe)%sf(i,j,k) = 1._wp - alph
+
+        q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k) * 1._wp
+        q_prim_vf(contxe)%sf(i,j,k) = q_prim_vf(advxe)%sf(i,j,k) * (1._wp / 950._wp)
+
+        q_prim_vf(E_idx)%sf(i,j,k) = p0 + &
+            (q_prim_vf(contxb)%sf(i,j,k) + q_prim_vf(contxe)%sf(i,j,k)) * g0 * &
+            (ih(start_idx(1) + i, start_idx(3) + k) - y_cc(j))
+
+        if (surface_tension) q_prim_vf(c_idx)%sf(i,j,k) = alph
 
         ! Put your variable assignments here
     case default

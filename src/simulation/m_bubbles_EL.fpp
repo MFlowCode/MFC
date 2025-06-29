@@ -1097,8 +1097,9 @@ contains
     !>  This subroutine updates the Lagrange variables using the tvd RK time steppers.
         !!      The time derivative of the bubble variables must be stored at every stage to avoid precision errors.
         !! @param stage Current tvd RK stage
-    impure subroutine s_update_lagrange_tdv_rk(stage)
+    impure subroutine s_update_lagrange_tdv_rk(q_cons_vf, stage)
 
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer, intent(in) :: stage
 
         integer :: k
@@ -1116,7 +1117,7 @@ contains
                 gas_mv(k, 1) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
             end do
 
-            if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=1)
+            if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest=1)
 
             call s_transfer_data_to_tmp()
             call s_write_void_evol(mytime)
@@ -1141,7 +1142,7 @@ contains
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
 
-                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=2)
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest=2)
 
             elseif (stage == 2) then
                 !$acc parallel loop gang vector default(present) private(k)
@@ -1156,7 +1157,7 @@ contains
                     gas_mv(k, 1) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2._wp
                 end do
 
-                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=1)
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest=1)
 
                 call s_transfer_data_to_tmp()
                 call s_write_void_evol(mytime)
@@ -1182,7 +1183,7 @@ contains
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
 
-                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=2)
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest=2)
 
             elseif (stage == 2) then
                 !$acc parallel loop gang vector default(present) private(k)
@@ -1197,7 +1198,7 @@ contains
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4._wp
                 end do
 
-                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=2)
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest=2)
 
             elseif (stage == 3) then
                 !$acc parallel loop gang vector default(present) private(k)
@@ -1212,7 +1213,8 @@ contains
                     gas_mv(k, 1) = gas_mv(k, 1) + (2._wp/3._wp)*dt*(gas_dmvdt(k, 1)/4._wp + gas_dmvdt(k, 2)/4._wp + gas_dmvdt(k, 3))
                 end do
 
-                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(dest=1)
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest=1)
+
 
                 call s_transfer_data_to_tmp()
                 call s_write_void_evol(mytime)
@@ -1230,16 +1232,20 @@ contains
 
     !> This subroutine enforces reflective and wall boundary conditions for EL bubbles
         !! @param dest Destination for the bubble position update
-    impure subroutine s_enforce_EL_bubbles_boundary_conditions(dest)
+    impure subroutine s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest)
 
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer, intent(in) :: dest
         integer :: k, i, patch_id, offset
         integer, dimension(3) :: cell
+        real(wp), dimension(3) :: scoord
 
         !$acc parallel loop gang vector default(present) private(cell)
         do k = 1, nBubs
             keep_bubble(k) = 1
 
+            ! Relocate bubbles at solid boundaries and delete bubbles that leave
+            ! buffer regions
             if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                 .and. mtn_pos(k,1,dest) < x_cb(-1) + intfc_rad(k,dest)) then
                 mtn_pos(k, 1, dest) = x_cb(-1) + intfc_rad(k,dest)
@@ -1278,20 +1284,31 @@ contains
                 end if
             end if
 
-            if (ib) then
-                cell = fd_number - buff_size
-                call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
+            if (keep_bubble(k) == 1) then
+                ! Remove bubbles that are no longer in a liquid
+                !cell = fd_number - buff_size
+                !call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
 
-                if (ib_markers%sf(cell(1), cell(2), cell(3)) /= 0) then
-                    patch_id = ib_markers%sf(cell(1), cell(2), cell(3))
+                !if (q_cons_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
+                    !keep_bubble(k) = 0
+                !end if
 
-                    do i = 1, num_dims
-                        mtn_pos(k, i, dest) = mtn_pos(k, i, dest) - &
-                                              levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
-                                              * levelset%sf(cell(1), cell(2), cell(3), patch_id)
-                    end do
+                ! Move bubbles back to surface of IB
+                if (ib) then
                     cell = fd_number - buff_size
                     call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
+
+                    if (ib_markers%sf(cell(1), cell(2), cell(3)) /= 0) then
+                        patch_id = ib_markers%sf(cell(1), cell(2), cell(3))
+
+                        do i = 1, num_dims
+                            mtn_pos(k, i, dest) = mtn_pos(k, i, dest) - &
+                                                  levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
+                                                  * levelset%sf(cell(1), cell(2), cell(3), patch_id)
+                        end do
+                        cell = fd_number - buff_size
+                        call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
+                    end if
                 end if
             end if
         end do

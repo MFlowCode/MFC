@@ -446,7 +446,7 @@ contains
         schlieren_wrt = .false.
         sim_data = .false.
         cf_wrt = .false.
-        lag_txt_wrt = .true.
+        lag_txt_wrt = .false.
         lag_header = .true.
         lag_db_wrt = .false.
         lag_id_wrt = .true.

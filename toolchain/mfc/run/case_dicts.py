@@ -102,6 +102,11 @@ PRE_PROCESS.update({
     'bubbles_lagrange': ParamType.LOG,
     'lag_params%vel_model': ParamType.INT,
     'fd_order': ParamType.INT,
+    'normFac': ParamType.REAL,
+    'interface_file': ParamType.STR,
+    'normMag': ParamType.REAL,
+    'g0': ParamType.REAL,
+    'p0': ParamType.REAL,
 })
 
 for ib_id in range(1, 10+1):
