@@ -1028,9 +1028,9 @@ contains
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
+#ifdef MFC_SIMULATION
         integer :: j, i
 
-#ifdef MFC_SIMULATION
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
                 do i = 1, sys_size
@@ -1520,7 +1520,7 @@ contains
 
         character(LEN=*), intent(in) :: step_dirpath
 
-        integer :: dir, loc, i
+        integer :: dir, loc
         character(len=path_len) :: file_path
 
         character(len=10) :: status
@@ -1561,12 +1561,10 @@ contains
         integer :: dir, loc
         character(len=path_len) :: file_loc, file_path
 
-        character(len=10) :: status
-
 #ifdef MFC_MPI
         integer :: ierr
         integer :: file_id
-        integer :: offset
+        integer(KIND=MPI_ADDRESS_KIND) :: offset
         character(len=7) :: proc_rank_str
         logical :: dir_check
 
@@ -1625,8 +1623,6 @@ contains
         logical :: file_exist
         character(len=path_len) :: file_path
 
-        character(len=10) :: status
-
         ! Read bc_types
         file_path = trim(step_dirpath)//'/bc_type.dat'
         inquire (FILE=trim(file_path), EXIST=file_exist)
@@ -1668,12 +1664,10 @@ contains
         integer :: dir, loc
         character(len=path_len) :: file_loc, file_path
 
-        character(len=10) :: status
-
 #ifdef MFC_MPI
         integer :: ierr
         integer :: file_id
-        integer :: offset
+        integer(KIND=MPI_ADDRESS_KIND) :: offset
         character(len=7) :: proc_rank_str
         logical :: dir_check
 
@@ -1696,7 +1690,7 @@ contains
         file_path = trim(file_loc)//'/bc_'//trim(proc_rank_str)//'.dat'
         call MPI_File_open(MPI_COMM_SELF, trim(file_path), MPI_MODE_RDONLY, MPI_INFO_NULL, file_id, ierr)
 
-        offset = 0
+        offset = int(0, KIND=MPI_ADDRESS_KIND)
 
         ! Read bc_types
         do dir = 1, num_dims
@@ -1788,9 +1782,9 @@ contains
         !!          boundary locations and cell-width distributions, based on
         !!          the boundary conditions.
     subroutine s_populate_grid_variables_buffers
-
+#ifndef MFC_PRE_PROCESS
         integer :: i !< Generic loop iterator
-
+#endif
 #ifdef MFC_SIMULATION
         ! Required for compatibility between codes
         type(int_bounds_info) :: offset_x, offset_y, offset_z

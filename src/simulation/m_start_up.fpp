@@ -1223,7 +1223,7 @@ contains
         call nvtxEndRange
         call cpu_time(finish)
         if (cfl_dt) then
-            nt = mytime/t_save
+            nt = int(mytime/t_save)
         else
             nt = int((t_step - t_step_start)/(t_step_save))
         end if
@@ -1336,8 +1336,9 @@ contains
     end subroutine s_initialize_modules
 
     impure subroutine s_initialize_mpi_domain
-        integer :: ierr
 #ifdef MFC_OpenACC
+        integer :: ierr
+
         real(wp) :: starttime, endtime
         integer :: num_devices, local_size, num_nodes, ppn, my_device_num
         integer :: dev, devNum, local_rank
