@@ -20,6 +20,8 @@
 
 - <a id="Gottlieb98">Gottlieb, S. and Shu, C.-W. (1998). Total variation diminishing runge-kutta schemes. Mathematics of computation of the American Mathematical Society, 67(221):73–85.</a>
 
+- <a id="Guo23">Guo, H., Jiang, P., Ye, L., & Zhu, Y. (2023). An efficient and low-divergence method for generating inhomogeneous and anisotropic turbulence with arbitrary spectra. Journal of Fluid Mechanics, 970, A2.</a>
+
 - <a id="Henrick05">Henrick, A. K., Aslam, T. D., and Powers, J. M. (2005). Mapped weighted essentially nonoscillatory schemes: achieving optimal order near critical points. Journal of Computational Physics, 207(2):542–567.</a>
 
 - <a id="Borges08">Borges, R., Carmona, M., Costa, B., and Don, W. S. (2008). An improved weighted essentially non-oscillatory scheme for hyperbolic conservation laws. Journal of computational physics, 227(6):3191–3211.</a>
@@ -33,6 +35,8 @@
 - <a id="Maeda18">Maeda, K. and Colonius, T. (2018). Eulerian–lagrangian method for simulation of cloud cavitation. Journal of computational physics, 371:994–1017.</a>
 
 - <a id="Meng16">Meng, J. C. C. (2016). Numerical simulations of droplet aerobreakup. PhD thesis, California Institute of Technology.</a>
+
+- <a id="Michalke64"> Michalke, A. (1964). On the inviscid instability of the hyperbolictangent velocity profile. Journal of Fluid Mechanics, 19(4), 543-556.</a>
 
 - <a id="Pirozzoli13">Pirozzoli, S., and Colonius, T. (2013). Generalized characteristic relaxation boundary conditions for unsteady compressible flow simulations. Journal of Computational Physics, 248:109-126.</a>
 

@@ -188,11 +188,7 @@ contains
             "mixlayer_vel_profile requires n > 0")
 
         ! Instability wave
-        @:PROHIBIT(mixlayer_perturb .and. n == 0, "mixlayer_perturb requires n > 0")
-        @:PROHIBIT(mixlayer_perturb .and. model_eqns /= 2, "mixlayer_perturb requires model_eqns = 2")
-        @:PROHIBIT(mixlayer_perturb .and. num_fluids > 1, "mixlayer_perturb requires num_fluids = 1")
-        @:PROHIBIT(mixlayer_perturb .and. any((/bc_y%beg, bc_y%end/) /= BC_CHAR_NR_SUB_BUFFER), &
-            "mixlayer_perturb requires both bc_y%beg and bc_y%end to be 6")
+        @:PROHIBIT(mixlayer_perturb .and. p == 0, "mixlayer_perturb requires p > 0")
         @:PROHIBIT(elliptic_smoothing .and. elliptic_smoothing_iters < 1, &
             "elliptic_smoothing_iters must be positive")
 
