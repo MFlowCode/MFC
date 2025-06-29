@@ -98,7 +98,7 @@ contains
 
 #ifdef MFC_POST_PROCESS
         if (allocated(fd_coeff_s)) deallocate (fd_coeff_s)
-        allocate (fd_coeff_s(-fd_number_in:fd_number_in, lb:lE))
+        allocate (fd_coeff_s(-fd_number:fd_number, lb:lE))
 #endif
 
         ! Computing the 1st order finite-difference coefficients
