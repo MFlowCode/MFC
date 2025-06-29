@@ -35,7 +35,7 @@ contains
             if (wp == selected_real_kind(15, 307)) then
                 tol = 1.e-10_wp
             else if (wp == selected_real_kind(6, 37)) then
-                tol = 1.e-6_wp 
+                tol = 1.e-6_wp
             end if
         end if
 
