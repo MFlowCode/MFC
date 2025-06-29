@@ -3279,7 +3279,6 @@ contains
             target, intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                                      dqL_prim_dy_vf, dqR_prim_dy_vf, &
                                      dqL_prim_dz_vf, dqR_prim_dz_vf, &
-                                     qL_prim_vf, qR_prim_vf
         type(scalar_field), &
             dimension(:), &
             pointer :: dqL_prim_d_vf, dqR_prim_d_vf
