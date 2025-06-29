@@ -161,20 +161,20 @@ contains
                                 flux_gsrc_vf, &
                                 norm_dir, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
 
-        type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
+        type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
-            intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+            intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
         integer, intent(IN) :: norm_dir
 
@@ -225,7 +225,7 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_src_vf
+            intent(inout) :: flux_src_vf
 
         integer, intent(IN) :: norm_dir
 
@@ -3278,7 +3278,7 @@ contains
             allocatable, dimension(:), &
             target, intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                                      dqL_prim_dy_vf, dqR_prim_dy_vf, &
-                                     dqL_prim_dz_vf, dqR_prim_dz_vf, &
+                                     dqL_prim_dz_vf, dqR_prim_dz_vf
 
         type(scalar_field), allocatable, dimension(:), pointer:: dqL_prim_d_vf, dqR_prim_d_vf
 
