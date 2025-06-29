@@ -687,8 +687,6 @@ contains
                                                       tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
                                                       s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
 
-                            s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
-
                             xi_M = (5.e-1_wp + sign(5.e-1_wp, s_L)) &
                                    + (5.e-1_wp - sign(5.e-1_wp, s_L)) &
                                    *(5.e-1_wp + sign(5.e-1_wp, s_R))
@@ -1445,10 +1443,6 @@ contains
                                                           tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
                                                           s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
 
-                                ! follows Einfeldt et al.
-                                ! s_M/P = min/max(0.,s_L/R)
-                                s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
-
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
                                 xi_L = (s_L - vel_L(idx1))/(s_L - s_S)
@@ -1717,10 +1711,6 @@ contains
                                                           c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
                                                           tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
                                                           s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
-
-                                ! follows Einfeldt et al.
-                                ! s_M/P = min/max(0.,s_L/R)
-                                s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
@@ -2119,10 +2109,6 @@ contains
                                                           c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
                                                           tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
                                                           s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
-
-                                ! follows Einfeldt et al.
-                                ! s_M/P = min/max(0.,s_L/R)
-                                s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
@@ -2561,10 +2547,6 @@ contains
                                                           c_L, c_R, c_avg, c_fast%L, c_fast%R, G_L, G_R, &
                                                           tau_e_L, tau_e_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
                                                           s_L, s_R, s_S, s_M, s_P, dir_idx(1), dir_idx_tau(1))
-
-                                ! follows Einfeldt et al.
-                                ! s_M/P = min/max(0.,s_L/R)
-                                s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
@@ -3280,7 +3262,7 @@ contains
                                      dqL_prim_dy_vf, dqR_prim_dy_vf, &
                                      dqL_prim_dz_vf, dqR_prim_dz_vf
 
-        type(scalar_field), dimension(:), pointer:: dqL_prim_d_vf, dqR_prim_d_vf
+        type(scalar_field), dimension(:), pointer :: dqL_prim_d_vf, dqR_prim_d_vf
 
         integer :: end_val, bc_beg, bc_end
 
