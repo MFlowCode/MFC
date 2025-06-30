@@ -3163,7 +3163,7 @@ contains
                             F_L(3:4) = U_L(2)*vel%L(2:3) - B%L(1)*B%L(2:3)
                             F_L(5:6) = vel%L(1)*B%L(2:3) - vel%L(2:3)*B%L(1)
                             F_L(7) = (E%L + pTot_L)*vel%L(1) - B%L(1)*(vel%L(1)*B%L(1) + vel%L(2)*B%L(2) + vel%L(3)*B%L(3))
-                            
+
                             F_R(1) = U_R(2)
                             F_R(2) = U_R(2)*vel%R(1) - B%R(1)*B%R(1) + pTot_R
                             F_R(3:4) = U_R(2)*vel%R(2:3) - B%R(1)*B%R(2:3)
