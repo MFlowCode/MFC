@@ -1050,8 +1050,8 @@ contains
             !! Remaining number of cells, in a particular coordinate direction,
             !! after the majority is divided up among the available processors
 
-        integer :: recon_order !< 
-            !! WENO or MUSCL reconstruction order        
+        integer :: recon_order !<
+            !! WENO or MUSCL reconstruction order
 
         integer :: i, j !< Generic loop iterators
 

@@ -1671,7 +1671,7 @@ contains
                     is1%end = is1%end - ${SCHEME}$_polyn
 
                 end if
-!$acc update device(is1, is2, is3, iv)
+
                 if (n > 0) then
                     if (p > 0) then
 
@@ -1728,7 +1728,7 @@ contains
 
                 end if
 
-!$acc update device(is1, is2, is3, iv)
+                !$acc update device(is1, is2, is3, iv)
 
                 if (recon_dir == 1) then
                     !$acc parallel loop collapse(4) default(present)

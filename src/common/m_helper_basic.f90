@@ -125,7 +125,7 @@ contains
                 buff_size = weno_polyn + 2
             end if
         elseif (recon_type == MUSCL_TYPE) then
-            buff_size = muscl_polyn + 2 
+            buff_size = muscl_polyn + 2
         end if
 
         ! Correction for smearing function in the lagrangian subgrid bubble model
