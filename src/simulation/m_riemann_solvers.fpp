@@ -3193,7 +3193,7 @@ contains
                             E_double = 0.5_wp*(E_doubleL + E_doubleR)
 
                             U_doubleL = [rhoL_star, rhoL_star*s_M, rhoL_star*v_double, rhoL_star*w_double, By_double, Bz_double, E_double]
-                            U_doubleR = [rhoR_star, rhoR_star*s_M, rhoR_star*w_double, rhoR_star*w_double, By_double, Bz_double, E_double]
+                            U_doubleR = [rhoR_star, rhoR_star*s_M, rhoR_star*v_double, rhoR_star*w_double, By_double, Bz_double, E_double]
 
                             ! (11) Choose HLLD flux based on wave-speed regions
                             if (0.0_wp <= s_L) then
