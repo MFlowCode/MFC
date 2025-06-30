@@ -3170,8 +3170,8 @@ contains
                             F_R(5:6) = vel%R(1)*B%R(2:3) - vel%R(2:3)*B%R(1)
                             F_R(7) = (E%R + pTot_R)*vel%R(1) - B%R(1)*(vel%R(1)*B%R(1) + vel%R(2)*B%R(2) + vel%R(3)*B%R(3))
                             ! Compute the star flux using HLL relation
-                            F_starL = F_L + s_M*(U_starL - U_L)
-                            F_starR = F_R + s_M*(U_starR - U_R)
+                            F_starL = F_L + s_L*(U_starL - U_L)
+                            F_starR = F_R + s_R*(U_starR - U_R)
                             ! Compute the rotational (Alfvén) speeds
                             s_starL = s_M - abs(B%L(1))/sqrt(rhoL_star)
                             s_starR = s_M + abs(B%L(1))/sqrt(rhoR_star)
