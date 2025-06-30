@@ -834,8 +834,7 @@ contains
                     weno_num_stencils = weno_polyn
                 end if
             elseif (recon_type == MUSCL_TYPE) then
-                muscl_polyn = muscl_order - 1
-                print *, "muscl polyn", muscl_polyn
+                muscl_polyn = muscl_order
             end if
             $:GPU_UPDATE(device='[weno_polyn, muscl_polyn]')
             $:GPU_UPDATE(device='[weno_num_stencils]')

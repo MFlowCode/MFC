@@ -52,7 +52,7 @@ contains
         is2_muscl%end = n - is2_muscl%beg
 
         if (p == 0) then
-          is3_muscl%beg = 0
+            is3_muscl%beg = 0
         else
             is3_muscl%beg = -buff_size
         end if
@@ -103,9 +103,8 @@ contains
         integer, intent(in) :: muscl_dir
         type(int_bounds_info), intent(in) :: is1_muscl_d, is2_muscl_d, is3_muscl_d
 
-        integer :: j, k, l, i, q
-        real(wp) :: slopeL, slopeR, slope, test
-        real(wp) :: sum
+        integer :: j, k, l, i
+        real(wp) :: slopeL, slopeR, slope
         is1_muscl = is1_muscl_d
         is2_muscl = is2_muscl_d
         is3_muscl = is3_muscl_d
@@ -159,13 +158,12 @@ contains
             ! MUSCL Reconstruction
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (muscl_dir == ${MUSCL_DIR}$) then
-                    !$acc parallel loop gang collapse(4)  default(present) private(slopeL, slopeR, slope, sum, test)
+                    !$acc parallel loop gang collapse(4)  default(present) private(slopeL, slopeR, slope)
                     do l = is3_muscl%beg, is3_muscl%end
                         do k = is2_muscl%beg, is2_muscl%end
-                            do j = is1_muscl%beg, is1_muscl%end 
+                            do j = is1_muscl%beg, is1_muscl%end
                                 do i = 1, v_size
 
-                                   test = v_rs_ws_${XYZ}$ (j, k, l, i) 
                                     slopeL = v_rs_ws_${XYZ}$ (j + 1, k, l, i) - &
                                              v_rs_ws_${XYZ}$ (j, k, l, i)
                                     slopeR = v_rs_ws_${XYZ}$ (j, k, l, i) - &
@@ -188,9 +186,7 @@ contains
                                             slope = ((slopeL + slopeR)*slopeL*slopeR)/(slopeL**2._wp + slopeR**2._wp)
                                         end if
                                     elseif (muscl_lim == 4) then ! Van Leer
-                                        sum = slopeL + slopeR
-                                        if (sum < 0._wp) sum = -sum
-                                        if (sum > 1.e-6_wp .and. slopeL*slopeR > 1.e-6_wp) then
+                                        if (abs(slopeL + slopeR) > 1.e-6_wp .and. slopeL*slopeR > 1.e-6_wp) then
                                             slope = 2._wp*slopeL*slopeR/(slopeL + slopeR)
                                         end if
                                     elseif (muscl_lim == 5) then ! SUPERBEE
@@ -200,17 +196,17 @@ contains
                                     end if
                                     ! reconstruct from left side
                                     vL_rs_vf_${XYZ}$ (j, k, l, i) = &
-                                        test - (5.e-1_wp*slope)
+                                        v_rs_ws_${XYZ}$ (j, k, l, i) - (5.e-1_wp*slope)
 
                                     ! reconstruct from the right side
                                     vR_rs_vf_${XYZ}$ (j, k, l, i) = &
-                                        test + (5.e-1_wp*slope)
+                                        v_rs_ws_${XYZ}$ (j, k, l, i) + (5.e-1_wp*slope)
 
                                 end do
                             end do
                         end do
                     end do
-                !$acc end parallel loop
+                    !$acc end parallel loop
                 end if
             #:endfor
         end if
@@ -234,16 +230,14 @@ contains
         integer, intent(in) :: muscl_dir
         type(int_bounds_info), intent(in) :: is1_muscl_d, is2_muscl_d, is3_muscl_d
 
-        integer :: j, k, l, i, q
+        integer :: j, k, l
 
         real(wp) :: aCL, aCR, aC, aTHINC, qmin, qmax, A, B, C, sign, moncon
-
 
         #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
 
-                !$acc parallel loop collapse(3) gang vector default(present) private(aCL, aC, &
-                !$acc aCR, aTHINC, moncon, sign, qmin, qmax)
+                !$acc parallel loop collapse(3) gang vector default(present) private(aCL, aC, aCR, aTHINC, moncon, sign, qmin, qmax)
                 do l = is3_muscl%beg, is3_muscl%end
                     do k = is2_muscl%beg, is2_muscl%end
                         do j = is1_muscl%beg, is1_muscl%end
@@ -306,7 +300,7 @@ contains
         type(scalar_field), dimension(:), intent(in) :: v_vf
         integer, intent(in) :: muscl_dir
 
-        integer :: i, j, k, l, q !< Generic loop iterators
+        integer :: j, k, l, q !< Generic loop iterators
 
         ! Determining the number of cell-average variables which will be
         ! muscl-reconstructed and mapping their indical bounds in the x-,
@@ -334,33 +328,33 @@ contains
         if (n == 0) return
 
         if (muscl_dir == 2) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do j = 1, v_size
-                    do q = is3_muscl%beg, is3_muscl%end
-                        do l = is2_muscl%beg, is2_muscl%end
-                            do k = is1_muscl%beg - muscl_polyn, is1_muscl%end + muscl_polyn
-                                v_rs_ws_y(k, l, q, j) = v_vf(j)%sf(l, k, q)
-                            end do
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do j = 1, v_size
+                do q = is3_muscl%beg, is3_muscl%end
+                    do l = is2_muscl%beg, is2_muscl%end
+                        do k = is1_muscl%beg - muscl_polyn, is1_muscl%end + muscl_polyn
+                            v_rs_ws_y(k, l, q, j) = v_vf(j)%sf(l, k, q)
                         end do
                     end do
                 end do
-!$acc end parallel loop
+            end do
+            !$acc end parallel loop
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in z-direction
         if (p == 0) return
         if (muscl_dir == 3) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do j = 1, v_size
-                    do q = is3_muscl%beg, is3_muscl%end
-                        do l = is2_muscl%beg, is2_muscl%end
-                            do k = is1_muscl%beg - muscl_polyn, is1_muscl%end + muscl_polyn
-                                v_rs_ws_z(k, l, q, j) = v_vf(j)%sf(q, l, k)
-                            end do
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do j = 1, v_size
+                do q = is3_muscl%beg, is3_muscl%end
+                    do l = is2_muscl%beg, is2_muscl%end
+                        do k = is1_muscl%beg - muscl_polyn, is1_muscl%end + muscl_polyn
+                            v_rs_ws_z(k, l, q, j) = v_vf(j)%sf(q, l, k)
                         end do
                     end do
                 end do
-!$acc end parallel loop
+            end do
+            !$acc end parallel loop
         end if
 
     end subroutine s_initialize_muscl
