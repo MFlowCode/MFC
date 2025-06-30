@@ -1381,7 +1381,6 @@ contains
                                     end do
                                 end if
 
-
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
 
@@ -1706,11 +1705,10 @@ contains
 
                                 ! Initialize all variables
                                 vel_L_rms = 0._wp; vel_R_rms = 0._wp
-                                rho_L = 0._wp; rho_R = 0._wp;
-                                gamma_L = 0._wp; gamma_R = 0._wp;
-                                pi_inf_L = 0._wp; pi_inf_R = 0._wp;
-                                qv_L = 0._wp; qv_R = 0._wp;
-
+                                rho_L = 0._wp; rho_R = 0._wp; 
+                                gamma_L = 0._wp; gamma_R = 0._wp; 
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp; 
+                                qv_L = 0._wp; qv_R = 0._wp; 
                                 !$acc loop seq
                                 do i = 1, contxe
                                     alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
@@ -1738,7 +1736,7 @@ contains
                                     qv_L = qv_L + alpha_rho_L(i)*qvs(i)
                                     qv_R = qv_R + alpha_rho_R(i)*qvs(i)
                                 end do
-                                
+
                                 pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
                                 pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
@@ -1837,8 +1835,8 @@ contains
                                     if (bubbles_euler) then
                                         ! Put p_tilde in
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) - &
-                                        dir_flg(dir_idx(i))*(xi_M*ptilde_L + xi_P*ptilde_R)
+                                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) - &
+                                            dir_flg(dir_idx(i))*(xi_M*ptilde_L + xi_P*ptilde_R)
                                     end if
                                 end do
 
@@ -1937,11 +1935,10 @@ contains
 
                                 ! Initialize all variables
                                 vel_L_rms = 0._wp; vel_R_rms = 0._wp
-                                rho_L = 0._wp; rho_R = 0._wp;
-                                gamma_L = 0._wp; gamma_R = 0._wp;
-                                pi_inf_L = 0._wp; pi_inf_R = 0._wp;
-                                qv_L = 0._wp; qv_R = 0._wp;
-
+                                rho_L = 0._wp; rho_R = 0._wp; 
+                                gamma_L = 0._wp; gamma_R = 0._wp; 
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp; 
+                                qv_L = 0._wp; qv_R = 0._wp; 
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
