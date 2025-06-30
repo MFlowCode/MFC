@@ -1259,6 +1259,8 @@ contains
 
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
+        type(riemann_states) :: c_fast, vel
+        integer :: loop_end
 
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
