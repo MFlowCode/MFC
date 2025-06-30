@@ -283,6 +283,7 @@ contains
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
+        real(wp) :: flux_tau_L, flux_tau_R
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
@@ -755,12 +756,12 @@ contains
                                     ! = rho * v_i * v_${XYZ}$ - B_i * B_${XYZ}$ + delta_(${XYZ}$,i) * p_tot
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + i) = &
                                         (s_M*(rho_R*vel_R(i)*vel_R(norm_dir) &
-                                            - B%R(i)*B%R(norm_dir) &
-                                            + dir_flg(i)*(pres_R + pres_mag%R)) &
-                                        - s_P*(rho_L*vel_L(i)*vel_L(norm_dir) &
+                                              - B%R(i)*B%R(norm_dir) &
+                                              + dir_flg(i)*(pres_R + pres_mag%R)) &
+                                         - s_P*(rho_L*vel_L(i)*vel_L(norm_dir) &
                                                 - B%L(i)*B%L(norm_dir) &
                                                 + dir_flg(i)*(pres_L + pres_mag%L)) &
-                                        + s_M*s_P*(rho_L*vel_L(i) - rho_R*vel_R(i))) &
+                                         + s_M*s_P*(rho_L*vel_L(i) - rho_R*vel_R(i))) &
                                         /(s_M - s_P)
                                 end do
                             elseif (mhd .and. relativity) then
@@ -770,14 +771,14 @@ contains
                                     ! = m_i * v_${XYZ}$ - b_i/Gamma * B_${XYZ}$ + delta_(${XYZ}$,i) * p_tot
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + i) = &
                                         (s_M*(cm%R(i)*vel_R(norm_dir) &
-                                            - b4%R(i)/Ga%R*B%R(norm_dir) &
-                                            + dir_flg(i)*(pres_R + pres_mag%R)) &
-                                        - s_P*(cm%L(i)*vel_L(norm_dir) &
+                                              - b4%R(i)/Ga%R*B%R(norm_dir) &
+                                              + dir_flg(i)*(pres_R + pres_mag%R)) &
+                                         - s_P*(cm%L(i)*vel_L(norm_dir) &
                                                 - b4%L(i)/Ga%L*B%L(norm_dir) &
                                                 + dir_flg(i)*(pres_L + pres_mag%L)) &
-                                        + s_M*s_P*(cm%L(i) - cm%R(i))) &
+                                         + s_M*s_P*(cm%L(i) - cm%R(i))) &
                                         /(s_M - s_P)
-                                end do          
+                                end do
                             elseif (bubbles_euler) then
                                 !$acc loop seq
                                 do i = 1, num_vels
@@ -958,7 +959,7 @@ contains
                                     ! B_y d/d${XYZ}$ flux = (1 - delta(y,${XYZ}$)) * (v_${XYZ}$ * B_y - v_y * B_${XYZ}$)
                                     ! B_z d/d${XYZ}$ flux = (1 - delta(z,${XYZ}$)) * (v_${XYZ}$ * B_z - v_z * B_${XYZ}$)
                                     !$acc loop seq
-                                    do i = 0,2
+                                    do i = 0, 2
                                         flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + i) = (1 - dir_flg(i + 1))*( &
                                                                                     s_M*(vel_R(dir_idx(1))*B%R(i + 1) - vel_R(i + 1)*B%R(norm_dir)) - &
                                                                                     s_P*(vel_L(dir_idx(1))*B%L(i + 1) - vel_L(i + 1)*B%L(norm_dir)) + &
