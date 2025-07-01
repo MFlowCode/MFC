@@ -858,7 +858,7 @@ contains
         ! Helper to select the correct coefficient routine
         subroutine s_coeff_selector(pres, rho, c, coeff, polytropic)
 #ifdef _CRAYFTN
-            !DIR$ INLINEALWAYS s_chyqmom
+            !DIR$ INLINEALWAYS s_coeff_selector
 #else
             !$acc routine seq
 #endif
