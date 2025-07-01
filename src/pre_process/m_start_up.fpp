@@ -134,8 +134,8 @@ contains
             model_eqns, num_fluids, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
             hypoelasticity, mhd, patch_icpp, fluid_pp, precision, parallel_io, &
-            mixlayer_vel_profile, mixlayer_vel_coef, mixlayer_domain, &
-            mixlayer_perturb, &
+            mixlayer_vel_profile, mixlayer_vel_coef, &
+            mixlayer_perturb, mixlayer_perturb_nk, mixlayer_perturb_k0, &
             pi_fac, perturb_flow, perturb_flow_fluid, perturb_flow_mag, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &
             cyl_coord, loops_x, loops_y, loops_z, &
