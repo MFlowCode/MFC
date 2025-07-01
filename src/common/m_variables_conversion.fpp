@@ -497,7 +497,7 @@ contains
         pi_inf_K = 0._wp
         qv_K = 0._wp
         alpha_K_sum = 0._wp
-        if (present(G_K) .and. present(G)) G_K = 0._wp
+
         do i = 1, 2
             Re_K(i) = dflt_real
         end do
@@ -526,6 +526,7 @@ contains
         end do
 
         if (present(G_K)) then
+            G_K = 0._wp
             do i = 1, num_fluids
                 !TODO: change to use Gs directly here?
                 !TODO: Make this changes as well for GPUs
