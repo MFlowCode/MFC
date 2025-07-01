@@ -1379,7 +1379,7 @@ contains
 
                                 ! ENERGY ADJUSTMENTS FOR HYPOELASTIC/HYPERELASTIC ENERGY
                                 if (hypoelasticity .or. hyperelasticity) then
-                                    G_L = 0_wp; G_R = 0_wp
+                                    G_L = 0._wp; G_R = 0._wp
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         G_L = G_L + alpha_L(i)*Gs(i)
@@ -1395,12 +1395,12 @@ contains
                                         do i = 1, strxe - strxb + 1
                                             ! Elastic contribution to energy if G large enough
                                             if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R)
+                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                                 ! Additional terms in 2D and 3D
                                                 if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                    E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L)
-                                                    E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R)
+                                                    E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                                    E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                                 end if
                                             end if
                                         end do
@@ -1410,7 +1410,7 @@ contains
                                             xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
                                             xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                                         end do
-                                        G_L = 0_wp; G_R = 0_wp; 
+                                        G_L = 0._wp; G_R = 0._wp;
                                         !$acc loop seq
                                         do i = 1, num_fluids
                                             ! Mixture left and right shear modulus
@@ -2498,7 +2498,7 @@ contains
 
                                 ! ENERGY ADJUSTMENTS FOR HYPOELASTIC/HYPERELASTIC ENERGY
                                 if (hypoelasticity .or. hyperelasticity) then
-                                    G_L = 0_wp; G_R = 0_wp
+                                    G_L = 0._wp; G_R = 0._wp
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         G_L = G_L + alpha_L(i)*Gs(i)
@@ -2514,12 +2514,12 @@ contains
                                         do i = 1, strxe - strxb + 1
                                             ! Elastic contribution to energy if G large enough
                                             if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R)
+                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                                 ! Additional terms in 2D and 3D
                                                 if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                    E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L)
-                                                    E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R)
+                                                    E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                                    E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                                 end if
                                             end if
                                         end do
@@ -2529,7 +2529,7 @@ contains
                                             xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
                                             xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                                         end do
-                                        G_L = 0_wp; G_R = 0_wp; 
+                                        G_L = 0._wp; G_R = 0._wp;
                                         !$acc loop seq
                                         do i = 1, num_fluids
                                             ! Mixture left and right shear modulus
