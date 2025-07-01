@@ -1302,7 +1302,13 @@ contains
 
                                 idx1 = dir_idx(1)
 
+                                ! Initialize variables
                                 vel_L_rms = 0._wp; vel_R_rms = 0._wp
+                                rho_L = 0._wp; rho_R = 0._wp
+                                gamma_L = 0._wp; gamma_R = 0._wp
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp
+                                qv_L = 0._wp; qv_R = 0._wp
+                                alpha_L_sum = 0._wp; alpha_R_sum = 0._wp
 
                                 !$acc loop seq
                                 do i = 1, num_dims
@@ -1314,19 +1320,6 @@ contains
 
                                 pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
                                 pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
-
-                                rho_L = 0._wp
-                                gamma_L = 0._wp
-                                pi_inf_L = 0._wp
-                                qv_L = 0._wp
-
-                                rho_R = 0._wp
-                                gamma_R = 0._wp
-                                pi_inf_R = 0._wp
-                                qv_R = 0._wp
-
-                                alpha_L_sum = 0._wp
-                                alpha_R_sum = 0._wp
 
                                 if (mpp_lim) then
                                     !$acc loop seq
@@ -2378,6 +2371,10 @@ contains
                                 do i = 1, num_fluids
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
+                                end do
+
+                                !$acc loop seq
+                                do i = 1, num_dims
                                     vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
                                     vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
                                     vel_L_rms = vel_L_rms + vel_L(i)**2._wp
