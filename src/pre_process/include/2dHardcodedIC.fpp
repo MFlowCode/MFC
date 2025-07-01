@@ -4,6 +4,19 @@
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: factor
+    real(wp) :: eps_mhd, sigma, C_mhd
+    real(wp) :: r0, alpha, r2
+    real(wp) :: sinA, cosA
+
+    real(wp), parameter :: r_0 = 0.1_wp       ! Rotor radius
+    real(wp), parameter :: r0_sq = r_0*r_0
+    real(wp), parameter :: rho_rotor = 10._wp ! Rotor density
+    real(wp), parameter :: omega = 20._wp     ! Angular velocity (v_0/r_0)
+    real(wp) :: r_sq
+
+    ! Center of the domain
+    real(wp), parameter :: x_center = 0.5_wp
+    real(wp), parameter :: y_center = 0.5_wp
 
     eps = 1e-9_wp
 
@@ -157,6 +170,91 @@
             q_prim_vf(contxb)%sf(i, j, 0) = 1.e-4_wp
             q_prim_vf(E_idx)%sf(i, j, 0) = 3.e-5_wp
         end if
+
+        ! case 252 is for the 2D MHD Rotor problem
+    case (252) ! 2D MHD Rotor Problem
+        ! Ambient conditions are set in the JSON file.
+        ! This case imposes the dense, rotating cylinder.
+        !
+        ! gamma = 1.4
+        ! Ambient medium (r > 0.1):
+        !   rho = 1, p = 1, v = 0, B = (1,0,0)
+        ! Rotor (r <= 0.1):
+        !   rho = 10, p = 1
+        !   v has angular velocity w=20, giving v_tan=2 at r=0.1
+
+        ! Calculate distance squared from the center
+        r_sq = (x_cc(i) - x_center)**2 + (y_cc(j) - y_center)**2
+
+        if (r_sq <= r0_sq) then
+            ! -- Inside the rotor --
+            ! Set density
+            q_prim_vf(contxb)%sf(i, j, 0) = rho_rotor
+
+            ! Set velocity components for rotation
+            ! v_x = -omega * (y - y_c)
+            ! v_y =  omega * (x - x_c)
+            q_prim_vf(momxb)%sf(i, j, 0) = -omega * (y_cc(j) - y_center)
+            q_prim_vf(momxb + 1)%sf(i, j, 0) = omega * (x_cc(i) - x_center)
+        end if
+
+    case (260)  ! Gaussian Divergence Pulse
+        !---------------------------------------------------------
+        !  Bx(x) = 1 + C * erf((x-0.5)/σ)
+        !  ⇒  ∂Bx/∂x = C * (2/√π) * exp[-((x-0.5)/σ)**2] * (1/σ)
+        !  Choose C = ε * σ * √π / 2  ⇒ ∂Bx/∂x = ε * exp[-((x-0.5)/σ)**2]
+        !  ψ is initialized to zero everywhere.
+        !---------------------------------------------------------
+
+        eps_mhd   = patch_icpp(patch_id)%a(2)
+        sigma     = patch_icpp(patch_id)%a(3)
+        C_mhd     = eps_mhd * sigma * sqrt(pi) * 0.5_wp
+
+        ! B-field
+        q_prim_vf(B_idx%beg)%sf(i,j,0) = 1._wp + C_mhd * erf( (x_cc(i) - 0.5_wp) / sigma )
+
+    case (261)  ! Blob
+        r0 = 1._wp/sqrt(8._wp)
+        r2 = x_cc(i)**2 + y_cc(j)**2
+        r = sqrt(r2)
+        alpha = r/r0
+        if (alpha < 1) then
+            q_prim_vf(B_idx%beg)%sf(i,j,0) = 1._wp/sqrt(4._wp*pi) * (alpha**8 - 2._wp*alpha**4 + 1._wp)
+            ! q_prim_vf(B_idx%beg)%sf(i,j,0) = 1._wp/sqrt(4000._wp*pi) * (4096._wp*r2**4 - 128._wp*r2**2 + 1._wp)
+            ! q_prim_vf(B_idx%beg)%sf(i,j,0) = 1._wp/(4._wp*pi) * (alpha**8 - 2._wp*alpha**4 + 1._wp)
+            ! q_prim_vf(E_idx)%sf(i,j,0) = 6._wp - q_prim_vf(B_idx%beg)%sf(i,j,0)**2/2._wp
+        end if
+
+    case (262)  ! Tilted 2D MHD shock‐tube at α = arctan2 (≈63.4°)
+        ! rotate by α = atan(2)
+        alpha = atan(2._wp)
+        cosA = cos(alpha)
+        sinA = sin(alpha)
+        ! projection along shock normal
+        r = x_cc(i)*cosA + y_cc(j)*sinA
+
+        if (r <= 0.5_wp) then
+            ! LEFT state: ρ=1, v∥=+10, v⊥=0, p=20, B∥=B⊥=5/√(4π)
+            q_prim_vf(contxb)%sf(i,j,0)    = 1._wp
+            q_prim_vf(momxb)%sf(i,j,0)     = 10._wp * cosA
+            q_prim_vf(momxb+1)%sf(i,j,0)   = 10._wp * sinA
+            q_prim_vf(E_idx)%sf(i,j,0)     = 20._wp
+            q_prim_vf(B_idx%beg)%sf(i,j,0)   = (5._wp/sqrt(4._wp*pi)) * cosA &
+                                                - (5._wp/sqrt(4._wp*pi)) * sinA
+            q_prim_vf(B_idx%beg+1)%sf(i,j,0) = (5._wp/sqrt(4._wp*pi)) * sinA &
+                                                + (5._wp/sqrt(4._wp*pi)) * cosA
+        else
+            ! RIGHT state: ρ=1, v∥=−10, v⊥=0, p=1, B∥=B⊥=5/√(4π)
+            q_prim_vf(contxb)%sf(i,j,0)    = 1._wp
+            q_prim_vf(momxb)%sf(i,j,0)     = -10._wp * cosA
+            q_prim_vf(momxb+1)%sf(i,j,0)   = -10._wp * sinA
+            q_prim_vf(E_idx)%sf(i,j,0)     = 1._wp
+            q_prim_vf(B_idx%beg)%sf(i,j,0)   = (5._wp/sqrt(4._wp*pi)) * cosA &
+                                                - (5._wp/sqrt(4._wp*pi)) * sinA
+            q_prim_vf(B_idx%beg+1)%sf(i,j,0) = (5._wp/sqrt(4._wp*pi)) * sinA &
+                                                + (5._wp/sqrt(4._wp*pi)) * cosA
+        end if
+        ! v^z and B^z remain zero by default
 
     case default
         if (proc_rank == 0) then
