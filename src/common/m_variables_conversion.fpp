@@ -487,9 +487,9 @@ contains
         real(wp), optional, intent(out) :: G_K
         real(wp), optional, dimension(num_fluids), intent(in) :: G
         real(wp) :: alpha_K_sum
-
+        integer :: i
 #ifdef MFC_SIMULATION
-        integer :: i, j !< Generic loop iterators
+        integer :: j !< Generic loop iterators
 #endif
         ! Initiate the variables to avoid compiler warnings
         rho_K = 0._wp
@@ -498,7 +498,9 @@ contains
         qv_K = 0._wp
         alpha_K_sum = 0._wp
         if (present(G_K) .and. present(G)) G_K = 0._wp
-        Re_K(:) = dflt_real
+        do i = 1, 2
+            Re_K(i) = dflt_real
+        end do
 #ifdef MFC_SIMULATION
         ! Constraining the partial densities and the volume fractions within
         ! their physical bounds to make sure that any mixture variables that
