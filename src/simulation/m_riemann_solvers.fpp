@@ -748,7 +748,7 @@ contains
 
                             ! Momentum
                             if (mhd .and. (.not. relativity)) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, 3
                                     ! Flux of rho*v_i in the ${XYZ}$ direction
                                     ! = rho * v_i * v_${XYZ}$ - B_i * B_${XYZ}$ + delta_(${XYZ}$,i) * p_tot
@@ -763,7 +763,7 @@ contains
                                         /(s_M - s_P)
                                 end do
                             elseif (mhd .and. relativity) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, 3
                                     ! Flux of m_i in the ${XYZ}$ direction
                                     ! = m_i * v_${XYZ}$ - b_i/Gamma * B_${XYZ}$ + delta_(${XYZ}$,i) * p_tot
@@ -850,7 +850,7 @@ contains
                                     + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R_rms - vel_L_rms)/2._wp
                             else if (hypoelasticity) then
                                 flux_tau_L = 0._wp; flux_tau_R = 0._wp
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
                                     flux_tau_L = flux_tau_L + tau_e_L(dir_idx_tau(i))*vel_L(dir_idx(i))
                                     flux_tau_R = flux_tau_R + tau_e_R(dir_idx_tau(i))*vel_R(dir_idx(i))
@@ -946,7 +946,7 @@ contains
                                 if (n == 0) then ! 1D: d/dx flux only & Bx = Bx0 = const.
                                     ! B_y flux = v_x * B_y - v_y * Bx0
                                     ! B_z flux = v_x * B_z - v_z * Bx0
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 1
                                         flux_rsx_vf(j, k, l, B_idx%beg + i) = (s_M*(vel_R(1)*B%R(2 + i) - vel_R(2 + i)*Bx0) &
                                                                                - s_P*(vel_L(1)*B%L(2 + i) - vel_L(2 + i)*Bx0) &
@@ -956,7 +956,7 @@ contains
                                     ! B_x d/d${XYZ}$ flux = (1 - delta(x,${XYZ}$)) * (v_${XYZ}$ * B_x - v_x * B_${XYZ}$)
                                     ! B_y d/d${XYZ}$ flux = (1 - delta(y,${XYZ}$)) * (v_${XYZ}$ * B_y - v_y * B_${XYZ}$)
                                     ! B_z d/d${XYZ}$ flux = (1 - delta(z,${XYZ}$)) * (v_${XYZ}$ * B_z - v_z * B_${XYZ}$)
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 2
                                         flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + i) = (1 - dir_flg(i + 1))*( &
                                                                                     s_M*(vel_R(dir_idx(1))*B%R(i + 1) - vel_R(i + 1)*B%R(norm_dir)) - &

@@ -316,15 +316,14 @@ contains
             Rc_min_loc = minval(Rc_sf)
         end if
 #else
-        !$acc kernels
+        #:call GPU_PARALLEL()
         icfl_max_loc = maxval(icfl_sf)
-        !$acc end kernels
-
+        #:endcall GPU_PARALLEL
         if (viscous) then
-            !$acc kernels
+            #:call GPU_PARALLEL()
             vcfl_max_loc = maxval(vcfl_sf)
             Rc_min_loc = minval(Rc_sf)
-            !$acc end kernels
+            #:endcall GPU_PARALLEL
         end if
 #endif
 

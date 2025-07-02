@@ -139,6 +139,68 @@ Uses FYPP eval directive using `$:`
 
 </details>
 
+<details>
+  <summary><code>GPU_PARALLEL</code> -- <code>(Execute the following on the GPU in parallel)</code></summary>
+
+**Macro Invocation**
+
+Uses FYPP call directive using `#:call`
+
+```C
+#:call GPU_PARALLEL(...)
+   {code}
+#:endcall GPU_PARALLEL 
+```
+
+**Parameters**
+
+| name             | data type           | Default Value     | description                                                                               |
+|------------------|---------------------|-------------------|-------------------------------------------------------------------------------------------|
+| `default`        | string              | 'present'         | Implicit assumptions compiler should make                                                 |
+| `private`        | string list         | None              | Variables that are private to each iteration/thread                                       |
+| `firstprivate`   | string list         | None              | Initialized variables that are private to each iteration/thread                           |
+| `reduction`      | 2-level string list | None              | Variables unique to each iteration and reduced at the end                                 |
+| `reductionOp`    | string list         | None              | Operator that each list of reduction will reduce with                                     |
+| `copy`           | string list         | None              | Allocates and copies data to GPU on entrance, then deallocated and copies to CPU on exit  |
+| `copyin`         | string list         | None              | Allocates and copies data to GPU on entrance and then deallocated on exit                 |
+| `copyinReadOnly` | string list         | None              | Allocates and copies readonly data to GPU and then deallocated on exit                    |
+| `copyout`        | string list         | None              | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit          |
+| `create`         | string list         | None              | Allocates data on GPU on entrance and then deallocates on exit                            |
+| `no_create`      | string list         | None              | Use data in CPU memory unless data is already in GPU memory                               |
+| `present`        | string list         | None              | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit |
+| `deviceptr`      | string list         | None              | Pointer variables that are already allocated on GPU memory                                |
+| `attach`         | string list         | None              | Attaches device pointer to device targets on entrance, then detach on exit                |
+| `extraAccArgs`   | string              | None              | String of any extra arguments added to the OpenACC directive                              |
+
+**Parameter Restrictions**
+
+| name          | Restricted range                                  |
+|---------------|---------------------------------------------------|
+| `default`     | 'present' or 'none'                               |
+
+**Additional information**
+
+- default present means that the any non-scalar data in assumed to be present on the GPU
+- default none means that the compiler should not implicitly determine the data attributes for any variable
+- reduction and reductionOp must match in length
+- With ``reduction='[[sum1, sum2], [largest]]'`` and ``reductionOp='[+, max]'``, `sum1` and `sum2` will be the sum of sum1/sum2 in each loop iteration, and `largest` will the maximum value of `largest` all the loop iterations
+- A reduction implies a copy, so it does not need to be added for both
+
+**Example**
+
+```C
+ #:call GPU_PARALLEL()
+      {code}
+      ...
+ #:endcall GPU_PARALLEL
+ #:call GPU_PARALLEL(create='[pixel_arr]', copyin='[initial_index]')
+      {code}
+      ...
+ #:endcall
+```
+
+</details>
+
 ------------------------------------------------------------------------------------------
 
 ### Data Control Macros

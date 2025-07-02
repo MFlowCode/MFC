@@ -21,7 +21,7 @@ contains
         !! @param l z coordinate index
         !! @return fltr_dtheta Modified dtheta value for cylindrical coordinates
     pure function f_compute_filtered_dtheta(k, l) result(fltr_dtheta)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         integer, intent(in) :: k, l
         real(wp) :: fltr_dtheta
         integer :: Nfq
@@ -48,7 +48,7 @@ contains
         !! @param l z coordinate index
         !! @return cfl_terms computed CFL terms for 2D/3D cases
     pure function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in) :: c
         integer, intent(in) :: j, k, l
