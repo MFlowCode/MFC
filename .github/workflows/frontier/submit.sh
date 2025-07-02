@@ -13,10 +13,10 @@ else
     exit 1
 fi
 
-if [ "$2" == "cpu" ]; then
+if [ "$2" = "cpu" ]; then
     sbatch_device_opts="\
 #SBATCH -n 32                       # Number of cores required"
-elif [ "$2" == "gpu" ]; then
+elif [ "$2" = "gpu" ]; then
     sbatch_device_opts="\
 #SBATCH -n 8                       # Number of cores required"
 else
