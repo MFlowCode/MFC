@@ -72,9 +72,9 @@ print(
             "bc_z%beg": -3,
             "bc_z%end": -3,
             # Turn on IBM
-            "ib" : 'T',
-            "num_ibs" : 1,
-            "viscous" : "T",
+            "ib": "T",
+            "num_ibs": 1,
+            "viscous": "T",
             # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
@@ -104,10 +104,10 @@ print(
             "patch_ib(1)%radius": 0.1,
             # Fluids Physical Parameters
             # Specify 2 fluids
-            "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1.0e00), 
+            "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1.0e00),
             "fluid_pp(1)%pi_inf": 0,
             "fluid_pp(1)%Re(1)": 54000,
-            "fluid_pp(2)%gamma": 1.0e00 / (1.4 - 1.0e00),  
+            "fluid_pp(2)%gamma": 1.0e00 / (1.4 - 1.0e00),
             "fluid_pp(2)%pi_inf": 0,
             "fluid_pp(2)%Re(1)": 54000,
         }
