@@ -858,7 +858,6 @@ contains
         subroutine s_coeff_selector(pres, rho, c, coeff, polytropic)
             $:GPU_ROUTINE(function_name='s_coeff_selector',parallelism='[seq]', &
                 & cray_inline=True)
-
             real(wp), intent(in) :: pres, rho, c
             real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
             logical, intent(in) :: polytropic

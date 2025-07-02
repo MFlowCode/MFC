@@ -66,6 +66,152 @@ module m_data_input
 
 contains
 
+    !> Helper subroutine to read grid data files for a given direction
+    !!  @param t_step_dir Directory containing the time-step data
+    !!  @param direction Direction name ('x', 'y', 'z')
+    !!  @param cb_array Cell boundary array to populate
+    !!  @param d_array Cell width array to populate
+    !!  @param cc_array Cell center array to populate
+    !!  @param size_dim Size of the dimension
+    impure subroutine s_read_grid_data_direction(t_step_dir, direction, cb_array, d_array, cc_array, size_dim)
+
+        character(len=*), intent(in) :: t_step_dir
+        character(len=1), intent(in) :: direction
+        real(wp), dimension(-1:), intent(out) :: cb_array
+        real(wp), dimension(0:), intent(out) :: d_array
+        real(wp), dimension(0:), intent(out) :: cc_array
+        integer, intent(in) :: size_dim
+
+        character(LEN=len_trim(t_step_dir) + 10) :: file_loc
+        logical :: file_check
+
+        ! Checking whether direction_cb.dat exists
+        file_loc = trim(t_step_dir)//'/'//direction//'_cb.dat'
+        inquire (FILE=trim(file_loc), EXIST=file_check)
+
+        ! Reading direction_cb.dat if it exists, exiting otherwise
+        if (file_check) then
+            open (1, FILE=trim(file_loc), FORM='unformatted', &
+                  STATUS='old', ACTION='read')
+            read (1) cb_array(-1:size_dim)
+            close (1)
+        else
+            call s_mpi_abort('File '//direction//'_cb.dat is missing in '// &
+                             trim(t_step_dir)//'. Exiting.')
+        end if
+
+        ! Computing the cell-width distribution
+        d_array(0:size_dim) = cb_array(0:size_dim) - cb_array(-1:size_dim - 1)
+
+        ! Computing the cell-center locations
+        cc_array(0:size_dim) = cb_array(-1:size_dim - 1) + d_array(0:size_dim)/2._wp
+
+    end subroutine s_read_grid_data_direction
+
+    !> Helper subroutine to setup MPI data I/O parameters
+    !!  @param data_size Local array size (output)
+    !!  @param m_MOK, n_MOK, p_MOK MPI offset kinds for dimensions (output)
+    !!  @param WP_MOK, MOK, str_MOK, NVARS_MOK Other MPI offset kinds (output)
+    impure subroutine s_setup_mpi_io_params(data_size, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
+
+        integer, intent(out) :: data_size
+        integer(KIND=MPI_OFFSET_KIND), intent(out) :: m_MOK, n_MOK, p_MOK
+        integer(KIND=MPI_OFFSET_KIND), intent(out) :: WP_MOK, MOK, str_MOK, NVARS_MOK
+
+        ! Initialize MPI data I/O
+        if (ib) then
+            call s_initialize_mpi_data(q_cons_vf, ib_markers)
+        else
+            call s_initialize_mpi_data(q_cons_vf)
+        end if
+
+        ! Size of local arrays
+        data_size = (m + 1)*(n + 1)*(p + 1)
+
+        ! Resize some integers so MPI can read even the biggest file
+        m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+        n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+        p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+        WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+        MOK = int(1._wp, MPI_OFFSET_KIND)
+        str_MOK = int(name_len, MPI_OFFSET_KIND)
+        NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+
+    end subroutine s_setup_mpi_io_params
+
+    !> Helper subroutine to read IB data files
+    !!  @param file_loc_base Base file location for IB data
+    impure subroutine s_read_ib_data_files(file_loc_base)
+
+        character(len=*), intent(in) :: file_loc_base
+
+        character(LEN=len_trim(file_loc_base) + 20) :: file_loc
+        logical :: file_exist
+        integer :: ifile, ierr, data_size
+        integer, dimension(MPI_STATUS_SIZE) :: status
+        integer(KIND=MPI_OFFSET_KIND) :: disp
+
+        if (.not. ib) return
+
+        if (parallel_io) then
+            write (file_loc, '(A)') trim(file_loc_base)//'ib.dat'
+        else
+            write (file_loc, '(A)') trim(file_loc_base)//'/ib.dat'
+        end if
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+        if (file_exist) then
+            if (parallel_io) then
+#ifdef MFC_MPI
+                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                data_size = (m + 1)*(n + 1)*(p + 1)
+                disp = 0
+
+                call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                       'native', mpi_info_int, ierr)
+                call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                   MPI_INTEGER, status, ierr)
+
+                call MPI_FILE_CLOSE(ifile, ierr)
+#endif
+            else
+                open (2, FILE=trim(file_loc), &
+                      FORM='unformatted', &
+                      ACTION='read', &
+                      STATUS='old')
+                read (2) ib_markers%sf(0:m, 0:n, 0:p)
+                close (2)
+            end if
+        else
+            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+        end if
+
+    end subroutine s_read_ib_data_files
+
+    !> Helper subroutine to allocate field arrays for given dimensionality
+    !!  @param start_idx Starting index for allocation
+    !!  @param end_x, end_y, end_z End indices for each dimension
+    impure subroutine s_allocate_field_arrays(start_idx, end_x, end_y, end_z)
+
+        integer, intent(in) :: start_idx, end_x, end_y, end_z
+        integer :: i
+
+        do i = 1, sys_size
+            allocate (q_cons_vf(i)%sf(start_idx:end_x, start_idx:end_y, start_idx:end_z))
+            allocate (q_prim_vf(i)%sf(start_idx:end_x, start_idx:end_y, start_idx:end_z))
+        end do
+
+        if (ib) then
+            allocate (ib_markers%sf(start_idx:end_x, start_idx:end_y, start_idx:end_z))
+        end if
+
+        if (chemistry) then
+            allocate (q_T_sf%sf(start_idx:end_x, start_idx:end_y, start_idx:end_z))
+        end if
+
+    end subroutine s_allocate_field_arrays
+
     !>  This subroutine is called at each time-step that has to
         !!      be post-processed in order to read the raw data files
         !!      present in the corresponding time-step directory and to
@@ -89,8 +235,6 @@ contains
         character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_ib_dir !<
         !! Location of the time-step directory associated with t_step
 
-        character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc_ib !<
-
         logical :: dir_check !<
             !! Generic logical used to test the existence of a particular folder
 
@@ -108,9 +252,6 @@ contains
 
         ! Inquiring as to the existence of the time-step directory
         file_loc = trim(t_step_dir)//'/.'
-
-        file_loc_ib = trim(t_step_ib_dir)//'/.'
-
         call my_inquire(file_loc, dir_check)
 
         ! If the time-step directory is missing, the post-process exits.
@@ -119,7 +260,8 @@ contains
                              ' is missing. Exiting.')
         end if
 
-        call my_inquire(file_loc_ib, dir_check)
+        file_loc = trim(t_step_ib_dir)//'/.'
+        call my_inquire(file_loc, dir_check)
 
         ! If the time-step directory is missing, the post-process exits.
         if (dir_check .neqv. .true.) then
@@ -132,79 +274,16 @@ contains
         else
             call s_assign_default_bc_type(bc_type)
         end if
-        ! Reading the Grid Data File for the x-direction
 
-        ! Checking whether x_cb.dat exists
-        file_loc = trim(t_step_dir)//'/x_cb.dat'
-        inquire (FILE=trim(file_loc), EXIST=file_check)
+        ! Reading the Grid Data Files using helper subroutine
+        call s_read_grid_data_direction(t_step_dir, 'x', x_cb, dx, x_cc, m)
 
-        ! Reading x_cb.dat if it exists, exiting otherwise
-        if (file_check) then
-            open (1, FILE=trim(file_loc), FORM='unformatted', &
-                  STATUS='old', ACTION='read')
-            read (1) x_cb(-1:m)
-            close (1)
-        else
-            call s_mpi_abort('File x_cb.dat is missing in '// &
-                             trim(t_step_dir)//'. Exiting.')
-        end if
-
-        ! Computing the cell-width distribution
-        dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
-
-        ! Computing the cell-center locations
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
-
-        ! Reading the Grid Data File for the y-direction
         if (n > 0) then
+            call s_read_grid_data_direction(t_step_dir, 'y', y_cb, dy, y_cc, n)
 
-            ! Checking whether y_cb.dat exists
-            file_loc = trim(t_step_dir)//'/y_cb.dat'
-            inquire (FILE=trim(file_loc), EXIST=file_check)
-
-            ! Reading y_cb.dat if it exists, exiting otherwise
-            if (file_check) then
-                open (1, FILE=trim(file_loc), FORM='unformatted', &
-                      STATUS='old', ACTION='read')
-                read (1) y_cb(-1:n)
-                close (1)
-            else
-                call s_mpi_abort('File y_cb.dat is missing in '// &
-                                 trim(t_step_dir)//'. Exiting.')
-            end if
-
-            ! Computing the cell-width distribution
-            dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
-
-            ! Computing the cell-center locations
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
-
-            ! Reading the Grid Data File for the z-direction
             if (p > 0) then
-
-                ! Checking whether z_cb.dat exists
-                file_loc = trim(t_step_dir)//'/z_cb.dat'
-                inquire (FILE=trim(file_loc), EXIST=file_check)
-
-                ! Reading z_cb.dat if it exists, exiting otherwise
-                if (file_check) then
-                    open (1, FILE=trim(file_loc), FORM='unformatted', &
-                          STATUS='old', ACTION='read')
-                    read (1) z_cb(-1:p)
-                    close (1)
-                else
-                    call s_mpi_abort('File z_cb.dat is missing in '// &
-                                     trim(t_step_dir)//'. Exiting.')
-                end if
-
-                ! Computing the cell-width distribution
-                dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
-
-                ! Computing the cell-center locations
-                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
-
+                call s_read_grid_data_direction(t_step_dir, 'z', z_cb, dz, z_cc, p)
             end if
-
         end if
 
         ! Reading the Conservative Variables Data Files
@@ -231,19 +310,8 @@ contains
 
         end do
 
-        if (ib) then
-            write (file_loc_ib, '(A,I0,A)') &
-                trim(t_step_ib_dir)//'/ib.dat'
-            inquire (FILE=trim(file_loc_ib), EXIST=file_check)
-            if (file_check) then
-                open (2, FILE=trim(file_loc_ib), &
-                      FORM='unformatted', &
-                      ACTION='read', &
-                      STATUS='old')
-            else
-                call s_mpi_abort('File '//trim(file_loc_ib)//' is missing. Exiting.')
-            end if
-        end if
+        ! Reading IB data using helper subroutine
+        call s_read_ib_data_files(t_step_ib_dir)
 
     end subroutine s_read_serial_data_files
 
@@ -344,6 +412,40 @@ contains
             end if
         end if
 
+        call s_read_parallel_conservative_data(t_step, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
+
+        deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
+
+        if (bc_io) then
+            call s_read_parallel_boundary_condition_files(bc_type)
+        else
+            call s_assign_default_bc_type(bc_type)
+        end if
+
+#endif
+
+    end subroutine s_read_parallel_data_files
+
+    !> Helper subroutine to read parallel conservative variable data
+    !!  @param t_step Current time-step
+    !!  @param m_MOK, n_MOK, p_MOK MPI offset kinds for dimensions
+    !!  @param WP_MOK, MOK, str_MOK, NVARS_MOK Other MPI offset kinds
+    impure subroutine s_read_parallel_conservative_data(t_step, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
+
+        integer, intent(in) :: t_step
+        integer(KIND=MPI_OFFSET_KIND), intent(inout) :: m_MOK, n_MOK, p_MOK
+        integer(KIND=MPI_OFFSET_KIND), intent(inout) :: WP_MOK, MOK, str_MOK, NVARS_MOK
+
+#ifdef MFC_MPI
+
+        integer :: ifile, ierr, data_size
+        integer, dimension(MPI_STATUS_SIZE) :: status
+        integer(KIND=MPI_OFFSET_KIND) :: disp, var_MOK
+        character(LEN=path_len + 2*name_len) :: file_loc
+        logical :: file_exist
+        character(len=10) :: t_step_string
+        integer :: i
+
         if (file_per_process) then
             call s_int_to_str(t_step, t_step_string)
             ! Open the file to read conservative variables
@@ -354,68 +456,27 @@ contains
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                ! Initialize MPI data I/O
-                if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
-                else
-                    call s_initialize_mpi_data(q_cons_vf)
-                end if
-
-                ! Size of local arrays
-                data_size = (m + 1)*(n + 1)*(p + 1)
-
-                ! Resize some integers so MPI can read even the biggest file
-                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                MOK = int(1._wp, MPI_OFFSET_KIND)
-                str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                call s_setup_mpi_io_params(data_size, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity .or. mhd) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
-
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                                mpi_p, status, ierr)
                     end do
                 else
                     do i = 1, adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
-
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                                mpi_p, status, ierr)
                     end do
                 end if
 
                 call s_mpi_barrier()
-
                 call MPI_FILE_CLOSE(ifile, ierr)
 
-                if (ib) then
-
-                    write (file_loc, '(A)') 'ib.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-                    inquire (FILE=trim(file_loc), EXIST=file_exist)
-
-                    if (file_exist) then
-
-                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-
-                        disp = 0
-
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
-                                               'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
-                                           MPI_INTEGER, status, ierr)
-
-                    else
-                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
-                    end if
-
-                end if
+                call s_read_ib_data_files(trim(case_dir)//'/restart_data'//trim(mpiiofs))
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
@@ -428,24 +489,7 @@ contains
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                ! Initialize MPI data I/O
-                if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
-                else
-                    call s_initialize_mpi_data(q_cons_vf)
-                end if
-
-                ! Size of local arrays
-                data_size = (m + 1)*(n + 1)*(p + 1)
-
-                ! Resize some integers so MPI can read even the biggest file
-                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                MOK = int(1._wp, MPI_OFFSET_KIND)
-                str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                call s_setup_mpi_io_params(data_size, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
 
                 ! Read the data for each variable
                 do i = 1, sys_size
@@ -461,46 +505,17 @@ contains
                 end do
 
                 call s_mpi_barrier()
-
                 call MPI_FILE_CLOSE(ifile, ierr)
 
-                if (ib) then
-
-                    write (file_loc, '(A)') 'ib.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-                    inquire (FILE=trim(file_loc), EXIST=file_exist)
-
-                    if (file_exist) then
-
-                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-
-                        disp = 0
-
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
-                                               'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
-                                           MPI_INTEGER, status, ierr)
-
-                    else
-                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
-                    end if
-                end if
+                call s_read_ib_data_files(trim(case_dir)//'/restart_data'//trim(mpiiofs))
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
         end if
 
-        deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
-
-        if (bc_io) then
-            call s_read_parallel_boundary_condition_files(bc_type)
-        else
-            call s_assign_default_bc_type(bc_type)
-        end if
-
 #endif
 
-    end subroutine s_read_parallel_data_files
+    end subroutine s_read_parallel_conservative_data
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
@@ -515,81 +530,21 @@ contains
         allocate (q_prim_vf(1:sys_size))
 
         ! Allocating the parts of the conservative and primitive variables
-        ! that do require the direct knowledge of the dimensionality of the
-        ! simulation
+        ! that do require the direct knowledge of the dimensionality of
+        ! the simulation using helper subroutine
 
         ! Simulation is at least 2D
         if (n > 0) then
-
             ! Simulation is 3D
             if (p > 0) then
-
-                do i = 1, sys_size
-                    allocate (q_cons_vf(i)%sf(-buff_size:m + buff_size, &
-                                              -buff_size:n + buff_size, &
-                                              -buff_size:p + buff_size))
-                    allocate (q_prim_vf(i)%sf(-buff_size:m + buff_size, &
-                                              -buff_size:n + buff_size, &
-                                              -buff_size:p + buff_size))
-                end do
-
-                if (ib) then
-                    allocate (ib_markers%sf(-buff_size:m + buff_size, &
-                                            -buff_size:n + buff_size, &
-                                            -buff_size:p + buff_size))
-                end if
-
-                if (chemistry) then
-                    allocate (q_T_sf%sf(-buff_size:m + buff_size, &
-                                        -buff_size:n + buff_size, &
-                                        -buff_size:p + buff_size))
-                end if
-
-                ! Simulation is 2D
+                call s_allocate_field_arrays(-buff_size, m + buff_size, n + buff_size, p + buff_size)
             else
-
-                do i = 1, sys_size
-                    allocate (q_cons_vf(i)%sf(-buff_size:m + buff_size, &
-                                              -buff_size:n + buff_size, &
-                                              0:0))
-                    allocate (q_prim_vf(i)%sf(-buff_size:m + buff_size, &
-                                              -buff_size:n + buff_size, &
-                                              0:0))
-                end do
-
-                if (ib) then
-                    allocate (ib_markers%sf(-buff_size:m + buff_size, &
-                                            -buff_size:n + buff_size, &
-                                            0:0))
-                end if
-
-                if (chemistry) then
-                    allocate (q_T_sf%sf(-buff_size:m + buff_size, &
-                                        -buff_size:n + buff_size, &
-                                        0:0))
-                end if
+                ! Simulation is 2D
+                call s_allocate_field_arrays(-buff_size, m + buff_size, n + buff_size, 0)
             end if
-
-            ! Simulation is 1D
         else
-
-            do i = 1, sys_size
-                allocate (q_cons_vf(i)%sf(-buff_size:m + buff_size, &
-                                          0:0, &
-                                          0:0))
-                allocate (q_prim_vf(i)%sf(-buff_size:m + buff_size, &
-                                          0:0, &
-                                          0:0))
-            end do
-
-            if (ib) then
-                allocate (ib_markers%sf(-buff_size:m + buff_size, 0:0, 0:0))
-            end if
-
-            if (chemistry) then
-                allocate (q_T_sf%sf(-buff_size:m + buff_size, 0:0, 0:0))
-            end if
-
+            ! Simulation is 1D
+            call s_allocate_field_arrays(-buff_size, m + buff_size, 0, 0)
         end if
 
         ! Allocating arrays to store the bc types
