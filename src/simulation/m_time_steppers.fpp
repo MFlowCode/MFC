@@ -994,7 +994,7 @@ contains
         end do
 
         #:call GPU_PARALLEL()
-        dt_local = minval(max_dt)
+            dt_local = minval(max_dt)
         #:endcall GPU_PARALLEL
 
         if (num_procs == 1) then

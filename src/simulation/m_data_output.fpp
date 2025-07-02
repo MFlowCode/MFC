@@ -317,12 +317,12 @@ contains
         end if
 #else
         #:call GPU_PARALLEL()
-        icfl_max_loc = maxval(icfl_sf)
+            icfl_max_loc = maxval(icfl_sf)
         #:endcall GPU_PARALLEL
         if (viscous) then
             #:call GPU_PARALLEL()
-            vcfl_max_loc = maxval(vcfl_sf)
-            Rc_min_loc = minval(Rc_sf)
+                vcfl_max_loc = maxval(vcfl_sf)
+                Rc_min_loc = minval(Rc_sf)
             #:endcall GPU_PARALLEL
         end if
 #endif
