@@ -14,6 +14,65 @@ module m_sim_helpers
 
 contains
 
+    !> Computes the modified dtheta for Fourier filtering in azimuthal direction
+        !! @param k y coordinate index
+        !! @param l z coordinate index
+        !! @return fltr_dtheta Modified dtheta value for cylindrical coordinates
+    pure function f_compute_filtered_dtheta(k, l) result(fltr_dtheta)
+        !$acc routine seq
+        integer, intent(in) :: k, l
+        real(wp) :: fltr_dtheta
+        integer :: Nfq
+
+        if (grid_geometry == 3) then
+            if (k == 0) then
+                fltr_dtheta = 2._wp*pi*y_cb(0)/3._wp
+            elseif (k <= fourier_rings) then
+                Nfq = min(floor(2._wp*real(k, wp)*pi), (p + 1)/2 + 1)
+                fltr_dtheta = 2._wp*pi*y_cb(k - 1)/real(Nfq, wp)
+            else
+                fltr_dtheta = y_cb(k - 1)*dz(l)
+            end if
+        else
+            fltr_dtheta = 0._wp
+        end if
+    end function f_compute_filtered_dtheta
+
+    !> Computes inviscid CFL terms for multi-dimensional cases (2D/3D only)
+        !! @param vel directional velocities
+        !! @param c mixture speed of sound
+        !! @param j x coordinate index
+        !! @param k y coordinate index
+        !! @param l z coordinate index
+        !! @return cfl_terms computed CFL terms for 2D/3D cases
+    pure function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
+        !$acc routine seq
+        real(wp), dimension(num_vels), intent(in) :: vel
+        real(wp), intent(in) :: c
+        integer, intent(in) :: j, k, l
+        real(wp) :: cfl_terms
+        real(wp) :: fltr_dtheta
+
+        fltr_dtheta = f_compute_filtered_dtheta(k, l)
+
+        if (p > 0) then
+            !3D
+            if (grid_geometry == 3) then
+                cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
+                                dy(k)/(abs(vel(2)) + c), &
+                                fltr_dtheta/(abs(vel(3)) + c))
+            else
+                cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
+                                dy(k)/(abs(vel(2)) + c), &
+                                dz(l)/(abs(vel(3)) + c))
+            end if
+        else
+            !2D
+            cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
+                            dy(k)/(abs(vel(2)) + c))
+        end if
+    end function f_compute_multidim_cfl_terms
+
     !> Computes enthalpy
         !! @param q_prim_vf cell centered primitive variables
         !! @param pres mixture pressure
@@ -77,7 +136,7 @@ contains
 
         E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
 
-        ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
+        ! Adjust energy for hyperelasticity
         if (hyperelasticity) then
             E = E + G*q_prim_vf(xiend + 1)%sf(j, k, l)
         end if
@@ -93,8 +152,8 @@ contains
         !! @param j x index
         !! @param k y index
         !! @param l z index
-        !! @param icfl_sf cell centered inviscid cfl number
-        !! @param vcfl_sf (optional) cell centered viscous cfl number
+        !! @param icfl_sf cell-centered inviscid cfl number
+        !! @param vcfl_sf (optional) cell-centered viscous CFL number
         !! @param Rc_sf (optional) cell centered Rc
     pure subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         !$acc routine seq
@@ -105,39 +164,25 @@ contains
         real(wp), dimension(2), intent(in) :: Re_l
         integer, intent(in) :: j, k, l
 
-        real(wp) :: fltr_dtheta   !<
-             !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
-        integer :: Nfq
+        real(wp) :: fltr_dtheta
 
-        if (grid_geometry == 3) then
-            if (k == 0) then
-                fltr_dtheta = 2._wp*pi*y_cb(0)/3._wp
-            elseif (k <= fourier_rings) then
-                Nfq = min(floor(2._wp*real(k, wp)*pi), (p + 1)/2 + 1)
-                fltr_dtheta = 2._wp*pi*y_cb(k - 1)/real(Nfq, wp)
-            else
-                fltr_dtheta = y_cb(k - 1)*dz(l)
-            end if
+        ! Inviscid CFL calculation
+        if (p > 0 .or. n > 0) then
+            ! 2D/3D
+            icfl_sf(j, k, l) = dt/f_compute_multidim_cfl_terms(vel, c, j, k, l)
+        else
+            ! 1D
+            icfl_sf(j, k, l) = (dt/dx(j))*(abs(vel(1)) + c)
         end if
 
-        if (p > 0) then
-            !3D
-            if (grid_geometry == 3) then
-                icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
-                                          dy(k)/(abs(vel(2)) + c), &
-                                          fltr_dtheta/(abs(vel(3)) + c))
-            else
-                icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
-                                          dy(k)/(abs(vel(2)) + c), &
-                                          dz(l)/(abs(vel(3)) + c))
-            end if
-
-            if (viscous) then
-
+        ! Viscous calculations
+        if (viscous) then
+            if (p > 0) then
+                !3D
                 if (grid_geometry == 3) then
+                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
                     vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
                                        /min(dx(j), dy(k), fltr_dtheta)**2._wp
-
                     Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
                                          dy(k)*(abs(vel(2)) + c), &
                                          fltr_dtheta*(abs(vel(3)) + c)) &
@@ -145,42 +190,22 @@ contains
                 else
                     vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
                                        /min(dx(j), dy(k), dz(l))**2._wp
-
                     Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
                                          dy(k)*(abs(vel(2)) + c), &
                                          dz(l)*(abs(vel(3)) + c)) &
                                      /maxval(1._wp/Re_l)
                 end if
-
-            end if
-
-        elseif (n > 0) then
-            !2D
-            icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
-                                      dy(k)/(abs(vel(2)) + c))
-
-            if (viscous) then
-
+            elseif (n > 0) then
+                !2D
                 vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
-
                 Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
                                      dy(k)*(abs(vel(2)) + c)) &
                                  /maxval(1._wp/Re_l)
-
-            end if
-
-        else
-            !1D
-            icfl_sf(j, k, l) = (dt/dx(j))*(abs(vel(1)) + c)
-
-            if (viscous) then
-
+            else
+                !1D
                 vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/dx(j)**2._wp
-
                 Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
-
             end if
-
         end if
 
     end subroutine s_compute_stability_from_dt
@@ -202,64 +227,39 @@ contains
         integer, intent(in) :: j, k, l
 
         real(wp) :: icfl_dt, vcfl_dt
-        real(wp) :: fltr_dtheta   !<
-             !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
+        real(wp) :: fltr_dtheta
 
-        integer :: Nfq
-
-        if (grid_geometry == 3) then
-            if (k == 0) then
-                fltr_dtheta = 2._wp*pi*y_cb(0)/3._wp
-            elseif (k <= fourier_rings) then
-                Nfq = min(floor(2._wp*real(k, wp)*pi), (p + 1)/2 + 1)
-                fltr_dtheta = 2._wp*pi*y_cb(k - 1)/real(Nfq, wp)
-            else
-                fltr_dtheta = y_cb(k - 1)*dz(l)
-            end if
+        ! Inviscid CFL calculation
+        if (p > 0 .or. n > 0) then
+            ! 2D/3D cases
+            icfl_dt = cfl_target*f_compute_multidim_cfl_terms(vel, c, j, k, l)
+        else
+            ! 1D case
+            icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
         end if
 
-        if (p > 0) then
-            !3D
-            if (grid_geometry == 3) then
-                icfl_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
-                                         dy(k)/(abs(vel(2)) + c), &
-                                         fltr_dtheta/(abs(vel(3)) + c))
-            else
-                icfl_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
-                                         dy(k)/(abs(vel(2)) + c), &
-                                         dz(l)/(abs(vel(3)) + c))
-            end if
-
-            if (viscous) then
+        ! Viscous calculations
+        if (viscous) then
+            if (p > 0) then
+                !3D
                 if (grid_geometry == 3) then
+                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp) &
                               /minval(1/(rho*Re_l))
                 else
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp) &
                               /minval(1/(rho*Re_l))
                 end if
-            end if
-
-        elseif (n > 0) then
-            !2D
-            icfl_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
-                                     dy(k)/(abs(vel(2)) + c))
-
-            if (viscous) then
+            elseif (n > 0) then
+                !2D
                 vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
-            end if
-
-        else
-            !1D
-            icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
-
-            if (viscous) then
+            else
+                !1D
                 vcfl_dt = cfl_target*(dx(j)**2._wp)/minval(1/(rho*Re_l))
             end if
-
         end if
 
-        if (any(re_size > 0)) then
+        if (any(Re_size > 0)) then
             max_dt(j, k, l) = min(icfl_dt, vcfl_dt)
         else
             max_dt(j, k, l) = icfl_dt
