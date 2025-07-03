@@ -2995,19 +2995,15 @@ contains
                             ! NOTE: unlike HLL, Bx, By, Bz are permutated by dir_idx for simpler logic
                             if (mhd) then
                                 if (n == 0) then ! 1D: constant Bx; By, Bz as variables; only in x so not permutated
-                                    B%L(1) = Bx0
-                                    B%R(1) = Bx0
-                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
-                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
-                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
-                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)
+                                    B%L = [Bx0, qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg), qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)]
+                                    B%R = [Bx0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg), qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)]
                                 else ! 2D/3D: Bx, By, Bz as variables
-                                    B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(1) - 1)
-                                    B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(1) - 1)
-                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(2) - 1)
-                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(2) - 1)
-                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(3) - 1)
-                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(3) - 1)
+                                    B%L = [qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(1) - 1), &
+                                           qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(2) - 1), &
+                                           qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(3) - 1)]
+                                    B%R = [qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(1) - 1), &
+                                           qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(2) - 1), &
+                                           qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(3) - 1)]
                                 end if
                             end if
 
@@ -3058,74 +3054,38 @@ contains
                             E_starL = ((s_L - vel%L(1))*E%L - pTot_L*vel%L(1) + p_star*s_M)/(s_L - s_M)
                             E_starR = ((s_R - vel%R(1))*E%R - pTot_R*vel%R(1) + p_star*s_M)/(s_R - s_M)
 
-                            ! (5) Compute the left/right conserved state vectors
-                            U_L(1) = rho%L
-                            U_L(2) = rho%L*vel%L(1)
-                            U_L(3) = rho%L*vel%L(2)
-                            U_L(4) = rho%L*vel%L(3)
-                            U_L(5) = B%L(2)
-                            U_L(6) = B%L(3)
-                            U_L(7) = E%L
+                            ! (5) Compute left/right state vectors and fluxes
+                            U_L = [rho%L, rho%L*vel%L(1:3), B%L(2:3), E%L]
+                            U_starL = [rhoL_star, rhoL_star*s_M, rhoL_star*vel%L(2:3), B%L(2:3), E_starL]
+                            U_R = [rho%R, rho%R*vel%R(1:3), B%R(2:3), E%R]
+                            U_starR = [rhoR_star, rhoR_star*s_M, rhoR_star*vel%R(2:3), B%R(2:3), E_starR]
 
-                            U_R(1) = rho%R
-                            U_R(2) = rho%R*vel%R(1)
-                            U_R(3) = rho%R*vel%R(2)
-                            U_R(4) = rho%R*vel%R(3)
-                            U_R(5) = B%R(2)
-                            U_R(6) = B%R(3)
-                            U_R(7) = E%R
-
-                            ! (6) Compute the left/right star state vectors
-                            U_starL(1) = rhoL_star
-                            U_starL(2) = rhoL_star*s_M
-                            U_starL(3) = rhoL_star*vel%L(2)
-                            U_starL(4) = rhoL_star*vel%L(3)
-                            U_starL(5) = B%L(2)
-                            U_starL(6) = B%L(3)
-                            U_starL(7) = E_starL
-
-                            U_starR(1) = rhoR_star
-                            U_starR(2) = rhoR_star*s_M
-                            U_starR(3) = rhoR_star*vel%R(2)
-                            U_starR(4) = rhoR_star*vel%R(3)
-                            U_starR(5) = B%R(2)
-                            U_starR(6) = B%R(3)
-                            U_starR(7) = E_starR
-
-                            ! (7) Compute the left/right fluxes
-                            F_L(1) = rho%L*vel%L(1)
-                            F_L(2) = rho%L*vel%L(1)*vel%L(1) - B%L(1)*B%L(1) + pTot_L
-                            F_L(3) = rho%L*vel%L(1)*vel%L(2) - B%L(1)*B%L(2)
-                            F_L(4) = rho%L*vel%L(1)*vel%L(3) - B%L(1)*B%L(3)
-                            F_L(5) = vel%L(1)*B%L(2) - vel%L(2)*B%L(1)
-                            F_L(6) = vel%L(1)*B%L(3) - vel%L(3)*B%L(1)
+                            ! Compute the left/right fluxes
+                            F_L(1) = U_L(2)
+                            F_L(2) = U_L(2)*vel%L(1) - B%L(1)*B%L(1) + pTot_L
+                            F_L(3:4) = U_L(2)*vel%L(2:3) - B%L(1)*B%L(2:3)
+                            F_L(5:6) = vel%L(1)*B%L(2:3) - vel%L(2:3)*B%L(1)
                             F_L(7) = (E%L + pTot_L)*vel%L(1) - B%L(1)*(vel%L(1)*B%L(1) + vel%L(2)*B%L(2) + vel%L(3)*B%L(3))
 
-                            F_R(1) = rho%R*vel%R(1)
-                            F_R(2) = rho%R*vel%R(1)*vel%R(1) - B%R(1)*B%R(1) + pTot_R
-                            F_R(3) = rho%R*vel%R(1)*vel%R(2) - B%R(1)*B%R(2)
-                            F_R(4) = rho%R*vel%R(1)*vel%R(3) - B%R(1)*B%R(3)
-                            F_R(5) = vel%R(1)*B%R(2) - vel%R(2)*B%R(1)
-                            F_R(6) = vel%R(1)*B%R(3) - vel%R(3)*B%R(1)
+                            F_R(1) = U_R(2)
+                            F_R(2) = U_R(2)*vel%R(1) - B%R(1)*B%R(1) + pTot_R
+                            F_R(3:4) = U_R(2)*vel%R(2:3) - B%R(1)*B%R(2:3)
+                            F_R(5:6) = vel%R(1)*B%R(2:3) - vel%R(2:3)*B%R(1)
                             F_R(7) = (E%R + pTot_R)*vel%R(1) - B%R(1)*(vel%R(1)*B%R(1) + vel%R(2)*B%R(2) + vel%R(3)*B%R(3))
-
-                            ! (8) Compute the left/right star fluxes (note array operations)
+                            ! Compute the star flux using HLL relation
                             F_starL = F_L + s_L*(U_starL - U_L)
                             F_starR = F_R + s_R*(U_starR - U_R)
-
-                            ! (9) Compute the rotational (Alfvén) speeds
+                            ! Compute the rotational (Alfvén) speeds
                             s_starL = s_M - abs(B%L(1))/sqrt(rhoL_star)
                             s_starR = s_M + abs(B%L(1))/sqrt(rhoR_star)
+                            ! Compute the double–star states [Miyoshi Eqns. (59)-(62)]
+                            sqrt_rhoL_star = sqrt(rhoL_star); sqrt_rhoR_star = sqrt(rhoR_star)
+                            vL_star = vel%L(2); wL_star = vel%L(3)
+                            vR_star = vel%R(2); wR_star = vel%R(3)
 
-                            ! (10) Compute the double–star states [Miyoshi Eqns. (59)-(62)]
-                            sqrt_rhoL_star = sqrt(rhoL_star)
-                            sqrt_rhoR_star = sqrt(rhoR_star)
+                            ! (6) Compute the double–star states [Miyoshi Eqns. (59)-(62)]
                             denom_ds = sqrt_rhoL_star + sqrt_rhoR_star
                             sign_Bx = sign(1._wp, B%L(1))
-                            vL_star = vel%L(2)
-                            wL_star = vel%L(3)
-                            vR_star = vel%R(2)
-                            wR_star = vel%R(3)
                             v_double = (sqrt_rhoL_star*vL_star + sqrt_rhoR_star*vR_star + (B%R(2) - B%L(2))*sign_Bx)/denom_ds
                             w_double = (sqrt_rhoL_star*wL_star + sqrt_rhoR_star*wR_star + (B%R(3) - B%L(3))*sign_Bx)/denom_ds
                             By_double = (sqrt_rhoL_star*B%R(2) + sqrt_rhoR_star*B%L(2) + sqrt_rhoL_star*sqrt_rhoR_star*(vR_star - vL_star)*sign_Bx)/denom_ds
@@ -3135,21 +3095,8 @@ contains
                             E_doubleR = E_starR + sqrt_rhoR_star*((vR_star*B%R(2) + wR_star*B%R(3)) - (v_double*By_double + w_double*Bz_double))*sign_Bx
                             E_double = 0.5_wp*(E_doubleL + E_doubleR)
 
-                            U_doubleL(1) = rhoL_star
-                            U_doubleL(2) = rhoL_star*s_M
-                            U_doubleL(3) = rhoL_star*v_double
-                            U_doubleL(4) = rhoL_star*w_double
-                            U_doubleL(5) = By_double
-                            U_doubleL(6) = Bz_double
-                            U_doubleL(7) = E_double
-
-                            U_doubleR(1) = rhoR_star
-                            U_doubleR(2) = rhoR_star*s_M
-                            U_doubleR(3) = rhoR_star*v_double
-                            U_doubleR(4) = rhoR_star*w_double
-                            U_doubleR(5) = By_double
-                            U_doubleR(6) = Bz_double
-                            U_doubleR(7) = E_double
+                            U_doubleL = [rhoL_star, rhoL_star*s_M, rhoL_star*v_double, rhoL_star*w_double, By_double, Bz_double, E_double]
+                            U_doubleR = [rhoR_star, rhoR_star*s_M, rhoR_star*v_double, rhoR_star*w_double, By_double, Bz_double, E_double]
 
                             ! (11) Choose HLLD flux based on wave-speed regions
                             if (0.0_wp <= s_L) then
@@ -3170,16 +3117,12 @@ contains
                             ! Mass
                             flux_rs${XYZ}$_vf(j, k, l, 1) = F_hlld(1) ! TODO multi-component
                             ! Momentum
-                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = F_hlld(2)
-                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(2)) = F_hlld(3)
-                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(3)) = F_hlld(4)
+                            flux_rs${XYZ}$_vf(j, k, l, [contxe + dir_idx(1), contxe + dir_idx(2), contxe + dir_idx(3)]) = F_hlld([2, 3, 4])
                             ! Magnetic field
                             if (n == 0) then
-                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg) = F_hlld(5)
-                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1) = F_hlld(6)
+                                flux_rs${XYZ}$_vf(j, k, l, [B_idx%beg, B_idx%beg + 1]) = F_hlld([5, 6])
                             else
-                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(2) - 1) = F_hlld(5)
-                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(3) - 1) = F_hlld(6)
+                                flux_rs${XYZ}$_vf(j, k, l, [B_idx%beg + dir_idx(2) - 1, B_idx%beg + dir_idx(3) - 1]) = F_hlld([5, 6])
                             end if
                             ! Energy
                             flux_rs${XYZ}$_vf(j, k, l, E_idx) = F_hlld(7)
