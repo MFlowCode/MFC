@@ -108,8 +108,6 @@ print(
             # Mixing layer
             "mixlayer_vel_profile": "T",
             "mixlayer_vel_coef": 1.0,
-            "mixlayer_domain": 1.0,
-            "mixlayer_perturb": "T",
             # Artificial Mach number
             "pi_fac": pi_fac,
             # Fluids Physical Parameters
