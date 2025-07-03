@@ -7,11 +7,11 @@ fi
 
 . ./mfc.sh load -c f -m g
 
-if [ "$2" == "bench" ]; then
+if [ "$2" = "bench" ]; then
     for dir in benchmarks/*/; do
         dirname=$(basename "$dir")
         ./mfc.sh run "$dir/case.py" --case-optimization -j 8 --dry-run $build_opts
     done
 else
-    ./mfc.sh test --dry-run -j 8 $build_opts
+    ./mfc.sh test --dry-run --rdma-mpi -j 8 $build_opts
 fi
