@@ -28,23 +28,27 @@ contains
 
         call s_check_inputs_compilers
 
-        call s_check_inputs_weno
-        call s_check_inputs_riemann_solver
+        if (igr) then
+            call s_check_inputs_igr
+        else
+            call s_check_inputs_weno
+            call s_check_inputs_riemann_solver
+            call s_check_inputs_model_eqns
+            call s_check_inputs_acoustic_src
+            call s_check_inputs_hypoelasticity
+            call s_check_inputs_bubbles_euler
+            call s_check_inputs_bubbles_lagrange
+            call s_check_inputs_adapt_dt
+            call s_check_inputs_alt_soundspeed
+            call s_check_inputs_grcbc
+            call s_check_inputs_geometry_precision
+            call s_check_inputs_mhd
+            call s_check_inputs_continuum_damage
+        end if
         call s_check_inputs_time_stepping
-        call s_check_inputs_model_eqns
-        call s_check_inputs_acoustic_src
-        call s_check_inputs_hypoelasticity
-        call s_check_inputs_bubbles_euler
-        call s_check_inputs_bubbles_lagrange
-        call s_check_inputs_adapt_dt
-        call s_check_inputs_alt_soundspeed
         call s_check_inputs_stiffened_eos_viscosity
         call s_check_inputs_body_forces
         call s_check_inputs_misc
-        call s_check_inputs_grcbc
-        call s_check_inputs_geometry_precision
-        call s_check_inputs_mhd
-        call s_check_inputs_continuum_damage
 
     end subroutine s_check_inputs
 
@@ -59,6 +63,34 @@ contains
 #endif
 
     end subroutine s_check_inputs_compilers
+
+    impure subroutine s_check_inputs_igr
+        @:PROHIBIT(num_igr_iters < 0, "num_igr_iters must be greater than 0")
+        @:PROHIBIT(num_igr_warm_start_iters < 0, "num_igr_warm_start_iters must be greater than 0")
+        @:PROHIBIT((igr_iter_solver /= 1 .and. igr_iter_solver /= 2), &
+            "igr_iter_solver must be 1 or 2")
+        @:PROHIBIT(alf_factor < 0, "alf factor must be positive")
+        @:PROHIBIT(model_eqns /= 2, "IGR only supports model_eqns = 2")
+        @:PROHIBIT(ib, "IGR does not support the immersed boundary method")
+        @:PROHIBIT(bubbles_euler, "IGR does not support Euler-Euler bubble models")
+        @:PROHIBIT(bubbles_lagrange, "IGR does not support Euler-Lagrange bubbles models")
+        @:PROHIBIT(alt_soundspeed, "IGR does not support alt_soundspeed = T")
+        @:PROHIBIT(surface_tension, "IGR does not support surface tension")
+        @:PROHIBIT(hypoelasticity, "IGR does not support hypoelasticity")
+        @:PROHIBIT(acoustic_source, "IGR does not support acoustic sources")
+        @:PROHIBIT(relax, "IGR does not support phase change")
+        @:PROHIBIT(mhd, "IGR does not support magnetohydrodynamics")
+        @:PROHIBIT(hyperelasticity, "IGR does not support hyperelasticity")
+        @:PROHIBIT(cyl_coord, "IGR does not support cylindrical or axisymmetric coordinates")
+
+        #:for DIR in [('x'), ('y'), ('z')]
+            #:for LOC in [('beg'), ('end')]
+                @:PROHIBIT((bc_${DIR}$%${LOC}$ <= -4 .and. bc_${DIR}$%${LOC}$ >= -14), &
+                    "Characteristic boundary condition bc_${DIR}$%${LOC}$ is not compatible with IGR")
+            #:endfor
+        #:endfor
+
+    end subroutine s_check_inputs_igr
 
     !> Checks constraints on WENO scheme parameters
     impure subroutine s_check_inputs_weno
@@ -306,8 +338,10 @@ contains
                     "model_eqns = 1 does not support fluid_pp("//trim(iStr)//")%"// "Re("//trim(jStr)//")")
                 @:PROHIBIT(i > num_fluids .and. (.not. f_is_default(fluid_pp(i)%Re(j))), &
                     "First index ("//trim(iStr)//") of fluid_pp("//trim(iStr)//")%"// "Re("//trim(jStr)//") exceeds num_fluids")
-                @:PROHIBIT(weno_order == 1 .and. (.not. weno_avg) .and. (.not. f_is_default(fluid_pp(i)%Re(j))), &
-                    "weno_order = 1 without weno_avg does not support fluid_pp("//trim(iStr)//")%"// "Re("//trim(jStr)//")")
+                if (.not. igr) then
+                    @:PROHIBIT(weno_order == 1 .and. (.not. weno_avg) .and. (.not. f_is_default(fluid_pp(i)%Re(j))), &
+                        "weno_order = 1 without weno_avg does not support fluid_pp("//trim(iStr)//")%"// "Re("//trim(jStr)//")")
+                end if
             end do
             @:PROHIBIT(.not. f_is_default(fluid_pp(i)%Re(1)) .and. .not. viscous, &
                 "Re(1) is specified, but viscous is not set to true")
