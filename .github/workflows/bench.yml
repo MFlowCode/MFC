@@ -23,19 +23,40 @@ jobs:
           filters: ".github/file-filter.yml"
 
   self:
-    name: Georgia Tech | Phoenix (NVHPC)
+    name: "${{ matrix.name }} (${{ matrix.device }})"
     if: ${{ github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && (
              (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
              (github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbryngelson')
-           ) }}    
+           ) }}
     needs: file-changes
     strategy:
-      matrix:
-        device: ['cpu', 'gpu']
       fail-fast: false
+      matrix:
+        include:
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: cpu
+            build_script: ""
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: gpu
+            build_script: ""
+          - cluster: frontier
+            name: Oak Ridge | Frontier (CCE)
+            group: phoenix
+            labels: frontier
+            flag: f
+            device: gpu
+            build_script: "bash .github/workflows/frontier/build.sh gpu bench"
     runs-on:
-      group:  phoenix
-      labels: gt
+      group: ${{ matrix.group }}
+      labels: ${{ matrix.labels }}
     timeout-minutes: 1400
     env:
       ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
@@ -53,15 +74,22 @@ jobs:
           ref: master
           path: master
 
+      - name: Setup & Build
+        if: matrix.build_script != ''
+        run: | 
+          (cd pr     && ${{ matrix.build_script }}) &
+          (cd master && ${{ matrix.build_script }}) &
+          wait %1 && wait %2
+
       - name: Bench (Master v. PR)
         run: |
-          (cd pr     && bash .github/workflows/phoenix/submit-bench.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
-          (cd master && bash .github/workflows/phoenix/submit-bench.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
+          (cd pr     && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }}) &
+          (cd master && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }}) &
           wait %1 && wait %2
 
       - name: Generate & Post Comment
         run: |
-          (cd pr && . ./mfc.sh load -c p -m g)
+          (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
           (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml)
 
       - name: Print Logs
@@ -72,9 +100,9 @@ jobs:
       
       - name: Archive Logs
         uses: actions/upload-artifact@v4
-        if:   always()
+        if: always()
         with:
-          name: logs-${{ matrix.device }}
+          name: ${{ matrix.cluster }}-${{ matrix.device }}
           path: |
             pr/bench-${{ matrix.device }}.*
             pr/build/benchmarks/*
