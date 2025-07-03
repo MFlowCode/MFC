@@ -1261,9 +1261,6 @@ contains
             !! Determines the amount of freedom available from utilizing a large
             !! value for the local curvature. The default value for beta is 4/3.
 
-        real(wp), parameter :: alpha_mp = 2._wp
-        real(wp), parameter :: beta_mp = 4._wp/3._wp
-
         !$acc parallel loop gang vector collapse (4)  default(present) private(d)
         do l = is3_weno%beg, is3_weno%end
             do k = is2_weno%beg, is2_weno%end
@@ -1296,7 +1293,7 @@ contains
 
                         vL_UL = v_rs_ws(j, k, l, i) &
                                 - (v_rs_ws(j + 1, k, l, i) &
-                                   - v_rs_ws(j, k, l, i))*alpha_mp
+                                   - v_rs_ws(j, k, l, i))*alpha
 
                         vL_MD = (v_rs_ws(j, k, l, i) &
                                  + v_rs_ws(j - 1, k, l, i) &
@@ -1304,7 +1301,7 @@ contains
 
                         vL_LC = v_rs_ws(j, k, l, i) &
                                 - (v_rs_ws(j + 1, k, l, i) &
-                                   - v_rs_ws(j, k, l, i))*5.e-1_wp + beta_mp*d_LC
+                                   - v_rs_ws(j, k, l, i))*5.e-1_wp + beta*d_LC
 
                         vL_min = max(min(v_rs_ws(j, k, l, i), &
                                          v_rs_ws(j - 1, k, l, i), &
@@ -1355,7 +1352,7 @@ contains
 
                         vR_UL = v_rs_ws(j, k, l, i) &
                                 + (v_rs_ws(j, k, l, i) &
-                                   - v_rs_ws(j - 1, k, l, i))*alpha_mp
+                                   - v_rs_ws(j - 1, k, l, i))*alpha
 
                         vR_MD = (v_rs_ws(j, k, l, i) &
                                  + v_rs_ws(j + 1, k, l, i) &
@@ -1363,7 +1360,7 @@ contains
 
                         vR_LC = v_rs_ws(j, k, l, i) &
                                 + (v_rs_ws(j, k, l, i) &
-                                   - v_rs_ws(j - 1, k, l, i))*5.e-1_wp + beta_mp*d_LC
+                                   - v_rs_ws(j - 1, k, l, i))*5.e-1_wp + beta*d_LC
 
                         vR_min = max(min(v_rs_ws(j, k, l, i), &
                                          v_rs_ws(j + 1, k, l, i), &
