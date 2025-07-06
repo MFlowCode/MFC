@@ -172,7 +172,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     def alter_muscl():
         for muscl_order in [1, 2]:
-            stack.push(f"muscl_order={muscl_order}", {'muscl_order': muscl_order})
+            stack.push(f"muscl_order={muscl_order}", {'muscl_order': muscl_order, 'recon_type':2, 'weno_order':0})
 
             if muscl_order == 1:
                 for int_comp in ["T", "F"]:

@@ -1,43 +1,10 @@
-This file was created on 2025-07-06 23:01:06.459783.
+This file was created on 2025-07-06 23:01:35.398415.
 
 mfc.sh:
 
-    Invocation: test -j 8 --generate -o muscl_order=2
+    Invocation: test -j 8 --generate -o shockdroplet_muscl
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
     Git:        1117c7926b10a92920fd501899761823dd2cf9db on muscl (dirty)
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v4.0.3-dirty on bok
-    
-        C       : NVHPC v24.5.1 (/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvc)
-        Fortran : NVHPC v24.5.1 (/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
 
 pre_process:
 
@@ -52,39 +19,6 @@ pre_process:
         SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v4.0.3-dirty on bok
-    
-        C       : GNU v15.1.1 (/usr/bin/cc)
-        Fortran : GNU v15.1.1 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -138,6 +72,72 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
+post_process:
+
+    CMake Configuration:
+    
+        CMake v4.0.3-dirty on bok
+    
+        C       : NVHPC v24.5.1 (/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvc)
+        Fortran : NVHPC v24.5.1 (/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvc
+        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvc++
+        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v4.0.3-dirty on bok
+    
+        C       : GNU v15.1.1 (/usr/bin/cc)
+        Fortran : GNU v15.1.1 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 CPU:
 
     CPU Info:
@@ -156,7 +156,7 @@ CPU:
     Core(s) per socket:                      4
     Socket(s):                               1
     Stepping:                                1
-    CPU(s) scaling MHz:                      45%
+    CPU(s) scaling MHz:                      37%
     CPU max MHz:                             4700.0000
     CPU min MHz:                             400.0000
     BogoMIPS:                                5606.40
