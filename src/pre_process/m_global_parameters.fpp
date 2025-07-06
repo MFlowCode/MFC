@@ -563,7 +563,7 @@ contains
         if (recon_type == WENO_TYPE) then
             weno_polyn = (weno_order - 1)/2
         elseif (recon_type == MUSCL_TYPE) then
-            muscl_polyn = muscl_order
+            muscl_polyn = muscl_order 
         end if
 
         ! Determining the layout of the state vectors and overall size of

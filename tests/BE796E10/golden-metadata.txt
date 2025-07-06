@@ -1,23 +1,23 @@
-This file was created on 2025-06-06 13:24:01.466889.
+This file was created on 2025-07-06 23:01:31.528371.
 
 mfc.sh:
 
-    Invocation: test -o shockdroplet_muscl -j 8 --generate
+    Invocation: test -j 8 --generate -o shockdroplet_muscl
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        a1172ffb4515b657433b79370d3289aea6f197fd on muscl (dirty)
+    Git:        1117c7926b10a92920fd501899761823dd2cf9db on muscl (dirty)
 
-post_process:
+pre_process:
 
     CMake Configuration:
     
-        CMake v4.0.2-dirty on bok
+        CMake v4.0.3-dirty on bok
     
         C       : GNU v15.1.1 (/usr/bin/cc)
         Fortran : GNU v15.1.1 (/usr/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
-        POST_PROCESS  : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -32,9 +32,9 @@ post_process:
     
     Configuration Environment:
     
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -43,7 +43,7 @@ simulation:
 
     CMake Configuration:
     
-        CMake v4.0.2-dirty on bok
+        CMake v4.0.3-dirty on bok
     
         C       : GNU v15.1.1 (/usr/bin/cc)
         Fortran : GNU v15.1.1 (/usr/bin/gfortran)
@@ -72,19 +72,19 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+post_process:
 
     CMake Configuration:
     
-        CMake v4.0.2-dirty on bok
+        CMake v4.0.3-dirty on bok
     
-        C       : GNU v15.1.1 (/usr/bin/cc)
-        Fortran : GNU v15.1.1 (/usr/bin/gfortran)
+        C       : NVHPC v24.5.1 (/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvc)
+        Fortran : NVHPC v24.5.1 (/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -98,26 +98,26 @@ syscheck:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvc
+        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvc++
+        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/24.5/compilers/bin/nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
-        CMake v4.0.2-dirty on bok
+        CMake v4.0.3-dirty on bok
     
         C       : GNU v15.1.1 (/usr/bin/cc)
         Fortran : GNU v15.1.1 (/usr/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -156,7 +156,7 @@ CPU:
     Core(s) per socket:                      4
     Socket(s):                               1
     Stepping:                                1
-    CPU(s) scaling MHz:                      38%
+    CPU(s) scaling MHz:                      56%
     CPU max MHz:                             4700.0000
     CPU min MHz:                             400.0000
     BogoMIPS:                                5606.40

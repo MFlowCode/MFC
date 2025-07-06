@@ -106,7 +106,7 @@ contains
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*muscl_order, &
             "For 3D simulation, p must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(muscl_order == 2 .and. muscl_lim == dflt_int, "muscl_lim must be defined if using muscl_order = 2")
-        @:PROHIBIT(muscl_lim < 1 .or. muscl_lim > 5, "muscl_lim must be 1,2,3,4, or 5")
+        @:PROHIBIT(muscl_order /= 1 .and. muscl_lim < 1 .or. muscl_lim > 5, "muscl_lim must be 1,2,3,4, or 5")
 
     end subroutine s_check_inputs_muscl
 

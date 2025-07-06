@@ -805,7 +805,7 @@ contains
                     weno_num_stencils = weno_polyn
                 end if
             elseif (recon_type == MUSCL_TYPE) then
-                muscl_polyn = muscl_order
+                muscl_polyn = muscl_order 
             end if
             !$acc update device(weno_polyn, muscl_polyn)
             !$acc update device(weno_num_stencils)

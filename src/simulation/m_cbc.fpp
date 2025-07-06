@@ -279,9 +279,9 @@ contains
             idx2%end = weno_order - 3
         else if (recon_type == MUSCL_TYPE) then
             idx1%beg = 0
-            idx1%end = muscl_polyn - 1
+            idx1%end = muscl_polyn 
             idx2%beg = 0
-            idx2%end = muscl_order - 2
+            idx2%end = muscl_order - 1 
         end if
         ! Allocating/Computing CBC Coefficients in x-direction
         if (all((/bc_x%beg, bc_x%end/) <= -5) .and. all((/bc_x%beg, bc_x%end/) >= -13)) then
@@ -479,8 +479,8 @@ contains
 
         ! Computing CBC1 Coefficients
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (cbc_dir_in == ${CBC_DIR}$) then
-                if (weno_order == 1 .or. muscl_order > 1) then
+            if (cbc_dir_in == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
+                if (weno_order == 1) then
 
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
                     fd_coef_${XYZ}$ (0, cbc_loc_in) = -2._wp/(ds(0) + ds(1))
@@ -694,7 +694,7 @@ contains
         call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
 
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (cbc_dir == ${CBC_DIR}$) then
+            if (cbc_dir == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
 
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
                 if (weno_order == 3) then
@@ -729,7 +729,7 @@ contains
                     end do
 
                     ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
-                else if (weno_order > 3) then
+                else
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
                                                                F_src_rs${XYZ}$_vf, &
