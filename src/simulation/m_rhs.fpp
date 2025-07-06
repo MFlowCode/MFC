@@ -173,8 +173,8 @@ contains
 
         integer :: num_eqns_after_adv
 
-        $:GPU_ENTER_DATA(copyin='[idwbuff,idwbuff]')
-        $:GPU_UPDATE(device='[idwbuff, idwbuff]')
+        $:GPU_ENTER_DATA(copyin='[idwbuff]')
+        $:GPU_UPDATE(device='[idwbuff]')
 
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
