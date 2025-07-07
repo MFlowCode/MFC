@@ -130,12 +130,17 @@ contains
         type(scalar_field), intent(in), optional :: beta
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
-        integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
+#ifndef MFC_POST_PROCESS
 
+        integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
+#endif
 #ifdef MFC_MPI
 
         ! Generic loop iterator
-        integer :: i, j
+        integer :: i
+#ifndef MFC_POST_PROCESS
+        integer :: j
+#endif
 
         !Altered system size for the lagrangian subgrid bubble model
         integer :: alt_sys
@@ -362,6 +367,11 @@ contains
         real(wp), intent(out) :: icfl_max_glb
         real(wp), intent(out) :: vcfl_max_glb
         real(wp), intent(out) :: Rc_min_glb
+
+        ! Initiate the global variables to the local values to avoid warnings
+        icfl_max_glb = icfl_max_loc
+        vcfl_max_glb = vcfl_max_loc
+        Rc_min_glb = Rc_min_loc
 
 #ifdef MFC_SIMULATION
 #ifdef MFC_MPI

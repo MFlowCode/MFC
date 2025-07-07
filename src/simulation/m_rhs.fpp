@@ -107,12 +107,12 @@ module m_rhs
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
     !$acc declare create(tau_Re_vf)
 
-    type(vector_field) :: gm_alpha_qp  !<
+    !type(vector_field) :: gm_alpha_qp  !<
     !! The gradient magnitude of the volume fractions at cell-interior Gaussian
     !! quadrature points. gm_alpha_qp is calculated from individual first-order
     !! spatial derivatives located in dq_prim_ds_qp.
 
-    !$acc declare create(gm_alpha_qp)
+    !!$acc declare create(gm_alpha_qp)
 
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
     !! average gradient magnitude of volume fractions, located in gm_alpha_qp.
