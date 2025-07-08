@@ -143,7 +143,6 @@
         q_prim_vf(B_idx%beg + 1)%sf(i, j, 0) = sin(4._wp*pi*x_cc(i))/sqrt(4._wp*pi)
 
     case (251) ! RMHD Cylindrical Blast Wave [Mignone, 2006: Section 4.3.1]
-
         if (x_cc(i)**2 + y_cc(j)**2 < 0.08_wp**2) then
             q_prim_vf(contxb)%sf(i, j, 0) = 0.01
             q_prim_vf(E_idx)%sf(i, j, 0) = 1.0
