@@ -88,11 +88,11 @@ contains
             "n must be positive (2D or 3D) for cylindrical coordinates")
         @:PROHIBIT(cyl_coord .and. (f_is_default(y_domain%beg) .or. f_is_default(y_domain%end)), &
             "y_domain%beg and y_domain%end must be set for n = 0 (2D cylindrical coordinates)")
-        @:PROHIBIT(cyl_coord .and. (y_domain%beg /= 0._wp .or. y_domain%end <= 0._wp), &
+        @:PROHIBIT(cyl_coord .and. ((.not. f_approx_equal(y_domain%beg , 0._wp)) .or. y_domain%end <= 0._wp), &
             "y_domain%beg must be 0 and y_domain%end must be positive for cylindrical coordinates")
         @:PROHIBIT(cyl_coord .and. p == 0 .and. ((.not. f_is_default(z_domain%beg)) .or. (.not. f_is_default(z_domain%end))), &
             "z_domain%beg and z_domain%end are not supported for p = 0 (2D cylindrical coordinates)")
-        @:PROHIBIT(cyl_coord .and. p > 0 .and. (z_domain%beg /= 0._wp .or. z_domain%end /= 2._wp*pi), &
+        @:PROHIBIT(cyl_coord .and. p > 0 .and. (.not. (f_approx_equal(z_domain%beg, 0._wp) .and. f_approx_equal(z_domain%end, 2._wp*pi))), &
             "z_domain%beg must be 0 and z_domain%end must be 2*pi for 3D cylindrical coordinates")
 
         @:PROHIBIT(num_patches < 0)
@@ -188,11 +188,7 @@ contains
             "mixlayer_vel_profile requires n > 0")
 
         ! Instability wave
-        @:PROHIBIT(mixlayer_perturb .and. n == 0, "mixlayer_perturb requires n > 0")
-        @:PROHIBIT(mixlayer_perturb .and. model_eqns /= 2, "mixlayer_perturb requires model_eqns = 2")
-        @:PROHIBIT(mixlayer_perturb .and. num_fluids > 1, "mixlayer_perturb requires num_fluids = 1")
-        @:PROHIBIT(mixlayer_perturb .and. any((/bc_y%beg, bc_y%end/) /= BC_CHAR_NR_SUB_BUFFER), &
-            "mixlayer_perturb requires both bc_y%beg and bc_y%end to be 6")
+        @:PROHIBIT(mixlayer_perturb .and. p == 0, "mixlayer_perturb requires p > 0")
         @:PROHIBIT(elliptic_smoothing .and. elliptic_smoothing_iters < 1, &
             "elliptic_smoothing_iters must be positive")
 

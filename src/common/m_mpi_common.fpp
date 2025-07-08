@@ -25,7 +25,7 @@ module m_mpi_common
     implicit none
 
     integer, private :: ierr, v_size !<
-    !$acc declare create(v_size)
+    $:GPU_DECLARE(create='[v_size]')
     !! Generic flags used to identify and report MPI errors
 
     real(wp), private, allocatable, dimension(:) :: buff_send !<
@@ -38,10 +38,10 @@ module m_mpi_common
     !! average primitive variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
-    !$acc declare create(buff_send, buff_recv)
+    $:GPU_DECLARE(create='[buff_send, buff_recv]')
 
     integer :: halo_size
-    !$acc declare create(halo_size)
+    $:GPU_DECLARE(create='[halo_size]')
 
 contains
 
@@ -76,7 +76,7 @@ contains
             halo_size = -1 + buff_size*(v_size)
         end if
 
-        !$acc update device(halo_size, v_size)
+        $:GPU_UPDATE(device='[halo_size, v_size]')
 
         @:ALLOCATE(buff_send(0:halo_size), buff_recv(0:halo_size))
 #endif
@@ -633,8 +633,6 @@ contains
 
         integer :: pack_offset, unpack_offset
 
-        real(wp), pointer :: p_send, p_recv
-
 #ifdef MFC_MPI
 
         call nvtxStartRange("RHS-COMM-PACKBUF")
@@ -658,7 +656,7 @@ contains
                             /)
         end if
 
-        !$acc update device(v_size)
+        $:GPU_UPDATE(device='[v_size]')
 
         buffer_count = buffer_counts(mpi_dir)
         boundary_conditions = (/bc_x, bc_y, bc_z/)
@@ -694,7 +692,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
                     do l = 0, p
                         do k = 0, n
                             do j = 0, buff_size - 1
@@ -707,7 +705,7 @@ contains
                     end do
 
                     if (qbmm_comm) then
-                        !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                        $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, buff_size - 1
@@ -722,7 +720,7 @@ contains
                             end do
                         end do
 
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, buff_size - 1
@@ -738,7 +736,7 @@ contains
                         end do
                     end if
                 #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
                     do i = 1, nVar
                         do l = 0, p
                             do k = 0, buff_size - 1
@@ -753,7 +751,7 @@ contains
                     end do
 
                     if (qbmm_comm) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do i = nVar + 1, nVar + 4
                             do l = 0, p
                                 do k = 0, buff_size - 1
@@ -769,7 +767,7 @@ contains
                             end do
                         end do
 
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do i = nVar + 1, nVar + 4
                             do l = 0, p
                                 do k = 0, buff_size - 1
@@ -786,7 +784,7 @@ contains
                         end do
                     end if
                 #:else
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
                     do i = 1, nVar
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
@@ -801,7 +799,7 @@ contains
                     end do
 
                     if (qbmm_comm) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do i = nVar + 1, nVar + 4
                             do l = 0, buff_size - 1
                                 do k = -buff_size, n + buff_size
@@ -817,7 +815,7 @@ contains
                             end do
                         end do
 
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do i = nVar + 1, nVar + 4
                             do l = 0, buff_size - 1
                                 do k = -buff_size, n + buff_size
@@ -843,28 +841,33 @@ contains
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
                 #:if rdma_mpi
-                    !$acc host_data use_device(buff_send, buff_recv)
-                    call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
+                    #:call GPU_HOST_DATA(use_device='[buff_send, buff_recv]')
+                        call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
+
+                        call MPI_SENDRECV( &
+                            buff_send, buffer_count, mpi_p, dst_proc, send_tag, &
+                            buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
+                            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                        call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
+
+                    #:endcall GPU_HOST_DATA
+                    $:GPU_WAIT()
                 #:else
                     call nvtxStartRange("RHS-COMM-DEV2HOST")
-                    !$acc update host(buff_send)
+                    $:GPU_UPDATE(host='[buff_send]')
                     call nvtxEndRange
                     call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
-                #:endif
 
-                call MPI_SENDRECV( &
-                    buff_send, buffer_count, mpi_p, dst_proc, send_tag, &
-                    buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV( &
+                        buff_send, buffer_count, mpi_p, dst_proc, send_tag, &
+                        buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
+                    call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
-                #:if rdma_mpi
-                    !$acc end host_data
-                    !$acc wait
-                #:else
                     call nvtxStartRange("RHS-COMM-HOST2DEV")
-                    !$acc update device(buff_recv)
+                    $:GPU_UPDATE(device='[buff_recv]')
                     call nvtxEndRange
                 #:endif
             end if
@@ -881,7 +884,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
                     do l = 0, p
                         do k = 0, n
                             do j = -buff_size, -1
@@ -901,7 +904,7 @@ contains
                     end do
 
                     if (qbmm_comm) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do l = 0, p
                             do k = 0, n
                                 do j = -buff_size, -1
@@ -916,7 +919,7 @@ contains
                             end do
                         end do
 
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do l = 0, p
                             do k = 0, n
                                 do j = -buff_size, -1
@@ -932,7 +935,7 @@ contains
                         end do
                     end if
                 #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
                     do i = 1, nVar
                         do l = 0, p
                             do k = -buff_size, -1
@@ -953,7 +956,7 @@ contains
                     end do
 
                     if (qbmm_comm) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do i = nVar + 1, nVar + 4
                             do l = 0, p
                                 do k = -buff_size, -1
@@ -969,7 +972,7 @@ contains
                             end do
                         end do
 
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do i = nVar + 1, nVar + 4
                             do l = 0, p
                                 do k = -buff_size, -1
@@ -987,7 +990,7 @@ contains
                     end if
                 #:else
                     ! Unpacking buffer from bc_z%beg
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
                     do i = 1, nVar
                         do l = -buff_size, -1
                             do k = -buff_size, n + buff_size
@@ -1009,7 +1012,7 @@ contains
                     end do
 
                     if (qbmm_comm) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do i = nVar + 1, nVar + 4
                             do l = -buff_size, -1
                                 do k = -buff_size, n + buff_size
@@ -1026,7 +1029,7 @@ contains
                             end do
                         end do
 
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do i = nVar + 1, nVar + 4
                             do l = -buff_size, -1
                                 do k = -buff_size, n + buff_size

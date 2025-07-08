@@ -3,6 +3,7 @@
 !! @brief Contains module m_assign_variables
 
 #:include 'case.fpp'
+#:include 'macros.fpp'
 
 module m_assign_variables
 
@@ -103,7 +104,7 @@ contains
         !! @param patch_id_fp Array to track patch ids
     pure subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
                                                                eta, q_prim_vf, patch_id_fp)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
@@ -181,7 +182,7 @@ contains
         end if
 
         ! Updating the patch identities bookkeeping variable
-        if (1._wp - eta < 1e-16_wp) patch_id_fp(j, k, l) = patch_id
+        if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_mixture_primitive_variables
 
@@ -199,8 +200,8 @@ contains
         real(wp) :: pres_mag, loc, n_tait, B_tait, p0
         real(wp) :: R3bar, n0, ratio, nH, vfH, velH, rhoH, deno
 
-        p0 = 101325
-        pres_mag = 1e-1_wp
+        p0 = 101325._wp
+        pres_mag = 1.e-1_wp
         loc = x_cc(177)
         n_tait = fluid_pp(1)%gamma
         B_tait = fluid_pp(1)%pi_inf
@@ -214,7 +215,7 @@ contains
 
         if (qbmm) then
             do i = 1, nb
-                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - fluid_pp(1)%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - fluid_pp(1)%pv))**(1/3._wp)
+                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - fluid_pp(1)%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - fluid_pp(1)%pv))**(1._wp/3._wp)
             end do
         end if
 
@@ -244,7 +245,7 @@ contains
         rhoH = (1._wp - vfH)/ratio
         deno = 1._wp - (1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/rhoH
 
-        if (deno == 0._wp) then
+        if (f_approx_equal(deno, 0._wp)) then
             velH = 0._wp
         else
             velH = (q_prim_vf(E_idx)%sf(j, k, l) - 1._wp)/(1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/deno
@@ -276,7 +277,7 @@ contains
         !! @param patch_id_fp Array to track patch ids
     impure subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, &
                                                                  eta, q_prim_vf, patch_id_fp)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
@@ -502,7 +503,7 @@ contains
                 theta = atan2(y_cc(k), x_cc(j))
                 phi = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
                 !spherical coord, assuming Rmax=1
-                xi_sph = (rcoord**3 - R0ref**3 + 1_wp)**(1_wp/3_wp)
+                xi_sph = (rcoord**3 - R0ref**3 + 1._wp)**(1._wp/3._wp)
                 xi_cart(1) = xi_sph*sin(phi)*cos(theta)
                 xi_cart(2) = xi_sph*sin(phi)*sin(theta)
                 xi_cart(3) = xi_sph*cos(phi)
@@ -515,7 +516,7 @@ contains
             ! assigning the reference map to the q_prim vector field
             do i = 1, num_dims
                 q_prim_vf(i + xibeg - 1)%sf(j, k, l) = eta*xi_cart(i) + &
-                                                       (1_wp - eta)*orig_prim_vf(i + xibeg - 1)
+                                                       (1._wp - eta)*orig_prim_vf(i + xibeg - 1)
             end do
         end if
 
@@ -687,7 +688,7 @@ contains
         end if
 
         ! Updating the patch identities bookkeeping variable
-        if (1._wp - eta < 1e-16_wp) patch_id_fp(j, k, l) = patch_id
+        if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_species_primitive_variables
 

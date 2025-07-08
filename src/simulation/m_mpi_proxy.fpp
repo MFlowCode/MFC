@@ -50,7 +50,7 @@ module m_mpi_proxy
     !> @}
 
     integer :: i_halo_size
-    !$acc declare create(i_halo_size)
+    $:GPU_DECLARE(create='[i_halo_size]')
 
     integer, dimension(-1:1, -1:1, -1:1) :: p_send_counts, p_recv_counts
     integer, dimension(:,:,:,:), allocatable :: p_send_ids
@@ -80,7 +80,7 @@ contains
                 i_halo_size = -1 + gp_layers
             end if
 
-            !$acc update device(i_halo_size)
+            $:GPU_UPDATE(device='[i_halo_size]')
             @:ALLOCATE(ib_buff_send(0:i_halo_size), ib_buff_recv(0:i_halo_size))
         end if
 #endif
@@ -294,8 +294,6 @@ contains
 
         integer :: pack_offset, unpack_offset
 
-        integer, pointer :: p_i_send, p_i_recv
-
 #ifdef MFC_MPI
 
         call nvtxStartRange("IB-MARKER-COMM-PACKBUF")
@@ -340,7 +338,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, p
                         do k = 0, n
                             do j = 0, gp_layers - 1
@@ -350,7 +348,7 @@ contains
                         end do
                     end do
                 #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, p
                         do k = 0, gp_layers - 1
                             do j = -gp_layers, m + gp_layers
@@ -361,7 +359,7 @@ contains
                         end do
                     end do
                 #:else
-                    !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, gp_layers - 1
                         do k = -gp_layers, n + gp_layers
                             do j = -gp_layers, m + gp_layers
@@ -388,7 +386,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, p
                         do k = 0, n
                             do j = -gp_layers, -1
@@ -398,7 +396,7 @@ contains
                         end do
                     end do
                 #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, p
                         do k = -gp_layers, -1
                             do j = -gp_layers, m + gp_layers
@@ -410,7 +408,7 @@ contains
                     end do
                 #:else
                     ! Unpacking buffer from bc_z%beg
-                    !$acc parallel loop collapse(3) gang vector default(present) private(r)
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = -gp_layers, -1
                         do k = -gp_layers, n + gp_layers
                             do j = -gp_layers, m + gp_layers

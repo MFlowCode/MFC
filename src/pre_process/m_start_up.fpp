@@ -134,8 +134,8 @@ contains
             model_eqns, num_fluids, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
             hypoelasticity, mhd, patch_icpp, fluid_pp, precision, parallel_io, &
-            mixlayer_vel_profile, mixlayer_vel_coef, mixlayer_domain, &
-            mixlayer_perturb, &
+            mixlayer_vel_profile, mixlayer_vel_coef, &
+            mixlayer_perturb, mixlayer_perturb_nk, mixlayer_perturb_k0, &
             pi_fac, perturb_flow, perturb_flow_fluid, perturb_flow_mag, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &
             cyl_coord, loops_x, loops_y, loops_z, &
@@ -776,8 +776,8 @@ contains
         end if
         !Initialize pb based on surface tension for qbmm (polytropic)
         if (qbmm .and. polytropic .and. (.not. f_is_default(Web))) then
-            pb0 = pref + 2._wp*fluid_pp(1)%ss/(R0*R0ref)
-            pb0 = pb0/pref
+            pb0(:) = pref + 2._wp*fluid_pp(1)%ss/(R0(:)*R0ref)
+            pb0(:) = pb0(:)/pref
             pref = 1._wp
         end if
         call s_initialize_mpi_common_module()

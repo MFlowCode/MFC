@@ -25,6 +25,8 @@ module m_data_output
 
     use m_helper
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_sim_helpers
 
     use m_delay_file_access
@@ -54,13 +56,14 @@ module m_data_output
     real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     real(wp), public, allocatable, dimension(:, :) :: c_mass
-    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf, c_mass)
+    $:GPU_DECLARE(create='[icfl_sf,vcfl_sf,ccfl_sf,Rc_sf,c_mass]')
 
     real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
     real(wp) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
     real(wp) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
-    !$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
+    $:GPU_DECLARE(create='[icfl_max_loc,icfl_max_glb,vcfl_max_loc,vcfl_max_glb]')
+    $:GPU_DECLARE(create='[ccfl_max_loc,ccfl_max_glb,Rc_min_loc,Rc_min_glb]')
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
     !> @{
@@ -277,7 +280,7 @@ contains
         integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step
-        !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -294,17 +297,16 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
 
         ! end: Computing Stability Criteria at Current Time-step
 
         ! Determining local stability criteria extrema at current time-step
 
 #ifdef _CRAYFTN
-        !$acc update host(icfl_sf)
+        $:GPU_UPDATE(host='[icfl_sf]')
 
         if (viscous) then
-            !$acc update host(vcfl_sf, Rc_sf)
+            $:GPU_UPDATE(host='[vcfl_sf,Rc_sf]')
         end if
 
         icfl_max_loc = maxval(icfl_sf)
@@ -317,7 +319,6 @@ contains
         !$acc kernels
         icfl_max_loc = maxval(icfl_sf)
         !$acc end kernels
-
         if (viscous) then
             !$acc kernels
             vcfl_max_loc = maxval(vcfl_sf)
@@ -360,7 +361,7 @@ contains
                     t_step, dt, t_step*dt, icfl_max_glb
             end if
 
-            if (icfl_max_glb /= icfl_max_glb) then
+            if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
                 call s_mpi_abort('ICFL is NaN. Exiting.')
             elseif (icfl_max_glb > 1._wp) then
                 print *, 'icfl', icfl_max_glb
@@ -368,7 +369,7 @@ contains
             end if
 
             if (viscous) then
-                if (vcfl_max_glb /= vcfl_max_glb) then
+                if (.not. f_approx_equal(vcfl_max_glb, vcfl_max_glb)) then
                     call s_mpi_abort('VCFL is NaN. Exiting.')
                 elseif (vcfl_max_glb > 1._wp) then
                     print *, 'vcfl', vcfl_max_glb
@@ -525,7 +526,7 @@ contains
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
-                !$acc update host(q_prim_vf(i)%sf(:,:,:))
+                $:GPU_UPDATE(host='[q_prim_vf(i)%sf(:,:,:)]')
             end do
             ! q_prim_vf(bubxb) stores the value of nb needed in riemann solvers, so replace with true primitive value (=1._wp)
             if (qbmm) then
@@ -661,8 +662,6 @@ contains
                             if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                                 .or. &
                                 ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                                .or. &
-                                ((i >= chemxb) .and. (i <= chemxe)) &
                                 ) then
                                 write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
                             else
@@ -1763,7 +1762,7 @@ contains
             @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
 
             vcfl_max = 0._wp
-            Rc_min = 1e3_wp
+            Rc_min = 1.e3_wp
         end if
 
     end subroutine s_initialize_data_output_module
