@@ -1143,7 +1143,9 @@ contains
                 io_time_final = maxval(io_proc_time)
             end if
 
-            grind_time = time_final*1.0e9_wp/(sys_size*maxval((/1,m_glb/))*maxval((/1,n_glb/))*maxval((/1,p_glb/)))
+            grind_time = time_final * 1.0e9_wp / &
+                (real(sys_size, wp) * real(maxval((/1, m_glb/)), wp) * &
+                 real(maxval((/1, n_glb/)), wp) * real(maxval((/1, p_glb/)), wp))
 
             print *, "Performance:", grind_time, "ns/gp/eq/rhs"
             inquire (FILE='time_data.dat', EXIST=file_exists)

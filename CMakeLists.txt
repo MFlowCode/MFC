@@ -164,7 +164,6 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         "SHELL: -h acc_model=no_fast_addr"
         "SHELL: -h list=adm"
         "SHELL: -munsafe-fp-atomics" # Not unsafe for operations we do
-        "SHELL: -O3 -hacc"
     )
 
     add_link_options("SHELL:-hkeepfiles")

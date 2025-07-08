@@ -195,7 +195,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[mpp_lim,model_eqns,mixture_err,alt_soundspeed]')
     $:GPU_DECLARE(create='[avg_state,mp_weno,weno_eps,teno_CT,hypoelasticity]')
     $:GPU_DECLARE(create='[hyperelasticity,hyper_model,elasticity,low_Mach]')
-    $:GPU_DECLARE(create='[viscous,shear_stress,bulk_stress,cont_damage]')
+    $:GPU_DECLARE(create='[shear_stress,bulk_stress,cont_damage]')
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model

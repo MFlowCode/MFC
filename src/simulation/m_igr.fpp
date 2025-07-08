@@ -163,7 +163,7 @@ contains
     end subroutine s_initialize_igr_module
 
     subroutine s_igr_iterative_solve(q_cons_vf, bc_type, t_step)
-
+        !DIR$ OPTIMIZE (-haggress)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
         integer, intent(in) :: t_step
@@ -261,7 +261,7 @@ contains
     end subroutine s_igr_iterative_solve
 
     subroutine s_igr_sigma_x(q_cons_vf, rhs_vf)
-
+        !DIR$ OPTIMIZE (-haggress)
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: rhs_vf
@@ -328,7 +328,7 @@ contains
     end subroutine s_igr_sigma_x
 
     subroutine s_igr_riemann_solver(q_cons_vf, rhs_vf, idir)
-
+        !DIR$ OPTIMIZE (-haggress)
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: rhs_vf
