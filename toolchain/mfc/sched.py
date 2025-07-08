@@ -50,23 +50,23 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = No
         for threadID, threadHolder in enumerate(threads):
             # Check if thread is not alive OR if it's been running for too long
             thread_not_alive = not threadHolder.thread.is_alive()
-            
+
             if thread_not_alive:
                 # Properly join the thread with timeout to prevent infinite hangs
                 try:
                     threadHolder.thread.join(timeout=30.0)  # 30 second timeout
-                    
+
                     # Double-check that thread actually finished joining
                     if threadHolder.thread.is_alive():
                         # Thread didn't finish within timeout - this is a serious issue
-                        raise Exception(f"Thread {threadID} failed to join within 30 seconds timeout. "
-                                      f"Thread may be hung or in an inconsistent state.")
-                        
+                        raise RuntimeError(f"Thread {threadID} failed to join within 30 seconds timeout. "
+                                         f"Thread may be hung or in an inconsistent state.")
+
                 except Exception as join_exc:
                     # Handle join-specific exceptions with more context
-                    raise Exception(f"Failed to join thread {threadID}: {join_exc}. "
-                                  f"This may indicate a system threading issue or hung test case.")
-                
+                    raise RuntimeError(f"Failed to join thread {threadID}: {join_exc}. "
+                                     f"This may indicate a system threading issue or hung test case.") from join_exc
+
                 # Check for and propagate any exceptions that occurred in the worker thread
                 # But only if the worker function didn't complete successfully
                 # (This allows test failures to be handled gracefully by handle_case)
@@ -75,13 +75,12 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = No
                         # Test framework handled the exception gracefully (e.g., test failure)
                         # Don't re-raise - this is expected behavior
                         pass
+                    # Unhandled exception - this indicates a real problem
+                    elif hasattr(threadHolder.thread, 'exc_info') and threadHolder.thread.exc_info:
+                        error_msg = f"Worker thread {threadID} failed with unhandled exception:\n{threadHolder.thread.exc_info}"
+                        raise RuntimeError(error_msg) from threadHolder.thread.exc
                     else:
-                        # Unhandled exception - this indicates a real problem
-                        if hasattr(threadHolder.thread, 'exc_info') and threadHolder.thread.exc_info:
-                            error_msg = f"Worker thread {threadID} failed with unhandled exception:\n{threadHolder.thread.exc_info}"
-                            raise Exception(error_msg) from threadHolder.thread.exc
-                        else:
-                            raise threadHolder.thread.exc
+                        raise threadHolder.thread.exc
 
                 nAvailable += threadHolder.ppn
                 for device in threadHolder.devices or set():
