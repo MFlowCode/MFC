@@ -92,6 +92,31 @@ jobs:
           (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
           (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml)
 
+      - name: Process Nsight Profiling Report
+        run: |
+          if [ -f "pr/report.nsys-rep" ]; then
+            echo "=== Nsight Profiling Summary ==="
+            echo "Master"
+            (cd master && nsys stats --report nvtx_sum report.nsys-rep)
+            echo "Pr"
+            (cd pr && nsys stats --report nvtx_sum report.nsys-rep)
+
+            echo "=== CUDA API CALLS ==="
+            echo "Master"
+            (cd master && nsys stats --report cuda_api_sum --format table report.nsys-rep | head -100)
+            echo "Pr"
+            (cd pr && nsys stats --report cuda_api_sum --format table report.nsys-rep | head -100)
+
+            echo "=== GPU KERNELS ==="
+            echo "Master"
+            (cd master && nsys stats --report cuda_gpu_kern_sum --format table report.nsys-rep | head -100)
+            echo "Pr"
+            (cd pr && nsys stats --report cuda_gpu_kern_sum --format table report.nsys-rep | head -100)
+            
+          else
+            echo "No Nsight report found, skipping profiling analysis"
+          fi
+
       - name: Print Logs
         if:   always()
         run: |
@@ -106,5 +131,6 @@ jobs:
           path: |
             pr/bench-${{ matrix.device }}.*
             pr/build/benchmarks/*
+            pr/report.nsys-rep
             master/bench-${{ matrix.device }}.*
             master/build/benchmarks/*
