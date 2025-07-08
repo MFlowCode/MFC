@@ -92,7 +92,7 @@ contains
         character(len=18) :: numStr !< for int to string conversion
         integer(kind=8) :: min_cells
 
-        min_cells = int(2, kind=8)**int(min(1, m) + min(1, n) + min(1, p), kind=8) * int(num_procs, kind=8)
+        min_cells = int(2, kind=8)**int(min(1, m) + min(1, n) + min(1, p), kind=8)*int(num_procs, kind=8)
         call s_int_to_str(2**(min(1, m) + min(1, n) + min(1, p))*num_procs, numStr)
 
         @:PROHIBIT(nGlobal < min_cells, &

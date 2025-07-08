@@ -1477,7 +1477,7 @@ contains
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 1, -1, 1)
         else
-            !$acc parallel loop gang vector collapse(2) default(present)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (bc_type(1, -1)%sf(0, k, l))
@@ -1501,7 +1501,7 @@ contains
         if (bc_x%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 1, 1, 1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (bc_type(1, 1)%sf(0, k, l))
@@ -1527,7 +1527,7 @@ contains
         else if (bc_y%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 2, -1, 1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = idwbuff(1)%beg, idwbuff(1)%end
                     select case (bc_type(2, -1)%sf(k, 0, l))
@@ -1551,7 +1551,7 @@ contains
         if (bc_y%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 2, 1, 1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = idwbuff(1)%beg, idwbuff(1)%end
                     select case (bc_type(2, 1)%sf(k, 0, l))
@@ -1577,7 +1577,7 @@ contains
         else if (bc_z%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 3, -1, 1)
         else
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = idwbuff(2)%beg, idwbuff(2)%end
                 do k = idwbuff(1)%beg, idwbuff(1)%end
                     select case (bc_type(3, -1)%sf(k, l, 0))
@@ -1601,7 +1601,7 @@ contains
         if (bc_z%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 3, 1, 1)
         else
-            !$acc parallel loop gang vector collapse(2) default(present)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = idwbuff(2)%beg, idwbuff(2)%end
                 do k = idwbuff(1)%beg, idwbuff(1)%end
                     select case (bc_type(3, 1)%sf(k, l, 0))

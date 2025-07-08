@@ -1460,7 +1460,7 @@ contains
             $:GPU_UPDATE(device='[ib_markers%sf]')
         end if
 
-        !$acc update device(igr, igr_order)
+        $:GPU_UPDATE(device='[igr, igr_order]')
 
     end subroutine s_initialize_gpu_vars
 

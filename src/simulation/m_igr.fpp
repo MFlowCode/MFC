@@ -25,20 +25,20 @@ module m_igr
  s_finalize_igr_module
 
     real(wp), allocatable, dimension(:, :, :) :: jac, jac_rhs, jac_old
-    !$acc declare create(jac, jac_rhs)
+    $:GPU_DECLARE(create='[jac, jac_rhs]')
 
     real(wp), allocatable, dimension(:, :) :: Res
-    !$acc declare create(Res)
+    $:GPU_DECLARE(create='[Res]')
 
     real(wp) :: alf_igr
-    !$acc declare create(alf_igr)
+    $:GPU_DECLARE(create='[alf_igr]')
 
     #:if not MFC_CASE_OPTIMIZATION
         integer :: vidxb, vidxe
-        !$acc declare create(vidxb, vidxe)
+        $:GPU_DECLARE(create='[vidxb, vidxe]')
 
         real(wp), allocatable, dimension(:) :: coeff_L, coeff_R
-        !$acc declare create(coeff_L, coeff_R)
+        $:GPU_DECLARE(create='[coeff_L, coeff_R]')
     #:else
         #:if igr_order == 5
             integer, parameter :: vidxb = -2
@@ -90,7 +90,7 @@ contains
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-            !$acc update device(Res, Re_idx, Re_size)
+            $:GPU_UPDATE(device='[Res, Re_idx, Re_size]')
         end if
 
         @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -104,12 +104,12 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end))
         end if
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
                     jac(j, k, l) = 0._wp
-                    if (igr_iter_solver == 1) jac_old(j,k,l) = 0._wp
+                    if (igr_iter_solver == 1) jac_old(j, k, l) = 0._wp
                 end do
             end do
         end do
@@ -119,28 +119,28 @@ contains
         else
             alf_igr = alf_factor*max(dx(1), dy(1), dz(1))**2._wp
         end if
-        !$acc update device(alf_igr)
+        $:GPU_UPDATE(device='[alf_igr]')
 
         #:if not MFC_CASE_OPTIMIZATION
             if (igr_order == 3) then
-                vidxb = -1; vidxe = 2;
-                !$acc update device(vidxb, vidxe)
+                vidxb = -1; vidxe = 2; 
+                $:GPU_UPDATE(device='[vidxb, vidxe]')
 
                 @:ALLOCATE(coeff_L(0:2))
                 coeff_L(0) = (2._wp/6._wp)
                 coeff_L(1) = (5._wp/6._wp)
                 coeff_L(2) = (-1._wp/6._wp)
-                !$acc update device(coeff_L)
+                $:GPU_UPDATE(device='[coeff_L]')
 
                 @:ALLOCATE(coeff_R(-1:1))
                 coeff_R(1) = (2._wp/6._wp)
                 coeff_R(0) = (5._wp/6._wp)
                 coeff_R(-1) = (-1._wp/6._wp)
-                !$acc update device(coeff_R)
+                $:GPU_UPDATE(device='[coeff_R]')
 
             elseif (igr_order == 5) then
-                vidxb = -2; vidxe = 3;
-                !$acc update device(vidxb, vidxe)
+                vidxb = -2; vidxe = 3; 
+                $:GPU_UPDATE(device='[vidxb, vidxe]')
 
                 @:ALLOCATE(coeff_L(-1:3))
                 coeff_L(-1) = (-3._wp/60._wp)
@@ -148,7 +148,7 @@ contains
                 coeff_L(1) = (47._wp/60._wp)
                 coeff_L(2) = (-13._wp/60._wp)
                 coeff_L(3) = (2._wp/60._wp)
-                !$acc update device(coeff_L)
+                $:GPU_UPDATE(device='[coeff_L]')
 
                 @:ALLOCATE(coeff_R(-2:2))
                 coeff_R(2) = (-3._wp/60._wp)
@@ -156,7 +156,7 @@ contains
                 coeff_R(0) = (47._wp/60._wp)
                 coeff_R(-1) = (-13._wp/60._wp)
                 coeff_R(-2) = (2._wp/60._wp)
-                !$acc update device(coeff_R)
+                $:GPU_UPDATE(device='[coeff_R]')
             end if
         #:endif
 
@@ -179,7 +179,8 @@ contains
         end if
 
         do q = 1, num_iters
-            !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz, fd_coeff)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[rho_lx, rho_rx, rho_ly, &
+                & rho_ry, rho_lz, rho_rz, fd_coeff]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -191,7 +192,7 @@ contains
                         rho_rz = 0._wp
                         fd_coeff = 0._wp
 
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
                             rho_lx = rho_lx + (q_cons_vf(i)%sf(j, k, l) + q_cons_vf(i)%sf(j - 1, k, l))/2._wp
                             rho_rx = rho_rx + (q_cons_vf(i)%sf(j, k, l) + q_cons_vf(i)%sf(j + 1, k, l))/2._wp
@@ -246,7 +247,7 @@ contains
             call s_populate_F_igr_buffers(bc_type, jac)
 
             if (igr_iter_solver == 1) then ! Jacobi iteration
-                !$acc parallel loop collapse(3) gang default(present)
+                $:GPU_PARALLEL_LOOP(collapse=3)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -271,7 +272,8 @@ contains
         real(wp) :: F_L, vel_L, rho_L, F_R, vel_R, rho_R
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(F_L,vel_L,alpha_rho_L,F_R,vel_R,alpha_rho_R)
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[F_L, vel_L, alpha_rho_L, &
+            & F_R, vel_R, alpha_rho_R]')
         do l = 0, p
             do k = 0, n
                 do j = -1, m
@@ -280,42 +282,42 @@ contains
                     alpha_rho_L = 0._wp; alpha_rho_R = 0._wp
                     vel_L = 0._wp; vel_R = 0._wp
 
-                    !$acc loop seq
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = vidxb + 1, vidxe
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
-                            alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q) * q_cons_vf(i)%sf(j + q, k, l)
+                            alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q)*q_cons_vf(i)%sf(j + q, k, l)
                         end do
 
-                        vel_L = vel_L + coeff_L(q) * q_cons_vf(momxb)%sf(j + q, k, l)
-                        F_L = F_L + coeff_L(q) * jac(j + q, k, l)
+                        vel_L = vel_L + coeff_L(q)*q_cons_vf(momxb)%sf(j + q, k, l)
+                        F_L = F_L + coeff_L(q)*jac(j + q, k, l)
                     end do
 
-                    !$acc loop seq
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = vidxb, vidxe - 1
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
-                            alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q) * q_cons_vf(i)%sf(j + q, k, l)
+                            alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q)*q_cons_vf(i)%sf(j + q, k, l)
                         end do
 
-                        vel_R = vel_R + coeff_R(q) * q_cons_vf(momxb)%sf(j + q, k, l)
-                        F_R = F_R + coeff_R(q) * jac(j + q, k, l)
+                        vel_R = vel_R + coeff_R(q)*q_cons_vf(momxb)%sf(j + q, k, l)
+                        F_R = F_R + coeff_R(q)*jac(j + q, k, l)
                     end do
 
-                    vel_L = vel_L / sum(alpha_rho_L)
-                    vel_R = vel_R / sum(alpha_rho_R)
+                    vel_L = vel_L/sum(alpha_rho_L)
+                    vel_R = vel_R/sum(alpha_rho_R)
 
                     #:for LR in ['L', 'R']
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb)%sf(j + 1, k, l) = rhs_vf(momxb)%sf(j + 1, k, l) + &
                                                         0.5_wp*F_${LR}$*(1._wp/dx(j + 1))
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) + &
                                                         0.5_wp*vel_${LR}$*F_${LR}$*(1._wp/dx(j + 1))
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) - &
                                                     0.5_wp*F_${LR}$*(1._wp/dx(j))
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) - &
                                                     0.5_wp*vel_${LR}$*F_${LR}$*(1._wp/dx(j))
                     #:endfor
@@ -347,10 +349,11 @@ contains
 
         if (idir == 1) then
             if (p == 0) then
-                !$acc parallel loop collapse(3) gang vector default(present) &
-                !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
-                !$acc alpha_L,alpha_R,alpha_rho_L,cfl,dvel,F_L,E_L,mu_R,rho_sf_small, &
-                !$acc alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[rho_L, rho_R, gamma_L, &
+                    & gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, &
+                    & pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, &
+                    & F_L, F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, &
+                    & vflux_L_arr, vflux_R_arr]')
                 do l = 0, p
                     do k = 0, n
                         do j = -1, m
@@ -366,14 +369,14 @@ contains
                                     !DIR$ unroll 4
                                 #:endif
                             #:endif
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb, vidxe
                                 dvel_small = 0._wp
                                 !x-direction contributions
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = -1, 1
                                     rho_L = 0._wp
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do r = 1, num_fluids
                                         rho_L = rho_L + q_cons_vf(r)%sf(j + i + q, k, l)
                                     end do
@@ -398,10 +401,10 @@ contains
                                 end if
 
                                 !y-direction contributions
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = -1, 1
                                     rho_L = 0._wp
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do r = 1, num_fluids
                                         rho_L = rho_L + q_cons_vf(r)%sf(j + q, k + i, l)
                                     end do
@@ -437,47 +440,47 @@ contains
                             alpha_L = 0._wp; alpha_R = 0._wp
                             vel_L = 0._wp; vel_R = 0._wp
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb + 1, vidxe
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q) * q_cons_vf(i)%sf(j + q, k, l)
+                                    alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q)*q_cons_vf(i)%sf(j + q, k, l)
                                 end do
 
                                 if (num_fluids > 1) then
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
-                                        alpha_L(i) = alpha_L(i) + coeff_L(q) * q_cons_vf(E_idx + i)%sf(j + q, k, l)
+                                        alpha_L(i) = alpha_L(i) + coeff_L(q)*q_cons_vf(E_idx + i)%sf(j + q, k, l)
                                     end do
                                 else
                                     alpha_L(1) = 1._wp
                                 end if
 
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
-                                    vel_L(i) = vel_L(i) + coeff_L(q) * q_cons_vf(momxb + i - 1)%sf(j + q, k, l)
+                                    vel_L(i) = vel_L(i) + coeff_L(q)*q_cons_vf(momxb + i - 1)%sf(j + q, k, l)
                                 end do
                             end do
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb, vidxe - 1
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q) * q_cons_vf(i)%sf(j + q, k, l)
+                                    alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q)*q_cons_vf(i)%sf(j + q, k, l)
                                 end do
 
                                 if (num_fluids > 1) then
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
-                                        alpha_R(i) = alpha_R(i) + coeff_R(q) * q_cons_vf(E_idx + i)%sf(j + q, k, l)
+                                        alpha_R(i) = alpha_R(i) + coeff_R(q)*q_cons_vf(E_idx + i)%sf(j + q, k, l)
                                     end do
                                 else
                                     alpha_R(1) = 1._wp
                                 end if
 
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
-                                    vel_R(i) = vel_R(i) + coeff_R(q) * q_cons_vf(momxb + i - 1)%sf(j + q, k, l)
+                                    vel_R(i) = vel_R(i) + coeff_R(q)*q_cons_vf(momxb + i - 1)%sf(j + q, k, l)
                                 end do
                             end do
 
@@ -494,84 +497,84 @@ contains
                             gamma_R = sum(alpha_R*gammas)
                             pi_inf_R = sum(alpha_R*pi_infs)
 
-                            vel_L = vel_L / rho_L
-                            vel_R = vel_R / rho_R
+                            vel_L = vel_L/rho_L
+                            vel_R = vel_R/rho_R
 
                             if (viscous) then
                                 mu_L = 0._wp; mu_R = 0._wp
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     mu_L = alpha_L(i)/Res(1, i) + mu_L
                                     mu_R = alpha_R(i)/Res(1, i) + mu_R
                                 end do
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j + 1, k, l) = rhs_vf(momxb + 1)%sf(j + 1, k, l) - &
                                                                     0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dx(j + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
                                                                 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dx(j))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j + 1, k, l) = rhs_vf(momxb + 1)%sf(j + 1, k, l) - &
                                                                     0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dx(j + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
                                                                 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dx(j))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j + 1, k, l) = rhs_vf(momxb)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dx(j + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dx(j))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j + 1, k, l) = rhs_vf(momxb)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dx(j + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dx(j))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j))
                             end if
 
                             E_L = 0._wp; E_R = 0._wp
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb + 1, vidxe
-                                E_L = E_L + coeff_L(q) * q_cons_vf(E_idx)%sf(j + q, k, l)
+                                E_L = E_L + coeff_L(q)*q_cons_vf(E_idx)%sf(j + q, k, l)
                             end do
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb, vidxe - 1
-                                E_R = E_R + coeff_R(q) * q_cons_vf(E_idx)%sf(j + q, k, l)
+                                E_R = E_R + coeff_R(q)*q_cons_vf(E_idx)%sf(j + q, k, l)
                             end do
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
@@ -579,13 +582,13 @@ contains
                                                       pres_L, pres_R, cfl)
 
                             do i = 1, num_fluids
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j + 1, k, l) = rhs_vf(i)%sf(j + 1, k, l) + &
                                                             (0.5_wp*(alpha_rho_L(i)* &
                                                                      vel_L(1))*(1._wp/dx(j + 1)) - &
                                                              0.5_wp*cfl*(alpha_rho_L(i))*(1._wp/dx(j + 1)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - &
                                                         (0.5_wp*(alpha_rho_L(i)* &
                                                                  vel_L(1))*(1._wp/dx(j)) - &
@@ -593,73 +596,73 @@ contains
                             end do
 
                             if (num_fluids > 1) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids - 1
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(advxb + i - 1)%sf(j + 1, k, l) + &
                                                                             (0.5_wp*(alpha_L(i)* &
                                                                                      vel_L(1))*(1._wp/dx(j + 1)) - &
                                                                              0.5_wp*cfl*(alpha_L(i))*(1._wp/dx(j + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(advxb + i - 1)%sf(j + 1, k, l) &
                                                                             - (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j + 1, k, l)*vel_L(1)*(1._wp/dx(j + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) - &
                                                                         (0.5_wp*(alpha_L(i)* &
                                                                                  vel_L(1))*(1._wp/dx(j)) - &
                                                                          0.5_wp*cfl*(alpha_L(i))*(1._wp/dx(j)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) &
                                                                         + (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k, l)*vel_L(1)*(1._wp/dx(j)))
                                 end do
                             end if
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j + 1, k, l) = rhs_vf(momxb)%sf(j + 1, k, l) + &
                                                             (0.5_wp*(rho_L*(vel_L(1))**2.0 + &
                                                                      pres_L)*(1._wp/dx(j + 1)) - &
                                                              0.5_wp*cfl*(rho_L*vel_L(1))*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j + 1, k, l) = rhs_vf(momxb + 1)%sf(j + 1, k, l) + &
                                                                 (0.5_wp*rho_L*vel_L(1)*vel_L(2)*(1._wp/dx(j + 1)) - &
                                                                  0.5_wp*cfl*(rho_L*vel_L(2))*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) + &
                                                             (0.5_wp*(vel_L(1)*(E_L + &
                                                                                pres_L))*(1._wp/dx(j + 1)) - &
                                                              0.5_wp*cfl*(E_L)*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) - &
                                                         (0.5_wp*(rho_L*(vel_L(1))**2.0 + &
                                                                  pres_L)*(1._wp/dx(j)) - &
                                                          0.5_wp*cfl*(rho_L*vel_L(1))*(1._wp/dx(j)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) - &
                                                             (0.5_wp*rho_L*vel_L(1)*vel_L(2)*(1._wp/dx(j)) - &
                                                              0.5_wp*cfl*(rho_L*vel_L(2))*(1._wp/dx(j)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) - &
                                                         (0.5_wp*(vel_L(1)*(E_L + &
                                                                            pres_L))*(1._wp/dx(j)) - &
                                                          0.5_wp*cfl*(E_L)*(1._wp/dx(j)))
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j + 1, k, l) = rhs_vf(i)%sf(j + 1, k, l) + &
                                                             (0.5_wp*(alpha_rho_R(i)* &
                                                                      vel_R(1))*(1._wp/dx(j + 1)) + &
                                                              0.5_wp*cfl*(alpha_rho_R(i))*(1._wp/dx(j + 1)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - &
                                                         (0.5_wp*(alpha_rho_R(i)* &
                                                                  vel_R(1))*(1._wp/dx(j)) + &
@@ -667,59 +670,59 @@ contains
                             end do
 
                             if (num_fluids > 1) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids - 1
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(advxb + i - 1)%sf(j + 1, k, l) + &
                                                                             (0.5_wp*(alpha_R(i)* &
                                                                                      vel_R(1))*(1._wp/dx(j + 1)) + &
                                                                              0.5_wp*cfl*(alpha_R(i))*(1._wp/dx(j + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(advxb + i - 1)%sf(j + 1, k, l) &
                                                                             - (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j + 1, k, l)*vel_R(1)*(1._wp/dx(j + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) - &
                                                                         (0.5_wp*(alpha_R(i)* &
                                                                                  vel_R(1))*(1._wp/dx(j)) + &
                                                                          0.5_wp*cfl*(alpha_R(i))*(1._wp/dx(j)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) &
                                                                         + (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k, l)*vel_R(1)*(1._wp/dx(j)))
                                 end do
                             end if
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j + 1, k, l) = rhs_vf(momxb)%sf(j + 1, k, l) + &
                                                             (0.5_wp*(rho_R*(vel_R(1))**2.0 + &
                                                                      pres_R)*(1._wp/dx(j + 1)) + &
                                                              0.5_wp*cfl*(rho_R*vel_R(1))*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j + 1, k, l) = rhs_vf(momxb + 1)%sf(j + 1, k, l) + &
                                                                 (0.5_wp*rho_R*vel_R(1)*vel_R(2)*(1._wp/dx(j + 1)) + &
                                                                  0.5_wp*cfl*(rho_R*vel_R(2))*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) + &
                                                             (0.5_wp*(vel_R(1)*(E_R + &
                                                                                pres_R))*(1._wp/dx(j + 1)) + &
                                                              0.5_wp*cfl*(E_R)*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) - &
                                                         (0.5_wp*(rho_R*(vel_R(1))**2.0 + &
                                                                  pres_R)*(1._wp/dx(j)) + &
                                                          0.5_wp*cfl*(rho_R*vel_R(1))*(1._wp/dx(j)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) - &
                                                             (0.5_wp*rho_R*vel_R(1)*vel_R(2)*(1._wp/dx(j)) + &
                                                              0.5_wp*cfl*(rho_R*vel_R(2))*(1._wp/dx(j)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) - &
                                                         (0.5_wp*(vel_R(1)*(E_R + &
                                                                            pres_R))*(1._wp/dx(j)) + &
@@ -729,10 +732,11 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present) &
-                !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
-                !$acc alpha_L,alpha_R,alpha_rho_L,cfl,dvel,F_L,E_L,mu_R,rho_sf_small, &
-                !$acc alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[rho_L, rho_R, gamma_L, &
+                    & gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, &
+                    & pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, &
+                    & F_L, F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, &
+                    & vflux_L_arr, vflux_R_arr]')
                 do l = 0, p
                     do k = 0, n
                         do j = -1, m
@@ -748,14 +752,14 @@ contains
                                     !DIR$ unroll 4
                                 #:endif
                             #:endif
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb, vidxe
                                 dvel_small = 0._wp
                                 !x-direction contributions
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = -1, 1
                                     rho_L = 0._wp
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do r = 1, num_fluids
                                         rho_L = rho_L + q_cons_vf(r)%sf(j + i + q, k, l)
                                     end do
@@ -785,10 +789,10 @@ contains
                                 end if
 
                                 !y-direction contributions
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = -1, 1
                                     rho_L = 0._wp
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do r = 1, num_fluids
                                         rho_L = rho_L + q_cons_vf(r)%sf(j + q, k + i, l)
                                     end do
@@ -816,10 +820,10 @@ contains
                                 end if
 
                                 !z-direction contributions
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = -1, 1
                                     rho_L = 0._wp
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do r = 1, num_fluids
                                         rho_L = rho_L + q_cons_vf(r)%sf(j + q, k, l + i)
                                     end do
@@ -860,47 +864,47 @@ contains
                             alpha_L = 0._wp; alpha_R = 0._wp
                             vel_L = 0._wp; vel_R = 0._wp
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb + 1, vidxe
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q) * q_cons_vf(i)%sf(j + q, k, l)
+                                    alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q)*q_cons_vf(i)%sf(j + q, k, l)
                                 end do
 
                                 if (num_fluids > 1) then
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
-                                        alpha_L(i) = alpha_L(i) + coeff_L(q) * q_cons_vf(E_idx + i)%sf(j + q, k, l)
+                                        alpha_L(i) = alpha_L(i) + coeff_L(q)*q_cons_vf(E_idx + i)%sf(j + q, k, l)
                                     end do
                                 else
                                     alpha_L(1) = 1._wp
                                 end if
 
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
-                                    vel_L(i) = vel_L(i) + coeff_L(q) * q_cons_vf(momxb + i - 1)%sf(j + q, k, l)
+                                    vel_L(i) = vel_L(i) + coeff_L(q)*q_cons_vf(momxb + i - 1)%sf(j + q, k, l)
                                 end do
                             end do
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb, vidxe - 1
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q) * q_cons_vf(i)%sf(j + q, k, l)
+                                    alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q)*q_cons_vf(i)%sf(j + q, k, l)
                                 end do
 
                                 if (num_fluids > 1) then
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
-                                        alpha_R(i) = alpha_R(i) + coeff_R(q) * q_cons_vf(E_idx + i)%sf(j + q, k, l)
+                                        alpha_R(i) = alpha_R(i) + coeff_R(q)*q_cons_vf(E_idx + i)%sf(j + q, k, l)
                                     end do
                                 else
                                     alpha_R(1) = 1._wp
                                 end if
 
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
-                                    vel_R(i) = vel_R(i) + coeff_R(q) * q_cons_vf(momxb + i - 1)%sf(j + q, k, l)
+                                    vel_R(i) = vel_R(i) + coeff_R(q)*q_cons_vf(momxb + i - 1)%sf(j + q, k, l)
                                 end do
                             end do
 
@@ -917,128 +921,128 @@ contains
                             gamma_R = sum(alpha_R*gammas)
                             pi_inf_R = sum(alpha_R*pi_infs)
 
-                            vel_L = vel_L / rho_L
-                            vel_R = vel_R / rho_R
+                            vel_L = vel_L/rho_L
+                            vel_R = vel_R/rho_R
 
                             if (viscous) then
                                 mu_L = 0._wp
                                 mu_R = 0._wp
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     mu_L = alpha_L(i)/Res(1, i) + mu_L
                                     mu_R = alpha_R(i)/Res(1, i) + mu_R
                                 end do
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j + 1, k, l) = rhs_vf(momxb + 1)%sf(j + 1, k, l) - &
                                                                     0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dx(j + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
                                                                 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dx(j))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j + 1, k, l) = rhs_vf(momxb + 1)%sf(j + 1, k, l) - &
                                                                     0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dx(j + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
                                                                 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dx(j))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 2)%sf(j + 1, k, l) = rhs_vf(momxb + 2)%sf(j + 1, k, l) - &
                                                                     0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dx(j + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dx(j + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 2)%sf(j, k, l) = rhs_vf(momxb + 2)%sf(j, k, l) + &
                                                                 0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dx(j))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dx(j))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 2)%sf(j + 1, k, l) = rhs_vf(momxb + 2)%sf(j + 1, k, l) - &
                                                                     0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dx(j + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dx(j + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 2)%sf(j, k, l) = rhs_vf(momxb + 2)%sf(j, k, l) + &
                                                                 0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dx(j))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dx(j))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j + 1, k, l) = rhs_vf(momxb)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dx(j + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dx(j))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j + 1, k, l) = rhs_vf(momxb)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dx(j + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dx(j))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j))
                             end if
 
                             E_L = 0._wp; E_R = 0._wp
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb + 1, vidxe
-                                E_L = E_L + coeff_L(q) * q_cons_vf(E_idx)%sf(j + q, k, l)
+                                E_L = E_L + coeff_L(q)*q_cons_vf(E_idx)%sf(j + q, k, l)
                             end do
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb, vidxe - 1
-                                E_R = E_R + coeff_R(q) * q_cons_vf(E_idx)%sf(j + q, k, l)
+                                E_R = E_R + coeff_R(q)*q_cons_vf(E_idx)%sf(j + q, k, l)
                             end do
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                       E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
                                                       pres_L, pres_R, cfl)
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j + 1, k, l) = rhs_vf(i)%sf(j + 1, k, l) + &
                                                             (0.5_wp*(alpha_rho_L(i)* &
                                                                      vel_L(1))*(1._wp/dx(j + 1)) - &
                                                              0.5_wp*cfl*(alpha_rho_L(i))*(1._wp/dx(j + 1)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - &
                                                         (0.5_wp*(alpha_rho_L(i)* &
                                                                  vel_L(1))*(1._wp/dx(j)) - &
@@ -1046,83 +1050,83 @@ contains
                             end do
 
                             if (num_fluids > 1) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids - 1
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(advxb + i - 1)%sf(j + 1, k, l) + &
                                                                             (0.5_wp*(alpha_L(i)* &
                                                                                      vel_L(1))*(1._wp/dx(j + 1)) - &
                                                                              0.5_wp*cfl*(alpha_L(i))*(1._wp/dx(j + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(advxb + i - 1)%sf(j + 1, k, l) &
                                                                             - (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j + 1, k, l)*vel_L(1)*(1._wp/dx(j + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) - &
                                                                         (0.5_wp*(alpha_L(i)* &
                                                                                  vel_L(1))*(1._wp/dx(j)) - &
                                                                          0.5_wp*cfl*(alpha_L(i))*(1._wp/dx(j)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) &
                                                                         + (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k, l)*vel_L(1)*(1._wp/dx(j)))
                                 end do
                             end if
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j + 1, k, l) = rhs_vf(momxb)%sf(j + 1, k, l) + &
                                                             (0.5_wp*(rho_L*(vel_L(1))**2.0 + &
                                                                      pres_L)*(1._wp/dx(j + 1)) - &
                                                              0.5_wp*cfl*(rho_L*vel_L(1))*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j + 1, k, l) = rhs_vf(momxb + 1)%sf(j + 1, k, l) + &
                                                                 (0.5_wp*rho_L*vel_L(1)*vel_L(2)*(1._wp/dx(j + 1)) - &
                                                                  0.5_wp*cfl*(rho_L*vel_L(2))*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 2)%sf(j + 1, k, l) = rhs_vf(momxb + 2)%sf(j + 1, k, l) + &
                                                                 (0.5_wp*rho_L*vel_L(1)*vel_L(3)*(1._wp/dx(j + 1)) - &
                                                                  0.5_wp*cfl*(rho_L*vel_L(3))*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) + &
                                                             (0.5_wp*(vel_L(1)*(E_L + &
                                                                                pres_L))*(1._wp/dx(j + 1)) - &
                                                              0.5_wp*cfl*(E_L)*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) - &
                                                         (0.5_wp*(rho_L*(vel_L(1))**2.0 + &
                                                                  pres_L)*(1._wp/dx(j)) - &
                                                          0.5_wp*cfl*(rho_L*vel_L(1))*(1._wp/dx(j)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) - &
                                                             (0.5_wp*rho_L*vel_L(1)*vel_L(2)*(1._wp/dx(j)) - &
                                                              0.5_wp*cfl*(rho_L*vel_L(2))*(1._wp/dx(j)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 2)%sf(j, k, l) = rhs_vf(momxb + 2)%sf(j, k, l) - &
                                                             (0.5_wp*rho_L*vel_L(1)*vel_L(3)*(1._wp/dx(j)) - &
                                                              0.5_wp*cfl*(rho_L*vel_L(3))*(1._wp/dx(j)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) - &
                                                         (0.5_wp*(vel_L(1)*(E_L + &
                                                                            pres_L))*(1._wp/dx(j)) - &
                                                          0.5_wp*cfl*(E_L)*(1._wp/dx(j)))
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j + 1, k, l) = rhs_vf(i)%sf(j + 1, k, l) + &
                                                             (0.5_wp*(alpha_rho_R(i)* &
                                                                      vel_R(1))*(1._wp/dx(j + 1)) + &
                                                              0.5_wp*cfl*(alpha_rho_R(i))*(1._wp/dx(j + 1)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - &
                                                         (0.5_wp*(alpha_rho_R(i)* &
                                                                  vel_R(1))*(1._wp/dx(j)) + &
@@ -1130,69 +1134,69 @@ contains
                             end do
 
                             if (num_fluids > 1) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids - 1
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(advxb + i - 1)%sf(j + 1, k, l) + &
                                                                             (0.5_wp*(alpha_R(i)* &
                                                                                      vel_R(1))*(1._wp/dx(j + 1)) + &
                                                                              0.5_wp*cfl*(alpha_R(i))*(1._wp/dx(j + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(advxb + i - 1)%sf(j + 1, k, l) &
                                                                             - (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j + 1, k, l)*vel_R(1)*(1._wp/dx(j + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) - &
                                                                         (0.5_wp*(alpha_R(i)* &
                                                                                  vel_R(1))*(1._wp/dx(j)) + &
                                                                          0.5_wp*cfl*(alpha_R(i))*(1._wp/dx(j)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) &
                                                                         + (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k, l)*vel_R(1)*(1._wp/dx(j)))
                                 end do
                             end if
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j + 1, k, l) = rhs_vf(momxb)%sf(j + 1, k, l) + &
                                                             (0.5_wp*(rho_R*(vel_R(1))**2.0 + &
                                                                      pres_R)*(1._wp/dx(j + 1)) + &
                                                              0.5_wp*cfl*(rho_R*vel_R(1))*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j + 1, k, l) = rhs_vf(momxb + 1)%sf(j + 1, k, l) + &
                                                                 (0.5_wp*rho_R*vel_R(1)*vel_R(2)*(1._wp/dx(j + 1)) + &
                                                                  0.5_wp*cfl*(rho_R*vel_R(2))*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 2)%sf(j + 1, k, l) = rhs_vf(momxb + 2)%sf(j + 1, k, l) + &
                                                                 (0.5_wp*rho_R*vel_R(1)*vel_R(3)*(1._wp/dx(j + 1)) + &
                                                                  0.5_wp*cfl*(rho_R*vel_R(3))*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j + 1, k, l) = rhs_vf(E_idx)%sf(j + 1, k, l) + &
                                                             (0.5_wp*(vel_R(1)*(E_R + &
                                                                                pres_R))*(1._wp/dx(j + 1)) + &
                                                              0.5_wp*cfl*(E_R)*(1._wp/dx(j + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) - &
                                                         (0.5_wp*(rho_R*(vel_R(1))**2.0 + &
                                                                  pres_R)*(1._wp/dx(j)) + &
                                                          0.5_wp*cfl*(rho_R*vel_R(1))*(1._wp/dx(j)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) - &
                                                             (0.5_wp*rho_R*vel_R(1)*vel_R(2)*(1._wp/dx(j)) + &
                                                              0.5_wp*cfl*(rho_R*vel_R(2))*(1._wp/dx(j)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 2)%sf(j, k, l) = rhs_vf(momxb + 2)%sf(j, k, l) - &
                                                             (0.5_wp*rho_R*vel_R(1)*vel_R(3)*(1._wp/dx(j)) + &
                                                              0.5_wp*cfl*(rho_R*vel_R(3))*(1._wp/dx(j)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) - &
                                                         (0.5_wp*(vel_R(1)*(E_R + &
                                                                            pres_R))*(1._wp/dx(j)) + &
@@ -1204,10 +1208,11 @@ contains
             end if
         else if (idir == 2) then
             if (p == 0) then
-                !$acc parallel loop collapse(3) gang vector default(present) &
-                !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
-                !$acc alpha_L,alpha_R,alpha_rho_L,cfl,F_L,F_R,E_L,mu_R, &
-                !$acc rho_sf_small, alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[rho_L, rho_R, gamma_L, &
+                    & gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, &
+                    & pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, &
+                    & F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, &
+                    & vflux_L_arr, vflux_R_arr]')
                 do l = 0, p
                     do k = -1, n
                         do j = 0, m
@@ -1223,14 +1228,14 @@ contains
                                         !DIR$ unroll 4
                                     #:endif
                                 #:endif
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do q = vidxb, vidxe
                                     dvel_small = 0._wp
                                     !x-direction contributions
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = -1, 1
                                         rho_L = 0._wp
-                                        !$acc loop seq
+                                        $:GPU_LOOP(parallelism='[seq]')
                                         do r = 1, num_fluids
                                             rho_L = rho_L + q_cons_vf(r)%sf(j + i, k + q, l)
                                         end do
@@ -1254,10 +1259,10 @@ contains
                                     end if
 
                                     !y-direction contributions
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = -1, 1
                                         rho_L = 0._wp
-                                        !$acc loop seq
+                                        $:GPU_LOOP(parallelism='[seq]')
                                         do r = 1, num_fluids
                                             rho_L = rho_L + q_cons_vf(r)%sf(j, k + i + q, l)
                                         end do
@@ -1286,47 +1291,47 @@ contains
                             alpha_L = 0._wp; alpha_R = 0._wp
                             vel_L = 0._wp; vel_R = 0._wp
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb + 1, vidxe
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q)* q_cons_vf(i)%sf(j, k + q, l)
+                                    alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q)*q_cons_vf(i)%sf(j, k + q, l)
                                 end do
 
                                 if (num_fluids > 1) then
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
-                                        alpha_L(i) = alpha_L(i) + coeff_L(q) * q_cons_vf(E_idx + i)%sf(j, k + q, l)
+                                        alpha_L(i) = alpha_L(i) + coeff_L(q)*q_cons_vf(E_idx + i)%sf(j, k + q, l)
                                     end do
                                 else
                                     alpha_L(1) = 1._wp
                                 end if
 
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
-                                    vel_L(i) = vel_L(i) + coeff_L(q) * q_cons_vf(momxb + i - 1)%sf(j, k + q, l)
+                                    vel_L(i) = vel_L(i) + coeff_L(q)*q_cons_vf(momxb + i - 1)%sf(j, k + q, l)
                                 end do
                             end do
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb, vidxe - 1
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q) * q_cons_vf(i)%sf(j, k + q, l)
+                                    alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q)*q_cons_vf(i)%sf(j, k + q, l)
                                 end do
 
                                 if (num_fluids > 1) then
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
-                                        alpha_R(i) = alpha_R(i) + coeff_R(q) * q_cons_vf(E_idx + i)%sf(j, k + q, l)
+                                        alpha_R(i) = alpha_R(i) + coeff_R(q)*q_cons_vf(E_idx + i)%sf(j, k + q, l)
                                     end do
                                 else
                                     alpha_R(1) = 1._wp
                                 end if
 
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
-                                    vel_R(i) = vel_R(i) + coeff_R(q) * q_cons_vf(momxb + i - 1)%sf(j, k + q, l)
+                                    vel_R(i) = vel_R(i) + coeff_R(q)*q_cons_vf(momxb + i - 1)%sf(j, k + q, l)
                                 end do
                             end do
 
@@ -1343,71 +1348,71 @@ contains
                             gamma_R = sum(alpha_R*gammas)
                             pi_inf_R = sum(alpha_R*pi_infs)
 
-                            vel_L = vel_L / rho_L
-                            vel_R = vel_R / rho_R
+                            vel_L = vel_L/rho_L
+                            vel_R = vel_R/rho_R
 
                             if (viscous) then
                                 mu_L = 0._wp
                                 mu_R = 0._wp
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     mu_L = alpha_L(i)/Res(1, i) + mu_L
                                     mu_R = alpha_R(i)/Res(1, i) + mu_R
                                 end do
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j, k + 1, l) = rhs_vf(momxb)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dy(k + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dy(k))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j, k + 1, l) = rhs_vf(momxb)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dy(k + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dy(k))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j, k + 1, l) = rhs_vf(momxb + 1)%sf(j, k + 1, l) - &
                                                                     0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dy(k + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
                                                                 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dy(k))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j, k + 1, l) = rhs_vf(momxb + 1)%sf(j, k + 1, l) - &
                                                                     0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dy(k + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
                                                                 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dy(k))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k))
                             end if
@@ -1415,31 +1420,31 @@ contains
                             E_L = 0._wp; E_R = 0._wp
                             F_L = 0._wp; F_R = 0._wp
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb + 1, vidxe
-                                E_L = E_L + coeff_L(q) * q_cons_vf(E_idx)%sf(j, k + q, l)
-                                F_L = F_L + coeff_L(q) * jac(j, k + q, l)
+                                E_L = E_L + coeff_L(q)*q_cons_vf(E_idx)%sf(j, k + q, l)
+                                F_L = F_L + coeff_L(q)*jac(j, k + q, l)
                             end do
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb, vidxe - 1
-                                E_R = E_R + coeff_R(q) * q_cons_vf(E_idx)%sf(j, k + q, l)
-                                F_R = F_R + coeff_R(q) * jac(j, k + q, l)
+                                E_R = E_R + coeff_R(q)*q_cons_vf(E_idx)%sf(j, k + q, l)
+                                F_R = F_R + coeff_R(q)*jac(j, k + q, l)
                             end do
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                       E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
                                                       pres_L, pres_R, cfl)
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k + 1, l) = rhs_vf(i)%sf(j, k + 1, l) + &
                                                             (0.5_wp*(alpha_rho_L(i)* &
                                                                      vel_L(2))*(1._wp/dy(k + 1)) - &
                                                              0.5_wp*cfl*(alpha_rho_L(i))*(1._wp/dy(k + 1)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - &
                                                         (0.5_wp*(alpha_rho_L(i)* &
                                                                  vel_L(2))*(1._wp/dy(k)) - &
@@ -1447,72 +1452,72 @@ contains
                             end do
 
                             if (num_fluids > 1) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids - 1
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(advxb + i - 1)%sf(j, k + 1, l) + &
                                                                             (0.5_wp*(alpha_L(i)* &
                                                                                      vel_L(2))*(1._wp/dy(k + 1)) - &
                                                                              0.5_wp*cfl*(alpha_L(i))*(1._wp/dy(k + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(advxb + i - 1)%sf(j, k + 1, l) &
                                                                             - (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k + 1, l)*vel_L(2)*(1._wp/dy(k + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) - &
                                                                         (0.5_wp*(alpha_L(i)* &
                                                                                  vel_L(2))*(1._wp/dy(k)) - &
                                                                          0.5_wp*cfl*(alpha_L(i))*(1._wp/dy(k)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) &
                                                                         + (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k, l)*vel_L(2)*(1._wp/dy(k)))
                                 end do
                             end if
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k + 1, l) = rhs_vf(momxb + 1)%sf(j, k + 1, l) + &
                                                                 (0.5_wp*(rho_L*(vel_L(2))**2.0 + &
                                                                          pres_L + F_L)*(1._wp/dy(k + 1)) - &
                                                                  0.5_wp*cfl*(rho_L*vel_L(2))*(1._wp/dy(k + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k + 1, l) = rhs_vf(momxb)%sf(j, k + 1, l) + &
                                                             (0.5_wp*rho_L*vel_L(1)*vel_L(2)*(1._wp/dy(k + 1)) - &
                                                              0.5_wp*cfl*(rho_L*vel_L(1))*(1._wp/dy(k + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) + &
                                                             (0.5_wp*(vel_L(2)*(E_L + &
                                                                                pres_L + F_L))*(1._wp/dy(k + 1)) - &
                                                              0.5_wp*cfl*(E_L)*(1._wp/dy(k + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) - &
                                                             (0.5_wp*(rho_L*(vel_L(2))**2.0 + &
                                                                      pres_L + F_L)*(1._wp/dy(k)) - &
                                                              0.5_wp*cfl*(rho_L*vel_L(2))*(1._wp/dy(k)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) - &
                                                         (0.5_wp*rho_L*vel_L(1)*vel_L(2)*(1._wp/dy(k)) - &
                                                          0.5_wp*cfl*(rho_L*vel_L(1))*(1._wp/dy(k)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) - &
                                                         (0.5_wp*(vel_L(2)*(E_L + &
                                                                            pres_L + F_L))*(1._wp/dy(k)) - &
                                                          0.5_wp*cfl*(E_L)*(1._wp/dy(k)))
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k + 1, l) = rhs_vf(i)%sf(j, k + 1, l) + &
                                                             (0.5_wp*(alpha_rho_R(i)* &
                                                                      vel_R(2))*(1._wp/dy(k + 1)) + &
                                                              0.5_wp*cfl*(alpha_rho_R(i))*(1._wp/dy(k + 1)))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - &
                                                         (0.5_wp*(alpha_rho_R(i)* &
                                                                  vel_R(2))*(1._wp/dy(k)) + &
@@ -1520,53 +1525,53 @@ contains
                             end do
 
                             if (num_fluids > 1) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids - 1
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(advxb + i - 1)%sf(j, k + 1, l) + &
                                                                             (0.5_wp*(alpha_R(i)* &
                                                                                      vel_R(2))*(1._wp/dy(k + 1)) + &
                                                                              0.5_wp*cfl*(alpha_R(i))*(1._wp/dy(k + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(advxb + i - 1)%sf(j, k + 1, l) &
                                                                             - (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k + 1, l)*vel_R(2)*(1._wp/dy(k + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) - &
                                                                         (0.5_wp*(alpha_R(i)* &
                                                                                  vel_R(2))*(1._wp/dy(k)) + &
                                                                          0.5_wp*cfl*(alpha_R(i))*(1._wp/dy(k)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) &
                                                                         + (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k, l)*vel_R(2)*(1._wp/dy(k)))
                                 end do
                             end if
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k + 1, l) = rhs_vf(momxb + 1)%sf(j, k + 1, l) + &
                                                                 (0.5_wp*(rho_R*(vel_R(2))**2.0 + &
                                                                          pres_R + F_R)*(1._wp/dy(k + 1)) + &
                                                                  0.5_wp*cfl*(rho_R*vel_R(2))*(1._wp/dy(k + 1)))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k + 1, l) = rhs_vf(momxb)%sf(j, k + 1, l) + &
                                                             (0.5_wp*rho_R*vel_R(2)*vel_R(1)*(1._wp/dy(k + 1)) + &
                                                              0.5_wp*cfl*(rho_R*vel_R(1))*(1._wp/dy(k + 1)))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) + &
                                                             (0.5_wp*(vel_R(2)*(E_R + &
                                                                                pres_R + F_R))*(1._wp/dy(k + 1)) + &
                                                              0.5_wp*cfl*(E_R)*(1._wp/dy(k + 1)))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) - &
                                                             (0.5_wp*(rho_R*(vel_R(2))**2.0 + &
                                                                      pres_R + F_R)*(1._wp/dy(k)) + &
                                                              0.5_wp*cfl*(rho_R*vel_R(2))*(1._wp/dy(k)))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) - &
                                                         (0.5_wp*rho_R*vel_R(2)*vel_R(1)*(1._wp/dy(k)) + &
                                                          0.5_wp*cfl*(rho_R*vel_R(1))*(1._wp/dy(k)))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) - &
                                                         (0.5_wp*(vel_R(2)*(E_R + &
                                                                            pres_R + F_R))*(1._wp/dy(k)) + &
@@ -1575,10 +1580,11 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present) &
-                !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
-                !$acc alpha_L,alpha_R,alpha_rho_L,cfl,F_L,F_R,E_L,mu_R, &
-                !$acc rho_sf_small, alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[rho_L, rho_R, gamma_L, &
+                    & gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, &
+                    & pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, &
+                    & F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, &
+                    & vflux_L_arr, vflux_R_arr]')
                 do l = 0, p
                     do k = -1, n
                         do j = 0, m
@@ -1594,14 +1600,14 @@ contains
                                         !DIR$ unroll 4
                                     #:endif
                                 #:endif
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do q = vidxb, vidxe
                                     dvel_small = 0._wp
                                     !x-direction contributions
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = -1, 1
                                         rho_L = 0._wp
-                                        !$acc loop seq
+                                        $:GPU_LOOP(parallelism='[seq]')
                                         do r = 1, num_fluids
                                             rho_L = rho_L + q_cons_vf(r)%sf(j + i, k + q, l)
                                         end do
@@ -1625,10 +1631,10 @@ contains
                                     end if
 
                                     !y-direction contributions
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = -1, 1
                                         rho_L = 0._wp
-                                        !$acc loop seq
+                                        $:GPU_LOOP(parallelism='[seq]')
                                         do r = 1, num_fluids
                                             rho_L = rho_L + q_cons_vf(r)%sf(j, k + i + q, l)
                                         end do
@@ -1657,10 +1663,10 @@ contains
                                     end if
 
                                     !z-direction contributions
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = -1, 1
                                         rho_L = 0._wp
-                                        !$acc loop seq
+                                        $:GPU_LOOP(parallelism='[seq]')
                                         do r = 1, num_fluids
                                             rho_L = rho_L + q_cons_vf(r)%sf(j, k + q, l + i)
                                         end do
@@ -1688,47 +1694,47 @@ contains
                             alpha_L = 0._wp; alpha_R = 0._wp
                             vel_L = 0._wp; vel_R = 0._wp
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb + 1, vidxe
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q) * q_cons_vf(i)%sf(j, k + q, l)
+                                    alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q)*q_cons_vf(i)%sf(j, k + q, l)
                                 end do
 
                                 if (num_fluids > 1) then
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
-                                        alpha_L(i) = alpha_L(i) + coeff_L(q) * q_cons_vf(E_idx + i)%sf(j, k + q, l)
+                                        alpha_L(i) = alpha_L(i) + coeff_L(q)*q_cons_vf(E_idx + i)%sf(j, k + q, l)
                                     end do
                                 else
                                     alpha_L(1) = 1._wp
                                 end if
 
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
-                                    vel_L(i) = vel_L(i) + coeff_L(q) * q_cons_vf(momxb + i - 1)%sf(j, k + q, l)
+                                    vel_L(i) = vel_L(i) + coeff_L(q)*q_cons_vf(momxb + i - 1)%sf(j, k + q, l)
                                 end do
                             end do
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb, vidxe - 1
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q) * q_cons_vf(i)%sf(j, k + q, l)
+                                    alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q)*q_cons_vf(i)%sf(j, k + q, l)
                                 end do
 
                                 if (num_fluids > 1) then
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
-                                        alpha_R(i) = alpha_R(i) + coeff_R(q) * q_cons_vf(E_idx + i)%sf(j, k + q, l)
+                                        alpha_R(i) = alpha_R(i) + coeff_R(q)*q_cons_vf(E_idx + i)%sf(j, k + q, l)
                                     end do
                                 else
                                     alpha_R(1) = 1._wp
                                 end if
 
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
-                                    vel_R(i) = vel_R(i) + coeff_R(q) * q_cons_vf(momxb + i - 1)%sf(j, k + q, l)
+                                    vel_R(i) = vel_R(i) + coeff_R(q)*q_cons_vf(momxb + i - 1)%sf(j, k + q, l)
                                 end do
                             end do
 
@@ -1745,99 +1751,99 @@ contains
                             gamma_R = sum(alpha_R*gammas)
                             pi_inf_R = sum(alpha_R*pi_infs)
 
-                            vel_L = vel_L / rho_L
-                            vel_R = vel_R / rho_R
+                            vel_L = vel_L/rho_L
+                            vel_R = vel_R/rho_R
 
                             if (viscous) then
                                 mu_L = 0._wp
                                 mu_R = 0._wp
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     mu_L = alpha_L(i)/Res(1, i) + mu_L
                                     mu_R = alpha_R(i)/Res(1, i) + mu_R
                                 end do
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j, k + 1, l) = rhs_vf(momxb)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dy(k + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dy(k))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j, k + 1, l) = rhs_vf(momxb)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dy(k + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dy(k))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 2)%sf(j, k + 1, l) = rhs_vf(momxb + 2)%sf(j, k + 1, l) - &
                                                                     0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dy(k + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dy(k + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 2)%sf(j, k, l) = rhs_vf(momxb + 2)%sf(j, k, l) + &
                                                                 0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dy(k))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dy(k))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 2)%sf(j, k + 1, l) = rhs_vf(momxb + 2)%sf(j, k + 1, l) - &
                                                                     0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dy(k + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dy(k + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 2)%sf(j, k, l) = rhs_vf(momxb + 2)%sf(j, k, l) + &
                                                                 0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dy(k))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dy(k))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j, k + 1, l) = rhs_vf(momxb + 1)%sf(j, k + 1, l) - &
                                                                     0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dy(k + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
                                                                 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dy(k))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j, k + 1, l) = rhs_vf(momxb + 1)%sf(j, k + 1, l) - &
                                                                     0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dy(k + 1))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k + 1))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
                                                                 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dy(k))
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k))
                             end if
@@ -1845,31 +1851,31 @@ contains
                             E_L = 0._wp; E_R = 0._wp
                             F_L = 0._wp; F_R = 0._wp
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb + 1, vidxe
-                                E_L = E_L + coeff_L(q) * q_cons_vf(E_idx)%sf(j, k + q, l)
-                                F_L = F_L + coeff_L(q) * jac(j, k + q, l)
+                                E_L = E_L + coeff_L(q)*q_cons_vf(E_idx)%sf(j, k + q, l)
+                                F_L = F_L + coeff_L(q)*jac(j, k + q, l)
                             end do
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb, vidxe - 1
-                                E_R = E_R + coeff_R(q) * q_cons_vf(E_idx)%sf(j, k + q, l)
-                                F_R = F_R + coeff_R(q) * jac(j, k + q, l)
+                                E_R = E_R + coeff_R(q)*q_cons_vf(E_idx)%sf(j, k + q, l)
+                                F_R = F_R + coeff_R(q)*jac(j, k + q, l)
                             end do
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                       E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
                                                       pres_L, pres_R, cfl)
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k + 1, l) = rhs_vf(i)%sf(j, k + 1, l) + &
                                                             (0.5_wp*(alpha_rho_L(i)* &
                                                                      vel_L(2))*(1._wp/dy(k + 1)) - &
                                                              0.5_wp*cfl*(alpha_rho_L(i))*(1._wp/dy(k + 1)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - &
                                                         (0.5_wp*(alpha_rho_L(i)* &
                                                                  vel_L(2))*(1._wp/dy(k)) - &
@@ -1877,83 +1883,83 @@ contains
                             end do
 
                             if (num_fluids > 1) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids - 1
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(advxb + i - 1)%sf(j, k + 1, l) + &
                                                                             (0.5_wp*(alpha_L(i)* &
                                                                                      vel_L(2))*(1._wp/dy(k + 1)) - &
                                                                              0.5_wp*cfl*(alpha_L(i))*(1._wp/dy(k + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(advxb + i - 1)%sf(j, k + 1, l) &
                                                                             - (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k + 1, l)*vel_L(2)*(1._wp/dy(k + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) - &
                                                                         (0.5_wp*(alpha_L(i)* &
                                                                                  vel_L(2))*(1._wp/dy(k)) - &
                                                                          0.5_wp*cfl*(alpha_L(i))*(1._wp/dy(k)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) &
                                                                         + (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k, l)*vel_L(2)*(1._wp/dy(k)))
                                 end do
                             end if
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k + 1, l) = rhs_vf(momxb + 1)%sf(j, k + 1, l) + &
                                                                 (0.5_wp*(rho_L*(vel_L(2))**2.0 + &
                                                                          pres_L + F_L)*(1._wp/dy(k + 1)) - &
                                                                  0.5_wp*cfl*(rho_L*vel_L(2))*(1._wp/dy(k + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k + 1, l) = rhs_vf(momxb)%sf(j, k + 1, l) + &
                                                             (0.5_wp*rho_L*vel_L(1)*vel_L(2)*(1._wp/dy(k + 1)) - &
                                                              0.5_wp*cfl*(rho_L*vel_L(1))*(1._wp/dy(k + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 2)%sf(j, k + 1, l) = rhs_vf(momxb + 2)%sf(j, k + 1, l) + &
                                                                 (0.5_wp*rho_L*vel_L(3)*vel_L(2)*(1._wp/dy(k + 1)) - &
                                                                  0.5_wp*cfl*(rho_L*vel_L(3))*(1._wp/dy(k + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) + &
                                                             (0.5_wp*(vel_L(2)*(E_L + &
                                                                                pres_L + F_L))*(1._wp/dy(k + 1)) - &
                                                              0.5_wp*cfl*(E_L)*(1._wp/dy(k + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) - &
                                                             (0.5_wp*(rho_L*(vel_L(2))**2.0 + &
                                                                      pres_L + F_L)*(1._wp/dy(k)) - &
                                                              0.5_wp*cfl*(rho_L*vel_L(2))*(1._wp/dy(k)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) - &
                                                         (0.5_wp*rho_L*vel_L(1)*vel_L(2)*(1._wp/dy(k)) - &
                                                          0.5_wp*cfl*(rho_L*vel_L(1))*(1._wp/dy(k)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 2)%sf(j, k, l) = rhs_vf(momxb + 2)%sf(j, k, l) - &
                                                             (0.5_wp*rho_L*vel_L(3)*vel_L(2)*(1._wp/dy(k)) - &
                                                              0.5_wp*cfl*(rho_L*vel_L(3))*(1._wp/dy(k)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) - &
                                                         (0.5_wp*(vel_L(2)*(E_L + &
                                                                            pres_L + F_L))*(1._wp/dy(k)) - &
                                                          0.5_wp*cfl*(E_L)*(1._wp/dy(k)))
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k + 1, l) = rhs_vf(i)%sf(j, k + 1, l) + &
                                                             (0.5_wp*(alpha_rho_R(i)* &
                                                                      vel_R(2))*(1._wp/dy(k + 1)) + &
                                                              0.5_wp*cfl*(alpha_rho_R(i))*(1._wp/dy(k + 1)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - &
                                                         (0.5_wp*(alpha_rho_R(i)* &
                                                                  vel_R(2))*(1._wp/dy(k)) + &
@@ -1961,69 +1967,69 @@ contains
                             end do
 
                             if (num_fluids > 1) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids - 1
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(advxb + i - 1)%sf(j, k + 1, l) + &
                                                                             (0.5_wp*(alpha_R(i)* &
                                                                                      vel_R(2))*(1._wp/dy(k + 1)) + &
                                                                              0.5_wp*cfl*(alpha_R(i))*(1._wp/dy(k + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(advxb + i - 1)%sf(j, k + 1, l) &
                                                                             - (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k + 1, l)*vel_R(2)*(1._wp/dy(k + 1)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) - &
                                                                         (0.5_wp*(alpha_R(i)* &
                                                                                  vel_R(2))*(1._wp/dy(k)) + &
                                                                          0.5_wp*cfl*(alpha_R(i))*(1._wp/dy(k)))
 
-                                    !$acc atomic
+                                    $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) &
                                                                         + (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k, l)*vel_R(2)*(1._wp/dy(k)))
                                 end do
                             end if
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k + 1, l) = rhs_vf(momxb + 1)%sf(j, k + 1, l) + &
                                                                 (0.5_wp*(rho_R*(vel_R(2))**2.0 + &
                                                                          pres_R + F_R)*(1._wp/dy(k + 1)) + &
                                                                  0.5_wp*cfl*(rho_R*vel_R(2))*(1._wp/dy(k + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k + 1, l) = rhs_vf(momxb)%sf(j, k + 1, l) + &
                                                             (0.5_wp*rho_R*vel_R(2)*vel_R(1)*(1._wp/dy(k + 1)) + &
                                                              0.5_wp*cfl*(rho_R*vel_R(1))*(1._wp/dy(k + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 2)%sf(j, k + 1, l) = rhs_vf(momxb + 2)%sf(j, k + 1, l) + &
                                                                 (0.5_wp*rho_R*vel_R(2)*vel_R(3)*(1._wp/dy(k + 1)) + &
                                                                  0.5_wp*cfl*(rho_R*vel_R(3))*(1._wp/dy(k + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k + 1, l) = rhs_vf(E_idx)%sf(j, k + 1, l) + &
                                                             (0.5_wp*(vel_R(2)*(E_R + &
                                                                                pres_R + F_R))*(1._wp/dy(k + 1)) + &
                                                              0.5_wp*cfl*(E_R)*(1._wp/dy(k + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) - &
                                                             (0.5_wp*(rho_R*(vel_R(2))**2.0 + &
                                                                      pres_R + F_R)*(1._wp/dy(k)) + &
                                                              0.5_wp*cfl*(rho_R*vel_R(2))*(1._wp/dy(k)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) - &
                                                         (0.5_wp*rho_R*vel_R(2)*vel_R(1)*(1._wp/dy(k)) + &
                                                          0.5_wp*cfl*(rho_R*vel_R(1))*(1._wp/dy(k)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 2)%sf(j, k, l) = rhs_vf(momxb + 2)%sf(j, k, l) - &
                                                             (0.5_wp*rho_R*vel_R(2)*vel_R(3)*(1._wp/dy(k)) + &
                                                              0.5_wp*cfl*(rho_R*vel_R(3))*(1._wp/dy(k)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) - &
                                                         (0.5_wp*(vel_R(2)*(E_R + &
                                                                            pres_R + F_R))*(1._wp/dy(k)) + &
@@ -2034,10 +2040,11 @@ contains
                 end do
             end if
         elseif (idir == 3) then
-            !$acc parallel loop collapse(3) gang vector default(present) &
-            !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
-            !$acc alpha_L,alpha_R,alpha_rho_L,cfl,F_L,F_R,E_L,mu_R, &
-            !$acc rho_sf_small,alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[rho_L, rho_R, gamma_L, &
+                & gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, &
+                & pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, &
+                & F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, &
+                & vflux_L_arr, vflux_R_arr]')
             do l = -1, p
                 do k = 0, n
                     do j = 0, m
@@ -2053,14 +2060,14 @@ contains
                                     !DIR$ unroll 4
                                 #:endif
                             #:endif
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do q = vidxb, vidxe
                                 dvel_small = 0._wp
                                 !x-direction contributions
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = -1, 1
                                     rho_L = 0._wp
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do r = 1, num_fluids
                                         rho_L = rho_L + q_cons_vf(r)%sf(j + i, k, l + q)
                                     end do
@@ -2084,10 +2091,10 @@ contains
                                 end if
 
                                 !y-direction contributions
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = -1, 1
                                     rho_L = 0._wp
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do r = 1, num_fluids
                                         rho_L = rho_L + q_cons_vf(r)%sf(j, k + i, l + q)
                                     end do
@@ -2111,10 +2118,10 @@ contains
                                 end if
 
                                 !z-direction contributions
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = -1, 1
                                     rho_L = 0._wp
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do r = 1, num_fluids
                                         rho_L = rho_L + q_cons_vf(r)%sf(j, k, l + i + q)
                                     end do
@@ -2146,47 +2153,47 @@ contains
                         alpha_L = 0._wp; alpha_R = 0._wp
                         vel_L = 0._wp; vel_R = 0._wp
 
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do q = vidxb + 1, vidxe
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q)* q_cons_vf(i)%sf(j, k, l + q)
+                                alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q)*q_cons_vf(i)%sf(j, k, l + q)
                             end do
 
                             if (num_fluids > 1) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids - 1
-                                    alpha_L(i) = alpha_L(i) + coeff_L(q) * q_cons_vf(E_idx + i)%sf(j, k, l + q)
+                                    alpha_L(i) = alpha_L(i) + coeff_L(q)*q_cons_vf(E_idx + i)%sf(j, k, l + q)
                                 end do
                             else
                                 alpha_L(1) = 1._wp
                             end if
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
-                                vel_L(i) = vel_L(i) + coeff_L(q) * q_cons_vf(momxb + i - 1)%sf(j, k, l + q)
+                                vel_L(i) = vel_L(i) + coeff_L(q)*q_cons_vf(momxb + i - 1)%sf(j, k, l + q)
                             end do
                         end do
 
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do q = vidxb, vidxe - 1
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q) * q_cons_vf(i)%sf(j, k, l + q)
+                                alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q)*q_cons_vf(i)%sf(j, k, l + q)
                             end do
 
                             if (num_fluids > 1) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids - 1
-                                    alpha_R(i) = alpha_R(i) + coeff_R(q) * q_cons_vf(E_idx + i)%sf(j, k, l + q)
+                                    alpha_R(i) = alpha_R(i) + coeff_R(q)*q_cons_vf(E_idx + i)%sf(j, k, l + q)
                                 end do
                             else
                                 alpha_R(1) = 1._wp
                             end if
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
-                                vel_R(i) = vel_R(i) + coeff_R(q) * q_cons_vf(momxb + i - 1)%sf(j, k, l + q)
+                                vel_R(i) = vel_R(i) + coeff_R(q)*q_cons_vf(momxb + i - 1)%sf(j, k, l + q)
                             end do
                         end do
 
@@ -2203,99 +2210,99 @@ contains
                         gamma_R = sum(alpha_R*gammas)
                         pi_inf_R = sum(alpha_R*pi_infs)
 
-                        vel_L = vel_L / rho_L
-                        vel_R = vel_R / rho_R
+                        vel_L = vel_L/rho_L
+                        vel_R = vel_R/rho_R
 
                         if (viscous) then
                             mu_L = 0._wp
                             mu_R = 0._wp
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
                                 mu_L = alpha_L(i)/Res(1, i) + mu_L
                                 mu_R = alpha_R(i)/Res(1, i) + mu_R
                             end do
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k, l + 1) = rhs_vf(momxb)%sf(j, k, l + 1) - &
                                                             0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dz(l + 1))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l + 1) = rhs_vf(E_idx)%sf(j, k, l + 1) - &
                                                             0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dz(l + 1))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
                                                         0.5_wp*mu_L*vflux_L_arr(1)*(1._wp/dz(l))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                         0.5_wp*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dz(l))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k, l + 1) = rhs_vf(momxb)%sf(j, k, l + 1) - &
                                                             0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dz(l + 1))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l + 1) = rhs_vf(E_idx)%sf(j, k, l + 1) - &
                                                             0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dz(l + 1))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
                                                         0.5_wp*mu_R*vflux_R_arr(1)*(1._wp/dz(l))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                         0.5_wp*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dz(l))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k, l + 1) = rhs_vf(momxb + 1)%sf(j, k, l + 1) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dz(l + 1))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l + 1) = rhs_vf(E_idx)%sf(j, k, l + 1) - &
                                                             0.5_wp*mu_L*vflux_L_arr(2)*vel_L(2)*(1._wp/dz(l + 1))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(2)*(1._wp/dz(l))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                         0.5_wp*mu_L*vflux_L_arr(2)*vel_L(2)*(1._wp/dz(l))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k, l + 1) = rhs_vf(momxb + 1)%sf(j, k, l + 1) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dz(l + 1))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l + 1) = rhs_vf(E_idx)%sf(j, k, l + 1) - &
                                                             0.5_wp*mu_R*vflux_R_arr(2)*vel_R(2)*(1._wp/dz(l + 1))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(2)*(1._wp/dz(l))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                         0.5_wp*mu_R*vflux_R_arr(2)*vel_R(2)*(1._wp/dz(l))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 2)%sf(j, k, l + 1) = rhs_vf(momxb + 2)%sf(j, k, l + 1) - &
                                                                 0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dz(l + 1))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l + 1) = rhs_vf(E_idx)%sf(j, k, l + 1) - &
                                                             0.5_wp*mu_L*vflux_L_arr(3)*vel_L(3)*(1._wp/dz(l + 1))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 2)%sf(j, k, l) = rhs_vf(momxb + 2)%sf(j, k, l) + &
                                                             0.5_wp*mu_L*vflux_L_arr(3)*(1._wp/dz(l))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                         0.5_wp*mu_L*vflux_L_arr(3)*vel_L(3)*(1._wp/dz(l))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 2)%sf(j, k, l + 1) = rhs_vf(momxb + 2)%sf(j, k, l + 1) - &
                                                                 0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dz(l + 1))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l + 1) = rhs_vf(E_idx)%sf(j, k, l + 1) - &
                                                             0.5_wp*mu_R*vflux_R_arr(3)*vel_R(3)*(1._wp/dz(l + 1))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(momxb + 2)%sf(j, k, l) = rhs_vf(momxb + 2)%sf(j, k, l) + &
                                                             0.5_wp*mu_R*vflux_R_arr(3)*(1._wp/dz(l))
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                         0.5_wp*mu_R*vflux_R_arr(3)*vel_R(3)*(1._wp/dz(l))
                         end if
@@ -2303,31 +2310,31 @@ contains
                         E_L = 0._wp; E_R = 0._wp
                         F_L = 0._wp; F_R = 0._wp
 
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do q = vidxb + 1, vidxe
-                            E_L = E_L + coeff_L(q) * q_cons_vf(E_idx)%sf(j, k, l+ q)
-                            F_L = F_L + coeff_L(q) * jac(j, k, l + q)
+                            E_L = E_L + coeff_L(q)*q_cons_vf(E_idx)%sf(j, k, l + q)
+                            F_L = F_L + coeff_L(q)*jac(j, k, l + q)
                         end do
 
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do q = vidxb, vidxe - 1
-                            E_R = E_R + coeff_R(q) * q_cons_vf(E_idx)%sf(j, k, l + q)
-                            F_R = F_R + coeff_R(q) * jac(j, k, l + q)
+                            E_R = E_R + coeff_R(q)*q_cons_vf(E_idx)%sf(j, k, l + q)
+                            F_R = F_R + coeff_R(q)*jac(j, k, l + q)
                         end do
 
                         call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                   E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
                                                   pres_L, pres_R, cfl)
 
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(i)%sf(j, k, l + 1) = rhs_vf(i)%sf(j, k, l + 1) + &
                                                         (0.5_wp*(alpha_rho_L(i)* &
                                                                  vel_L(3))*(1._wp/dz(l + 1)) - &
                                                          0.5_wp*cfl*(alpha_rho_L(i))*(1._wp/dz(l + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - &
                                                     (0.5_wp*(alpha_rho_L(i)* &
                                                              vel_L(3))*(1._wp/dz(l)) - &
@@ -2335,83 +2342,83 @@ contains
                         end do
 
                         if (num_fluids > 1) then
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids - 1
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(advxb + i - 1)%sf(j, k, l + 1) = rhs_vf(advxb + i - 1)%sf(j, k, l + 1) + &
                                                                         (0.5_wp*(alpha_L(i)* &
                                                                                  vel_L(3))*(1._wp/dz(l + 1)) - &
                                                                          0.5_wp*cfl*(alpha_L(i))*(1._wp/dz(l + 1)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(advxb + i - 1)%sf(j, k, l + 1) = rhs_vf(advxb + i - 1)%sf(j, k, l + 1) &
                                                                         - (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k, l + 1)*vel_L(3)*(1._wp/dz(l + 1)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) - &
                                                                     (0.5_wp*(alpha_L(i)* &
                                                                              vel_L(3))*(1._wp/dz(l)) - &
                                                                      0.5_wp*cfl*(alpha_L(i))*(1._wp/dz(l)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) &
                                                                     + (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k, l)*vel_L(3)*(1._wp/dz(l)))
                             end do
                         end if
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb + 2)%sf(j, k, l + 1) = rhs_vf(momxb + 2)%sf(j, k, l + 1) + &
                                                             (0.5_wp*(rho_L*(vel_L(3))**2.0 + &
                                                                      pres_L + F_L)*(1._wp/dz(l + 1)) - &
                                                              0.5_wp*cfl*(rho_L*vel_L(3))*(1._wp/dz(l + 1)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb)%sf(j, k, l + 1) = rhs_vf(momxb)%sf(j, k, l + 1) + &
                                                         (0.5_wp*rho_L*vel_L(1)*vel_L(3)*(1._wp/dz(l + 1)) - &
                                                          0.5_wp*cfl*(rho_L*vel_L(1))*(1._wp/dz(l + 1)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb + 1)%sf(j, k, l + 1) = rhs_vf(momxb + 1)%sf(j, k, l + 1) + &
                                                             (0.5_wp*rho_L*vel_L(2)*vel_L(3)*(1._wp/dz(l + 1)) - &
                                                              0.5_wp*cfl*(rho_L*vel_L(2))*(1._wp/dz(l + 1)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(E_idx)%sf(j, k, l + 1) = rhs_vf(E_idx)%sf(j, k, l + 1) + &
                                                         (0.5_wp*(vel_L(3)*(E_L + &
                                                                            pres_L + F_L))*(1._wp/dz(l + 1)) - &
                                                          0.5_wp*cfl*(E_L)*(1._wp/dz(l + 1)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb + 2)%sf(j, k, l) = rhs_vf(momxb + 2)%sf(j, k, l) - &
                                                         (0.5_wp*(rho_L*(vel_L(3))**2.0 + &
                                                                  pres_L + F_L)*(1._wp/dz(l)) - &
                                                          0.5_wp*cfl*(rho_L*vel_L(3))*(1._wp/dz(l)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) - &
                                                     (0.5_wp*rho_L*vel_L(1)*vel_L(3)*(1._wp/dz(l)) - &
                                                      0.5_wp*cfl*(rho_L*vel_L(1))*(1._wp/dz(l)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) - &
                                                         (0.5_wp*rho_L*vel_L(2)*vel_L(3)*(1._wp/dz(l)) - &
                                                          0.5_wp*cfl*(rho_L*vel_L(2))*(1._wp/dz(l)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) - &
                                                     (0.5_wp*(vel_L(3)*(E_L + &
                                                                        pres_L + F_L))*(1._wp/dz(l)) - &
                                                      0.5_wp*cfl*(E_L)*(1._wp/dz(l)))
 
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(i)%sf(j, k, l + 1) = rhs_vf(i)%sf(j, k, l + 1) + &
                                                         (0.5_wp*(alpha_rho_R(i)* &
                                                                  vel_R(3))*(1._wp/dz(l + 1)) + &
                                                          0.5_wp*cfl*(alpha_rho_R(i))*(1._wp/dz(l + 1)))
 
-                            !$acc atomic
+                            $:GPU_ATOMIC(atomic='update')
                             rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - &
                                                     (0.5_wp*(alpha_rho_R(i)* &
                                                              vel_R(3))*(1._wp/dz(l)) + &
@@ -2419,69 +2426,69 @@ contains
                         end do
 
                         if (num_fluids > 1) then
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids - 1
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(advxb + i - 1)%sf(j, k, l + 1) = rhs_vf(advxb + i - 1)%sf(j, k, l + 1) + &
                                                                         (0.5_wp*(alpha_R(i)* &
                                                                                  vel_R(3))*(1._wp/dz(l + 1)) + &
                                                                          0.5_wp*cfl*(alpha_R(i))*(1._wp/dz(l + 1)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(advxb + i - 1)%sf(j, k, l + 1) = rhs_vf(advxb + i - 1)%sf(j, k, l + 1) &
                                                                         - (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k, l + 1)*vel_R(3)*(1._wp/dz(l + 1)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) - &
                                                                     (0.5_wp*(alpha_R(i)* &
                                                                              vel_R(3))*(1._wp/dz(l)) + &
                                                                      0.5_wp*cfl*(alpha_R(i))*(1._wp/dz(l)))
 
-                                !$acc atomic
+                                $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(advxb + i - 1)%sf(j, k, l) = rhs_vf(advxb + i - 1)%sf(j, k, l) &
                                                                     + (0.5_wp*q_cons_vf(advxb + i - 1)%sf(j, k, l)*vel_R(3)*(1._wp/dz(l)))
                             end do
                         end if
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb + 2)%sf(j, k, l + 1) = rhs_vf(momxb + 2)%sf(j, k, l + 1) + &
                                                             (0.5_wp*(rho_R*(vel_R(3))**2.0 + &
                                                                      pres_R + F_R)*(1._wp/dz(l + 1)) + &
                                                              0.5_wp*cfl*(rho_R*vel_R(3))*(1._wp/dz(l + 1)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb)%sf(j, k, l + 1) = rhs_vf(momxb)%sf(j, k, l + 1) + &
                                                         (0.5_wp*rho_R*vel_R(1)*vel_R(3)*(1._wp/dz(l + 1)) + &
                                                          0.5_wp*cfl*(rho_R*vel_R(1))*(1._wp/dz(l + 1)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb + 1)%sf(j, k, l + 1) = rhs_vf(momxb + 1)%sf(j, k, l + 1) + &
                                                             (0.5_wp*rho_R*vel_R(2)*vel_R(3)*(1._wp/dz(l + 1)) + &
                                                              0.5_wp*cfl*(rho_R*vel_R(2))*(1._wp/dz(l + 1)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(E_idx)%sf(j, k, l + 1) = rhs_vf(E_idx)%sf(j, k, l + 1) + &
                                                         (0.5_wp*(vel_R(3)*(E_R + &
                                                                            pres_R + F_R))*(1._wp/dz(l + 1)) + &
                                                          0.5_wp*cfl*(E_R)*(1._wp/dz(l + 1)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb + 2)%sf(j, k, l) = rhs_vf(momxb + 2)%sf(j, k, l) - &
                                                         (0.5_wp*(rho_R*(vel_R(3))**2.0 + &
                                                                  pres_R + F_R)*(1._wp/dz(l)) + &
                                                          0.5_wp*cfl*(rho_R*vel_R(3))*(1._wp/dz(l)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) - &
                                                     (0.5_wp*rho_R*vel_R(1)*vel_R(3)*(1._wp/dz(l)) + &
                                                      0.5_wp*cfl*(rho_R*vel_R(1))*(1._wp/dz(l)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) - &
                                                         (0.5_wp*rho_R*vel_R(2)*vel_R(3)*(1._wp/dz(l)) + &
                                                          0.5_wp*cfl*(rho_R*vel_R(2))*(1._wp/dz(l)))
 
-                        !$acc atomic
+                        $:GPU_ATOMIC(atomic='update')
                         rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) - &
                                                     (0.5_wp*(vel_R(3)*(E_R + &
                                                                        pres_R + F_R))*(1._wp/dz(l)) + &
@@ -2497,7 +2504,8 @@ contains
     pure subroutine s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                          E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
                                          pres_L, pres_R, cfl)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         real(wp), intent(in) :: E_L, gamma_L, pi_inf_L, rho_L
         real(wp), intent(in) :: E_R, gamma_R, pi_inf_R, rho_R
         real(wp), dimension(num_dims), intent(in) :: vel_L, vel_R
@@ -2548,7 +2556,7 @@ contains
         integer, intent(in) :: idir
 
         if (idir == 1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
                     do k = 0, n
@@ -2561,7 +2569,7 @@ contains
                 end do
             end do
         elseif (idir == 2) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
                     do k = 0, n
@@ -2575,7 +2583,7 @@ contains
                 end do
             end do
         elseif (idir == 3) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
                     do k = 0, n
