@@ -1,3 +1,5 @@
+#:include 'macros.fpp'
+
 module m_sim_helpers
 
     use m_derived_types        !< Definitions of the derived types
@@ -19,7 +21,7 @@ contains
         !! @param l z coordinate index
         !! @return fltr_dtheta Modified dtheta value for cylindrical coordinates
     pure function f_compute_filtered_dtheta(k, l) result(fltr_dtheta)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         integer, intent(in) :: k, l
         real(wp) :: fltr_dtheta
         integer :: Nfq
@@ -46,7 +48,7 @@ contains
         !! @param l z coordinate index
         !! @return cfl_terms computed CFL terms for 2D/3D cases
     pure function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in) :: c
         integer, intent(in) :: j, k, l
@@ -88,11 +90,8 @@ contains
         !! @param k y index
         !! @param l z index
     pure subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_enthalpy
-#else
-        !$acc routine seq
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', &
+            & cray_inline=True)
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         real(wp), intent(inout), dimension(num_fluids) :: alpha
@@ -111,6 +110,7 @@ contains
                 alpha_rho(1) = q_prim_vf(contxb)%sf(j, k, l)
                 alpha(1) = q_prim_vf(advxb)%sf(j, k, l)
             else
+                $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, num_fluids - 1
                     alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
                     alpha(i) = q_prim_vf(advxb + i - 1)%sf(j, k, l)
@@ -120,6 +120,7 @@ contains
                 alpha(num_fluids) = 1._wp - sum(alpha(1:num_fluids - 1))
             end if
         else
+            $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_fluids
                 alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
                 alpha(i) = q_prim_vf(advxb + i - 1)%sf(j, k, l)
@@ -136,19 +137,19 @@ contains
         end if
 
         if (igr) then
-            !$acc loop seq
+            $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_vels
                 vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)/rho
             end do
         else
-            !$acc loop seq
+            $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_vels
                 vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
             end do
         end if
 
         vel_sum = 0._wp
-        !$acc loop seq
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_vels
             vel_sum = vel_sum + vel(i)**2._wp
         end do
@@ -181,7 +182,7 @@ contains
         !! @param vcfl_sf (optional) cell-centered viscous CFL number
         !! @param Rc_sf (optional) cell centered Rc
     pure subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in), dimension(num_vels) :: vel
         real(wp), intent(in) :: c, rho
         real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: icfl_sf
@@ -244,7 +245,7 @@ contains
         !! @param k y coordinate
         !! @param l z coordinate
     pure subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in) :: c, rho
         real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: max_dt
