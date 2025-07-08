@@ -109,6 +109,7 @@ contains
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
                     jac(j, k, l) = 0._wp
+                    if (igr_iter_solver == 1) jac_old(j,k,l) = 0._wp
                 end do
             end do
         end do
@@ -122,7 +123,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             if (igr_order == 3) then
-                vidxb = -1; vidxe = 2; 
+                vidxb = -1; vidxe = 2;
                 !$acc update device(vidxb, vidxe)
 
                 @:ALLOCATE(coeff_L(0:2))
@@ -138,7 +139,7 @@ contains
                 !$acc update device(coeff_R)
 
             elseif (igr_order == 5) then
-                vidxb = -2; vidxe = 3; 
+                vidxb = -2; vidxe = 3;
                 !$acc update device(vidxb, vidxe)
 
                 @:ALLOCATE(coeff_L(-1:3))
@@ -274,63 +275,35 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = -1, m
-                    if (igr_order == 3) then
-                        F_L = (1._wp/6._wp)*(2._wp*jac(j, k, l) + &
-                                             5._wp*jac(j + 1, k, l) - &
-                                             1._wp*jac(j + 2, k, l))
-                        F_R = (1._wp/6._wp)*(2._wp*jac(j + 1, k, l) + &
-                                             5._wp*jac(j, k, l) - &
-                                             1._wp*jac(j - 1, k, l))
+
+                    F_L = 0._wp; F_R = 0._wp
+                    alpha_rho_L = 0._wp; alpha_rho_R = 0._wp
+                    vel_L = 0._wp; vel_R = 0._wp
+
+                    !$acc loop seq
+                    do q = vidxb + 1, vidxe
                         !$acc loop seq
                         do i = 1, num_fluids
-                            alpha_rho_L(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(i)%sf(j, k, l) + &
-                                                            5._wp*q_cons_vf(i)%sf(j - 1, k, l) - &
-                                                            1._wp*q_cons_vf(i)%sf(j - 2, k, l))
-                            alpha_rho_R(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(i)%sf(j + 1, k, l) + &
-                                                            5._wp*q_cons_vf(i)%sf(j, k, l) - &
-                                                            1._wp*q_cons_vf(i)%sf(j - 1, k, l))
+                            alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q) * q_cons_vf(i)%sf(j + q, k, l)
                         end do
-                        vel_L = ((1._wp/6._wp)*(2._wp*q_cons_vf(momxb)%sf(j, k, l) + &
-                                                5._wp*q_cons_vf(momxb)%sf(j + 1, k, l) - &
-                                                1._wp*q_cons_vf(momxb)%sf(j + 2, k, l)))/sum(alpha_rho_L)
-                        vel_R = ((1._wp/6._wp)*(2._wp*q_cons_vf(momxb)%sf(j + 1, k, l) + &
-                                                5._wp*q_cons_vf(momxb)%sf(j, k, l) - &
-                                                1._wp*q_cons_vf(momxb)%sf(j - 1, k, l)))/sum(alpha_rho_R)
-                    elseif (igr_order == 5) then
-                        F_L = (1._wp/60._wp)*(-3._wp*jac(j - 1, k, l) + &
-                                              27._wp*jac(j, k, l) + &
-                                              47._wp*jac(j + 1, k, l) - &
-                                              13._wp*jac(j + 2, k, l) + &
-                                              2._wp*jac(j + 3, k, l))
-                        F_R = (1._wp/60._wp)*(-3._wp*jac(j + 2, k, l) + &
-                                              27._wp*jac(j + 1, k, l) + &
-                                              47._wp*jac(j, k, l) - &
-                                              13._wp*jac(j - 1, k, l) + &
-                                              2._wp*jac(j - 2, k, l))
+
+                        vel_L = vel_L + coeff_L(q) * q_cons_vf(momxb)%sf(j + q, k, l)
+                        F_L = F_L + coeff_L(q) * jac(j + q, k, l)
+                    end do
+
+                    !$acc loop seq
+                    do q = vidxb, vidxe - 1
                         !$acc loop seq
                         do i = 1, num_fluids
-                            alpha_rho_L(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(i)%sf(j - 1, k, l) + &
-                                                             27._wp*q_cons_vf(i)%sf(j, k, l) + &
-                                                             47._wp*q_cons_vf(i)%sf(j + 1, k, l) - &
-                                                             13._wp*q_cons_vf(i)%sf(j + 2, k, l) + &
-                                                             2._wp*q_cons_vf(i)%sf(j + 3, k, l))
-                            alpha_rho_R(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(i)%sf(j + 2, k, l) + &
-                                                             27._wp*q_cons_vf(i)%sf(j + 1, k, l) + &
-                                                             47._wp*q_cons_vf(i)%sf(j, k, l) - &
-                                                             13._wp*q_cons_vf(i)%sf(j - 1, k, l) + &
-                                                             2._wp*q_cons_vf(i)%sf(j - 2, k, l))
+                            alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q) * q_cons_vf(i)%sf(j + q, k, l)
                         end do
-                        vel_L = ((1._wp/60._wp)*(-3._wp*q_cons_vf(momxb)%sf(j - 1, k, l) + &
-                                                 27._wp*q_cons_vf(momxb)%sf(j, k, l) + &
-                                                 47._wp*q_cons_vf(momxb)%sf(j + 1, k, l) - &
-                                                 13._wp*q_cons_vf(momxb)%sf(j + 2, k, l) + &
-                                                 2._wp*q_cons_vf(momxb)%sf(j + 3, k, l)))/sum(alpha_rho_L)
-                        vel_R = ((1._wp/60._wp)*(-3._wp*q_cons_vf(momxb)%sf(j + 2, k, l) + &
-                                                 27._wp*q_cons_vf(momxb)%sf(j + 1, k, l) + &
-                                                 47._wp*q_cons_vf(momxb)%sf(j, k, l) - &
-                                                 13._wp*q_cons_vf(momxb)%sf(j - 1, k, l) + &
-                                                 2._wp*q_cons_vf(momxb)%sf(j - 2, k, l)))/sum(alpha_rho_R)
-                    end if
+
+                        vel_R = vel_R + coeff_R(q) * q_cons_vf(momxb)%sf(j + q, k, l)
+                        F_R = F_R + coeff_R(q) * jac(j + q, k, l)
+                    end do
+
+                    vel_L = vel_L / sum(alpha_rho_L)
+                    vel_R = vel_R / sum(alpha_rho_R)
 
                     #:for LR in ['L', 'R']
                         !$acc atomic
@@ -389,7 +362,7 @@ contains
                             #:if MFC_CASE_OPTIMIZATION
                                 #:if igr_order == 5
                                     !DIR$ unroll 6
-                                #:elif igr_irder == 3
+                                #:elif igr_order == 3
                                     !DIR$ unroll 4
                                 #:endif
                             #:endif
@@ -460,116 +433,72 @@ contains
                                 end if
                             end do
 
-                            if (igr_order == 3) then
+                            alpha_rho_L = 0._wp; alpha_rho_R = 0._wp
+                            alpha_L = 0._wp; alpha_R = 0._wp
+                            vel_L = 0._wp; vel_R = 0._wp
+
+                            !$acc loop seq
+                            do q = vidxb + 1, vidxe
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(i)%sf(j, k, l) + &
-                                                                    5._wp*q_cons_vf(i)%sf(j + 1, k, l) - &
-                                                                    1._wp*q_cons_vf(i)%sf(j + 2, k, l))
-                                    alpha_rho_R(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(i)%sf(j + 1, k, l) + &
-                                                                    5._wp*q_cons_vf(i)%sf(j, k, l) - &
-                                                                    1._wp*q_cons_vf(i)%sf(j - 1, k, l))
+                                    alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q) * q_cons_vf(i)%sf(j + q, k, l)
                                 end do
 
                                 if (num_fluids > 1) then
                                     !$acc loop seq
                                     do i = 1, num_fluids - 1
-                                        alpha_L(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx + i)%sf(j, k, l) + &
-                                                                    5._wp*q_cons_vf(E_idx + i)%sf(j + 1, k, l) - &
-                                                                    1._wp*q_cons_vf(E_idx + i)%sf(j + 2, k, l))
-                                        alpha_R(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx + i)%sf(j + 1, k, l) + &
-                                                                    5._wp*q_cons_vf(E_idx + i)%sf(j, k, l) - &
-                                                                    1._wp*q_cons_vf(E_idx + i)%sf(j - 1, k, l))
+                                        alpha_L(i) = alpha_L(i) + coeff_L(q) * q_cons_vf(E_idx + i)%sf(j + q, k, l)
                                     end do
-                                    alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                    alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                                 else
                                     alpha_L(1) = 1._wp
-                                    alpha_R(1) = 1._wp
                                 end if
-
-                                rho_L = sum(alpha_rho_L)
-                                gamma_L = sum(alpha_L*gammas)
-                                pi_inf_L = sum(alpha_L*pi_infs)
-
-                                rho_R = sum(alpha_rho_R)
-                                gamma_R = sum(alpha_R*gammas)
-                                pi_inf_R = sum(alpha_R*pi_infs)
 
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_L(i) = ((1._wp/6._wp)*(2._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) + &
-                                                               5._wp*q_cons_vf(momxb + i - 1)%sf(j + 1, k, l) - &
-                                                               1._wp*q_cons_vf(momxb + i - 1)%sf(j + 2, k, l)))/rho_L
-                                    vel_R(i) = ((1._wp/6._wp)*(2._wp*q_cons_vf(momxb + i - 1)%sf(j + 1, k, l) + &
-                                                               5._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) - &
-                                                               1._wp*q_cons_vf(momxb + i - 1)%sf(j - 1, k, l)))/rho_R
+                                    vel_L(i) = vel_L(i) + coeff_L(q) * q_cons_vf(momxb + i - 1)%sf(j + q, k, l)
                                 end do
+                            end do
 
-                            elseif (igr_order == 5) then
+                            !$acc loop seq
+                            do q = vidxb, vidxe - 1
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(i)%sf(j - 1, k, l) + &
-                                                                     27._wp*q_cons_vf(i)%sf(j, k, l) + &
-                                                                     47._wp*q_cons_vf(i)%sf(j + 1, k, l) - &
-                                                                     13._wp*q_cons_vf(i)%sf(j + 2, k, l) + &
-                                                                     2._wp*q_cons_vf(i)%sf(j + 3, k, l))
-                                    alpha_rho_R(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(i)%sf(j + 2, k, l) + &
-                                                                     27._wp*q_cons_vf(i)%sf(j + 1, k, l) + &
-                                                                     47._wp*q_cons_vf(i)%sf(j, k, l) - &
-                                                                     13._wp*q_cons_vf(i)%sf(j - 1, k, l) + &
-                                                                     2._wp*q_cons_vf(i)%sf(j - 2, k, l))
+                                    alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q) * q_cons_vf(i)%sf(j + q, k, l)
                                 end do
 
                                 if (num_fluids > 1) then
                                     !$acc loop seq
                                     do i = 1, num_fluids - 1
-                                        alpha_L(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx + i)%sf(j - 1, k, l) + &
-                                                                     27._wp*q_cons_vf(E_idx + i)%sf(j, k, l) + &
-                                                                     47._wp*q_cons_vf(E_idx + i)%sf(j + 1, k, l) - &
-                                                                     13._wp*q_cons_vf(E_idx + i)%sf(j + 2, k, l) + &
-                                                                     2._wp*q_cons_vf(E_idx + i)%sf(j + 3, k, l))
-                                        alpha_R(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx + i)%sf(j + 2, k, l) + &
-                                                                     27._wp*q_cons_vf(E_idx + i)%sf(j + 1, k, l) + &
-                                                                     47._wp*q_cons_vf(E_idx + i)%sf(j, k, l) - &
-                                                                     13._wp*q_cons_vf(E_idx + i)%sf(j - 1, k, l) + &
-                                                                     2._wp*q_cons_vf(E_idx + i)%sf(j - 2, k, l))
+                                        alpha_R(i) = alpha_R(i) + coeff_R(q) * q_cons_vf(E_idx + i)%sf(j + q, k, l)
                                     end do
-
-                                    alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                    alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                                 else
-                                    alpha_L(1) = 1._wp
                                     alpha_R(1) = 1._wp
                                 end if
 
-                                rho_L = sum(alpha_rho_L)
-                                gamma_L = sum(alpha_L*gammas)
-                                pi_inf_L = sum(alpha_L*pi_infs)
-
-                                rho_R = sum(alpha_rho_R)
-                                gamma_R = sum(alpha_R*gammas)
-                                pi_inf_R = sum(alpha_R*pi_infs)
-
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_L(i) = ((1._wp/60._wp)*(-3._wp*q_cons_vf(momxb + i - 1)%sf(j - 1, k, l) + &
-                                                                27._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) + &
-                                                                47._wp*q_cons_vf(momxb + i - 1)%sf(j + 1, k, l) - &
-                                                                13._wp*q_cons_vf(momxb + i - 1)%sf(j + 2, k, l) + &
-                                                                2._wp*q_cons_vf(momxb + i - 1)%sf(j + 3, k, l)))/rho_L
-                                    vel_R(i) = ((1._wp/60._wp)*(-3._wp*q_cons_vf(momxb + i - 1)%sf(j + 2, k, l) + &
-                                                                27._wp*q_cons_vf(momxb + i - 1)%sf(j + 1, k, l) + &
-                                                                47._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) - &
-                                                                13._wp*q_cons_vf(momxb + i - 1)%sf(j - 1, k, l) + &
-                                                                2._wp*q_cons_vf(momxb + i - 1)%sf(j - 2, k, l)))/rho_R
+                                    vel_R(i) = vel_R(i) + coeff_R(q) * q_cons_vf(momxb + i - 1)%sf(j + q, k, l)
                                 end do
+                            end do
 
+                            if (num_fluids > 1) then
+                                alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
+                                alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                             end if
 
+                            rho_L = sum(alpha_rho_L)
+                            gamma_L = sum(alpha_L*gammas)
+                            pi_inf_L = sum(alpha_L*pi_infs)
+
+                            rho_R = sum(alpha_rho_R)
+                            gamma_R = sum(alpha_R*gammas)
+                            pi_inf_R = sum(alpha_R*pi_infs)
+
+                            vel_L = vel_L / rho_L
+                            vel_R = vel_R / rho_R
+
                             if (viscous) then
-                                mu_L = 0._wp
-                                mu_R = 0._wp
+                                mu_L = 0._wp; mu_R = 0._wp
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     mu_L = alpha_L(i)/Res(1, i) + mu_L
@@ -633,25 +562,17 @@ contains
                                                             0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j))
                             end if
 
-                            if (igr_order == 3) then
-                                E_L = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                     5._wp*q_cons_vf(E_idx)%sf(j + 1, k, l) - &
-                                                     1._wp*q_cons_vf(E_idx)%sf(j + 2, k, l))
-                                E_R = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx)%sf(j + 1, k, l) + &
-                                                     5._wp*q_cons_vf(E_idx)%sf(j, k, l) - &
-                                                     1._wp*q_cons_vf(E_idx)%sf(j - 1, k, l))
-                            elseif (igr_order == 5) then
-                                E_L = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx)%sf(j - 1, k, l) + &
-                                                      27._wp*q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                      47._wp*q_cons_vf(E_idx)%sf(j + 1, k, l) - &
-                                                      13._wp*q_cons_vf(E_idx)%sf(j + 2, k, l) + &
-                                                      2._wp*q_cons_vf(E_idx)%sf(j + 3, k, l))
-                                E_R = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx)%sf(j + 2, k, l) + &
-                                                      27._wp*q_cons_vf(E_idx)%sf(j + 1, k, l) + &
-                                                      47._wp*q_cons_vf(E_idx)%sf(j, k, l) - &
-                                                      13._wp*q_cons_vf(E_idx)%sf(j - 1, k, l) + &
-                                                      2._wp*q_cons_vf(E_idx)%sf(j - 2, k, l))
-                            end if
+                            E_L = 0._wp; E_R = 0._wp
+
+                            !$acc loop seq
+                            do q = vidxb + 1, vidxe
+                                E_L = E_L + coeff_L(q) * q_cons_vf(E_idx)%sf(j + q, k, l)
+                            end do
+
+                            !$acc loop seq
+                            do q = vidxb, vidxe - 1
+                                E_R = E_R + coeff_R(q) * q_cons_vf(E_idx)%sf(j + q, k, l)
+                            end do
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                       E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
@@ -823,7 +744,7 @@ contains
                             #:if MFC_CASE_OPTIMIZATION
                                 #:if igr_order == 5
                                     !DIR$ unroll 6
-                                #:elif igr_irder == 3
+                                #:elif igr_order == 3
                                     !DIR$ unroll 4
                                 #:endif
                             #:endif
@@ -935,111 +856,69 @@ contains
                                 end if
                             end do
 
-                            if (igr_order == 3) then
+                            alpha_rho_L = 0._wp; alpha_rho_R = 0._wp
+                            alpha_L = 0._wp; alpha_R = 0._wp
+                            vel_L = 0._wp; vel_R = 0._wp
+
+                            !$acc loop seq
+                            do q = vidxb + 1, vidxe
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(i)%sf(j, k, l) + &
-                                                                    5._wp*q_cons_vf(i)%sf(j + 1, k, l) - &
-                                                                    1._wp*q_cons_vf(i)%sf(j + 2, k, l))
-                                    alpha_rho_R(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(i)%sf(j + 1, k, l) + &
-                                                                    5._wp*q_cons_vf(i)%sf(j, k, l) - &
-                                                                    1._wp*q_cons_vf(i)%sf(j - 1, k, l))
+                                    alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q) * q_cons_vf(i)%sf(j + q, k, l)
                                 end do
 
                                 if (num_fluids > 1) then
                                     !$acc loop seq
                                     do i = 1, num_fluids - 1
-                                        alpha_L(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx + i)%sf(j, k, l) + &
-                                                                    5._wp*q_cons_vf(E_idx + i)%sf(j + 1, k, l) - &
-                                                                    1._wp*q_cons_vf(E_idx + i)%sf(j + 2, k, l))
-                                        alpha_R(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx + i)%sf(j + 1, k, l) + &
-                                                                    5._wp*q_cons_vf(E_idx + i)%sf(j, k, l) - &
-                                                                    1._wp*q_cons_vf(E_idx + i)%sf(j - 1, k, l))
+                                        alpha_L(i) = alpha_L(i) + coeff_L(q) * q_cons_vf(E_idx + i)%sf(j + q, k, l)
                                     end do
-                                    alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                    alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                                 else
                                     alpha_L(1) = 1._wp
-                                    alpha_R(1) = 1._wp
                                 end if
-
-                                rho_L = sum(alpha_rho_L)
-                                gamma_L = sum(alpha_L*gammas)
-                                pi_inf_L = sum(alpha_L*pi_infs)
-
-                                rho_R = sum(alpha_rho_R)
-                                gamma_R = sum(alpha_R*gammas)
-                                pi_inf_R = sum(alpha_R*pi_infs)
 
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_L(i) = ((1._wp/6._wp)*(2._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) + &
-                                                               5._wp*q_cons_vf(momxb + i - 1)%sf(j + 1, k, l) - &
-                                                               1._wp*q_cons_vf(momxb + i - 1)%sf(j + 2, k, l)))/rho_L
-                                    vel_R(i) = ((1._wp/6._wp)*(2._wp*q_cons_vf(momxb + i - 1)%sf(j + 1, k, l) + &
-                                                               5._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) - &
-                                                               1._wp*q_cons_vf(momxb + i - 1)%sf(j - 1, k, l)))/rho_R
+                                    vel_L(i) = vel_L(i) + coeff_L(q) * q_cons_vf(momxb + i - 1)%sf(j + q, k, l)
                                 end do
+                            end do
 
-                            elseif (igr_order == 5) then
+                            !$acc loop seq
+                            do q = vidxb, vidxe - 1
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(i)%sf(j - 1, k, l) + &
-                                                                     27._wp*q_cons_vf(i)%sf(j, k, l) + &
-                                                                     47._wp*q_cons_vf(i)%sf(j + 1, k, l) - &
-                                                                     13._wp*q_cons_vf(i)%sf(j + 2, k, l) + &
-                                                                     2._wp*q_cons_vf(i)%sf(j + 3, k, l))
-                                    alpha_rho_R(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(i)%sf(j + 2, k, l) + &
-                                                                     27._wp*q_cons_vf(i)%sf(j + 1, k, l) + &
-                                                                     47._wp*q_cons_vf(i)%sf(j, k, l) - &
-                                                                     13._wp*q_cons_vf(i)%sf(j - 1, k, l) + &
-                                                                     2._wp*q_cons_vf(i)%sf(j - 2, k, l))
+                                    alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q) * q_cons_vf(i)%sf(j + q, k, l)
                                 end do
 
                                 if (num_fluids > 1) then
                                     !$acc loop seq
                                     do i = 1, num_fluids - 1
-                                        alpha_L(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx + i)%sf(j - 1, k, l) + &
-                                                                     27._wp*q_cons_vf(E_idx + i)%sf(j, k, l) + &
-                                                                     47._wp*q_cons_vf(E_idx + i)%sf(j + 1, k, l) - &
-                                                                     13._wp*q_cons_vf(E_idx + i)%sf(j + 2, k, l) + &
-                                                                     2._wp*q_cons_vf(E_idx + i)%sf(j + 3, k, l))
-                                        alpha_R(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx + i)%sf(j + 2, k, l) + &
-                                                                     27._wp*q_cons_vf(E_idx + i)%sf(j + 1, k, l) + &
-                                                                     47._wp*q_cons_vf(E_idx + i)%sf(j, k, l) - &
-                                                                     13._wp*q_cons_vf(E_idx + i)%sf(j - 1, k, l) + &
-                                                                     2._wp*q_cons_vf(E_idx + i)%sf(j - 2, k, l))
+                                        alpha_R(i) = alpha_R(i) + coeff_R(q) * q_cons_vf(E_idx + i)%sf(j + q, k, l)
                                     end do
-
-                                    alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                    alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                                 else
-                                    alpha_L(1) = 1._wp
                                     alpha_R(1) = 1._wp
                                 end if
 
-                                rho_L = sum(alpha_rho_L)
-                                gamma_L = sum(alpha_L*gammas)
-                                pi_inf_L = sum(alpha_L*pi_infs)
-
-                                rho_R = sum(alpha_rho_R)
-                                gamma_R = sum(alpha_R*gammas)
-                                pi_inf_R = sum(alpha_R*pi_infs)
-
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_L(i) = ((1._wp/60._wp)*(-3._wp*q_cons_vf(momxb + i - 1)%sf(j - 1, k, l) + &
-                                                                27._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) + &
-                                                                47._wp*q_cons_vf(momxb + i - 1)%sf(j + 1, k, l) - &
-                                                                13._wp*q_cons_vf(momxb + i - 1)%sf(j + 2, k, l) + &
-                                                                2._wp*q_cons_vf(momxb + i - 1)%sf(j + 3, k, l)))/rho_L
-                                    vel_R(i) = ((1._wp/60._wp)*(-3._wp*q_cons_vf(momxb + i - 1)%sf(j + 2, k, l) + &
-                                                                27._wp*q_cons_vf(momxb + i - 1)%sf(j + 1, k, l) + &
-                                                                47._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) - &
-                                                                13._wp*q_cons_vf(momxb + i - 1)%sf(j - 1, k, l) + &
-                                                                2._wp*q_cons_vf(momxb + i - 1)%sf(j - 2, k, l)))/rho_R
+                                    vel_R(i) = vel_R(i) + coeff_R(q) * q_cons_vf(momxb + i - 1)%sf(j + q, k, l)
                                 end do
+                            end do
+
+                            if (num_fluids > 1) then
+                                alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
+                                alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                             end if
+
+                            rho_L = sum(alpha_rho_L)
+                            gamma_L = sum(alpha_L*gammas)
+                            pi_inf_L = sum(alpha_L*pi_infs)
+
+                            rho_R = sum(alpha_rho_R)
+                            gamma_R = sum(alpha_R*gammas)
+                            pi_inf_R = sum(alpha_R*pi_infs)
+
+                            vel_L = vel_L / rho_L
+                            vel_R = vel_R / rho_R
 
                             if (viscous) then
                                 mu_L = 0._wp
@@ -1135,25 +1014,17 @@ contains
                                                             0.5_wp*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j))
                             end if
 
-                            if (igr_order == 3) then
-                                E_L = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                     5._wp*q_cons_vf(E_idx)%sf(j + 1, k, l) - &
-                                                     1._wp*q_cons_vf(E_idx)%sf(j + 2, k, l))
-                                E_R = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx)%sf(j + 1, k, l) + &
-                                                     5._wp*q_cons_vf(E_idx)%sf(j, k, l) - &
-                                                     1._wp*q_cons_vf(E_idx)%sf(j - 1, k, l))
-                            elseif (igr_order == 5) then
-                                E_L = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx)%sf(j - 1, k, l) + &
-                                                      27._wp*q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                      47._wp*q_cons_vf(E_idx)%sf(j + 1, k, l) - &
-                                                      13._wp*q_cons_vf(E_idx)%sf(j + 2, k, l) + &
-                                                      2._wp*q_cons_vf(E_idx)%sf(j + 3, k, l))
-                                E_R = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx)%sf(j + 2, k, l) + &
-                                                      27._wp*q_cons_vf(E_idx)%sf(j + 1, k, l) + &
-                                                      47._wp*q_cons_vf(E_idx)%sf(j, k, l) - &
-                                                      13._wp*q_cons_vf(E_idx)%sf(j - 1, k, l) + &
-                                                      2._wp*q_cons_vf(E_idx)%sf(j - 2, k, l))
-                            end if
+                            E_L = 0._wp; E_R = 0._wp
+
+                            !$acc loop seq
+                            do q = vidxb + 1, vidxe
+                                E_L = E_L + coeff_L(q) * q_cons_vf(E_idx)%sf(j + q, k, l)
+                            end do
+
+                            !$acc loop seq
+                            do q = vidxb, vidxe - 1
+                                E_R = E_R + coeff_R(q) * q_cons_vf(E_idx)%sf(j + q, k, l)
+                            end do
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                       E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
@@ -1335,7 +1206,7 @@ contains
             if (p == 0) then
                 !$acc parallel loop collapse(3) gang vector default(present) &
                 !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
-                !$acc alpha_L,alpha_R,alpha_rho_L,cfl,dvel,F_L,F_R,E_L,mu_R, &
+                !$acc alpha_L,alpha_R,alpha_rho_L,cfl,F_L,F_R,E_L,mu_R, &
                 !$acc rho_sf_small, alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
                 do l = 0, p
                     do k = -1, n
@@ -1348,7 +1219,7 @@ contains
                                 #:if MFC_CASE_OPTIMIZATION
                                     #:if igr_order == 5
                                         !DIR$ unroll 6
-                                    #:elif igr_irder == 3
+                                    #:elif igr_order == 3
                                         !DIR$ unroll 4
                                     #:endif
                                 #:endif
@@ -1411,110 +1282,69 @@ contains
                                 end do
                             end if
 
-                            if (igr_order == 3) then
+                            alpha_rho_L = 0._wp; alpha_rho_R = 0._wp
+                            alpha_L = 0._wp; alpha_R = 0._wp
+                            vel_L = 0._wp; vel_R = 0._wp
+
+                            !$acc loop seq
+                            do q = vidxb + 1, vidxe
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(i)%sf(j, k, l) + &
-                                                                    5._wp*q_cons_vf(i)%sf(j, k + 1, l) - &
-                                                                    1._wp*q_cons_vf(i)%sf(j, k + 2, l))
-                                    alpha_rho_R(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(i)%sf(j, k + 1, l) + &
-                                                                    5._wp*q_cons_vf(i)%sf(j, k, l) - &
-                                                                    1._wp*q_cons_vf(i)%sf(j, k - 1, l))
+                                    alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q)* q_cons_vf(i)%sf(j, k + q, l)
                                 end do
 
                                 if (num_fluids > 1) then
                                     !$acc loop seq
                                     do i = 1, num_fluids - 1
-                                        alpha_L(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx + i)%sf(j, k, l) + &
-                                                                    5._wp*q_cons_vf(E_idx + i)%sf(j, k + 1, l) - &
-                                                                    1._wp*q_cons_vf(E_idx + i)%sf(j, k + 2, l))
-                                        alpha_R(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx + i)%sf(j, k + 1, l) + &
-                                                                    5._wp*q_cons_vf(E_idx + i)%sf(j, k, l) - &
-                                                                    1._wp*q_cons_vf(E_idx + i)%sf(j, k - 1, l))
+                                        alpha_L(i) = alpha_L(i) + coeff_L(q) * q_cons_vf(E_idx + i)%sf(j, k + q, l)
                                     end do
-                                    alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                    alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                                 else
                                     alpha_L(1) = 1._wp
-                                    alpha_R(1) = 1._wp
                                 end if
-
-                                rho_L = sum(alpha_rho_L)
-                                gamma_L = sum(alpha_L*gammas)
-                                pi_inf_L = sum(alpha_L*pi_infs)
-
-                                rho_R = sum(alpha_rho_R)
-                                gamma_R = sum(alpha_R*gammas)
-                                pi_inf_R = sum(alpha_R*pi_infs)
 
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_L(i) = ((1._wp/6._wp)*(2._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) + &
-                                                               5._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 1, l) - &
-                                                               1._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 2, l)))/rho_L
-                                    vel_R(i) = ((1._wp/6._wp)*(2._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 1, l) + &
-                                                               5._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) - &
-                                                               1._wp*q_cons_vf(momxb + i - 1)%sf(j, k - 1, l)))/rho_R
+                                    vel_L(i) = vel_L(i) + coeff_L(q) * q_cons_vf(momxb + i - 1)%sf(j, k + q, l)
                                 end do
-                            elseif (igr_order == 5) then
+                            end do
+
+                            !$acc loop seq
+                            do q = vidxb, vidxe - 1
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(i)%sf(j, k - 1, l) + &
-                                                                     27._wp*q_cons_vf(i)%sf(j, k, l) + &
-                                                                     47._wp*q_cons_vf(i)%sf(j, k + 1, l) - &
-                                                                     13._wp*q_cons_vf(i)%sf(j, k + 2, l) + &
-                                                                     2._wp*q_cons_vf(i)%sf(j, k + 3, l))
-                                    alpha_rho_R(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(i)%sf(j, k + 2, l) + &
-                                                                     27._wp*q_cons_vf(i)%sf(j, k + 1, l) + &
-                                                                     47._wp*q_cons_vf(i)%sf(j, k, l) - &
-                                                                     13._wp*q_cons_vf(i)%sf(j, k - 1, l) + &
-                                                                     2._wp*q_cons_vf(i)%sf(j, k - 2, l))
+                                    alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q) * q_cons_vf(i)%sf(j, k + q, l)
                                 end do
 
                                 if (num_fluids > 1) then
                                     !$acc loop seq
                                     do i = 1, num_fluids - 1
-                                        alpha_L(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx + i)%sf(j, k - 1, l) + &
-                                                                     27._wp*q_cons_vf(E_idx + i)%sf(j, k, l) + &
-                                                                     47._wp*q_cons_vf(E_idx + i)%sf(j, k + 1, l) - &
-                                                                     13._wp*q_cons_vf(E_idx + i)%sf(j, k + 2, l) + &
-                                                                     2._wp*q_cons_vf(E_idx + i)%sf(j, k + 3, l))
-                                        alpha_R(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx + i)%sf(j, k + 2, l) + &
-                                                                     27._wp*q_cons_vf(E_idx + i)%sf(j, k + 1, l) + &
-                                                                     47._wp*q_cons_vf(E_idx + i)%sf(j, k, l) - &
-                                                                     13._wp*q_cons_vf(E_idx + i)%sf(j, k - 1, l) + &
-                                                                     2._wp*q_cons_vf(E_idx + i)%sf(j, k - 2, l))
+                                        alpha_R(i) = alpha_R(i) + coeff_R(q) * q_cons_vf(E_idx + i)%sf(j, k + q, l)
                                     end do
-                                    alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                    alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                                 else
-                                    alpha_L(1) = 1._wp
                                     alpha_R(1) = 1._wp
                                 end if
 
-                                rho_L = sum(alpha_rho_L)
-                                gamma_L = sum(alpha_L*gammas)
-                                pi_inf_L = sum(alpha_L*pi_infs)
-
-                                rho_R = sum(alpha_rho_R)
-                                gamma_R = sum(alpha_R*gammas)
-                                pi_inf_R = sum(alpha_R*pi_infs)
-
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_L(i) = ((1._wp/60._wp)*(-3._wp*q_cons_vf(momxb + i - 1)%sf(j, k - 1, l) + &
-                                                                27._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) + &
-                                                                47._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 1, l) - &
-                                                                13._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 2, l) + &
-                                                                2._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 3, l)))/rho_L
-                                    vel_R(i) = ((1._wp/60._wp)*(-3._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 2, l) + &
-                                                                27._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 1, l) + &
-                                                                47._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) - &
-                                                                13._wp*q_cons_vf(momxb + i - 1)%sf(j, k - 1, l) + &
-                                                                2._wp*q_cons_vf(momxb + i - 1)%sf(j, k - 2, l)))/rho_R
+                                    vel_R(i) = vel_R(i) + coeff_R(q) * q_cons_vf(momxb + i - 1)%sf(j, k + q, l)
                                 end do
+                            end do
 
+                            if (num_fluids > 1) then
+                                alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
+                                alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                             end if
+
+                            rho_L = sum(alpha_rho_L)
+                            gamma_L = sum(alpha_L*gammas)
+                            pi_inf_L = sum(alpha_L*pi_infs)
+
+                            rho_R = sum(alpha_rho_R)
+                            gamma_R = sum(alpha_R*gammas)
+                            pi_inf_R = sum(alpha_R*pi_infs)
+
+                            vel_L = vel_L / rho_L
+                            vel_R = vel_R / rho_R
 
                             if (viscous) then
                                 mu_L = 0._wp
@@ -1582,44 +1412,20 @@ contains
                                                             0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k))
                             end if
 
-                            if (igr_order == 3) then
-                                F_L = (1._wp/6._wp)*(2._wp*jac(j, k, l) + &
-                                                     5._wp*jac(j, k + 1, l) - &
-                                                     1._wp*jac(j, k + 2, l))
-                                F_R = (1._wp/6._wp)*(2._wp*jac(j, k + 1, l) + &
-                                                     5._wp*jac(j, k, l) - &
-                                                     1._wp*jac(j, k - 1, l))
+                            E_L = 0._wp; E_R = 0._wp
+                            F_L = 0._wp; F_R = 0._wp
 
-                                E_L = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                     5._wp*q_cons_vf(E_idx)%sf(j, k + 1, l) - &
-                                                     1._wp*q_cons_vf(E_idx)%sf(j, k + 2, l))
-                                E_R = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx)%sf(j, k + 1, l) + &
-                                                     5._wp*q_cons_vf(E_idx)%sf(j, k, l) - &
-                                                     1._wp*q_cons_vf(E_idx)%sf(j, k - 1, l))
+                            !$acc loop seq
+                            do q = vidxb + 1, vidxe
+                                E_L = E_L + coeff_L(q) * q_cons_vf(E_idx)%sf(j, k + q, l)
+                                F_L = F_L + coeff_L(q) * jac(j, k + q, l)
+                            end do
 
-                            elseif (igr_order == 5) then
-                                F_L = (1._wp/60._wp)*(-3._wp*jac(j, k - 1, l) + &
-                                                      27._wp*jac(j, k, l) + &
-                                                      47._wp*jac(j, k + 1, l) - &
-                                                      13._wp*jac(j, k + 2, l) + &
-                                                      2._wp*jac(j, k + 3, l))
-                                F_R = (1._wp/60._wp)*(-3._wp*jac(j, k + 2, l) + &
-                                                      27._wp*jac(j, k + 1, l) + &
-                                                      47._wp*jac(j, k, l) - &
-                                                      13._wp*jac(j, k - 1, l) + &
-                                                      2._wp*jac(j, k - 2, l))
-
-                                E_L = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx)%sf(j, k - 1, l) + &
-                                                      27._wp*q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                      47._wp*q_cons_vf(E_idx)%sf(j, k + 1, l) - &
-                                                      13._wp*q_cons_vf(E_idx)%sf(j, k + 2, l) + &
-                                                      2._wp*q_cons_vf(E_idx)%sf(j, k + 3, l))
-                                E_R = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx)%sf(j, k + 2, l) + &
-                                                      27._wp*q_cons_vf(E_idx)%sf(j, k + 1, l) + &
-                                                      47._wp*q_cons_vf(E_idx)%sf(j, k, l) - &
-                                                      13._wp*q_cons_vf(E_idx)%sf(j, k - 1, l) + &
-                                                      2._wp*q_cons_vf(E_idx)%sf(j, k - 2, l))
-                            end if
+                            !$acc loop seq
+                            do q = vidxb, vidxe - 1
+                                E_R = E_R + coeff_R(q) * q_cons_vf(E_idx)%sf(j, k + q, l)
+                                F_R = F_R + coeff_R(q) * jac(j, k + q, l)
+                            end do
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                       E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
@@ -1771,7 +1577,7 @@ contains
             else
                 !$acc parallel loop collapse(3) gang vector default(present) &
                 !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
-                !$acc alpha_L,alpha_R,alpha_rho_L,cfl,dvel,F_L,F_R,E_L,mu_R, &
+                !$acc alpha_L,alpha_R,alpha_rho_L,cfl,F_L,F_R,E_L,mu_R, &
                 !$acc rho_sf_small, alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
                 do l = 0, p
                     do k = -1, n
@@ -1784,7 +1590,7 @@ contains
                                 #:if MFC_CASE_OPTIMIZATION
                                     #:if igr_order == 5
                                         !DIR$ unroll 6
-                                    #:elif igr_irder == 3
+                                    #:elif igr_order == 3
                                         !DIR$ unroll 4
                                     #:endif
                                 #:endif
@@ -1878,111 +1684,69 @@ contains
                                 end do
                             end if
 
-                            if (igr_order == 3) then
+                            alpha_rho_L = 0._wp; alpha_rho_R = 0._wp
+                            alpha_L = 0._wp; alpha_R = 0._wp
+                            vel_L = 0._wp; vel_R = 0._wp
+
+                            !$acc loop seq
+                            do q = vidxb + 1, vidxe
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(i)%sf(j, k, l) + &
-                                                                    5._wp*q_cons_vf(i)%sf(j, k + 1, l) - &
-                                                                    1._wp*q_cons_vf(i)%sf(j, k + 2, l))
-                                    alpha_rho_R(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(i)%sf(j, k + 1, l) + &
-                                                                    5._wp*q_cons_vf(i)%sf(j, k, l) - &
-                                                                    1._wp*q_cons_vf(i)%sf(j, k - 1, l))
+                                    alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q) * q_cons_vf(i)%sf(j, k + q, l)
                                 end do
 
                                 if (num_fluids > 1) then
                                     !$acc loop seq
                                     do i = 1, num_fluids - 1
-                                        alpha_L(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx + i)%sf(j, k, l) + &
-                                                                    5._wp*q_cons_vf(E_idx + i)%sf(j, k + 1, l) - &
-                                                                    1._wp*q_cons_vf(E_idx + i)%sf(j, k + 2, l))
-                                        alpha_R(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx + i)%sf(j, k + 1, l) + &
-                                                                    5._wp*q_cons_vf(E_idx + i)%sf(j, k, l) - &
-                                                                    1._wp*q_cons_vf(E_idx + i)%sf(j, k - 1, l))
+                                        alpha_L(i) = alpha_L(i) + coeff_L(q) * q_cons_vf(E_idx + i)%sf(j, k + q, l)
                                     end do
-                                    alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                    alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                                 else
                                     alpha_L(1) = 1._wp
-                                    alpha_R(1) = 1._wp
                                 end if
-
-                                rho_L = sum(alpha_rho_L)
-                                gamma_L = sum(alpha_L*gammas)
-                                pi_inf_L = sum(alpha_L*pi_infs)
-
-                                rho_R = sum(alpha_rho_R)
-                                gamma_R = sum(alpha_R*gammas)
-                                pi_inf_R = sum(alpha_R*pi_infs)
 
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_L(i) = ((1._wp/6._wp)*(2._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) + &
-                                                               5._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 1, l) - &
-                                                               1._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 2, l)))/rho_L
-                                    vel_R(i) = ((1._wp/6._wp)*(2._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 1, l) + &
-                                                               5._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) - &
-                                                               1._wp*q_cons_vf(momxb + i - 1)%sf(j, k - 1, l)))/rho_R
+                                    vel_L(i) = vel_L(i) + coeff_L(q) * q_cons_vf(momxb + i - 1)%sf(j, k + q, l)
                                 end do
+                            end do
 
-                            elseif (igr_order == 5) then
+                            !$acc loop seq
+                            do q = vidxb, vidxe - 1
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(i)%sf(j, k - 1, l) + &
-                                                                     27._wp*q_cons_vf(i)%sf(j, k, l) + &
-                                                                     47._wp*q_cons_vf(i)%sf(j, k + 1, l) - &
-                                                                     13._wp*q_cons_vf(i)%sf(j, k + 2, l) + &
-                                                                     2._wp*q_cons_vf(i)%sf(j, k + 3, l))
-                                    alpha_rho_R(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(i)%sf(j, k + 2, l) + &
-                                                                     27._wp*q_cons_vf(i)%sf(j, k + 1, l) + &
-                                                                     47._wp*q_cons_vf(i)%sf(j, k, l) - &
-                                                                     13._wp*q_cons_vf(i)%sf(j, k - 1, l) + &
-                                                                     2._wp*q_cons_vf(i)%sf(j, k - 2, l))
+                                    alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q) * q_cons_vf(i)%sf(j, k + q, l)
                                 end do
 
                                 if (num_fluids > 1) then
                                     !$acc loop seq
                                     do i = 1, num_fluids - 1
-                                        alpha_L(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx + i)%sf(j, k - 1, l) + &
-                                                                     27._wp*q_cons_vf(E_idx + i)%sf(j, k, l) + &
-                                                                     47._wp*q_cons_vf(E_idx + i)%sf(j, k + 1, l) - &
-                                                                     13._wp*q_cons_vf(E_idx + i)%sf(j, k + 2, l) + &
-                                                                     2._wp*q_cons_vf(E_idx + i)%sf(j, k + 3, l))
-                                        alpha_R(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx + i)%sf(j, k + 2, l) + &
-                                                                     27._wp*q_cons_vf(E_idx + i)%sf(j, k + 1, l) + &
-                                                                     47._wp*q_cons_vf(E_idx + i)%sf(j, k, l) - &
-                                                                     13._wp*q_cons_vf(E_idx + i)%sf(j, k - 1, l) + &
-                                                                     2._wp*q_cons_vf(E_idx + i)%sf(j, k - 2, l))
+                                        alpha_R(i) = alpha_R(i) + coeff_R(q) * q_cons_vf(E_idx + i)%sf(j, k + q, l)
                                     end do
-                                    alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                    alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                                 else
-                                    alpha_L(1) = 1._wp
                                     alpha_R(1) = 1._wp
                                 end if
 
-                                rho_L = sum(alpha_rho_L)
-                                gamma_L = sum(alpha_L*gammas)
-                                pi_inf_L = sum(alpha_L*pi_infs)
-
-                                rho_R = sum(alpha_rho_R)
-                                gamma_R = sum(alpha_R*gammas)
-                                pi_inf_R = sum(alpha_R*pi_infs)
-
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_L(i) = ((1._wp/60._wp)*(-3._wp*q_cons_vf(momxb + i - 1)%sf(j, k - 1, l) + &
-                                                                27._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) + &
-                                                                47._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 1, l) - &
-                                                                13._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 2, l) + &
-                                                                2._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 3, l)))/rho_L
-                                    vel_R(i) = ((1._wp/60._wp)*(-3._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 2, l) + &
-                                                                27._wp*q_cons_vf(momxb + i - 1)%sf(j, k + 1, l) + &
-                                                                47._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) - &
-                                                                13._wp*q_cons_vf(momxb + i - 1)%sf(j, k - 1, l) + &
-                                                                2._wp*q_cons_vf(momxb + i - 1)%sf(j, k - 2, l)))/rho_R
+                                    vel_R(i) = vel_R(i) + coeff_R(q) * q_cons_vf(momxb + i - 1)%sf(j, k + q, l)
                                 end do
+                            end do
 
+                            if (num_fluids > 1) then
+                                alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
+                                alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                             end if
+
+                            rho_L = sum(alpha_rho_L)
+                            gamma_L = sum(alpha_L*gammas)
+                            pi_inf_L = sum(alpha_L*pi_infs)
+
+                            rho_R = sum(alpha_rho_R)
+                            gamma_R = sum(alpha_R*gammas)
+                            pi_inf_R = sum(alpha_R*pi_infs)
+
+                            vel_L = vel_L / rho_L
+                            vel_R = vel_R / rho_R
 
                             if (viscous) then
                                 mu_L = 0._wp
@@ -2078,45 +1842,20 @@ contains
                                                             0.5_wp*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k))
                             end if
 
-                            if (igr_order == 3) then
-                                F_L = (1._wp/6._wp)*(2._wp*jac(j, k, l) + &
-                                                     5._wp*jac(j, k + 1, l) - &
-                                                     1._wp*jac(j, k + 2, l))
-                                F_R = (1._wp/6._wp)*(2._wp*jac(j, k + 1, l) + &
-                                                     5._wp*jac(j, k, l) - &
-                                                     1._wp*jac(j, k - 1, l))
+                            E_L = 0._wp; E_R = 0._wp
+                            F_L = 0._wp; F_R = 0._wp
 
-                                E_L = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                     5._wp*q_cons_vf(E_idx)%sf(j, k + 1, l) - &
-                                                     1._wp*q_cons_vf(E_idx)%sf(j, k + 2, l))
-                                E_R = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx)%sf(j, k + 1, l) + &
-                                                     5._wp*q_cons_vf(E_idx)%sf(j, k, l) - &
-                                                     1._wp*q_cons_vf(E_idx)%sf(j, k - 1, l))
+                            !$acc loop seq
+                            do q = vidxb + 1, vidxe
+                                E_L = E_L + coeff_L(q) * q_cons_vf(E_idx)%sf(j, k + q, l)
+                                F_L = F_L + coeff_L(q) * jac(j, k + q, l)
+                            end do
 
-                            elseif (igr_order == 5) then
-                                F_L = (1._wp/60._wp)*(-3._wp*jac(j, k - 1, l) + &
-                                                      27._wp*jac(j, k, l) + &
-                                                      47._wp*jac(j, k + 1, l) - &
-                                                      13._wp*jac(j, k + 2, l) + &
-                                                      2._wp*jac(j, k + 3, l))
-                                F_R = (1._wp/60._wp)*(-3._wp*jac(j, k + 2, l) + &
-                                                      27._wp*jac(j, k + 1, l) + &
-                                                      47._wp*jac(j, k, l) - &
-                                                      13._wp*jac(j, k - 1, l) + &
-                                                      2._wp*jac(j, k - 2, l))
-
-                                E_L = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx)%sf(j, k - 1, l) + &
-                                                      27._wp*q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                      47._wp*q_cons_vf(E_idx)%sf(j, k + 1, l) - &
-                                                      13._wp*q_cons_vf(E_idx)%sf(j, k + 2, l) + &
-                                                      2._wp*q_cons_vf(E_idx)%sf(j, k + 3, l))
-                                E_R = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx)%sf(j, k + 2, l) + &
-                                                      27._wp*q_cons_vf(E_idx)%sf(j, k + 1, l) + &
-                                                      47._wp*q_cons_vf(E_idx)%sf(j, k, l) - &
-                                                      13._wp*q_cons_vf(E_idx)%sf(j, k - 1, l) + &
-                                                      2._wp*q_cons_vf(E_idx)%sf(j, k - 2, l))
-
-                            end if
+                            !$acc loop seq
+                            do q = vidxb, vidxe - 1
+                                E_R = E_R + coeff_R(q) * q_cons_vf(E_idx)%sf(j, k + q, l)
+                                F_R = F_R + coeff_R(q) * jac(j, k + q, l)
+                            end do
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                       E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
@@ -2297,7 +2036,7 @@ contains
         elseif (idir == 3) then
             !$acc parallel loop collapse(3) gang vector default(present) &
             !$acc private(rho_L,gamma_L,pi_inf_L,mu_L,vel_L,vel_R,pres_L, &
-            !$acc alpha_L,alpha_R,alpha_rho_L,cfl,dvel,F_L,F_R,E_L,mu_R, &
+            !$acc alpha_L,alpha_R,alpha_rho_L,cfl,F_L,F_R,E_L,mu_R, &
             !$acc rho_sf_small,alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
             do l = -1, p
                 do k = 0, n
@@ -2310,7 +2049,7 @@ contains
                             #:if MFC_CASE_OPTIMIZATION
                                 #:if igr_order == 5
                                     !DIR$ unroll 6
-                                #:elif igr_irder == 3
+                                #:elif igr_order == 3
                                     !DIR$ unroll 4
                                 #:endif
                             #:endif
@@ -2403,112 +2142,69 @@ contains
                             end do
                         end if
 
-                        if (igr_order == 3) then
+                        alpha_rho_L = 0._wp; alpha_rho_R = 0._wp
+                        alpha_L = 0._wp; alpha_R = 0._wp
+                        vel_L = 0._wp; vel_R = 0._wp
+
+                        !$acc loop seq
+                        do q = vidxb + 1, vidxe
                             !$acc loop seq
                             do i = 1, num_fluids
-                                alpha_rho_L(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(i)%sf(j, k, l) + &
-                                                                5._wp*q_cons_vf(i)%sf(j, k, l + 1) - &
-                                                                1._wp*q_cons_vf(i)%sf(j, k, l + 2))
-                                alpha_rho_R(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(i)%sf(j, k, l + 1) + &
-                                                                5._wp*q_cons_vf(i)%sf(j, k, l) - &
-                                                                1._wp*q_cons_vf(i)%sf(j, k, l - 1))
+                                alpha_rho_L(i) = alpha_rho_L(i) + coeff_L(q)* q_cons_vf(i)%sf(j, k, l + q)
                             end do
 
                             if (num_fluids > 1) then
                                 !$acc loop seq
                                 do i = 1, num_fluids - 1
-                                    alpha_L(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx + i)%sf(j, k, l) + &
-                                                                5._wp*q_cons_vf(E_idx + i)%sf(j, k, l + 1) - &
-                                                                1._wp*q_cons_vf(E_idx + i)%sf(j, k, l + 2))
-                                    alpha_R(i) = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx + i)%sf(j, k, l + 1) + &
-                                                                5._wp*q_cons_vf(E_idx + i)%sf(j, k, l) - &
-                                                                1._wp*q_cons_vf(E_idx + i)%sf(j, k, l - 1))
+                                    alpha_L(i) = alpha_L(i) + coeff_L(q) * q_cons_vf(E_idx + i)%sf(j, k, l + q)
                                 end do
-                                alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                             else
                                 alpha_L(1) = 1._wp
-                                alpha_R(1) = 1._wp
                             end if
-
-                            rho_L = sum(alpha_rho_L)
-                            gamma_L = sum(alpha_L*gammas)
-                            pi_inf_L = sum(alpha_L*pi_infs)
-
-                            rho_R = sum(alpha_rho_R)
-                            gamma_R = sum(alpha_R*gammas)
-                            pi_inf_R = sum(alpha_R*pi_infs)
 
                             !$acc loop seq
                             do i = 1, num_dims
-                                vel_L(i) = ((1._wp/6._wp)*(2._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) + &
-                                                           5._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l + 1) - &
-                                                           1._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l + 2)))/rho_L
-                                vel_R(i) = ((1._wp/6._wp)*(2._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l + 1) + &
-                                                           5._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) - &
-                                                           1._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l - 1)))/rho_R
-
+                                vel_L(i) = vel_L(i) + coeff_L(q) * q_cons_vf(momxb + i - 1)%sf(j, k, l + q)
                             end do
+                        end do
 
-                        elseif (igr_order == 5) then
+                        !$acc loop seq
+                        do q = vidxb, vidxe - 1
                             !$acc loop seq
                             do i = 1, num_fluids
-                                alpha_rho_L(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(i)%sf(j, k, l - 1) + &
-                                                                 27._wp*q_cons_vf(i)%sf(j, k, l) + &
-                                                                 47._wp*q_cons_vf(i)%sf(j, k, l + 1) - &
-                                                                 13._wp*q_cons_vf(i)%sf(j, k, l + 2) + &
-                                                                 2._wp*q_cons_vf(i)%sf(j, k, l + 3))
-                                alpha_rho_R(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(i)%sf(j, k, l + 2) + &
-                                                                 27._wp*q_cons_vf(i)%sf(j, k, l + 1) + &
-                                                                 47._wp*q_cons_vf(i)%sf(j, k, l) - &
-                                                                 13._wp*q_cons_vf(i)%sf(j, k, l - 1) + &
-                                                                 2._wp*q_cons_vf(i)%sf(j, k, l - 2))
+                                alpha_rho_R(i) = alpha_rho_R(i) + coeff_R(q) * q_cons_vf(i)%sf(j, k, l + q)
                             end do
 
                             if (num_fluids > 1) then
                                 !$acc loop seq
                                 do i = 1, num_fluids - 1
-                                    alpha_L(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx + i)%sf(j, k, l - 1) + &
-                                                                 27._wp*q_cons_vf(E_idx + i)%sf(j, k, l) + &
-                                                                 47._wp*q_cons_vf(E_idx + i)%sf(j, k, l + 1) - &
-                                                                 13._wp*q_cons_vf(E_idx + i)%sf(j, k, l + 2) + &
-                                                                 2._wp*q_cons_vf(E_idx + i)%sf(j, k, l + 3))
-                                    alpha_R(i) = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx + i)%sf(j, k, l + 2) + &
-                                                                 27._wp*q_cons_vf(E_idx + i)%sf(j, k, l + 1) + &
-                                                                 47._wp*q_cons_vf(E_idx + i)%sf(j, k, l) - &
-                                                                 13._wp*q_cons_vf(E_idx + i)%sf(j, k, l - 1) + &
-                                                                 2._wp*q_cons_vf(E_idx + i)%sf(j, k, l - 2))
+                                    alpha_R(i) = alpha_R(i) + coeff_R(q) * q_cons_vf(E_idx + i)%sf(j, k, l + q)
                                 end do
-                                alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                             else
-                                alpha_L(1) = 1._wp
                                 alpha_R(1) = 1._wp
                             end if
 
-                            rho_L = sum(alpha_rho_L)
-                            gamma_L = sum(alpha_L*gammas)
-                            pi_inf_L = sum(alpha_L*pi_infs)
-
-                            rho_R = sum(alpha_rho_R)
-                            gamma_R = sum(alpha_R*gammas)
-                            pi_inf_R = sum(alpha_R*pi_infs)
-
                             !$acc loop seq
                             do i = 1, num_dims
-                                vel_L(i) = ((1._wp/60._wp)*(-3._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l - 1) + &
-                                                            27._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) + &
-                                                            47._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l + 1) - &
-                                                            13._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l + 2) + &
-                                                            2._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l + 3)))/rho_L
-                                vel_R(i) = ((1._wp/60._wp)*(-3._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l + 2) + &
-                                                            27._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l + 1) + &
-                                                            47._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l) - &
-                                                            13._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l - 1) + &
-                                                            2._wp*q_cons_vf(momxb + i - 1)%sf(j, k, l - 2)))/rho_R
+                                vel_R(i) = vel_R(i) + coeff_R(q) * q_cons_vf(momxb + i - 1)%sf(j, k, l + q)
                             end do
+                        end do
 
+                        if (num_fluids > 1) then
+                            alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
+                            alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
                         end if
+
+                        rho_L = sum(alpha_rho_L)
+                        gamma_L = sum(alpha_L*gammas)
+                        pi_inf_L = sum(alpha_L*pi_infs)
+
+                        rho_R = sum(alpha_rho_R)
+                        gamma_R = sum(alpha_R*gammas)
+                        pi_inf_R = sum(alpha_R*pi_infs)
+
+                        vel_L = vel_L / rho_L
+                        vel_R = vel_R / rho_R
 
                         if (viscous) then
                             mu_L = 0._wp
@@ -2604,43 +2300,20 @@ contains
                                                         0.5_wp*mu_R*vflux_R_arr(3)*vel_R(3)*(1._wp/dz(l))
                         end if
 
-                        if (igr_order == 3) then
-                            F_L = (1._wp/6._wp)*(2._wp*jac(j, k, l) + &
-                                                 5._wp*jac(j, k, l + 1) - &
-                                                 1._wp*jac(j, k, l + 2))
-                            F_R = (1._wp/6._wp)*(2._wp*jac(j, k, l + 1) + &
-                                                 5._wp*jac(j, k, l) - &
-                                                 1._wp*jac(j, k, l - 1))
+                        E_L = 0._wp; E_R = 0._wp
+                        F_L = 0._wp; F_R = 0._wp
 
-                            E_L = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                 5._wp*q_cons_vf(E_idx)%sf(j, k, l + 1) - &
-                                                 1._wp*q_cons_vf(E_idx)%sf(j, k, l + 2))
-                            E_R = (1._wp/6._wp)*(2._wp*q_cons_vf(E_idx)%sf(j, k, l + 1) + &
-                                                 5._wp*q_cons_vf(E_idx)%sf(j, k, l) - &
-                                                 1._wp*q_cons_vf(E_idx)%sf(j, k, l - 1))
-                        elseif (igr_order == 5) then
-                            F_L = (1._wp/60._wp)*(-3._wp*jac(j, k, l - 1) + &
-                                                  27._wp*jac(j, k, l) + &
-                                                  47._wp*jac(j, k, l + 1) - &
-                                                  13._wp*jac(j, k, l + 2) + &
-                                                  2._wp*jac(j, k, l + 3))
-                            F_R = (1._wp/60._wp)*(-3._wp*jac(j, k, l + 2) + &
-                                                  27._wp*jac(j, k, l + 1) + &
-                                                  47._wp*jac(j, k, l) - &
-                                                  13._wp*jac(j, k, l - 1) + &
-                                                  2._wp*jac(j, k, l - 2))
+                        !$acc loop seq
+                        do q = vidxb + 1, vidxe
+                            E_L = E_L + coeff_L(q) * q_cons_vf(E_idx)%sf(j, k, l+ q)
+                            F_L = F_L + coeff_L(q) * jac(j, k, l + q)
+                        end do
 
-                            E_L = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx)%sf(j, k, l - 1) + &
-                                                  27._wp*q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                  47._wp*q_cons_vf(E_idx)%sf(j, k, l + 1) - &
-                                                  13._wp*q_cons_vf(E_idx)%sf(j, k, l + 2) + &
-                                                  2._wp*q_cons_vf(E_idx)%sf(j, k, l + 3))
-                            E_R = (1._wp/60._wp)*(-3._wp*q_cons_vf(E_idx)%sf(j, k, l + 2) + &
-                                                  27._wp*q_cons_vf(E_idx)%sf(j, k, l + 1) + &
-                                                  47._wp*q_cons_vf(E_idx)%sf(j, k, l) - &
-                                                  13._wp*q_cons_vf(E_idx)%sf(j, k, l - 1) + &
-                                                  2._wp*q_cons_vf(E_idx)%sf(j, k, l - 2))
-                        end if
+                        !$acc loop seq
+                        do q = vidxb, vidxe - 1
+                            E_R = E_R + coeff_R(q) * q_cons_vf(E_idx)%sf(j, k, l + q)
+                            F_R = F_R + coeff_R(q) * jac(j, k, l + q)
+                        end do
 
                         call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                   E_R, gamma_R, pi_inf_R, rho_R, vel_R, &

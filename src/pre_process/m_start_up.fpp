@@ -174,7 +174,7 @@ contains
             n_glb = n
             p_glb = p
 
-            nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
+            nGlobal = int(m_glb + 1, kind=8)*int(n_glb + 1, kind=8)*int(p_glb + 1, kind=8)
 
             if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
