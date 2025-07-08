@@ -1,49 +1,16 @@
-This file was created on 2025-05-20 16:45:14.327741.
+This file was created on 2025-07-08 11:01:44.738662.
 
 mfc.sh:
 
-    Invocation: test --generate -o IGR
+    Invocation: test -o IGR --generate -j 8
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        c015058ff300900ab2a27f16b2102e090629f231 on IGRMergeOne (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.31.3 on ipsec-10-2-192-95.vpn.gatech.edu
-    
-        C       : AppleClang v17.0.0.17000013 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        945bc2214200403a1422e7556ed69dc8d7c05a62 on IGRMergeOne (dirty)
 
 post_process:
 
     CMake Configuration:
     
-        CMake v3.31.3 on ipsec-10-2-192-95.vpn.gatech.edu
+        CMake v3.31.3 on ipsec-10-2-192-197.vpn.gatech.edu
     
         C       : AppleClang v17.0.0.17000013 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
@@ -72,35 +39,35 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-documentation:
+simulation:
 
     CMake Configuration:
     
-        CMake v3.31.3 on ipsec-10-2-192-95.vpn.gatech.edu
+        CMake v3.31.3 on ipsec-10-2-192-197.vpn.gatech.edu
     
         C       : AppleClang v17.0.0.17000013 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
-        DOCUMENTATION : ON
+        DOCUMENTATION : OFF
         ALL           : OFF
     
         MPI     : ON
         OpenACC : OFF
     
         Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
-        Doxygen : /opt/homebrew/bin/doxygen
+        Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -109,7 +76,7 @@ pre_process:
 
     CMake Configuration:
     
-        CMake v3.31.3 on ipsec-10-2-192-95.vpn.gatech.edu
+        CMake v3.31.3 on ipsec-10-2-192-197.vpn.gatech.edu
     
         C       : AppleClang v17.0.0.17000013 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
@@ -142,7 +109,7 @@ syscheck:
 
     CMake Configuration:
     
-        CMake v3.31.3 on ipsec-10-2-192-95.vpn.gatech.edu
+        CMake v3.31.3 on ipsec-10-2-192-197.vpn.gatech.edu
     
         C       : AppleClang v17.0.0.17000013 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
@@ -159,6 +126,39 @@ syscheck:
     
         Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
         Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+documentation:
+
+    CMake Configuration:
+    
+        CMake v3.31.3 on ipsec-10-2-192-32.vpn.gatech.edu
+    
+        C       : AppleClang v17.0.0.17000013 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : ON
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : /opt/homebrew/bin/doxygen
     
         Build Type : Release
     
