@@ -1601,7 +1601,7 @@ contains
 
         character(len=*), intent(in) :: varname
         integer, intent(in) :: t_step
-        real(wp), dimension(1:nBubs), intent(in), optional :: data
+        real(wp), dimension(1:), intent(in), optional :: data
         integer, intent(in), optional :: nBubs
 
         character(len=64), dimension(num_procs) :: var_names

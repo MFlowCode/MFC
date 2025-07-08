@@ -57,7 +57,8 @@ module m_mpi_proxy
     character(len=1), dimension(:), allocatable :: p_send_buff, p_recv_buff
     type(bounds_info), dimension(3) :: comm_coords
     integer :: p_buff_size, p_var_size
-    !$acc declare create(p_send_counts, comm_coords)
+
+    $:GPU_DECLARE(create='[p_send_counts, comm_coords]')
 
 contains
 

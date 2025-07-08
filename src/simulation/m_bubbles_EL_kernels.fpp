@@ -433,7 +433,7 @@ contains
             !! @param q_prim_vf Eulerian field with primitive variables
             !! @return v Interpolated velocity at the position of the bubble
     pure function f_interpolate_velocity(pos, cell, i, q_prim_vf) result(v)
-!$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: pos
         integer, dimension(3), intent(in) :: cell
         integer, intent(in) :: i
@@ -489,7 +489,7 @@ contains
             !! @param q_prim_vf Eulerian field with primitive variables
             !! @return a Acceleration of the bubble in direction i
     pure function f_get_acceleration(pos,rad,vel,mg,mv,Re,rho,cell,i,q_prim_vf) result(a)
-!$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: pos, rad, vel, mg, mv, Re, rho
         integer, dimension(3), intent(in) :: cell
         integer, intent(in) :: i

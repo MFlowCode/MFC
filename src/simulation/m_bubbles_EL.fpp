@@ -81,7 +81,7 @@ module m_bubbles_EL
 
     integer, allocatable, dimension(:) :: keep_bubble, prefix_sum
     integer :: active_bubs
-    !$acc declare create(keep_bubble, prefix_sum, active_bubs)
+    $:GPU_DECLARE(create='[keep_bubble, prefix_sum, active_bubs]')
 
 contains
 
@@ -903,7 +903,7 @@ contains
         !! @param f_pinfl Driving pressure
         !! @param cell Bubble cell
         !! @param Romega Control volume radius
-    pure subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
+    impure subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
         $:GPU_ROUTINE(function_name='s_get_pinf',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -1242,9 +1242,8 @@ contains
         integer, intent(in) :: dest
         integer :: k, i, patch_id, offset
         integer, dimension(3) :: cell
-        real(wp), dimension(3) :: scoord
 
-        !$acc parallel loop gang vector default(present) private(cell)
+        $:GPU_PARALLEL_LOOP(private='[cell]')
         do k = 1, nBubs
             keep_bubble(k) = 1
 
@@ -1290,12 +1289,12 @@ contains
 
             if (keep_bubble(k) == 1) then
                 ! Remove bubbles that are no longer in a liquid
-                !cell = fd_number - buff_size
-                !call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
+                cell = fd_number - buff_size
+                call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
 
-                !if (q_cons_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
-                    !keep_bubble(k) = 0
-                !end if
+                if (q_cons_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
+                    keep_bubble(k) = 0
+                end if
 
                 ! Move bubbles back to surface of IB
                 if (ib) then
@@ -1305,11 +1304,13 @@ contains
                     if (ib_markers%sf(cell(1), cell(2), cell(3)) /= 0) then
                         patch_id = ib_markers%sf(cell(1), cell(2), cell(3))
 
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_dims
                             mtn_pos(k, i, dest) = mtn_pos(k, i, dest) - &
                                                   levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
                                                   * levelset%sf(cell(1), cell(2), cell(3), patch_id)
                         end do
+
                         cell = fd_number - buff_size
                         call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
                     end if
@@ -1318,12 +1319,11 @@ contains
         end do
 
         call nvtxStartRange("LAG-BC-DEV2HOST")
-        !$acc update host(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-        !$acc gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
-        !$acc intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
-        !$acc mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-        !$acc gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, &
-        !$acc keep_bubble, nBubs)
+        $:GPU_UPDATE(host='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+            & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
+            & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
+            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, keep_bubble, &
+            & nBubs]')
         call nvtxEndRange
 
         do k = 1, nBubs
@@ -1380,11 +1380,10 @@ contains
         end if
 
         call nvtxStartRange("LAG-BC-HOST2DEV")
-        !$acc update device(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-        !$acc gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
-        !$acc intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
-        !$acc mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-        !$acc gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
+        $:GPU_UPDATE(device='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+            & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
+            & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
+            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts]')
         call nvtxEndRange
 
     end subroutine s_enforce_EL_bubbles_boundary_conditions
