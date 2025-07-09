@@ -1,7 +1,6 @@
 name: Continuous Benchmarking
 
-on:
-  pull_request:
+on: [push, pull_request, workflow_dispatch]
 
 permissions:
   contents: write
