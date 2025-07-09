@@ -9,8 +9,28 @@ permissions:
   id-token: write
 
 jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+          base: ${{ github.event.repository.default_branch || 'main' }}
+
   self:
     name: "Continuous Benchmarking"
+    needs: file-changes
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - name: Clone - PR
@@ -28,7 +48,7 @@ jobs:
           sudo chmod +x /usr/local/bin/yq
           yq --version
 
-      - name: Run Fortran Benchmark
+      - name: Run Benchmark Cases
         run: |
           (cd pr     && ./mfc.sh bench -o bench.yaml)
           find pr/ -maxdepth 1 -name "*.yaml" -exec sh -c 'yq eval -o=json "$1" > "${1%.yaml}.json"' _ {} \;
