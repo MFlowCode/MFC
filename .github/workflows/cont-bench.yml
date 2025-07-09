@@ -51,7 +51,30 @@ jobs:
       - name: Run Benchmark Cases
         run: |
           (cd pr     && ./mfc.sh bench -o bench.yaml)
-          find pr/ -maxdepth 1 -name "*.yaml" -exec sh -c 'yq eval -o=json "$1" > "${1%.yaml}.json"' _ {} \;
+          find pr -maxdepth 1 -name "*.yaml" -exec sh -c 'yq eval -o=json "$1" > "${1%.yaml}.json"' _ {} \;
+
+      - name: Create Benchmark Documentation
+        run: |
+          mkdir -p pr/docs/documentation
+          cat > pr/docs/documentation/cont-bench.md << 'EOF'
+          # Continuous Benchmarking
+
+          ## Overview
+
+          The continuous benchmarking system automatically runs performance tests on every approved pull request and main branch commit to track performance regressions and improvements over time.
+
+          ## Benchmark Results
+
+          ### Live Dashboard
+          
+          View the interactive benchmark dashboard with historical performance data:
+          
+          **[🔗 Live Benchmark Results](https://mflowcode.github.io/MFC/benchmarks/)**
+
+          *Last updated: $(date '+%Y-%m-%d %H:%M:%S UTC')*
+          *Generated automatically by the continuous benchmarking workflow*
+          EOF
+
 
       - name: Archive Results
         uses: actions/upload-artifact@v4
