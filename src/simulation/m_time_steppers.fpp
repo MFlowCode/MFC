@@ -993,9 +993,9 @@ contains
             end do
         end do
 
-        #:call GPU_PARALLEL()
-            dt_local = minval(max_dt)
-        #:endcall GPU_PARALLEL
+        !$acc kernels
+        dt_local = minval(max_dt)
+        !$acc end kernels
 
         if (num_procs == 1) then
             dt = dt_local
