@@ -52,3 +52,13 @@ jobs:
         run: |
           (cd pr     && ./mfc.sh bench -o bench.yaml)
           find pr/ -maxdepth 1 -name "*.yaml" -exec sh -c 'yq eval -o=json "$1" > "${1%.yaml}.json"' _ {} \;
+
+      - name: Archive Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: |
+            pr/bench*
+            pr/build/benchmarks/*
+            pr/docs/documentation/cont-bench.md
