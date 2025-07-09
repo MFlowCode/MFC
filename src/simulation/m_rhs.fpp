@@ -250,33 +250,27 @@ contains
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
                                  & idwbuff(2)%beg:idwbuff(2)%end, &
                                  & idwbuff(3)%beg:idwbuff(3)%end))
-                        if (.not. igr) then
-                            @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
-                                    & idwbuff(1)%beg:idwbuff(1)%end, &
-                                    & idwbuff(2)%beg:idwbuff(2)%end, &
-                                    & idwbuff(3)%beg:idwbuff(3)%end))
-                        end if
+                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
+                                & idwbuff(1)%beg:idwbuff(1)%end, &
+                                & idwbuff(2)%beg:idwbuff(2)%end, &
+                                & idwbuff(3)%beg:idwbuff(3)%end))
                     end do
 
                     if (viscous .or. surface_tension) then
-                        if (.not. igr) then
-                            do l = mom_idx%beg, E_idx
-                                @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
-                                         & idwbuff(1)%beg:idwbuff(1)%end, &
-                                         & idwbuff(2)%beg:idwbuff(2)%end, &
-                                         & idwbuff(3)%beg:idwbuff(3)%end))
-                            end do
-                        end if
+                        do l = mom_idx%beg, E_idx
+                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
+                                     & idwbuff(1)%beg:idwbuff(1)%end, &
+                                     & idwbuff(2)%beg:idwbuff(2)%end, &
+                                     & idwbuff(3)%beg:idwbuff(3)%end))
+                        end do
                     end if
 
-                    if (.not. igr) then
-                        @:ALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf( &
-                                 & idwbuff(1)%beg:idwbuff(1)%end, &
-                                 & idwbuff(2)%beg:idwbuff(2)%end, &
-                                 & idwbuff(3)%beg:idwbuff(3)%end))
-                    end if
+                    @:ALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf( &
+                             & idwbuff(1)%beg:idwbuff(1)%end, &
+                             & idwbuff(2)%beg:idwbuff(2)%end, &
+                             & idwbuff(3)%beg:idwbuff(3)%end))
 
-                    if (riemann_solver == 1 .and. (.not. igr)) then
+                    if (riemann_solver == 1) then
                         do l = adv_idx%beg + 1, adv_idx%end
                             @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                      & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -304,12 +298,10 @@ contains
                 end if
 
                 @:ACC_SETUP_VFs(flux_n(i))
-                if (.not. igr) then
-                    @:ACC_SETUP_VFs(flux_src_n(i), flux_gsrc_n(i))
-                end if
+                @:ACC_SETUP_VFs(flux_src_n(i), flux_gsrc_n(i))
 
                 if (i == 1) then
-                    if (riemann_solver /= 1 .and. (.not. igr)) then
+                    if (riemann_solver /= 1) then
                         do l = adv_idx%beg + 1, adv_idx%end
                             flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
                             $:GPU_ENTER_DATA(attach='[flux_src_n(i)%vf(l)%sf]')
@@ -319,10 +311,8 @@ contains
                     do l = 1, sys_size
                         flux_n(i)%vf(l)%sf => flux_n(1)%vf(l)%sf
                         $:GPU_ENTER_DATA(attach='[flux_n(i)%vf(l)%sf]')
-                        if (.not. igr) then
-                            flux_src_n(i)%vf(l)%sf => flux_src_n(1)%vf(l)%sf
-                            $:GPU_ENTER_DATA(attach='[flux_src_n(i)%vf(l)%sf]')
-                        end if
+                        flux_src_n(i)%vf(l)%sf => flux_src_n(1)%vf(l)%sf
+                        $:GPU_ENTER_DATA(attach='[flux_src_n(i)%vf(l)%sf]')
                     end do
                 end if
             end if
@@ -1981,40 +1971,32 @@ contains
                 if (i /= 1) then
                     do l = 1, sys_size
                         nullify (flux_n(i)%vf(l)%sf)
-                        if (.not. igr) then
-                            nullify (flux_src_n(i)%vf(l)%sf)
-                            @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
-                        end if
+                        nullify (flux_src_n(i)%vf(l)%sf)
+                        @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
                     end do
                 else
                     do l = 1, sys_size
                         @:DEALLOCATE(flux_n(i)%vf(l)%sf)
-                        if (.not. igr) then
-                            @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
-                        end if
+                        @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
                     end do
 
-                    if (viscous .and. (.not. igr)) then
+                    if (viscous) then
                         do l = mom_idx%beg, E_idx
                             @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                         end do
                     end if
 
-                    if (.not. igr) then
-                        if (riemann_solver == 1) then
-                            do l = adv_idx%beg + 1, adv_idx%end
-                                @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
-                            end do
-                        else
-                            do l = adv_idx%beg + 1, adv_idx%end
-                                nullify (flux_src_n(i)%vf(l)%sf)
-                            end do
-                        end if
+                    if (riemann_solver == 1) then
+                        do l = adv_idx%beg + 1, adv_idx%end
+                            @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
+                        end do
+                    else
+                        do l = adv_idx%beg + 1, adv_idx%end
+                            nullify (flux_src_n(i)%vf(l)%sf)
+                        end do
                     end if
 
-                    if (.not. igr) then
-                        @:DEALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf)
-                    end if
+                    @:DEALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf)
                 end if
 
                 @:DEALLOCATE(flux_n(i)%vf, flux_src_n(i)%vf, flux_gsrc_n(i)%vf)
