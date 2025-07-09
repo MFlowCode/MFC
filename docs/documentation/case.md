@@ -225,6 +225,8 @@ end if
 Some patch configurations are not adequately handled with the above analytic variable definitions.
 In this case, a hard coded patch can be used.
 Hard coded patches can be added by adding additional hard coded patch identifiers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`.
+When using a hard coded patch, the `patch_icpp(patch_id)%%hcid` must be set to the hard-coded patch id.
+One must also set the `patch_icpp(patch_id)%%geometry` to either 15, 7, or 13 for 1, 2, or 3 dimensions, respectively.
 For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
 
 ```f90
@@ -313,7 +315,7 @@ These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch 
 #### Parameter Descriptions
 
 - `geometry` defines the type of geometry of a patch with an integer number.
-Definitions for currently implemented patch types are list in table [Immersed Boundary Patch Type](#immersed-boundary-patch-types)
+Definitions for currently implemented patch types are list in table [Patch Types](#patch-types).
 
 - `x[y,z]_centroid` is the centroid location of the patch in the x[y,z]-direction
 
