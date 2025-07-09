@@ -196,7 +196,7 @@ contains
                         end select
 
                         ! Extract species mass fractions
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = chemxb, chemxe
                             Ys_L(i - chemxb + 1) = q_prim_qp(i)%sf(x, y, z)
                             Ys_R(i - chemxb + 1) = q_prim_qp(i)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
@@ -238,7 +238,7 @@ contains
                         call get_species_enthalpies_rt(T_R, h_r)
 
                         ! Calculate species properties and gradients
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = chemxb, chemxe
                             h_l(i - chemxb + 1) = h_l(i - chemxb + 1)*gas_constant*T_L/molecular_weights(i - chemxb + 1)
                             h_r(i - chemxb + 1) = h_r(i - chemxb + 1)*gas_constant*T_R/molecular_weights(i - chemxb + 1)
@@ -248,7 +248,7 @@ contains
                         end do
 
                         ! Calculate mixture-averaged diffusivities
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = chemxb, chemxe
                             mass_diffusivities_mixavg_Cell(i - chemxb + 1) = &
                                 (mass_diffusivities_mixavg2(i - chemxb + 1) + mass_diffusivities_mixavg1(i - chemxb + 1))/ &
@@ -261,7 +261,7 @@ contains
                         rho_Vic = 0.0_wp
                         Mass_Diffu_Energy = 0.0_wp
 
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do eqn = chemxb, chemxe
                             Mass_Diffu_Flux(eqn - chemxb + 1) = rho_cell*mass_diffusivities_mixavg_Cell(eqn - chemxb + 1)* &
                                                                 molecular_weights(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn - chemxb + 1)
@@ -270,7 +270,7 @@ contains
                         end do
 
                         ! Apply corrections for mass conservation
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do eqn = chemxb, chemxe
                             Mass_Diffu_Energy = Mass_Diffu_Energy - h_k(eqn - chemxb + 1)*Ys_cell(eqn - chemxb + 1)*rho_Vic
                             Mass_Diffu_Flux(eqn - chemxb + 1) = Mass_Diffu_Flux(eqn - chemxb + 1) - rho_Vic*Ys_cell(eqn - chemxb + 1)
@@ -282,7 +282,7 @@ contains
                         ! Update flux arrays
                         flux_src_vf(E_idx)%sf(x, y, z) = flux_src_vf(E_idx)%sf(x, y, z) - Mass_Diffu_Energy
 
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do eqn = chemxb, chemxe
                             flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, z) - Mass_diffu_Flux(eqn - chemxb + 1)
                         end do
