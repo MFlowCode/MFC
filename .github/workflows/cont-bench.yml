@@ -15,23 +15,23 @@ permissions:
   id-token: write
 
 jobs:
-  file-changes:
-    name: Detect File Changes
-    runs-on: 'ubuntu-latest'
-    outputs: 
-      checkall: ${{ steps.changes.outputs.checkall }}
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 
+  # file-changes:
+  #   name: Detect File Changes
+  #   runs-on: 'ubuntu-latest'
+  #   outputs: 
+  #     checkall: ${{ steps.changes.outputs.checkall }}
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0 
 
-      - name: Detect Changes
-        uses: dorny/paths-filter@v3
-        id: changes
-        with: 
-          filters: ".github/file-filter.yml"
-          base: ${{ github.event.repository.default_branch || 'main' }}
+  #     - name: Detect Changes
+  #       uses: dorny/paths-filter@v3
+  #       id: changes
+  #       with: 
+  #         filters: ".github/file-filter.yml"
+  #         base: ${{ github.event.repository.default_branch || 'main' }}
 
   self:
     name: "Continuous Benchmarking"
@@ -64,7 +64,7 @@ jobs:
           name: Fortran Benchmark
           tool: 'googlecpp'
           output-file-path: pr/bench-*
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: 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
           auto-push: true
           alert-threshold: '200%'
           comment-on-alert: true
@@ -73,7 +73,6 @@ jobs:
           benchmark-data-dir-path: benchmarks
           # alert-comment-cc-users: '@sbryngelson'
       
-
       - name: Create Benchmark Documentation
         run: |
           mkdir -p pr/docs/documentation
@@ -218,7 +217,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Update continuous benchmarking documentation [skip ci]"
+            git commit -m "Update continuous benchmarking documentation"
             git push
           fi
       
