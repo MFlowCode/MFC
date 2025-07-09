@@ -64,7 +64,7 @@ jobs:
           name: Fortran Benchmark
           tool: 'googlecpp'
           output-file-path: pr/bench-*
-          github-token: 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
+          github-token: ${{ secrets.TOKEN }}
           auto-push: true
           alert-threshold: '200%'
           comment-on-alert: true
