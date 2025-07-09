@@ -1,0 +1,75 @@
+name: Continuous Benchmarking
+
+on:
+  pull_request:
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+
+
+permissions:
+  contents: write
+  deployments: write
+
+jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+
+  self:
+    name: "Continuous Benchmarking"
+    if: ${{ github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && (
+             (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
+             (github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbryngelson')
+           ) }}
+    needs: file-changes
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone - PR
+        uses: actions/checkout@v4
+        with:
+          path: pr
+
+      - name: Setup
+        run: | 
+          sudo apt update -y
+          sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
+                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev
+
+      - name: Run Fortran Benchmark
+        run: |
+          (cd pr     && ./mfc.sh bench -o bench)
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Fortran Benchmark
+          tool: 'googlecpp'
+          output-file-path: pr/bench.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          alert-threshold: '200%'
+          comment-on-alert: true
+          fail-on-alert: true
+          # alert-comment-cc-users: '@sbryngelson'
+      
+      - name: Archive Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          path: |
+            pr/bench-*
+            pr/build/benchmarks/*
+            pr/bench.json
+      - uses: actions/checkout@v4
