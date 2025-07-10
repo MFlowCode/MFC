@@ -1,0 +1,153 @@
+cases:
+  5eq_rk3_weno3_hllc:
+    description:
+      args: []
+      path: /home/mohammed/Desktop/cont-bench/benchmarks/5eq_rk3_weno3_hllc/case.py
+      slug: 5eq_rk3_weno3_hllc
+    output_summary:
+      invocation:
+      - run
+      - /home/mohammed/Desktop/cont-bench/benchmarks/5eq_rk3_weno3_hllc/case.py
+      - --case-optimization
+      - --targets
+      - pre_process
+      - simulation
+      - post_process
+      - --output-summary
+      - /home/mohammed/Desktop/cont-bench/build/benchmarks/6462/5eq_rk3_weno3_hllc.yaml
+      - --
+      - --gbpp
+      - '1'
+      lock:
+        debug: false
+        gcov: false
+        gpu: false
+        mpi: true
+        single: false
+        unified: false
+      post_process:
+        exec: 2.6731925
+      pre_process:
+        exec: 0.945057
+      simulation:
+        exec: 553.7461466
+        grind: 311.46590698
+      syscheck:
+        exec: 0.5911245
+  hypo_hll:
+    description:
+      args: []
+      path: /home/mohammed/Desktop/cont-bench/benchmarks/hypo_hll/case.py
+      slug: hypo_hll
+    output_summary:
+      invocation:
+      - run
+      - /home/mohammed/Desktop/cont-bench/benchmarks/hypo_hll/case.py
+      - --case-optimization
+      - --targets
+      - pre_process
+      - simulation
+      - post_process
+      - --output-summary
+      - /home/mohammed/Desktop/cont-bench/build/benchmarks/6462/hypo_hll.yaml
+      - --
+      - --gbpp
+      - '1'
+      lock:
+        debug: false
+        gcov: false
+        gpu: false
+        mpi: true
+        single: false
+        unified: false
+      post_process:
+        exec: 4.6181798
+      pre_process:
+        exec: 28.0626009
+      simulation:
+        exec: 1158.0062294
+        grind: 373.3648501
+      syscheck:
+        exec: 0.5746224
+  ibm:
+    description:
+      args: []
+      path: /home/mohammed/Desktop/cont-bench/benchmarks/ibm/case.py
+      slug: ibm
+    output_summary:
+      invocation:
+      - run
+      - /home/mohammed/Desktop/cont-bench/benchmarks/ibm/case.py
+      - --case-optimization
+      - --targets
+      - pre_process
+      - simulation
+      - post_process
+      - --output-summary
+      - /home/mohammed/Desktop/cont-bench/build/benchmarks/6462/ibm.yaml
+      - --
+      - --gbpp
+      - '1'
+      lock:
+        debug: false
+        gcov: false
+        gpu: false
+        mpi: true
+        single: false
+        unified: false
+      post_process:
+        exec: 2.7696633
+      pre_process:
+        exec: 0.6595922
+      simulation:
+        exec: 1560.6666524
+        grind: 1329.41865639
+      syscheck:
+        exec: 0.350557
+  viscous_weno5_sgb_acoustic:
+    description:
+      args: []
+      path: /home/mohammed/Desktop/cont-bench/benchmarks/viscous_weno5_sgb_acoustic/case.py
+      slug: viscous_weno5_sgb_acoustic
+    output_summary:
+      invocation:
+      - run
+      - /home/mohammed/Desktop/cont-bench/benchmarks/viscous_weno5_sgb_acoustic/case.py
+      - --case-optimization
+      - --targets
+      - pre_process
+      - simulation
+      - post_process
+      - --output-summary
+      - /home/mohammed/Desktop/cont-bench/build/benchmarks/6462/viscous_weno5_sgb_acoustic.yaml
+      - --
+      - --gbpp
+      - '1'
+      lock:
+        debug: false
+        gcov: false
+        gpu: false
+        mpi: true
+        single: false
+        unified: false
+      post_process:
+        exec: 1.7293213
+      pre_process:
+        exec: 0.7582608
+      simulation:
+        exec: 968.760392
+        grind: 1051.98369313
+      syscheck:
+        exec: 0.6131606
+metadata:
+  invocation:
+  - bench
+  - -o
+  - bench
+  lock:
+    debug: false
+    gcov: false
+    gpu: false
+    mpi: true
+    single: false
+    unified: false
