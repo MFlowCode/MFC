@@ -22,8 +22,6 @@ From: ubuntu:24.04
 %runscript
     mkdir -p /tmp/mfc/build
     cd /opt/MFC
-    if [ ! -w "/opt/MFC/build" ]; then
-        cp -r /opt/MFC /tmp/mfc/
-        cd /tmp/mfc/MFC
-    fi
+    cp -r /opt/MFC /tmp/mfc/
+    cd /tmp/mfc/MFC
     exec ./mfc.sh "$@"
