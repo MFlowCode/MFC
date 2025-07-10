@@ -17,11 +17,11 @@ From: ubuntu:24.04
     git clone --depth 1 https://github.com/mflowcode/mfc.git MFC
     cd /opt/MFC
     ./mfc.sh build -j $(nproc)
-    ./mfc.sh test --dry-run -j $(nproc)
+    ./mfc.sh test -a --dry-run -j $(nproc)
 
 %runscript
-    mkdir -p /tmp/mfc/build
-    cd /opt/MFC
-    cp -r /opt/MFC /tmp/mfc/
-    cd /tmp/mfc/MFC
+    mkdir -p /tmp/mfc
+    cd /tmp/mfc
+    cp -r /opt/MFC ./
+    cd MFC
     exec ./mfc.sh "$@"
