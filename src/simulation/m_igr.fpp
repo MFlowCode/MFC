@@ -25,7 +25,7 @@ module m_igr
  s_finalize_igr_module
 
     real(wp), allocatable, dimension(:, :, :) :: jac, jac_rhs, jac_old
-    $:GPU_DECLARE(create='[jac, jac_rhs]')
+    $:GPU_DECLARE(create='[jac, jac_rhs, jac_old]')
 
     real(wp), allocatable, dimension(:, :) :: Res
     $:GPU_DECLARE(create='[Res]')
