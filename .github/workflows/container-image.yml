@@ -26,7 +26,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "${{secrets.SSH_PRIVATE_KEY}}" >~/.ssh/id_rsa
-          chmod 6000 ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ap40.uw.osg-htc.org >> ~/.ssh/known_hosts
           scp pr/.github/workflows/images/mfc_cpu.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu.sif
           ssh ${{secrets.SSH_USER}} "
