@@ -10,14 +10,24 @@
         @: HardcodedReadValues()
 
     case (180)
-        ! This is patch is hard-coded for test suite optimization
-        ! patch_icpp(patch_id)%alpha_rho(1) = 1.0_wp + 0.2_wp*sin(5._wp*x_cc(i))
-        ! if (patch_id == 2) then
-        !     q_prim_vf(contxb + 0)%sf(i, 0, 0) = 1 + 0.2*sin(5*x_cc(i))
-        ! end if
+        ! This is patch is hard-coded for test suite optimization used in the
+        ! 1D_shuoser cases: "patch_icpp(2)%alpha_rho(1)": "1 + 0.2*sin(5*x)"
+        ! This analytic patch used geometry 1
         if (patch_id == 2) then
             q_prim_vf(contxb + 0)%sf(i, 0, 0) = 1 + 0.2*sin(5*x_cc(i))
         end if
+    
+    case (181)
+        ! This is patch is hard-coded for test suite optimization used in the
+        ! 1D_titarevtorro cases: "patch_icpp(2)%alpha_rho(1)": "1 + 0.1*sin(20*x*pi)"
+        ! This analytic patch used geometry 1
+        q_prim_vf(contxb + 0)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*3.141592653589793)
+
+    case (182)
+        ! This is patch is hard-coded for test suite optimization used in the
+        ! 1D_titarevtorro cases: "patch_icpp(2)%alpha_rho(1)": "1 + 0.1*sin(20*x*pi)"
+        ! This analytic patch used geometry 1
+        q_prim_vf(contxb + 0)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*3.141592653589793)
 
     case default
         call s_int_to_str(patch_id, iStr)
