@@ -13,13 +13,29 @@ jobs:
         with:
           path: pr
 
-      - name: Test and Store Images on Shared Resource
+      - name: Set up Singularity Images
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common apptainer openssh-client
+          sudo add-apt-repository -y ppa:apptainer/ppa
+          sudo apptainer config fakeroot --enable $(whoami)
+          (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu.sif Singularity.cpu)
+
+      - name: Test and Store Images
         run: |
           mkdir -p ~/.ssh
           echo "${{secrets.SSH_PRIVATE_KEY}}" >~/.ssh/id_rsa
           chmod 6000 ~/.ssh/id_rsa
           ssh-keyscan -H ap40.uw.osg-htc.org >> ~/.ssh/known_hosts
           scp pr/.github/workflows/images/mfc_cpu.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu.sif
-          # ssh ${{secrets.SSH_USER}} "
-          #   apptainer run --fakeroot MFC/mfc_cpu.sif test -a --no-build --no-mpi
-          # "
+          ssh ${{secrets.SSH_USER}} "
+            apptainer run --fakeroot MFC/mfc_cpu.sif test -a --no-build --no-mpi
+          "
+
+      - name: Upload images as artifacts
+        uses: actions/upload-artifact@v4
+        if:   always()
+        with:
+          name: singularity-images
+          path: |
+            pr/.github/workflows/images/*
