@@ -20,5 +20,10 @@ From: ubuntu:24.04
     ./mfc.sh test --dry-run -j $(nproc)
 
 %runscript
+    mkdir -p /tmp/mfc/build
     cd /opt/MFC
+    if [ ! -w "/opt/MFC/build" ]; then
+        cp -r /opt/MFC /tmp/mfc/
+        cd /tmp/mfc/MFC
+    fi
     exec ./mfc.sh "$@"
