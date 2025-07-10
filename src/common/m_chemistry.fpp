@@ -28,6 +28,9 @@ contains
 
     subroutine compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L, Re_R)
 
+    $:GPU_ROUTINE(function_name='compute_viscosity_and_inversion',parallelism='[seq]', &
+        & cray_inline=True)
+
         real(wp), intent(inout) :: T_L, T_R, Re_L, Re_R
         real(wp), dimension(num_species), intent(inout) :: Ys_R, Ys_L
 

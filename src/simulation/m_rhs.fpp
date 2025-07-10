@@ -1559,6 +1559,7 @@ contains
                                 end do
                             end do
                         end do
+                    end do
                 end if
 
                if (chem_params%diffusion) then

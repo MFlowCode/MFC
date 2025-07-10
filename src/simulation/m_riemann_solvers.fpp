@@ -649,7 +649,6 @@ contains
                                 if (chemistry) then
                                     call compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L(1), Re_R(1))
                                 end if
-                                !$acc loop seq
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, 2
                                     Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2._wp/(1._wp/Re_L(i) + 1._wp/Re_R(i))
@@ -2602,7 +2601,6 @@ contains
                                     if (chemistry) then
                                         call compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L(1), Re_R(1))
                                     end if
-                                    !$acc loop seq
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, 2
                                         Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2._wp/(1._wp/Re_L(i) + 1._wp/Re_R(i))
