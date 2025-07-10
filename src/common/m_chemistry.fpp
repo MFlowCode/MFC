@@ -180,11 +180,10 @@ contains
             offsets = 0
             offsets(idir) = 1
 
-            $:GPU_DECLARE(copyin='[offsets]')
             $:GPU_PARALLEL_LOOP(collapse=3,  private='[Ys_L, Ys_R, Ys_cell, &
                     & Xs_L, Xs_R, mass_diffusivities_mixavg1, mass_diffusivities_mixavg2, &
                     & mass_diffusivities_mixavg_Cell, h_l, h_r, Xs_cell, h_k, &
-                    & dXk_dxi,Mass_Diffu_Flux]')
+                    & dXk_dxi,Mass_Diffu_Flux]', copyin='[offsets]')
             do z = isc3%beg, isc3%end
                 do y = isc2%beg, isc2%end
                     do x = isc1%beg, isc1%end
