@@ -126,7 +126,7 @@ jobs:
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
-        if:   always()
+        if:   matrix.lbl == 'frontier'
         with:
           name: logs-${{ strategy.job-index }}-${{ matrix.device }}
           path: test-${{ matrix.device }}.out
