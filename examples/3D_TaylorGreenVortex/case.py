@@ -89,7 +89,7 @@ print(
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%vel(3)": 0,
             "patch_icpp(1)%pres": 0.0,
-            "patch_icpp(1)%hcid": 0.0,
+            "patch_icpp(1)%hcid": 380,
             "patch_icpp(1)%alpha_rho(1)": 1,
             "patch_icpp(1)%alpha(1)": 1,
             # Fluids Physical Parameters

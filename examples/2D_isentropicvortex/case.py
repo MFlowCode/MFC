@@ -105,7 +105,7 @@ print(
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%pres": 0.0,
             "patch_icpp(1)%alpha_rho(1)": 0.0,
-            "patch_icpp(1)%hcid": 180,
+            "patch_icpp(1)%hcid": 280,
             "patch_icpp(1)%alpha(1)": 1.0,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1.0e00),
