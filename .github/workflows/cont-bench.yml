@@ -1,0 +1,149 @@
+name: Continuous Benchmarking
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: write
+  deployments: write
+  pages: write
+  id-token: write
+
+jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+          base: ${{ github.event.repository.default_branch || 'main' }}
+
+  self:
+    name: "Continuous Benchmarking"
+    needs: file-changes
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone - PR
+        uses: actions/checkout@v4
+        with:
+          path: pr
+
+      - name: Setup
+        run: | 
+          sudo apt update -y
+          sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
+                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev
+          export TOKEN=$(gh auth token)
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Run Benchmark Cases
+        run: |
+          (cd pr     && ./mfc.sh bench -o bench.yaml)
+          find pr -maxdepth 1 -name "*.yaml" -exec sh -c 'yq eval -o=json "$1" > "${1%.yaml}.json"' _ {} \;
+
+
+      - name: Convert MFC to Google Benchmark Format
+        run: |
+          python3 << 'EOF'
+          import json
+          from datetime import datetime
+
+          # Read the MFC benchmark data
+          with open('bench.json', 'r') as f:
+              mfc_data = json.load(f)
+
+          # Convert to Google Benchmark format
+          benchmarks = []
+
+          for case_name, case_data in mfc_data['cases'].items():
+              output_summary = case_data['output_summary']
+              
+              # Simulation execution time
+              if 'simulation' in output_summary and 'exec' in output_summary['simulation']:
+                  benchmarks.append({
+                      "name": f"{case_name}/simulation_time",
+                      "family_index": len(benchmarks),
+                      "per_family_instance_index": 0,
+                      "run_name": f"{case_name}/simulation_time",
+                      "run_type": "iteration",
+                      "repetitions": 1,
+                      "repetition_index": 0,
+                      "threads": 1,
+                      "iterations": 1,
+                      "real_time": output_summary['simulation']['exec'] * 1e9,
+                      "cpu_time": output_summary['simulation']['exec'] * 1e9,
+                      "time_unit": "ns"
+                  })
+              
+              # Simulation grind time
+              if 'simulation' in output_summary and 'grind' in output_summary['simulation']:
+                  benchmarks.append({
+                      "name": f"{case_name}/grind_time",
+                      "family_index": len(benchmarks),
+                      "per_family_instance_index": 0,
+                      "run_name": f"{case_name}/grind_time",
+                      "run_type": "iteration",
+                      "repetitions": 1,
+                      "repetition_index": 0,
+                      "threads": 1,
+                      "iterations": 1,
+                      "real_time": output_summary['simulation']['grind'],
+                      "cpu_time": output_summary['simulation']['grind'],
+                      "time_unit": "ns"
+                  })
+
+          # Create Google Benchmark format
+          google_benchmark_data = {
+              "context": {
+                  "date": datetime.now().isoformat(),
+                  "host_name": "github-runner",
+                  "executable": "mfc_benchmark",
+                  "num_cpus": 2,
+                  "mhz_per_cpu": 2000,
+                  "cpu_scaling_enabled": False,
+                  "caches": []
+              },
+              "benchmarks": benchmarks
+          }
+
+          # Write the converted data
+          with open('bench-google.json', 'w') as f:
+              json.dump(google_benchmark_data, f, indent=2)
+
+          print(f"✓ Converted {len(benchmarks)} benchmark measurements")
+          EOF
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: C++ Benchmark
+          tool: 'googlecpp'
+          output-file-path: bench-google.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          alert-threshold: '200%'
+          comment-on-alert: true
+          fail-on-alert: true
+          alert-comment-cc-users: '@Malmahrouqi'
+
+      - name: Archive Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: |
+            pr/bench*
+            pr/build/benchmarks/*
+            pr/docs/documentation/cont-bench.md
