@@ -50,8 +50,11 @@ JOBID=$(sbatch <<-EOT | awk '{print $4}'
 	${sbatch_common_opts}
 	${sbatch_device_opts}
  
-    	export job_slug="${job_slug}"
-	echo "My job slug is:" $job_slug
+	export job_slug="${job_slug}"
+	export job_device="${device}"
+
+	echo "Job slug is:" $job_slug
+ 	echo "Device is:" $job_device
  
 	set -e -x
 
