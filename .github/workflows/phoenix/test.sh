@@ -13,7 +13,7 @@ if [ "$job_device" = "gpu" ]; then
     build_opts="--gpu"
 fi
 
-./mfc.sh test --dry-run -j $n_test_thread $build_opts
+./mfc.sh test --dry-run -j $n_test_threads $build_opts
 
 if [ "$job_device" = "gpu" ]; then
     gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
