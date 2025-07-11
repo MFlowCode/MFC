@@ -1,0 +1,17 @@
+# mfc_cpu.sub
+
+executable = mfc_cpu.sh
+arguments = $(Process)
+
+log = mfc_cpu_$(Cluster)_$(Process).log
+error = mfc_cpu_$(Cluster)_$(Process).err
+output = mfc_cpu_$(Cluster)_$(Process).out
+
++JobDurationCategory = "Medium"
+
+requirements = (OSGVO_OS_STRING == "Ubuntu 22")
+request_cpus = 4
+request_memory = 16GB
+request_disk = 32GB
+
+queue 1

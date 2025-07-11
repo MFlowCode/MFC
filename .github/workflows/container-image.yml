@@ -1,6 +1,7 @@
 name: Build Singularity Images
 
-on: [push, pull_request, pull_request_target]
+on:
+  push:
 
 jobs:
   Build-singularity-images:
@@ -12,48 +13,32 @@ jobs:
         with:
           path: pr
 
-      - name: Build & Store Images
+      - name: Set up & Build Images
         run: |
           sudo apt-get update
           sudo apt-get install -y software-properties-common openssh-client
           sudo add-apt-repository -y ppa:apptainer/ppa
           sudo apt-get install -y apptainer
           sudo apptainer config fakeroot --enable $(whoami)
-          
-          mkdir -p ~/.ssh
-          echo "${{secrets.SSH_PRIVATE_KEY}}" >~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ap40.uw.osg-htc.org >> ~/.ssh/known_hosts
-
           (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu.sif Singularity.cpu)
-          scp pr/.github/workflows/images/mfc_cpu.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu.sif
-          rm -rf pr/.github/workflows/images/mfc_cpu.sif
-
           (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu_bench.sif Singularity.cpu_bench)
-          scp pr/.github/workflows/images/mfc_cpu_bench.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu_bench.sif
-          rm -rf pr/.github/workflows/images/mfc_cpu_bench.sif
-
           (cd pr/.github/workflows/images && sudo apptainer build mfc_gpu.sif Singularity.gpu)
-          scp pr/.github/workflows/images/mfc_gpu.sif ${{secrets.SSH_USER}}:MFC/mfc_gpu.sif
-          rm -rf pr/.github/workflows/images/mfc_gpu.sif
-
           (cd pr/.github/workflows/images && sudo apptainer build mfc_gpu_bench.sif Singularity.gpu_bench)
-          scp pr/.github/workflows/images/mfc_gpu_bench.sif ${{secrets.SSH_USER}}:MFC/mfc_gpu_bench.sif
-          rm -rf pr/.github/workflows/images/mfc_gpu_bench.sif
 
-      - name: Test Images
+      - name: Test and Store Images
         run: |
           mkdir -p ~/.ssh
-          echo "${{secrets.SSH_PRIVATE_KEY}}" >~/.ssh/id_rsa
+          echo "${{secrets.SSH_PRIVATE_KEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ap40.uw.osg-htc.org >> ~/.ssh/known_hosts
           scp pr/.github/workflows/images/mfc_cpu.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu.sif
-          ssh ${{secrets.SSH_USER}} ""
-          apptainer exec --fakeroot --writable-tmpfs mfc_cpu.sif /bin/bash -c 'cd /opt/MFC && ./mfc.sh test -a'
-          apptainer exec --fakeroot --writable-tmpfs mfc_cpu_bench.sif /bin/bash -c 'cd /opt/MFC && ./mfc.sh test -a'
-          apptainer exec --fakeroot --writable-tmpfs mfc_gpu.sif /bin/bash -c 'cd /opt/MFC && ./mfc.sh test -a'
-          apptainer exec --fakeroot --writable-tmpfs mfc_gpu_bench.sif /bin/bash -c 'cd /opt/MFC && ./mfc.sh test -a'
+          ssh ${{secrets.SSH_USER}} "
+            apptainer run --fakeroot MFC/mfc_cpu.sif test -a --no-build
+            apptainer run --fakeroot MFC/mfc_cpu_bench.sif test -a --no-build
+            apptainer run --fakeroot MFC/mfc_gpu.sif test -a --no-build
+            apptainer run --fakeroot MFC/mfc_gpu_bench.sif test -a --no-build
           "
+
       - name: Upload images as artifacts
         uses: actions/upload-artifact@v4
         if:   always()
