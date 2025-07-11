@@ -162,8 +162,8 @@
     
     case (280)
         ! This is patch is hard-coded for test suite optimization used in the
-        ! 2D_isentropicvortex cases:
-        ! This analytic patch used geometry 3
+        ! 2D_zero_circ_vortex case:
+        ! This analytic patch used geometry 2
         if (patch_id == 1) then
             q_prim_vf(E_idx)%sf(i, j, 0) = 1d0*(1d0 - (1d0/1d0)*(5d0/(2d0*3.141592653589793))*(5d0/(8d0*1d0*(1.4 + 1d0)*3.141592653589793))*exp(2d0*1d0*(1d0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2d0- (y_cc(j) - patch_icpp(1)%y_centroid)**2d0)))**(1.4 + 1d0)
             q_prim_vf(contxb + 0)%sf(i, j, 0) = 1d0*(1d0 - (1d0/1d0)*(5d0/(2d0*3.141592653589793))*(5d0/(8d0*1d0*(1.4 + 1d0)*3.141592653589793))*exp(2d0*1d0*(1d0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2d0- (y_cc(j) - patch_icpp(1)%y_centroid)**2d0)))**1.4
