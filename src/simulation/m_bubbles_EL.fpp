@@ -930,7 +930,7 @@ contains
         real(wp), intent(out), optional :: preterm1, term2, Romega
 
         real(wp), dimension(3) :: scoord, psi_pos, psi_x, psi_y, psi_z
-        real(wp), xi, eta, zeta
+        real(wp) :: xi, eta, zeta
         real(wp) :: dc, vol, aux
         real(wp) :: volgas, term1, Rbeq, denom
         real(wp) :: charvol, charpres, charvol2, charpres2
