@@ -106,7 +106,6 @@ jobs:
           http_proxy: "socks5://localhost:1080"
           https_proxy: "socks5://localhost:1080"
           no_proxy: "localhost,127.0.0.1,github.com,api.github.com,uploads.github.com"
-          NO_PROXY: "localhost,127.0.0.1,github.com,api.github.com,uploads.github.com"
         with:
           name: ${{ matrix.cluster }}-${{ matrix.device }}
           path: |
