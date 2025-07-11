@@ -1162,7 +1162,7 @@ contains
 
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
-        
+
         integer :: loop_end
 
         ! Populating the buffers of the left and right Riemann problem
@@ -1313,7 +1313,7 @@ contains
                                             xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
                                             xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                                         end do
-                                        G_L = 0._wp; G_R = 0._wp;
+                                        G_L = 0._wp; G_R = 0._wp; 
                                         !$acc loop seq
                                         do i = 1, num_fluids
                                             ! Mixture left and right shear modulus
@@ -2432,7 +2432,7 @@ contains
                                             xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
                                             xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                                         end do
-                                        G_L = 0._wp; G_R = 0._wp;
+                                        G_L = 0._wp; G_R = 0._wp; 
                                         !$acc loop seq
                                         do i = 1, num_fluids
                                             ! Mixture left and right shear modulus
