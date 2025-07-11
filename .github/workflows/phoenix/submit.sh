@@ -65,14 +65,24 @@ echo "🚀 Submitted SLURM job $JOBID"
 # if this wrapper is killed/canceled, make sure SLURM job is cleaned up
 trap '[[ -n "${JOBID:-}" ]] && scancel "$JOBID" >/dev/null 2>&1 || :' EXIT
 
-# poll until job finishes
-while true; do
-  STATE=$(sacct -j "$JOBID" --noheader --format=State | head -1 | cut -d' ' -f1)
+# ────────── Poll until SLURM job finishes ──────────
+while :; do
+  # First try sacct (may take a moment to appear)
+  STATE=$(sacct -j "$JOBID" --format=State --noheader --parsable2 | head -n1)
+
+  # If sacct didn’t return anything yet, check squeue
+  if [[ -z "$STATE" ]]; then
+    STATE=$(squeue -j "$JOBID" -h -o "%T" || echo "")
+  fi
+
+  # When both are empty, the job has left the queue
+  if [[ -z "$STATE" ]]; then
+    echo "✅ SLURM job $JOBID no longer in queue; assuming finished"
+    break
+  fi
+
   echo "⏳ SLURM job $JOBID state: $STATE"
-  case "$STATE" in
-    COMPLETED|FAILED|CANCELLED|TIMEOUT) break ;;
-    *) sleep 10 ;;
-  esac
+  sleep 10
 done
 
 # show final report
