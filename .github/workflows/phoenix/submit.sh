@@ -11,17 +11,19 @@ usage() {
 sbatch_script="$1"
 device="$2"
 
+job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2"
+
 # read the body of the user script
 sbatch_body=$(<"$sbatch_script")
 
 # common SBATCH directives
 sbatch_common_opts="\
-#SBATCH -J shb-${sbatch_script%%.sh}-$device   # job name
-#SBATCH --account=gts-sbryngelson3             # account
+#SBATCH -J shb-${sbatch_script%%.sh}-$device    # job name
+#SBATCH --account=gts-sbryngelson3              # account
 #SBATCH -N1                                     # nodes
 #SBATCH -t 03:00:00                             # walltime
 #SBATCH -q embers                               # QOS
-#SBATCH -o ${sbatch_script%%.sh}-$device.%j.out  # stdout+stderr
+#SBATCH -o $job_slug.out                        # stdout+stderr
 #SBATCH --mem-per-cpu=2G                        # default mem (overridden below)
 "
 
