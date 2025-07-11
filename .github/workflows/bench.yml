@@ -102,10 +102,11 @@ jobs:
       - name: Archive Logs (Phoenix)
         if: always() && matrix.cluster == 'phoenix'
         uses: actions/upload-artifact@v4
+        # Clear any proxy settings so this step uses direct HTTPS
         env:
-          http_proxy: "socks5://localhost:1080"
-          https_proxy: "socks5://localhost:1080"
-          no_proxy: "localhost,127.0.0.1,github.com,api.github.com,uploads.github.com"
+          http_proxy:  ""
+          https_proxy: ""
+          no_proxy:    ""
         with:
           name: ${{ matrix.cluster }}-${{ matrix.device }}
           path: |
@@ -115,7 +116,7 @@ jobs:
             master/build/benchmarks/*
 
       # All other runners (non-Phoenix) just run without special env
-      - name: Archive Logs
+      - name: Archive Logs (Frontier)
         if: always() && matrix.cluster != 'phoenix'
         uses: actions/upload-artifact@v4
         with:
