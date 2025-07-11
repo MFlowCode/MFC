@@ -9,8 +9,8 @@ usage() {
 [[ $# -eq 2 ]] || usage
 
 sbatch_script="$1"
-device="$2"
 
+device="$2"
 job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2"
 
 # read the body of the user script
@@ -51,10 +51,10 @@ JOBID=$(sbatch <<-EOT | awk '{print $4}'
 	${sbatch_device_opts}
  
 	export job_slug="${job_slug}"
-	export job_device="${device}"
+	export device="${device}"
 
 	echo "Job slug is:" $job_slug
- 	echo "Device is:" $job_device
+ 	echo "Device is:" $device
  
 	set -e -x
 
