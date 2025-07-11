@@ -145,7 +145,7 @@ contains
             & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',  'fd_order',     &
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
             & 'R0_type', 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
-            & 'num_bc_patches', 'fd_order', 'lag_params%vel_model']
+            & 'num_bc_patches', 'lag_params%vel_model']
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -754,7 +754,6 @@ contains
         end do
 
     end subroutine s_mpi_sendrecv_particles
-
 
     !! This function returns a unique tag for each neighbor based on its position
         !! relative to the current process.

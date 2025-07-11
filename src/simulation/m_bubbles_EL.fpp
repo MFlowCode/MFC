@@ -605,15 +605,15 @@ contains
         real(wp) :: myR_m, mygamma_m, myPb, myMass_n, myMass_v
         real(wp) :: myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot
         real(wp) :: myPinf, aux1, aux2, myCson, myRho
+        real(wp), dimension(3) :: myPos, myVel
         real(wp) :: gamma, pi_inf, qv
         real(wp), dimension(contxe) :: myalpha_rho, myalpha
         real(wp), dimension(2) :: Re
         integer, dimension(3) :: cell
-
         integer :: adap_dt_stop_max, adap_dt_stop !< Fail-safe exit if max iteration count reached
         real(wp) :: dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu !< Dummy variables for unified subgrid bubble subroutines
 
-        integer :: i, k, l
+        integer :: i, j, k, l
 
         call nvtxStartRange("LAGRANGE-BUBBLE-DYNAMICS")
 
@@ -641,7 +641,7 @@ contains
 
         ! Radial motion model
         adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(private='[k,myalpha_rho,myalpha,Re,cell]', &
+        $:GPU_PARALLEL_LOOP(private='[k,myalpha_rho,myalpha,Re,cell,myPos,myVel]', &
             & reduction='[[adap_dt_stop_max]]',reductionOp='[MAX]', &
             & copy='[adap_dt_stop_max]',copyin='[stage]')
         do k = 1, nBubs
@@ -655,6 +655,8 @@ contains
             myBeta_c = gas_betaC(k)
             myBeta_t = gas_betaT(k)
             myR0 = bub_R0(k)
+            myPos = mtn_pos(k,:,2)
+            myVel = mtn_vel(k,:,2)
 
             ! Vapor and heat fluxes
             call s_vflux(myR, myV, myPb, myMass_v, k, myVapFlux, myMass_n, myBeta_c, myR_m, mygamma_m)
@@ -681,13 +683,24 @@ contains
                 call s_advance_step(myRho, myPinf, myR, myV, myR0, myPb, myPbdot, dmalf, &
                                     dmntait, dmBtait, dm_bub_adv_src, dm_divu, &
                                     k, myMass_v, myMass_n, myBeta_c, &
-                                    myBeta_t, myCson, adap_dt_stop)
+                                    myBeta_t, myCson, adap_dt_stop, Re(1), &
+                                    myPos, myVel, cell, q_prim_vf)
 
                 ! Update bubble state
                 intfc_rad(k, 1) = myR
                 intfc_vel(k, 1) = myV
                 gas_p(k, 1) = myPb
                 gas_mv(k, 1) = myMass_v
+
+                if (lag_params%vel_model == 1) then
+                    mtn_posPrev(k,:,1) = mtn_pos(k,:,2)
+                    mtn_pos(k,:,1) = myPos
+                    mtn_vel(k,:,1) = myVel
+                elseif (lag_params%vel_model == 2) then
+                    mtn_posPrev(k,:,1) = mtn_pos(k,:,2)
+                    mtn_pos(k,:,1) = myPos
+                    mtn_vel(k,:,1) = myVel
+                end if
 
             else
                 ! Radial acceleration from bubble models
@@ -701,21 +714,20 @@ contains
 
                 do l = 1, num_dims
                     if (lag_params%vel_model == 1) then
-                        mtn_dposdt(k, l, stage) = f_interpolate_velocity(mtn_pos(k,l,2), &
+                        mtn_dposdt(k, l, stage) = f_interpolate_velocity(myPos(l), &
                                                     cell, l, q_prim_vf)
                         mtn_dveldt(k, l, stage) = 0._wp
                     elseif (lag_params%vel_model == 2) then
-                        mtn_dposdt(k, l, stage) = mtn_vel(k,l,2)
-                        mtn_dveldt(k, l, stage) = f_get_acceleration(mtn_pos(k,l,2), &
-                                                    intfc_rad(k,2), mtn_vel(k,l,2), &
-                                                    gas_mg(k), gas_mv(k, 2), &
+                        mtn_dposdt(k, l, stage) = myVel(l)
+                        mtn_dveldt(k, l, stage) = f_get_acceleration(myPos(l), &
+                                                    myR, myVel(l), &
+                                                    myMass_n, myMass_v, &
                                                     Re(1), myRho, cell, l, q_prim_vf)
                     else
                         mtn_dposdt(k, l, stage) = 0._wp
                         mtn_dveldt(k, l, stage) = 0._wp
                     end if
                 end do
-
             end if
 
             adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
@@ -723,6 +735,10 @@ contains
         end do
 
         if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
+
+        if (adap_dt .and. lag_params%vel_model > 0) then
+            call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=1)
+        end if
 
         call nvtxEndRange
 
@@ -913,7 +929,8 @@ contains
         integer, dimension(3), intent(out) :: cell
         real(wp), intent(out), optional :: preterm1, term2, Romega
 
-        real(wp), dimension(3) :: scoord, psi
+        real(wp), dimension(3) :: scoord, psi_pos, psi_x, psi_y, psi_z
+        real(wp), xi, eta, zeta
         real(wp) :: dc, vol, aux
         real(wp) :: volgas, term1, Rbeq, denom
         real(wp) :: charvol, charpres, charvol2, charpres2
@@ -940,46 +957,149 @@ contains
         if ((lag_params%cluster_type == 1)) then
             !< Getting p_cell in terms of only the current cell by interpolation
 
-            !< Getting the cell volulme as Omega
-            if (p > 0) then
-                vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
-            else
-                if (cyl_coord) then
-                    vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
+            if (fd_order == 2) then ! Bilinear interpolation
+
+                if (p > 0) then
+                    vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
                 else
-                    vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+                    if (cyl_coord) then
+                        vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
+                    else
+                        vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+                    end if
                 end if
-            end if
 
-            !< Obtain bilinear interpolation coefficients, based on the current location of the bubble.
-            psi(1) = (scoord(1) - real(cell(1)))*dx(cell(1)) + x_cb(cell(1) - 1)
-            psi(1) = abs((psi(1) - x_cc(cell(1)))/(x_cc(cell(1) + 1) - x_cc(cell(1))))
+                !< Obtain bilinear interpolation coefficients, based on the current location of the bubble.
+                psi_pos(1) = (scoord(1) - real(cell(1)))*dx(cell(1)) + x_cb(cell(1) - 1)
+                psi_pos(1) = abs((psi_pos(1) - x_cc(cell(1)))/(x_cc(cell(1) + 1) - x_cc(cell(1))))
 
-            psi(2) = (scoord(2) - real(cell(2)))*dy(cell(2)) + y_cb(cell(2) - 1)
-            psi(2) = abs((psi(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2))))
+                psi_pos(2) = (scoord(2) - real(cell(2)))*dy(cell(2)) + y_cb(cell(2) - 1)
+                psi_pos(2) = abs((psi_pos(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2))))
 
-            if (p > 0) then
-                psi(3) = (scoord(3) - real(cell(3)))*dz(cell(3)) + z_cb(cell(3) - 1)
-                psi(3) = abs((psi(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3))))
-            else
-                psi(3) = 0._wp
-            end if
+                if (p > 0) then
+                    psi_pos(3) = (scoord(3) - real(cell(3)))*dz(cell(3)) + z_cb(cell(3) - 1)
+                    psi_pos(3) = abs((psi_pos(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3))))
+                else
+                    psi_pos(3) = 0._wp
+                end if
 
-            !< Perform bilinear interpolation
-            if (p == 0) then  !2D
-                f_pinfl = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)
-            else              !3D
-                f_pinfl = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1)*(1._wp - psi(1))*(1._wp - psi(2))*psi(3)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3) + 1)*psi(1)*(1._wp - psi(2))*psi(3)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3) + 1)*psi(1)*psi(2)*psi(3)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3) + 1)*(1._wp - psi(1))*psi(2)*psi(3)
+                ! Calculate bilinear basis functions for each direction
+                ! For normalized coordinate xi in [0, 1], the two basis functions are:
+                ! phi_0(xi) = 1 - xi, phi_1(xi) = xi
+
+                ! X-direction basis functions
+                psi_x(1) = 1._wp - psi_pos(1)  ! Left basis function
+                psi_x(2) = psi_pos(1)          ! Right basis function
+
+                ! Y-direction basis functions
+                psi_y(1) = 1._wp - psi_pos(2)  ! Left basis function
+                psi_y(2) = psi_pos(2)          ! Right basis function
+
+                if (p > 0) then
+                    ! Z-direction basis functions
+                    psi_z(1) = 1._wp - psi_pos(3)  ! Left basis function
+                    psi_z(2) = psi_pos(3)          ! Right basis function
+                else
+                    psi_z(1) = 1._wp
+                    psi_z(2) = 0._wp
+                end if
+
+                !< Perform bilinear interpolation
+                f_pinfl = 0._wp
+
+                if (p == 0) then  !2D - 4 point interpolation (2x2)
+                    do j = 1, 2
+                        do i = 1, 2
+                            f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 1, cell(2) + j - 1, cell(3)) * &
+                                               psi_x(i) * psi_y(j)
+                        end do
+                    end do
+                else              !3D - 8 point interpolation (2x2x2)
+                    do k = 1, 2
+                        do j = 1, 2
+                            do i = 1, 2
+                                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 1, cell(2) + j - 1, cell(3) + k - 1) * &
+                                                   psi_x(i) * psi_y(j) * psi_z(k)
+                            end do
+                        end do
+                    end do
+                end if
+
+            elseif (fd_order == 4) then ! Biquadratic interpolation
+
+                if (p > 0) then
+                    vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
+                else
+                    if (cyl_coord) then
+                        vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
+                    else
+                        vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+                    end if
+                end if
+
+                !< Obtain biquadratic interpolation coefficients, based on the current location of the bubble.
+                ! For biquadratic interpolation, we need coefficients for 3 points in each direction
+                psi_pos(1) = (scoord(1) - real(cell(1)))*dx(cell(1)) + x_cb(cell(1) - 1)
+                psi_pos(1) = (psi_pos(1) - x_cc(cell(1)))/(x_cc(cell(1) + 1) - x_cc(cell(1)))
+
+                psi_pos(2) = (scoord(2) - real(cell(2)))*dy(cell(2)) + y_cb(cell(2) - 1)
+                psi_pos(2) = (psi_pos(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2)))
+
+                if (p > 0) then
+                    psi_pos(3) = (scoord(3) - real(cell(3)))*dz(cell(3)) + z_cb(cell(3) - 1)
+                    psi_pos(3) = (psi_pos(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3)))
+                else
+                    psi_pos(3) = 0._wp
+                end if
+
+                ! Calculate biquadratic basis functions for each direction
+                ! For normalized coordinate xi in [-1, 1], the three basis functions are:
+                ! phi_0(xi) = xi*(xi-1)/2, phi_1(xi) = (1-xi)*(1+xi), phi_2(xi) = xi*(xi+1)/2
+
+                ! X-direction basis functions
+                xi = 2._wp*psi_pos(1) - 1._wp  ! Convert to [-1, 1] range
+                psi_x(1) = xi*(xi - 1._wp)/2._wp        ! Left basis function
+                psi_x(2) = (1._wp - xi)*(1._wp + xi)    ! Center basis function
+                psi_x(3) = xi*(xi + 1._wp)/2._wp        ! Right basis function
+
+                ! Y-direction basis functions
+                eta = 2._wp*psi_pos(2) - 1._wp  ! Convert to [-1, 1] range
+                psi_y(1) = eta*(eta - 1._wp)/2._wp      ! Left basis function
+                psi_y(2) = (1._wp - eta)*(1._wp + eta)  ! Center basis function
+                psi_y(3) = eta*(eta + 1._wp)/2._wp      ! Right basis function
+
+                if (p > 0) then
+                    ! Z-direction basis functions
+                    zeta = 2._wp*psi_pos(3) - 1._wp  ! Convert to [-1, 1] range
+                    psi_z(1) = zeta*(zeta - 1._wp)/2._wp      ! Left basis function
+                    psi_z(2) = (1._wp - zeta)*(1._wp + zeta)  ! Center basis function
+                    psi_z(3) = zeta*(zeta + 1._wp)/2._wp      ! Right basis function
+                else
+                    psi_z(1) = 0._wp
+                    psi_z(2) = 1._wp
+                    psi_z(3) = 0._wp
+                end if
+
+                !< Perform biquadratic interpolation
+                f_pinfl = 0._wp
+
+                if (p == 0) then  !2D - 9 point interpolation (3x3)
+                    do j = 1, 3
+                        do i = 1, 3
+                            f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 2, cell(2) + j - 2, cell(3)) * &
+                                               psi_x(i) * psi_y(j)
+                        end do
+                    end do
+                else              !3D - 27 point interpolation (3x3x3)
+                    do k = 1, 3
+                        do j = 1, 3
+                            do i = 1, 3
+                                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 2, cell(2) + j - 2, cell(3) + k - 2) * &
+                                                   psi_x(i) * psi_y(j) * psi_z(k)
+                            end do
+                        end do
+                    end do
+                end if
             end if
 
             !R_Omega
@@ -1101,9 +1221,9 @@ contains
     !>  This subroutine updates the Lagrange variables using the tvd RK time steppers.
         !!      The time derivative of the bubble variables must be stored at every stage to avoid precision errors.
         !! @param stage Current tvd RK stage
-    impure subroutine s_update_lagrange_tdv_rk(q_cons_vf, stage)
+    impure subroutine s_update_lagrange_tdv_rk(q_prim_vf, stage)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: stage
 
         integer :: k
@@ -1121,7 +1241,7 @@ contains
                 gas_mv(k, 1) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
             end do
 
-            if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest=1)
+            if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=1)
 
             call s_transfer_data_to_tmp()
             call s_write_void_evol(mytime)
@@ -1146,7 +1266,7 @@ contains
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
 
-                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest=2)
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=2)
 
             elseif (stage == 2) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
@@ -1161,7 +1281,7 @@ contains
                     gas_mv(k, 1) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2._wp
                 end do
 
-                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest=1)
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=1)
 
                 call s_transfer_data_to_tmp()
                 call s_write_void_evol(mytime)
@@ -1187,7 +1307,7 @@ contains
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
 
-                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest=2)
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=2)
 
             elseif (stage == 2) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
@@ -1202,7 +1322,7 @@ contains
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4._wp
                 end do
 
-                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest=2)
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=2)
 
             elseif (stage == 3) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
@@ -1217,8 +1337,7 @@ contains
                     gas_mv(k, 1) = gas_mv(k, 1) + (2._wp/3._wp)*dt*(gas_dmvdt(k, 1)/4._wp + gas_dmvdt(k, 2)/4._wp + gas_dmvdt(k, 3))
                 end do
 
-                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest=1)
-
+                if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=1)
 
                 call s_transfer_data_to_tmp()
                 call s_write_void_evol(mytime)
@@ -1236,9 +1355,9 @@ contains
 
     !> This subroutine enforces reflective and wall boundary conditions for EL bubbles
         !! @param dest Destination for the bubble position update
-    impure subroutine s_enforce_EL_bubbles_boundary_conditions(q_cons_vf, dest)
+    impure subroutine s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: dest
         integer :: k, i, patch_id, offset
         integer, dimension(3) :: cell
@@ -1292,7 +1411,7 @@ contains
                 cell = fd_number - buff_size
                 call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
 
-                if (q_cons_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
+                if (q_prim_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
                     keep_bubble(k) = 0
                 end if
 
@@ -1322,7 +1441,7 @@ contains
         $:GPU_UPDATE(host='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
             & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
             & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
-            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, keep_bubble, &
+            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, keep_bubble, &
             & nBubs]')
         call nvtxEndRange
 
@@ -1383,7 +1502,7 @@ contains
         $:GPU_UPDATE(device='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
             & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
             & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
-            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts]')
+            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, nBubs]')
         call nvtxEndRange
 
     end subroutine s_enforce_EL_bubbles_boundary_conditions

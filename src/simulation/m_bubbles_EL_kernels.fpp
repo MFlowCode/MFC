@@ -440,38 +440,86 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
         real(wp) :: v
-        real(wp) :: L1, L2, L3
-        real(wp) :: x1, x2, x3
-        real(wp) :: y1, y2, y3
+        real(wp), dimension(fd_order + 1) :: xi, eta, L
 
-        if (i == 1) then
-            x1 = x_cc(cell(1) - 1)
-            y1 = q_prim_vf(momxb)%sf(cell(1) - 1, cell(2), cell(3))
-            x2 = x_cc(cell(1))
-            y2 = q_prim_vf(momxb)%sf(cell(1)    , cell(2), cell(3))
-            x3 = x_cc(cell(1) + 1)
-            y3 = q_prim_vf(momxb)%sf(cell(1) + 1, cell(2), cell(3))
-        elseif (i == 2) then
-            x1 = y_cc(cell(2) - 1)
-            y1 = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 1, cell(3))
-            x2 = y_cc(cell(2))
-            y2 = q_prim_vf(momxb + 1)%sf(cell(1), cell(2)    , cell(3))
-            x3 = y_cc(cell(2) + 1)
-            y3 = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 1, cell(3))
-        elseif (i == 3) then
-            x1 = z_cc(cell(3) - 1)
-            y1 = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 1)
-            x2 = z_cc(cell(3))
-            y1 = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3)    )
-            x3 = z_cc(cell(3) + 1)
-            y1 = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 1)
-        endif
+        if (fd_order == 2) then
+            if (i == 1) then
+                xi(1) = x_cc(cell(1) - 1)
+                eta(1) = q_prim_vf(momxb)%sf(cell(1) - 1, cell(2), cell(3))
+                xi(2) = x_cc(cell(1))
+                eta(2) = q_prim_vf(momxb)%sf(cell(1)    , cell(2), cell(3))
+                xi(3) = x_cc(cell(1) + 1)
+                eta(3) = q_prim_vf(momxb)%sf(cell(1) + 1, cell(2), cell(3))
+            elseif (i == 2) then
+                xi(1) = y_cc(cell(2) - 1)
+                eta(1) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 1, cell(3))
+                xi(2) = y_cc(cell(2))
+                eta(2) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2)    , cell(3))
+                xi(3) = y_cc(cell(2) + 1)
+                eta(3) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 1, cell(3))
+            elseif (i == 3) then
+                xi(1) = z_cc(cell(3) - 1)
+                eta(1) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 1)
+                xi(2) = z_cc(cell(3))
+                eta(2) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3)    )
+                xi(3) = z_cc(cell(3) + 1)
+                eta(3) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 1)
+            endif
 
-        L1 = ((pos - x2)*(pos - x3)) / ((x1 - x2)*(x1 - x3))
-        L2 = ((pos - x1)*(pos - x3)) / ((x2 - x1)*(x2 - x3))
-        L3 = ((pos - x1)*(pos - x2)) / ((x3 - x1)*(x3 - x2))
+            L(1) = ((pos - xi(2))*(pos - xi(3))) / ((xi(1) - xi(2))*(xi(1) - xi(3)))
+            L(2) = ((pos - xi(1))*(pos - xi(3))) / ((xi(2) - xi(1))*(xi(2) - xi(3)))
+            L(3) = ((pos - xi(1))*(pos - xi(2))) / ((xi(3) - xi(1))*(xi(3) - xi(2)))
 
-        v = L1*y1 + L2*y2 + L3*y3
+            v = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3)
+        elseif (fd_order == 4) then
+            if (i == 1) then
+                xi(1) = x_cc(cell(1) - 2)
+                eta(1) = q_prim_vf(momxb)%sf(cell(1) - 2, cell(2), cell(3))
+                xi(2) = x_cc(cell(1) - 1)
+                eta(2) = q_prim_vf(momxb)%sf(cell(1) - 1, cell(2), cell(3))
+                xi(3) = x_cc(cell(1))
+                eta(3) = q_prim_vf(momxb)%sf(cell(1)    , cell(2), cell(3))
+                xi(4) = x_cc(cell(1) + 1)
+                eta(4) = q_prim_vf(momxb)%sf(cell(1) + 1, cell(2), cell(3))
+                xi(5) = x_cc(cell(1) + 2)
+                eta(5) = q_prim_vf(momxb)%sf(cell(1) + 2, cell(2), cell(3))
+            elseif (i == 2) then
+                xi(1) = y_cc(cell(2) - 2)
+                eta(1) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 2, cell(3))
+                xi(2) = y_cc(cell(2) - 1)
+                eta(2) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 1, cell(3))
+                xi(3) = y_cc(cell(2))
+                eta(3) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2)    , cell(3))
+                xi(4) = y_cc(cell(2) + 1)
+                eta(4) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 1, cell(3))
+                xi(5) = y_cc(cell(2) + 2)
+                eta(5) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 2, cell(3))
+            elseif (i == 3) then
+                xi(1) = z_cc(cell(3) - 2)
+                eta(1) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 2)
+                xi(2) = z_cc(cell(3) - 1)
+                eta(2) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 1)
+                xi(3) = z_cc(cell(3))
+                eta(3) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3)    )
+                xi(4) = z_cc(cell(3) + 1)
+                eta(4) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 1)
+                xi(5) = z_cc(cell(3) + 2)
+                eta(5) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 2)
+            endif
+
+            L(1) = ((pos - xi(2))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5))) / &
+                   ((xi(1) - xi(2))*(xi(1) - xi(3))*(xi(1) - xi(3))*(xi(2) - xi(5)))
+            L(2) = ((pos - xi(1))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5))) / &
+                   ((xi(2) - xi(1))*(xi(2) - xi(3))*(xi(2) - xi(3))*(xi(2) - xi(5)))
+            L(3) = ((pos - xi(1))*(pos - xi(2))*(pos - xi(4))*(pos - xi(5))) / &
+                   ((xi(3) - xi(1))*(xi(3) - xi(2))*(xi(3) - xi(4))*(xi(3) - xi(5)))
+            L(4) = ((pos - xi(1))*(pos - xi(2))*(pos - xi(3))*(pos - xi(4))) / &
+                   ((xi(4) - xi(1))*(xi(4) - xi(2))*(xi(4) - xi(3))*(xi(4) - xi(5)))
+            L(5) = ((pos - xi(1))*(pos - xi(2))*(pos - xi(3))*(pos - xi(4))) / &
+                   ((xi(5) - xi(1))*(xi(5) - xi(2))*(xi(5) - xi(3))*(xi(5) - xi(4)))
+
+            v = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3) + L(4)*eta(4) + L(5)*eta(5)
+        end if
 
     end function f_interpolate_velocity
 
@@ -497,19 +545,69 @@ contains
 
         real(wp) :: a
         real(wp) :: dp, vol, force, v_rel
+        real(wp), dimension(fd_order - 1) :: xi, eta, L
 
-        if (i == 1) then
-            dp = (q_prim_vf(E_idx)%sf(cell(1) + 1,cell(2),cell(3)) - &
-                  q_prim_vf(E_idx)%sf(cell(1) - 1,cell(2),cell(3))) / &
-                  (x_cc(cell(1) + 1) - x_cc(cell(1) - 1))
-        elseif (i == 2) then
-            dp = (q_prim_vf(E_idx)%sf(cell(1),cell(2) + 1,cell(3)) - &
-                  q_prim_vf(E_idx)%sf(cell(1),cell(2) - 1,cell(3))) / &
-                  (y_cc(cell(2) + 1) - y_cc(cell(2) - 1))
-        elseif (i == 3) then
-            dp = (q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3) + 1) - &
-                  q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3) - 1)) / &
-                  (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
+        if (fd_order == 2) then
+            if (i == 1) then
+                dp = (q_prim_vf(E_idx)%sf(cell(1) + 1,cell(2),cell(3)) - &
+                      q_prim_vf(E_idx)%sf(cell(1) - 1,cell(2),cell(3))) / &
+                      (x_cc(cell(1) + 1) - x_cc(cell(1) - 1))
+            elseif (i == 2) then
+                dp = (q_prim_vf(E_idx)%sf(cell(1),cell(2) + 1,cell(3)) - &
+                      q_prim_vf(E_idx)%sf(cell(1),cell(2) - 1,cell(3))) / &
+                      (y_cc(cell(2) + 1) - y_cc(cell(2) - 1))
+            elseif (i == 3) then
+                dp = (q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3) + 1) - &
+                      q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3) - 1)) / &
+                      (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
+            end if
+        elseif (fd_order == 4) then
+            if (i == 1) then
+                xi(1) = x_cc(cell(1) - 1)
+                eta(1) = (q_prim_vf(E_idx)%sf(cell(1)    ,cell(2),cell(3)) - &
+                      q_prim_vf(E_idx)%sf(cell(1) - 2,cell(2),cell(3))) / &
+                      (x_cc(cell(1)) - x_cc(cell(1) - 2))
+                xi(2) = x_cc(cell(1))
+                eta(2) = (q_prim_vf(E_idx)%sf(cell(1) + 1,cell(2),cell(3)) - &
+                      q_prim_vf(E_idx)%sf(cell(1) - 1,cell(2),cell(3))) / &
+                      (x_cc(cell(1) + 1) - x_cc(cell(1) - 1))
+                xi(3) = x_cc(cell(1) + 1)
+                eta(3) = (q_prim_vf(E_idx)%sf(cell(1) + 2,cell(2),cell(3)) - &
+                      q_prim_vf(E_idx)%sf(cell(1)    ,cell(2),cell(3))) / &
+                      (x_cc(cell(1) + 2) - x_cc(cell(1)))
+            elseif (i == 2) then
+                xi(1) = y_cc(cell(2) - 1)
+                eta(1) = (q_prim_vf(E_idx)%sf(cell(1),cell(2)    ,cell(3)) - &
+                      q_prim_vf(E_idx)%sf(cell(1),cell(2) - 2,cell(3))) / &
+                      (y_cc(cell(2)) - y_cc(cell(2) - 2))
+                xi(2) = y_cc(cell(2))
+                eta(2) = (q_prim_vf(E_idx)%sf(cell(1),cell(2) + 1,cell(3)) - &
+                      q_prim_vf(E_idx)%sf(cell(1),cell(2) - 1,cell(3))) / &
+                      (y_cc(cell(2) + 1) - y_cc(cell(2) - 1))
+                xi(3) = y_cc(cell(2) + 1)
+                eta(3) = (q_prim_vf(E_idx)%sf(cell(1),cell(2) + 2,cell(3)) - &
+                      q_prim_vf(E_idx)%sf(cell(1),cell(2)    ,cell(3))) / &
+                      (y_cc(cell(2) + 2) - y_cc(cell(2)))
+            elseif (i == 3) then
+                xi(1) = z_cc(cell(3) - 1)
+                eta(1) = (q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3)    ) - &
+                      q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3) - 2)) / &
+                      (z_cc(cell(3)) - z_cc(cell(3) - 2))
+                xi(2) = y_cc(cell(3))
+                eta(2) = (q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3) + 1) - &
+                      q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3) - 1)) / &
+                      (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
+                xi(3) = y_cc(cell(3) + 1)
+                eta(3) = (q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3) + 2) - &
+                      q_prim_vf(E_idx)%sf(cell(1),cell(2),cell(3)   )) / &
+                      (z_cc(cell(3) + 2) - z_cc(cell(3)))
+            end if
+
+            L(1) = ((pos - xi(2))*(pos - xi(3))) / ((xi(1) - xi(2))*(xi(1) - xi(3)))
+            L(2) = ((pos - xi(1))*(pos - xi(3))) / ((xi(2) - xi(1))*(xi(2) - xi(3)))
+            L(3) = ((pos - xi(1))*(pos - xi(2))) / ((xi(3) - xi(1))*(xi(3) - xi(2)))
+
+            dp = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3)
         end if
 
         vol = (4._wp/3._wp) * pi * rad**3._wp

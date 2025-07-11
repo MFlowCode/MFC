@@ -375,7 +375,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_cons_ts(1)%vf, stage=1)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=1)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -477,7 +477,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_cons_ts(1)%vf, stage=1)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=1)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -549,7 +549,7 @@ contains
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
 
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_cons_ts(2)%vf, stage=2)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=2)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -659,7 +659,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_cons_ts(1)%vf, stage=1)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=1)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -731,7 +731,7 @@ contains
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
 
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_cons_ts(2)%vf, stage=2)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=2)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -804,7 +804,7 @@ contains
         ! Stage 3 of 3
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
 
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_cons_ts(2)%vf, stage=3)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=3)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
