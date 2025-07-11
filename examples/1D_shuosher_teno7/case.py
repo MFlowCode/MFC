@@ -52,7 +52,7 @@ print(
             "parallel_io": "T",
             # Background to cover whole domain with basic line patch
             # Patch 1 Left (0 < x < 1)
-            "patch_icpp(1)%geometry": 15,
+            "patch_icpp(1)%geometry": 1,
             "patch_icpp(1)%x_centroid": 0.5,
             "patch_icpp(1)%length_x": 1.0,
             "patch_icpp(1)%vel(1)": 2.629,
@@ -61,12 +61,13 @@ print(
             "patch_icpp(1)%alpha(1)": 1.0,
             # One anlytic patch to take care of 1 < x < 10
             # Patch 2 Analytic
-            "patch_icpp(2)%geometry": 1,
+            "patch_icpp(2)%geometry": 15,
             "patch_icpp(2)%x_centroid": 5.5,
             "patch_icpp(2)%length_x": 9.0,
             "patch_icpp(2)%vel(1)": 0.0,
             "patch_icpp(2)%pres": 1.0,
-            "patch_icpp(2)%alpha_rho(1)": 0,
+            "patch_icpp(2)%alpha_rho(1)": 0.0,
+            "patch_icpp(1)%hcid": 180,
             "patch_icpp(2)%hcid": 180,
             "patch_icpp(2)%alpha(1)": 1.0,
             # Fluids Physical Parameters
