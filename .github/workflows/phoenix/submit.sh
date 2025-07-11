@@ -67,27 +67,32 @@ trap '[[ -n "${JOBID:-}" ]] && scancel "$JOBID" >/dev/null 2>&1 || :' EXIT
 
 # ────────── Poll until SLURM job finishes ──────────
 while :; do
-  # First try sacct (may take a moment to appear)
+  # Try sacct first
   STATE=$(sacct -j "$JOBID" --format=State --noheader --parsable2 | head -n1)
 
-  # If sacct didn’t return anything yet, check squeue
+  # Fallback to squeue if sacct is empty
   if [[ -z "$STATE" ]]; then
     STATE=$(squeue -j "$JOBID" -h -o "%T" || echo "")
   fi
 
-  # When both are empty, the job has left the queue
-  if [[ -z "$STATE" ]]; then
-    echo "✅ SLURM job $JOBID no longer in queue; assuming finished"
-    break
-  fi
-
-  echo "⏳ SLURM job $JOBID state: $STATE"
-  sleep 10
+  # If it’s one of SLURM’s terminal states, break immediately
+  case "$STATE" in
+    COMPLETED|FAILED|CANCELLED|TIMEOUT)
+      echo "✅ SLURM job $JOBID reached terminal state: $STATE"
+      break
+      ;;
+    "")
+      echo "✅ SLURM job $JOBID no longer in queue; assuming finished"
+      break
+      ;;
+    *)
+      echo "⏳ SLURM job $JOBID state: $STATE"
+      sleep 10
+      ;;
+  esac
 done
 
-# show final report
-sacct -j "$JOBID" --format=JobID,State,ExitCode,Elapsed,MaxRSS
-
-# exit with the job's real code (left of the colon)
+# Now retrieve the exit code and exit with it
 EXIT_CODE=$(sacct -j "$JOBID" --noheader --format=ExitCode | head -1 | cut -d: -f1)
+echo "🔚 SLURM job $JOBID exit code: $EXIT_CODE"
 exit "$EXIT_CODE"
