@@ -1447,11 +1447,11 @@ contains
                                 rhs_vf(i)%sf(j, k, l) = &
                                     rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
                                     (flux_src_n(i)%sf(j - 1, k, l) &
-                                    - flux_src_n(i)%sf(j, k, l))
+                                     - flux_src_n(i)%sf(j, k, l))
                             end do
                         end do
                     end do
-                end do   
+                end do
             end if
 
             if (chem_params%diffusion) then
@@ -1545,7 +1545,7 @@ contains
 
             else
 
-               if (viscous .or. surface_tension) then
+                if (viscous .or. surface_tension) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do l = 0, p
                         do k = 0, n
@@ -1555,14 +1555,14 @@ contains
                                     rhs_vf(i)%sf(j, k, l) = &
                                         rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
                                         (flux_src_n(i)%sf(j, k - 1, l) &
-                                        - flux_src_n(i)%sf(j, k, l))
+                                         - flux_src_n(i)%sf(j, k, l))
                                 end do
                             end do
                         end do
                     end do
                 end if
 
-               if (chem_params%diffusion) then
+                if (chem_params%diffusion) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do l = 0, p
                         do k = 0, n
@@ -1570,20 +1570,20 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = chemxb, chemxe
                                     rhs_vf(i)%sf(j, k, l) = &
-                                    rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
-                                    (flux_src_n(i)%sf(j, k - 1, l) &
-                                    - flux_src_n(i)%sf(j, k, l))
+                                        rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
+                                        (flux_src_n(i)%sf(j, k - 1, l) &
+                                         - flux_src_n(i)%sf(j, k, l))
                                 end do
-                               if (.not. viscous) then
-                                   rhs_vf(E_idx)%sf(j, k, l) = &
-                                       rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dy(k)* &
-                                       (flux_src_n(E_idx)%sf(j, k - 1, l) &
-                                       - flux_src_n(E_idx)%sf(j, k, l))
-                               end if
+                                if (.not. viscous) then
+                                    rhs_vf(E_idx)%sf(j, k, l) = &
+                                        rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dy(k)* &
+                                        (flux_src_n(E_idx)%sf(j, k - 1, l) &
+                                         - flux_src_n(E_idx)%sf(j, k, l))
+                                end if
                             end do
                         end do
                     end do
-               end if
+                end if
             end if
 
             ! Applying the geometrical viscous Riemann source fluxes calculated as average
@@ -1666,7 +1666,7 @@ contains
                                 rhs_vf(i)%sf(j, k, l) = &
                                     rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
                                     (flux_src_n(i)%sf(j, k, l - 1) &
-                                    - flux_src_n(i)%sf(j, k, l))
+                                     - flux_src_n(i)%sf(j, k, l))
                             end do
                         end do
                     end do

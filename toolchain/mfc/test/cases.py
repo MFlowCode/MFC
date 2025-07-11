@@ -983,25 +983,36 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 mods={
                     **common_mods,
                     'riemann_solver': riemann_solver,
-                    'chem_params%gamma_method': gamma_method
+                    'chem_params%gamma_method': gamma_method,
+                    'weno_order': 3, "mapped_weno": 'F', 'mp_weno': 'F'
                 },
-                override_tol=1
+                override_tol=10**(-11)
             ))
-        stack.push(f'1D -> Chemistry -> MultiComponent_Diffusion', {"m": 50,
-                    'dt': 1e-06, 'num_patches': 1, 'num_fluids': 1, 'x_domain%beg': 0.0, 'x_domain%end': 0.05,
-                    'num_fluids': 1, 'bc_x%beg': -1, 'bc_x%end': -1, "weno_order": 5,"weno_eps": 1e-16, "weno_avg": "F",
-                    "mapped_weno": "T", "mp_weno": "T",'weno_Re_flux': 'F', "riemann_solver": 2, "wave_speeds": 2,
-                    "avg_state": 1,"chemistry": "T", "chem_params%diffusion": "T","chem_params%reactions": "F", "chem_wrt_T" : "T",
-                    "patch_icpp(1)%geometry": 1, "patch_icpp(1)%x_centroid": 0.05 / 2, "patch_icpp(1)%length_x": 0.05,
-                    "patch_icpp(1)%vel(1)": "0", "patch_icpp(1)%pres": 1.01325e5,  "patch_icpp(1)%alpha(1)": 1,
-                    "patch_icpp(1)%Y(1)": "(0.195-0.142)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.142",
-                    "patch_icpp(1)%Y(2)": "(0.0-0.1)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.1",
-                    "patch_icpp(1)%Y(3)": "(0.214-0.0)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.0",
-                    "patch_icpp(1)%Y(4)": "(0.591-0.758)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.758",
-                    "patch_icpp(1)%alpha_rho(1)": "1.01325d0*10.0d0**(5.0d0)/(((320.0d0-1350.0d0)*(1.0d0-0.50d0*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+1350.0d0)*8.3144626d0*1000.0d0*( ((0.195d0-0.142d0)*(1.0d0-0.5d0*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.142d0)/31.998d0 +((0.0-0.1)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.1)/18.01508d0+ ((0.214-0.0)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.0)/16.04256 + ((0.591-0.758)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.758)/28.0134))",
-                    "fluid_pp(1)%gamma": 1.0e00 / (1.9326e00 - 1.0e00),  "fluid_pp(1)%pi_inf": 0, "cantera_file": "h2o2.yaml", 't_step_start': 0, 't_step_stop': 400, 't_step_save': 400
+        
+        stack.push(f'1D -> Chemistry -> MultiComponent_Diffusion', {'m': 200,
+                    'dt': 0.1e-06, 'num_patches': 1, 'num_fluids': 1, 'x_domain%beg': 0.0, 'x_domain%end': 0.05,
+                    'num_fluids': 1, 'bc_x%beg': -1, 'bc_x%end': -1, 'weno_order': 5,'weno_eps': 1e-16, 'weno_avg': 'F',
+                    'mapped_weno': 'T', 'mp_weno': 'T','weno_Re_flux': 'F', 'riemann_solver': 2, 'wave_speeds': 1,
+                    'avg_state': 1,'chemistry': 'T', 'chem_params%diffusion': 'T','chem_params%reactions': 'F', 'chem_wrt_T' : 'T',
+                    'patch_icpp(1)%geometry': 1, 'patch_icpp(1)%x_centroid': 0.05 / 2, 'patch_icpp(1)%length_x': 0.05,
+                    'patch_icpp(1)%vel(1)': '0', 'patch_icpp(1)%pres': 1.01325e5,  'patch_icpp(1)%alpha(1)': 1,
+                    'patch_icpp(1)%Y(1)': '(0.195-0.142)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.142',
+                    'patch_icpp(1)%Y(2)': '(0.0-0.1)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.1',
+                    'patch_icpp(1)%Y(3)': '(0.214-0.0)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.0',
+                    'patch_icpp(1)%Y(4)': '(0.591-0.758)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.758',
+                    'patch_icpp(1)%alpha_rho(1)': '1.01325d0*10.0d0**(5.0d0)/(((320.0d0-1350.0d0)*(1.0d0-0.50d0*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+1350.0d0)*8.3144626d0*1000.0d0*( ((0.195d0-0.142d0)*(1.0d0-0.5d0*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.142d0)/31.998d0 +((0.0-0.1)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.1)/18.01508d0+ ((0.214-0.0)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.0)/16.04256 + ((0.591-0.758)*(1-0.5*exp(-(x-0.05d0/2.0d0)**2/(2.5d0*10.0d0**(-3.0d0))**2))+0.758)/28.0134))',
+                    'fluid_pp(1)%gamma': 1.0e00 / (1.9326e00 - 1.0e00),  'fluid_pp(1)%pi_inf': 0, 'cantera_file': 'h2o2.yaml', 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50
         })
-        cases.append(define_case_d(stack, '', {}))
+        cases.append(define_case_d(stack, '', {},override_tol=10**(-10)))
+       
+        cases.append(define_case_f(
+            f'1D -> Chemistry -> Premixed Flame',
+            'examples/1D_Premixed_Flame/case.py',
+            mods={
+                't_step_stop': 100, 't_step_save': 100, 'm': 200
+            },
+            override_tol=10**(-10)
+        ))
 
         stack.pop()
 

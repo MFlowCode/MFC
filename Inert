@@ -1,0 +1,486 @@
+mfc: OK > (venv) Entered the Python 3.12.3 virtual environment (>= 3.9).
+
+      .=++*:          -+*+=.        | pain@UchihaMadara [Linux]
+     :+   -*-        ==   =* .      | -------------------------
+   :*+      ==      ++    .+-       | 
+  :*##-.....:*+   .#%+++=--+=:::.   | --jobs 1
+  -=-++-======#=--**+++==+*++=::-:. | --mpi --no-gpu --no-debug --no-gcov --no-unified --no-single
+ .:++=----------====+*= ==..:%..... | 
+  .:-=++++===--==+=-+=   +.  :=     | 
+  +#=::::::::=%=. -+:    =+   *:    | ----------------------------------------------------------
+ .*=-=*=..    :=+*+:      -...--    | $ ./mfc.sh (build, run, test, clean, count, packer) --help
+
+
+ Test pre_process and simulation | Only 1D, -, -, and Shocktube (0 tests)
+  
+    tests/UUID     (s)      Summary
+  
+
+  
+ 
+Test Summary: 0 passed, 0 failed, 460 skipped.
+
+ Skipped Cases
+
+ 2D -> IBM -> STL
+ 3D -> IBM -> STL
+ 1D -> bc=-1
+ 1D -> bc=-2
+ 1D -> bc=-4
+ 1D -> bc=-5
+ 1D -> bc=-6
+ 1D -> bc=-7
+ 1D -> bc=-8
+ 1D -> bc=-9
+ 1D -> bc=-10
+ 1D -> bc=-11
+ 1D -> bc=-12
+ 1D -> bc=-3
+ 1D -> bc=-15
+ 1D -> bc=-16
+ 1D -> bc=-17
+ 1D -> grcbc x
+ 1D -> weno_order=3
+ 1D -> weno_order=3 -> wenoz=T
+ 1D -> weno_order=3 -> mapped_weno=T
+ 1D -> weno_order=5
+ 1D -> weno_order=5 -> mp_weno=T
+ 1D -> weno_order=5 -> teno=T
+ 1D -> weno_order=5 -> wenoz=T
+ 1D -> weno_order=5 -> mapped_weno=T
+ 1D -> weno_order=7
+ 1D -> weno_order=7 -> teno=T
+ 1D -> weno_order=7 -> wenoz=T
+ 1D -> weno_order=7 -> mapped_weno=T
+ 1D -> 1 Fluid(s) -> riemann_solver=1 -> mixture_err
+ 1D -> 1 Fluid(s) -> riemann_solver=1 -> avg_state=1
+ 1D -> 1 Fluid(s) -> riemann_solver=1 -> wave_speeds=2
+ 1D -> 1 Fluid(s) -> riemann_solver=2 -> mixture_err
+ 1D -> 1 Fluid(s) -> riemann_solver=2 -> avg_state=1
+ 1D -> 1 Fluid(s) -> riemann_solver=2 -> wave_speeds=2
+ 1D -> 1 Fluid(s) -> riemann_solver=2 -> model_eqns=3
+ 1D -> 1 Fluid(s) -> riemann_solver=1 -> low_Mach=1
+ 1D -> 1 Fluid(s) -> riemann_solver=2 -> low_Mach=1
+ 1D -> 1 Fluid(s) -> riemann_solver=2 -> low_Mach=2
+ 1D -> 1 Fluid(s) -> Viscous
+ 1D -> 1 Fluid(s) -> Viscous -> weno_Re_flux
+ 1D -> 1 Fluid(s) -> Viscous -> weno_Re_flux -> weno_avg
+ 1D -> 2 Fluid(s) -> riemann_solver=1 -> mixture_err
+ 1D -> 2 Fluid(s) -> riemann_solver=1 -> avg_state=1
+ 1D -> 2 Fluid(s) -> riemann_solver=1 -> wave_speeds=2
+ 1D -> 2 Fluid(s) -> riemann_solver=1 -> mpp_lim
+ 1D -> 2 Fluid(s) -> riemann_solver=2 -> mixture_err
+ 1D -> 2 Fluid(s) -> riemann_solver=2 -> avg_state=1
+ 1D -> 2 Fluid(s) -> riemann_solver=2 -> wave_speeds=2
+ 1D -> 2 Fluid(s) -> riemann_solver=2 -> model_eqns=3
+ 1D -> 2 Fluid(s) -> riemann_solver=2 -> alt_soundspeed
+ 1D -> 2 Fluid(s) -> riemann_solver=2 -> mpp_lim
+ 1D -> 2 Fluid(s) -> riemann_solver=1 -> low_Mach=1
+ 1D -> 2 Fluid(s) -> riemann_solver=2 -> low_Mach=1
+ 1D -> 2 Fluid(s) -> riemann_solver=2 -> low_Mach=2
+ 1D -> 2 Fluid(s) -> Viscous
+ 1D -> 2 Fluid(s) -> Viscous -> weno_Re_flux
+ 1D -> 2 Fluid(s) -> Viscous -> weno_Re_flux -> weno_avg
+ 1D -> 2 MPI Ranks
+ 1D -> Acoustic Source -> Sine -> Frequency
+ 1D -> Acoustic Source -> Sine -> Wavelength
+ 1D -> Acoustic Source -> Sine -> Delay
+ 1D -> Acoustic Source -> Sine -> Number of Pulses
+ 1D -> Acoustic Source -> Square -> Frequency
+ 1D -> Acoustic Source -> Square -> Wavelength
+ 1D -> Acoustic Source -> Square -> Delay
+ 1D -> Acoustic Source -> Square -> Number of Pulses
+ 1D -> Acoustic Source -> Gaussian -> Sigma Time
+ 1D -> Acoustic Source -> Gaussian -> Sigma Dist
+ 1D -> Acoustic Source -> Gaussian -> Dipole
+ 1D -> Bubbles -> Polytropic -> bubble_model=3
+ 1D -> Bubbles -> Polytropic -> bubble_model=2
+ 1D -> Bubbles -> bubble_model=2
+ 1D -> Bubbles -> nb=1
+ 1D -> Bubbles -> adv_n=T
+ 1D -> Bubbles -> adv_n=T -> adap_dt=T
+ 1D -> Bubbles -> artificial_Ma
+ 1D -> Bubbles -> low_Mach=1
+ 1D -> Bubbles -> low_Mach=2
+ 1D -> Bubbles -> QBMM
+ 1D -> Bubbles -> QBMM -> Non-polytropic
+ 1D -> Bubbles -> QBMM -> bubble_model=3
+ 1D -> Bubbles -> QBMM -> bubble_model=3 -> Non-polytropic
+ 1D -> Hypoelasticity -> 1 Fluid(s)
+ 1D -> Hypoelasticity -> 1 Fluid(s) -> cont_damage
+ 1D -> Hypoelasticity -> 2 Fluid(s)
+ 1D -> Phase Change model 5 -> 2 Fluid(s)
+ 1D -> Phase Change model 5 -> 3 Fluid(s)
+ 1D -> Phase Change model 6 -> 2 Fluid(s)
+ 1D -> Phase Change model 6 -> 3 Fluid(s)
+ 1D -> Viscosity -> Bubbles -> Polytropic -> bubble_model=3
+ 1D -> Viscosity -> Bubbles -> Polytropic -> bubble_model=2
+ 1D -> Viscosity -> Bubbles -> bubble_model=2
+ 1D -> Viscosity -> Bubbles -> nb=1
+ 1D -> Viscosity -> Bubbles -> QBMM
+ 1D -> Viscosity -> Bubbles -> QBMM -> bubble_model=3
+ 1D -> Viscosity -> Bubbles -> QBMM -> bubble_model=3 -> cfl_adap_dt=T
+ 1D -> Viscosity -> Bubbles -> QBMM -> bubble_model=3 -> cfl_const_dt=T
+ 1D -> Smoothing
+ 1D -> Bodyforces
+ 1D -> Bodyforces -> cfl_adap_dt=T
+ 2D -> bc=-1
+ 2D -> bc=-2
+ 2D -> bc=-4
+ 2D -> bc=-5
+ 2D -> bc=-6
+ 2D -> bc=-7
+ 2D -> bc=-8
+ 2D -> bc=-9
+ 2D -> bc=-10
+ 2D -> bc=-11
+ 2D -> bc=-12
+ 2D -> bc=-3
+ 2D -> bc=-15
+ 2D -> bc=-16
+ 2D -> bc=-17
+ 2D -> grcbc x
+ 2D -> grcbc y
+ 2D -> weno_order=3
+ 2D -> weno_order=3 -> wenoz=T
+ 2D -> weno_order=3 -> mapped_weno=T
+ 2D -> weno_order=5
+ 2D -> weno_order=5 -> mp_weno=T
+ 2D -> weno_order=5 -> teno=T
+ 2D -> weno_order=5 -> wenoz=T
+ 2D -> weno_order=5 -> mapped_weno=T
+ 2D -> weno_order=7
+ 2D -> weno_order=7 -> teno=T
+ 2D -> weno_order=7 -> wenoz=T
+ 2D -> weno_order=7 -> mapped_weno=T
+ 2D -> 1 Fluid(s) -> riemann_solver=1 -> mixture_err
+ 2D -> 1 Fluid(s) -> riemann_solver=1 -> avg_state=1
+ 2D -> 1 Fluid(s) -> riemann_solver=1 -> wave_speeds=2
+ 2D -> 1 Fluid(s) -> riemann_solver=2 -> mixture_err
+ 2D -> 1 Fluid(s) -> riemann_solver=2 -> avg_state=1
+ 2D -> 1 Fluid(s) -> riemann_solver=2 -> wave_speeds=2
+ 2D -> 1 Fluid(s) -> riemann_solver=2 -> model_eqns=3
+ 2D -> 1 Fluid(s) -> riemann_solver=1 -> low_Mach=1
+ 2D -> 1 Fluid(s) -> riemann_solver=2 -> low_Mach=1
+ 2D -> 1 Fluid(s) -> riemann_solver=2 -> low_Mach=2
+ 2D -> 1 Fluid(s) -> IBM -> Rectangle -> slip
+ 2D -> 1 Fluid(s) -> IBM -> Circle -> slip
+ 2D -> 1 Fluid(s) -> IBM -> Rectangle
+ 2D -> 1 Fluid(s) -> IBM -> Circle
+ 2D -> 1 Fluid(s) -> Viscous -> IBM -> Rectangle -> slip
+ 2D -> 1 Fluid(s) -> Viscous -> IBM -> Circle -> slip
+ 2D -> 1 Fluid(s) -> Viscous -> IBM -> model_eqns=3 -> slip
+ 2D -> 1 Fluid(s) -> Viscous -> IBM -> Rectangle
+ 2D -> 1 Fluid(s) -> Viscous -> IBM -> Circle
+ 2D -> 1 Fluid(s) -> Viscous -> IBM -> model_eqns=3
+ 2D -> 1 Fluid(s) -> Viscous
+ 2D -> 1 Fluid(s) -> Viscous -> weno_Re_flux
+ 2D -> 1 Fluid(s) -> Viscous -> weno_Re_flux -> weno_avg
+ 2D -> 2 Fluid(s) -> capillary=T -> model_eqns=3
+ 2D -> 2 Fluid(s) -> riemann_solver=1 -> mixture_err
+ 2D -> 2 Fluid(s) -> riemann_solver=1 -> avg_state=1
+ 2D -> 2 Fluid(s) -> riemann_solver=1 -> wave_speeds=2
+ 2D -> 2 Fluid(s) -> riemann_solver=1 -> mpp_lim
+ 2D -> 2 Fluid(s) -> riemann_solver=2 -> mixture_err
+ 2D -> 2 Fluid(s) -> riemann_solver=2 -> avg_state=1
+ 2D -> 2 Fluid(s) -> riemann_solver=2 -> wave_speeds=2
+ 2D -> 2 Fluid(s) -> riemann_solver=2 -> model_eqns=3
+ 2D -> 2 Fluid(s) -> riemann_solver=2 -> alt_soundspeed
+ 2D -> 2 Fluid(s) -> riemann_solver=2 -> mpp_lim
+ 2D -> 2 Fluid(s) -> riemann_solver=1 -> low_Mach=1
+ 2D -> 2 Fluid(s) -> riemann_solver=2 -> low_Mach=1
+ 2D -> 2 Fluid(s) -> riemann_solver=2 -> low_Mach=2
+ 2D -> 2 Fluid(s) -> IBM -> Rectangle -> slip
+ 2D -> 2 Fluid(s) -> IBM -> Circle -> slip
+ 2D -> 2 Fluid(s) -> IBM -> Rectangle
+ 2D -> 2 Fluid(s) -> IBM -> Circle
+ 2D -> 2 Fluid(s) -> Viscous -> IBM -> Rectangle -> slip
+ 2D -> 2 Fluid(s) -> Viscous -> IBM -> Circle -> slip
+ 2D -> 2 Fluid(s) -> Viscous -> IBM -> model_eqns=3 -> slip
+ 2D -> 2 Fluid(s) -> Viscous -> IBM -> Rectangle
+ 2D -> 2 Fluid(s) -> Viscous -> IBM -> Circle
+ 2D -> 2 Fluid(s) -> Viscous -> IBM -> model_eqns=3
+ 2D -> 2 Fluid(s) -> Viscous
+ 2D -> 2 Fluid(s) -> Viscous -> weno_Re_flux
+ 2D -> 2 Fluid(s) -> Viscous -> weno_Re_flux -> weno_avg
+ 2D -> Axisymmetric -> model_eqns=2
+ 2D -> Axisymmetric -> model_eqns=3
+ 2D -> Axisymmetric -> HLL
+ 2D -> Axisymmetric -> Viscous
+ 2D -> Axisymmetric -> Viscous -> weno_Re_flux
+ 2D -> Axisymmetric -> Viscous -> weno_Re_flux -> weno_avg
+ 2D -> 2 MPI Ranks
+ 2D -> Acoustic Source -> Planar -> support=2
+ 2D -> Acoustic Source -> Planar -> support=2 -> Dipole
+ 2D -> Acoustic Source -> Transducer -> support=5 -> Sine
+ 2D -> Acoustic Source -> Transducer -> support=5 -> Gaussian
+ 2D -> Acoustic Source -> Transducer -> support=5 -> Delay
+ 2D -> Acoustic Source -> Transducer -> support=6 -> Sine
+ 2D -> Acoustic Source -> Transducer -> support=6 -> Gaussian
+ 2D -> Acoustic Source -> Transducer -> support=6 -> Delay
+ 2D -> Acoustic Source -> Transducer Array -> support=9 -> All Elements
+ 2D -> Acoustic Source -> Transducer Array -> support=9 -> One element
+ 2D -> Acoustic Source -> Transducer Array -> support=10
+ 2D -> Bubbles -> Polytropic -> bubble_model=3
+ 2D -> Bubbles -> Polytropic -> bubble_model=2
+ 2D -> Bubbles -> bubble_model=2
+ 2D -> Bubbles -> nb=1
+ 2D -> Bubbles -> adv_n=T
+ 2D -> Bubbles -> adv_n=T -> adap_dt=T
+ 2D -> Bubbles -> artificial_Ma
+ 2D -> Bubbles -> low_Mach=1
+ 2D -> Bubbles -> low_Mach=2
+ 2D -> Bubbles -> QBMM
+ 2D -> Bubbles -> QBMM -> Non-polytropic
+ 2D -> Bubbles -> QBMM -> bubble_model=3
+ 2D -> Bubbles -> QBMM -> bubble_model=3 -> Non-polytropic
+ 2D -> Hypoelasticity -> 1 Fluid(s)
+ 2D -> Hypoelasticity -> 1 Fluid(s) -> cont_damage
+ 2D -> Hypoelasticity -> 1 Fluid(s) -> bc=-2
+ 2D -> Hypoelasticity -> 1 Fluid(s) -> Axisymmetric
+ 2D -> Hypoelasticity -> 2 Fluid(s)
+ 2D -> Phase Change model 5 -> 2 Fluid(s)
+ 2D -> Phase Change model 5 -> 3 Fluid(s)
+ 2D -> Phase Change model 6 -> 3 Fluid(s)
+ 2D -> Viscosity -> Bubbles -> Polytropic -> bubble_model=3
+ 2D -> Viscosity -> Bubbles -> Polytropic -> bubble_model=2
+ 2D -> Viscosity -> Bubbles -> bubble_model=2
+ 2D -> Viscosity -> Bubbles -> nb=1
+ 2D -> Viscosity -> Bubbles -> QBMM
+ 2D -> Viscosity -> Bubbles -> QBMM -> bubble_model=3
+ 2D -> Viscosity -> Bubbles -> QBMM -> bubble_model=3 -> cfl_adap_dt=T
+ 2D -> Viscosity -> Bubbles -> QBMM -> bubble_model=3 -> cfl_const_dt=T
+ 2D -> Smoothing
+ 2D -> Bodyforces
+ 2D -> Bodyforces -> cfl_adap_dt=T
+ 2D -> BC Patches -> Line Segment -> X
+ 2D -> BC Patches -> Line Segment -> Y
+ 3D -> bc=-1
+ 3D -> bc=-2
+ 3D -> bc=-4
+ 3D -> bc=-5
+ 3D -> bc=-6
+ 3D -> bc=-7
+ 3D -> bc=-8
+ 3D -> bc=-9
+ 3D -> bc=-10
+ 3D -> bc=-11
+ 3D -> bc=-12
+ 3D -> bc=-3
+ 3D -> bc=-15
+ 3D -> bc=-16
+ 3D -> bc=-17
+ 3D -> grcbc x
+ 3D -> grcbc y
+ 3D -> grcbc z
+ 3D -> weno_order=3
+ 3D -> weno_order=3 -> wenoz=T
+ 3D -> weno_order=3 -> mapped_weno=T
+ 3D -> weno_order=5
+ 3D -> weno_order=5 -> mp_weno=T
+ 3D -> weno_order=5 -> teno=T
+ 3D -> weno_order=5 -> wenoz=T
+ 3D -> weno_order=5 -> mapped_weno=T
+ 3D -> weno_order=7
+ 3D -> weno_order=7 -> teno=T
+ 3D -> weno_order=7 -> wenoz=T
+ 3D -> weno_order=7 -> mapped_weno=T
+ 3D -> 1 Fluid(s) -> riemann_solver=1 -> mixture_err
+ 3D -> 1 Fluid(s) -> riemann_solver=1 -> avg_state=1
+ 3D -> 1 Fluid(s) -> riemann_solver=1 -> wave_speeds=2
+ 3D -> 1 Fluid(s) -> riemann_solver=2 -> mixture_err
+ 3D -> 1 Fluid(s) -> riemann_solver=2 -> avg_state=1
+ 3D -> 1 Fluid(s) -> riemann_solver=2 -> wave_speeds=2
+ 3D -> 1 Fluid(s) -> riemann_solver=2 -> model_eqns=3
+ 3D -> 1 Fluid(s) -> riemann_solver=1 -> low_Mach=1
+ 3D -> 1 Fluid(s) -> riemann_solver=2 -> low_Mach=1
+ 3D -> 1 Fluid(s) -> riemann_solver=2 -> low_Mach=2
+ 3D -> 1 Fluid(s) -> IBM -> Sphere -> slip
+ 3D -> 1 Fluid(s) -> IBM -> Cuboid -> slip
+ 3D -> 1 Fluid(s) -> IBM -> Cylinder -> slip
+ 3D -> 1 Fluid(s) -> IBM -> Sphere
+ 3D -> 1 Fluid(s) -> IBM -> Cuboid
+ 3D -> 1 Fluid(s) -> IBM -> Cylinder
+ 3D -> 1 Fluid(s) -> Viscous -> IBM -> Sphere -> slip
+ 3D -> 1 Fluid(s) -> Viscous -> IBM -> Cuboid -> slip
+ 3D -> 1 Fluid(s) -> Viscous -> IBM -> Cylinder -> slip
+ 3D -> 1 Fluid(s) -> Viscous -> IBM -> Sphere
+ 3D -> 1 Fluid(s) -> Viscous -> IBM -> Cuboid
+ 3D -> 1 Fluid(s) -> Viscous -> IBM -> Cylinder
+ 3D -> 1 Fluid(s) -> Viscous
+ 3D -> 1 Fluid(s) -> Viscous -> weno_Re_flux
+ 3D -> 1 Fluid(s) -> Viscous -> weno_Re_flux -> weno_avg
+ 3D -> 2 Fluid(s) -> capillary=T -> model_eqns=3
+ 3D -> 2 Fluid(s) -> riemann_solver=1 -> mixture_err
+ 3D -> 2 Fluid(s) -> riemann_solver=1 -> avg_state=1
+ 3D -> 2 Fluid(s) -> riemann_solver=1 -> wave_speeds=2
+ 3D -> 2 Fluid(s) -> riemann_solver=1 -> mpp_lim
+ 3D -> 2 Fluid(s) -> riemann_solver=2 -> mixture_err
+ 3D -> 2 Fluid(s) -> riemann_solver=2 -> avg_state=1
+ 3D -> 2 Fluid(s) -> riemann_solver=2 -> wave_speeds=2
+ 3D -> 2 Fluid(s) -> riemann_solver=2 -> model_eqns=3
+ 3D -> 2 Fluid(s) -> riemann_solver=2 -> alt_soundspeed
+ 3D -> 2 Fluid(s) -> riemann_solver=2 -> mpp_lim
+ 3D -> 2 Fluid(s) -> riemann_solver=1 -> low_Mach=1
+ 3D -> 2 Fluid(s) -> riemann_solver=2 -> low_Mach=1
+ 3D -> 2 Fluid(s) -> riemann_solver=2 -> low_Mach=2
+ 3D -> 2 Fluid(s) -> IBM -> Sphere -> slip
+ 3D -> 2 Fluid(s) -> IBM -> Cuboid -> slip
+ 3D -> 2 Fluid(s) -> IBM -> Cylinder -> slip
+ 3D -> 2 Fluid(s) -> IBM -> Sphere
+ 3D -> 2 Fluid(s) -> IBM -> Cuboid
+ 3D -> 2 Fluid(s) -> IBM -> Cylinder
+ 3D -> 2 Fluid(s) -> Viscous -> IBM -> Sphere -> slip
+ 3D -> 2 Fluid(s) -> Viscous -> IBM -> Cuboid -> slip
+ 3D -> 2 Fluid(s) -> Viscous -> IBM -> Cylinder -> slip
+ 3D -> 2 Fluid(s) -> Viscous -> IBM -> Sphere
+ 3D -> 2 Fluid(s) -> Viscous -> IBM -> Cuboid
+ 3D -> 2 Fluid(s) -> Viscous -> IBM -> Cylinder
+ 3D -> 2 Fluid(s) -> Viscous
+ 3D -> 2 Fluid(s) -> Viscous -> weno_Re_flux
+ 3D -> 2 Fluid(s) -> Viscous -> weno_Re_flux -> weno_avg
+ 3D -> Cylindrical -> model_eqns=2
+ 3D -> Cylindrical -> cfl_adap_dt=T
+ 3D -> Cylindrical -> Viscous
+ 3D -> Cylindrical -> Viscous -> weno_Re_flux
+ 3D -> Cylindrical -> Viscous -> weno_Re_flux -> weno_avg
+ 3D -> Lagrange Bubbles -> One-way Coupling
+ 3D -> Lagrange Bubbles -> Two-way Coupling
+ 3D -> Lagrange Bubbles -> One-way Coupling -> adap_dt=T
+ 3D -> Lagrange Bubbles -> Two-way Coupling -> adap_dt=T
+ 3D -> 2 MPI Ranks
+ 3D -> Acoustic Source -> Planar -> support=3
+ 3D -> Acoustic Source -> Planar -> support=3 -> Dipole
+ 3D -> Acoustic Source -> Transducer -> support=7
+ 3D -> Acoustic Source -> Transducer Array -> support=11 -> All Elements
+ 3D -> Acoustic Source -> Transducer Array -> support=11 -> One element
+ 3D -> Bubbles -> Polytropic -> bubble_model=3
+ 3D -> Bubbles -> Polytropic -> bubble_model=2
+ 3D -> Bubbles -> bubble_model=2
+ 3D -> Bubbles -> nb=1
+ 3D -> Bubbles -> adv_n=T
+ 3D -> Bubbles -> adv_n=T -> adap_dt=T
+ 3D -> Bubbles -> artificial_Ma
+ 3D -> Bubbles -> low_Mach=1
+ 3D -> Bubbles -> low_Mach=2
+ 3D -> Bubbles -> QBMM
+ 3D -> Bubbles -> QBMM -> Non-polytropic
+ 3D -> Bubbles -> QBMM -> bubble_model=3
+ 3D -> Bubbles -> QBMM -> bubble_model=3 -> Non-polytropic
+ 3D -> Hypoelasticity -> 1 Fluid(s)
+ 3D -> Hypoelasticity -> 1 Fluid(s) -> cont_damage
+ 3D -> Hypoelasticity -> 1 Fluid(s) -> bc=-2
+ 3D -> Hypoelasticity -> 2 Fluid(s)
+ 3D -> Phase Change model 5 -> 2 Fluid(s)
+ 3D -> Phase Change model 5 -> 3 Fluid(s)
+ 3D -> Viscosity -> Bubbles -> Polytropic -> bubble_model=3
+ 3D -> Viscosity -> Bubbles -> Polytropic -> bubble_model=2
+ 3D -> Viscosity -> Bubbles -> bubble_model=2
+ 3D -> Viscosity -> Bubbles -> nb=1
+ 3D -> Viscosity -> Bubbles -> QBMM
+ 3D -> Viscosity -> Bubbles -> QBMM -> bubble_model=3
+ 3D -> Viscosity -> Bubbles -> QBMM -> bubble_model=3 -> cfl_adap_dt=T
+ 3D -> Viscosity -> Bubbles -> QBMM -> bubble_model=3 -> cfl_const_dt=T
+ 3D -> Smoothing
+ 3D -> Bodyforces
+ 3D -> Bodyforces -> cfl_adap_dt=T
+ 3D -> mixlayer_perturb
+ 3D -> BC Patches -> Circle -> X
+ 3D -> BC Patches -> Circle -> Y
+ 3D -> BC Patches -> Circle -> Z
+ 1D -> MHD -> HLL
+ 1D -> MHD -> HLLD
+ 1D -> RMHD
+ 2D -> MHD -> HLL
+ 2D -> MHD -> HLLD
+ 2D -> MHD -> Powell
+ 2D -> RMHD
+ 3D -> MHD
+ 3D -> RMHD
+ 2D -> Example -> shock_cloud_rmhd
+ 2D -> Example -> phasechange_bubble
+ 2D -> Example -> ibm
+ 3D -> Example -> acoustic_support3
+ 1D -> Example -> impact
+ 3D -> Example -> phasechange_bubble
+ 1D -> Example -> hypo_2materials
+ 2D -> Example -> lid_driven_cavity
+ 3D -> Example -> acoustic_support11
+ 2D -> Example -> acoustic_support10_axisym
+ 1D -> Example -> acoustic_sine_wavelength
+ 2D -> Example -> axisym_shockbubble
+ 1D -> Example -> bubblescreen
+ 1D -> Example -> cont_damage
+ 1D -> Example -> exp_bubscreen
+ 2D -> Example -> zero_circ_vortex
+ 3D -> Example -> TaylorGreenVortex
+ 1D -> Example -> brio_wu_rmhd
+ 2D -> Example -> acoustic_pulse
+ 2D -> Example -> rayleigh_taylor
+ 1D -> Example -> qbmm
+ 1D -> Example -> shuosher_old
+ 2D -> Example -> 5wave_quasi1D
+ 2D -> Example -> orszag_tang_powell
+ 2D -> Example -> whale_bubble_annulus
+ 2D -> Example -> isentropicvortex
+ 2D -> Example -> orszag_tang
+ 1D -> Example -> kapilashocktube
+ 1D -> Example -> acoustic_gauss_sigmadist
+ 1D -> Example -> laxshocktube
+ 1D -> Example -> poly_bubscreen
+ 3D -> Example -> recovering_sphere
+ 1D -> Example -> acoustic_gauss_sigmatime
+ 2D -> Example -> GreshoVortex
+ 2D -> Example -> lungwave
+ 1D -> Example -> vacuum_restart
+ 1D -> Example -> shuosher_wenojs5
+ 3D -> Example -> ibm_stl_test
+ 2D -> Example -> acoustic_support6_axisym
+ 1D -> Example -> acoustic_dipole
+ 2D -> Example -> ibm_stl_test
+ 2D -> Example -> ibm_stl_MFCCharacter
+ 2D -> Example -> shockbubble
+ 2D -> Example -> shocktube_phasechange
+ 1D -> Example -> exp_tube_phasechange
+ 1D -> Example -> acoustic_sine_frequency
+ 3D -> Example -> acoustic_support7
+ 1D -> Example -> vacuum
+ 1D -> Example -> shuosher_wenoz5
+ 2D -> Example -> acoustic_support9
+ 2D -> Example -> acoustic_support5
+ 1D -> Example -> shuosher_teno7
+ 3D -> Example -> shockdroplet
+ 3D -> Example -> lagrange_shbubcollapse
+ 1D -> Example -> shuosher_wenom5
+ 2D -> Example -> jet
+ 1D -> Example -> dai_woodward
+ 1D -> Example -> shuosher_teno5
+ 2D -> Example -> shockdroplet
+ 2D -> Example -> acoustic_support2
+ 2D -> Example -> lungwave_horizontal
+ 2D -> Example -> ibm_airfoil
+ 1D -> Example -> brio_wu_hlld
+ 2D -> Example -> axisym_hypoelasticity
+ 2D -> Example -> TaylorGreenVortex
+ 2D -> Example -> axisym_shockwatercavity
+ 3D -> Example -> rayleigh_taylor
+ 2D -> Example -> cont_damage
+ 1D -> Example -> brio_wu
+ 1D -> Example -> titarevtorro
+ nD -> Example -> perfect_reactor
+ 1D -> Example -> sodshocktube
+ 2D -> Example -> shearlayer
+ 0D -> Example -> bubblecollapse_adap
+ 3D -> Example -> brio_wu
+ 2D -> Example -> riemann_test
+ 1D -> Example -> dai_woodward_hlld
+ 1D -> Chemistry -> Perfect Reactor
+ 2D -> Chemistry -> Perfect Reactor
+ 3D -> Chemistry -> Perfect Reactor
+ 1D -> Chemistry -> Inert Shocktube -> Riemann Solver 1 -> Gamma Method 1
+ 1D -> Chemistry -> Inert Shocktube -> Riemann Solver 1 -> Gamma Method 2
+ 1D -> Chemistry -> Inert Shocktube -> Riemann Solver 2 -> Gamma Method 1
+ 1D -> Chemistry -> Inert Shocktube -> Riemann Solver 2 -> Gamma Method 2
+ 1D -> Chemistry -> MultiComponent_Diffusion
+
+mfc: (venv) Exiting the Python virtual environment.
