@@ -1,6 +1,6 @@
 # mfc_cpu.sub
 
-executable = mfc_cpu.sh
+executable = mfc_test.sh 'mfc_cpu.sif' 'cd /opt/MFC && ./mfc.sh test -a'
 arguments = $(Process)
 
 log = mfc_cpu_$(Cluster)_$(Process).log

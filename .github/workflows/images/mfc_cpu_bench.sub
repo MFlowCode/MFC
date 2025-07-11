@@ -1,11 +1,11 @@
 # mfc_cpu_bench.sub
 
-executable = mfc_cpu_bench.sh
+executable = mfc_test.sh 'mfc_cpu.sif' 'cd /opt/MFC && ./mfc.sh test -a'
 arguments = $(Process)
 
 log = mfc_cpu_bench_$(Cluster)_$(Process).log
-error = mfc_cpu_bench$(Cluster)_$(Process).err
-output = mfc_cpu_bench$(Cluster)_$(Process).out
+error = mfc_cpu_bench_$(Cluster)_$(Process).err
+output = mfc_cpu_bench_$(Cluster)_$(Process).out
 
 +JobDurationCategory = "Medium"
 

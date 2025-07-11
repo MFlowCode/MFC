@@ -1,11 +1,11 @@
-# mfc_cpu.sub
+# mfc_gpu.sub
 
-executable = mfc_gpu.sh
+executable = mfc_test.sh 'mfc_cpu.sif' 'cd /opt/MFC && ./mfc.sh test -a --gpu'
 arguments = $(Process)
 
-log = mfc_cpu_$(Cluster)_$(Process).log
-error = mfc_cpu_$(Cluster)_$(Process).err
-output = mfc_cpu_$(Cluster)_$(Process).out
+log = mfc_gpu_$(Cluster)_$(Process).log
+error = mfc_gpu_$(Cluster)_$(Process).err
+output = mfc_gpu_$(Cluster)_$(Process).out
 
 +JobDurationCategory = "Medium"
 
