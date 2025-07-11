@@ -20,8 +20,5 @@ From: ubuntu:24.04
     ./mfc.sh test -a --dry-run -j $(nproc)
 
 %runscript
-    mkdir -p /tmp/mfc
-    cd /tmp/mfc
-    cp -r /opt/MFC ./
-    cd MFC
+    cd /opt/MFC
     exec ./mfc.sh "$@"
