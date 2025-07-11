@@ -75,14 +75,15 @@ print(
             "patch_icpp(1)%alpha_rho(1)": rho_inf,
             "patch_icpp(1)%alpha(1)": 1.0,
             # Patch 2
-            "patch_icpp(2)%geometry": 2,
+            "patch_icpp(2)%geometry": 7,
             "patch_icpp(2)%x_centroid": 0,
             "patch_icpp(2)%y_centroid": 0,
             "patch_icpp(2)%radius": 1.0,
             "patch_icpp(2)%vel(1)": 0,
             "patch_icpp(2)%vel(2)": 0,
-            "patch_icpp(2)%pres": f"{p_inf}*(1 - 0.5*({gam} - 1)*({alf_st})**2*exp(0.5*(1 - sqrt(x**2 + y**2))))**({gam} / ({gam} - 1))",
-            "patch_icpp(2)%alpha_rho(1)": f"{rho_inf}*(1 - 0.5*({gam} - 1)*({alf_st})**2*exp(0.5*(1 - sqrt(x**2 + y**2))))**(1 / ({gam} - 1))",
+            "patch_icpp(2)%pres": 0.0,
+            "patch_icpp(2)%alpha_rho(1)": 0.0,
+            "patch_icpp(2)%hcid": 281,
             "patch_icpp(2)%alpha(1)": 1.0,
             "patch_icpp(2)%alter_patch(1)": "T",
             # CBC Inflow / Outflow

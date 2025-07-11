@@ -170,6 +170,15 @@
             q_prim_vf(momxb + 0)%sf(i, j, 0) = 0d0 + (y_cc(j) - patch_icpp(1)%y_centroid)*(5d0/(2d0*3.141592653589793))*exp(1d0*(1d0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2d0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2d0))
             q_prim_vf(momxb + 1)%sf(i, j, 0) = 0d0 - (x_cc(i) - patch_icpp(1)%x_centroid)*(5d0/(2d0*3.141592653589793))*exp(1d0*(1d0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2d0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2d0))
         end if
+    
+    case (281)
+        ! This is patch is hard-coded for test suite optimization used in the
+        ! 2D_acoustic_pulse case:
+        ! This analytic patch used geometry 2
+        if (patch_id == 2) then
+            q_prim_vf(E_idx)%sf(i, j, 0) = 101325*(1 - 0.5*(1.4 - 1)*(0.4)**2*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2))))**(1.4 / (1.4 - 1))
+            q_prim_vf(contxb + 0)%sf(i, j, 0) = 1*(1 - 0.5*(1.4 - 1)*(0.4)**2*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2))))**(1 / (1.4 - 1))
+        end if
 
     case default
         if (proc_rank == 0) then

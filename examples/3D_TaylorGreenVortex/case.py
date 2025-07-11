@@ -78,17 +78,18 @@ print(
             "parallel_io": "T",
             # I will use 1 for WATER properties, and 2 for AIR properties
             # Patch 1: Background (AIR - 2)
-            "patch_icpp(1)%geometry": 9,
+            "patch_icpp(1)%geometry": 13,
             "patch_icpp(1)%x_centroid": 0,
             "patch_icpp(1)%y_centroid": 0,
             "patch_icpp(1)%z_centroid": 0,
             "patch_icpp(1)%length_x": 2 * math.pi * L,
             "patch_icpp(1)%length_y": 2 * math.pi * L,
             "patch_icpp(1)%length_z": 2 * math.pi * L,
-            "patch_icpp(1)%vel(1)": f"{V0}*sin(x/{L})*cos(y/{L})*sin(z/{L})",
-            "patch_icpp(1)%vel(2)": f"-{V0}*cos(x/{L})*sin(y/{L})*sin(z/{L})",
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%vel(3)": 0,
-            "patch_icpp(1)%pres": f"{P0} + ({rho0}*{V0}**2/16)*(cos(2*x/{L}) + cos(2*y/{L}))*(cos(2*z/{L}) + 2)",
+            "patch_icpp(1)%pres": 0.0,
+            "patch_icpp(1)%hcid": 0.0,
             "patch_icpp(1)%alpha_rho(1)": 1,
             "patch_icpp(1)%alpha(1)": 1,
             # Fluids Physical Parameters
