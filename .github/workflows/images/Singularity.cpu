@@ -10,15 +10,16 @@ From: ubuntu:24.04
     export DEBIAN_FRONTEND=noninteractive
     apt update -y && apt install -y \
         build-essential git tar wget make cmake gcc g++ \
-        python3 python3-dev python3-venv \
-        openmpi-bin libopenmpi-dev libfftw3-dev \
-        python3-pip python3-venv
+        python3 python3-venv python3-pip\
+        openmpi-bin libopenmpi-dev libfftw3-dev
+        
     cd /opt
     git clone --depth 1 https://github.com/mflowcode/mfc.git MFC
     cd /opt/MFC
     ./mfc.sh build -j $(nproc)
-    ./mfc.sh test -a --dry-run -j $(nproc)
+    ./mfc.sh test --dry-run -j $(nproc)
 
 %runscript
+    mkdir -p /tmp/mfc_build
     cd /opt/MFC
-    exec ./mfc.sh "$@"
+    exec ./mfc.sh "$@" --build-dir="/tmp/mfc_build"
