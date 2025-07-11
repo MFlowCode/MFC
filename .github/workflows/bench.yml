@@ -1,110 +1,110 @@
-# name: 'Benchmark'
+name: 'Benchmark'
 
-# on:
-#   pull_request:
-#   pull_request_review:
-#     types: [submitted]
-#   workflow_dispatch:
+on:
+  pull_request:
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
 
-# jobs:
-#   file-changes:
-#     name: Detect File Changes
-#     runs-on: 'ubuntu-latest'
-#     outputs: 
-#       checkall: ${{ steps.changes.outputs.checkall }}
-#     steps:
-#       - name: Clone
-#         uses: actions/checkout@v4
+jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
 
-#       - name: Detect Changes
-#         uses: dorny/paths-filter@v3
-#         id: changes
-#         with: 
-#           filters: ".github/file-filter.yml"
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
 
-#   self:
-#     name: "${{ matrix.name }} (${{ matrix.device }})"
-#     if: ${{ github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && (
-#              (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
-#              (github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbryngelson')
-#            ) }}
-#     needs: file-changes
-#     strategy:
-#       fail-fast: false
-#       matrix:
-#         include:
-#           - cluster: phoenix
-#             name: Georgia Tech | Phoenix (NVHPC)
-#             group: phoenix
-#             labels: gt
-#             flag: p
-#             device: cpu
-#             build_script: ""
-#           - cluster: phoenix
-#             name: Georgia Tech | Phoenix (NVHPC)
-#             group: phoenix
-#             labels: gt
-#             flag: p
-#             device: gpu
-#             build_script: ""
-#           - cluster: frontier
-#             name: Oak Ridge | Frontier (CCE)
-#             group: phoenix
-#             labels: frontier
-#             flag: f
-#             device: gpu
-#             build_script: "bash .github/workflows/frontier/build.sh gpu bench"
-#     runs-on:
-#       group: ${{ matrix.group }}
-#       labels: ${{ matrix.labels }}
-#     timeout-minutes: 1400
-#     env:
-#       ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
-#       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-#     steps:
-#       - name: Clone - PR
-#         uses: actions/checkout@v4
-#         with:
-#           path: pr
+  self:
+    name: "${{ matrix.name }} (${{ matrix.device }})"
+    if: ${{ github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && (
+             (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
+             (github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbryngelson')
+           ) }}
+    needs: file-changes
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: cpu
+            build_script: ""
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: gpu
+            build_script: ""
+          - cluster: frontier
+            name: Oak Ridge | Frontier (CCE)
+            group: phoenix
+            labels: frontier
+            flag: f
+            device: gpu
+            build_script: "bash .github/workflows/frontier/build.sh gpu bench"
+    runs-on:
+      group: ${{ matrix.group }}
+      labels: ${{ matrix.labels }}
+    timeout-minutes: 1400
+    env:
+      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+    steps:
+      - name: Clone - PR
+        uses: actions/checkout@v4
+        with:
+          path: pr
 
-#       - name: Clone - Master
-#         uses: actions/checkout@v4
-#         with:
-#           repository: MFlowCode/MFC
-#           ref: master
-#           path: master
+      - name: Clone - Master
+        uses: actions/checkout@v4
+        with:
+          repository: MFlowCode/MFC
+          ref: master
+          path: master
 
-#       - name: Setup & Build
-#         if: matrix.build_script != ''
-#         run: | 
-#           (cd pr     && ${{ matrix.build_script }}) &
-#           (cd master && ${{ matrix.build_script }}) &
-#           wait %1 && wait %2
+      - name: Setup & Build
+        if: matrix.build_script != ''
+        run: | 
+          (cd pr     && ${{ matrix.build_script }}) &
+          (cd master && ${{ matrix.build_script }}) &
+          wait %1 && wait %2
 
-#       - name: Bench (Master v. PR)
-#         run: |
-#           (cd pr     && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }}) &
-#           (cd master && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }}) &
-#           wait %1 && wait %2
+      - name: Bench (Master v. PR)
+        run: |
+          (cd pr     && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }}) &
+          (cd master && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }}) &
+          wait %1 && wait %2
 
-#       - name: Generate & Post Comment
-#         run: |
-#           (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
-#           (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml)
+      - name: Generate & Post Comment
+        run: |
+          (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
+          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml)
 
-#       - name: Print Logs
-#         if:   always()
-#         run: |
-#           cat pr/bench-${{ matrix.device }}.* 2>/dev/null || true
-#           cat master/bench-${{ matrix.device }}.* 2>/dev/null || true
+      - name: Print Logs
+        if:   always()
+        run: |
+          cat pr/bench-${{ matrix.device }}.* 2>/dev/null || true
+          cat master/bench-${{ matrix.device }}.* 2>/dev/null || true
       
-#       - name: Archive Logs
-#         uses: actions/upload-artifact@v4
-#         if: always()
-#         with:
-#           name: ${{ matrix.cluster }}-${{ matrix.device }}
-#           path: |
-#             pr/bench-${{ matrix.device }}.*
-#             pr/build/benchmarks/*
-#             master/bench-${{ matrix.device }}.*
-#             master/build/benchmarks/*
+      - name: Archive Logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.cluster }}-${{ matrix.device }}
+          path: |
+            pr/bench-${{ matrix.device }}.*
+            pr/build/benchmarks/*
+            master/bench-${{ matrix.device }}.*
+            master/build/benchmarks/*
