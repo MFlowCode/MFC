@@ -49,7 +49,10 @@ JOBID=$(sbatch <<-EOT | awk '{print $4}'
 	#!/usr/bin/env bash
 	${sbatch_common_opts}
 	${sbatch_device_opts}
-
+ 
+    	export job_slug="${job_slug}"
+	echo "My job slug is:" $job_slug
+ 
 	set -e -x
 
 	cd "\$SLURM_SUBMIT_DIR"
