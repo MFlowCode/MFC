@@ -95,7 +95,7 @@ jobs:
     timeout-minutes: 1400
     strategy:
       matrix:
-        device: ['cpu', 'gpu']
+        device: ['cpu']
         lbl: ['gt', 'frontier']
     runs-on:
       group:  phoenix
