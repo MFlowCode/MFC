@@ -9,6 +9,7 @@
 #:enddef
 
 #:def Hardcoded2D()
+    print *, "DEBUG: patch_id=", patch_id, " hcid=", patch_icpp(patch_id)%hcid
 
     select case (patch_icpp(patch_id)%hcid) ! 2D_hardcoded_ic example case
 
