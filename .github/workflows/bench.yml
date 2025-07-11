@@ -98,9 +98,27 @@ jobs:
           cat pr/bench-${{ matrix.device }}.* 2>/dev/null || true
           cat master/bench-${{ matrix.device }}.* 2>/dev/null || true
       
-      - name: Archive Logs
+      # Phoenix runners need to bypass the SOCKS tunnel for uploads
+      - name: Archive Logs (Phoenix)
+        if: always() && matrix.cluster == 'phoenix'
         uses: actions/upload-artifact@v4
-        if: always()
+        env:
+          http_proxy: "socks5://localhost:1080"
+          https_proxy: "socks5://localhost:1080"
+          no_proxy: "localhost,127.0.0.1,github.com,api.github.com,uploads.github.com"
+          NO_PROXY: "localhost,127.0.0.1,github.com,api.github.com,uploads.github.com"
+        with:
+          name: ${{ matrix.cluster }}-${{ matrix.device }}
+          path: |
+            pr/bench-${{ matrix.device }}.*
+            pr/build/benchmarks/*
+            master/bench-${{ matrix.device }}.*
+            master/build/benchmarks/*
+
+      # All other runners (non-Phoenix) just run without special env
+      - name: Archive Logs
+        if: always() && matrix.cluster != 'phoenix'
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.cluster }}-${{ matrix.device }}
           path: |
