@@ -16,7 +16,7 @@ mkdir -p $currentdir
 
 export TMPDIR=$currentdir
 
-if [ "$job_device" = "gpu" ]; then
+if [ "device" = "gpu" ]; then
     ./mfc.sh bench --mem 12 -j $(nproc) -o "$job_slug.yaml" -- -c phoenix-bench $device_opts -n $n_ranks
 else
     ./mfc.sh bench --mem 1 -j $(nproc) -o "$job_slug.yaml" -- -c phoenix-bench $device_opts -n $n_ranks
