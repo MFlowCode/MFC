@@ -20,6 +20,9 @@
   <a href="https://codecov.io/github/MFlowCode/MFC" target="_blank">
     <img src="https://codecov.io/github/MFlowCode/MFC/graph/badge.svg?token=8SY043QND4">
   </a>
+  <a href="https://github.com/MFlowCode/MFC/blob/master/.github/CONTRIBUTING.md" target="_blank">
+    <img src="https://img.shields.io/badge/Contributing-Guide-orange?style=flat">
+  </a>
 </p>
 
 Welcome to the home of MFC!
