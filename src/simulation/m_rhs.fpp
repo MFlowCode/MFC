@@ -270,7 +270,7 @@ contains
                              & idwbuff(2)%beg:idwbuff(2)%end, &
                              & idwbuff(3)%beg:idwbuff(3)%end))
 
-                    if (riemann_solver == 1) then
+                    if (riemann_solver == 1 .or. riemann_solver == 4) then
                         do l = adv_idx%beg + 1, adv_idx%end
                             @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                      & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -1986,7 +1986,7 @@ contains
                         end do
                     end if
 
-                    if (riemann_solver == 1) then
+                    if (riemann_solver == 1 .or. riemann_solver == 4) then
                         do l = adv_idx%beg + 1, adv_idx%end
                             @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                         end do
