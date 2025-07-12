@@ -280,7 +280,7 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs(num_dims + 1)%sf(j, k, l) = 0._wp
-                    !s$acc loop seq
+                    $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_dims
                         c_divs(num_dims + 1)%sf(j, k, l) = &
                             c_divs(num_dims + 1)%sf(j, k, l) + &

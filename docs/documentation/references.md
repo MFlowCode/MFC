@@ -10,6 +10,8 @@
 
 - <a id="Bryngelson19">Bryngelson, S. H., Schmidmayer, K., Coralic, V., Meng, J. C., Maeda, K., and Colonius, T. (2019). Mfc: An open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver. arXiv preprint arXiv:1907.10512.</a>
 
+- <a id="Cao24">Cao A. and. Sch&auml;fer F. (2024). Information Geometric Regularization of the Barotropic Euler Equations. arXiv preprint arXiv:2308.14127.</a>
+
 - <a id="Chen22">Chen, S. S., Li, J. P., Li, Z., Yuan, W., & Gao, Z. H. (2022). Anti-dissipation pressure correction under low Mach numbers for Godunov-type schemes. Journal of Computational Physics, 456, 111027. </a>
 
 - <a id="Childs12">Childs, H., Brugger, E., Whitlock, B., Meredith, J., Ahern, S., Pugmire, D., Biagas, K., Miller, M., Harrison, C., Weber, G. H., Krishnan, H., Fogal, T., Sanderson, A., Garth, C., Bethel, E. W., Camp, D., R¨ubel, O., Durant, M., Favre, J. M., and Navr´atil, P. (2012). VisIt: An End-User Tool For Visualizing and Analyzing Very Large Data. In High Performance Visualization–Enabling Extreme-Scale Scientific Insight, pages 357–372.</a>

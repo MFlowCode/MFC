@@ -35,24 +35,27 @@ contains
         call s_check_total_cells
 #endif
 
-#ifndef MFC_POST_PROCESS
-        call s_check_inputs_bubbles_euler
-        call s_check_inputs_qbmm_and_polydisperse
-        call s_check_inputs_adv_n
-        call s_check_inputs_hypoelasticity
-        call s_check_inputs_phase_change
-        call s_check_inputs_ibm
-#endif
-
         ! Run by all three stages
         call s_check_inputs_simulation_domain
         call s_check_inputs_model_eqns_and_num_fluids
-        call s_check_inputs_weno
+        if (igr) then
+            call s_check_inputs_igr
+        else
+#ifndef MFC_POST_PROCESS
+            call s_check_inputs_bubbles_euler
+            call s_check_inputs_qbmm_and_polydisperse
+            call s_check_inputs_adv_n
+            call s_check_inputs_hypoelasticity
+            call s_check_inputs_phase_change
+            call s_check_inputs_ibm
+#endif
+            call s_check_inputs_weno
+            call s_check_inputs_surface_tension
+            call s_check_inputs_mhd
+        end if
         call s_check_inputs_bc
         call s_check_inputs_stiffened_eos
-        call s_check_inputs_surface_tension
         call s_check_inputs_moving_bc
-        call s_check_inputs_mhd
 
     end subroutine s_check_inputs_common
 
@@ -86,10 +89,13 @@ contains
 
     ! Checks constraints on the total number of cells
     impure subroutine s_check_total_cells
-        character(len=5) :: numStr !< for int to string conversion
+        character(len=18) :: numStr !< for int to string conversion
+        integer(kind=8) :: min_cells
 
+        min_cells = int(2, kind=8)**int(min(1, m) + min(1, n) + min(1, p), kind=8)*int(num_procs, kind=8)
         call s_int_to_str(2**(min(1, m) + min(1, n) + min(1, p))*num_procs, numStr)
-        @:PROHIBIT(nGlobal < 2**(min(1, m) + min(1, n) + min(1, p))*num_procs, &
+
+        @:PROHIBIT(nGlobal < min_cells, &
             "Total number of cells must be at least (2^[number of dimensions])*num_procs, " // &
             "which is currently "//trim(numStr))
     end subroutine s_check_total_cells
@@ -204,6 +210,15 @@ contains
         @:PROHIBIT(model_eqns == 3 .and. cyl_coord .and. p /= 0, &
             "6-equation model (model_eqns = 3) does not support cylindrical coordinates (cyl_coord = T and p != 0)")
     end subroutine s_check_inputs_model_eqns_and_num_fluids
+
+    !> Checks constraints regarding IGR order.
+        !! Called by s_check_inputs_common for all three stages
+    impure subroutine s_check_inputs_igr
+        @:PROHIBIT(all(igr_order /= (/3, 5/)), "igr_order must be 3 or 5")
+        @:PROHIBIT(m + 1 < igr_order, "m must be at least igr_order - 1")
+        @:PROHIBIT(n > 0 .and. n + 1 < igr_order, "n must be at least igr_order - 1")
+        @:PROHIBIT(p > 0 .and. p + 1 < igr_order, "p must be at least igr_order - 1")
+    end subroutine s_check_inputs_igr
 
     !> Checks constraints regarding WENO order.
         !! Called by s_check_inputs_common for all three stages
