@@ -12,15 +12,16 @@ jobs:
       - name: valgrind Setup
         run: |
           # get recent release of valgrind from GitHub API
-          VALGRIND_VERSION=$(curl -s https://api.github.com/repos/LouisBrunner/valgrind/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")')
-          # download and extract it
-          wget https://github.com/LouisBrunner/valgrind/releases/download/${VALGRIND_VERSION}/valgrind-${VALGRIND_VERSION}.tar.bz2
-          tar -xjf valgrind-${VALGRIND_VERSION}.tar.bz2
-          cd valgrind-${VALGRIND_VERSION}
+          VERROU_VERSION=$(curl -s https://api.github.com/repos/edf-hpc/verrou/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")')
+          VERROU_NUMBER=${VERROU_VERSION#v}
+
+          wget https://github.com/edf-hpc/verrou/releases/download/${VERROU_VERSION}/valgrind-3.23.0_verrou-${VERROU_NUMBER}.tar.gz
+          tar -xzf valgrind-3.23.0_verrou-${VERROU_NUMBER}.tar.gz
+          cd valgrind-3.23.0+verrou-${VERROU_NUMBER}
           ./autogen.sh
           ./configure --enable-only64bit --prefix=/usr/local
           make
-          sudo make install
+          make install
           source /usr/local/env.sh
 
       - name: Run tests
