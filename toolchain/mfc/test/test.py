@@ -5,7 +5,7 @@ import rich, rich.table
 
 from ..printer import cons
 from ..        import common
-from ..state   import ARG
+from ..state   import ARG, ARGS
 from .case     import TestCase
 from .cases    import list_cases
 from ..        import sched
@@ -58,7 +58,12 @@ def __filter(cases_) -> typing.List[TestCase]:
         if case.ppn > 1 and not ARG("mpi"):
             cases.remove(case)
             skipped_cases.append(case)
-    
+
+    for case in cases[:]:
+        if "RDMA MPI" in case.trace and not ARG("rdma_mpi"):
+            cases.remove(case)
+            skipped_cases.append(case)
+
     for case in cases[:]:
         if ARG("single"):
             skip = ['low_Mach', 'Hypoelasticity', 'teno', 'Chemistry', 'Phase Change model 6'
@@ -66,7 +71,6 @@ def __filter(cases_) -> typing.List[TestCase]:
             if any(label in case.trace for label in skip):
                 cases.remove(case)
                 skipped_cases.append(case)
-
 
     if ARG("no_examples"):
         example_cases = [case for case in cases if "Example" in case.trace]
@@ -89,7 +93,7 @@ def test():
     global errors
 
     cases = list_cases()
-
+    
     # Delete UUIDs that are not in the list of cases from tests/
     if ARG("remove_old_tests"):
         dir_uuids = set(os.listdir(common.MFC_TEST_DIR))
@@ -120,6 +124,9 @@ def test():
     # Some cases require a specific build of MFC for features like Chemistry,
     # Analytically defined patches, and --case-optimization. Here, we build all
     # the unique versions of MFC we need to run cases.
+    if ARG("rdma_mpi") and ARG("dry_run"):
+        ARGS()["test_all"] = False
+
     codes = [PRE_PROCESS, SIMULATION] + ([POST_PROCESS] if ARG('test_all') else [])
     unique_builds = set()
     for case, code in itertools.product(cases, codes):
@@ -186,6 +193,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         return
 
     cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
     common.file_write(out_filepath, cmd.stdout)
