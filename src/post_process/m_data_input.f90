@@ -515,9 +515,8 @@ contains
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
         end if
-#endif
-
     end subroutine s_read_parallel_conservative_data
+#endif
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
