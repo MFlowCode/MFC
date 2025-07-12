@@ -122,10 +122,11 @@ jobs:
         run: |
           cat pr/bench-${{ matrix.device }}.* 2>/dev/null || true
           cat master/bench-${{ matrix.device }}.* 2>/dev/null || true
-      
-      - name: Archive Logs
+
+      # All other runners (non-Phoenix) just run without special env
+      - name: Archive Logs (Frontier)
+        if: always() && matrix.cluster != 'phoenix'
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: ${{ matrix.cluster }}-${{ matrix.device }}
           path: |
