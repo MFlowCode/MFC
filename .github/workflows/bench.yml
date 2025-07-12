@@ -97,19 +97,6 @@ jobs:
         run: |
           cat pr/bench-${{ matrix.device }}.* 2>/dev/null || true
           cat master/bench-${{ matrix.device }}.* 2>/dev/null || true
-      
-      # Phoenix runners need to bypass the SOCKS tunnel for uploads
-      - name: Cat Logs (Phoenix)
-        if: always() && matrix.cluster == 'phoenix'
-        run: |
-            echo "PR BENCH 1" |
-            cat pr/bench-${{ matrix.device }}.* |
-            echo "PR BENCH 2" |
-            cat pr/build/benchmarks/* |
-            echo "Master BENCH 1" |
-            master/bench-${{ matrix.device }}.* |
-            echo "Master BENCH 2" |
-            cat master/build/benchmarks/*
 
       # All other runners (non-Phoenix) just run without special env
       - name: Archive Logs (Frontier)
