@@ -108,6 +108,7 @@ contains
 
     end subroutine s_read_grid_data_direction
 
+#ifdef MFC_MPI
     !> Helper subroutine to setup MPI data I/O parameters
     !!  @param data_size Local array size (output)
     !!  @param m_MOK, n_MOK, p_MOK MPI offset kinds for dimensions (output)
@@ -138,6 +139,7 @@ contains
         NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
     end subroutine s_setup_mpi_io_params
+#endif
 
     !> Helper subroutine to read IB data files
     !!  @param file_loc_base Base file location for IB data
@@ -148,9 +150,11 @@ contains
         character(LEN=len_trim(file_loc_base) + 20) :: file_loc
         logical :: file_exist
         integer :: ifile, ierr, data_size
+
+#ifdef MFC_MPI
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(KIND=MPI_OFFSET_KIND) :: disp
-
+#endif
         if (.not. ib) return
 
         if (parallel_io) then
@@ -426,6 +430,7 @@ contains
 
     end subroutine s_read_parallel_data_files
 
+#ifdef MFC_MPI
     !> Helper subroutine to read parallel conservative variable data
     !!  @param t_step Current time-step
     !!  @param m_MOK, n_MOK, p_MOK MPI offset kinds for dimensions
@@ -435,8 +440,6 @@ contains
         integer, intent(in) :: t_step
         integer(KIND=MPI_OFFSET_KIND), intent(inout) :: m_MOK, n_MOK, p_MOK
         integer(KIND=MPI_OFFSET_KIND), intent(inout) :: WP_MOK, MOK, str_MOK, NVARS_MOK
-
-#ifdef MFC_MPI
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
@@ -512,10 +515,8 @@ contains
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
         end if
-
-#endif
-
     end subroutine s_read_parallel_conservative_data
+#endif
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
