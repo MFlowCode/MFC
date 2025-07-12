@@ -991,7 +991,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         
         stack.push(f'1D -> Chemistry -> MultiComponent_Diffusion', {'m': 200,
                     'dt': 0.1e-06, 'num_patches': 1, 'num_fluids': 1, 'x_domain%beg': 0.0, 'x_domain%end': 0.05,
-                    'num_fluids': 1, 'bc_x%beg': -1, 'bc_x%end': -1, 'weno_order': 5,'weno_eps': 1e-16, 'weno_avg': 'F',
+                    'bc_x%beg': -1, 'bc_x%end': -1, 'weno_order': 5,'weno_eps': 1e-16, 'weno_avg': 'F',
                     'mapped_weno': 'T', 'mp_weno': 'T','weno_Re_flux': 'F', 'riemann_solver': 2, 'wave_speeds': 1,
                     'avg_state': 1,'chemistry': 'T', 'chem_params%diffusion': 'T','chem_params%reactions': 'F', 'chem_wrt_T' : 'T',
                     'patch_icpp(1)%geometry': 1, 'patch_icpp(1)%x_centroid': 0.05 / 2, 'patch_icpp(1)%length_x': 0.05,
