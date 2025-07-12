@@ -1,10 +1,10 @@
-This file was created on 2025-07-10 22:22:51.100526.
+This file was created on 2025-06-21 21:24:14.754636.
 
 mfc.sh:
 
-    Invocation: test -o 1D Chemistry --generate
+    Invocation: test -o MultiComponent_Diffusion --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        6ef589fa253fe3498ab61aeea25b12aa31226ae4 on Diffusion (dirty)
+    Git:        2ccbc6dccae0b2424bb2d0e06ab46b5b99a3c93f on Diffusion (clean)
 
 CPU:
 

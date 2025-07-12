@@ -1,10 +1,109 @@
-This file was created on 2025-07-10 22:22:51.100526.
+This file was created on 2025-06-23 16:36:03.250867.
 
 mfc.sh:
 
-    Invocation: test -o 1D Chemistry --generate
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        6ef589fa253fe3498ab61aeea25b12aa31226ae4 on Diffusion (dirty)
+    Invocation: test -o MultiComponent_Diffusion --generate
+    Lock:       mpi=Yes & gpu=No & debug=Yes & gcov=No & unified=No & single=No
+    Git:        1a664bf02e84691339ef6df226854a7554bd5160 on Mixture_Layer (dirty)
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on UchihaMadara
+    
+        C       : GNU v14.2.0 (/usr/bin/gcc-14)
+        Fortran : GNU v14.2.0 (/usr/bin/gfortran-14)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/pain/MFC-Adam/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Debug
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/gcc-14
+        CXX      : /usr/bin/g++-14
+        FC       : /usr/bin/gfortran-14
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on UchihaMadara
+    
+        C       : GNU v14.2.0 (/usr/bin/gcc-14)
+        Fortran : GNU v14.2.0 (/usr/bin/gfortran-14)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/pain/MFC-Adam/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Debug
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/gcc-14
+        CXX      : /usr/bin/g++-14
+        FC       : /usr/bin/gfortran-14
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on UchihaMadara
+    
+        C       : GNU v14.2.0 (/usr/bin/gcc-14)
+        Fortran : GNU v14.2.0 (/usr/bin/gfortran-14)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/pain/MFC-Adam/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Debug
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/gcc-14
+        CXX      : /usr/bin/g++-14
+        FC       : /usr/bin/gfortran-14
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 CPU:
 
