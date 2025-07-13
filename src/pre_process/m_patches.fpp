@@ -261,11 +261,6 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
 
-        if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
-            print *, "I do not really know what is going on here, but I am just going to put in a really long error message until I see what happens"
-            ! @:HardcodedDimensionsExtrusion()
-            ! @:Hardcoded1DVariables()
-        end if
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1._wp + gamma)/gamma

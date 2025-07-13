@@ -59,7 +59,7 @@ print(
             "patch_icpp(1)%alpha(1)": 1.0,
             # One anlytic patch to take care of -4 < x < 5
             # Patch 2 Analytic
-            "patch_icpp(2)%geometry": 15,
+            "patch_icpp(2)%geometry": 1,
             "patch_icpp(2)%x_centroid": 0.5,
             "patch_icpp(2)%length_x": 9.0,
             "patch_icpp(2)%vel(1)": 0.0,
