@@ -253,13 +253,24 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
+        ! Generic loop iterators
+        integer :: i, j, k
+
+        ! Placeholders for the cell boundary values
         real(wp) :: pi_inf, gamma, lit_gamma
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded1DVariables()
 
-        integer :: i, j, k !< Generic loop operators
-
+        if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+            print *, "I do not really know what is going on here, but I am just going to put in a really long error message until I see what happens"
+            ! @:HardcodedDimensionsExtrusion()
+            ! @:Hardcoded1DVariables()
+        end if
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1._wp + gamma)/gamma
+        j = 0.0_wp
+        k = 0.0_wp
 
         ! Transferring the line segment's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -289,6 +300,11 @@ contains
                                                         eta, q_prim_vf, patch_id_fp)
 
                 @:analytical()
+
+                ! check if this should load a hardcoded patch
+                if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                    @:Hardcoded1D()
+                end if
 
                 ! Updating the patch identities bookkeeping variable
                 if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, 0, 0) = patch_id
