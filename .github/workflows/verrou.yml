@@ -20,7 +20,7 @@ jobs:
           tar -xzf valgrind-3.23.0_verrou-${VERROU_NUMBER}.tar.gz
           cd valgrind-3.23.0+verrou-${VERROU_NUMBER}
           ./autogen.sh
-          ./configure
+          ./configure --prefix=$HOME/.local
           make
           make install
           cd ../..
