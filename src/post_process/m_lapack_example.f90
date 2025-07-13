@@ -59,10 +59,10 @@ contains
         ! Call appropriate LAPACK routine based on precision
 #ifdef MFC_SINGLE_PRECISION
         call sgesv(n, nrhs, A, n, ipiv, x, n, info)
-        print *, "Using single precision LAPACK (SGESV)"
+        print *, "Using sing. prec. LAPACK (SGESV)"
 #else
         call dgesv(n, nrhs, A, n, ipiv, x, n, info)
-        print *, "Using double precision LAPACK (DGESV)"
+        print *, "Using doub. prec. LAPACK (DGESV)"
 #endif
 
         ! Check for success
