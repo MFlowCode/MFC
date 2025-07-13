@@ -13,11 +13,11 @@ module m_lapack_example
     implicit none
 
     private; public :: s_lapack_example_solve_linear_system, &
-                      s_lapack_example_eigenvalues
+ s_lapack_example_eigenvalues
 
 contains
 
-    !> @brief Example subroutine demonstrating LAPACK usage for solving 
+    !> @brief Example subroutine demonstrating LAPACK usage for solving
     !!        a linear system Ax = b using DGESV/SGESV
     !!        This routine shows how to use LAPACK with MFC's precision system
     impure subroutine s_lapack_example_solve_linear_system()
@@ -27,35 +27,35 @@ contains
         real(wp), dimension(n, n) :: A  ! Coefficient matrix
         real(wp), dimension(n) :: b     ! Right-hand side vector
         real(wp), dimension(n) :: x     ! Solution vector
-        
+
         ! LAPACK variables
         integer, dimension(n) :: ipiv   ! Pivot indices
         integer :: info                 ! Return status
-        integer :: nrhs = 1            ! Number of right-hand sides
-        
+        integer, parameter :: nrhs = 1  ! Number of right-hand sides
+
         ! Only run on the root process to avoid duplicate output
         if (proc_rank /= 0) return
-        
+
         ! Set up a simple 3x3 linear system: Ax = b
-        ! Example: 
+        ! Example:
         !   2x + y + z = 8
-        !   x + 3y + z = 10  
+        !   x + 3y + z = 10
         !   x + y + 4z = 16
         A(1, :) = [2.0_wp, 1.0_wp, 1.0_wp]
         A(2, :) = [1.0_wp, 3.0_wp, 1.0_wp]
         A(3, :) = [1.0_wp, 1.0_wp, 4.0_wp]
-        
+
         b = [8.0_wp, 10.0_wp, 16.0_wp]
-        
+
         print *, "=== LAPACK Linear System Solver Example ==="
         print *, "Solving the system Ax = b where:"
         print *, "A = [2 1 1; 1 3 1; 1 1 4]"
         print *, "b = [8; 10; 16]"
         print *, ""
-        
+
         ! Copy b to x (LAPACK will overwrite the right-hand side with solution)
         x = b
-        
+
         ! Call appropriate LAPACK routine based on precision
 #ifdef MFC_SINGLE_PRECISION
         call sgesv(n, nrhs, A, n, ipiv, x, n, info)
@@ -64,7 +64,7 @@ contains
         call dgesv(n, nrhs, A, n, ipiv, x, n, info)
         print *, "Using double precision LAPACK (DGESV)"
 #endif
-        
+
         ! Check for success
         if (info == 0) then
             print *, "Linear system solved successfully!"
@@ -75,13 +75,13 @@ contains
         else
             print *, "LAPACK error: matrix is singular, solution could not be computed"
         end if
-        
+
         print *, "=== End LAPACK Example ==="
         print *, ""
-        
+
     end subroutine s_lapack_example_solve_linear_system
 
-    !> @brief Example subroutine demonstrating LAPACK usage for computing 
+    !> @brief Example subroutine demonstrating LAPACK usage for computing
     !!        eigenvalues of a symmetric matrix using DSYEV/SSYEV
     impure subroutine s_lapack_example_eigenvalues()
 
@@ -90,24 +90,24 @@ contains
         real(wp), dimension(n, n) :: A  ! Symmetric matrix
         real(wp), dimension(n) :: w     ! Eigenvalues
         real(wp), dimension(3*n) :: work ! Work array
-        integer :: lwork = 3*n          ! Size of work array
+        integer, parameter :: lwork = 3*n          ! Size of work array
         integer :: info                 ! Return status
-        character :: jobz = 'N'         ! Compute eigenvalues only
-        character :: uplo = 'U'         ! Upper triangular part of A
-        
+        character, parameter :: jobz = 'N'         ! Compute eigenvalues only
+        character, parameter :: uplo = 'U'         ! Upper triangular part of A
+
         ! Only run on the root process to avoid duplicate output
         if (proc_rank /= 0) return
-        
+
         ! Set up a simple symmetric 3x3 matrix
         A(1, :) = [4.0_wp, 1.0_wp, 1.0_wp]
         A(2, :) = [1.0_wp, 4.0_wp, 1.0_wp]
         A(3, :) = [1.0_wp, 1.0_wp, 4.0_wp]
-        
+
         print *, "=== LAPACK Eigenvalue Example ==="
         print *, "Computing eigenvalues of symmetric matrix:"
         print *, "A = [4 1 1; 1 4 1; 1 1 4]"
         print *, ""
-        
+
         ! Call appropriate LAPACK routine based on precision
 #ifdef MFC_SINGLE_PRECISION
         call ssyev(jobz, uplo, n, A, n, w, work, lwork, info)
@@ -116,7 +116,7 @@ contains
         call dsyev(jobz, uplo, n, A, n, w, work, lwork, info)
         print *, "Using double precision LAPACK (DSYEV)"
 #endif
-        
+
         ! Check for success
         if (info == 0) then
             print *, "Eigenvalues computed successfully!"
@@ -127,10 +127,10 @@ contains
         else
             print *, "LAPACK error: algorithm failed to converge"
         end if
-        
+
         print *, "=== End LAPACK Eigenvalue Example ==="
         print *, ""
-        
+
     end subroutine s_lapack_example_eigenvalues
 
-end module m_lapack_example 
+end module m_lapack_example

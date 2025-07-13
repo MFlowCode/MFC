@@ -716,11 +716,11 @@ contains
         ! leads to the termination of the post-process.
         if (proc_rank == 0) then
             call s_assign_default_values_to_user_inputs()
-            
+
             ! Run LAPACK examples before reading input file
             call s_lapack_example_solve_linear_system()
             call s_lapack_example_eigenvalues()
-            
+
             call s_read_input_file()
             call s_check_input_file()
 
