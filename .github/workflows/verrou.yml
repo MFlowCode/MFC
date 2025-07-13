@@ -19,10 +19,9 @@ jobs:
           tar -xzf valgrind-3.23.0_verrou-${VERROU_NUMBER}.tar.gz
           cd valgrind-3.23.0+verrou-${VERROU_NUMBER}
           ./autogen.sh
-          ./configure --enable-only64bit --prefix=/usr/local
+          ./configure
           make
           make install
-          source /usr/local/env.sh
 
       - name: Run tests
         run: valgrind --tool=verrou ./mfc.sh test -a --dry-run
