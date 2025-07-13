@@ -320,7 +320,7 @@ contains
 
         type(ic_model_parameters), intent(in) :: p
         real(wp), dimension(1:3), optional, intent(in) :: center
-        real(wp), dimension(1:4,1:4) :: sc, rz, rx, ry, tr, t_back, t_to_origin, out_matrix
+        real(wp), dimension(1:4, 1:4) :: sc, rz, rx, ry, tr, t_back, t_to_origin, out_matrix
 
         sc = transpose(reshape([ &
                                p%scale(1), 0._wp, 0._wp, 0._wp, &
@@ -380,7 +380,7 @@ contains
     pure subroutine s_transform_vec(vec, matrix)
 
         real(wp), dimension(1:3), intent(inout) :: vec
-        real(wp), dimension(1:4,1:4), intent(in) :: matrix
+        real(wp), dimension(1:4, 1:4), intent(in) :: matrix
 
         real(wp), dimension(1:4) :: tmp
 
@@ -395,7 +395,7 @@ contains
     pure subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
         type(t_triangle), intent(inout) :: triangle
-        real(wp), dimension(1:4,1:4), intent(in) :: matrix, matrix_n
+        real(wp), dimension(1:4, 1:4), intent(in) :: matrix, matrix_n
 
         integer :: i
 
@@ -413,7 +413,7 @@ contains
     pure subroutine s_transform_model(model, matrix, matrix_n)
 
         type(t_model), intent(inout) :: model
-        real(wp), dimension(1:4,1:4), intent(in) :: matrix, matrix_n
+        real(wp), dimension(1:4, 1:4), intent(in) :: matrix, matrix_n
 
         integer :: i
 

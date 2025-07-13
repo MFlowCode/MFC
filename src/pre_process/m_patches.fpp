@@ -2167,7 +2167,7 @@ contains
         integer :: cell_num
         integer :: ncells
 
-        real(wp), dimension(1:4,1:4) :: transform, transform_n
+        real(wp), dimension(1:4, 1:4) :: transform, transform_n
 
         if (present(ib) .and. proc_rank == 0) then
             print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
