@@ -57,14 +57,4 @@ if (LAPACK_FOUND AND NOT TARGET LAPACK::LAPACK)
         set_property(TARGET LAPACK::LAPACK APPEND PROPERTY
             INTERFACE_LINK_LIBRARIES "m")
     endif()
-    
-    # Add compiler-specific libraries
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-        set_property(TARGET LAPACK::LAPACK APPEND PROPERTY
-            INTERFACE_LINK_LIBRARIES "gfortran")
-    elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
-        # NVHPC/PGI may need additional libraries
-        set_property(TARGET LAPACK::LAPACK APPEND PROPERTY
-            INTERFACE_LINK_LIBRARIES "pgf90rtl")
-    endif()
 endif() 
