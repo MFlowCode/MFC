@@ -26,9 +26,14 @@ jobs:
           cd ../..
           rm -rf pr/valgrind-*
 
-      - name: Run tests
-        run: valgrind --tool=verrou ./mfc.sh test -a --dry-run
+      - name: Run Tests
+        run: |
+           sudo apt update -y
+           sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
+                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev
+          
+           valgrind --tool=verrou ./mfc.sh test -a --dry-run
 
-      - name: Check floating point compliance
+      - name: Check Compliance
         run: |
           echo "Checking floating point compliance..."
