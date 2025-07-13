@@ -2160,14 +2160,14 @@ contains
         type(t_model) :: model
         type(ic_model_parameters) :: params
 
-        t_vec3 :: point, model_center
+        real(wp), dimension(1:3) :: point, model_center
 
         real(wp) :: grid_mm(1:3, 1:2)
 
         integer :: cell_num
         integer :: ncells
 
-        t_mat4x4 :: transform, transform_n
+        real(wp), dimension(1:4,1:4) :: transform, transform_n
 
         if (present(ib) .and. proc_rank == 0) then
             print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
@@ -2402,8 +2402,8 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        t_vec3, intent(in) :: cyl
-        t_vec3 :: cart
+        real(wp), dimension(1:3), intent(in) :: cyl
+        real(wp), dimension(1:3) :: cart
 
         cart = (/cyl(1), &
                  cyl(2)*sin(cyl(3)), &

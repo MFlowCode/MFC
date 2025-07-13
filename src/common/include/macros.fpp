@@ -96,9 +96,6 @@
     end if
 #:enddef
 
-#define t_vec3   real(wp), dimension(1:3)
-#define t_mat4x4 real(wp), dimension(1:4,1:4)
-
 #:def ASSERT(predicate, message = None)
     if (.not. (${predicate}$)) then
         call s_mpi_abort("${_FILE_.split('/')[-1]}$:${_LINE_}$: "// &
