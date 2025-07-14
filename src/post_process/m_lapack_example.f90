@@ -47,11 +47,10 @@ contains
 
         b = [8.0_wp, 10.0_wp, 16.0_wp]
 
-        print *, "=== LAPACK Linear System Solver Example ==="
+        print *, "LAPACK Linear System Solver Example"
         print *, "Solving the system Ax = b where:"
         print *, "A = [2 1 1; 1 3 1; 1 1 4]"
         print *, "b = [8; 10; 16]"
-        print *, ""
 
         ! Copy b to x (LAPACK will overwrite the right-hand side with solution)
         x = b
@@ -76,8 +75,7 @@ contains
             print *, "LAPACK error: matrix is singular, solution could not be computed"
         end if
 
-        print *, "=== End LAPACK Example ==="
-        print *, ""
+        print *, "End LAPACK Example"
 
     end subroutine s_lapack_example_solve_linear_system
 
@@ -103,10 +101,9 @@ contains
         A(2, :) = [1.0_wp, 4.0_wp, 1.0_wp]
         A(3, :) = [1.0_wp, 1.0_wp, 4.0_wp]
 
-        print *, "=== LAPACK Eigenvalue Example ==="
+        print *, "LAPACK Eigenvalue Example"
         print *, "Computing eigenvalues of symmetric matrix:"
         print *, "A = [4 1 1; 1 4 1; 1 1 4]"
-        print *, ""
 
         ! Call appropriate LAPACK routine based on precision
 #ifdef MFC_SINGLE_PRECISION
@@ -128,8 +125,7 @@ contains
             print *, "LAPACK error: algorithm failed to converge"
         end if
 
-        print *, "=== End LAPACK Eigenvalue Example ==="
-        print *, ""
+        print *, "End LAPACK Eigenvalue Example"
 
     end subroutine s_lapack_example_eigenvalues
 
