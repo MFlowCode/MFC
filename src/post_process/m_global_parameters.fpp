@@ -38,6 +38,9 @@ module m_global_parameters
     integer :: p
     !> @}
 
+    !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
+    type(cell_num_bounds) :: cells_bounds
+
     integer(8) :: nGlobal ! Total number of cells in global domain
 
     !> @name Cylindrical coordinates (either axisymmetric or full 3D)
@@ -336,6 +339,8 @@ contains
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
+        call s_update_cell_bounds(cells_bounds, m, n, p)
+        
         m_root = dflt_int
         cyl_coord = .false.
 
