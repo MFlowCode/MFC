@@ -211,7 +211,6 @@ ARGS = vars(parser.parse_args())
 
 case = {self.gen_json_dict_str()}
 mods = {{}}
-
 if "post_process" in ARGS["mfc"]["targets"]:
     mods = {{
         'parallel_io'  : 'T', 'cons_vars_wrt'   : 'T',
@@ -230,8 +229,39 @@ if "post_process" in ARGS["mfc"]["targets"]:
         mods['omega_wrt(2)'] = 'T'
         mods['omega_wrt(3)'] = 'T'
 else:
-    mods['parallel_io']   = 'F'
-    mods['prim_vars_wrt'] = 'F'
+    if ('fd_order' not in case) and ('fd_order' not in mods):
+        mods['fd_order'] = 1    
+    if ('prim_vars_wrt' not in case):
+        mods['prim_vars_wrt'] = 'F'
+    mods['parallel_io'] = 'F'
+
+    mods['probe_wrt'] = 'T'
+    if case['n'] == 0:
+        mods['num_probes'] = 2
+        dx = (case['x_domain%end'] - case['x_domain%beg']) / 3
+        for i in range(2):
+            mods[f'probe({{i+1}})%x'] = case['x_domain%beg'] + (i+1) * dx
+
+    elif case['p'] == 0:
+        mods['num_probes'] = 4
+        dx = (case['x_domain%end'] - case['x_domain%beg']) / 3
+        dy = (case['y_domain%end'] - case['y_domain%beg']) / 3
+        for i in range(2):
+            for j in range(2):
+                mods[f'probe({{i*2+j+1}})%x'] = case['x_domain%beg'] + (i+1) * dx
+                mods[f'probe({{i*2+j+1}})%y'] = case['y_domain%beg'] + (j+1) * dy
+    else:
+        mods['num_probes'] = 8
+        dx = (case['x_domain%end'] - case['x_domain%beg']) / 3
+        dy = (case['y_domain%end'] - case['y_domain%beg']) / 3
+        dz = (case['z_domain%end'] - case['z_domain%beg']) / 3
+        for i in range(2):
+            for j in range(2):
+                for k in range(2):
+                    mods[f'probe({{i*4+j*2+k+1}})%x'] = case['x_domain%beg'] + (i+1) * dx
+                    mods[f'probe({{i*4+j*2+k+1}})%y'] = case['y_domain%beg'] + (j+1) * dy
+                    mods[f'probe({{i*4+j*2+k+1}})%z'] = case['z_domain%beg'] + (k+1) * dz
+
 
 print(json.dumps({{**case, **mods}}))
 """)

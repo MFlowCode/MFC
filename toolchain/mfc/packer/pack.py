@@ -131,12 +131,17 @@ def compile(casepath: str) -> typing.Tuple[Pack, str]:
             def _extract_doubles(s: str) -> list:
                 return [ float(e) for e in re.sub(r"[\n\t\s]+", " ", s).strip().split(' ') ]
 
-            # Every line is <x> <y> <z> <value> (<y> and <z> are optional). So the
-            # number of dimensions is the number of doubles in the first line minus 1.
-            ndims   = len(_extract_doubles(content.split('\n', 1)[0])) - 1
-            # We discard all <x> <y> <z> values and only keep the <value> ones.
-            # This is in an effort to save on storage.
-            doubles = _extract_doubles(content)[ndims::ndims+1]
+            if 'probe' in short_filepath:
+                # Probes are constructed as <time> <value1> <value2> ...
+                # Just discard the first column
+                doubles = [float(e) for line in content.strip().splitlines() if line.strip() for e in _extract_doubles(line)[1:]]
+            else:
+                # Every line is <x> <y> <z> <value> (<y> and <z> are optional). So the
+                # number of dimensions is the number of doubles in the first line minus 1.
+                ndims   = len(_extract_doubles(content.split('\n', 1)[0])) - 1
+                # We discard all <x> <y> <z> values and only keep the <value> ones.
+                # This is in an effort to save on storage.
+                doubles = _extract_doubles(content)[ndims::ndims+1]
         except ValueError:
             return None, f"Failed to interpret the content of [magenta]{filepath}[/magenta] as a list of floating point numbers."
 

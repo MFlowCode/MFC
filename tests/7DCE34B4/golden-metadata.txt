@@ -1,19 +1,19 @@
-This file was created on 2024-10-24 01:51:14.649277.
+This file was created on 2025-07-13 22:18:31.587813.
 
 mfc.sh:
 
-    Invocation: test -j 12 -f B9D934CF -t 7DCE34B4 --generate
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        d64b621a64cbe025c58909c80369dbb9e12d388b on levelset_rewrite_pr (dirty)
+    Invocation: test -j 24 --generate -- -c phoenix -a gts-kj20 -q embers
+    Lock:       mpi=Yes & gpu=No & debug=Yes & gcov=No & unified=No & single=No
+    Git:        6f58eecc6177035b13201e39b9d731878896ecc7 on EnhanceTest (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.30.2 on Anshs-MacBook-Pro-2.local
+        CMake v3.26.5 on atl1-1-02-010-29-2.pace.gatech.edu
     
-        C       : GNU v13.3.0 (/usr/local/bin/gcc-13)
-        Fortran : GNU v13.3.0 (/usr/local/bin/gfortran-13)
+        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
+        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -25,16 +25,16 @@ pre_process:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /Users/anshgupta1234/Desktop/Coding/MFC-copy/build/venv/bin/fypp
+        Fypp    : /storage/home/hcoda1/5/xtian64/scratch/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
-        CC       : gcc-13
-        CXX      : g++-13
-        FC       : gfortran-13
+        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
+        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
+        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -43,10 +43,10 @@ post_process:
 
     CMake Configuration:
     
-        CMake v3.30.2 on Anshs-MacBook-Pro-2.local
+        CMake v3.26.5 on atl1-1-02-010-29-2.pace.gatech.edu
     
-        C       : GNU v13.3.0 (/usr/local/bin/gcc-13)
-        Fortran : GNU v13.3.0 (/usr/local/bin/gfortran-13)
+        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
+        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -58,16 +58,16 @@ post_process:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /Users/anshgupta1234/Desktop/Coding/MFC-copy/build/venv/bin/fypp
+        Fypp    : /storage/home/hcoda1/5/xtian64/scratch/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
-        CC       : gcc-13
-        CXX      : g++-13
-        FC       : gfortran-13
+        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
+        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
+        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -76,10 +76,10 @@ syscheck:
 
     CMake Configuration:
     
-        CMake v3.30.2 on Anshs-MacBook-Pro-2.local
+        CMake v3.26.5 on atl1-1-02-010-29-2.pace.gatech.edu
     
-        C       : GNU v13.3.0 (/usr/local/bin/gcc-13)
-        Fortran : GNU v13.3.0 (/usr/local/bin/gfortran-13)
+        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
+        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -91,16 +91,16 @@ syscheck:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /Users/anshgupta1234/Desktop/Coding/MFC-copy/build/venv/bin/fypp
+        Fypp    : /storage/home/hcoda1/5/xtian64/scratch/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
-        CC       : gcc-13
-        CXX      : g++-13
-        FC       : gfortran-13
+        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
+        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
+        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -109,10 +109,10 @@ simulation:
 
     CMake Configuration:
     
-        CMake v3.30.2 on Anshs-MacBook-Pro-2.local
+        CMake v3.26.5 on atl1-1-02-010-29-2.pace.gatech.edu
     
-        C       : GNU v13.3.0 (/usr/local/bin/gcc-13)
-        Fortran : GNU v13.3.0 (/usr/local/bin/gfortran-13)
+        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
+        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
@@ -124,16 +124,16 @@ simulation:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /Users/anshgupta1234/Desktop/Coding/MFC-copy/build/venv/bin/fypp
+        Fypp    : /storage/home/hcoda1/5/xtian64/scratch/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
-        CC       : gcc-13
-        CXX      : g++-13
-        FC       : gfortran-13
+        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
+        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
+        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -141,62 +141,46 @@ simulation:
 CPU:
 
     CPU Info:
-    From sysctl -a 
-    machdep.cpu.mwait.linesize_min: 64
-    machdep.cpu.mwait.linesize_max: 64
-    machdep.cpu.mwait.extensions: 3
-    machdep.cpu.mwait.sub_Cstates: 286531872
-    machdep.cpu.thermal.sensor: 1
-    machdep.cpu.thermal.dynamic_acceleration: 1
-    machdep.cpu.thermal.invariant_APIC_timer: 1
-    machdep.cpu.thermal.thresholds: 2
-    machdep.cpu.thermal.ACNT_MCNT: 1
-    machdep.cpu.thermal.core_power_limits: 1
-    machdep.cpu.thermal.fine_grain_clock_mod: 1
-    machdep.cpu.thermal.package_thermal_intr: 1
-    machdep.cpu.thermal.hardware_feedback: 0
-    machdep.cpu.thermal.energy_policy: 1
-    machdep.cpu.xsave.extended_state: 31 832 1088 0
-    machdep.cpu.xsave.extended_state1: 15 832 256 0
-    machdep.cpu.arch_perf.version: 4
-    machdep.cpu.arch_perf.number: 4
-    machdep.cpu.arch_perf.width: 48
-    machdep.cpu.arch_perf.events_number: 7
-    machdep.cpu.arch_perf.events: 0
-    machdep.cpu.arch_perf.fixed_number: 3
-    machdep.cpu.arch_perf.fixed_width: 48
-    machdep.cpu.cache.linesize: 64
-    machdep.cpu.cache.L2_associativity: 4
-    machdep.cpu.cache.size: 256
-    machdep.cpu.tlb.inst.large: 8
-    machdep.cpu.tlb.data.small: 64
-    machdep.cpu.tlb.data.small_level1: 64
-    machdep.cpu.address_bits.physical: 39
-    machdep.cpu.address_bits.virtual: 48
-    machdep.cpu.tsc_ccc.numerator: 216
-    machdep.cpu.tsc_ccc.denominator: 2
-    machdep.cpu.max_basic: 22
-    machdep.cpu.max_ext: 2147483656
-    machdep.cpu.vendor: GenuineIntel
-    machdep.cpu.brand_string: Intel(R) Core(TM) i7-8850H CPU @ 2.60GHz
-    machdep.cpu.family: 6
-    machdep.cpu.model: 158
-    machdep.cpu.extmodel: 9
-    machdep.cpu.extfamily: 0
-    machdep.cpu.stepping: 10
-    machdep.cpu.feature_bits: 9221960262849657855
-    machdep.cpu.leaf7_feature_bits: 43806655 1073741824
-    machdep.cpu.leaf7_feature_bits_edx: 3154128384
-    machdep.cpu.extfeature_bits: 1241984796928
-    machdep.cpu.signature: 591594
-    machdep.cpu.brand: 0
-    machdep.cpu.features: FPU VME DE PSE TSC MSR PAE MCE CX8 APIC SEP MTRR PGE MCA CMOV PAT PSE36 CLFSH DS ACPI MMX FXSR SSE SSE2 SS HTT TM PBE SSE3 PCLMULQDQ DTES64 MON DSCPL VMX SMX EST TM2 SSSE3 FMA CX16 TPR PDCM SSE4.1 SSE4.2 x2APIC MOVBE POPCNT AES PCID XSAVE OSXSAVE SEGLIM64 TSCTMR AVX1.0 RDRAND F16C
-    machdep.cpu.leaf7_features: RDWRFSGS TSC_THREAD_OFFSET SGX BMI1 HLE AVX2 SMEP BMI2 ERMS INVPCID RTM FPU_CSDS MPX RDSEED ADX SMAP CLFSOPT IPT SGXLC MDCLEAR TSXFA IBRS STIBP L1DF ACAPMSR SSBD
-    machdep.cpu.extfeatures: SYSCALL XD 1GBPAGE EM64T LAHF LZCNT PREFETCHW RDTSCP TSCI
-    machdep.cpu.logical_per_package: 16
-    machdep.cpu.cores_per_package: 8
-    machdep.cpu.microcode_version: 248
-    machdep.cpu.processor_flag: 5
-    machdep.cpu.core_count: 6
-    machdep.cpu.thread_count: 12
+    From lscpu
+    Architecture:                         x86_64
+    CPU op-mode(s):                       32-bit, 64-bit
+    Address sizes:                        46 bits physical, 48 bits virtual
+    Byte Order:                           Little Endian
+    CPU(s):                               24
+    On-line CPU(s) list:                  0-23
+    Vendor ID:                            GenuineIntel
+    Model name:                           Intel(R) Xeon(R) Gold 6226 CPU @ 2.70GHz
+    CPU family:                           6
+    Model:                                85
+    Thread(s) per core:                   1
+    Core(s) per socket:                   12
+    Socket(s):                            2
+    Stepping:                             7
+    CPU(s) scaling MHz:                   100%
+    CPU max MHz:                          2700.0000
+    CPU min MHz:                          1200.0000
+    BogoMIPS:                             5400.00
+    Flags:                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 intel_ppin ssbd mba ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm mpx rdt_a avx512f avx512dq rdseed adx smap clflushopt clwb intel_pt avx512cd avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts hwp hwp_act_window hwp_epp hwp_pkg_req vnmi pku ospke avx512_vnni md_clear flush_l1d arch_capabilities
+    Virtualization:                       VT-x
+    L1d cache:                            768 KiB (24 instances)
+    L1i cache:                            768 KiB (24 instances)
+    L2 cache:                             24 MiB (24 instances)
+    L3 cache:                             38.5 MiB (2 instances)
+    NUMA node(s):                         2
+    NUMA node0 CPU(s):                    0-11
+    NUMA node1 CPU(s):                    12-23
+    Vulnerability Gather data sampling:   Vulnerable
+    Vulnerability Itlb multihit:          KVM: Mitigation: VMX disabled
+    Vulnerability L1tf:                   Not affected
+    Vulnerability Mds:                    Not affected
+    Vulnerability Meltdown:               Not affected
+    Vulnerability Mmio stale data:        Vulnerable
+    Vulnerability Reg file data sampling: Not affected
+    Vulnerability Retbleed:               Vulnerable
+    Vulnerability Spec rstack overflow:   Not affected
+    Vulnerability Spec store bypass:      Vulnerable
+    Vulnerability Spectre v1:             Vulnerable: __user pointer sanitization and usercopy barriers only; no swapgs barriers
+    Vulnerability Spectre v2:             Vulnerable; IBPB: disabled; STIBP: disabled; PBRSB-eIBRS: Vulnerable; BHI: Vulnerable
+    Vulnerability Srbds:                  Not affected
+    Vulnerability Tsx async abort:        Mitigation; TSX disabled
 

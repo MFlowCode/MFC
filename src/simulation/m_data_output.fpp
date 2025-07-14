@@ -1075,6 +1075,8 @@ contains
         real(wp) :: G
         real(wp) :: dyn_p, T
         real(wp) :: damage_state
+        character(LEN=15) :: FMT_glb
+        character(len=50) :: FMT
 
         integer :: i, j, k, l, s, d !< Generic loop iterator
 
@@ -1088,7 +1090,7 @@ contains
         logical :: trigger !< For integral quantities
 
         real(wp) :: rhoYks(1:num_species)
-
+        real(wp) :: pres_mag !< Magnetic pressure for MHD
         T = dflt_T_guess
 
         ! Non-dimensional time calculation
@@ -1156,7 +1158,8 @@ contains
                                                             Re, G, fluid_pp(:)%G)
                     else
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
-                                                            rho, gamma, pi_inf, qv)
+                                                            rho, gamma, pi_inf, qv, &
+                                                            Re)
                     end if
                     do s = 1, num_vels
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
@@ -1176,6 +1179,14 @@ contains
                             dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
+                    else if (mhd) then
+                        pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(B_idx%beg)%sf(j-2, k, l)**2 + q_cons_vf(B_idx%beg + 1)%sf(j-2, k, l)**2)
+
+                        call s_compute_pressure( &
+                            q_cons_vf(1)%sf(j - 2, k, l), &
+                            q_cons_vf(alf_idx)%sf(j - 2, k, l), &
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
+                            pres_mag= pres_mag)
                     else
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
@@ -1243,11 +1254,7 @@ contains
                     accel = accel_mag(j - 2, k, l)
                 end if
             elseif (p == 0) then ! 2D simulation
-                if (chemistry) then
-                    do d = 1, num_species
-                        rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l)
-                    end do
-                end if
+
 
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
@@ -1264,7 +1271,11 @@ contains
                         if (j == 1) j = 2 ! Pick first point if probe is at edge
                         if (k == 1) k = 2 ! Pick first point if probe is at edge
                         l = 0
-
+                        if (chemistry) then
+                            do d = 1, num_species
+                                rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l)
+                            end do
+                        end if
                         ! Computing/Sharing necessary state variables
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, &
                                                             rho, gamma, pi_inf, qv, &
@@ -1290,6 +1301,13 @@ contains
                                 T, &
                                 q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
+                        else if (mhd) then
+                            pres_mag = 0.5_wp*(q_cons_vf(B_idx%beg)%sf(j-2, k-2, l)**2 + q_cons_vf(B_idx%beg + 1)%sf(j-2, k-2, l)**2 + q_cons_vf(B_idx%beg + 2)%sf(j-2, k-2, l)**2)
+                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
+                                                    q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
+                                                    dyn_p, pi_inf, gamma, rho, qv, &
+                                                    rhoYks, pres, T, pres_mag=pres_mag)
+
                         else
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
                                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
@@ -1329,6 +1347,7 @@ contains
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
                                                       ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c)
+                        accel = accel_mag(j - 2, k - 2, l)
 
                     end if
                 end if
@@ -1384,6 +1403,12 @@ contains
                                     rhoYks, pres, T, &
                                     q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G)
+                            else if (mhd) then
+                                pres_mag = 0.5_wp*(q_cons_vf(B_idx%beg)%sf(j-2, k-2, l-2)**2 + q_cons_vf(B_idx%beg + 1)%sf(j-2, k-2, l-2)**2 + q_cons_vf(B_idx%beg + 2)%sf(j-2, k-2, l-2)**2)
+                                call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
+                                                        q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
+                                                        dyn_p, pi_inf, gamma, rho, qv, &
+                                                        rhoYks, pres, T, pres_mag=pres_mag)
                             else
                                 call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
                                                         q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
@@ -1437,11 +1462,17 @@ contains
                     call s_mpi_allreduce_sum(tmp, damage_state)
                 end if
             end if
+            if (precision == 1) then
+                FMT_glb = "F30.7"
+            else
+                FMT_glb = "F40.14"
+            end if
             if (proc_rank == 0) then
                 if (n == 0) then
                     if (bubbles_euler .and. (num_fluids <= 2)) then
                         if (qbmm) then
-                            write (i + 30, '(6x,f12.6,14f28.16)') &
+                            FMT = '(6X,f12.6,14'//FMT_glb//')'
+                            write (i + 30, FMT) &
                                 nondim_time, &
                                 rho, &
                                 vel(1), &
@@ -1458,7 +1489,8 @@ contains
                                 M20, &
                                 M02
                         else
-                            write (i + 30, '(6x,f12.6,8f24.8)') &
+                            FMT = '(6X,f12.6,8'//FMT_glb//')'
+                            write (i + 30, FMT) &
                                 nondim_time, &
                                 rho, &
                                 vel(1), &
@@ -1472,8 +1504,8 @@ contains
                             ! ptot
                         end if
                     else if (bubbles_euler .and. (num_fluids == 3)) then
-                        write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,'// &
-                               'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') &
+                        FMT = '(6X,f12.6,11'//FMT_glb//')'
+                        write (i + 30, FMT) &
                             nondim_time, &
                             rho, &
                             vel(1), &
@@ -1487,8 +1519,8 @@ contains
                             ptilde, &
                             ptot
                     else if (bubbles_euler .and. num_fluids == 4) then
-                        write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,'// &
-                               'f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8)') &
+                        FMT = '(6X,f12.6,13'//FMT_glb//')'
+                        write (i + 30, FMT) &
                             nondim_time, &
                             q_cons_vf(1)%sf(j - 2, 0, 0), &
                             q_cons_vf(2)%sf(j - 2, 0, 0), &
@@ -1504,7 +1536,8 @@ contains
                             R(1), &
                             Rdot(1)
                     else
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
+                        FMT = '(6X,f12.6,3'//FMT_glb//')'
+                        write (i + 30, FMT) &
                             nondim_time, &
                             rho, &
                             vel(1), &
@@ -1512,7 +1545,8 @@ contains
                     end if
                 elseif (p == 0) then
                     if (bubbles_euler) then
-                        write (i + 30, '(6X,10F24.8)') &
+                        FMT = '(6X,f12.6,9'//FMT_glb//')'
+                        write (i + 30, FMT) &
                             nondim_time, &
                             rho, &
                             vel(1), &
@@ -1524,8 +1558,8 @@ contains
                             R(1), &
                             Rdot(1)
                     else if (elasticity) then
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                               'F24.8,F24.8,F24.8)') &
+                        FMT = '(6X,F12.6,7'//FMT_glb//')'
+                        write (i + 30, FMT) &
                             nondim_time, &
                             rho, &
                             vel(1), &
@@ -1535,7 +1569,8 @@ contains
                             tau_e(2), &
                             tau_e(3)
                     else
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
+                        FMT = '(6X,F12.6,3'//FMT_glb//')'
+                        write (i + 30, FMT) &
                             nondim_time, &
                             rho, &
                             vel(1), &
@@ -1543,20 +1578,45 @@ contains
                         print *, 'time =', nondim_time, 'rho =', rho, 'pres =', pres
                     end if
                 else
-                    write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8)') &
-                        nondim_time, &
-                        rho, &
-                        vel(1), &
-                        vel(2), &
-                        vel(3), &
-                        pres, &
-                        gamma, &
-                        pi_inf, &
-                        qv, &
-                        c, &
-                        accel
+                    if (bubbles_euler) then
+                        FMT = '(6X,F12.6,10'//FMT_glb//')'
+                        write (i + 30, FMT) &
+                            nondim_time, &
+                            rho, &
+                            vel(1), &
+                            vel(2), &
+                            vel(3), &
+                            pres, &
+                            alf, &
+                            nR(1), &
+                            nRdot(1), &
+                            R(1), &
+                            Rdot(1)
+                    else if (elasticity) then
+                        FMT = '(6X,F12.6,8'//FMT_glb//')'
+                        write (i + 30, FMT) &
+                            nondim_time, &
+                            rho, &
+                            vel(1), &
+                            vel(2), &
+                            vel(3), &
+                            pres, &
+                            tau_e(1), &
+                            tau_e(2), &
+                            tau_e(3)
+                    else
+                        FMT = '(6X,F12.6,9'//FMT_glb//')'
+                        write (i + 30, FMT) &
+                            nondim_time, &
+                            rho, &
+                            vel(1), &
+                            vel(2), &
+                            vel(3), &
+                            pres, &    ! Out of tolerance
+                            gamma, &
+                            pi_inf, &
+                            qv
+                    end if
                 end if
             end if
         end do
