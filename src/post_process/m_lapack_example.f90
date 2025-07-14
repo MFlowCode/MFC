@@ -111,10 +111,10 @@ contains
         ! Call appropriate LAPACK routine based on precision
 #ifdef MFC_SINGLE_PRECISION
         call ssyev(jobz, uplo, n, A, n, w, work, lwork, info)
-        print *, "Using single precision LAPACK (SSYEV)"
+        print *, "Using LAPACK (SSYEV)"
 #else
         call dsyev(jobz, uplo, n, A, n, w, work, lwork, info)
-        print *, "Using double precision LAPACK (DSYEV)"
+        print *, "Using LAPACK (DSYEV)"
 #endif
 
         ! Check for success
