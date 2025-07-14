@@ -293,7 +293,7 @@ contains
                 end if
 
                 ! Updating the patch identities bookkeeping variable
-                if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, 0, 0) = patch_id
+                if (1._wp - eta < sgm_eps) patch_id_fp(i, 0, 0) = patch_id
 
             end if
         end do
@@ -363,7 +363,7 @@ contains
                     end if
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
                 end if
             end do
         end do
@@ -848,7 +848,7 @@ contains
                     end if
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
 
                     q_prim_vf(alf_idx)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
                                                      exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
@@ -917,7 +917,7 @@ contains
                         end if
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
 
                         q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
                                                          exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
@@ -994,7 +994,7 @@ contains
                     end if
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
                 end if
             end do
         end do
@@ -1080,7 +1080,7 @@ contains
                         end if
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
                     end if
                 end do
             end do
@@ -1177,7 +1177,7 @@ contains
                             end if
 
                             ! Updating the patch identities bookkeeping variable
-                            if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                            if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
 
                         end if
                     end if
@@ -1253,7 +1253,7 @@ contains
                     end if
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
                 end if
 
             end do
@@ -1329,7 +1329,7 @@ contains
                     end if
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
 
                     ! Assign Parameters
                     q_prim_vf(mom_idx%beg)%sf(i, j, 0) = U0*sin(x_cc(i)/L0)*cos(y_cc(j)/L0)
@@ -1740,7 +1740,7 @@ contains
                                 end if
 
                                 ! Updating the patch identities bookkeeping variable
-                                if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
+                                if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
 
                             end if
                         end if
@@ -1900,7 +1900,7 @@ contains
                             end if
 
                             ! Updating the patch identities bookkeeping variable
-                            if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
+                            if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
                         end if
                     end if
                 end do
@@ -1988,7 +1988,7 @@ contains
                         end if
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
                     end if
 
                 end do
