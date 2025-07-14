@@ -1359,72 +1359,16 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
     subroutine s_1D_analytical(patch_id, patch_id_fp, q_prim_vf)
-        
-        ! print *,  "WARNING"
-        ! :: The use of the 1D analytical patch geometry has been depricated and will be removed in a future release. Use patch_icpp(patch_id)%geometry: 1 instead'
-
-        ! Patch identifier
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        ! Generic loop iterators
-        integer :: i, j, k
-
-        ! Placeholders for the cell boundary values
-        real(wp) :: pi_inf, gamma, lit_gamma
-        
-        @:HardcodedDimensionsExtrusion()
-        @:Hardcoded1DVariables()
-
         print *, "WARNING :: The use of the 1D analytical patch geometry has &
         & been depricated and will be removed in a future release. Use &
         & `patch_icpp(patch_id)%geometry: 1` instead"
-        return
 
-        pi_inf = fluid_pp(1)%pi_inf
-        gamma = fluid_pp(1)%gamma
-        lit_gamma = (1._wp + gamma)/gamma
-        j = 0.0_wp
-        k = 0.0_wp
-
-        ! Transferring the patch's centroid and length information
-        x_centroid = patch_icpp(patch_id)%x_centroid
-        length_x = patch_icpp(patch_id)%length_x
-
-        ! Computing the beginning and the end x- and y-coordinates
-        ! of the patch based on its centroid and lengths
-        x_boundary%beg = x_centroid - 0.5_wp*length_x
-        x_boundary%end = x_centroid + 0.5_wp*length_x
-
-        ! Since the patch doesn't allow for its boundaries to be
-        ! smoothed out, the pseudo volume fraction is set to 1 to
-        ! ensure that only the current patch contributes to the fluid
-        ! state in the cells that this patch covers.
-        eta = 1._wp
-
-        ! Checking whether the line segment covers a particular cell in the
-        ! domain and verifying whether the current patch has the permission
-        ! to write to that cell. If both queries check out, the primitive
-        ! variables of the current patch are assigned to this cell.
-        do i = 0, m
-            if (x_boundary%beg <= x_cc(i) .and. &
-                x_boundary%end >= x_cc(i) .and. &
-                patch_icpp(patch_id)%alter_patch(patch_id_fp(i, 0, 0))) then
-
-                call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
-                                                        eta, q_prim_vf, patch_id_fp)
-
-                @:Hardcoded1D()
-
-                ! Updating the patch identities bookkeeping variable
-                if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, 0, 0) = patch_id
-
-            end if
-        end do
-
-        @:HardcodedDellacation()
-
+        call s_line_segment(patch_id, patch_id_fp, q_prim_vf)
+        
     end subroutine s_1D_analytical
 
         !! @param patch_id is the patch identifier
@@ -1494,73 +1438,15 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
     subroutine s_2D_analytical(patch_id, patch_id_fp, q_prim_vf)
-        ! print *,  "WARNING :: The use of the 2D analytical patch geometry has &
-        ! & been depricated and will be removed in a future release. Use &
-        ! & `patch_icpp(patch_id)%geometry: 3` instead"
-
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        integer :: i, j, k !< generic loop iterators
+        print *,  "WARNING :: The use of the 2D analytical patch geometry has &
+        & been depricated and will be removed in a future release. Use &
+        & `patch_icpp(patch_id)%geometry: 3` instead"
 
-        real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
-        real(wp) :: l, U0 !< Taylor Green Vortex parameters
-        @:HardcodedDimensionsExtrusion()
-        @:Hardcoded2DVariables()
-
-        pi_inf = fluid_pp(1)%pi_inf
-        gamma = fluid_pp(1)%gamma
-        lit_gamma = (1._wp + gamma)/gamma
-
-        k = 0.0_wp
-
-        ! Transferring the patch's centroid and length information
-        x_centroid = patch_icpp(patch_id)%x_centroid
-        y_centroid = patch_icpp(patch_id)%y_centroid
-        length_x = patch_icpp(patch_id)%length_x
-        length_y = patch_icpp(patch_id)%length_y
-
-        ! Computing the beginning and the end x- and y-coordinates
-        ! of the patch based on its centroid and lengths
-        x_boundary%beg = x_centroid - 0.5_wp*length_x
-        x_boundary%end = x_centroid + 0.5_wp*length_x
-        y_boundary%beg = y_centroid - 0.5_wp*length_y
-        y_boundary%end = y_centroid + 0.5_wp*length_y
-
-        ! Since the patch doesn't allow for its boundaries to be
-        ! smoothed out, the pseudo volume fraction is set to 1 to
-        ! ensure that only the current patch contributes to the fluid
-        ! state in the cells that this patch covers.
-        eta = 1._wp
-        l = 1._wp
-        U0 = 0.1_wp
-        ! Checking whether the patch covers a particular cell in the
-        ! domain and verifying whether the current patch has the
-        ! permission to write to that cell. If both queries check out,
-        ! the primitive variables of the current patch are assigned
-        ! to this cell.
-
-        do j = 0, n
-            do i = 0, m
-                if (x_boundary%beg <= x_cc(i) .and. &
-                    x_boundary%end >= x_cc(i) .and. &
-                    y_boundary%beg <= y_cc(j) .and. &
-                    y_boundary%end >= y_cc(j) .and. &
-                    patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
-
-                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                            eta, q_prim_vf, patch_id_fp)
-
-                    @:Hardcoded2D()
-                    ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
-
-                end if
-            end do
-        end do
-
-        @:HardcodedDellacation()
+        call s_rectangle(patch_id, patch_id_fp, q_prim_vf)
 
     end subroutine s_2D_analytical
 
@@ -1570,86 +1456,17 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
     subroutine s_3D_analytical(patch_id, patch_id_fp, q_prim_vf)
-        ! print *,  "WARNING :: The use of the 1D analytical patch geometry has &
-        ! & been depricated and will be removed in a future release. Use &
-        ! & `patch_icpp(patch_id)%geometry: 1` instead"
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        integer :: i, j, k !< generic loop iterators
-        real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
-        @:HardcodedDimensionsExtrusion()
-        @:Hardcoded3DVariables()
+        print *,  "WARNING :: The use of the 3D analytical patch geometry has &
+        & been depricated and will be removed in a future release. Use &
+        & `patch_icpp(patch_id)%geometry: 3` instead"
 
-        pi_inf = fluid_pp(1)%pi_inf
-        gamma = fluid_pp(1)%gamma
-        lit_gamma = (1._wp + gamma)/gamma
+        call s_cuboid(patch_id, patch_id_fp, q_prim_vf)
 
-        ! Transferring the patch's centroid and length information
-        x_centroid = patch_icpp(patch_id)%x_centroid
-        y_centroid = patch_icpp(patch_id)%y_centroid
-        z_centroid = patch_icpp(patch_id)%z_centroid
-        length_x = patch_icpp(patch_id)%length_x
-        length_y = patch_icpp(patch_id)%length_y
-        length_z = patch_icpp(patch_id)%length_z
-
-        ! Computing the beginning and the end x-, y- and z-coordinates of
-        ! the patch based on its centroid and lengths
-        x_boundary%beg = x_centroid - 0.5_wp*length_x
-        x_boundary%end = x_centroid + 0.5_wp*length_x
-        y_boundary%beg = y_centroid - 0.5_wp*length_y
-        y_boundary%end = y_centroid + 0.5_wp*length_y
-        z_boundary%beg = z_centroid - 0.5_wp*length_z
-        z_boundary%end = z_centroid + 0.5_wp*length_z
-
-        ! Since the analytical patch does not allow for its boundaries to get
-        ! smoothed out, the pseudo volume fraction is set to 1 to make sure
-        ! that only the current patch contributes to the fluid state in the
-        ! cells that this patch covers.
-        eta = 1._wp
-
-        ! Checking whether the patch covers a particular cell in the domain
-        ! and verifying whether the current patch has permission to write to
-        ! to that cell. If both queries check out, the primitive variables
-        ! of the current patch are assigned to this cell.
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
-
-                    if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
-                    else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
-                    end if
-
-                    if (x_boundary%beg <= x_cc(i) .and. &
-                        x_boundary%end >= x_cc(i) .and. &
-                        y_boundary%beg <= cart_y .and. &
-                        y_boundary%end >= cart_y .and. &
-                        z_boundary%beg <= cart_z .and. &
-                        z_boundary%end >= cart_z &
-                        .and. &
-                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
-                        then
-
-                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                                eta, q_prim_vf, patch_id_fp)
-
-                        @:Hardcoded3D()
-
-                        ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
-
-                    end if
-
-                end do
-            end do
-        end do
-
-        @:HardcodedDellacation()
     end subroutine s_3D_analytical
 
     !> This patch generates the shape of the spherical harmonics
