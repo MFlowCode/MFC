@@ -1,16 +1,16 @@
-This file was created on 2025-07-13 22:20:01.241178.
+This file was created on 2025-07-14 11:53:37.053711.
 
 mfc.sh:
 
     Invocation: test -j 24 --generate -- -c phoenix -a gts-kj20 -q embers
     Lock:       mpi=Yes & gpu=No & debug=Yes & gcov=No & unified=No & single=No
-    Git:        6f58eecc6177035b13201e39b9d731878896ecc7 on EnhanceTest (dirty)
+    Git:        e563f3d3d2851db816fd59f7d66bdf2bb684a5d6 on EnhanceTest (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.26.5 on atl1-1-02-010-29-2.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-02-012-12-1.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
@@ -39,18 +39,18 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+simulation:
 
     CMake Configuration:
     
-        CMake v3.26.5 on atl1-1-02-010-29-2.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-02-012-12-1.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -76,7 +76,7 @@ syscheck:
 
     CMake Configuration:
     
-        CMake v3.26.5 on atl1-1-02-010-29-2.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-02-012-12-1.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
@@ -105,18 +105,18 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+post_process:
 
     CMake Configuration:
     
-        CMake v3.26.5 on atl1-1-02-010-29-2.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-02-012-12-1.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF

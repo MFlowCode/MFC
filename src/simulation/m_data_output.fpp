@@ -56,13 +56,14 @@ module m_data_output
     real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     real(wp), public, allocatable, dimension(:, :) :: c_mass
-    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf, c_mass)
+    $:GPU_DECLARE(create='[icfl_sf,vcfl_sf,ccfl_sf,Rc_sf,c_mass]')
 
     real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
     real(wp) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
     real(wp) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
-    !$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
+    $:GPU_DECLARE(create='[icfl_max_loc,icfl_max_glb,vcfl_max_loc,vcfl_max_glb]')
+    $:GPU_DECLARE(create='[ccfl_max_loc,ccfl_max_glb,Rc_min_loc,Rc_min_glb]')
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
     !> @{
@@ -279,7 +280,7 @@ contains
         integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step
-        !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -296,17 +297,16 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
 
         ! end: Computing Stability Criteria at Current Time-step
 
         ! Determining local stability criteria extrema at current time-step
 
 #ifdef _CRAYFTN
-        !$acc update host(icfl_sf)
+        $:GPU_UPDATE(host='[icfl_sf]')
 
         if (viscous) then
-            !$acc update host(vcfl_sf, Rc_sf)
+            $:GPU_UPDATE(host='[vcfl_sf,Rc_sf]')
         end if
 
         icfl_max_loc = maxval(icfl_sf)
@@ -319,7 +319,6 @@ contains
         !$acc kernels
         icfl_max_loc = maxval(icfl_sf)
         !$acc end kernels
-
         if (viscous) then
             !$acc kernels
             vcfl_max_loc = maxval(vcfl_sf)
@@ -527,7 +526,7 @@ contains
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
-                !$acc update host(q_prim_vf(i)%sf(:,:,:))
+                $:GPU_UPDATE(host='[q_prim_vf(i)%sf(:,:,:)]')
             end do
             ! q_prim_vf(bubxb) stores the value of nb needed in riemann solvers, so replace with true primitive value (=1._wp)
             if (qbmm) then
@@ -1180,13 +1179,13 @@ contains
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
                     else if (mhd) then
-                        pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(B_idx%beg)%sf(j-2, k, l)**2 + q_cons_vf(B_idx%beg + 1)%sf(j-2, k, l)**2)
+                        pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(B_idx%beg)%sf(j - 2, k, l)**2 + q_cons_vf(B_idx%beg + 1)%sf(j - 2, k, l)**2)
 
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
                             dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
-                            pres_mag= pres_mag)
+                            pres_mag=pres_mag)
                     else
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
@@ -1255,7 +1254,6 @@ contains
                 end if
             elseif (p == 0) then ! 2D simulation
 
-
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
                         do s = -1, m
@@ -1302,7 +1300,7 @@ contains
                                 q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
                         else if (mhd) then
-                            pres_mag = 0.5_wp*(q_cons_vf(B_idx%beg)%sf(j-2, k-2, l)**2 + q_cons_vf(B_idx%beg + 1)%sf(j-2, k-2, l)**2 + q_cons_vf(B_idx%beg + 2)%sf(j-2, k-2, l)**2)
+                            pres_mag = 0.5_wp*(q_cons_vf(B_idx%beg)%sf(j - 2, k - 2, l)**2 + q_cons_vf(B_idx%beg + 1)%sf(j - 2, k - 2, l)**2 + q_cons_vf(B_idx%beg + 2)%sf(j - 2, k - 2, l)**2)
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
                                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
                                                     dyn_p, pi_inf, gamma, rho, qv, &
@@ -1404,7 +1402,7 @@ contains
                                     q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G)
                             else if (mhd) then
-                                pres_mag = 0.5_wp*(q_cons_vf(B_idx%beg)%sf(j-2, k-2, l-2)**2 + q_cons_vf(B_idx%beg + 1)%sf(j-2, k-2, l-2)**2 + q_cons_vf(B_idx%beg + 2)%sf(j-2, k-2, l-2)**2)
+                                pres_mag = 0.5_wp*(q_cons_vf(B_idx%beg)%sf(j - 2, k - 2, l - 2)**2 + q_cons_vf(B_idx%beg + 1)%sf(j - 2, k - 2, l - 2)**2 + q_cons_vf(B_idx%beg + 2)%sf(j - 2, k - 2, l - 2)**2)
                                 call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
                                                         q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
                                                         dyn_p, pi_inf, gamma, rho, qv, &
@@ -1605,7 +1603,7 @@ contains
                             tau_e(2), &
                             tau_e(3)
                     else
-                        FMT = '(6X,F12.6,9'//FMT_glb//')'
+                        FMT = '(6X,F12.6,11'//FMT_glb//')'
                         write (i + 30, FMT) &
                             nondim_time, &
                             rho, &

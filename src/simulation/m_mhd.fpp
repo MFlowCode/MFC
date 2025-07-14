@@ -24,12 +24,12 @@ module m_mhd
     real(wp), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
     real(wp), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
     real(wp), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
-    !$acc declare create(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
+    $:GPU_DECLARE(create='[du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz]')
 
     real(wp), allocatable, dimension(:, :) :: fd_coeff_x_h
     real(wp), allocatable, dimension(:, :) :: fd_coeff_y_h
     real(wp), allocatable, dimension(:, :) :: fd_coeff_z_h
-    !$acc declare create(fd_coeff_x_h,fd_coeff_y_h,fd_coeff_z_h)
+    $:GPU_DECLARE(create='[fd_coeff_x_h,fd_coeff_y_h,fd_coeff_z_h]')
 
 contains
 
@@ -52,12 +52,12 @@ contains
 
         ! Computing centered finite difference coefficients
         call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_h, buff_size, fd_number, fd_order)
-        !$acc update device(fd_coeff_x_h)
+        $:GPU_UPDATE(device='[fd_coeff_x_h]')
         call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_h, buff_size, fd_number, fd_order)
-        !$acc update device(fd_coeff_y_h)
+        $:GPU_UPDATE(device='[fd_coeff_y_h]')
         if (p > 0) then
             call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_h, buff_size, fd_number, fd_order)
-            !$acc update device(fd_coeff_z_h)
+            $:GPU_UPDATE(device='[fd_coeff_z_h]')
         end if
 
     end subroutine s_initialize_mhd_powell_module
@@ -76,23 +76,22 @@ contains
         real(wp), dimension(3) :: v, B
         real(wp) :: divB, vdotB
 
-        !$acc parallel loop collapse(3) gang vector default(present) &
-        !$acc private(v, B)
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[v, B]')
         do q = 0, p
             do l = 0, n
                 do k = 0, m
 
                     divB = 0._wp
-                    !$acc loop seq
+                    $:GPU_LOOP(parallelism='[seq]')
                     do r = -fd_number, fd_number
                         divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
                     end do
-                    !$acc loop seq
+                    $:GPU_LOOP(parallelism='[seq]')
                     do r = -fd_number, fd_number
                         divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
                     end do
                     if (p > 0) then
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do r = -fd_number, fd_number
                             divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
                         end do
@@ -130,7 +129,6 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
 
     end subroutine s_compute_mhd_powell_rhs
 
