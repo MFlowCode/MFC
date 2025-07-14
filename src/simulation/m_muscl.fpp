@@ -169,6 +169,7 @@ contains
                                     slopeR = v_rs_ws_${XYZ}$ (j, k, l, i) - &
                                              v_rs_ws_${XYZ}$ (j - 1, k, l, i)
                                     slope = 0._wp
+
                                     if (muscl_lim == 1) then ! minmod
                                         if (slopeL*slopeR > 1e-9_wp) then
                                             slope = min(abs(slopeL), abs(slopeR))
@@ -194,6 +195,7 @@ contains
                                             slope = -1._wp*min(-min(2._wp*abs(slopeL), abs(slopeR)), -min(abs(slopeL), 2._wp*abs(slopeR)))
                                         end if
                                     end if
+
                                     ! reconstruct from left side
                                     vL_rs_vf_${XYZ}$ (j, k, l, i) = &
                                         v_rs_ws_${XYZ}$ (j, k, l, i) - (5.e-1_wp*slope)

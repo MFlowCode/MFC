@@ -1299,6 +1299,7 @@ contains
             $:GPU_UPDATE(device='[wenojs,mapped_weno,wenoz,teno]')
             $:GPU_UPDATE(device='[wenoz_q]')
             $:GPU_UPDATE(device='[mhd, relativity]')
+            $:GPU_UPDATE(device='[muscl_order, muscl_lim]')
         #:endif
 
         $:GPU_ENTER_DATA(copyin='[nb,R0ref,Ca,Web,Re_inv,weight,R0, &
