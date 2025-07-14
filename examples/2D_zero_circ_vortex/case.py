@@ -81,6 +81,7 @@ print(
             "patch_icpp(2)%x_centroid": 0,
             "patch_icpp(2)%y_centroid": 0,
             "patch_icpp(2)%radius": 1.0,
+            "patch_icpp(2)%vel(1)": 0.0,
             "patch_icpp(2)%vel(2)": 0.0,
             "patch_icpp(2)%hcid": 282,
             "patch_icpp(2)%alpha(1)": 1.0,
