@@ -99,9 +99,6 @@ contains
                     ! Ellipsoidal patch
                 elseif (patch_icpp(i)%geometry == 12) then
                     call s_ellipsoid(i, patch_id_fp, q_prim_vf)
-                    ! Analytical function patch for testing purposes
-                elseif (patch_icpp(i)%geometry == 13) then
-                    call s_3D_analytical(i, patch_id_fp, q_prim_vf)
                     ! Spherical harmonic patch
                 elseif (patch_icpp(i)%geometry == 14) then
                     call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
@@ -169,9 +166,6 @@ contains
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, '// &
                                      'which no longer exists. See Examples. Exiting.')
-                    ! Analytical function patch for testing purposes
-                elseif (patch_icpp(i)%geometry == 7) then
-                    call s_2D_analytical(i, patch_id_fp, q_prim_vf)
                     ! Spherical Harmonic Patch
                 elseif (patch_icpp(i)%geometry == 14) then
                     call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
@@ -226,9 +220,6 @@ contains
                 if (patch_icpp(i)%geometry == 1) then
                     call s_line_segment(i, patch_id_fp, q_prim_vf)
                     ! 1d analytical
-                elseif (patch_icpp(i)%geometry == 15) then
-                    call s_1d_analytical(i, patch_id_fp, q_prim_vf)
-                    ! 1d bubble screen with sinusoidal pressure pulse
                 elseif (patch_icpp(i)%geometry == 16) then
                     call s_1d_bubble_pulse(i, patch_id_fp, q_prim_vf)
                 end if
@@ -1353,24 +1344,6 @@ contains
 
     end subroutine s_2D_TaylorGreen_Vortex
 
-    !>  This patch assigns the primitive variables as analytical
-        !!  functions such that the code can be verified.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
-    subroutine s_1D_analytical(patch_id, patch_id_fp, q_prim_vf)
-        integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-
-        print *, "WARNING :: The use of the 1D analytical patch geometry has &
-        & been deprecated and will be removed in a future release. Use &
-        & `patch_icpp(patch_id)%geometry: 1` instead"
-
-        call s_line_segment(patch_id, patch_id_fp, q_prim_vf)
-
-    end subroutine s_1D_analytical
-
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
@@ -1431,43 +1404,6 @@ contains
         @:HardcodedDellacation()
 
     end subroutine s_1D_bubble_pulse
-
-    !>  This patch assigns the primitive variables as analytical
-        !!  functions such that the code can be verified.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
-    subroutine s_2D_analytical(patch_id, patch_id_fp, q_prim_vf)
-        integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-
-        print *, "WARNING :: The use of the 2D analytical patch geometry has &
-        & been deprecated and will be removed in a future release. Use &
-        & `patch_icpp(patch_id)%geometry: 3` instead"
-
-        call s_rectangle(patch_id, patch_id_fp, q_prim_vf)
-
-    end subroutine s_2D_analytical
-
-    !> This patch assigns the primitive variables as analytical
-        !!      functions such that the code can be verified.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
-    subroutine s_3D_analytical(patch_id, patch_id_fp, q_prim_vf)
-
-        integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-
-        print *, "WARNING :: The use of the 3D analytical patch geometry has &
-        & been deprecated and will be removed in a future release. Use &
-        & `patch_icpp(patch_id)%geometry: 3` instead"
-
-        call s_cuboid(patch_id, patch_id_fp, q_prim_vf)
-
-    end subroutine s_3D_analytical
 
     !> This patch generates the shape of the spherical harmonics
         !!      as a perturbation to a perfect sphere
