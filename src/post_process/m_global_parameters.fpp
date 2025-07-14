@@ -340,7 +340,7 @@ contains
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
         call s_update_cell_bounds(cells_bounds, m, n, p)
-        
+
         m_root = dflt_int
         cyl_coord = .false.
 

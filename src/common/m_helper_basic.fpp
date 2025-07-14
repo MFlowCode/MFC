@@ -147,7 +147,7 @@ contains
 
     end subroutine s_configure_coordinate_bounds
 
-        !> Updates the min and max number of cells in each set of axes
+    !> Updates the min and max number of cells in each set of axes
     !! @param bounds Min ans max values to update
     !! @param m Number of cells in x-axis
     !! @param n Number of cells in y-axis

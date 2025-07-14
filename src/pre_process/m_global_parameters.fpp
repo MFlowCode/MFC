@@ -311,7 +311,6 @@ contains
 
         call s_update_cell_bounds(cells_bounds, m, n, p)
 
-
         cyl_coord = .false.
 
         x_domain%beg = dflt_real
