@@ -96,7 +96,7 @@ print(
             "omega_wrt(3)": "T",
             "fd_order": 2,
             # Patch 1
-            "patch_icpp(1)%geometry": 7,
+            "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0,
             "patch_icpp(1)%y_centroid": 0,
             "patch_icpp(1)%length_x": 10.0,

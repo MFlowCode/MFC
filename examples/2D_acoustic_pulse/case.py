@@ -75,7 +75,7 @@ print(
             "patch_icpp(1)%alpha_rho(1)": rho_inf,
             "patch_icpp(1)%alpha(1)": 1.0,
             # Patch 2
-            "patch_icpp(2)%geometry": 7,
+            "patch_icpp(2)%geometry": 2,
             "patch_icpp(2)%x_centroid": 0,
             "patch_icpp(2)%y_centroid": 0,
             "patch_icpp(2)%radius": 1.0,

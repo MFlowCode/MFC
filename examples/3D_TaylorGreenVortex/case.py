@@ -78,7 +78,7 @@ print(
             "parallel_io": "T",
             # I will use 1 for WATER properties, and 2 for AIR properties
             # Patch 1: Background (AIR - 2)
-            "patch_icpp(1)%geometry": 13,
+            "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": 0,
             "patch_icpp(1)%y_centroid": 0,
             "patch_icpp(1)%z_centroid": 0,
