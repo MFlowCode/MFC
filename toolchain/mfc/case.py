@@ -106,7 +106,7 @@ class Case:
 
         patches = {}
 
-        # iterates over the paramters and checks if they are defined as an
+        # iterates over the parameters and checks if they are defined as an
         # analytical function. If so, append it to the `patches`` object
         for key, val in self.params.items():
             if not self.__is_ic_analytical(key, val):

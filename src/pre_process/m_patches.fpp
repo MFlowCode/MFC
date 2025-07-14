@@ -1364,7 +1364,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         print *, "WARNING :: The use of the 1D analytical patch geometry has &
-        & been depricated and will be removed in a future release. Use &
+        & been deprecated and will be removed in a future release. Use &
         & `patch_icpp(patch_id)%geometry: 1` instead"
 
         call s_line_segment(patch_id, patch_id_fp, q_prim_vf)
@@ -1443,7 +1443,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         print *, "WARNING :: The use of the 2D analytical patch geometry has &
-        & been depricated and will be removed in a future release. Use &
+        & been deprecated and will be removed in a future release. Use &
         & `patch_icpp(patch_id)%geometry: 3` instead"
 
         call s_rectangle(patch_id, patch_id_fp, q_prim_vf)
@@ -1462,7 +1462,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         print *, "WARNING :: The use of the 3D analytical patch geometry has &
-        & been depricated and will be removed in a future release. Use &
+        & been deprecated and will be removed in a future release. Use &
         & `patch_icpp(patch_id)%geometry: 3` instead"
 
         call s_cuboid(patch_id, patch_id_fp, q_prim_vf)
