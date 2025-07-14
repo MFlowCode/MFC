@@ -62,7 +62,7 @@ contains
                                      'is no longer supported for patch '//trim(iStr)// &
                                      '. Exiting.')
                 elseif (patch_icpp(i)%geometry == 7) then
-                    call s_mpi_abort('geometry 7 (formerly "2D Harcoded")'// &
+                    call s_mpi_abort('geometry 7 (formerly "2D Hardcoded")'// &
                                      'is no longer supported for patch '//trim(iStr)// &
                                      '. Exiting.')
                 elseif (patch_icpp(i)%geometry == 8) then
@@ -76,13 +76,13 @@ contains
                 elseif (patch_icpp(i)%geometry == 12) then
                     call s_check_ellipsoid_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 13) then
-                    call s_mpi_abort('geometry 13 (formerly "3D Harcoded")'// &
+                    call s_mpi_abort('geometry 13 (formerly "3D Hardcoded")'// &
                                      'is no longer supported for patch '//trim(iStr)// &
                                      '. Exiting.')
                 elseif (patch_icpp(i)%geometry == 14) then
                     call s_check_spherical_harmonic_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 15) then
-                    call s_mpi_abort('geometry 15 (formerly "1D Harcoded")'// &
+                    call s_mpi_abort('geometry 15 (formerly "1D Hardcoded")'// &
                                      'is no longer supported for patch '//trim(iStr)// &
                                      '. Exiting.')
                 elseif (patch_icpp(i)%geometry == 16) then
