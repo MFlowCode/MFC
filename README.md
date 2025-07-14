@@ -1,4 +1,7 @@
 <p align="center">
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+[![All Contributors](https://img.shields.io/badge/all_contributors-25-orange.svg?style=flat-square)](#contributors-)
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
   <a href="http://mflowcode.github.io/">
     <img src="docs/res/readme.png" alt="MFC Banner" width="500"/>
   </a>
@@ -231,3 +234,66 @@ MFC computations have used many supercomputing systems. A partial list is below
   * DOD systems Onyx, Carpenter, Nautilus, and Narwhal via the DOD HPCMP program
   * Sandia National Labs systems Doom and Attaway and testbed systems Weaver and Vortex
 
+
+## Contributors ✨
+
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+[![All Contributors](https://img.shields.io/badge/all_contributors-0-orange.svg?style=flat-square)](#contributors-)
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/sbryngelson"><img src="https://avatars.githubusercontent.com/u/39740593?v=4?s=100" width="100px;" alt="Spencer Bryngelson"/><br /><sub><b>Spencer Bryngelson</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=sbryngelson" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/henryleberre"><img src="https://avatars.githubusercontent.com/u/24208000?v=4?s=100" width="100px;" alt="Henry Le Berre"/><br /><sub><b>Henry Le Berre</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=henryleberre" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/wilfonba"><img src="https://avatars.githubusercontent.com/u/48168887?v=4?s=100" width="100px;" alt="Ben Wilfong"/><br /><sub><b>Ben Wilfong</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=wilfonba" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/haochey"><img src="https://avatars.githubusercontent.com/u/98496194?v=4?s=100" width="100px;" alt="Haocheng Yu"/><br /><sub><b>Haocheng Yu</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=haochey" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/hyeoksu-lee"><img src="https://avatars.githubusercontent.com/u/121892187?v=4?s=100" width="100px;" alt="Hyeoksu Lee"/><br /><sub><b>Hyeoksu Lee</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=hyeoksu-lee" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/anandrdbz"><img src="https://avatars.githubusercontent.com/u/62814442?v=4?s=100" width="100px;" alt="anandrdbz"/><br /><sub><b>anandrdbz</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=anandrdbz" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/anshgupta1234"><img src="https://avatars.githubusercontent.com/u/38015438?v=4?s=100" width="100px;" alt="Ansh Gupta"/><br /><sub><b>Ansh Gupta</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=anshgupta1234" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ChrisZYJ"><img src="https://avatars.githubusercontent.com/u/120074479?v=4?s=100" width="100px;" alt="Yanjun Zhang"/><br /><sub><b>Yanjun Zhang</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=ChrisZYJ" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/okBrian"><img src="https://avatars.githubusercontent.com/u/63064763?v=4?s=100" width="100px;" alt="Brian Ok"/><br /><sub><b>Brian Ok</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=okBrian" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/RasmitDevkota"><img src="https://avatars.githubusercontent.com/u/20760979?v=4?s=100" width="100px;" alt="Rasmit Devkota"/><br /><sub><b>Rasmit Devkota</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=RasmitDevkota" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/js-spratt"><img src="https://avatars.githubusercontent.com/u/37048159?v=4?s=100" width="100px;" alt="Jean-Sebastien Spratt"/><br /><sub><b>Jean-Sebastien Spratt</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=js-spratt" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/malmahrouqi3"><img src="https://avatars.githubusercontent.com/u/145478595?v=4?s=100" width="100px;" alt="Mohammed S. Al-Mahrouqi"/><br /><sub><b>Mohammed S. Al-Mahrouqi</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=Malmahrouqi3" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/AiredaleDev"><img src="https://avatars.githubusercontent.com/u/71239694?v=4?s=100" width="100px;" alt="Cameron"/><br /><sub><b>Cameron</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=AiredaleDev" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/XZTian64"><img src="https://avatars.githubusercontent.com/u/195029395?v=4?s=100" width="100px;" alt="Xuzheng Tian"/><br /><sub><b>Xuzheng Tian</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=XZTian64" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/DimAdam-01"><img src="https://avatars.githubusercontent.com/u/153962156?v=4?s=100" width="100px;" alt="Dimitrios Adam"/><br /><sub><b>Dimitrios Adam</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=DimAdam-01" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/JRChreim"><img src="https://avatars.githubusercontent.com/u/22774282?v=4?s=100" width="100px;" alt="JRChreim"/><br /><sub><b>JRChreim</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=JRChreim" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/max-Hawkins"><img src="https://avatars.githubusercontent.com/u/37495064?v=4?s=100" width="100px;" alt="Max Hawkins"/><br /><sub><b>Max Hawkins</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=max-Hawkins" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/prathi-wind"><img src="https://avatars.githubusercontent.com/u/128338570?v=4?s=100" width="100px;" alt="Tanush Prathi"/><br /><sub><b>Tanush Prathi</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=prathi-wind" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/dgvacarevelo"><img src="https://avatars.githubusercontent.com/u/143528660?v=4?s=100" width="100px;" alt="Diego Vaca Revelo"/><br /><sub><b>Diego Vaca Revelo</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=dgvacarevelo" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/belericant"><img src="https://avatars.githubusercontent.com/u/17969913?v=4?s=100" width="100px;" alt="Eric Dong"/><br /><sub><b>Eric Dong</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=belericant" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://vivo.brown.edu/display/mrodri97"><img src="https://avatars.githubusercontent.com/u/19245739?v=4?s=100" width="100px;" alt="Mauro Rodriguez Jr"/><br /><sub><b>Mauro Rodriguez Jr</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=mrodrig6" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/aricer123"><img src="https://avatars.githubusercontent.com/u/107273558?v=4?s=100" width="100px;" alt="aricer123"/><br /><sub><b>aricer123</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=aricer123" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Sam-Briney"><img src="https://avatars.githubusercontent.com/u/46232496?v=4?s=100" width="100px;" alt="Sam-Briney"/><br /><sub><b>Sam-Briney</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=Sam-Briney" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/abbotts"><img src="https://avatars.githubusercontent.com/u/13371405?v=4?s=100" width="100px;" alt="Steve Abbott"/><br /><sub><b>Steve Abbott</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=abbotts" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/arjunj05"><img src="https://avatars.githubusercontent.com/u/88004187?v=4?s=100" width="100px;" alt="arjunj05"/><br /><sub><b>arjunj05</b></sub></a><br /><a href="https://github.com/sbryngelson/MFC/commits?author=arjunj05" title="Code">💻</a></td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr>
+      <td align="center" size="13px" colspan="7">
+        <img src="https://raw.githubusercontent.com/all-contributors/all-contributors-cli/1b8533af435da9854653492b1327a23a4dbd0a10/assets/logo-small.svg">
+          <a href="https://all-contributors.js.org/docs/en/bot/usage">Add your contributions</a>
+        </img>
+      </td>
+    </tr>
+  </tfoot>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+Thanks goes to these wonderful people ✨
