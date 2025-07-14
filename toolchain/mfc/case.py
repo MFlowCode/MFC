@@ -181,7 +181,6 @@ class Case:
 {f'{chr(10)}{chr(10)}'.join(srcs)}
 #:enddef
 """
-
         return content
 
     def __get_sim_fpp(self, print: bool) -> str:
