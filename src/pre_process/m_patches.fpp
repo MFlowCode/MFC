@@ -297,7 +297,7 @@ contains
                 @:analytical()
 
                 ! check if this should load a hardcoded patch
-                if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                if (patch_icpp(patch_id)%hcid /= dflt_int) then
                     @:Hardcoded1D()
                 end if
 
@@ -367,7 +367,7 @@ contains
                                                             eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
-                    if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                    if (patch_icpp(patch_id)%hcid /= dflt_int) then
                         @:Hardcoded2D()
                     end if
 
@@ -457,7 +457,7 @@ contains
                                                                 eta, q_prim_vf, patch_id_fp)
 
                         @:analytical()
-                        if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                        if (patch_icpp(patch_id)%hcid /= dflt_int) then
                             @:Hardcoded2D()
                         end if
 
@@ -852,7 +852,7 @@ contains
                                                             eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
-                    if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                    if (patch_icpp(patch_id)%hcid /= dflt_int) then
                         @:Hardcoded2D()
                     end if
 
@@ -921,7 +921,7 @@ contains
                                                                 eta, q_prim_vf, patch_id_fp)
 
                         @:analytical()
-                        if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                        if (patch_icpp(patch_id)%hcid /= dflt_int) then
                             @:Hardcoded3D()
                         end if
 
@@ -998,7 +998,7 @@ contains
                                                             eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
-                    if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                    if (patch_icpp(patch_id)%hcid /= dflt_int) then
                         @:Hardcoded2D()
                     end if
 
@@ -1084,7 +1084,7 @@ contains
                                                                 eta, q_prim_vf, patch_id_fp)
 
                         @:analytical()
-                        if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                        if (patch_icpp(patch_id)%hcid /= dflt_int) then
                             @:Hardcoded3D()
                         end if
 
@@ -1174,7 +1174,7 @@ contains
 
                             @:analytical()
 
-                            if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                            if (patch_icpp(patch_id)%hcid /= dflt_int) then
                                 @:Hardcoded2D()
                             end if
 
@@ -1257,7 +1257,7 @@ contains
                                                             eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
-                    if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                    if (patch_icpp(patch_id)%hcid /= dflt_int) then
                         @:Hardcoded3D()
                     end if
 
@@ -1333,7 +1333,7 @@ contains
                                                             eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
-                    if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                    if (patch_icpp(patch_id)%hcid /= dflt_int) then
                         @:Hardcoded2D()
                     end if
 
@@ -1368,7 +1368,7 @@ contains
         & `patch_icpp(patch_id)%geometry: 1` instead"
 
         call s_line_segment(patch_id, patch_id_fp, q_prim_vf)
-        
+
     end subroutine s_1D_analytical
 
         !! @param patch_id is the patch identifier
@@ -1422,7 +1422,7 @@ contains
                                                         eta, q_prim_vf, patch_id_fp)
 
                 @:analytical()
-                if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                if (patch_icpp(patch_id)%hcid /= dflt_int) then
                     @:Hardcoded1D()
                 end if
 
@@ -1442,7 +1442,7 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        print *,  "WARNING :: The use of the 2D analytical patch geometry has &
+        print *, "WARNING :: The use of the 2D analytical patch geometry has &
         & been depricated and will be removed in a future release. Use &
         & `patch_icpp(patch_id)%geometry: 3` instead"
 
@@ -1461,7 +1461,7 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        print *,  "WARNING :: The use of the 3D analytical patch geometry has &
+        print *, "WARNING :: The use of the 3D analytical patch geometry has &
         & been depricated and will be removed in a future release. Use &
         & `patch_icpp(patch_id)%geometry: 3` instead"
 
@@ -1700,7 +1700,7 @@ contains
                                                                     eta, q_prim_vf, patch_id_fp)
 
                             @:analytical()
-                            if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                            if (patch_icpp(patch_id)%hcid /= dflt_int) then
                                 @:Hardcoded3D()
                             end if
 
@@ -1799,7 +1799,7 @@ contains
                                                                         eta, q_prim_vf, patch_id_fp)
 
                                 @:analytical()
-                                if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                                if (patch_icpp(patch_id)%hcid /= dflt_int) then
                                     @:Hardcoded3D()
                                 end if
 
@@ -1959,7 +1959,7 @@ contains
                                                                     eta, q_prim_vf, patch_id_fp)
 
                             @:analytical()
-                            if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                            if (patch_icpp(patch_id)%hcid /= dflt_int) then
                                 @:Hardcoded3D()
                             end if
 
@@ -2047,7 +2047,7 @@ contains
                                                                 eta, q_prim_vf, patch_id_fp)
 
                         @:analytical()
-                        if (patch_icpp(patch_id)%hcid .ne. dflt_int) then
+                        if (patch_icpp(patch_id)%hcid /= dflt_int) then
                             @:Hardcoded3D()
                         end if
 
