@@ -85,7 +85,7 @@ print(
             "patch_icpp(2)%vel(2)": 0.0,
             "patch_icpp(2)%pres": 0.0,
             "patch_icpp(2)%alpha_rho(1)": 0.0,
-            "patch_icpp(2)%hcid": 280,
+            "patch_icpp(2)%hcid": 282,
             "patch_icpp(2)%alpha(1)": 1.0,
             "patch_icpp(2)%alter_patch(1)": "T",
             # CBC Inflow / Outflow
