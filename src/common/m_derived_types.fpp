@@ -141,13 +141,13 @@ module m_derived_types
         character(LEN=pathlen_max) :: filepath !<
         !! Path the STL file relative to case_dir.
 
-        t_vec3 :: translate !<
+        real(wp), dimension(1:3) :: translate !<
         !! Translation of the STL object.
 
-        t_vec3 :: scale !<
+        real(wp), dimension(1:3) :: scale !<
         !! Scale factor for the STL object.
 
-        t_vec3 :: rotate !<
+        real(wp), dimension(1:3) :: rotate !<
         !! Angle to rotate the STL object along each cartesian coordinate axis,
         !! in radians.
 
@@ -160,17 +160,17 @@ module m_derived_types
 
     type :: t_triangle
         real(wp), dimension(1:3, 1:3) :: v ! Vertices of the triangle
-        t_vec3 :: n ! Normal vector
+        real(wp), dimension(1:3) :: n ! Normal vector
     end type t_triangle
 
     type :: t_ray
-        t_vec3 :: o ! Origin
-        t_vec3 :: d ! Direction
+        real(wp), dimension(1:3) :: o ! Origin
+        real(wp), dimension(1:3) :: d ! Direction
     end type t_ray
 
     type :: t_bbox
-        t_vec3 :: min ! Minimum coordinates
-        t_vec3 :: max ! Maximum coordinates
+        real(wp), dimension(1:3) :: min ! Minimum coordinates
+        real(wp), dimension(1:3) :: max ! Maximum coordinates
     end type t_bbox
 
     type :: t_model
@@ -265,13 +265,13 @@ module m_derived_types
         character(LEN=pathlen_max) :: model_filepath !<
         !! Path the STL file relative to case_dir.
 
-        t_vec3 :: model_translate !<
+        real(wp), dimension(1:3) :: model_translate !<
         !! Translation of the STL object.
 
-        t_vec3 :: model_scale !<
+        real(wp), dimension(1:3) :: model_scale !<
         !! Scale factor for the STL object.
 
-        t_vec3 :: model_rotate !<
+        real(wp), dimension(1:3) :: model_rotate !<
         !! Angle to rotate the STL object along each cartesian coordinate axis,
         !! in radians.
 
@@ -303,13 +303,13 @@ module m_derived_types
         character(LEN=pathlen_max) :: model_filepath !<
         !! Path the STL file relative to case_dir.
 
-        t_vec3 :: model_translate !<
+        real(wp), dimension(1:3) :: model_translate !<
         !! Translation of the STL object.
 
-        t_vec3 :: model_scale !<
+        real(wp), dimension(1:3) :: model_scale !<
         !! Scale factor for the STL object.
 
-        t_vec3 :: model_rotate !<
+        real(wp), dimension(1:3) :: model_rotate !<
         !! Angle to rotate the STL object along each cartesian coordinate axis,
         !! in radians.
 
