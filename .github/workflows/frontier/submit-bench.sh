@@ -32,7 +32,7 @@ sbatch <<EOT
 #SBATCH -A CFD154                  # charge account
 #SBATCH -N 1                       # Number of nodes required
 $sbatch_device_opts
-#SBATCH -t 03:59:00                # Duration of the job (Ex: 15 mins)
+#SBATCH -t 01:59:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -o$job_slug.out            # Combined output and error messages file
 #SBATCH -p extended                # Extended partition for shorter queues
 #SBATCH -W                         # Do not exit until the submitted job terminates.
