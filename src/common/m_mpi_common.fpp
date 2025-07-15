@@ -67,10 +67,10 @@ contains
                                          & (m + 2*buff_size + 1)* &
                                          & (n + 2*buff_size + 1)* &
                                          & (p + 2*buff_size + 1)/ &
-                                         & (min(m, n, p) + 2*buff_size + 1))
+                                         & (cells_bounds%mnp_min + 2*buff_size + 1))
             else
                 halo_size = -1 + buff_size*(v_size)* &
-                                         & (max(m, n) + 2*buff_size + 1)
+                                         & (cells_bounds%mn_max + 2*buff_size + 1)
             end if
         else
             halo_size = -1 + buff_size*(v_size)
@@ -1445,6 +1445,8 @@ contains
                 m = m + 1; exit
             end if
         end do
+
+        call s_update_cell_bounds(cells_bounds, m, n, p)
 
         ! Boundary condition at the beginning
         if (proc_coords(1) > 0 .or. (bc_x%beg == BC_PERIODIC .and. num_procs_x > 1)) then

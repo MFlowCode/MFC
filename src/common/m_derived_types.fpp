@@ -443,4 +443,10 @@ module m_derived_types
 
     end type bubbles_lagrange_parameters
 
+    !> Max and min number of cells in a direction of each combination of x-,y-, and z-
+    type cell_num_bounds
+        integer :: mn_max, np_max, mp_max, mnp_max
+        integer :: mn_min, np_min, mp_min, mnp_min
+    end type cell_num_bounds
+
 end module m_derived_types
