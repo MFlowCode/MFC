@@ -255,7 +255,7 @@ contains
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1._wp + gamma)/gamma
-        j = 0.0_wp
+        j = 0
         k = 0.0_wp
 
         ! Transferring the line segment's centroid and length information
