@@ -1,7 +1,7 @@
 {
     "editor.detectIndentation": false,
     "editor.insertSpaces":      true,
-    "editor.tabSize":           4,
+    "editor.tabSize":           2,
     "editor.rulers":            [ 80, 120 ],
     "files.exclude": {
         "**/.git":      true,
@@ -9,6 +9,7 @@
         "**/build":     true,
         "**/*.o":       true,
         "**/*.mod":     true,
+        "**/misc/**":   true
     },
 
     "cmake.configureOnOpen": false,
@@ -17,15 +18,78 @@
 
     "files.associations": {
         "*.f90": "FortranFreeForm",
-        "*.fpp": "FortranFreeForm",
+        "*.fpp": "FortranFreeForm"
     },
 
-    "fortran.preferredCase":       "lowercase",
-    "fortran.linter.includePaths": [
-        "${workspacefolder}/src/${fileDirname}",
-        "${workspacefolder}/src/${fileDirname}/include",
-        "${workspacefolder}/src/common",
-        "${workspacefolder}/src/common/include"
-    ],
-    "fortran.linter.extraArgs":    ["--free-form"],
+    // Disable the extension entirely at workspace level
+    "extensions.ignoreRecommendations": true,
+    "extensions.autoCheckUpdates": false,
+    
+    "fortran.preferredCase": "lowercase",
+    
+    // Disable built-in linter completely but enable fortls
+    "fortran.disabled": false,
+    "fortran.linter.enabled": false,
+    "fortran.linter.gfortran.enabled": false,
+    "fortran.linter.compiler": "",
+    "fortran.linter.diagnostics": false,
+    "fortran.linter.gfortran.diagnostics": false,
+    "fortran.linter.modOutput": "",
+    "fortran.linter.includePaths": [],
+    "fortran.linter.extraArgs": [],
+    "fortran.provideDiagnostics": false,
+    "fortran.provideCompletion": false,
+    "fortran.provideHover": false,
+    "fortran.provideSymbols": false,
+    "fortran.validation.enabled": false,
+    "fortran.validation.diagnostics": false,
+    "fortran.symbols": false,
+    "fortran.hover": false,
+    
+    // Enable ONLY fortls language server
+    "fortran.enableLanguageServer": true,
+    "fortran.languageServer": "fortls",
+    "fortran.fortls.disabled": false,
+    "fortran.fortls.path": "fortls",
+    
+    // Try to disable any built-in language features
+    "editor.semanticHighlighting.enabled": false,
+    "editor.suggest.showWords": false,
+    "editor.suggest.showSnippets": false,
+    
+    "[fortran]": {
+        "editor.tabSize": 2,
+        "editor.semanticHighlighting.enabled": false
+    },
+    "[fortran-free]": {
+        "editor.tabSize": 2,
+        "editor.semanticHighlighting.enabled": false
+    },
+    "[FortranFreeForm]": {
+        "editor.tabSize": 2,
+        "editor.semanticHighlighting.enabled": false
+    },
+    
+    // File exclusions - multiple layers of exclusion
+    "files.watcherExclude": {
+        "**/misc/**": true,
+        "**/benchmarks/**": true,
+        "**/examples/**": true,
+        "**/tests/**": true,
+        "**/build/**": true,
+        "**/m_nvtx*": true,
+        "**/syscheck.fpp": true
+    },
+    
+    "search.exclude": {
+        "**/misc/**": true,
+        "**/benchmarks/**": true,
+        "**/examples/**": true,
+        "**/tests/**": true,
+        "**/build/**": true
+    },
+    
+    // Keep problems panel available
+    "problems.showOn": "toggle",
+    "problems.defaultViewMode": "list"
 }

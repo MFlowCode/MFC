@@ -16,7 +16,8 @@ module m_helper_basic
               f_is_default, &
               f_all_default, &
               f_is_integer, &
-              s_configure_coordinate_bounds
+              s_configure_coordinate_bounds, &
+              s_update_cell_bounds
 
 contains
 
@@ -145,5 +146,25 @@ contains
         idwbuff(3)%end = idwint(3)%end - idwbuff(3)%beg
 
     end subroutine s_configure_coordinate_bounds
+
+    !> Updates the min and max number of cells in each set of axes
+    !! @param bounds Min ans max values to update
+    !! @param m Number of cells in x-axis
+    !! @param n Number of cells in y-axis
+    !! @param p Number of cells in z-axis
+    pure elemental subroutine s_update_cell_bounds(bounds, m, n, p)
+        type(cell_num_bounds), intent(out) :: bounds
+        integer, intent(in) :: m, n, p
+
+        bounds%mn_max = max(m, n)
+        bounds%np_max = max(n, p)
+        bounds%mp_max = max(m, p)
+        bounds%mnp_max = max(m, n, p)
+        bounds%mn_min = min(m, n)
+        bounds%np_min = min(n, p)
+        bounds%mp_min = min(m, p)
+        bounds%mnp_min = min(m, n, p)
+
+    end subroutine s_update_cell_bounds
 
 end module m_helper_basic
