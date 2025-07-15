@@ -8,7 +8,7 @@ gam_a = 1.4
 p0 = 101325
 rho0 = 1
 c0 = math.sqrt(gam_a * p0 / rho0)
-v0 = 3*c0
+v0 = 3 * c0
 mu = v0 * h / Re
 
 # Configuring case dictionary
@@ -82,6 +82,7 @@ print(
             "fluid_pp(1)%gamma": 1.0 / (gam_a - 1.0),
             "fluid_pp(1)%pi_inf": 0.0,
             "fluid_pp(1)%Re(1)": 1 / mu,
-        }, indent=4
+        },
+        indent=4,
     )
 )
