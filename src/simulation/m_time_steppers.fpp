@@ -1020,9 +1020,9 @@ contains
             end do
         end do
 
-        !$acc kernels
-        dt_local = minval(max_dt)
-        !$acc end kernels
+        #:call GPU_PARALLEL(copyout='[dt_local]', copyin='[max_dt]')
+            dt_local = minval(max_dt)
+        #:endcall GPU_PARALLEL
 
         if (num_procs == 1) then
             dt = dt_local

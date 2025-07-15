@@ -62,10 +62,10 @@ contains
                                             & (m + 2*gp_layers + 1)* &
                                             & (n + 2*gp_layers + 1)* &
                                             & (p + 2*gp_layers + 1)/ &
-                                            & (min(m, n, p) + 2*gp_layers + 1)
+                                            & (cells_bounds%mnp_min + 2*gp_layers + 1)
                 else
                     i_halo_size = -1 + gp_layers* &
-                                            & (max(m, n) + 2*gp_layers + 1)
+                                            & (cells_bounds%mn_max + 2*gp_layers + 1)
                 end if
             else
                 i_halo_size = -1 + gp_layers

@@ -215,6 +215,8 @@ contains
             n_glb = n
             p_glb = p
 
+            call s_update_cell_bounds(cells_bounds, m, n, p)
+
             if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. &

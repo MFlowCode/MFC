@@ -43,6 +43,9 @@ module m_global_parameters
     integer :: m, n, p
     !> @}
 
+    !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
+    type(cell_num_bounds) :: cells_bounds
+
     !> @name Global number of cells in each direction
     !> @{
     integer :: m_glb, n_glb, p_glb
@@ -286,10 +289,11 @@ module m_global_parameters
     !! numbers, will be non-negligible.
     !> @{
     integer, dimension(2) :: Re_size
+    integer :: Re_size_max
     integer, allocatable, dimension(:, :) :: Re_idx
     !> @}
 
-    $:GPU_DECLARE(create='[Re_size,Re_idx]')
+    $:GPU_DECLARE(create='[Re_size,Re_size_max,Re_idx]')
 
     ! The WENO average (WA) flag regulates whether the calculation of any cell-
     ! average spatial derivatives is carried out in each cell by utilizing the
@@ -538,6 +542,7 @@ contains
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
+        call s_update_cell_bounds(cells_bounds, m, n, p)
 
         cyl_coord = .false.
 
@@ -830,6 +835,7 @@ contains
         ! of fluids for which the physical and geometric curvatures of the
         ! interfaces will be computed
         Re_size = 0
+        Re_size_max = 0
 
         ! Gamma/Pi_inf Model
         if (model_eqns == 1) then
@@ -1065,13 +1071,15 @@ contains
             if (Re_size(1) > 0._wp) shear_stress = .true.
             if (Re_size(2) > 0._wp) bulk_stress = .true.
 
-            $:GPU_UPDATE(device='[Re_size,viscous,shear_stress,bulk_stress]')
+            Re_size_max = maxval(Re_size)
+
+            $:GPU_UPDATE(device='[Re_size,Re_size_max,viscous,shear_stress,bulk_stress]')
 
             ! Bookkeeping the indexes of any viscous fluids and any pairs of
             ! fluids whose interface will support effects of surface tension
             if (viscous) then
 
-                @:ALLOCATE(Re_idx(1:2, 1:maxval(Re_size)))
+                @:ALLOCATE(Re_idx(1:2, 1:Re_size_max))
 
                 k = 0
                 do i = 1, num_fluids
@@ -1197,8 +1205,6 @@ contains
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
         Np = 0
-
-        $:GPU_UPDATE(device='[Re_size]')
 
         if (elasticity) then
             fd_number = max(1, fd_order/2)
