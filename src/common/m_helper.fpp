@@ -319,8 +319,8 @@ contains
     pure function f_create_transform_matrix(p, center) result(out_matrix)
 
         type(ic_model_parameters), intent(in) :: p
-        t_vec3, optional, intent(in) :: center
-        t_mat4x4 :: sc, rz, rx, ry, tr, t_back, t_to_origin, out_matrix
+        real(wp), dimension(1:3), optional, intent(in) :: center
+        real(wp), dimension(1:4, 1:4) :: sc, rz, rx, ry, tr, t_back, t_to_origin, out_matrix
 
         sc = transpose(reshape([ &
                                p%scale(1), 0._wp, 0._wp, 0._wp, &
@@ -379,8 +379,8 @@ contains
     !! @param matrix Transformation matrix.
     pure subroutine s_transform_vec(vec, matrix)
 
-        t_vec3, intent(inout) :: vec
-        t_mat4x4, intent(in) :: matrix
+        real(wp), dimension(1:3), intent(inout) :: vec
+        real(wp), dimension(1:4, 1:4), intent(in) :: matrix
 
         real(wp), dimension(1:4) :: tmp
 
@@ -395,7 +395,7 @@ contains
     pure subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
         type(t_triangle), intent(inout) :: triangle
-        t_mat4x4, intent(in) :: matrix, matrix_n
+        real(wp), dimension(1:4, 1:4), intent(in) :: matrix, matrix_n
 
         integer :: i
 
@@ -413,7 +413,7 @@ contains
     pure subroutine s_transform_model(model, matrix, matrix_n)
 
         type(t_model), intent(inout) :: model
-        t_mat4x4, intent(in) :: matrix, matrix_n
+        real(wp), dimension(1:4, 1:4), intent(in) :: matrix, matrix_n
 
         integer :: i
 
