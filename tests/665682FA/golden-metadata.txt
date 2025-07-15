@@ -1,12 +1,12 @@
-This file was created on 2025-07-14 23:30:51.362578.
+This file was created on 2025-07-15 19:32:14.339203.
 
 mfc.sh:
 
-    Invocation: test --generate -o 665682FA -j 8
+    Invocation: test -o 665682FA --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        fdc378f6b15743eac7531e4c519a8ea62e48eb32 on BackwardFacingStep (clean)
+    Git:        d7d5f10ee95f9edde94f18d5b886b7a9deb3f75e on BackwardFacingStep (dirty)
 
-simulation:
+pre_process:
 
     CMake Configuration:
     
@@ -15,8 +15,8 @@ simulation:
         C       : AppleClang v17.0.0.17000013 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -105,6 +105,39 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.31.3 on ipsec-10-2-192-197.vpn.gatech.edu
+    
+        C       : AppleClang v17.0.0.17000013 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 documentation:
 
     CMake Configuration:
@@ -126,39 +159,6 @@ documentation:
     
         Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
         Doxygen : /opt/homebrew/bin/doxygen
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.31.3 on ipsec-10-2-192-197.vpn.gatech.edu
-    
-        C       : AppleClang v17.0.0.17000013 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
-        Doxygen : 
     
         Build Type : Release
     
