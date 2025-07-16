@@ -253,7 +253,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if "inf," in output:
                 raise MFCException(f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
-    case.delete_output()
+    #case.delete_output()
 
     end_time = time.time()
     duration = end_time - start_time
