@@ -460,7 +460,6 @@ contains
 
     end subroutine s_circle
 
-    ! TODO :: Determine if we want analytical and hardcoded patches for the airfoil geometries
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
     !! @param q_prim_vf Array of primitive variables

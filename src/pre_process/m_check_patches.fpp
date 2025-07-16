@@ -81,14 +81,6 @@ contains
                 elseif (patch_icpp(i)%geometry == 15) then
                     call s_prohibit_abort("Invalid patch geometry number", "patch_icpp("//trim(iStr)//")%geometry "// &
                                           "is deprecated")
-                elseif (patch_icpp(i)%geometry == 16) then
-                    print *, '1d pressure sinusoid'
-                elseif (patch_icpp(i)%geometry == 17) then
-                    print *, '2d spiral'
-                elseif (patch_icpp(i)%geometry == 18) then
-                    print *, '2d var circle'
-                elseif (patch_icpp(i)%geometry == 19) then
-                    print *, '3d var circle'
                 elseif (patch_icpp(i)%geometry == 20) then
                     call s_check_2D_TaylorGreen_vortex_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 21) then
