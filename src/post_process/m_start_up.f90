@@ -111,6 +111,9 @@ contains
             end if
 
             close (1)
+
+            call s_update_cell_bounds(cells_bounds, m, n, p)
+
             ! Store m,n,p into global m,n,p
             m_glb = m
             n_glb = n
