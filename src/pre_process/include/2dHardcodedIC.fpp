@@ -165,10 +165,10 @@
         ! 2D_isentropicvortex case:
         ! This analytic patch uses geometry 2
         if (patch_id == 1) then
-            q_prim_vf(E_idx)%sf(i, j, 0) = 1.0*(1.0 - (1.0/1.0)*(5.0/(2.0*3.141592653589793))*(5.0/(8.0*1.0*(1.4 + 1.0)*3.141592653589793))*exp(2.0*1.0*(1.0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0)))**(1.4 + 1.0)
-            q_prim_vf(contxb + 0)%sf(i, j, 0) = 1.0*(1.0 - (1.0/1.0)*(5.0/(2.0*3.141592653589793))*(5.0/(8.0*1.0*(1.4 + 1.0)*3.141592653589793))*exp(2.0*1.0*(1.0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0)))**1.4
-            q_prim_vf(momxb + 0)%sf(i, j, 0) = 0.0 + (y_cc(j) - patch_icpp(1)%y_centroid)*(5.0/(2.0*3.141592653589793))*exp(1.0*(1.0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
-            q_prim_vf(momxb + 1)%sf(i, j, 0) = 0.0 - (x_cc(i) - patch_icpp(1)%x_centroid)*(5.0/(2.0*3.141592653589793))*exp(1.0*(1.0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
+            q_prim_vf(E_idx)%sf(i, j, 0) = 1.0*(1.0 - (1.0/1.0)*(5.0/(2.0*pi))*(5.0/(8.0*1.0*(1.4 + 1.0)*pi))*exp(2.0*1.0*(1.0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0)))**(1.4 + 1.0)
+            q_prim_vf(contxb + 0)%sf(i, j, 0) = 1.0*(1.0 - (1.0/1.0)*(5.0/(2.0*pi))*(5.0/(8.0*1.0*(1.4 + 1.0)*pi))*exp(2.0*1.0*(1.0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0)))**1.4
+            q_prim_vf(momxb + 0)%sf(i, j, 0) = 0.0 + (y_cc(j) - patch_icpp(1)%y_centroid)*(5.0/(2.0*pi))*exp(1.0*(1.0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
+            q_prim_vf(momxb + 1)%sf(i, j, 0) = 0.0 - (x_cc(i) - patch_icpp(1)%x_centroid)*(5.0/(2.0*pi))*exp(1.0*(1.0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
         end if
 
     case (281)

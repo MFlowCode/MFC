@@ -18,7 +18,7 @@
     case (181)
         ! This is patch is hard-coded for test suite optimization used in the
         ! 1D_titarevtorro cases: "patch_icpp(2)%alpha_rho(1)": "1 + 0.1*sin(20*x*pi)"
-        q_prim_vf(contxb + 0)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*3.141592653589793)
+        q_prim_vf(contxb + 0)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*pi)
 
     case default
         call s_int_to_str(patch_id, iStr)
