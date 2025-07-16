@@ -314,7 +314,7 @@ These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch 
 #### Parameter Descriptions
 
 - `geometry` defines the type of geometry of a patch with an integer number.
-Definitions for currently implemented patch types are list in table [Patch Types](#patch-types).
+Definitions for currently implemented patch types are listed in table [Patch Types](#patch-types). A table of allowed geometries for immersed boundaries patch types are listed in table [Immersed Boundary Patch Type](#immersed-boundary-patch-types).
 
 - `x[y,z]_centroid` is the centroid location of the patch in the x[y,z]-direction
 
