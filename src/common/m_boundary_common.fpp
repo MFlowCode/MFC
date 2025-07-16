@@ -1470,9 +1470,9 @@ contains
 
         integer :: j, k, l
 
-        !$acc kernels
-        jac_sf(1)%sf => jac
-        !$acc end kernels
+        #:call GPU_PARALLEL()
+            jac_sf(1)%sf => jac
+        #:endcall GPU_PARALLEL
 
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 1, -1, 1)
