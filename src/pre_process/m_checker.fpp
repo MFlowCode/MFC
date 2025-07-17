@@ -48,6 +48,7 @@ contains
     impure subroutine s_check_inputs_restart
         logical :: skip_check !< Flag to skip the check when iterating over
         !! x, y, and z directions, for special treatment of cylindrical coordinates
+        integer :: i
 
         @:PROHIBIT((.not. old_grid) .and. old_ic, &
             "old_ic can only be enabled with old_grid enabled")
