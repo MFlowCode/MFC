@@ -46,6 +46,17 @@ contains
             if (i <= num_patches) then
                 ! call s_check_patch_geometry(i)
                 call s_int_to_str(i, iStr)
+                @:PROHIBIT(patch_icpp(i)%geometry == 6, "Invalid patch geometry number. "// &
+                                          "patch_icpp("//trim(iStr)//")%geometry is deprecated.")
+                @:PROHIBIT(patch_icpp(i)%geometry == 7, "Invalid patch geometry number. "// &
+                                          "patch_icpp("//trim(iStr)//")%geometry is deprecated.")
+                @:PROHIBIT(patch_icpp(i)%geometry == 13, "Invalid patch geometry number. "// &
+                                          "patch_icpp("//trim(iStr)//")%geometry is deprecated.")
+                @:PROHIBIT(patch_icpp(i)%geometry == 15, "Invalid patch geometry number. "// &
+                                          "patch_icpp("//trim(iStr)//")%geometry is deprecated.")
+                @:PROHIBIT(patch_icpp(i)%geometry == dflt_int, "Invalid patch geometry number. "// &
+                                          "patch_icpp("//trim(iStr)//")%geometry must be set.")
+
                 ! Constraints on the geometric initial condition patch parameters
                 if (patch_icpp(i)%geometry == 1) then
                     call s_check_line_segment_patch_geometry(i)
@@ -57,12 +68,6 @@ contains
                     call s_check_line_sweep_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 5) then
                     call s_check_ellipse_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 6) then
-                    call s_prohibit_abort("Invalid patch geometry number", "patch_icpp("//trim(iStr)//")%geometry "// &
-                                          "is deprecated")
-                elseif (patch_icpp(i)%geometry == 7) then
-                    call s_prohibit_abort("Invalid patch geometry number", "patch_icpp("//trim(iStr)//")%geometry "// &
-                                          "is deprecated")
                 elseif (patch_icpp(i)%geometry == 8) then
                     call s_check_sphere_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 9) then
@@ -73,31 +78,21 @@ contains
                     call s_check_plane_sweep_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 12) then
                     call s_check_ellipsoid_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 13) then
-                    call s_prohibit_abort("Invalid patch geometry number", "patch_icpp("//trim(iStr)//")%geometry "// &
-                                          "is deprecated")
                 elseif (patch_icpp(i)%geometry == 14) then
                     call s_check_spherical_harmonic_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 15) then
-                    call s_prohibit_abort("Invalid patch geometry number", "patch_icpp("//trim(iStr)//")%geometry "// &
-                                          "is deprecated")
                 elseif (patch_icpp(i)%geometry == 20) then
                     call s_check_2D_TaylorGreen_vortex_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_check_model_geometry(i)
-                elseif (patch_icpp(i)%geometry == dflt_int) then
-                    call s_prohibit_abort("Active patch undefined", "patch_icpp("//trim(iStr)//")%geometry must be set")
                 else
                     call s_prohibit_abort("Invalid patch geometry number", "patch_icpp("//trim(iStr)//")%geometry "// &
                                           "must be between 1 and 21")
                 end if
             else
-                if (patch_icpp(i)%geometry == dflt_int) then
-                    call s_check_inactive_patch_geometry(i)
-                else
-                    call s_prohibit_abort("Inactive patch defined", "patch_icpp("//trim(iStr)//")%geometry must not be set. "// &
+                @:PROHIBIT(patch_icpp(i)%geometry .ne. dflt_int, "Inactive patch defined. "// &
+                                          "patch_ib("//trim(iStr)//")%geometry not be set for inactive patches. "// &
                                           "Patch "//trim(iStr)//" is inactive as the number of patches is "//trim(num_patches_str))
-                end if
+                call s_check_inactive_patch_geometry(i)
             end if
         end do
 
