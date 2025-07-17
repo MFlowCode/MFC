@@ -17,7 +17,7 @@ started, run ./mfc.sh build -h.""",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    # Here are all of the parser arguments that call fuctions in other python files
+    # Here are all of the parser arguments that call functions in other python files
     parsers = parser.add_subparsers(dest="command")
     run        = parsers.add_parser(name="run",        help="Run a case with MFC.",                   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     test       = parsers.add_parser(name="test",       help="Run MFC's test suite.",                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
