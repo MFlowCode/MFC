@@ -68,7 +68,7 @@ contains
                                           "2-4, 8-10, 11 or 12.")
                 end if
             else
-                @:PROHIBIT(patch_ib(i)%geometry .ne. dflt_int, "Inactive IB patch defined. "// &
+                @:PROHIBIT(patch_ib(i)%geometry /= dflt_int, "Inactive IB patch defined. "// &
                     "patch_ib("//trim(iStr)//")%geometry not be set for inactive patches.")
                 call s_check_inactive_ib_patch_geometry(i)
             end if
