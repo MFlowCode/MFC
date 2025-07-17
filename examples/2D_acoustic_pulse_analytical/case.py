@@ -2,22 +2,20 @@ import math
 import json
 
 # Numerical setup
-Nx = 250
-Ny = 125
-dx = 40.0 / (1.0 * (Nx + 1))
+Nx = 99
+Ny = 99
+dx = 8.0 / (1.0 * (Nx + 1))
 
-M_inf = 0.3
-Mv = 0.1
+alf_st = 0.4
 
 p_inf = 101325
 rho_inf = 1
 gam = 1.4
 
 c = math.sqrt(gam * (p_inf) / rho_inf)
-u_inf = M_inf * c
 cfl = 0.3
 mydt = cfl * dx / c
-Tfinal = 150 * 1 / u_inf
+Tfinal = 80 * 1 / c
 Nt = int(Tfinal / mydt)
 
 # Configuring case dictionary
@@ -27,10 +25,10 @@ print(
             # Logistics
             "run_time_info": "T",
             # Computational Domain Parameters
-            "x_domain%beg": -20,
-            "x_domain%end": 20,
-            "y_domain%beg": -10,
-            "y_domain%end": 10,
+            "x_domain%beg": -4,
+            "x_domain%end": 4,
+            "y_domain%beg": -4,
+            "y_domain%end": 4,
             "m": Nx,
             "n": Ny,
             "p": 0,
@@ -54,10 +52,10 @@ print(
             "riemann_solver": 2,
             "wave_speeds": 1,
             "avg_state": 2,
-            "bc_x%beg": -7,
+            "bc_x%beg": -8,
             "bc_x%end": -8,
-            "bc_y%beg": -6,
-            "bc_y%end": -6,
+            "bc_y%beg": -8,
+            "bc_y%end": -8,
             # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
@@ -69,37 +67,33 @@ print(
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0,
             "patch_icpp(1)%y_centroid": 0,
-            "patch_icpp(1)%length_x": 40.0,
-            "patch_icpp(1)%length_y": 20.0,
-            "patch_icpp(1)%vel(1)": u_inf,
+            "patch_icpp(1)%length_x": 8.0,
+            "patch_icpp(1)%length_y": 8.0,
+            "patch_icpp(1)%vel(1)": 0,
             "patch_icpp(1)%vel(2)": 0,
-            "patch_icpp(1)%pres": 101325,
-            "patch_icpp(1)%alpha_rho(1)": 1,
+            "patch_icpp(1)%pres": p_inf,
+            "patch_icpp(1)%alpha_rho(1)": rho_inf,
             "patch_icpp(1)%alpha(1)": 1.0,
             # Patch 2
             "patch_icpp(2)%geometry": 2,
             "patch_icpp(2)%x_centroid": 0,
             "patch_icpp(2)%y_centroid": 0,
             "patch_icpp(2)%radius": 1.0,
-            "patch_icpp(2)%vel(1)": 0.0,
-            "patch_icpp(2)%vel(2)": 0.0,
-            "patch_icpp(2)%hcid": 282,
+            "patch_icpp(2)%vel(1)": 0,
+            "patch_icpp(2)%vel(2)": 0,
+            "patch_icpp(2)%pres": f"{p_inf}*(1 - 0.5*({gam} - 1)*({alf_st})**2*exp(0.5*(1 - sqrt(x**2 + y**2))))**({gam} / ({gam} - 1))",
+            "patch_icpp(2)%alpha_rho(1)": f"{rho_inf}*(1 - 0.5*({gam} - 1)*({alf_st})**2*exp(0.5*(1 - sqrt(x**2 + y**2))))**(1 / ({gam} - 1))",
             "patch_icpp(2)%alpha(1)": 1.0,
             "patch_icpp(2)%alter_patch(1)": "T",
             # CBC Inflow / Outflow
-            "bc_x%grcbc_in": "T",
+            "bc_x%grcbc_in": "F",
             "bc_x%grcbc_out": "T",
-            "bc_x%grcbc_vel_out": "T",
-            "bc_x%vel_in(1)": u_inf,
-            "bc_x%vel_in(2)": 0,
-            "bc_x%vel_in(3)": 0,
-            "bc_x%pres_in": p_inf,
-            "bc_x%alpha_rho_in(1)": rho_inf,
-            "bc_x%alpha_in(1)": 1,
-            "bc_x%vel_out(1)": u_inf,
-            "bc_x%vel_out(2)": 0,
-            "bc_x%vel_out(3)": 0,
+            "bc_x%grcbc_vel_out": "F",
             "bc_x%pres_out": p_inf,
+            "bc_y%grcbc_in": "F",
+            "bc_y%grcbc_out": "T",
+            "bc_y%grcbc_vel_out": "F",
+            "bc_y%pres_out": p_inf,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam - 1.0e00),
             "fluid_pp(1)%pi_inf": 0.0,
