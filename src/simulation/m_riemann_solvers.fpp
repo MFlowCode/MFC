@@ -3169,7 +3169,7 @@ contains
         $:GPU_UPDATE(device='[Gs]')
 
         if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+            @:ALLOCATE(Res(1:2, 1:Re_size_max))
         end if
 
         if (viscous) then

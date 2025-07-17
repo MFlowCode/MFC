@@ -59,6 +59,16 @@
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
         @: HardcodedReadValues()
 
+    case (380)
+        ! This is patch is hard-coded for test suite optimization used in the
+        ! 3D_TaylorGreenVortex case:
+        ! This analytic patch used geometry 9
+        if (patch_id == 1) then
+            q_prim_vf(E_idx)%sf(i, j, k) = 101325 + (1*37.6636429464809**2/16)*(cos(2*x_cc(i)/1) + cos(2*y_cc(j)/1))*(cos(2*z_cc(k)/1) + 2)
+            q_prim_vf(momxb + 0)%sf(i, j, k) = 37.6636429464809*sin(x_cc(i)/1)*cos(y_cc(j)/1)*sin(z_cc(k)/1)
+            q_prim_vf(momxb + 1)%sf(i, j, k) = -37.6636429464809*cos(x_cc(i)/1)*sin(y_cc(j)/1)*sin(z_cc(k)/1)
+        end if
+
     case default
         call s_int_to_str(patch_id, iStr)
         call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))

@@ -55,7 +55,7 @@ print(
             "prim_vars_wrt": "T",
             "parallel_io": "T",
             # Patch 1: Base
-            "patch_icpp(1)%geometry": 7,
+            "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%hcid": 200,
             "patch_icpp(1)%x_centroid": 4.0,
             "patch_icpp(1)%y_centroid": 4.0,

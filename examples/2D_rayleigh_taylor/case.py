@@ -85,7 +85,7 @@ data = {
     "p_y": 0.0,
     "g_y": -9.81,
     # Water Patch
-    "patch_icpp(1)%geometry": 7,
+    "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%hcid": 204,
     "patch_icpp(1)%x_centroid": 0,
     "patch_icpp(1)%y_centroid": h / 2,
