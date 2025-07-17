@@ -98,7 +98,7 @@ print(
             "c_wrt": "T",
             "parallel_io": "T",
             # Background
-            "patch_icpp(1)%geometry": 13,
+            "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": (x1 + x0) / 2,
             "patch_icpp(1)%y_centroid": (y1 + y0) / 2,
             "patch_icpp(1)%z_centroid": (z1 + z0) / 2,
