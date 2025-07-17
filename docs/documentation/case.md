@@ -825,7 +825,7 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `perturb_sph_fluid`    | Integer | Fluid component whose partial density is to be perturbed |
 | `mixlayer_vel_profile` | Logical | Set the mean streamwise velocity to hyperbolic tangent profile |
 | `mixlayer_vel_coef`    | Real    | Coefficient for the hyperbolic tangent profile of a mixing layer |
-| `mixlayer_perturb`     | Logical | Perturb the initial velocity field by instability waves |
+| `mixlayer_perturb`     | Logical | Perturb the initial velocity field using a spectrum-based synthetic turbulence generation method |
 
 The table lists velocity field parameters.
 The parameters are optionally used to define initial velocity profiles and perturbations.
