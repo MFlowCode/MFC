@@ -17,6 +17,7 @@ started, run ./mfc.sh build -h.""",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
+    # Here are all of the parser arguments that call fuctions in other python files
     parsers = parser.add_subparsers(dest="command")
     run        = parsers.add_parser(name="run",        help="Run a case with MFC.",                   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     test       = parsers.add_parser(name="test",       help="Run MFC's test suite.",                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -28,6 +29,7 @@ started, run ./mfc.sh build -h.""",
     count_diff = parsers.add_parser(name="count_diff", help="Count LOC in MFC.",                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     packer     = parsers.add_parser(name="packer",     help="Packer utility (pack/unpack/compare).",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
+    # These parser arguments all call BASH scripts, and they only exist so that they show up in the help message
     parsers.add_parser(name="load",       help="Loads the MFC environment with source.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parsers.add_parser(name="lint",       help="Lints all code after editing.",          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parsers.add_parser(name="format",     help="Formats all code after editing.",        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
