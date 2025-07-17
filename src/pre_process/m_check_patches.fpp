@@ -90,7 +90,7 @@ contains
                 end if
             else
                 @:PROHIBIT(patch_icpp(i)%geometry /= dflt_int, "Inactive patch defined. "// &
-                    "patch_ib("//trim(iStr)//")%geometry not be set for inactive patches. "// &
+                    "patch_icpp("//trim(iStr)//")%geometry not be set for inactive patches. "// &
                     "Patch "//trim(iStr)//" is inactive as the number of patches is "//trim(num_patches_str))
                 call s_check_inactive_patch_geometry(i)
             end if
