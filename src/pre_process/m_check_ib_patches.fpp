@@ -42,7 +42,7 @@ contains
                 ! call s_check_patch_geometry(i)
                 call s_int_to_str(i, iStr)
                 @:PROHIBIT(patch_ib(i)%geometry == dflt_int, "IB patch undefined. &
-                                          patch_ib("//trim(iStr)//")%geometry must be set.")
+                    patch_ib("//trim(iStr)//")%geometry must be set.")
 
                 ! Constraints on the geometric initial condition patch parameters
                 if (patch_ib(i)%geometry == 2) then
@@ -69,7 +69,7 @@ contains
                 end if
             else
                 @:PROHIBIT(patch_ib(i)%geometry .ne. dflt_int, "Inactive IB patch defined. "// &
-                                          "patch_ib("//trim(iStr)//")%geometry not be set for inactive patches.")
+                    "patch_ib("//trim(iStr)//")%geometry not be set for inactive patches.")
                 call s_check_inactive_ib_patch_geometry(i)
             end if
         end do
