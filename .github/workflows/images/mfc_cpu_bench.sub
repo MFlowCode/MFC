@@ -1,17 +1,46 @@
 # mfc_cpu_bench.sub
+universe = container
+container_image = mfc_cpu_bench.sif
 
-executable = mfc_test.sh 'mfc_cpu.sif' 'cd /opt/MFC && ./mfc.sh test -a'
-arguments = $(Process)
+executable = run_mfc.sh
+
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+transfer_input_files = mfc_cpu_bench.sif, run_mfc.sh
+transfer_executable = True
 
 log = mfc_cpu_bench_$(Cluster)_$(Process).log
 error = mfc_cpu_bench_$(Cluster)_$(Process).err
 output = mfc_cpu_bench_$(Cluster)_$(Process).out
 
 +JobDurationCategory = "Medium"
+request_cpus = 12
+request_memory = 8GB
+request_disk = 8GB
 
-requirements = (OSGVO_OS_STRING == "Ubuntu 22")
-request_cpus = 4
-request_memory = 16GB
-request_disk = 32GB
++SingularityBindCVMFS = True
++SingularityBind = "/tmp"
 
-queue 1
+requirements = (HAS_SINGULARITY =?= TRUE) && (Arch == "X86_64") && (OpSysAndVer == "AlmaLinux9")
+queue
+
+requirements = (HAS_SINGULARITY =?= TRUE) && (Arch == "X86_64") && (OpSysAndVer == "CentOS7")
+queue
+
+requirements = (HAS_SINGULARITY =?= TRUE) && (Arch == "X86_64") && (OpSysAndVer == "CentOS8")
+queue
+
+requirements = (HAS_SINGULARITY =?= TRUE) && (Arch == "X86_64") && (OpSysAndVer == "CentOS9")
+queue
+
+requirements = (HAS_SINGULARITY =?= TRUE) && (Arch == "X86_64") && (OpSysAndVer == "DEBIAN12")
+queue
+
+requirements = (HAS_SINGULARITY =?= TRUE) && (Arch == "X86_64") && (OpSysAndVer == "RedHat9")
+queue
+
+requirements = (HAS_SINGULARITY =?= TRUE) && (Arch == "X86_64") && (OpSysAndVer == "Rocky9")
+queue
+
+requirements = (HAS_SINGULARITY =?= TRUE) && (Arch == "X86_64") && (OpSysAndVer == "UBUNTU22")
+queue
