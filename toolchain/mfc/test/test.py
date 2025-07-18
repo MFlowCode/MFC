@@ -60,7 +60,7 @@ def __filter(cases_) -> typing.List[TestCase]:
             skipped_cases.append(case)
 
     for case in cases[:]:
-        if "RDMA MPI" in case.trace and not ARG("rdma_mpi"):
+        if "RDMA MPI" in case.trace:
             cases.remove(case)
             skipped_cases.append(case)
 
@@ -189,10 +189,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]     SKIP     {case.trace}")
         return
 
-    if "RDMA MPI" in case.trace:
-        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices, rdma_mpi=True)
-    else:
-        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+    cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
 
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
@@ -236,9 +233,6 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
     if ARG("test_all"):
         case.delete_output()
-        # if ARG("rdma_mpi"):
-        #     cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices, rdma_mpi=True)
-        # else:
         cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
         out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
         common.file_write(out_filepath, cmd.stdout)
