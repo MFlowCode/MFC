@@ -27,13 +27,13 @@ jobs:
             rm -rf *.sif *.log *.err *.out
             apptainer config fakeroot --enable $(whoami)
             apptainer build mfc_cpu.sif Singularity.cpu > singularity.cpu.log
-            mv -r /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/mfc_cpu.sif /ospool/ap40/data/mohammed.al-mahrouqi
+            mv /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/mfc_cpu.sif /ospool/ap40/data/mohammed.al-mahrouqi
             apptainer build mfc_cpu_bench.sif Singularity.cpu_bench > singularity.cpu_bench.log
-            mv -r /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/mfc_cpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi
+            mv /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/mfc_cpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi
             apptainer build mfc_gpu.sif Singularity.gpu > singularity.gpu.log
-            mv -r /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/mfc_gpu.sif /ospool/ap40/data/mohammed.al-mahrouqi
+            mv /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/mfc_gpu.sif /ospool/ap40/data/mohammed.al-mahrouqi
             apptainer build mfc_gpu_bench.sif Singularity.gpu_bench > singularity.gpu_bench.log
-            mv -r /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/mfc_gpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi
+            mv /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/mfc_gpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi
             "
       
       - name: Test Images
