@@ -524,10 +524,21 @@ function(MFC_SETUP_TARGET)
             target_compile_options(${a_target} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")
         endif()
 
-        if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
-            find_package(CUDAToolkit REQUIRED)
-            target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
+        if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR
+            CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+
+            # Ask specifically for the header-only NVTX v3 interface
+            find_package(CUDAToolkit REQUIRED COMPONENTS nvtx3)
+
+            if (TARGET CUDA::nvToolsExt) # CUDA <= 12.8
+                target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
+            else() # CUDA >= 12.9
+                target_link_libraries(${a_target} PRIVATE CUDA::nvtx3)
+            endif()
+            target_link_options(${a_target} PRIVATE "-cudalib=nvtx")
+
         endif()
+        
     endforeach()
 
     install(TARGETS ${ARGS_TARGET} RUNTIME DESTINATION bin)
