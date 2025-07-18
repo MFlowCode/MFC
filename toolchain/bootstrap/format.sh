@@ -1,10 +1,25 @@
 #!/bin/bash
 
+# Function to display help message
+show_help() {
+  echo "Usage: $(basename "$0") [OPTIONS]"
+  echo "This function formats all code in and below the current execution directory."
+  echo ""
+  echo "Options:"
+  echo "  -h, --help            Display this help message and exit."
+  echo "  -j, --jobs JOBS       Runs JOBS number of jobs."
+  echo ""
+  exit 0
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -j|--jobs)
             JOBS="$2"
             shift
+            ;;
+        -h | --help)
+            show_help
             ;;
         *)
             echo "Format, unknown argument: $1."
