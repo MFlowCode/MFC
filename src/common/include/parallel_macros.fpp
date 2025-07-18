@@ -367,14 +367,64 @@
     $:end_acc_directive
 #:enddef
 
+#:def GEN_MP_PARENTHESES_CLAUSE(clause_name, clause_modifier, clause_str)
+    #:set clause_regex = re.compile(',(?![^(]*\\))')
+    #:assert isinstance(clause_name, str)
+    #:if clause_str is not None
+        #:set count = 0
+        #:assert isinstance(clause_str, str)
+        #:assert clause_str[0] == '[' and clause_str[-1] == ']'
+        #:for c in clause_str
+            #:if c == '('
+                #:set count = count + 1
+            #:elif c == ')'
+                #:set count = count - 1
+            #:endif
+            #:if c == ',' and count > 1
+                #:stop 'Nested parentheses with comma inside is not supported. Incorrect clause: {}'.format(clause_str)
+            #:elif count < 0
+                #:stop 'Missing parentheses. Incorrect clause: {}'.format(clause_str)
+            #:endif
+        #:endfor
+        #:set clause_str = re.sub(clause_regex, ';', clause_str)
+        #:set clause_list = [x.strip() for x in clause_str.strip('[]').split(';')]
+        $:ASSERT_LIST(clause_list, str)
+        #:set clause_str = clause_name + '(' + clause_modifier + ':' + ', '.join(clause_list) + ') '
+    #:else
+        #:set clause_str = ''
+    #:endif
+    $:clause_str
+#:enddef
+
+#:def GEN_TO_STR(to)
+    #:set to_str = GEN_MP_PARENTHESES_CLAUSE('map', 'to', to)
+    $:to_str
+#:enddef
+
+
+#:def GEN_ALLOC_STR(alloc)
+    #:set alloc_str = GEN_MP_PARENTHESES_CLAUSE('map', 'alloc', alloc)
+    $:alloc_str
+#:enddef
+
 #:def GPU_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraAccArgs=None)
     #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
     #:set create_val = GEN_CREATE_STR(create)
     #:set attach_val = GEN_ATTACH_STR(attach)
+    #:set to_val = GEN_TO_STR(copyin)
+    #:set alloc_val = GEN_ALLOC_STR(create)
+    #:set alloc_val2 = GEN_ALLOC_STR(attach)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-    #:set clause_val = copyin_val.strip('\n') + create_val.strip('\n') + attach_val.strip('\n')
-    #:set acc_directive = '!$acc enter data ' + clause_val + extraAccArgs_val.strip('\n')
+    #:set extraMpArgs_val = ''
+    #:set acc_clause_val = copyin_val.strip('\n') + create_val.strip('\n') + attach_val.strip('\n')
+    #:set mp_clause_val = to_val.strip('\n') + alloc_val.strip('\n') + alloc_val2.strip('\n')
+    #:set acc_directive = '!$acc enter data ' + acc_clause_val + extraAccArgs_val.strip('\n')
+    #:set mp_directive = '!$omp target enter data ' + mp_clause_val + extraMpArgs_val.strip('\n')
+#if MFC_OpenACC
     $:acc_directive
+#elif MFC_OpenMP
+    $:mp_directive
+#endif
 #:enddef
 
 #:def GPU_EXIT_DATA(copyout=None, delete=None, detach=None, extraAccArgs=None)
@@ -419,6 +469,16 @@
     #:set clause_val = ''
     #:set acc_directive = '!$acc wait ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
+#:enddef
+
+#:def USE_GPU_MODULE()
+
+#if defined(MFC_OpenACC)
+    use openacc
+#elif defined(MFC_OpenMP)
+    use omp_lib
+#endif
+
 #:enddef
 
 #:endmute

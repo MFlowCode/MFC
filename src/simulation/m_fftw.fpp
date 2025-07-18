@@ -15,9 +15,9 @@ module m_fftw
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
-#if defined(MFC_OpenACC) && defined(__PGI)
+#if defined(MFC_GPU) && defined(__PGI)
     use cufft
-#elif defined(MFC_OpenACC)
+#elif defined(MFC_GPU)
     use hipfort
     use hipfort_check
     use hipfort_hipfft
@@ -29,7 +29,7 @@ module m_fftw
  s_apply_fourier_filter, &
  s_finalize_fftw_module
 
-#if !defined(MFC_OpenACC)
+#if !defined(MFC_GPU)
     include 'fftw3.f03'
 #endif
 
@@ -45,13 +45,14 @@ module m_fftw
     complex(c_double_complex), pointer :: data_fltr_cmplx(:) !<
     !! Filtered complex data in Fourier space
 
-#if defined(MFC_OpenACC)
+#if defined(MFC_GPU)
     $:GPU_DECLARE(create='[real_size,cmplx_size,x_size,batch_size,Nfq]')
 
     real(dp), allocatable, target :: data_real_gpu(:)
     complex(dp), allocatable, target :: data_cmplx_gpu(:)
     complex(dp), allocatable, target :: data_fltr_cmplx_gpu(:)
     $:GPU_DECLARE(create='[data_real_gpu,data_cmplx_gpu,data_fltr_cmplx_gpu]')
+    !$omp declare target (data_real_gpu,data_cmplx_gpu,data_fltr_cmplx_gpu)
 
 #if defined(__PGI)
     integer :: fwd_plan_gpu, bwd_plan_gpu
@@ -81,8 +82,7 @@ contains
         x_size = m + 1
         batch_size = x_size*sys_size
 
-#if defined(MFC_OpenACC)
-
+#if defined(MFC_GPU)
         rank = 1; istride = 1; ostride = 1
 
         allocate (gpu_fft_size(1:rank), iembed(1:rank), oembed(1:rank))
@@ -107,7 +107,7 @@ contains
         bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real, FFTW_ESTIMATE)
 #endif
 
-#if defined(MFC_OpenACC)
+#if defined(MFC_GPU)
         @:ALLOCATE(data_real_gpu(1:real_size*x_size*sys_size))
         @:ALLOCATE(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
         @:ALLOCATE(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
@@ -139,7 +139,8 @@ contains
 
         ! Restrict filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
-#if defined(MFC_OpenACC)
+#if defined(MFC_GPU)
+
         $:GPU_PARALLEL_LOOP(collapse=3)
         do k = 1, sys_size
             do j = 0, m
@@ -302,7 +303,7 @@ contains
         !!      applying the Fourier filter in the azimuthal direction.
     impure subroutine s_finalize_fftw_module
 
-#if defined(MFC_OpenACC)
+#if defined(MFC_GPU)
         integer :: ierr !< Generic flag used to identify and report GPU errors
         @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
 #if defined(__PGI)
