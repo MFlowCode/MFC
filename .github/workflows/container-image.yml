@@ -30,10 +30,10 @@ jobs:
 
           ssh ${{secrets.SSH_USER}} "
             cd MFC/.github/workflows/images
-            sudo apptainer build mfc_cpu.sif Singularity.cpu
-            sudo apptainer build mfc_cpu_bench.sif Singularity.cpu_bench
-            sudo apptainer build mfc_gpu.sif Singularity.gpu
-            sudo apptainer build mfc_gpu_bench.sif Singularity.gpu_bench
+            apptainer build mfc_cpu.sif Singularity.cpu
+            apptainer build mfc_cpu_bench.sif Singularity.cpu_bench
+            apptainer build mfc_gpu.sif Singularity.gpu
+            apptainer build mfc_gpu_bench.sif Singularity.gpu_bench
             "
       
       - name: Test Images
