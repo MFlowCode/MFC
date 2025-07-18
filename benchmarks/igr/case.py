@@ -60,8 +60,8 @@ print(
             "cyl_coord": "F",
             "dt": dt,
             "t_step_start": 0,
-            "t_step_stop": int(20 * (95 * size + 5)),
-            "t_step_save": int(20 * (95 * size + 5)),
+            "t_step_stop": int(20 * (5 * size + 5)),
+            "t_step_save": int(20 * (5 * size + 5)),
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,

@@ -41,8 +41,8 @@ print(
             "p": Nz,
             "dt": 1e-8,
             "t_step_start": 0,
-            "t_step_stop": int(30 * (95 * size + 5)),
-            "t_step_save": int(30 * (95 * size + 5)),
+            "t_step_stop": int(20 * (5 * size + 5)),
+            "t_step_save": int(20 * (5 * size + 5)),
             # Simulation Algorithm Parameters
             "num_patches": 2,
             "model_eqns": 2,
