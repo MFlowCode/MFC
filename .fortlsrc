@@ -29,7 +29,7 @@
         "MFC_DOUBLE_PRECISION": 1
     },
     "lowercase_intrinsics": true,
-    "debug_log": true,
+    "debug_log": false,
     "disable_diagnostics": false,
     "use_signature_help": true,
     "variable_hover": true,
