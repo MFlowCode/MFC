@@ -18,6 +18,7 @@ project(MFC LANGUAGES C CXX Fortran)
 
 option(MFC_MPI           "Build with MPI"                                     ON)
 option(MFC_OpenACC       "Build with OpenACC"                                OFF)
+option(MFC_OpenMP        "Build with OpenMP"                                 OFF)
 option(MFC_GCov          "Build with GCov"                                   OFF)
 option(MFC_Unified       "Build with unified CPU & GPU memory (GH-200 only)" OFF)
 option(MFC_PRE_PROCESS   "Build pre_process"                                 OFF)
@@ -393,7 +394,7 @@ HANDLE_SOURCES(syscheck OFF)
 #             being used.
 
 function(MFC_SETUP_TARGET)
-    cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW" "TARGET" "SOURCES" ${ARGN})
+    cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW;OpenMP" "TARGET" "SOURCES" ${ARGN})
 
     add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
     set(IPO_TARGETS ${ARGS_TARGET})
@@ -447,7 +448,7 @@ function(MFC_SETUP_TARGET)
         endif()
 
         if (ARGS_FFTW)
-            if (MFC_OpenACC AND ARGS_OpenACC)
+            if ((MFC_OpenACC AND ARGS_OpenACC) OR (MFC_OpenMP AND ARGS_OpenMP))
                 if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                     find_package(CUDAToolkit REQUIRED)
                     target_link_libraries(${a_target} PRIVATE CUDA::cudart CUDA::cufft)
@@ -461,16 +462,31 @@ function(MFC_SETUP_TARGET)
             endif()
         endif()
 
-        if (MFC_OpenACC AND ARGS_OpenACC)
-            find_package(OpenACC)
+        if ((MFC_OpenACC AND ARGS_OpenACC) OR (MFC_OpenMP AND ARGS_OpenMP))
+            if ((MFC_OpenACC AND ARGS_OpenACC))
+                find_package(OpenACC)
 
-            # This should be equivalent to if (NOT OpenACC_FC_FOUND)
-            if (NOT TARGET OpenACC::OpenACC_Fortran)
-                message(FATAL_ERROR "OpenACC + Fortran is unsupported.")
+                # This should be equivalent to if (NOT OpenACC_FC_FOUND)
+                if (NOT TARGET OpenACC::OpenACC_Fortran)
+                    message(FATAL_ERROR "OpenACC + Fortran is unsupported.")
+                endif()
+
+                target_link_libraries(${a_target} PRIVATE OpenACC::OpenACC_Fortran)
+                target_compile_definitions(${a_target} PRIVATE MFC_OpenACC MFC_GPU)
+            elseif((MFC_OpenMP AND ARGS_OpenMP))
+                find_package(OpenMP)
+
+                # This should be equivalent to if (NOT OpenACC_FC_FOUND)
+                if (NOT TARGET OpenMP::OpenMP_Fortran)
+                    message(FATAL_ERROR "OpenMP + Fortran is unsupported.")
+                endif()
+
+                target_link_libraries(${a_target} PRIVATE OpenMP::OpenMP_Fortran)
+                target_compile_definitions(${a_target} PRIVATE MFC_OpenMP MFC_GPU)
+                if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+                    target_compile_options(${a_target} PRIVATE "-mp=gpu")
+                endif()
             endif()
-
-            target_link_libraries(${a_target} PRIVATE OpenACC::OpenACC_Fortran)
-            target_compile_definitions(${a_target} PRIVATE MFC_OpenACC)
 
             if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
                 # FIXME: This should work with other cards than gfx90a ones.
@@ -535,7 +551,7 @@ endif()
 if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
-                     MPI OpenACC FFTW)
+                     MPI FFTW OpenACC OpenMP)
 endif()
 
 if (MFC_POST_PROCESS)
@@ -550,7 +566,7 @@ endif()
 if (MFC_SYSCHECK)
     MFC_SETUP_TARGET(TARGET  syscheck
                      SOURCES "${syscheck_SRCs}"
-                     MPI OpenACC)
+                     MPI OpenACC OpenMP)
 endif()
 
 if (MFC_DOCUMENTATION)

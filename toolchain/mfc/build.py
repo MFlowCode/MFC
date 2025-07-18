@@ -6,6 +6,7 @@ from .common  import MFCException, system, delete_directory, create_directory, \
                      format_list_to_string
 from .state   import ARG, CFG
 from .run     import input
+from .state   import gpuConfigOptions
 
 @dataclasses.dataclass
 class MFCTarget:
@@ -141,7 +142,10 @@ class MFCTarget:
 
         if not self.isDependency:
             flags.append(f"-DMFC_MPI={    'ON' if ARG('mpi') else 'OFF'}")
-            flags.append(f"-DMFC_OpenACC={'ON' if ARG('gpu') else 'OFF'}")
+            # flags.append(f"-DMFC_OpenACC={'ON' if ARG('acc') else 'OFF'}")
+            # flags.append(f"-DMFC_OpenMP={'ON' if ARG('mp') else 'OFF'}")
+            flags.append(f"-DMFC_OpenACC={'ON' if (ARG('gpu') == gpuConfigOptions.ACC.value) else 'OFF'}")
+            flags.append(f"-DMFC_OpenMP={'ON' if (ARG('gpu') == gpuConfigOptions.MP.value) else 'OFF'}")
             flags.append(f"-DMFC_GCov={   'ON' if ARG('gcov') else 'OFF'}")
             flags.append(f"-DMFC_Unified={'ON' if ARG('unified') else 'OFF'}")
 
