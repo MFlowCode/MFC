@@ -29,25 +29,25 @@ jobs:
 
           (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu.sif Singularity.cpu)
           scp pr/.github/workflows/images/mfc_cpu.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu.sif
-          mv /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/mfc_cpu.sif /ospool/ap40/data/mohammed.al-mahrouqi
+          mv /home/mohammed.al-mahrouqi/MFC/mfc_cpu.sif /ospool/ap40/data/mohammed.al-mahrouqi
           rm -rf pr/.github/workflows/images/mfc_cpu.sif
           rm -rf ~/.apptainer
 
           (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu_bench.sif Singularity.cpu_bench)
           scp pr/.github/workflows/images/mfc_cpu_bench.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu_bench.sif
-          mv /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/mfc_cpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi
+          mv /home/mohammed.al-mahrouqi/MFC/mfc_cpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi
           rm -rf pr/.github/workflows/images/mfc_cpu_bench.sif
           rm -rf ~/.apptainer
 
           (cd pr/.github/workflows/images && sudo apptainer build mfc_gpu.sif Singularity.gpu)
           scp pr/.github/workflows/images/mfc_gpu.sif ${{secrets.SSH_USER}}:MFC/mfc_gpu.sif
-          mv /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/mfc_gpu.sif /ospool/ap40/data/mohammed.al-mahrouqi
+          mv /home/mohammed.al-mahrouqi/MFC/mfc_gpu.sif /ospool/ap40/data/mohammed.al-mahrouqi
           rm -rf pr/.github/workflows/images/mfc_gpu.sif
           rm -rf ~/.apptainer
 
           (cd pr/.github/workflows/images && sudo apptainer build mfc_gpu_bench.sif Singularity.gpu_bench)
           scp pr/.github/workflows/images/mfc_gpu_bench.sif ${{secrets.SSH_USER}}:MFC/mfc_gpu_bench.sif
-          mv /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/mfc_gpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi
+          mv /home/mohammed.al-mahrouqi/MFC/mfc_gpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi
           rm -rf pr/.github/workflows/images/mfc_gpu_bench.sif
           rm -rf ~/.apptainer
       
