@@ -26,7 +26,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ap40.uw.osg-htc.org >> ~/.ssh/known_hosts
 
-          scp pr/* ${{secrets.SSH_USER}}:MFC/
+          scp -r pr/* ${{secrets.SSH_USER}}:MFC/
 
           ssh ${{secrets.SSH_USER}} "
             cd MFC/.github/workflows/images
