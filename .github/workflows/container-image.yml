@@ -36,13 +36,13 @@ jobs:
           sudo apt-get clean
 
 
-          (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu_bench.sif Singularity.cpu_bench)
-          scp pr/.github/workflows/images/mfc_cpu_bench.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu_bench.sif
-          ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_cpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi"
-          rm -rf pr/.github/workflows/images/mfc_cpu_bench.sif
-          rm -rf ~/.apptainer
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm
-          sudo apt-get clean
+          # (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu_bench.sif Singularity.cpu_bench)
+          # scp pr/.github/workflows/images/mfc_cpu_bench.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu_bench.sif
+          # ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_cpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi"
+          # rm -rf pr/.github/workflows/images/mfc_cpu_bench.sif
+          # rm -rf ~/.apptainer
+          # sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm
+          # sudo apt-get clean
 
 
           (cd pr/.github/workflows/images && sudo apptainer build mfc_gpu.sif Singularity.gpu)
@@ -54,13 +54,13 @@ jobs:
           sudo apt-get clean
 
 
-          (cd pr/.github/workflows/images && sudo apptainer build mfc_gpu_bench.sif Singularity.gpu_bench)
-          scp pr/.github/workflows/images/mfc_gpu_bench.sif ${{secrets.SSH_USER}}:MFC/mfc_gpu_bench.sif
-          ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_gpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi"
-          rm -rf pr/.github/workflows/images/mfc_gpu_bench.sif
-          rm -rf ~/.apptainer
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm
-          sudo apt-get clean
+          # (cd pr/.github/workflows/images && sudo apptainer build mfc_gpu_bench.sif Singularity.gpu_bench)
+          # scp pr/.github/workflows/images/mfc_gpu_bench.sif ${{secrets.SSH_USER}}:MFC/mfc_gpu_bench.sif
+          # ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_gpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi"
+          # rm -rf pr/.github/workflows/images/mfc_gpu_bench.sif
+          # rm -rf ~/.apptainer
+          # sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm
+          # sudo apt-get clean
 
       
       - name: Test Images
