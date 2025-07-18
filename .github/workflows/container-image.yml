@@ -30,6 +30,7 @@ jobs:
 
           ssh ${{secrets.SSH_USER}} "
             cd MFC/.github/workflows/images
+            rm -rf *.sif *.log *.err *.out
             apptainer build mfc_cpu.sif Singularity.cpu > singularity.cpu.log
             apptainer build mfc_cpu_bench.sif Singularity.cpu_bench > singularity.cpu_bench.log
             apptainer build mfc_gpu.sif Singularity.gpu > singularity.gpu.log
