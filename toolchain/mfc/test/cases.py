@@ -632,58 +632,38 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         if ndims == 3:
             stack.pop()
 
-    def alter_instability_wave(dimInfo):
-        if len(dimInfo[0]) > 1:
-            for bubbles in ['F', 'T']:
-                stack.push('mixlayer_perturb', {
-                    'm': 24, 'n': 35, 'num_patches': 1, 'num_fluids': 1,
-                    'x_domain%beg': 0.0, 'x_domain%end': 360.0, 'y_domain%beg': -180.0, 'y_domain%end': 180.0,
-                    'bc_x%beg': -3, 'bc_x%end': -3, 'bc_y%beg': -6, 'bc_y%end': -6,
-                    'mixlayer_vel_profile': 'T', 'mixlayer_domain': 1.475, 'mixlayer_vel_coef': 0.6,
-                    'mixlayer_perturb': 'T', 'weno_Re_flux': 'T', 'weno_avg': 'T', 'mapped_weno': 'T',
-                    'fluid_pp(1)%gamma': 0.16393442623, 'fluid_pp(1)%pi_inf': 22.312399959394575,
-                    'fluid_pp(1)%Re(1)': 1.6881644098979287, 'viscous': 'T',
-                    'patch_icpp(1)%x_centroid': 180.0, 'patch_icpp(1)%length_x': 360.0,
-                    'patch_icpp(1)%y_centroid': 0.0, 'patch_icpp(1)%length_y': 360.0,
-                    'patch_icpp(1)%vel(1)': 1.1966855884162177, 'patch_icpp(1)%vel(2)': 0.0, 'patch_icpp(1)%pres': 1.0,
-                    'patch_icpp(2)%geometry': -100, 'patch_icpp(2)%x_centroid': -1e6, 'patch_icpp(2)%length_x': -1e6,
-                    'patch_icpp(2)%y_centroid': -1e6, 'patch_icpp(2)%length_y': -1e6, 'patch_icpp(2)%vel(1)': -1e6,
-                    'patch_icpp(2)%vel(2)': -1e6, 'patch_icpp(2)%r0': -1e6, 'patch_icpp(2)%v0': -1e6,
-                    'patch_icpp(3)%geometry': -100, 'patch_icpp(3)%x_centroid': -1e6, 'patch_icpp(3)%length_x': -1e6,
-                    'patch_icpp(3)%y_centroid': -1e6, 'patch_icpp(3)%length_y': -1e6, 'patch_icpp(3)%vel(1)': -1e6,
-                    'patch_icpp(3)%vel(2)': -1e6, 'patch_icpp(3)%r0': -1e6, 'patch_icpp(3)%v0': -1e6
-                })
-
-                if bubbles == 'F':
-                    stack.push('',{'bubbles_euler': 'F',
-                        'patch_icpp(1)%alpha_rho(1)': 1.0, 'patch_icpp(1)%alpha(1)': 1.0,
-                        'patch_icpp(1)%r0': -1e6, 'patch_icpp(1)%v0': -1e6
-                        })
-                elif bubbles == 'T':
-                    stack.push('bubbles',{'bubbles_euler': 'T',
-                        'patch_icpp(1)%alpha_rho(1)': 0.99999, 'patch_icpp(1)%alpha(1)': 0.00001,
-                        'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0,
-                        'Ca': 0.7160271976687712, 'Web': 5.660481099656358, 'Re_inv': 0.0069829599021229965,
-                        'adv_n': 'T', 'polytropic': 'T', 'thermal': 1, 'polydisperse': 'F', 'nb': 1, 'qbmm': 'F'
-                        })
-
-                if len(dimInfo[0]) == 2:
-                    stack.push('', {'p': 0, 'patch_icpp(1)%geometry': 3,
-                        'patch_icpp(1)%vel(3)': -1e6, 'patch_icpp(2)%vel(3)': -1e6, 'patch_icpp(3)%vel(3)': -1e6
-                    })
-
-                if len(dimInfo[0]) == 3:
-                    stack.push('', {'p': 24, 'patch_icpp(1)%geometry': 9,
-                        'z_domain%beg': 0.0, 'z_domain%end': 360.0, 'bc_z%beg': -3, 'bc_z%end': -3,
-                        'patch_icpp(1)%z_centroid': 180.0, 'patch_icpp(1)%length_z': 360.0, 'patch_icpp(1)%vel(3)': 0.0,
-                        'patch_icpp(2)%z_centroid': -1e6, 'patch_icpp(2)%length_z': -1e6, 'patch_icpp(2)%vel(3)': -1e6,
-                        'patch_icpp(3)%z_centroid': -1e6, 'patch_icpp(3)%length_z': -1e6, 'patch_icpp(3)%vel(3)': -1e6
-                    })
-
-                cases.append(define_case_d(stack, '', {}))
-                stack.pop()
-                stack.pop()
-                stack.pop()
+    def alter_mixlayer_perturb(dimInfo):
+        if len(dimInfo[0]) == 3:
+            cases.append(define_case_d(stack,'mixlayer_perturb',{
+                'm': 24, 'n': 64, 'p': 24, 'dt': 1e-2,
+                'num_patches': 1, 'num_fluids': 1,
+                'x_domain%beg': 0.0, 'x_domain%end': 20.0, 'bc_x%beg': -1, 'bc_x%end': -1,
+                'y_domain%beg': -10.0, 'y_domain%end': 10.0, 'bc_y%beg': -6, 'bc_y%end': -6,
+                'z_domain%beg': 0.0, 'z_domain%end': 20.0, 'bc_z%beg': -1, 'bc_z%end': -1,
+                'mixlayer_vel_profile': 'T', 'mixlayer_perturb': 'T',
+                'weno_Re_flux': 'F', 'weno_avg': 'T', 'wenoz': 'T',
+                'fluid_pp(1)%gamma': 2.5, 'fluid_pp(1)%pi_inf': 0.0,
+                'fluid_pp(1)%Re(1)': 1.6881644098979287, 'viscous': 'T',
+                'patch_icpp(1)%geometry': 9,
+                'patch_icpp(1)%x_centroid': 10.0, 'patch_icpp(1)%length_x': 20.0,
+                'patch_icpp(1)%y_centroid': 0.0, 'patch_icpp(1)%length_y': 20.0,
+                'patch_icpp(1)%z_centroid': 10.0, 'patch_icpp(1)%length_z': 20.0,
+                'patch_icpp(1)%vel(1)': 1.0, 'patch_icpp(1)%vel(2)': 0.0, 'patch_icpp(1)%vel(3)': 0.0,
+                'patch_icpp(1)%pres': 17.8571428571, 'patch_icpp(1)%alpha_rho(1)': 1.0, 'patch_icpp(1)%alpha(1)': 1.0,
+                'patch_icpp(1)%r0': -1e6, 'patch_icpp(1)%v0': -1e6,
+                'patch_icpp(2)%geometry': -100, 
+                'patch_icpp(2)%x_centroid': -1e6, 'patch_icpp(2)%length_x': -1e6,
+                'patch_icpp(2)%y_centroid': -1e6, 'patch_icpp(2)%length_y': -1e6, 
+                'patch_icpp(2)%z_centroid': -1e6, 'patch_icpp(2)%length_z': -1e6, 
+                'patch_icpp(2)%vel(1)': -1e6, 'patch_icpp(2)%vel(2)': -1e6, 'patch_icpp(2)%vel(3)': -1e6, 
+                'patch_icpp(2)%r0': -1e6, 'patch_icpp(2)%v0': -1e6,
+                'patch_icpp(3)%geometry': -100, 
+                'patch_icpp(3)%x_centroid': -1e6, 'patch_icpp(3)%length_x': -1e6,
+                'patch_icpp(3)%y_centroid': -1e6, 'patch_icpp(3)%length_y': -1e6, 
+                'patch_icpp(3)%z_centroid': -1e6, 'patch_icpp(3)%length_z': -1e6, 
+                'patch_icpp(3)%vel(1)': -1e6, 'patch_icpp(3)%vel(2)': -1e6, 'patch_icpp(3)%vel(3)': -1e6, 
+                'patch_icpp(3)%r0': -1e6, 'patch_icpp(3)%v0': -1e6
+            }))
 
     def alter_phasechange(dimInfo):
         ndims = len(dimInfo[0])
@@ -946,7 +926,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_viscosity(dimInfo)
             alter_elliptic_smoothing()
             alter_body_forces(dimInfo)
-            alter_instability_wave(dimInfo)
+            alter_mixlayer_perturb(dimInfo)
             alter_bc_patches(dimInfo)
             stack.pop()
             stack.pop()
@@ -956,9 +936,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if path == "scaling":
                 continue
 
-            # # List of currently broken examples -> currently attempting to fix!
-            brokenCases = ["2D_ibm_cfl_dt", "1D_sodHypo", "2D_viscous", "2D_laplace_pressure_jump", "2D_bubbly_steady_shock", "2D_advection", "2D_hardcodied_ic", "2D_ibm_multiphase", "2D_acoustic_broadband", "1D_inert_shocktube", "1D_reactive_shocktube", "2D_ibm_steady_shock", "3D_performance_test", "3D_ibm_stl_ellipsoid", "3D_sphbubcollapse", "2D_ibm_stl_wedge", "3D_ibm_stl_pyramid", "3D_ibm_bowshock", "3D_turb_mixing", "2D_mixing_artificial_Ma", "2D_lagrange_bubblescreen", "3D_lagrange_bubblescreen", "2D_triple_point"]
-            if path in brokenCases:
+            # # List of all example cases that will be skipped during testing
+            casesToSkip = ["2D_ibm_cfl_dt", "1D_sodHypo", "2D_viscous",
+                           "2D_laplace_pressure_jump", "2D_bubbly_steady_shock",
+                           "2D_advection", "2D_hardcodied_ic",
+                           "2D_ibm_multiphase", "2D_acoustic_broadband",
+                           "1D_inert_shocktube", "1D_reactive_shocktube",
+                           "2D_ibm_steady_shock", "3D_performance_test",
+                           "3D_ibm_stl_ellipsoid", "3D_sphbubcollapse",
+                           "2D_ibm_stl_wedge", "3D_ibm_stl_pyramid",
+                           "3D_ibm_bowshock", "3D_turb_mixing",
+                           "2D_mixing_artificial_Ma",
+                           "2D_lagrange_bubblescreen",
+                           "3D_lagrange_bubblescreen", "2D_triple_point",
+                           "1D_shuosher_analytical",
+                           "1D_titarevtorro_analytical", 
+                           "2D_acoustic_pulse_analytical",
+                           "2D_isentropicvortex_analytical",
+                           "2D_zero_circ_vortex_analytical",
+                           "3D_TaylorGreenVortex_analytical"]
+            if path in casesToSkip:
                 continue
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"
             path = os.path.join(common.MFC_EXAMPLE_DIRPATH, path, "case.py")

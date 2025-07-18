@@ -20,6 +20,9 @@
   <a href="https://codecov.io/github/MFlowCode/MFC" target="_blank">
     <img src="https://codecov.io/github/MFlowCode/MFC/graph/badge.svg?token=8SY043QND4">
   </a>
+  <a href="https://github.com/MFlowCode/MFC/blob/master/.github/CONTRIBUTING.md" target="_blank">
+    <img src="https://img.shields.io/badge/Contributing-Guide-orange?style=flat">
+  </a>
 </p>
 
 Welcome to the home of MFC!
@@ -134,7 +137,6 @@ They are organized below.
 * Acoustic wave generation (one- and two-way sound sources)
 * Magnetohydrodynamics (MHD)
 * Relativistic Magnetohydrodynamics (RMHD)
-</details>
 
 ### Numerics
 
@@ -153,7 +155,6 @@ They are organized below.
 * Runge-Kutta orders 1-3 (SSP TVD), adaptive time stepping
 * RK4-5 operator splitting for Euler-Lagrange modeling
 * Interface sharpening (THINC-like)
-
 
 ### Large-scale and accelerated simulation
 
@@ -179,27 +180,20 @@ They are organized below.
 
 ## Citation
 
-If you use MFC, consider citing it as:
-
-<p align="center">
-  <a href="https://doi.org/10.1016/j.cpc.2020.107396">
-    S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2021) Computer Physics Communications <b>266</b>, 107396
-  </a>
-</p>
+If you use MFC, consider citing it as below.
+Ref. 1 includes all modern MFC features, including GPU acceleration and many new physics features.
+If referencing MFC's (GPU) performance, consider citing ref. 1 and 2, which describe the solver and how it was crafted.
+The original open-source release of MFC is ref. 3, which should be cited for provenance as appropriate.
 
 ```bibtex
-@article{Bryngelson_2021,
-  title   = {{MFC: A}n open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver},
-  author  = {S. H. Bryngelson and K. Schmidmayer and V. Coralic and J. C. Meng and K. Maeda and T. Colonius},
-  journal = {Computer Physics Communications},
-  year    = {2021},
-  volume  = {266},
-  pages   = {107396},
-  doi     = {10.1016/j.cpc.2020.107396}
+@article{Wilfong_2025,
+  author = {Wilfong, Benjamin and {Le Berre}, Henry and Radhakrishnan, Anand and Gupta, Ansh and Vaca-Revelo, Diego and Adam, Dimitrios and Yu, Haocheng and Lee, Hyeoksu and Chreim, Jose Rodolfo and {Carcana Barbosa}, Mirelys and Zhang, Yanjun and Cisneros-Garibay, Esteban and Gnanaskandan, Aswin and {Rodriguez Jr.}, Mauro and Budiardja, Reuben D. and Abbott, Stephen and Colonius, Tim and Bryngelson, Spencer H.},
+  title = {{MFC 5.0: A}n exascale many-physics flow solver},
+  journal = {arXiv preprint arXiv:2503.07953},
+  year = {2025},
+  doi = {10.48550/arXiv.2503.07953}
 }
-```
 
-```bibtex
 @article{Radhakrishnan_2024,
   title   = {Method for portable, scalable, and performant {GPU}-accelerated simulation of multiphase compressible flow},
   author  = {A. Radhakrishnan and H. {Le Berre} and B. Wilfong and J.-S. Spratt and M. {Rodriguez Jr.} and T. Colonius and S. H. Bryngelson},
@@ -208,6 +202,16 @@ If you use MFC, consider citing it as:
   volume  = {302},
   pages   = {109238},
   doi     = {10.1016/j.cpc.2024.109238}
+}
+
+@article{Bryngelson_2021,
+  title   = {{MFC: A}n open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver},
+  author  = {S. H. Bryngelson and K. Schmidmayer and V. Coralic and J. C. Meng and K. Maeda and T. Colonius},
+  journal = {Computer Physics Communications},
+  year    = {2021},
+  volume  = {266},
+  pages   = {107396},
+  doi     = {10.1016/j.cpc.2020.107396}
 }
 ```
 
@@ -222,12 +226,7 @@ Federal sponsors have supported MFC development, including the US Department of 
 
 MFC computations have used many supercomputing systems. A partial list is below
   * OLCF Frontier and Summit, and testbeds Wombat, Crusher, and Spock (allocation CFD154, PI Bryngelson)
-  * LLNL Tuolumne and Lassen, El Capitan early access system Tioga
-  * PSC Bridges(1/2), NCSA Delta, SDSC Comet and Expanse, Purdue Anvil, TACC Stampede(1-3), and TAMU ACES via ACCESS-CI allocations from Bryngelson, Colonius, Rodriguez, and more.
-  * DOD systems Onyx, Carpenter, Nautilus, and Narwhal via the DOD HPCMP program
+  * LLNL El Capitan, Tuolumne, and Lassen; El Capitan early access system Tioga
+  * NCSA Delta and DeltaAI, PSC Bridges(1/2), SDSC Comet and Expanse, Purdue Anvil, TACC Stampede(1-3), and TAMU ACES via ACCESS-CI allocations from Bryngelson, Colonius, Rodriguez, and more.
+  * DOD systems Blueback, Onyx, Carpenter, Nautilus, and Narwhal via the DOD HPCMP program
   * Sandia National Labs systems Doom and Attaway and testbed systems Weaver and Vortex
-
-
-## Contributors
-
-[![Contributors](https://contributors-img.web.app/image?repo=mflowcode/mfc)](https://github.com/mflowcode/mfc/graphs/contributors)

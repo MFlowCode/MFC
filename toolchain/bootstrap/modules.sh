@@ -1,5 +1,23 @@
 #!/bin/bash
 
+# Function to display help message
+show_help() {
+  echo "Usage: $(basename "$0") [OPTIONS]"
+  echo "This function loads in modules for a specific computer and mode"
+  echo ""
+  echo "Options:"
+  echo "  -h, --help                  Display this help message and exit."
+  echo "  -c, --computer COMPUTER     Configures for COMPUTER environment."
+  echo "                 Options:     Ascent (a) | Frontier (f) | Summit (s) | Wombat (w)"
+  echo "                              Bridges2 (b) | Expanse (e) | Delta (d) | DeltaAI (dai)"
+  echo "                              Phoenix (p) | Richardson (r) | Oscar (o)"
+  echo "                              Carpenter Cray (cc) | Carpenter GNU (c) |  Nautilus (n)"
+  echo "  -m, --mode MODE             Configures into MODE."
+  echo "                 Options:     gpu (g) | cpu (c)"
+  echo ""
+  exit 0
+}
+
 unset u_c
 unset u_cg
 
@@ -12,6 +30,7 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -c|--computer) u_c="$2";  shift; shift; ;;
         -m|--mode)     u_cg="$2"; shift; shift; ;;
+        -h|--help)     show_help; shift; shift; ;;
         -*|--*)        echo "Unknown option $1"; return; ;;
     esac
 done
@@ -24,8 +43,8 @@ if [ -v $u_c ]; then
     log   "$Y""Gatech$W:  Phoenix    (p)"
     log   "$R""Caltech$W: Richardson (r)"
     log   "$BR""Brown$W: Oscar (o)"
-    log   "$B""DoD$W:     Carpenter  (c) | Nautilus (n)"
-    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d/$C""dai$CR/$Y""p$CR/$R""r$CR/$B""c$CR/$B""n$CR/$BR""o"$CR"): "
+    log   "$B""DoD$W:     Carpenter Cray (cc) | Carpenter GNU (c) |  Nautilus (n)"
+    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d/$C""dai$CR/$Y""p$CR/$R""r$CR/$B""cc$CR/$B""c$CR/$B""n$CR/$BR""o"$CR"): "
     read u_c
     log
 fi
@@ -68,7 +87,7 @@ fi
 log "Loading modules (& env variables) for $M$COMPUTER$CR on $M$CG$CR"'s:'
 
 # Reset modules to default system configuration (unless Carpenter)
-if [ "$u_c" != 'c' ]; then
+if [ "$u_c" '!=' 'cc' ] && [ "$u_c" '!=' 'c' ]; then
     module reset > /dev/null 2>&1
     code="$?"
 
@@ -97,7 +116,7 @@ if [ $(echo "$VARIABLES" | grep = | wc -c) -gt 0 ]; then
 fi
 
 # Don't check for Cray paths on Carpenter, otherwise do check if they exist
-if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" != 'c' ]; then
+if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" '!=' 'c' ]; then
     ok "Found $M\$CRAY_LD_LIBRARY_PATH$CR. Prepending to $M\$LD_LIBRARY_PATH$CR."
     export LD_LIBRARY_PATH="$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH"
 fi

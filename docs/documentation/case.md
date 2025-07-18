@@ -225,6 +225,7 @@ end if
 Some patch configurations are not adequately handled with the above analytic variable definitions.
 In this case, a hard coded patch can be used.
 Hard coded patches can be added by adding additional hard coded patch identifiers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`.
+When using a hard coded patch, the `patch_icpp(patch_id)%%hcid` must be set to the hard-coded patch id.
 For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
 
 ```f90
@@ -232,7 +233,7 @@ For example, to add a 2D Hardcoded patch with an id of 200, one would add the fo
         ! Primitive variables assignment
 ```
 
-and use `patch_icpp(i)%%geometry = 7` and `patch_icpp(i)%%hcid = 200` in the input file.
+and use `patch_icpp(i)%%hcid = 200` in the input file.
 Additional variables can be declared in `Hardcoded1[2,3]DVariables` and used in `hardcoded1[2,3]D`.
 As a convention, any hard coded patches that are part of the MFC master branch should be identified as 1[2,3]xx where the first digit indicates the number of dimensions.
 
@@ -312,8 +313,8 @@ These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch 
 
 #### Parameter Descriptions
 
-- `geometry` defines the type of geometry of a patch with an integer number.
-Definitions for currently implemented patch types are list in table [Immersed Boundary Patch Type](#immersed-boundary-patch-types)
+- `geometry` defines the type of geometry of an immersed boundary patch with an integer number.
+Definitions for currently implemented immersed boundary patch types are listed in table [Immersed Boundary Patch Type](#immersed-boundary-patch-types).
 
 - `x[y,z]_centroid` is the centroid location of the patch in the x[y,z]-direction
 
@@ -824,8 +825,7 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `perturb_sph_fluid`    | Integer | Fluid component whose partial density is to be perturbed |
 | `mixlayer_vel_profile` | Logical | Set the mean streamwise velocity to hyperbolic tangent profile |
 | `mixlayer_vel_coef`    | Real    | Coefficient for the hyperbolic tangent profile of a mixing layer |
-| `mixlayer_perturb`     | Logical | Perturb the initial velocity field by instability waves |
-| `mixlayer_domain`      | Real    | Domain size of a mixing layer for the linear stability analysis |
+| `mixlayer_perturb`     | Logical | Perturb the initial velocity field using a spectrum-based synthetic turbulence generation method |
 
 The table lists velocity field parameters.
 The parameters are optionally used to define initial velocity profiles and perturbations.
@@ -840,15 +840,13 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `perturb_sph_fluid` specifies the fluid component whose partial density is to be perturbed.
 
-- `mixlayer_vel_profile` activates setting the mean streamwise velocity to a hyperbolic tangent profile. This option works only for 2D and 3D cases.
+- `mixlayer_vel_profile` activates setting the mean streamwise velocity to a hyperbolic tangent profile. This option works only for `n > 0`.
 
 - `mixlayer_vel_coef` is a parameter for the hyperbolic tangent profile of a mixing layer when `mixlayer_vel_profile = 'T'`. The mean streamwise velocity profile is given as:
 
-$$ u = patch\_icpp(1)\%vel(1) * tanh(y\_cc * mixlayer\_vel\_profile) $$
+$$ u = \mbox{patch\_icpp(1)\%vel(1)} * \tanh( y_{cc} * \mbox{mixlayer\_vel\_coef}) $$
 
-- `mixlayer_perturb` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for `n > 0`, `bc_y%[beg,end] = -6`, `num_fluids = 1`, `model_eqns = 2` and `mixlayer_vel_profile = 'T'`.
-
-- `mixlayer_domain` defines the domain size to compute spatial eigenvalues of the linear instability analysis when `mixlayer_perturb = 'T'`. For example, the spatial eigenvalue in `x` direction in 2D problem will be $2 \pi \alpha / (mixlayer\_domain*patch\_icpp(1)\%length\_y)$ for $\alpha = 1$, $2$ and $4$.
+- `mixlayer_perturb` activates the velocity perturbation for a temporal mixing layer with hyperbolic tangent mean streamwise velocity profile, using an inverter version of the spectrum-based synthetic turbulence generation method proposed by Guo et al. (2023, JFM). This option only works for `p > 0` and `mixlayer_vel_profile = 'T'`.
 
 ### 11. Phase Change Model
 | Parameter              | Type    | Description                                    |
@@ -999,16 +997,16 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | 3    | Rectangle 	        | 2     | N      | Coordinate-aligned. Requires `[x,y]_centroid` and `length_[x,y]`. |
 | 4    | Sweep line 		| 2     | Y      | Not coordinate aligned. Requires `[x,y]_centroid` and `normal(i)`. |
 | 5    | Ellipse 		    | 2     | Y      | Requires `[x,y]_centroid` and `radii(i)`. |
-| 6    | N/A 		        | 2     | N      | No longer exists. Empty. |
-| 7    | 2D Hardcoded 	    | 2     | N      | Assigns the primitive variables as analytical functions. |
+| 6    | N/A 		        | N/A   | N/A    | No longer exists. Empty. |
+| 7    | N/A        	    | N/A   | N/A    | No longer exists. Empty. |
 | 8    | Sphere 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radius` |
 | 9    | Cuboid 		    | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `length_[x,y,z]`. |
 | 10   | Cylinder 		    | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_[x,y,z]`. |
 | 11   | Sweep plane 	    | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
-| 13   | 3D Hardcoded 	    | 3     | N      | Assigns the primitive variables as analytical functions |
+| 13   | N/A        	    | N/A   | N/A    | No longer exists. Empty. |
 | 14   | Spherical Harmonic | 3     | N      | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |
-| 15   | 1D Hardcoded      | 1     | N      | Assigns the primitive variables as analytical functions  |
+| 15   | N/A                | N/A   | N/A    | No longer exists. Empty.  |
 | 16   | 1D bubble pulse    | 1     | N      | Requires `x_centroid`, `length_x` |
 | 17   | Spiral             | 2     | N      | Requires `[x,y]_centroid` |
 | 18   | 2D Varcircle       | 2     | Y      | Requires `[x,y]_centroid`, `radius`, and `thickness` |

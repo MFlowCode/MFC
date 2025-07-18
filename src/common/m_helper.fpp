@@ -1,4 +1,5 @@
 #:include 'macros.fpp'
+
 !>
 !! @file m_helper.f90
 !! @brief Contains module m_helper
@@ -43,7 +44,7 @@ contains
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
     pure subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: vftmp
         real(wp), dimension(nb), intent(in) :: Rtmp
         real(wp), intent(out) :: ntmp
@@ -57,7 +58,7 @@ contains
     end subroutine s_comp_n_from_prim
 
     pure subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: vftmp
         real(wp), dimension(nb), intent(in) :: nRtmp
         real(wp), intent(out) :: ntmp
@@ -318,8 +319,8 @@ contains
     pure function f_create_transform_matrix(p, center) result(out_matrix)
 
         type(ic_model_parameters), intent(in) :: p
-        t_vec3, optional, intent(in) :: center
-        t_mat4x4 :: sc, rz, rx, ry, tr, t_back, t_to_origin, out_matrix
+        real(wp), dimension(1:3), optional, intent(in) :: center
+        real(wp), dimension(1:4, 1:4) :: sc, rz, rx, ry, tr, t_back, t_to_origin, out_matrix
 
         sc = transpose(reshape([ &
                                p%scale(1), 0._wp, 0._wp, 0._wp, &
@@ -378,8 +379,8 @@ contains
     !! @param matrix Transformation matrix.
     pure subroutine s_transform_vec(vec, matrix)
 
-        t_vec3, intent(inout) :: vec
-        t_mat4x4, intent(in) :: matrix
+        real(wp), dimension(1:3), intent(inout) :: vec
+        real(wp), dimension(1:4, 1:4), intent(in) :: matrix
 
         real(wp), dimension(1:4) :: tmp
 
@@ -394,7 +395,7 @@ contains
     pure subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
         type(t_triangle), intent(inout) :: triangle
-        t_mat4x4, intent(in) :: matrix, matrix_n
+        real(wp), dimension(1:4, 1:4), intent(in) :: matrix, matrix_n
 
         integer :: i
 
@@ -412,7 +413,7 @@ contains
     pure subroutine s_transform_model(model, matrix, matrix_n)
 
         type(t_model), intent(inout) :: model
-        t_mat4x4, intent(in) :: matrix, matrix_n
+        real(wp), dimension(1:4, 1:4), intent(in) :: matrix, matrix_n
 
         integer :: i
 

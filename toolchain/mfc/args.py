@@ -17,16 +17,23 @@ started, run ./mfc.sh build -h.""",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
+    # Here are all of the parser arguments that call functions in other python files
     parsers = parser.add_subparsers(dest="command")
-    run        = parsers.add_parser(name="run",        help="Run a case with MFC.",                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    test       = parsers.add_parser(name="test",       help="Run MFC's test suite.",                formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    build      = parsers.add_parser(name="build",      help="Build MFC and its dependencies.",      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    clean      = parsers.add_parser(name="clean",      help="Clean build artifacts.",               formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    bench      = parsers.add_parser(name="bench",      help="Benchmark MFC (for CI).",              formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    bench_diff = parsers.add_parser(name="bench_diff", help="Compare MFC Benchmarks (for CI).",     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    count      = parsers.add_parser(name="count",      help="Count LOC in MFC.",                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    count_diff = parsers.add_parser(name="count_diff", help="Count LOC in MFC.",                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    packer     = parsers.add_parser(name="packer",     help="Packer utility (pack/unpack/compare)", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    run        = parsers.add_parser(name="run",        help="Run a case with MFC.",                   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    test       = parsers.add_parser(name="test",       help="Run MFC's test suite.",                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    build      = parsers.add_parser(name="build",      help="Build MFC and its dependencies.",        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    clean      = parsers.add_parser(name="clean",      help="Clean build artifacts.",                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    bench      = parsers.add_parser(name="bench",      help="Benchmark MFC (for CI).",                formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    bench_diff = parsers.add_parser(name="bench_diff", help="Compare MFC Benchmarks (for CI).",       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    count      = parsers.add_parser(name="count",      help="Count LOC in MFC.",                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    count_diff = parsers.add_parser(name="count_diff", help="Count LOC in MFC.",                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    packer     = parsers.add_parser(name="packer",     help="Packer utility (pack/unpack/compare).",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    # These parser arguments all call BASH scripts, and they only exist so that they show up in the help message
+    parsers.add_parser(name="load",       help="Loads the MFC environment with source.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parsers.add_parser(name="lint",       help="Lints all code after editing.",          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parsers.add_parser(name="format",     help="Formats all code after editing.",        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parsers.add_parser(name="spelling",   help="Runs the spell checker after editing.",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     packers = packer.add_subparsers(dest="packer")
     pack = packers.add_parser(name="pack", help="Pack a case into a single file.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
