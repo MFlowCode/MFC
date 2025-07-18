@@ -2,9 +2,12 @@
 !! @file m_helper_basic.f90
 !! @brief Contains module m_helper_basic
 
+#:include 'macros.fpp'
+
 module m_helper_basic
 
     use m_derived_types        !< Definitions of the derived types
+    use m_precision_select     !< Definitions of the precision types
 
     implicit none
 
@@ -14,7 +17,8 @@ module m_helper_basic
               f_is_default, &
               f_all_default, &
               f_is_integer, &
-              s_configure_coordinate_bounds
+              s_configure_coordinate_bounds, &
+              s_update_cell_bounds
 
 contains
 
@@ -24,7 +28,7 @@ contains
     !! @param tol_input Relative error (default = 1.e-10_wp for double and 1e-6 for single).
     !! @return Result of the comparison.
     logical pure elemental function f_approx_equal(a, b, tol_input) result(res)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a, b
         real(wp), optional, intent(in) :: tol_input
         real(wp) :: tol
@@ -32,10 +36,10 @@ contains
         if (present(tol_input)) then
             tol = tol_input
         else
-            if (wp == selected_real_kind(15, 307)) then
-                tol = 1.e-10_wp
-            else if (wp == selected_real_kind(6, 37)) then
+            if (wp == single_precision) then
                 tol = 1.e-6_wp
+            else
+                tol = 1.e-10_wp
             end if
         end if
 
@@ -54,7 +58,7 @@ contains
     !! @param tol_input Relative error (default = 1.e-10_wp for double and 1e-6 for single).
     !! @return Result of the comparison.
     logical pure function f_approx_in_array(a, b, tol_input) result(res)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a
         real(wp), intent(in) :: b(:)
         real(wp), optional, intent(in) :: tol_input
@@ -66,10 +70,10 @@ contains
         if (present(tol_input)) then
             tol = tol_input
         else
-            if (wp == selected_real_kind(15, 307)) then
-                tol = 1.e-10_wp
-            else if (wp == selected_real_kind(6, 37)) then
+            if (wp == single_precision) then
                 tol = 1.e-6_wp
+            else
+                tol = 1.e-10_wp
             end if
         end if
 
@@ -84,7 +88,7 @@ contains
     !> Checks if a real(wp) variable is of default value.
     !! @param var Variable to check.
     logical pure elemental function f_is_default(var) result(res)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: var
 
         res = f_approx_equal(var, dflt_real)
@@ -109,7 +113,7 @@ contains
     !> Checks if a real(wp) variable is an integer.
     !! @param var Variable to check.
     logical pure elemental function f_is_integer(var) result(res)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: var
 
         res = f_approx_equal(var, real(nint(var), wp))
@@ -151,5 +155,25 @@ contains
         idwbuff(3)%end = idwint(3)%end - idwbuff(3)%beg
 
     end subroutine s_configure_coordinate_bounds
+
+    !> Updates the min and max number of cells in each set of axes
+    !! @param bounds Min ans max values to update
+    !! @param m Number of cells in x-axis
+    !! @param n Number of cells in y-axis
+    !! @param p Number of cells in z-axis
+    pure elemental subroutine s_update_cell_bounds(bounds, m, n, p)
+        type(cell_num_bounds), intent(out) :: bounds
+        integer, intent(in) :: m, n, p
+
+        bounds%mn_max = max(m, n)
+        bounds%np_max = max(n, p)
+        bounds%mp_max = max(m, p)
+        bounds%mnp_max = max(m, n, p)
+        bounds%mn_min = min(m, n)
+        bounds%np_min = min(n, p)
+        bounds%mp_min = min(m, p)
+        bounds%mnp_min = min(m, n, p)
+
+    end subroutine s_update_cell_bounds
 
 end module m_helper_basic

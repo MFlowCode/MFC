@@ -72,7 +72,7 @@ contains
             event%message = c_loc(tempName)
             call nvtxRangePushEx(event)
         else
-            call nvtxRangePush(tempName)
+            call nvtxRangePushA(tempName)
         end if
 
 #endif
