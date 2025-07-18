@@ -21,7 +21,7 @@ sbatch_common_opts="\
 #SBATCH -J shb-${sbatch_script%%.sh}-$device    # job name
 #SBATCH --account=gts-sbryngelson3              # account
 #SBATCH -N1                                     # nodes
-#SBATCH -t 03:00:00                             # walltime
+#SBATCH -t 04:00:00                             # walltime
 #SBATCH -q embers                               # QOS
 #SBATCH -o $job_slug.out                        # stdout+stderr
 #SBATCH --mem-per-cpu=2G                        # default mem (overridden below)

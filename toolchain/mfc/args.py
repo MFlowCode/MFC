@@ -91,6 +91,7 @@ started, run ./mfc.sh build -h.""",
     test.add_argument(      "--no-examples",  action="store_true",                    default=False,      help="Do not test example cases." )
     test.add_argument("--case-optimization",  action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
     test.add_argument(      "--dry-run",      action="store_true",                    default=False,      help="Build and generate case files but do not run tests.")
+    test.add_argument(      "--sched-debug",  action="store_true",                    default=False,      help="Enable detailed scheduler debug logging.")
 
     test_meg = test.add_mutually_exclusive_group()
     test_meg.add_argument("--generate",          action="store_true", default=False, help="(Test Generation) Generate golden files.")
