@@ -720,8 +720,8 @@ contains
                 if (precision == ${PRECISION}$) then
                     if (p > 0) then
                         err = DBMKOPTLIST(2, optlist)
-                        err = DBADDIAOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
-                        err = DBADDIAOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
+                        err = DBADDIAOPT(optlist, DBOPT_LO_OFFSET, 3, lo_offset)
+                        err = DBADDIAOPT(optlist, DBOPT_HI_OFFSET, 3, hi_offset)
                         if (grid_geometry == 3) then
                             err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
                                           'x', 1, 'y', 1, 'z', 1, &
@@ -738,8 +738,8 @@ contains
                         err = DBFREEOPTLIST(optlist)
                     else
                         err = DBMKOPTLIST(2, optlist)
-                        err = DBADDIAOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
-                        err = DBADDIAOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
+                        err = DBADDIAOPT(optlist, DBOPT_LO_OFFSET, 2, lo_offset)
+                        err = DBADDIAOPT(optlist, DBOPT_HI_OFFSET, 2, hi_offset)
                         err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
                                       'x', 1, 'y', 1, 'z', 1, &
                                       x_cb${SFX}$, y_cb${SFX}$, DB_F77NULL, dims, 2, &
