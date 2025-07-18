@@ -49,6 +49,8 @@ jobs:
             condor_submit MFC/mfc_cpu_bench.sub
             condor_submit MFC/mfc_gpu.sub
             condor_submit MFC/mfc_gpu_bench.sub
+
+            condor_wait logfile
           "
 
       - name: Upload images as artifacts
