@@ -68,9 +68,12 @@ module m_start_up
 
     use m_helper_basic          !< Functions to compare floating point numbers
 
-#ifdef MFC_OpenACC
-    use openacc
-#endif
+    $:USE_GPU_MODULE()
+!     #if defined(MFC_OpenACC)
+!     use openacc
+! #elif defined(MFC_OpenMP)
+!     use omp_lib
+! #endif
 
     use m_nvtx
 
@@ -1329,14 +1332,16 @@ contains
 
     impure subroutine s_initialize_mpi_domain
         integer :: ierr
-#ifdef MFC_OpenACC
+#ifdef MFC_GPU
         real(wp) :: starttime, endtime
         integer :: num_devices, local_size, num_nodes, ppn, my_device_num
         integer :: dev, devNum, local_rank
 #ifdef MFC_MPI
         integer :: local_comm
 #endif
+#if defined(MFC_OpenACC)
         integer(acc_device_kind) :: devtype
+#endif
 #endif
 
         ! Initializing MPI execution environment
@@ -1344,7 +1349,7 @@ contains
         call s_mpi_initialize()
 
         ! Bind GPUs if OpenACC is enabled
-#ifdef MFC_OpenACC
+#ifdef MFC_GPU
 #ifndef MFC_MPI
         local_size = 1
         local_rank = 0
@@ -1354,12 +1359,17 @@ contains
         call MPI_Comm_size(local_comm, local_size, ierr)
         call MPI_Comm_rank(local_comm, local_rank, ierr)
 #endif
-
+#if defined(MFC_OpenACC)
         devtype = acc_get_device_type()
         devNum = acc_get_num_devices(devtype)
         dev = mod(local_rank, devNum)
 
         call acc_set_device_num(dev, devtype)
+#elif defined(MFC_OpenMP)
+     devNum = omp_get_num_devices()
+     dev = mod(local_rank, devNum)
+     call omp_set_default_device(dev)
+#endif
 #endif
 
         ! The rank 0 processor assigns default values to the user inputs prior to
