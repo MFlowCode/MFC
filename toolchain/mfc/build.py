@@ -18,7 +18,7 @@ class MFCTarget:
 
         def compute(self) -> typing.Set:
             r  = self.all[:]
-            r += self.gpu[:] if ARG("gpu") else self.cpu[:]
+            r += self.gpu[:] if (ARG("gpu") != gpuConfigOptions.NONE.value) else self.cpu[:]
 
             return r
 
