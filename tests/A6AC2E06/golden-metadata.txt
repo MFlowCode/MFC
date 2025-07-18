@@ -1,52 +1,18 @@
-This file was created on 2025-07-14 11:51:49.564522.
+This file was created on 2023-11-21 08:14:23.091225.
 
 mfc.sh:
 
-    Invocation: test -j 24 --generate -- -c phoenix -a gts-kj20 -q embers
-    Lock:       mpi=Yes & gpu=No & debug=Yes & gcov=No & unified=No & single=No
-    Git:        e563f3d3d2851db816fd59f7d66bdf2bb684a5d6 on EnhanceTest (dirty)
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.26.5 on atl1-1-02-012-12-1.pace.gatech.edu
-    
-        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
-        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /storage/home/hcoda1/5/xtian64/scratch/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
-        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
-        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test -j 8 --generate
+    Lock:       mpi=Yes & gpu=No & debug=No
 
 simulation:
 
     CMake Configuration:
     
-        CMake v3.26.5 on atl1-1-02-012-12-1.pace.gatech.edu
+        CMake v3.27.7 on shb-m1pro-3.local
     
-        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
-        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
+        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
@@ -58,28 +24,28 @@ simulation:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /storage/home/hcoda1/5/xtian64/scratch/MFC/build/venv/bin/fypp
+        Fypp    : /Users/spencer/Downloads/master/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
-        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
-        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
-        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
+        CC       : /opt/homebrew/bin/gcc-13
+        CXX      : g++-13
+        FC       : /opt/homebrew/bin/gfortran-13
         OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+        OMPI_CXX : g++-13
+        OMPI_FC  : gfortran-13
 
 syscheck:
 
     CMake Configuration:
     
-        CMake v3.26.5 on atl1-1-02-012-12-1.pace.gatech.edu
+        CMake v3.27.7 on shb-m1pro-3.local
     
-        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
-        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
+        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -91,32 +57,32 @@ syscheck:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /storage/home/hcoda1/5/xtian64/scratch/MFC/build/venv/bin/fypp
+        Fypp    : /Users/spencer/Downloads/master/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
-        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
-        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
-        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
+        CC       : /opt/homebrew/bin/gcc-13
+        CXX      : g++-13
+        FC       : /opt/homebrew/bin/gfortran-13
         OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+        OMPI_CXX : g++-13
+        OMPI_FC  : gfortran-13
 
-post_process:
+pre_process:
 
     CMake Configuration:
     
-        CMake v3.26.5 on atl1-1-02-012-12-1.pace.gatech.edu
+        CMake v3.27.7 on shb-m1pro-3.local
     
-        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
-        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
+        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
-        POST_PROCESS  : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -124,63 +90,27 @@ post_process:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /storage/home/hcoda1/5/xtian64/scratch/MFC/build/venv/bin/fypp
+        Fypp    : /Users/spencer/Downloads/master/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
-        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
-        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
-        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
+        CC       : /opt/homebrew/bin/gcc-13
+        CXX      : g++-13
+        FC       : /opt/homebrew/bin/gfortran-13
         OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+        OMPI_CXX : g++-13
+        OMPI_FC  : gfortran-13
 
 CPU:
 
-    CPU Info:
-    From lscpu
-    Architecture:                         x86_64
-    CPU op-mode(s):                       32-bit, 64-bit
-    Address sizes:                        46 bits physical, 48 bits virtual
-    Byte Order:                           Little Endian
-    CPU(s):                               24
-    On-line CPU(s) list:                  0-23
-    Vendor ID:                            GenuineIntel
-    Model name:                           Intel(R) Xeon(R) Gold 6226 CPU @ 2.70GHz
-    CPU family:                           6
-    Model:                                85
-    Thread(s) per core:                   1
-    Core(s) per socket:                   12
-    Socket(s):                            2
-    Stepping:                             7
-    CPU(s) scaling MHz:                   100%
-    CPU max MHz:                          2700.0000
-    CPU min MHz:                          1200.0000
-    BogoMIPS:                             5400.00
-    Flags:                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 intel_ppin ssbd mba ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm mpx rdt_a avx512f avx512dq rdseed adx smap clflushopt clwb intel_pt avx512cd avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts hwp hwp_act_window hwp_epp hwp_pkg_req vnmi pku ospke avx512_vnni md_clear flush_l1d arch_capabilities
-    Virtualization:                       VT-x
-    L1d cache:                            768 KiB (24 instances)
-    L1i cache:                            768 KiB (24 instances)
-    L2 cache:                             24 MiB (24 instances)
-    L3 cache:                             38.5 MiB (2 instances)
-    NUMA node(s):                         2
-    NUMA node0 CPU(s):                    0-11
-    NUMA node1 CPU(s):                    12-23
-    Vulnerability Gather data sampling:   Vulnerable
-    Vulnerability Itlb multihit:          KVM: Mitigation: VMX disabled
-    Vulnerability L1tf:                   Not affected
-    Vulnerability Mds:                    Not affected
-    Vulnerability Meltdown:               Not affected
-    Vulnerability Mmio stale data:        Vulnerable
-    Vulnerability Reg file data sampling: Not affected
-    Vulnerability Retbleed:               Vulnerable
-    Vulnerability Spec rstack overflow:   Not affected
-    Vulnerability Spec store bypass:      Vulnerable
-    Vulnerability Spectre v1:             Vulnerable: __user pointer sanitization and usercopy barriers only; no swapgs barriers
-    Vulnerability Spectre v2:             Vulnerable; IBPB: disabled; STIBP: disabled; PBRSB-eIBRS: Vulnerable; BHI: Vulnerable
-    Vulnerability Srbds:                  Not affected
-    Vulnerability Tsx async abort:        Mitigation; TSX disabled
+    CPU Info: 
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 10
+    machdep.cpu.core_count: 10
+    machdep.cpu.logical_per_package: 10
+    machdep.cpu.thread_count: 10
+    machdep.cpu.brand_string: Apple M1 Max
 
