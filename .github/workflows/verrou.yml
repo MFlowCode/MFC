@@ -1,0 +1,39 @@
+name: Floating-Point Compliance
+
+on: [pull_request, push]
+
+jobs:
+  Floating-Point_Compliance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone PR
+        uses: actions/checkout@v4
+
+      - name: Verrou Setup
+        run: |
+          # get recent release of valgrind from GitHub API
+          VERROU_VERSION=$(curl -s https://api.github.com/repos/edf-hpc/verrou/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")')
+          VERROU_NUMBER=${VERROU_VERSION#v}
+
+          wget -P pr https://github.com/edf-hpc/verrou/releases/download/${VERROU_VERSION}/valgrind-3.23.0_verrou-${VERROU_NUMBER}.tar.gz
+          cd pr
+          tar -xzf valgrind-3.23.0_verrou-${VERROU_NUMBER}.tar.gz
+          cd valgrind-3.23.0+verrou-${VERROU_NUMBER}
+          ./autogen.sh
+          ./configure --prefix=$HOME/.local
+          make
+          make install
+          cd ../..
+          rm -rf pr/valgrind-*
+
+      - name: Run Tests
+        run: |
+           sudo apt update -y
+           sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
+                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev
+          
+           valgrind --tool=verrou ./mfc.sh test -a --dry-run
+
+      - name: Check Compliance
+        run: |
+          echo "Checking floating point compliance..."
