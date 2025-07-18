@@ -43,7 +43,14 @@ jobs:
             condor_wait logfile
           "
 
-      - name: Upload images as artifacts
+      - name: Migrate Images to ODSF
+        run: |
+          ssh ${{secrets.SSH_USER}} "
+          cp /home/mohammed.al-mahrouqi/MFC/.github/workflows/images/*.sif /ospool/ap40/data/mohammed.al-mahrouqi
+          "
+          scp -r ${{secrets.SSH_USER}}:MFC/.github/workflows/images/* pr/.github/workflows/images/
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         if:   always()
         with:
