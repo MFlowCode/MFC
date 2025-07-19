@@ -131,9 +131,12 @@ contains
     impure subroutine s_apply_fourier_filter(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+#if defined(MFC_OpenACC)
         real(c_double), pointer :: p_real(:)
         complex(c_double_complex), pointer :: p_cmplx(:), p_fltr_cmplx(:)
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: l !< Generic loop iterators
+#endif
+        integer :: i, j, k !< Generic loop iterators
 
         ! Restrict filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
