@@ -231,7 +231,6 @@ if "post_process" in ARGS["mfc"]["targets"]:
 else:
     mods['prim_vars_wrt'] = 'F'
     mods['parallel_io'] = 'F'
-    
     if ('fd_order' not in case) and ('fd_order' not in mods):
         mods['fd_order'] = 1
     if ('probe_wrt' not in case):
