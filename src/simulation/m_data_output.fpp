@@ -362,6 +362,7 @@ contains
             end if
 
             if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
+                print *, 'icfl', icfl_max_glb
                 call s_mpi_abort('ICFL is NaN. Exiting.')
             elseif (icfl_max_glb > 1._wp) then
                 print *, 'icfl', icfl_max_glb
