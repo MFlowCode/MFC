@@ -62,27 +62,7 @@ Written primarily for Fortran/Fypp; the GPU and style sections matter only when 
 
 ---
 
-# 3  FYPP Macros for GPU acceleration Programming Guidelines (for GPU kernels)
-
-Do not directly use OpenACC or OpenMP directives directly.
-Instead, use the FYPP macros contained in src/common/include/parallel_macros.fpp
-
-Wrap tight loops with
-
-```fortran
-$:GPU_PARALLEL_FOR(private='[...]', copy='[...]')
-```
-* Add `collapse=n` to merge nested loops when safe.
-* Declare loop-local variables with `private='[...]'`.
-* Allocate large arrays with `managed` or move them into a persistent
-  `$:GPU_ENTER_DATA(...)` region at start-up.
-* **Do not** place `stop` / `error stop` inside device code.
-* Must compile with Cray `ftn` and NVIDIA `nvfortran` for GPU offloading; also build CPU-only with
-  GNU `gfortran` and Intel `ifx`/`ifort`.
-
----
-
-# 4  File & Module Structure
+# 3  File & Module Structure
 
 - **File Naming**:
   - `.fpp` files: Fypp preprocessed files that get translated to `.f90`
@@ -99,25 +79,44 @@ $:GPU_PARALLEL_FOR(private='[...]', copy='[...]')
   - `contains` section
   - Implementation of subroutines and functions
 
-# 5  Fypp Macros and GPU Acceleration
+---
 
-## Use of Fypp
+# 4  Fypp Macros
+
 - **Fypp Directives**:
   - Start with `#:` (e.g., `#:include`, `#:def`, `#:enddef`)
   - Macros defined in `include/*.fpp` files
   - Used for code generation, conditional compilation, and GPU offloading
 
-## Some examples
+---
 
-Documentation on how to use the Fypp macros for GPU offloading is available at https://mflowcode.github.io/documentation/md_gpuParallelization.html
+# 5  FYPP Macros for GPU acceleration Programming Guidelines (for GPU kernels)
 
-Some examples include:
-- `$:GPU_ROUTINE(parallelism='[seq]')` - Marks GPU-callable routines
-- `$:GPU_PARALLEL_LOOP(collapse=N)` - Parallelizes loops
-- `$:GPU_LOOP(parallelism='[seq]')` - Marks sequential loops
-- `$:GPU_UPDATE(device='[var1,var2]')` - Updates device data
-- `$:GPU_ENTER_DATA(copyin='[var]')` - Copies data to device
-- `$:GPU_EXIT_DATA(delete='[var]')` - Removes data from device
+- Do not use OpenACC or OpenMP directives directly.
+- Instead, use the FYPP macros contained in `src/common/include/parallel_macros.fpp`
+- Documentation on how to use the Fypp macros for GPU offloading is available at https://mflowcode.github.io/documentation/md_gpuParallelization.html
+
+Wrap tight loops with
+```fortran
+$:GPU_PARALLEL_FOR(private='[...]', copy='[...]')
+```
+* Add `collapse=n` to merge nested loops when safe.
+* Declare loop-local variables with `private='[...]'`.
+* Allocate large arrays with `managed` or move them into a persistent
+  `$:GPU_ENTER_DATA(...)` region at start-up.
+* **Do not** place `stop` / `error stop` inside device code.
+* Must compile with Cray `ftn` or NVIDIA `nvfortran` for GPU offloading; also build CPU-only with
+  GNU `gfortran` and Intel `ifx`/`ifort`.
+
+- Example GPU macros include the below, among others:
+  - `$:GPU_ROUTINE(parallelism='[seq]')` - Marks GPU-callable routines
+  - `$:GPU_PARALLEL_LOOP(collapse=N)` - Parallelizes loops
+  - `$:GPU_LOOP(parallelism='[seq]')` - Marks sequential loops
+  - `$:GPU_UPDATE(device='[var1,var2]')` - Updates device data
+  - `$:GPU_ENTER_DATA(copyin='[var]')` - Copies data to device
+  - `$:GPU_EXIT_DATA(delete='[var]')` - Removes data from device
+
+---
 
 # 6  Documentation Style
 
