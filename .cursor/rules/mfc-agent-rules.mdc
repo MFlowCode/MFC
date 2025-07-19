@@ -1,7 +1,7 @@
-----
--description: Full MFC project rules – consolidated for Agent Mode
--alwaysApply: true
-----
+---
+description: Full MFC project rules – consolidated for Agent Mode
+alwaysApply: true
+---
 
 # 0  Purpose & Scope
 Consolidated guidance for the MFC exascale, many-physics solver.
