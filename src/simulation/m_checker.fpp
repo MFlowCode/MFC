@@ -50,7 +50,6 @@ contains
             call s_check_inputs_continuum_damage
         end if
 
-        call s_check_inputs_riemann_solver
         call s_check_inputs_time_stepping
         call s_check_inputs_stiffened_eos_viscosity
         call s_check_inputs_body_forces

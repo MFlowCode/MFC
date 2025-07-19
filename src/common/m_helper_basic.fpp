@@ -1,4 +1,4 @@
-!>
+
 !! @file m_helper_basic.f90
 !! @brief Contains module m_helper_basic
 
@@ -128,8 +128,7 @@ contains
             else
                 buff_size = 4
             end if
-        else
-        if (recon_type == WENO_TYPE) then
+        elseif (recon_type == WENO_TYPE) then
             if (viscous) then
                 buff_size = 2*weno_polyn + 2
             else

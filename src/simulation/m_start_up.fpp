@@ -167,7 +167,6 @@ contains
             nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, &
             num_fluids, mhd, relativity, igr_order, viscous, &
             igr_iter_solver, igr, igr_pres_lim, &
-            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, mhd, relativity, &
             recon_type, muscl_order, muscl_lim, &
 #:endif
             Ca, Web, Re_inv, &
@@ -188,7 +187,7 @@ contains
             cont_damage, tau_star, cont_damage_s, alpha_bar, &
             alf_factor, num_igr_iters, &
             num_igr_warm_start_iters, &
-            ic_eps, ic_beta 
+            int_comp, ic_eps, ic_beta 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
         inquire (FILE=trim(file_path), EXIST=file_exist)

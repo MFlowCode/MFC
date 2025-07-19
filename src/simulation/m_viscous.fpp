@@ -1004,8 +1004,7 @@ contains
 
                 end if
 
-
-        $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
+                $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
                 if (n > 0) then
                     if (p > 0) then
                         call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
@@ -1045,8 +1044,8 @@ contains
                                 do j = is1_viscous%beg, is1_viscous%end
                                     do k = is2_viscous%beg, is2_viscous%end
                                         do l = is3_viscous%beg, is3_viscous%end
-                                            vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
-                                            vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
+                                            vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
+                                            vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
                                         end do
                                     end do
                                 end do
@@ -1057,8 +1056,9 @@ contains
                                 do l = is3_viscous%beg, is3_viscous%end
                                     do k = is2_viscous%beg, is2_viscous%end
                                         do j = is1_viscous%beg, is1_viscous%end
-                                            vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
-                                            vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
+                                            print *, i, l, k, j
+                                            vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
+                                            vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
                                         end do
                                     end do
                                 end do
@@ -1145,8 +1145,8 @@ contains
                                 do j = is1_viscous%beg, is1_viscous%end
                                     do k = is2_viscous%beg, is2_viscous%end
                                         do l = is3_viscous%beg, is3_viscous%end
-                                            vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
-                                            vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
+                                            vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
+                                            vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
                                         end do
                                     end do
                                 end do

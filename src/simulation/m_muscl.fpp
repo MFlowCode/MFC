@@ -20,10 +20,10 @@ module m_muscl
  s_finalize_muscl_module
 
     integer :: v_size
-    !$acc declare create(v_size)
+    $:GPU_DECLARE(create='[v_size]')
 
     type(int_bounds_info) :: is1_muscl, is2_muscl, is3_muscl
-    !$acc declare create(is1_muscl, is2_muscl, is3_muscl)
+    $:GPU_DECLARE(create='[is1_muscl,is2_muscl,is3_muscl]')
 
     !> @name The cell-average variables that will be MUSCL-reconstructed. Formerly, they
     !! are stored in v_vf. However, they are transferred to v_rs_wsL and v_rs_wsR
@@ -35,7 +35,7 @@ module m_muscl
     !> @{
     real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
     !> @}
-    !$acc declare create (v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
+    $:GPU_DECLARE(create='[v_rs_ws_x,v_rs_ws_y,v_rs_ws_z]')
 
 contains
 
@@ -109,7 +109,7 @@ contains
         is2_muscl = is2_muscl_d
         is3_muscl = is3_muscl_d
 
-        !$acc update device(is1_muscl, is2_muscl, is3_muscl)
+        $:GPU_UPDATE(device='[is1_muscl,is2_muscl,is3_muscl]')
 
         if (muscl_order /= 1) then
             call s_initialize_muscl(v_vf, muscl_dir)
@@ -117,7 +117,7 @@ contains
 
         if (muscl_order == 1) then
             if (muscl_dir == 1) then
-                !$acc parallel loop collapse(4) default(present)
+                $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_muscl%beg, is3_muscl%end
                         do k = is2_muscl%beg, is2_muscl%end
@@ -129,7 +129,7 @@ contains
                     end do
                 end do
             else if (muscl_dir == 2) then
-                !$acc parallel loop collapse(4) default(present)
+                $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_muscl%beg, is3_muscl%end
                         do k = is2_muscl%beg, is2_muscl%end
@@ -141,7 +141,7 @@ contains
                     end do
                 end do
             else if (muscl_dir == 3) then
-                !$acc parallel loop collapse(4) default(present)
+                $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_muscl%beg, is3_muscl%end
                         do k = is2_muscl%beg, is2_muscl%end
@@ -158,7 +158,7 @@ contains
             ! MUSCL Reconstruction
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (muscl_dir == ${MUSCL_DIR}$) then
-                    !$acc parallel loop gang collapse(4)  default(present) private(slopeL, slopeR, slope)
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[slopeL,slopeR,slope]')
                     do l = is3_muscl%beg, is3_muscl%end
                         do k = is2_muscl%beg, is2_muscl%end
                             do j = is1_muscl%beg, is1_muscl%end
@@ -208,7 +208,6 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
                 end if
             #:endfor
         end if
@@ -239,7 +238,7 @@ contains
         #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
 
-                !$acc parallel loop collapse(3) gang vector default(present) private(aCL, aC, aCR, aTHINC, moncon, sign, qmin, qmax)
+                $:GPU_PARALLEL_LOOP(collapse=3,private='[aCL,aC,aCR,aTHINC,moncon,sign,qmin,qmax]')
                 do l = is3_muscl%beg, is3_muscl%end
                     do k = is2_muscl%beg, is2_muscl%end
                         do j = is1_muscl%beg, is1_muscl%end
@@ -310,10 +309,10 @@ contains
         ! as to reshape the inputted data in the coordinate direction of
         ! the muscl reconstruction
         v_size = ubound(v_vf, 1)
-        !$acc update device(v_size)
+        $:GPU_UPDATE(device='[v_size]')
 
         if (muscl_dir == 1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do j = 1, v_size
                 do q = is3_muscl%beg, is3_muscl%end
                     do l = is2_muscl%beg, is2_muscl%end
@@ -323,14 +322,13 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in y-direction
         if (n == 0) return
 
         if (muscl_dir == 2) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do j = 1, v_size
                 do q = is3_muscl%beg, is3_muscl%end
                     do l = is2_muscl%beg, is2_muscl%end
@@ -340,13 +338,12 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in z-direction
         if (p == 0) return
         if (muscl_dir == 3) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do j = 1, v_size
                 do q = is3_muscl%beg, is3_muscl%end
                     do l = is2_muscl%beg, is2_muscl%end
@@ -356,7 +353,6 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
         end if
 
     end subroutine s_initialize_muscl

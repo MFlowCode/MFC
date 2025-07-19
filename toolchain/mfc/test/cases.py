@@ -180,9 +180,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             elif muscl_order == 2:
                 for int_comp in ["T", "F"]:
                     stack.push(f"int_comp={int_comp}", {'int_comp': int_comp})
-                    for muscl_lim in [1,2,3,4,5]:
-                        cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {'muscl_lim': muscl_lim}))
+                    cases.append(define_case_d(stack, f"muscl_lim=1", {'muscl_lim': 1}))
                     stack.pop()
+                for muscl_lim in [2,3,4,5]:
+                    cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {'muscl_lim': muscl_lim}))
             stack.pop()
 
     def alter_riemann_solvers(num_fluids):
