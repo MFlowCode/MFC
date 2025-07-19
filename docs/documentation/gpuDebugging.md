@@ -39,13 +39,13 @@ CRAY_ACC_DEBUG: 0 (off), 1, 2, 3 (very noisy)
   - Recognizes `stderr`, `stdout`, and `process`.
   - `process` automatically generates a new file based on `pid` (each MPI process will have a different file)
 
-- While this enviornment variable specifies ACC, it can be used for both OpenACC and OpenMP
+- While this environment variable specifies ACC, it can be used for both OpenACC and OpenMP
 
 ```bash
 CRAY_ACC_FORCE_EARLY_INIT=1
 ```
 - Force full GPU initialization at program start so you can see start-up hangs immediately
-- Default behavior without environment variable is to defer initalization on first use
+- Default behavior without environment variable is to defer initialization on first use
 -  Device initialization includes initializing the GPU vendor’s low-level device runtime library (e.g., libcuda for NVIDIA GPUs) and establishing all necessary software contexts for interacting with the device
 
 ### Cray OpenACC Options
