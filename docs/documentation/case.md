@@ -1,7 +1,6 @@
 # Case Files
 
-Example Python case files, also referred to as *input files*, can be found in the [examples/](https://github.com/MFlowCode/MFC/tree/master/examples) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented
-in the user manual. A commented, tutorial script
+Example Python case files, also referred to as *input files*, can be found in the [examples/](https://github.com/MFlowCode/MFC/tree/master/examples) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented in the user manual. A commented, tutorial script
 can also be found in [examples/3d_sphbubcollapse/](https://github.com/MFlowCode/MFC/blob/master/examples/3D_sphbubcollapse/case.py).
 
 ## Basic Skeleton

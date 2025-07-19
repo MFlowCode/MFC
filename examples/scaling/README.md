@@ -1,6 +1,6 @@
 # Strong- & Weak-scaling
 
-The [**Scaling**](case.py) case can exercise both weak- and strong-scaling. It
+The scaling case can exercise both weak- and strong-scaling. It
 adjusts itself depending on the number of requested ranks.
 
 This directory also contains a collection of scripts used to test strong-scaling
