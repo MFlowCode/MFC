@@ -1257,11 +1257,6 @@ contains
             pref = 1._wp
         end if
 
-#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
-        call acc_present_dump()
-#endif
-
-
         call s_initialize_mpi_common_module()
         call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
@@ -1271,10 +1266,6 @@ contains
         if(bubbles_euler) call s_initialize_bubbles_EE_module()
         if (ib) call s_initialize_ibm_module()
         if (qbmm) call s_initialize_qbmm_module()
-
-#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
-        call acc_present_dump()
-#endif
 
         if (acoustic_source) then
             call s_initialize_acoustic_src()
@@ -1288,19 +1279,12 @@ contains
 
         if (surface_tension) call s_initialize_surface_tension_module()
 
-#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
-        call acc_present_dump()
-#endif
-
         if (relax) call s_initialize_phasechange_module()
 
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
 
-#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
-        call acc_present_dump()
-#endif
         call s_initialize_boundary_common_module()
 
         ! Reading in the user provided initial condition and grid data
@@ -1321,11 +1305,6 @@ contains
         ! and/or execution of any other tasks that are needed to properly configure
         ! the modules. The preparations below DO DEPEND on the grid being complete.
         call s_initialize_weno_module()
-
-#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
-        print *, "[MEM-INST] After: s_initialize_weno_module"
-        call acc_present_dump()
-#endif
 
         call s_initialize_cbc_module()
         call s_initialize_derived_variables()
