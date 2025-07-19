@@ -155,6 +155,8 @@ They are organized below.
 * Runge-Kutta orders 1-3 (SSP TVD), adaptive time stepping
 * RK4-5 operator splitting for Euler-Lagrange modeling
 * Interface sharpening (THINC-like)
+* Information geometric regularization (IGR)
+    * Shock capturing without WENO and Riemann solvers
 
 ### Large-scale and accelerated simulation
 
