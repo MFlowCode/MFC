@@ -19,7 +19,7 @@ Written primarily for Fortran/Fypp; the GPU and style sections matter only when 
 - Assume free-form Fortran 2008+, `implicit none`, explicit `intent`, and modern intrinsics.
 - Prefer `module … contains … subroutine foo()`; avoid `COMMON` blocks and file-level `include` files.
 - **Read the full codebase and docs *before* changing code.**
-  - Docs: <https://mflowcode.github.io/documentation/md_readme.html> and the respository root `README.md`.
+  - Docs: <https://mflowcode.github.io/documentation/md_readme.html> and the repository root `README.md`.
 
 ### Incremental-change workflow
 
@@ -62,7 +62,7 @@ Written primarily for Fortran/Fypp; the GPU and style sections matter only when 
 
 ---
 
-# 3  FYPP Macros for GPU acceleration Pogramming Guidelines (for GPU kernels)
+# 3 FYPP Macros for GPU acceleration Programming Guidelines (for GPU kernels)
 
 Do not directly use OpenACC or OpenMP directives directly.
 Instead, use the FYPP macros contained in src/common/include/parallel_macros.fpp
@@ -136,7 +136,7 @@ which conforms to the Doxygen Fortran format.
   - Example: `@:ASSERT(predicate, message)`
 
 - **Error Reporting**:
-  - Use `s_mpi_abort(<msg>)` for error termination, not `stop`
+  - Use `s_mpi_abort(error_message)` for error termination, not `stop`
   - No `stop` / `error stop` inside device code
 
 # 8  Memory Management
