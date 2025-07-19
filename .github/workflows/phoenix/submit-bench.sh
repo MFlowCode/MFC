@@ -69,7 +69,7 @@ JOBID=$(sbatch <<-EOT | awk '{print $4}'
 EOT
 )
 
-echo "🚀 Submitted SLURM job $JOBID"
+echo "Submitted: SLURM job $JOBID"
 
 # if this wrapper is killed/canceled, make sure SLURM job is cleaned up
 trap '[[ -n "${JOBID:-}" ]] && scancel "$JOBID" >/dev/null 2>&1 || :' EXIT
@@ -86,16 +86,16 @@ while :; do
 
   # If it’s one of SLURM’s terminal states, break immediately
   case "$STATE" in
-    COMPLETED|FAILED|CANCELLED|TIMEOUT)
-      echo "✅ SLURM job $JOBID reached terminal state: $STATE"
+    COMPLETED|FAILED|CANCELLED|TIMEOUT|PREEMPTED)
+      echo "Completed: SLURM job $JOBID reached terminal state: $STATE"
       break
       ;;
     "")
-      echo "✅ SLURM job $JOBID no longer in queue; assuming finished"
+      echo "Completed: SLURM job $JOBID no longer in queue; assuming finished"
       break
       ;;
     *)
-      echo "⏳ SLURM job $JOBID state: $STATE"
+      echo "Waiting: SLURM job $JOBID state: $STATE"
       sleep 10
       ;;
   esac
@@ -103,5 +103,5 @@ done
 
 # Now retrieve the exit code and exit with it
 EXIT_CODE=$(sacct -j "$JOBID" --noheader --format=ExitCode | head -1 | cut -d: -f1)
-echo "🔚 SLURM job $JOBID exit code: $EXIT_CODE"
+echo "Completed: SLURM job $JOBID exit code: $EXIT_CODE"
 exit "$EXIT_CODE"
