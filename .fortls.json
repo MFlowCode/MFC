@@ -24,7 +24,11 @@
     "pp_suffixes": [".fpp"],
     "pp_defs": {
         "MFC": 1,
-        "MFC_DOUBLE_PRECISION": 1
+        "MFC_DOUBLE_PRECISION": 1,
+        "MFC_SIMULATION" : 1,
+        "MFC_MPI": 1,
+        "MFC_DEBUG" : 0,
+        "MFC_OpenACC": 0
     },
     "lowercase_intrinsics": true,
     "debug_log": false,
@@ -56,9 +60,6 @@
     ],
     "disable_diagnostics_for_external_modules": true,
     "max_line_length": 132,
-    "symbol_skip_mem": [
-        "mpi_*"
-    ],
     "disable_var_diagnostics": true,
     "disable_fypp": false,
     "fypp_strict": false,
