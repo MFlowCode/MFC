@@ -23,7 +23,7 @@ Please select your desired configuration from the list bellow:
 . ./mfc.sh load
 ```
 
-- **Via [Aptitude](https://wiki.debian.org/Aptitude):**
+- **Via Aptitude:**
 
 ```shell
 sudo apt update
