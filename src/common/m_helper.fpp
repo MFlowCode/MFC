@@ -618,7 +618,7 @@ contains
         real(wp) :: gx
 
         if (x > 0) then
-            gx = exp(-1._wp / x)
+            gx = exp(-1._wp/x)
         else
             gx = 0._wp
         end if
