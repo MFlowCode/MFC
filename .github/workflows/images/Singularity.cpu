@@ -1,6 +1,9 @@
 Bootstrap: docker
 From: ubuntu:24.04
 
+%files
+    ../../../ /opt/MFC
+
 %environment
     export OMPI_ALLOW_RUN_AS_ROOT=1
     export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
@@ -13,9 +16,8 @@ From: ubuntu:24.04
         python3 python3-venv python3-pip\
         openmpi-bin libopenmpi-dev libfftw3-dev
         
-    cd /opt
-    git clone --depth 1 https://github.com/mflowcode/mfc.git MFC
     cd /opt/MFC
+    rm -rf build
     ./mfc.sh build -j $(nproc)
     ./mfc.sh test --dry-run -j $(nproc)
 

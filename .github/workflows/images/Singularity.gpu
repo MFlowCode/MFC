@@ -1,5 +1,8 @@
 Bootstrap: docker
-From: nvcr.io/nvidia/nvhpc:25.5-devel-cuda12.9-ubuntu22.04
+From: nvcr.io/nvidia/nvhpc:23.11-devel-cuda12.3-ubuntu22.04
+
+%files
+    ../../../ /opt/MFC
 
 %environment
     export OMPI_ALLOW_RUN_AS_ROOT=1
@@ -16,13 +19,12 @@ From: nvcr.io/nvidia/nvhpc:25.5-devel-cuda12.9-ubuntu22.04
         python3 python3-venv python3-pip\
         openmpi-bin libopenmpi-dev libfftw3-dev
 
-    cd /opt
-    git clone --depth 1 https://github.com/mflowcode/mfc.git MFC
     cd /opt/MFC
     rm -rf build
     export CC=nvc
     export CXX=nvc++
     export FC=nvfortran
+
     ./mfc.sh build --mpi --gpu -j $(nproc)
     ./mfc.sh test --dry-run --gpu -j $(nproc)
 
