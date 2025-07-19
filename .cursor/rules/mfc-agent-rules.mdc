@@ -1,11 +1,11 @@
----
-description: Full MFC project rules – consolidated for Agent Mode
-alwaysApply: true
----
+----
+-description: Full MFC project rules – consolidated for Agent Mode
+-alwaysApply: true
+----
 
 # 0  Purpose & Scope
 Consolidated guidance for the MFC exascale, many-physics solver.
-Written primarily for Fortran/Fypp; the OpenACC and style sections matter only when `.fpp` / `.f90` files are in view.
+Written primarily for Fortran/Fypp; the GPU and style sections matter only when `.fpp` / `.f90` files are in view.
 
 ---
 
@@ -15,15 +15,14 @@ Written primarily for Fortran/Fypp; the OpenACC and style sections matter only w
   - Most sources are `.fpp`; CMake transpiles them to `.f90`.
 - **Fypp macros** live in `src/<subprogram>/include/` you should scan these first.
   `<subprogram>` ∈ {`simulation`,`common`,`pre_process`,`post_process`}.
-- Only `simulation` (+ its `common` calls) is GPU-accelerated via **OpenACC**.
-- Assume free-form Fortran 2008+, `implicit none`, explicit `intent`, and modern
-  intrinsics.
-- Prefer `module … contains … subroutine foo()`; avoid `COMMON` blocks and
-  file-level `include` files.
+- Only `simulation` (+ its `common` calls) is GPU-accelerated via **OpenACC** or **OpenMP**.
+- Assume free-form Fortran 2008+, `implicit none`, explicit `intent`, and modern intrinsics.
+- Prefer `module … contains … subroutine foo()`; avoid `COMMON` blocks and file-level `include` files.
 - **Read the full codebase and docs *before* changing code.**
-  Docs: <https://mflowcode.github.io/documentation/md_readme.html> and the repository root `README.md`.
+  - Docs: <https://mflowcode.github.io/documentation/md_readme.html> and the respository root `README.md`.
 
 ### Incremental-change workflow
+
 1. Draft a step-by-step plan.
 2. After each step, build:
    ```bash
@@ -48,34 +47,35 @@ Written primarily for Fortran/Fypp; the OpenACC and style sections matter only w
   * Subroutine → `s_<verb>_<noun>` (e.g. `s_compute_flux`)
   * Function   → `f_<verb>_<noun>`
 * Private helpers stay in the module; avoid nested procedures.
-* **Size limits**: subroutine ≤ 500 lines, helper ≤ 150, function ≤ 100,
-  module/file ≤ 1000.
+* **Size limits**: subroutine ≤ 500 lines, helper ≤ 150, function ≤ 100, module/file ≤ 1000.
 * ≤ 6 arguments per routine; otherwise pass a derived-type "params" struct.
 * No `goto` (except unavoidable legacy); no global state (`COMMON`, `save`).
-* Every variable: `intent(in|out|inout)` + appropriate `dimension` / `allocatable`
-  / `pointer`.
+* Every variable: `intent(in|out|inout)` + appropriate `dimension` / `allocatable` / `pointer`.
 * Use `s_mpi_abort(<msg>)` for errors, not `stop`.
-* Mark OpenACC-callable helpers that are called from OpenACC parallel loops immediately after declaration:
+* Mark GPU-callable helpers that are called from GPU parallel loops immediately after declaration:
   ```fortran
   subroutine s_flux_update(...)
-    !$acc routine seq
+    $:GPU_ROUTINE(function_name='s_flux_update', parallelism='[seq]')
     ...
   end subroutine
   ```
 
 ---
 
-# 3  OpenACC Programming Guidelines (for kernels)
+# 3  FYPP Macros for GPU acceleration Pogramming Guidelines (for GPU kernels)
+
+Do not directly use OpenACC or OpenMP directives directly.
+Instead, use the FYPP macros contained in src/common/include/parallel_macros.fpp
 
 Wrap tight loops with
 
 ```fortran
-!$acc parallel loop gang vector default(present) reduction(...)
+$:GPU_PARALLEL_FOR(private='[...]', copy='[...]')
 ```
-* Add `collapse(n)` to merge nested loops when safe.
-* Declare loop-local variables with `private(...)`.
+* Add `collapse=n` to merge nested loops when safe.
+* Declare loop-local variables with `private='[...]'`.
 * Allocate large arrays with `managed` or move them into a persistent
-  `!$acc enter data` region at start-up.
+  `$:GPU_ENTER_DATA(...)` region at start-up.
 * **Do not** place `stop` / `error stop` inside device code.
 * Must compile with Cray `ftn` and NVIDIA `nvfortran` for GPU offloading; also build CPU-only with
   GNU `gfortran` and Intel `ifx`/`ifort`.
@@ -101,18 +101,23 @@ Wrap tight loops with
 
 # 5  Fypp Macros and GPU Acceleration
 
+## Use of Fypp
 - **Fypp Directives**:
   - Start with `#:` (e.g., `#:include`, `#:def`, `#:enddef`)
   - Macros defined in `include/*.fpp` files
   - Used for code generation, conditional compilation, and GPU offloading
 
-- **GPU Macros**:
-  - `$:GPU_ROUTINE(parallelism='[seq]')` - Marks GPU-callable routines
-  - `$:GPU_PARALLEL_LOOP(collapse=N)` - Parallelizes loops
-  - `$:GPU_LOOP(parallelism='[seq]')` - Marks sequential loops
-  - `$:GPU_UPDATE(device='[var1,var2]')` - Updates device data
-  - `$:GPU_ENTER_DATA(copyin='[var]')` - Copies data to device
-  - `$:GPU_EXIT_DATA(delete='[var]')` - Removes data from device
+## Some examples
+
+Documentation on how to use the Fypp macros for GPU offloading is available at https://mflowcode.github.io/documentation/md_gpuParallelization.html
+
+Some examples include:
+- `$:GPU_ROUTINE(parallelism='[seq]')` - Marks GPU-callable routines
+- `$:GPU_PARALLEL_LOOP(collapse=N)` - Parallelizes loops
+- `$:GPU_LOOP(parallelism='[seq]')` - Marks sequential loops
+- `$:GPU_UPDATE(device='[var1,var2]')` - Updates device data
+- `$:GPU_ENTER_DATA(copyin='[var]')` - Copies data to device
+- `$:GPU_EXIT_DATA(delete='[var]')` - Removes data from device
 
 # 6  Documentation Style
 
@@ -122,11 +127,12 @@ Wrap tight loops with
   !! @param param_name Description of the parameter
   !! @return Description of the return value (for functions)
   ```
+which conforms to the Doxygen Fortran format.
 
 # 7  Error Handling
 
 - **Assertions**:
-  - Use `ASSERT` macro for validating conditions
+  - Use the fypp `ASSERT` macro for validating conditions
   - Example: `@:ASSERT(predicate, message)`
 
 - **Error Reporting**:
@@ -136,8 +142,8 @@ Wrap tight loops with
 # 8  Memory Management
 
 - **Allocation/Deallocation**:
-  - Use `@:ALLOCATE(var1, var2)` macro for device-aware allocation
-  - Use `@:DEALLOCATE(var1, var2)` macro for device-aware deallocation
+  - Use fypp macro `@:ALLOCATE(var1, var2)` macro for device-aware allocation
+  - Use fypp macro `@:DEALLOCATE(var1, var2)` macro for device-aware deallocation
 
 # 9. Additional Observed Patterns
 
@@ -156,7 +162,7 @@ Wrap tight loops with
 
 - **Loop Optimization**:
   - Favor array operations over explicit loops when possible
-  - Use `collapse(N)` directive to optimize nested loops
+  - Use `collapse=N` directive to optimize nested loops
 
 # 10. Fortran Practices to Avoid
 
