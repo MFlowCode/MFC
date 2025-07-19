@@ -62,7 +62,7 @@ Written primarily for Fortran/Fypp; the GPU and style sections matter only when 
 
 ---
 
-# 3 FYPP Macros for GPU acceleration Programming Guidelines (for GPU kernels)
+# 3  FYPP Macros for GPU acceleration Programming Guidelines (for GPU kernels)
 
 Do not directly use OpenACC or OpenMP directives directly.
 Instead, use the FYPP macros contained in src/common/include/parallel_macros.fpp
