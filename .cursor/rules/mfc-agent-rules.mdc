@@ -16,7 +16,7 @@ Written primarily for Fortran/Fypp; the OpenACC and style sections matter only w
   - Most sources are `.fpp`; CMake transpiles them to `.f90`.  
 - **Fypp macros** live in `src/<subprogram>/include/` you should scan these first.  
   `<subprogram>` ∈ {`simulation`,`common`,`pre_process`,`post_process`}.  
-- Only `simulation` (+ its `common` calls) is GPU-accelerated via **OpenACC**.  
+- Only `simulation` (+ its `common` calls) is GPU-accelerated via **OpenACC** or **OpenMP**.  
 - Assume free-form Fortran 2008+, `implicit none`, explicit `intent`, and modern
   intrinsics.  
 - Prefer `module … contains … subroutine foo()`; avoid `COMMON` blocks and
@@ -56,27 +56,29 @@ Written primarily for Fortran/Fypp; the OpenACC and style sections matter only w
 * Every variable: `intent(in|out|inout)` + appropriate `dimension` / `allocatable`
   / `pointer`.
 * Use `s_mpi_abort(<msg>)` for errors, not `stop`.
-* Mark OpenACC-callable helpers that are called from OpenACC parallel loops immediately after declaration:
+* Mark GPU-callable helpers that are called from GPU parallel loops immediately after declaration:
   ```fortran
   subroutine s_flux_update(...)
-    !$acc routine seq
+    $:GPU_ROUTINE(function_name='s_flux_update', parallelism='[seq]')
     ...
   end subroutine
   ```
 
 ---
 
-# 3  OpenACC Programming Guidelines (for kernels)
+# 3  FYPP Macros for GPU acceleration Pogramming Guidelines (for kernels)
+
+Do not directly use OpenACC or OpenMP directives directly. Instead, use the FYPP macros contained in src/common/include/parallel_macros.fpp
 
 Wrap tight loops with
 
 ```fortran
-!$acc parallel loop gang vector default(present) reduction(...)
+$:GPU_PARALLEL_FOR(private='[...]', copy='[...]')
 ```
-* Add `collapse(n)` to merge nested loops when safe.
-* Declare loop-local variables with `private(...)`.
+* Add `collapse=n` to merge nested loops when safe.
+* Declare loop-local variables with `private='[...]'`.
 * Allocate large arrays with `managed` or move them into a persistent
-  `!$acc enter data` region at start-up.
+  `$:GPU_ENTER_DATA(...)` region at start-up.
 * **Do not** place `stop` / `error stop` inside device code.
 * Must compile with Cray `ftn` and NVIDIA `nvfortran` for GPU offloading; also build CPU-only with
   GNU `gfortran` and Intel `ifx`/`ifort`.
