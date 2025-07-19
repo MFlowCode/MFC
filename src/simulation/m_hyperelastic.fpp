@@ -218,10 +218,10 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-    pure subroutine s_neoHookean_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
+    pure subroutine s_neoHookean_cauchy_solver(btensor_in, q_prim_vf, G, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(inout) :: btensor
+        type(scalar_field), dimension(b_size), intent(inout) :: btensor_in
         real(wp), intent(in) :: G
         integer, intent(in) :: j, k, l
 
@@ -230,22 +230,22 @@ contains
         integer :: i !< Generic loop iterators
 
         ! tensor is the symmetric tensor & calculate the trace of the tensor
-        trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l) + btensor(6)%sf(j, k, l)
+        trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
 
         ! calculate the deviatoric of the tensor
         #:for IJ in [1,3,6]
-            btensor(${IJ}$)%sf(j, k, l) = btensor(${IJ}$)%sf(j, k, l) - f13*trace
+            btensor_in(${IJ}$)%sf(j, k, l) = btensor_in(${IJ}$)%sf(j, k, l) - f13*trace
         #:endfor
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
-                G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
+                G*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &
-            0.5_wp*(trace - 3.0_wp)/btensor(b_size)%sf(j, k, l)
+            0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
 
     end subroutine s_neoHookean_cauchy_solver
 
@@ -257,10 +257,10 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-    pure subroutine s_Mooney_Rivlin_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
+    pure subroutine s_Mooney_Rivlin_cauchy_solver(btensor_in, q_prim_vf, G, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(inout) :: btensor
+        type(scalar_field), dimension(b_size), intent(inout) :: btensor_in
         real(wp), intent(in) :: G
         integer, intent(in) :: j, k, l
 
@@ -270,23 +270,23 @@ contains
 
         !TODO Make this 1D and 2D capable
         ! tensor is the symmetric tensor & calculate the trace of the tensor
-        trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l) + btensor(6)%sf(j, k, l)
+        trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
 
         ! calculate the deviatoric of the tensor
-        btensor(1)%sf(j, k, l) = btensor(1)%sf(j, k, l) - f13*trace
-        btensor(3)%sf(j, k, l) = btensor(3)%sf(j, k, l) - f13*trace
-        btensor(6)%sf(j, k, l) = btensor(6)%sf(j, k, l) - f13*trace
+        btensor_in(1)%sf(j, k, l) = btensor_in(1)%sf(j, k, l) - f13*trace
+        btensor_in(3)%sf(j, k, l) = btensor_in(3)%sf(j, k, l) - f13*trace
+        btensor_in(6)%sf(j, k, l) = btensor_in(6)%sf(j, k, l) - f13*trace
 
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
-                G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
+                G*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &
-            0.5_wp*(trace - 3.0_wp)/btensor(b_size)%sf(j, k, l)
+            0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
 
     end subroutine s_Mooney_Rivlin_cauchy_solver
 

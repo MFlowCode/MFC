@@ -284,7 +284,7 @@ contains
         integer, intent(in) :: root               ! Rank of the root process
         real(wp), allocatable, intent(out) :: gathered_vector(:) ! Gathered vector on the root process
 
-        integer :: i, ierr
+        integer :: i, local_ierr
         integer, allocatable :: recounts(:), displs(:)
 
 #ifdef MFC_MPI
@@ -292,7 +292,7 @@ contains
         allocate (recounts(num_procs))
 
         call MPI_GATHER(counts, 1, MPI_INTEGER, recounts, 1, MPI_INTEGER, root, &
-                        MPI_COMM_WORLD, ierr)
+                        MPI_COMM_WORLD, local_ierr)
 
         allocate (displs(size(recounts)))
 
@@ -304,7 +304,7 @@ contains
 
         allocate (gathered_vector(sum(recounts)))
         call MPI_GATHERV(my_vector, counts, mpi_p, gathered_vector, recounts, displs, mpi_p, &
-                         root, MPI_COMM_WORLD, ierr)
+                         root, MPI_COMM_WORLD, local_ierr)
 #endif
     end subroutine s_mpi_gather_data
 
@@ -590,10 +590,10 @@ contains
                                                 mpi_dir, &
                                                 pbc_loc, &
                                                 nVar, &
-                                                pb, mv)
+                                                pb_in, mv_in)
 
         type(scalar_field), dimension(1:), intent(inout) :: q_comm
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
         integer, intent(in) :: mpi_dir, pbc_loc, nVar
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
@@ -614,7 +614,7 @@ contains
 
         qbmm_comm = .false.
 
-        if (present(pb) .and. present(mv) .and. qbmm .and. .not. polytropic) then
+        if (present(pb_in) .and. present(mv_in) .and. qbmm .and. .not. polytropic) then
             qbmm_comm = .true.
             v_size = nVar + 2*nb*4
             buffer_counts = (/ &
@@ -688,7 +688,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*4 + v_size* &
                                                 (j + buff_size*(k + (n + 1)*l))
-                                            buff_send(r) = pb(j + pack_offset, k, l, i - nVar, q)
+                                            buff_send(r) = pb_in(j + pack_offset, k, l, i - nVar, q)
                                         end do
                                     end do
                                 end do
@@ -703,7 +703,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                 (j + buff_size*(k + (n + 1)*l))
-                                            buff_send(r) = mv(j + pack_offset, k, l, i - nVar, q)
+                                            buff_send(r) = mv_in(j + pack_offset, k, l, i - nVar, q)
                                         end do
                                     end do
                                 end do
@@ -735,7 +735,7 @@ contains
                                             r = (i - 1) + (q - 1)*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  (k + buff_size*l))
-                                            buff_send(r) = pb(j, k + pack_offset, l, i - nVar, q)
+                                            buff_send(r) = pb_in(j, k + pack_offset, l, i - nVar, q)
                                         end do
                                     end do
                                 end do
@@ -751,7 +751,7 @@ contains
                                             r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  (k + buff_size*l))
-                                            buff_send(r) = mv(j, k + pack_offset, l, i - nVar, q)
+                                            buff_send(r) = mv_in(j, k + pack_offset, l, i - nVar, q)
                                         end do
                                     end do
                                 end do
@@ -783,7 +783,7 @@ contains
                                             r = (i - 1) + (q - 1)*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                            buff_send(r) = pb(j, k, l + pack_offset, i - nVar, q)
+                                            buff_send(r) = pb_in(j, k, l + pack_offset, i - nVar, q)
                                         end do
                                     end do
                                 end do
@@ -799,7 +799,7 @@ contains
                                             r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                            buff_send(r) = mv(j, k, l + pack_offset, i - nVar, q)
+                                            buff_send(r) = mv_in(j, k, l + pack_offset, i - nVar, q)
                                         end do
                                     end do
                                 end do
@@ -887,7 +887,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*4 + v_size* &
                                                 (j + buff_size*((k + 1) + (n + 1)*l))
-                                            pb(j + unpack_offset, k, l, i - nVar, q) = buff_recv(r)
+                                            pb_in(j + unpack_offset, k, l, i - nVar, q) = buff_recv(r)
                                         end do
                                     end do
                                 end do
@@ -902,7 +902,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                 (j + buff_size*((k + 1) + (n + 1)*l))
-                                            mv(j + unpack_offset, k, l, i - nVar, q) = buff_recv(r)
+                                            mv_in(j + unpack_offset, k, l, i - nVar, q) = buff_recv(r)
                                         end do
                                     end do
                                 end do
@@ -940,7 +940,7 @@ contains
                                             r = (i - 1) + (q - 1)*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  ((k + buff_size) + buff_size*l))
-                                            pb(j, k + unpack_offset, l, i - nVar, q) = buff_recv(r)
+                                            pb_in(j, k + unpack_offset, l, i - nVar, q) = buff_recv(r)
                                         end do
                                     end do
                                 end do
@@ -956,7 +956,7 @@ contains
                                             r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  ((k + buff_size) + buff_size*l))
-                                            mv(j, k + unpack_offset, l, i - nVar, q) = buff_recv(r)
+                                            mv_in(j, k + unpack_offset, l, i - nVar, q) = buff_recv(r)
                                         end do
                                     end do
                                 end do
@@ -997,7 +997,7 @@ contains
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  ((k + buff_size) + (n + 2*buff_size + 1)* &
                                                   (l + buff_size)))
-                                            pb(j, k, l + unpack_offset, i - nVar, q) = buff_recv(r)
+                                            pb_in(j, k, l + unpack_offset, i - nVar, q) = buff_recv(r)
                                         end do
                                     end do
                                 end do
@@ -1014,7 +1014,7 @@ contains
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                  ((k + buff_size) + (n + 2*buff_size + 1)* &
                                                   (l + buff_size)))
-                                            mv(j, k, l + unpack_offset, i - nVar, q) = buff_recv(r)
+                                            mv_in(j, k, l + unpack_offset, i - nVar, q) = buff_recv(r)
                                         end do
                                     end do
                                 end do

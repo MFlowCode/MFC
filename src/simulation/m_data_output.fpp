@@ -1,4 +1,3 @@
-
 !! @file m_data_output.f90
 !! @brief Contains module m_data_output
 
@@ -985,10 +984,10 @@ contains
     !!  @param t_step Current time-step
     !!  @param q_com Center of mass information
     !!  @param moments Higher moment information
-    impure subroutine s_write_com_files(t_step, c_mass)
+    impure subroutine s_write_com_files(t_step, c_mass_in)
 
         integer, intent(in) :: t_step
-        real(wp), dimension(num_fluids, 5), intent(in) :: c_mass
+        real(wp), dimension(num_fluids, 5), intent(in) :: c_mass_in
         integer :: i !< Generic loop iterator
         real(wp) :: nondim_time !< Non-dimensional time
 
@@ -1004,28 +1003,28 @@ contains
                 do i = 1, num_fluids ! Loop through fluids
                     write (i + 120, '(6X,4F24.12)') &
                         nondim_time, &
-                        c_mass(i, 1), &
-                        c_mass(i, 2), &
-                        c_mass(i, 5)
+                        c_mass_in(i, 1), &
+                        c_mass_in(i, 2), &
+                        c_mass_in(i, 5)
                 end do
             elseif (p == 0) then ! 2D simulation
                 do i = 1, num_fluids ! Loop through fluids
                     write (i + 120, '(6X,5F24.12)') &
                         nondim_time, &
-                        c_mass(i, 1), &
-                        c_mass(i, 2), &
-                        c_mass(i, 3), &
-                        c_mass(i, 5)
+                        c_mass_in(i, 1), &
+                        c_mass_in(i, 2), &
+                        c_mass_in(i, 3), &
+                        c_mass_in(i, 5)
                 end do
             else ! 3D simulation
                 do i = 1, num_fluids ! Loop through fluids
                     write (i + 120, '(6X,6F24.12)') &
                         nondim_time, &
-                        c_mass(i, 1), &
-                        c_mass(i, 2), &
-                        c_mass(i, 3), &
-                        c_mass(i, 4), &
-                        c_mass(i, 5)
+                        c_mass_in(i, 1), &
+                        c_mass_in(i, 2), &
+                        c_mass_in(i, 3), &
+                        c_mass_in(i, 4), &
+                        c_mass_in(i, 5)
                 end do
             end if
         end if
