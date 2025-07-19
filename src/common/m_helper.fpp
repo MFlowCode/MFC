@@ -35,7 +35,9 @@ module m_helper
               associated_legendre, &
               spherical_harmonic_func, &
               double_factorial, &
-              factorial
+              factorial, &
+              f_cut_on, &
+              f_cut_off
 
 contains
 
@@ -576,5 +578,51 @@ contains
         R = product((/(i, i=n, 1, -1)/))
 
     end function factorial
+
+    !> This function calculates a smooth cut-on function that is zero for x values
+    !! smaller than zero and goes to one. It can be used for generating smooth
+    !! initial conditions
+    !! @param x is the input value
+    !! @param eps is the smoothing parameter
+    !! @return fx is the cut-on function evaluated at x
+    function f_cut_on(x, eps) result(fx)
+
+        real(wp), intent(in) :: x, eps
+        real(wp) :: fx
+
+        fx = 1 - f_gx(x/eps)/(f_gx(x/eps) + f_gx(1 - x/eps))
+
+    end function f_cut_on
+
+    !> This function calculates a smooth cut-off function that is one for x values
+    !! smaller than zero and goes to zero. It can be used for generating smooth
+    !! initial conditions
+    !! @param x is the input value
+    !! @param eps is the smoothing parameter
+    !! @return fx is the cut-ff function evaluated at x
+    function f_cut_off(x, eps) result(fx)
+
+        real(wp), intent(in) :: x, eps
+        real(wp) :: fx
+
+        fx = f_gx(x/eps)/(f_gx(x/eps) + f_gx(1 - x/eps))
+
+    end function f_cut_off
+
+    !> This function is a helper function for the functions f_cut_on and f_cut_off
+    !! @param x is the input value
+    !! @return gx is the result
+    function f_gx(x) result(gx)
+
+        real(wp), intent(in) :: x
+        real(wp) :: gx
+
+        if (x > 0) then
+            gx = exp(-1._wp/x)
+        else
+            gx = 0._wp
+        end if
+
+    end function f_gx
 
 end module m_helper

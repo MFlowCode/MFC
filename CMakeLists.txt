@@ -135,17 +135,17 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             -Wall
-            -Wextra	
+            -Wextra
             -fcheck=all,no-array-temps
             -fbacktrace
             -fimplicit-none
             -fsignaling-nans
             -finit-real=snan
             -finit-integer=-99999999
-            -Wintrinsic-shadow	
-            -Wunderflow	
-            -Wrealloc-lhs	
-            -Wsurprising	
+            -Wintrinsic-shadow
+            -Wunderflow
+            -Wrealloc-lhs
+            -Wsurprising
 	    )
     endif()
 
@@ -163,6 +163,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         "SHELL:-h acc_model=auto_async_none"
         "SHELL: -h acc_model=no_fast_addr"
         "SHELL: -h list=adm"
+        "SHELL: -munsafe-fp-atomics" # Not unsafe for operations we do
     )
 
     add_link_options("SHELL:-hkeepfiles")
@@ -172,7 +173,6 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
                 "SHELL:-h acc_model=auto_async_none"
                 "SHELL: -h acc_model=no_fast_addr"
                 "SHELL: -K trap=fp" "SHELL: -G2"
-
         )
         add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
     endif()
@@ -200,10 +200,10 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-O0>
-            $<$<COMPILE_LANGUAGE:Fortran>:-C> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-C>
             $<$<COMPILE_LANGUAGE:Fortran>:-g>
-            $<$<COMPILE_LANGUAGE:Fortran>:-traceback> 
-            $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
+            $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform>
             $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
         )
     endif()
