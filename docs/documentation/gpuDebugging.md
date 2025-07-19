@@ -6,19 +6,19 @@
 ```bash
 OMP_DISPLAY_ENV=true | false | verbose
 ```
-- Prints out the internal control values and environment variables at beginning of program if `true` or `verbose`
+- Prints out the internal control values and environment variables at the beginning of the program if `true` or `verbose`
 - `verbose` will also print out vendor-specific internal control values and environment variables
 
 ```bash
 OMP_TARGET_OFFLOAD = MANDATORY | DISABLED | DEFAULT
 ```
-- Quick way to turn off off-load (DISABLED) or make it abort if a GPU isn't found (MANDATORY)
-- great first test: does the problem disappear when you drop back to the CPU? 
+- Quick way to turn off off-load (`DISABLED`) or make it abort if a GPU isn't found (`MANDATORY`)
+- Great first test: does the problem disappear when you drop back to the CPU? 
 
 ```bash
 OMP_THREAD_LIMIT=<positive_integer>
 ```
-- Sets maximum number of OpenMP threads to use in a contention group
+- Sets the maximum number of OpenMP threads to use in a contention group
 - Might be useful in checking for issues with contention or race conditions
 
 ```bash
@@ -33,7 +33,7 @@ OMP_DISPLAY_AFFINITY=TRUE
 ```bash
 CRAY_ACC_DEBUG: 0 (off), 1, 2, 3 (very noisy)
 ```
-- Dumps a time-stamped log line ("ACC: …) for every allocation, data transfer, kernel launch, wait, etc. Great first stop when "nothing seems to run on the GPU.
+- Dumps a time-stamped log line (`"ACC: ...`) for every allocation, data transfer, kernel launch, wait, etc. Great first stop when "nothing seems to run on the GPU.
 
 - Outputs on STDERR by default. Can be changed by setting `CRAY_ACC_DEBUG_FILE`. 
   - Recognizes `stderr`, `stdout`, and `process`.
@@ -45,16 +45,16 @@ CRAY_ACC_DEBUG: 0 (off), 1, 2, 3 (very noisy)
 CRAY_ACC_FORCE_EARLY_INIT=1
 ```
 - Force full GPU initialization at program start so you can see start-up hangs immediately
-- Default behavior without environment variable is to defer initialization on first use
--  Device initialization includes initializing the GPU vendor’s low-level device runtime library (e.g., libcuda for NVIDIA GPUs) and establishing all necessary software contexts for interacting with the device
+- Default behavior without an environment variable is to defer initialization on first use
+- Device initialization includes initializing the GPU vendor’s low-level device runtime library (e.g., libcuda for NVIDIA GPUs) and establishing all necessary software contexts for interacting with the device
 
 ### Cray OpenACC Options
 
 ```bash
 CRAY_ACC_PRESENT_DUMP_SAVE_NAMES=1
 ```
-- Will cause acc_present_dump() to output variable names and file locations in addition to variable mappings
-- Add acc_present_dump() around hotspots to help find problems with data movements
+- Will cause `acc_present_dump()` to output variable names and file locations in addition to variable mappings
+- Add `acc_present_dump()` around hotspots to help find problems with data movements
   - Helps more if adding `CRAY_ACC_DEBUG` environment variable
 
 ## NVHPC Compiler Options
@@ -64,7 +64,7 @@ CRAY_ACC_PRESENT_DUMP_SAVE_NAMES=1
 ```bash
 STATIC_RANDOM_SEED=1
 ```
-- Forces the seed returned by RANDOM_SEED to be constant, so generates same sequence of random numbers 
+- Forces the seed returned by `RANDOM_SEED` to be constant, so it generates the same sequence of random numbers 
 - Useful for testing issues with randomized data
 
 ```bash
@@ -107,7 +107,7 @@ NVCOMPILER_ACC_DEBUG=1
 LIBOMPTARGET_PROFILE=run.json
 ```
 - Emits a Chrome-trace (JSON) timeline you can open in chrome://tracing or Speedscope
-- great lightweight profiler when Nsight is over-kill.
+- Great lightweight profiler when Nsight is overkill.
 - Granularity in µs via `LIBOMPTARGET_PROFILE_GRANULARITY` (default 500).
 
 ```bash
@@ -128,23 +128,24 @@ LIBOMPTARGET_INFO=<bitmask>
 LIBOMPTARGET_DEBUG=1
 ```
 - Developer-level trace (host-side)
-- Much noisier than INFO
-- only works if the runtime was built with -DOMPTARGET_DEBUG.
+- Much noisier than `INFO`
+- Only works if the runtime was built with `-DOMPTARGET_DEBUG`.
 
 ```bash
 LIBOMPTARGET_JIT_OPT_LEVEL=-O{0,1,2,3}
 ```
 - This environment variable can be used to change the optimization pipeline used to optimize the embedded device code as part of the device JIT. 
-- The value is corresponds to the -O{0,1,2,3} command line argument passed to clang.
+- The value corresponds to the `-O{0,1,2,3}` command line argument passed to clang.
 
 ```bash
 LIBOMPTARGET_JIT_SKIP_OPT=1
 ```
 - This environment variable can be used to skip the optimization pipeline during JIT compilation.
 - If set, the image will only be passed through the backend.
-- The backend is invoked with the LIBOMPTARGET_JIT_OPT_LEVEL flag.
+- The backend is invoked with the `LIBOMPTARGET_JIT_OPT_LEVEL` flag.
 
 ## Compiler Documentation
+
 - [Cray & OpenMP Docs](https://cpe.ext.hpe.com/docs/24.11/cce/man7/intro_openmp.7.html#environment-variables)
 - [Cray & OpenACC Docs](https://cpe.ext.hpe.com/docs/24.11/cce/man7/intro_openacc.7.html#environment-variables)
 - [NVHPC & OpenACC Docs](https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html?highlight=NVCOMPILER_#environment-variables)
