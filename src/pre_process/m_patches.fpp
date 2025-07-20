@@ -471,7 +471,8 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib_flag
 
-        real(wp) :: x0, y0, f, x_act, y_act, ca_in, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
+        real(wp) :: x0, y0, f, x_act, y_act, ca_in, pa, ma, ta, theta
+        real(wp) :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k
         integer :: Np1, Np2
 

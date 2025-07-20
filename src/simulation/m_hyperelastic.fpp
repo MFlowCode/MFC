@@ -103,11 +103,11 @@ contains
         real(wp), dimension(num_fluids) :: alpha_k, alpha_rho_k
         real(wp), dimension(2) :: Re
         real(wp) :: rho, gamma, pi_inf, qv
-        real(wp) :: G
+        real(wp) :: G_local
         integer :: j, k, l, i, r
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, rho, &
-            & gamma, pi_inf, qv, G, Re, tensora, tensorb]')
+            & gamma, pi_inf, qv, G_local, Re, tensora, tensorb]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -118,12 +118,12 @@ contains
                     end do
                     ! If in simulation, use acc mixture subroutines
                     call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha_k, &
-                                                                    alpha_rho_k, Re, G, Gs)
+                                                                    alpha_rho_k, Re, G_local, Gs)
                     rho = max(rho, sgm_eps)
-                    G = max(G, sgm_eps)
-                    !if ( G <= verysmall ) G_K = 0._wp
+                    G_local = max(G_local, sgm_eps)
+                    !if ( G_local <= verysmall ) G_K = 0._wp
 
-                    if (G > verysmall) then
+                    if (G_local > verysmall) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, tensor_size
                             tensora(i) = 0._wp
@@ -190,13 +190,13 @@ contains
                             btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
                             ! STEP 5a: updating the Cauchy stress primitive scalar field
                             if (hyper_model == 1) then
-                                call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)
+                                call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G_local, j, k, l)
                             elseif (hyper_model == 2) then
-                                call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)
+                                call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G_local, j, k, l)
                             end if
                             ! STEP 5b: updating the pressure field
                             q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
-                                                           G*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma
+                                                           G_local*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma
                             ! STEP 5c: updating the Cauchy stress conservative scalar field
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, b_size - 1
@@ -218,11 +218,11 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-    pure subroutine s_neoHookean_cauchy_solver(btensor_in, q_prim_vf, G, j, k, l)
+    pure subroutine s_neoHookean_cauchy_solver(btensor_in, q_prim_vf, G_param, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(inout) :: btensor_in
-        real(wp), intent(in) :: G
+        real(wp), intent(in) :: G_param
         integer, intent(in) :: j, k, l
 
         real(wp) :: trace
@@ -241,7 +241,7 @@ contains
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
-                G*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
+                G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &
@@ -257,11 +257,11 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-    pure subroutine s_Mooney_Rivlin_cauchy_solver(btensor_in, q_prim_vf, G, j, k, l)
+    pure subroutine s_Mooney_Rivlin_cauchy_solver(btensor_in, q_prim_vf, G_param, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(inout) :: btensor_in
-        real(wp), intent(in) :: G
+        real(wp), intent(in) :: G_param
         integer, intent(in) :: j, k, l
 
         real(wp) :: trace
@@ -282,7 +282,7 @@ contains
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
-                G*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
+                G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &

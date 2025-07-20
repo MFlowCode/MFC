@@ -526,7 +526,7 @@ contains
     !! at x with inputs l and m
     !! @param x is the input value
     !! @param l is the degree
-    !! @param m is the order
+    !! @param m_order is the order
     !! @return P is the associated legendre polynomial evaluated at x
     pure recursive function associated_legendre(x, l, m_order) result(result_P)
 
