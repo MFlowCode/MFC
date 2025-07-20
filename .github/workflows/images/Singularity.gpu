@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: nvcr.io/nvidia/nvhpc:25.5-runtime-cuda12.9-ubuntu24.04
+From: nvcr.io/nvidia/nvhpc:22.11-devel-cuda11.8-ubuntu22.04
 
 %files
     ../../../ /opt/MFC
@@ -7,46 +7,23 @@ From: nvcr.io/nvidia/nvhpc:25.5-runtime-cuda12.9-ubuntu24.04
 %environment
     export OMPI_ALLOW_RUN_AS_ROOT=1
     export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
-    export PATH="/opt/MFC:$PATH"
+    export PATH="/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/bin:/opt/MFC:$PATH"
+    export LD_LIBRARY_PATH="/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/lib:$LD_LIBRARY_PATH"
+    export CC=nvc
+    export CXX=nvc++
+    export FC=nvfortran
 
 %post
     export DEBIAN_FRONTEND=noninteractive
     
-    # Debug: Find all NVHPC installations
-    echo "=== Searching for NVHPC installation ==="
-    find /opt -name "nvc" -type f 2>/dev/null || echo "nvc not found"
-    find /opt -name "nvhpc" -type d 2>/dev/null || echo "nvhpc directory not found"
-    ls -la /opt/nvidia/ || echo "/opt/nvidia not found"
-    
-    # Try different possible paths
-    if [ -d "/opt/nvidia/hpc_sdk" ]; then
-        ls -la /opt/nvidia/hpc_sdk/
-        NVHPC_ROOT=$(find /opt/nvidia/hpc_sdk -name "Linux_x86_64" -type d | head -1)
-        if [ -n "$NVHPC_ROOT" ]; then
-            NVHPC_VERSION=$(basename $(dirname $NVHPC_ROOT))
-            echo "Found NVHPC at: $NVHPC_ROOT/$NVHPC_VERSION"
-            export PATH=$NVHPC_ROOT/$NVHPC_VERSION/compilers/bin:$PATH
-            export LD_LIBRARY_PATH=$NVHPC_ROOT/$NVHPC_VERSION/compilers/lib:$LD_LIBRARY_PATH
-        fi
-    fi
-    
-    # Alternative: source the NVHPC environment if available
-    if [ -f "/opt/nvidia/hpc_sdk/modulefiles/nvhpc/25.5" ]; then
-        source /opt/nvidia/hpc_sdk/modulefiles/nvhpc/25.5
-    fi
-    
-    apt update -y && apt install -y software-properties-common
-    
     apt install -y \
         build-essential git tar wget make cmake gcc g++ \
         python3 python3-venv python3-pip python3-dev \
-        openmpi-bin libopenmpi-dev libfftw3-dev
+        libfftw3-dev \
+        openmpi-bin libopenmpi-dev
 
     cd /opt/MFC
     rm -rf build
-    export CC=nvc
-    export CXX=nvc++
-    export FC=nvfortran
 
     ./mfc.sh build --mpi --gpu -j $(nproc)
     ./mfc.sh test --dry-run --gpu -j $(nproc)
