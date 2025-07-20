@@ -1,4 +1,7 @@
 #:mute
+#:include 'shared_parallel_macros.fpp'
+#:include 'omp_macros.fpp'
+#:include 'acc_macros.fpp'
 
 #:def ASSERT_LIST(data, datatype)
     #:assert data is not None
@@ -106,15 +109,7 @@
     $:link_val
 #:enddef
 
-#:def GEN_EXTRA_ARGS_STR(extraArgs)
-    #:if extraArgs is not None
-        #:assert isinstance(extraArgs, str)
-        #:set extraArgs_val = extraArgs
-    #:else
-        #:set extraArgs_val = ''
-    #:endif
-    $:extraArgs_val
-#:enddef
+
 
 #:def GEN_PARALLELISM_STR(parallelism)
     #:if parallelism is not None
@@ -154,36 +149,6 @@
     $:default_val
 #:enddef
 
-#:def GEN_REDUCTION_STR(reduction, reductionOp)
-    #:if reduction is not None and reductionOp is not None
-        #:assert isinstance(reduction, str)
-        #:assert isinstance(reductionOp, str)
-        #:assert reduction[0] == '[' and reduction[-1] == ']'
-        #:assert reductionOp[0] == '[' and reductionOp[-1] == ']'
-        #:set reduction = reduction.replace(' ', '')
-        #:set reduction = reduction[1:-1]
-        #:set reduction_list = reduction.split('],')
-        #:set reduction_list = [str + ']' for str in reduction_list]
-        #:assert all(str[0] == '[' and str[-1] == ']' for str in reduction_list)
-
-        #:set reductionOp_list = [x.strip() for x in reductionOp.strip('[]').split(',')]
-        $:ASSERT_LIST(reduction_list, str)
-        $:ASSERT_LIST(reductionOp_list, str)
-        #:assert len(reduction_list) == len(reductionOp_list)
-        #:set reduction_val = ''
-        #:for i in range(len(reduction_list))
-            #:set temp_clause = GEN_PARENTHESES_CLAUSE('reduction', reduction_list[i]).strip('\n')
-            #:set ind = temp_clause.find('reduction(') + len('reduction(')
-            #:set reduction_val = reduction_val.strip('\n') + temp_clause[:ind] + reductionOp_list[i] + ':' + temp_clause[ind:]
-        #:endfor
-    #:elif reduction is not None or reductionOp is not None
-        #:stop 'Cannot set the reduction list or reduction operation without setting the other'
-    #:else
-        #:set reduction_val = ''
-    #:endif
-    $:reduction_val
-#:enddef
-
 #:def GEN_HOST_STR(host)
     #:set host_val = GEN_PARENTHESES_CLAUSE('host', host)
     $:host_val
@@ -201,60 +166,34 @@
 
 #:def GPU_PARALLEL(code, private=None, default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
-    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None)
-    #:set default_val = GEN_DEFAULT_STR(default)
-    #:set private_val = GEN_PRIVATE_STR(private, False).strip('\n') + GEN_PRIVATE_STR(firstprivate, True).strip('\n')
-    #:set reduction_val = GEN_REDUCTION_STR(reduction, reductionOp)
-    #:set copy_val = GEN_COPY_STR(copy)
-    #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
-    #:set copyout_val = GEN_COPYOUT_STR(copyout)
-    #:set create_val = GEN_CREATE_STR(create)
-    #:set no_create_val = GEN_NOCREATE_STR(no_create)
-    #:set present_val = GEN_PRESENT_STR(present)
-    #:set deviceptr_val = GEN_DEVICEPTR_STR(deviceptr)
-    #:set attach_val = GEN_ATTACH_STR(attach)
-    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-    #:set clause_val = default_val.strip('\n') + private_val.strip('\n') + reduction_val.strip('\n') + &
-        & copy_val.strip('\n') + copyin_val.strip('\n') + &
-        & copyout_val.strip('\n') + create_val.strip('\n') + &
-        & no_create_val.strip('\n') + present_val.strip('\n') + &
-        & deviceptr_val.strip('\n') + attach_val.strip('\n')
-    #:set acc_directive = '!$acc parallel ' + &
-        & clause_val + extraAccArgs_val.strip('\n')
-    #:set end_acc_directive = '!$acc end parallel'
-    $:acc_directive
-    $:code
-    $:end_acc_directive
-#:enddef
+    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
+    
+    #:set acc_code = ACC_PARALLEL(code, private, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
+    #:set omp_code = OMP_PARALLEL(code, private, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
 
+#if defined(MFC_OpenACC)
+    $:acc_code
+#elif defined(MFC_OpenMP)
+    $:omp_code
+#else
+    $:code
+#endif
+
+#:enddef
 
 #:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
-    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None)
-    #:set collapse_val = GEN_COLLAPSE_STR(collapse)
-    #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
-    #:set default_val = GEN_DEFAULT_STR(default)
-    #:set private_val = GEN_PRIVATE_STR(private, False).strip('\n') + GEN_PRIVATE_STR(firstprivate, True).strip('\n')
-    #:set reduction_val = GEN_REDUCTION_STR(reduction, reductionOp)
-    #:set copy_val = GEN_COPY_STR(copy)
-    #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
-    #:set copyout_val = GEN_COPYOUT_STR(copyout)
-    #:set create_val = GEN_CREATE_STR(create)
-    #:set no_create_val = GEN_NOCREATE_STR(no_create)
-    #:set present_val = GEN_PRESENT_STR(present)
-    #:set deviceptr_val = GEN_DEVICEPTR_STR(deviceptr)
-    #:set attach_val = GEN_ATTACH_STR(attach)
-    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-    #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
-        & default_val.strip('\n') + private_val.strip('\n') + reduction_val.strip('\n') + &
-        & copy_val.strip('\n') + copyin_val.strip('\n') + &
-        & copyout_val.strip('\n') + create_val.strip('\n') + &
-        & no_create_val.strip('\n') + present_val.strip('\n') + &
-        & deviceptr_val.strip('\n') + attach_val.strip('\n')
-    #:set acc_directive = '!$acc parallel loop ' + &
-        & clause_val + extraAccArgs_val.strip('\n')
-    $:acc_directive
+    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
+    
+    #:set acc_code = ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
+    #:set omp_code = OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
+
+#if defined(MFC_OpenACC)
+    $:acc_code
+#elif defined(MFC_OpenMP)
+    $:omp_code
+#endif
 #:enddef
 
 #:def GPU_ROUTINE(function_name=None, parallelism=None, nohost=False, cray_inline=False, extraAccArgs=None)
