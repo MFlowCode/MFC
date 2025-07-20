@@ -218,7 +218,7 @@ contains
     end subroutine s_initialize_nonpoly
 
     !> Computes the transfer coefficient for the non-polytropic bubble compression process
-        !! @param omega natural frqeuencies
+        !! @param omega natural frequencies
         !! @param peclet Peclet number
         !! @param Re_trans Real part of the transport coefficients
         !! @param Im_trans Imaginary part of the transport coefficients
