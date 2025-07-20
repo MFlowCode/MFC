@@ -244,8 +244,6 @@ module m_global_parameters
     integer :: mpi_info_int
     !> @}
 
-    integer, private :: ierr
-
     !> @name Annotations of the structure of the state and flux vectors in terms of the
     !! size and the configuration of the system of equations to which they belong
     !> @{
@@ -1317,6 +1315,10 @@ contains
 
     !> Initializes parallel infrastructure
     impure subroutine s_initialize_parallel_io
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+#endif
 
         #:if not MFC_CASE_OPTIMIZATION
             num_dims = 1 + min(1, n) + min(1, p)

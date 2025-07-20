@@ -24,7 +24,7 @@ module m_mpi_common
 
     implicit none
 
-    integer, private :: ierr, v_size !<
+    integer, private :: v_size
     $:GPU_DECLARE(create='[v_size]')
     !! Generic flags used to identify and report MPI errors
 
@@ -88,6 +88,10 @@ contains
         !!      available for the job and the local processor rank.
     impure subroutine s_mpi_initialize
 
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+#endif
+
 #ifndef MFC_MPI
 
         ! Serial run only has 1 processor
@@ -136,6 +140,7 @@ contains
 
         ! Generic loop iterator
         integer :: i, j
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         !Altered system size for the lagrangian subgrid bubble model
         integer :: alt_sys
@@ -284,7 +289,8 @@ contains
         integer, intent(in) :: root               ! Rank of the root process
         real(wp), allocatable, intent(out) :: gathered_vector(:) ! Gathered vector on the root process
 
-        integer :: i, local_ierr
+        integer :: i
+        integer :: ierr !< Generic flag used to identify and report MPI errors
         integer, allocatable :: recounts(:), displs(:)
 
 #ifdef MFC_MPI
@@ -292,7 +298,7 @@ contains
         allocate (recounts(num_procs))
 
         call MPI_GATHER(counts, 1, MPI_INTEGER, recounts, 1, MPI_INTEGER, root, &
-                        MPI_COMM_WORLD, local_ierr)
+                        MPI_COMM_WORLD, ierr)
 
         allocate (displs(size(recounts)))
 
@@ -304,7 +310,7 @@ contains
 
         allocate (gathered_vector(sum(recounts)))
         call MPI_GATHERV(my_vector, counts, mpi_p, gathered_vector, recounts, displs, mpi_p, &
-                         root, MPI_COMM_WORLD, local_ierr)
+                         root, MPI_COMM_WORLD, ierr)
 #endif
     end subroutine s_mpi_gather_data
 
@@ -314,6 +320,7 @@ contains
         real(wp), intent(inout) :: time_avg
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         call MPI_GATHER(time_avg, 1, mpi_p, proc_time(0), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
@@ -365,6 +372,7 @@ contains
 
 #ifdef MFC_SIMULATION
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their
         ! global extrema and bookkeeping the results on the rank 0 processor
@@ -408,6 +416,7 @@ contains
         real(wp), intent(out) :: var_glb
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
@@ -430,6 +439,7 @@ contains
         real(wp), intent(out) :: var_glb
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
@@ -452,6 +462,7 @@ contains
         real(wp), intent(out) :: var_glb
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
@@ -472,6 +483,7 @@ contains
         real(wp), intent(inout) :: var_loc
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Temporary storage variable that holds the reduced minimum value
         real(wp) :: var_glb
@@ -507,6 +519,7 @@ contains
         real(wp), dimension(2), intent(inout) :: var_loc
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         real(wp), dimension(2) :: var_glb  !<
             !! Temporary storage variable that holds the reduced maximum value
@@ -532,6 +545,10 @@ contains
 
         character(len=*), intent(in), optional :: prnt
         integer, intent(in), optional :: code
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+#endif
 
         if (present(prnt)) then
             print *, prnt
@@ -560,6 +577,7 @@ contains
     impure subroutine s_mpi_barrier
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Calling MPI_BARRIER
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -572,6 +590,7 @@ contains
     impure subroutine s_mpi_finalize
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Finalizing the MPI environment
         call MPI_FINALIZE(ierr)
@@ -609,6 +628,7 @@ contains
         integer :: pack_offset, unpack_offset
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         call nvtxStartRange("RHS-COMM-PACKBUF")
 
@@ -1058,6 +1078,7 @@ contains
         integer :: recon_order !< reconstruction order
 
         integer :: i, j !< Generic loop iterators
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         if (num_procs == 1 .and. parallel_io) then
             do i = 1, num_dims
@@ -1532,6 +1553,7 @@ contains
         integer, intent(in) :: pbc_loc
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! MPI Communication in x-direction
         if (mpi_dir == 1) then
