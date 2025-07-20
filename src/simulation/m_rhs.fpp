@@ -867,7 +867,7 @@ contains
                 if (viscous .or. surface_tension) then
                     call nvtxStartRange("RHS-ADD-PHYSICS")
                     call s_compute_additional_physics_rhs(id, &
-                                                          q_prim_vf, &
+                                                          q_prim_qp%vf, &
                                                           rhs_vf, &
                                                           flux_src_n(id)%vf, &
                                                           dq_prim_dx_qp(1)%vf, &
@@ -1749,7 +1749,6 @@ contains
 
         if (n > 0) then
             if (p > 0) then
-
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
                             weno_dir, &
@@ -1761,9 +1760,8 @@ contains
                             is1, is2, is3)
             end if
         else
-
             call s_weno(v_vf(iv%beg:iv%end), &
-                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
+                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
                         weno_dir, &
                         is1, is2, is3)
         end if
