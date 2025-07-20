@@ -15,6 +15,13 @@ From: nvcr.io/nvidia/nvhpc:22.11-devel-cuda11.8-ubuntu22.04
 
 %post
     export DEBIAN_FRONTEND=noninteractive
+
+    export CC=nvc
+    export CXX=nvc++
+    export FC=nvfortran
+    export PATH="/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/bin:$PATH"
+    export LD_LIBRARY_PATH="/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/lib:$LD_LIBRARY_PATH"
+
     apt update -y && apt install -y \
         build-essential git tar wget make cmake gcc g++ \
         python3 python3-venv python3-pip\
