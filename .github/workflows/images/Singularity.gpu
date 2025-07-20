@@ -15,12 +15,10 @@ From: nvcr.io/nvidia/nvhpc:22.11-devel-cuda11.8-ubuntu22.04
 
 %post
     export DEBIAN_FRONTEND=noninteractive
-    
-    apt install -y \
+    apt update -y && apt install -y \
         build-essential git tar wget make cmake gcc g++ \
-        python3 python3-venv python3-pip python3-dev \
-        libfftw3-dev \
-        openmpi-bin libopenmpi-dev
+        python3 python3-venv python3-pip\
+        openmpi-bin libopenmpi-dev libfftw3-dev
 
     cd /opt/MFC
     rm -rf build
