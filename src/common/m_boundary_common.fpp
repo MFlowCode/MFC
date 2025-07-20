@@ -276,7 +276,7 @@ contains
 
     end subroutine s_populate_variables_buffers
 
-    pure subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l)
+    subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l)
         $:GPU_ROUTINE(function_name='s_ghost_cell_extrapolation', &
             & parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -337,7 +337,7 @@ contains
 
     end subroutine s_ghost_cell_extrapolation
 
-    pure subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
+    subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
@@ -597,7 +597,7 @@ contains
 
     end subroutine s_symmetry
 
-    pure subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
+    subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
@@ -736,7 +736,7 @@ contains
 
     end subroutine s_periodic
 
-    pure subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l)
+    subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
@@ -795,7 +795,7 @@ contains
 
     end subroutine s_axis
 
-    pure subroutine s_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
+    subroutine s_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
         $:GPU_ROUTINE(function_name='s_slip_wall',parallelism='[seq]', &
             & cray_inline=True)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -886,7 +886,7 @@ contains
 
     end subroutine s_slip_wall
 
-    pure subroutine s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
+    subroutine s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
         $:GPU_ROUTINE(function_name='s_no_slip_wall',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -1014,7 +1014,7 @@ contains
 
     end subroutine s_no_slip_wall
 
-    pure subroutine s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l)
+    subroutine s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l)
         $:GPU_ROUTINE(function_name='s_dirichlet',parallelism='[seq]', &
             & cray_inline=True)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -1079,7 +1079,7 @@ contains
 
     end subroutine s_dirichlet
 
-    pure subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb_in, mv_in)
+    subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb_in, mv_in)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
         integer, intent(in) :: bc_dir, bc_loc
@@ -1274,7 +1274,7 @@ contains
         end if
     end subroutine s_populate_capillary_buffers
 
-    pure subroutine s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)
+    subroutine s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)
         $:GPU_ROUTINE(function_name='s_color_function_periodic', &
             & parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
@@ -1329,7 +1329,7 @@ contains
 
     end subroutine s_color_function_periodic
 
-    pure subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
+    subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
         $:GPU_ROUTINE(function_name='s_color_function_reflective', &
             & parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
@@ -1408,7 +1408,7 @@ contains
 
     end subroutine s_color_function_reflective
 
-    pure subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
+    subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
         $:GPU_ROUTINE(function_name='s_color_function_ghost_cell_extrapolation', &
             & parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs

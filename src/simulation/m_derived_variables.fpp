@@ -187,7 +187,7 @@ contains
         !!  @param q_prim_vf2 Primitive variables
         !!  @param q_prim_vf3 Primitive variables
         !!  @param q_sf Acceleration component
-    pure subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, &
+    subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, &
                                                     q_prim_vf2, q_prim_vf3, q_sf)
 
         integer, intent(in) :: i

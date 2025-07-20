@@ -345,7 +345,7 @@ contains
     !! @param frequency_local Frequency at the spatial location for sine and square waves
     !! @param gauss_sigma_time_local sigma in time for Gaussian pulse
     !! @param source Source term amplitude
-    pure elemental subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source, sum_BB)
+    elemental subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source, sum_BB)
         $:GPU_ROUTINE(parallelism='[seq]')
         integer, intent(in) :: ai, term_index
         real(wp), intent(in) :: sim_time, c, sum_BB
@@ -504,7 +504,7 @@ contains
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
-    pure subroutine s_source_spatial(j, k, l, loc, ai, source, angle, xyz_to_r_ratios)
+    subroutine s_source_spatial(j, k, l, loc, ai, source, angle, xyz_to_r_ratios)
         integer, intent(in) :: j, k, l, ai
         real(wp), dimension(3), intent(in) :: loc
         real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
@@ -540,7 +540,7 @@ contains
     !! @param sig Sigma value for the Gaussian distribution
     !! @param r Displacement from source to current point
     !! @param source Source term amplitude
-    pure subroutine s_source_spatial_planar(ai, sig, r, source)
+    subroutine s_source_spatial_planar(ai, sig, r, source)
         integer, intent(in) :: ai
         real(wp), intent(in) :: sig, r(3)
         real(wp), intent(out) :: source
@@ -570,7 +570,7 @@ contains
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
-    pure subroutine s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
+    subroutine s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
         integer, intent(in) :: ai
         real(wp), intent(in) :: sig, r(3)
         real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
@@ -615,7 +615,7 @@ contains
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
-    pure subroutine s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
+    subroutine s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
         integer, intent(in) :: ai
         real(wp), intent(in) :: sig, r(3)
         real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
@@ -697,7 +697,7 @@ contains
     !! @param ai Acoustic source index
     !! @param c Speed of sound
     !! @return frequency_local Converted frequency
-    pure elemental function f_frequency_local(freq_conv_flag, ai, c)
+    elemental function f_frequency_local(freq_conv_flag, ai, c)
         $:GPU_ROUTINE(parallelism='[seq]')
         logical, intent(in) :: freq_conv_flag
         integer, intent(in) :: ai
@@ -716,7 +716,7 @@ contains
     !! @param c Speed of sound
     !! @param ai Acoustic source index
     !! @return gauss_sigma_time_local Converted Gaussian sigma time
-    pure elemental function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
+    elemental function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
         $:GPU_ROUTINE(parallelism='[seq]')
         logical, intent(in) :: gauss_conv_flag
         integer, intent(in) :: ai

@@ -65,7 +65,7 @@ contains
         end if
     end subroutine s_initialize_surface_tension_module
 
-    pure subroutine s_compute_capillary_source_flux( &
+    subroutine s_compute_capillary_source_flux( &
         vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
         flux_src_vf, &
         id, isx, isy, isz)

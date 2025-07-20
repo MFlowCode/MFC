@@ -1571,7 +1571,7 @@ contains
     end subroutine s_finalize_cbc
 
     ! Detext if the problem has any characteristic boundary conditions
-    pure elemental subroutine s_any_cbc_boundaries(toggle)
+    elemental subroutine s_any_cbc_boundaries(toggle)
 
         logical, intent(inout) :: toggle
 

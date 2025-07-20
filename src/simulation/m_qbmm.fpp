@@ -411,7 +411,7 @@ contains
 
     end subroutine s_initialize_qbmm_module
 
-    pure subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
+    subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
@@ -562,7 +562,7 @@ contains
     end subroutine s_compute_qbmm_rhs
 
     !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
-    pure subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
+    subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
         $:GPU_ROUTINE(function_name='s_coeff_nonpoly',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -633,7 +633,7 @@ contains
     end subroutine s_coeff_nonpoly
 
 !Coefficient array for polytropic model (pb for each R0 bin accounted for in wght_pb)
-    pure subroutine s_coeff(pres, rho, c, coeffs)
+    subroutine s_coeff(pres, rho, c, coeffs)
         $:GPU_ROUTINE(function_name='s_coeff',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -868,7 +868,7 @@ contains
             end if
         end subroutine s_coeff_selector
 
-        pure subroutine s_chyqmom(momin, wght, abscX, abscY)
+        subroutine s_chyqmom(momin, wght, abscX, abscY)
             $:GPU_ROUTINE(function_name='s_chyqmom',parallelism='[seq]', &
                 & cray_inline=True)
 
@@ -926,7 +926,7 @@ contains
 
         end subroutine s_chyqmom
 
-        pure subroutine s_hyqmom(frho, fup, fmom)
+        subroutine s_hyqmom(frho, fup, fmom)
             $:GPU_ROUTINE(function_name='s_hyqmom',parallelism='[seq]', &
                 & cray_inline=True)
 
@@ -946,7 +946,7 @@ contains
 
         end subroutine s_hyqmom
 
-        pure function f_quad(abscX, abscY, wght_in, q, r, s)
+        function f_quad(abscX, abscY, wght_in, q, r, s)
             $:GPU_ROUTINE(parallelism='[seq]')
             real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
             real(wp), intent(in) :: q, r, s
@@ -962,7 +962,7 @@ contains
 
         end function f_quad
 
-        pure function f_quad2D(abscX, abscY, wght_in, pow)
+        function f_quad2D(abscX, abscY, wght_in, pow)
             $:GPU_ROUTINE(parallelism='[seq]')
             real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
             real(wp), dimension(3), intent(in) :: pow

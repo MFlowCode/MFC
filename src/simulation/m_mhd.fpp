@@ -67,7 +67,7 @@ contains
         !!      S = - (divB) [ 0, Bx, By, Bz, vdotB, vx, vy, vz ]^T
         !!  @param q_prim_vf  Primitive variables
         !!  @param rhs_vf     rhs variables
-    pure subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)
+    subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf

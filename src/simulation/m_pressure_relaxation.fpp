@@ -65,7 +65,7 @@ contains
 
     !> The main pressure relaxation procedure
     !! @param q_cons_vf Cell-average conservative variables
-    pure subroutine s_pressure_relaxation_procedure(q_cons_vf)
+    subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer :: j, k, l
@@ -82,7 +82,7 @@ contains
     end subroutine s_pressure_relaxation_procedure
 
     !> Process pressure relaxation for a single cell
-    pure subroutine s_relax_cell_pressure(q_cons_vf, j, k, l)
+    subroutine s_relax_cell_pressure(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -102,7 +102,7 @@ contains
     end subroutine s_relax_cell_pressure
 
     !> Check if pressure relaxation is needed for this cell
-    pure logical function s_needs_pressure_relaxation(q_cons_vf, j, k, l)
+    logical function s_needs_pressure_relaxation(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -120,7 +120,7 @@ contains
     end function s_needs_pressure_relaxation
 
     !> Correct volume fractions to physical bounds
-    pure subroutine s_correct_volume_fractions(q_cons_vf, j, k, l)
+    subroutine s_correct_volume_fractions(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -150,7 +150,7 @@ contains
     end subroutine s_correct_volume_fractions
 
     !> Main pressure equilibration using Newton-Raphson
-    pure subroutine s_equilibrate_pressure(q_cons_vf, j, k, l)
+    subroutine s_equilibrate_pressure(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -219,7 +219,7 @@ contains
     end subroutine s_equilibrate_pressure
 
     !> Correct internal energies using equilibrated pressure
-    pure subroutine s_correct_internal_energies(q_cons_vf, j, k, l)
+    subroutine s_correct_internal_energies(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf

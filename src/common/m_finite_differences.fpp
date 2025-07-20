@@ -8,7 +8,7 @@ module m_finite_differences
 
 contains
 
-    pure subroutine s_compute_fd_divergence(div, fields, ix_s, iy_s, iz_s)
+    subroutine s_compute_fd_divergence(div, fields, ix_s, iy_s, iz_s)
 
         type(scalar_field), intent(INOUT) :: div
         type(scalar_field), intent(IN) :: fields(1:3)
@@ -69,7 +69,7 @@ contains
     !!  @param q Number of cells in the s-coordinate direction
     !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
     !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
-    pure subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s, local_buff_size, &
+    subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s, local_buff_size, &
                                                              fd_number_in, fd_order_in, offset_s)
 
         integer :: lB, lE !< loop bounds

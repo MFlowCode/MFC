@@ -71,7 +71,7 @@ contains
 
     ! Compute the bubble volume fraction alpha from the bubble number density n
         !! @param q_cons_vf is the conservative variable
-    pure subroutine s_comp_alpha_from_n(q_cons_vf)
+    subroutine s_comp_alpha_from_n(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp) :: nR3bar
         integer(wp) :: i, j, k, l
@@ -92,7 +92,7 @@ contains
 
     end subroutine s_comp_alpha_from_n
 
-    pure subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu_in)
+    subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu_in)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
