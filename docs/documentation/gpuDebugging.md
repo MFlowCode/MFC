@@ -33,17 +33,17 @@ OMP_DISPLAY_AFFINITY=TRUE
 ```bash
 CRAY_ACC_DEBUG: 0 (off), 1, 2, 3 (very noisy)
 ```
-- Dumps a time-stamped log line (`"ACC: ...`) for every allocation, data transfer, kernel launch, wait, etc. Great first stop when "nothing seems to run on the GPU.
 
-- Outputs on STDERR by default. Can be changed by setting `CRAY_ACC_DEBUG_FILE`. 
+- Dumps a time-stamped log line (`ACC: ...`) for every allocation, data transfer, kernel launch, wait, etc. Great first stop when "nothing seems to run on the GPU".
+- Outputs on STDERR by default. Can be changed by setting `CRAY_ACC_DEBUG_FILE`.
   - Recognizes `stderr`, `stdout`, and `process`.
   - `process` automatically generates a new file based on `pid` (each MPI process will have a different file)
-
 - While this environment variable specifies ACC, it can be used for both OpenACC and OpenMP
 
 ```bash
 CRAY_ACC_FORCE_EARLY_INIT=1
 ```
+
 - Force full GPU initialization at program start so you can see start-up hangs immediately
 - Default behavior without an environment variable is to defer initialization on first use
 - Device initialization includes initializing the GPU vendor’s low-level device runtime library (e.g., libcuda for NVIDIA GPUs) and establishing all necessary software contexts for interacting with the device
@@ -150,7 +150,7 @@ LIBOMPTARGET_JIT_SKIP_OPT=1
 - [Cray & OpenACC Docs](https://cpe.ext.hpe.com/docs/24.11/cce/man7/intro_openacc.7.html#environment-variables)
 - [NVHPC & OpenACC Docs](https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html?highlight=NVCOMPILER_#environment-variables)
 - [NVHPC & OpenMP Docs](https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html?highlight=NVCOMPILER_#id2)
-- [LLVM & OpenMP Docs] (https://openmp.llvm.org/design/Runtimes.html)
+- [LLVM & OpenMP Docs](https://openmp.llvm.org/design/Runtimes.html)
     - NVHPC is built on top of LLVM
 - [OpenMP Docs](https://www.openmp.org/spec-html/5.1/openmp.html)
 - [OpenACC Docs](https://www.openacc.org/sites/default/files/inline-files/OpenACC.2.7.pdf)
