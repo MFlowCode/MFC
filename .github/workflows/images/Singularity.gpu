@@ -12,11 +12,28 @@ From: nvcr.io/nvidia/nvhpc:25.5-runtime-cuda12.9-ubuntu24.04
 %post
     export DEBIAN_FRONTEND=noninteractive
     
-    NVHPC_ROOT=$(find /opt/nvidia/hpc_sdk -name "Linux_x86_64" -type d | head -1)
-    NVHPC_VERSION=$(basename $(dirname $NVHPC_ROOT))
+    # Debug: Find all NVHPC installations
+    echo "=== Searching for NVHPC installation ==="
+    find /opt -name "nvc" -type f 2>/dev/null || echo "nvc not found"
+    find /opt -name "nvhpc" -type d 2>/dev/null || echo "nvhpc directory not found"
+    ls -la /opt/nvidia/ || echo "/opt/nvidia not found"
     
-    export PATH=$NVHPC_ROOT/$NVHPC_VERSION/compilers/bin:$PATH
-    export LD_LIBRARY_PATH=$NVHPC_ROOT/$NVHPC_VERSION/compilers/lib:$LD_LIBRARY_PATH
+    # Try different possible paths
+    if [ -d "/opt/nvidia/hpc_sdk" ]; then
+        ls -la /opt/nvidia/hpc_sdk/
+        NVHPC_ROOT=$(find /opt/nvidia/hpc_sdk -name "Linux_x86_64" -type d | head -1)
+        if [ -n "$NVHPC_ROOT" ]; then
+            NVHPC_VERSION=$(basename $(dirname $NVHPC_ROOT))
+            echo "Found NVHPC at: $NVHPC_ROOT/$NVHPC_VERSION"
+            export PATH=$NVHPC_ROOT/$NVHPC_VERSION/compilers/bin:$PATH
+            export LD_LIBRARY_PATH=$NVHPC_ROOT/$NVHPC_VERSION/compilers/lib:$LD_LIBRARY_PATH
+        fi
+    fi
+    
+    # Alternative: source the NVHPC environment if available
+    if [ -f "/opt/nvidia/hpc_sdk/modulefiles/nvhpc/25.5" ]; then
+        source /opt/nvidia/hpc_sdk/modulefiles/nvhpc/25.5
+    fi
     
     apt update -y && apt install -y software-properties-common
     
