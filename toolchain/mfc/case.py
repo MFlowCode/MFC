@@ -201,9 +201,14 @@ class Case:
             wenoz  = 1 if self.params.get("wenoz", 'F') == 'T' else 0
             teno   = 1 if self.params.get("teno", 'F') == 'T' else 0
             wenojs = 0 if (mapped_weno or wenoz or teno) else 1
+            igr = 1 if self.params.get("igr", 'F') == 'T' else 0
 
-            weno_order = int(self.params["weno_order"])
-            weno_polyn = int((self.params["weno_order"] - 1) / 2)
+            weno_order = int(self.params.get("weno_order",1))
+            weno_polyn = int((self.params.get("weno_order",1) - 1) / 2)
+
+            if self.params.get("igr", "F") == 'T':
+                weno_order = 5
+                weno_polyn = 3
 
             if teno:
                 weno_num_stencils = weno_order - 3
@@ -218,6 +223,9 @@ class Case:
 
             mhd = 1 if self.params.get("mhd", 'F') == 'T' else 0
             relativity = 1 if self.params.get("relativity", 'F') == 'T' else 0
+            viscous = 1 if self.params.get("viscous", 'F') == 'T' else 0
+            igr = 1 if self.params.get("igr", 'F') == 'T' else 0
+            igr_pres_lim = 1 if self.params.get("igr_pres_lim", 'F') == 'T' else 0
 
             # Throw error if wenoz_q is required but not set
             return f"""\
@@ -237,6 +245,11 @@ class Case:
 #:set wenoz_q               = {self.params.get("wenoz_q", -1)}
 #:set mhd                   = {mhd}
 #:set relativity            = {relativity}
+#:set igr                   = {igr}
+#:set igr_iter_solver       = {self.params.get("igr_iter_solver", 1)}
+#:set igr_pres_lim          = {igr_pres_lim}
+#:set igr_order             = {self.params.get("igr_order", 3)}
+#:set viscous               = {viscous}
 """
 
         return """\

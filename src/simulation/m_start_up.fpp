@@ -90,6 +90,8 @@ module m_start_up
 
     use m_mhd
 
+    use m_igr
+
     implicit none
 
     private; public :: s_read_input_file, &
@@ -160,7 +162,9 @@ contains
             rhoref, pref, bubbles_euler, bubble_model, &
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, mhd, relativity, &
+            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, &
+            num_fluids, mhd, relativity, igr_order, viscous, &
+            igr_iter_solver, igr, igr_pres_lim, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
@@ -175,10 +179,11 @@ contains
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target, &
-            viscous, surface_tension, &
-            bubbles_lagrange, lag_params, &
+            surface_tension, bubbles_lagrange, lag_params, &
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
-            cont_damage, tau_star, cont_damage_s, alpha_bar
+            cont_damage, tau_star, cont_damage_s, alpha_bar, &
+            alf_factor, num_igr_iters, &
+            num_igr_warm_start_iters
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -259,8 +264,8 @@ contains
     impure subroutine s_read_serial_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        
-            
+
+
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the starting time-step directory
 
@@ -1140,7 +1145,9 @@ contains
                 io_time_final = maxval(io_proc_time)
             end if
 
-            grind_time = time_final*1.0e9_wp/(sys_size*maxval((/1,m_glb/))*maxval((/1,n_glb/))*maxval((/1,p_glb/)))
+            grind_time = time_final * 1.0e9_wp / &
+                (real(sys_size, wp) * real(maxval((/1, m_glb/)), wp) * &
+                 real(maxval((/1, n_glb/)), wp) * real(maxval((/1, p_glb/)), wp))
 
             print *, "Performance:", grind_time, "ns/gp/eq/rhs"
             inquire (FILE='time_data.dat', EXIST=file_exists)
@@ -1257,30 +1264,20 @@ contains
             pref = 1._wp
         end if
 
-#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
-        call acc_present_dump()
-#endif
-
-
         call s_initialize_mpi_common_module()
         call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
         if (grid_geometry == 3) call s_initialize_fftw_module()
-        call s_initialize_riemann_solvers_module()
 
         if(bubbles_euler) call s_initialize_bubbles_EE_module()
         if (ib) call s_initialize_ibm_module()
         if (qbmm) call s_initialize_qbmm_module()
 
-#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
-        call acc_present_dump()
-#endif
-
         if (acoustic_source) then
             call s_initialize_acoustic_src()
         end if
 
-        if (viscous) then
+        if (viscous .and. (.not. igr)) then
             call s_initialize_viscous_module()
         end if
 
@@ -1288,19 +1285,12 @@ contains
 
         if (surface_tension) call s_initialize_surface_tension_module()
 
-#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
-        call acc_present_dump()
-#endif
-
         if (relax) call s_initialize_phasechange_module()
 
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
 
-#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
-        call acc_present_dump()
-#endif
         call s_initialize_boundary_common_module()
 
         ! Reading in the user provided initial condition and grid data
@@ -1320,14 +1310,14 @@ contains
         ! Computation of parameters, allocation of memory, association of pointers,
         ! and/or execution of any other tasks that are needed to properly configure
         ! the modules. The preparations below DO DEPEND on the grid being complete.
-        call s_initialize_weno_module()
+        if (igr) then
+            call s_initialize_igr_module()
+        else
+            call s_initialize_weno_module()
+            call s_initialize_cbc_module()
+            call s_initialize_riemann_solvers_module()
+        end if
 
-#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
-        print *, "[MEM-INST] After: s_initialize_weno_module"
-        call acc_present_dump()
-#endif
-
-        call s_initialize_cbc_module()
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
 
@@ -1454,6 +1444,9 @@ contains
         if (ib) then
             $:GPU_UPDATE(device='[ib_markers%sf]')
         end if
+
+        $:GPU_UPDATE(device='[igr, igr_order]')
+
     end subroutine s_initialize_gpu_vars
 
     impure subroutine s_finalize_modules
@@ -1464,9 +1457,13 @@ contains
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()
-        call s_finalize_cbc_module()
-        call s_finalize_riemann_solvers_module()
-        call s_finalize_weno_module()
+        if (igr) then
+            call s_finalize_igr_module()
+        else
+            call s_finalize_cbc_module()
+            call s_finalize_riemann_solvers_module()
+            call s_finalize_weno_module()
+        end if
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_common_module()
@@ -1474,7 +1471,7 @@ contains
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (bubbles_lagrange) call s_finalize_lagrangian_solver()
-        if (viscous) then
+        if (viscous .and. (.not. igr)) then
             call s_finalize_viscous_module()
         end if
         call s_finalize_mpi_proxy_module()

@@ -1065,6 +1065,8 @@ contains
             !! Remaining number of cells, in a particular coordinate direction,
             !! after the majority is divided up among the available processors
 
+        integer :: recon_order !< reconstruction order
+
         integer :: i, j !< Generic loop iterators
 
         if (num_procs == 1 .and. parallel_io) then
@@ -1072,6 +1074,12 @@ contains
                 start_idx(i) = 0
             end do
             return
+        end if
+
+        if (igr) then
+            recon_order = igr_order
+        else
+            recon_order = weno_order
         end if
 
         ! 3D Cartesian Processor Topology
@@ -1102,7 +1110,7 @@ contains
 
                         if (mod(num_procs, i) == 0 &
                             .and. &
-                            (m + 1)/i >= num_stcls_min*weno_order) then
+                            (m + 1)/i >= num_stcls_min*recon_order) then
 
                             tmp_num_procs_x = i
                             tmp_num_procs_y = num_procs/i
@@ -1112,7 +1120,7 @@ contains
                                 .and. &
                                 (n + 1)/tmp_num_procs_y &
                                 >= &
-                                num_stcls_min*weno_order) then
+                                num_stcls_min*recon_order) then
 
                                 num_procs_x = i
                                 num_procs_y = num_procs/i
@@ -1148,13 +1156,13 @@ contains
 
                         if (mod(num_procs, i) == 0 &
                             .and. &
-                            (m + 1)/i >= num_stcls_min*weno_order) then
+                            (m + 1)/i >= num_stcls_min*recon_order) then
 
                             do j = 1, num_procs/i
 
                                 if (mod(num_procs/i, j) == 0 &
                                     .and. &
-                                    (n + 1)/j >= num_stcls_min*weno_order) then
+                                    (n + 1)/j >= num_stcls_min*recon_order) then
 
                                     tmp_num_procs_x = i
                                     tmp_num_procs_y = j
@@ -1167,7 +1175,7 @@ contains
                                         .and. &
                                         (p + 1)/tmp_num_procs_z &
                                         >= &
-                                        num_stcls_min*weno_order) &
+                                        num_stcls_min*recon_order) &
                                         then
 
                                         num_procs_x = i
@@ -1196,7 +1204,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     call s_mpi_abort('Unsupported combination of values '// &
                                      'of num_procs, m, n, p and '// &
-                                     'weno_order. Exiting.')
+                                     'weno/igr_order. Exiting.')
                 end if
 
                 ! Creating new communicator using the Cartesian topology
@@ -1304,7 +1312,7 @@ contains
 
                     if (mod(num_procs, i) == 0 &
                         .and. &
-                        (m + 1)/i >= num_stcls_min*weno_order) then
+                        (m + 1)/i >= num_stcls_min*recon_order) then
 
                         tmp_num_procs_x = i
                         tmp_num_procs_y = num_procs/i
@@ -1314,7 +1322,7 @@ contains
                             .and. &
                             (n + 1)/tmp_num_procs_y &
                             >= &
-                            num_stcls_min*weno_order) then
+                            num_stcls_min*recon_order) then
 
                             num_procs_x = i
                             num_procs_y = num_procs/i
@@ -1333,7 +1341,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     call s_mpi_abort('Unsupported combination of values '// &
                                      'of num_procs, m, n and '// &
-                                     'weno_order. Exiting.')
+                                     'weno/igr_order. Exiting.')
                 end if
 
                 ! Creating new communicator using the Cartesian topology

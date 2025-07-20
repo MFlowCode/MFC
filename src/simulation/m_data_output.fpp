@@ -541,7 +541,7 @@ contains
         !1D
         if (n == 0 .and. p == 0) then
 
-            if (model_eqns == 2) then
+            if (model_eqns == 2 .and. (.not. igr)) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
@@ -655,7 +655,7 @@ contains
                 end do
             end if
 
-            if (prim_vars_wrt) then
+            if (prim_vars_wrt .and. (.not. igr)) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
@@ -750,7 +750,7 @@ contains
                 end do
             end if
 
-            if (prim_vars_wrt) then
+            if (prim_vars_wrt .and. (.not. igr)) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
