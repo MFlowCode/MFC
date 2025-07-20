@@ -11,9 +11,13 @@ From: nvcr.io/nvidia/nvhpc:25.5-runtime-cuda12.9-ubuntu24.04
 
 %post
     export DEBIAN_FRONTEND=noninteractive
-    export PATH=/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin:$PATH
-    export LD_LIBRARY_PATH=/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/lib:$LD_LIBRARY_PATH
-
+    
+    NVHPC_ROOT=$(find /opt/nvidia/hpc_sdk -name "Linux_x86_64" -type d | head -1)
+    NVHPC_VERSION=$(basename $(dirname $NVHPC_ROOT))
+    
+    export PATH=$NVHPC_ROOT/$NVHPC_VERSION/compilers/bin:$PATH
+    export LD_LIBRARY_PATH=$NVHPC_ROOT/$NVHPC_VERSION/compilers/lib:$LD_LIBRARY_PATH
+    
     apt update -y && apt install -y software-properties-common
     
     apt install -y \
