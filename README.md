@@ -5,17 +5,17 @@
 </p>
 
 <p align="center">
-  <a href="http://dx.doi.org/10.1016/j.cpc.2020.107396" target="_blank">
-    <img src="https://zenodo.org/badge/doi/10.1016/j.cpc.2020.107396.svg" />
-  </a>
   <a href="https://github.com/MFlowCode/MFC/actions">
-    <img src="https://github.com/MFlowCode/MFC/actions/workflows/test.yml/badge.svg" />
+    <img src="https://img.shields.io/github/actions/workflow/status/mflowcode/mfc/test.yml?style=flat&label=Tests&color=slateblue%09"/>
+  </a>
+  <a href="https://github.com/MFlowCode/MFC/blob/master/.github/CONTRIBUTING.md">
+    <img src="https://img.shields.io/github/contributors-anon/mflowcode/mfc?style=flat&color=darkslategrey%09" />
   </a>
   <a href="https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw">
     <img src="https://img.shields.io/badge/slack-MFC-purple.svg?logo=slack" />
   </a>
   <a href="https://lbesson.mit-license.org/">
-    <img src="https://img.shields.io/badge/License-MIT-blue.svg" />
+    <img src="https://img.shields.io/badge/License-MIT-crimson.svg" />
   </a>
   <a href="https://codecov.io/github/MFlowCode/MFC" target="_blank">
     <img src="https://codecov.io/github/MFlowCode/MFC/graph/badge.svg?token=8SY043QND4">
@@ -25,12 +25,35 @@
   </a>
 </p>
 
-Welcome to the home of MFC!
-MFC simulates compressible multi-component and multi-phase flows, [amongst other things](#what-else-can-this-thing-do). 
-MFC is written in Fortran and uses metaprogramming to keep the code short (about 20K lines).
+**Welcome!**
+MFC simulates compressible multi-phase flows, [among other things](#what-else-can-this-thing-do). 
+It uses metaprogramming to stay short and portable (~20K lines).
+MFC conducted the largest known, open CFD simulation at <a href="https://arxiv.org/abs/2505.07392" target="_blank">101 trillion grid points</a> (as of July 2025).
+
+<p align="center">
+<a href="https://doi.org/10.48550/arXiv.2503.07953" target="_blank">
+    <img src="https://img.shields.io/badge/DOI-10.48550/arXiv.2503.07953-thistle.svg"/>
+</a>
+<a href="https://github.com/MFlowCode/MFC/stargazers" target="_blank">
+    <img src="https://img.shields.io/github/stars/MFlowCode/MFC?style=flat&color=maroon"/>
+</a>
+
+</br>
+Is MFC useful for you? Consider citing it or giving a star! 
+</p>
+
+```bibtex
+@article{Wilfong_2025,
+  author = {Wilfong, Benjamin and {Le Berre}, Henry and Radhakrishnan, Anand and Gupta, Ansh and Vaca-Revelo, Diego and Adam, Dimitrios and Yu, Haocheng and Lee, Hyeoksu and Chreim, Jose Rodolfo and {Carcana Barbosa}, Mirelys and Zhang, Yanjun and Cisneros-Garibay, Esteban and Gnanaskandan, Aswin and {Rodriguez Jr.}, Mauro and Budiardja, Reuben D. and Abbott, Stephen and Colonius, Tim and Bryngelson, Spencer H.},
+  title = {{MFC 5.0: A}n exascale many-physics flow solver},
+  journal = {arXiv preprint arXiv:2503.07953},
+  year = {2025},
+  doi = {10.48550/arXiv.2503.07953}
+}
+```
 
 MFC is used on the latest leadership-class supercomputers.
-It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU machines](#is-this-really-exascale) on Oak Ridge Summit and Frontier.
+It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU machines](#is-this-really-exascale) on Oak Ridge Frontier, LLNL El Capitan, CSCS Alps, among others.
 MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and used OLCF Frontier and LLNL El Capitan early access systems.
   
 Get in touch with <a href="mailto:shb@gatech.edu">Spencer</a> if you have questions!
