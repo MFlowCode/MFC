@@ -7,11 +7,7 @@ From: nvcr.io/nvidia/nvhpc:23.11-devel-cuda12.3-ubuntu22.04
 %environment
     export OMPI_ALLOW_RUN_AS_ROOT=1
     export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
-    export PATH="/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/bin:/opt/MFC:$PATH"
-    export LD_LIBRARY_PATH="/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/lib:$LD_LIBRARY_PATH"
-    export CC=nvc
-    export CXX=nvc++
-    export FC=nvfortran
+    export PATH="/opt/MFC:$PATH"
 
 %post
     export DEBIAN_FRONTEND=noninteractive
