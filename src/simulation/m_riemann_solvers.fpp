@@ -203,7 +203,7 @@ contains
         !! For more information please refer to:
         !!      1) s_compute_cartesian_viscous_source_flux
         !!      2) s_compute_cylindrical_viscous_source_flux
-    pure subroutine s_compute_viscous_source_flux(velL_vf, &
+    subroutine s_compute_viscous_source_flux(velL_vf, &
                                                   dvelL_dx_vf, &
                                                   dvelL_dy_vf, &
                                                   dvelL_dz_vf, &
@@ -3795,7 +3795,7 @@ contains
         !! @param[in] ix Global X-direction loop bounds (int_bounds_info).
         !! @param[in] iy Global Y-direction loop bounds (int_bounds_info).
         !! @param[in] iz Global Z-direction loop bounds (int_bounds_info).
-    pure subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, &
+    subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, &
                                                               dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, &
                                                               velR_vf, &
                                                               dvelR_dx_vf, dvelR_dy_vf, dvelR_dz_vf, &
@@ -3956,7 +3956,7 @@ contains
     !! @param[in] ix X-direction loop bounds (int_bounds_info).
     !! @param[in] iy Y-direction loop bounds (int_bounds_info).
     !! @param[in] iz Z-direction loop bounds (int_bounds_info).
-    pure subroutine s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, &
+    subroutine s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, &
                                                             dvelL_dy_vf, &
                                                             dvelL_dz_vf, &
                                                             dvelR_dx_vf, &
@@ -4082,7 +4082,7 @@ contains
     !! @param[in] Re_shear Shear Reynolds number.
     !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
     !! @param[out] tau_shear_out Calculated shear stress tensor (stress on i-face, j-direction).
-    pure subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
+    subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         implicit none
@@ -4116,7 +4116,7 @@ contains
     !! @param[in] Re_bulk Bulk Reynolds number.
     !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
     !! @param[out] tau_bulk_out Calculated bulk stress tensor (stress on i-face, i-direction).
-    pure subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
+    subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         implicit none
@@ -4143,7 +4143,7 @@ contains
         !!  @param flux_src_vf   Intercell source fluxes
         !!  @param flux_gsrc_vf  Intercell geometric source fluxes
         !!  @param norm_dir Dimensional splitting coordinate direction
-    pure subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, &
+    subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                               flux_gsrc_vf, &
                                               norm_dir)
 

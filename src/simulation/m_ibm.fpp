@@ -127,7 +127,7 @@ contains
         !!  @param q_prim_vf Primitive variables
         !!  @param pb Internal bubble pressure
         !!  @param mv Mass of vapor in bubble
-    pure subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
+    subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -420,7 +420,7 @@ contains
 
     !> Function that finds the number of ghost points, used for allocating
     !! memory.
-    pure subroutine s_find_num_ghost_points(num_gps_out, num_inner_gps_out)
+    subroutine s_find_num_ghost_points(num_gps_out, num_inner_gps_out)
 
         integer, intent(out) :: num_gps_out
         integer, intent(out) :: num_inner_gps_out
@@ -468,7 +468,7 @@ contains
     end subroutine s_find_num_ghost_points
 
     !> Function that finds the ghost points
-    pure subroutine s_find_ghost_points(ghost_points_in, inner_points_in)
+    subroutine s_find_ghost_points(ghost_points_in, inner_points_in)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points_in
         type(ghost_point), dimension(num_inner_gps), intent(INOUT) :: inner_points_in
@@ -583,7 +583,7 @@ contains
     end subroutine s_find_ghost_points
 
     !>  Function that computes the interpolation coefficients of image points
-    pure subroutine s_compute_interpolation_coeffs(ghost_points_in)
+    subroutine s_compute_interpolation_coeffs(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points_in
 
@@ -737,7 +737,7 @@ contains
 
     !> Function that uses the interpolation coefficients and the current state
     !! at the cell centers in order to estimate the state at the image point
-    pure subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+    subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), &
             dimension(sys_size), &

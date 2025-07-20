@@ -35,7 +35,7 @@ contains
         !! @param fv2 temporary storage array
         !! @param fv3 temporary storage array
         !! @param ierr an error completion code
-    pure subroutine cg(nm, nl, ar, ai, wr, wi, zr, zi, fv1, fv2, fv3, ierr)
+    subroutine cg(nm, nl, ar, ai, wr, wi, zr, zi, fv1, fv2, fv3, ierr)
         integer, intent(in) :: nm, nl
         real(wp), dimension(nm, nl), intent(inout) :: ar, ai
         real(wp), dimension(nl), intent(out) :: wr, wi
@@ -78,7 +78,7 @@ contains
         !!            (2) j=1, ,low-1 or i=igh+1, ,nl.
         !! @param scale the information determining the permutations and scaling
         !!              factors used.
-    pure subroutine cbal(nm, nl, ar, ai, low, igh, scale)
+    subroutine cbal(nm, nl, ar, ai, low, igh, scale)
         integer, intent(in) :: nm, nl
         real(wp), dimension(nm, nl), intent(inout) :: ar, ai
         integer, intent(out) :: low, igh
@@ -221,7 +221,7 @@ contains
         !!            if  cbal  has not been used, set igh=nl.
         !! @param ortr further information about the transformations
         !! @param orti further information about the transformations
-    pure subroutine corth(nm, nl, low, igh, ar, ai, ortr, orti)
+    subroutine corth(nm, nl, low, igh, ar, ai, ortr, orti)
         integer, intent(in) :: nm, nl, low, igh
         real(wp), dimension(nm, nl), intent(inout) :: ar, ai
         real(wp), dimension(igh), intent(out) :: ortr, orti
@@ -345,7 +345,7 @@ contains
         !! @param zr the real part of the eigenvectors
         !! @param zi the imaginary part of the eigenvectors
         !! @param ierr an error completion code
-    pure subroutine comqr2(nm, nl, low, igh, ortr, orti, hr, hi, wr, wi, zr, zi, ierr)
+    subroutine comqr2(nm, nl, low, igh, ortr, orti, hr, hi, wr, wi, zr, zi, ierr)
         integer, intent(in) :: nm, nl, low, igh
         real(wp), dimension(nm, nl), intent(inout) :: hr, hi
         real(wp), dimension(nl), intent(out) :: wr, wi
@@ -708,7 +708,7 @@ contains
         !!           their first ml columns
         !! @param zi the imaginary part of the eigenvectors to be back
         !!           transformed in their first ml columns
-    pure subroutine cbabk2(nm, nl, low, igh, scale, ml, zr, zi)
+    subroutine cbabk2(nm, nl, low, igh, scale, ml, zr, zi)
         integer, intent(in) :: nm, nl, low, igh
         real(wp), intent(in) :: scale(nl)
         integer, intent(in) :: ml
@@ -754,7 +754,7 @@ contains
 200     return
     end subroutine cbabk2
 
-    pure elemental subroutine csroot(xr, xi, yr, yi)
+    elemental subroutine csroot(xr, xi, yr, yi)
         real(wp), intent(in) :: xr, xi
         real(wp), intent(out) :: yr, yi
 
@@ -774,7 +774,7 @@ contains
         return
     end subroutine csroot
 
-    pure elemental subroutine cdiv(ar, ai, br, bi, cr, ci)
+    elemental subroutine cdiv(ar, ai, br, bi, cr, ci)
         real(wp), intent(in) :: ar, ai, br, bi
         real(wp), intent(out) :: cr, ci
         real(wp) :: s, ars, ais, brs, bis
@@ -790,7 +790,7 @@ contains
         return
     end subroutine cdiv
 
-    pure elemental subroutine pythag(a, b, c)
+    elemental subroutine pythag(a, b, c)
         real(wp), intent(in) :: a, b
         real(wp), intent(out) :: c
 

@@ -381,7 +381,7 @@ contains
 
     end subroutine s_finalize_hypoelastic_module
 
-    pure subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
+    subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf

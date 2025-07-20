@@ -739,7 +739,7 @@ contains
         !! @param gamma Liquid specific heat ratio
         !! @param pi_inf Liquid stiffness
         !! @param cson Calculated speed of sound
-    pure subroutine s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
+    subroutine s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
         $:GPU_ROUTINE(function_name='s_compute_cson_from_pinf', &
             & parallelism='[seq]', cray_inline=True)
 
@@ -807,7 +807,7 @@ contains
         !! @param f_pinfl Driving pressure
         !! @param cell Bubble cell
         !! @param Romega Control volume radius
-    pure subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
+    subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
         $:GPU_ROUTINE(function_name='s_get_pinf',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -1136,7 +1136,7 @@ contains
           !! @param pos Input coordinates
           !! @param cell Computational coordinate of the cell
           !! @param scoord Calculated particle coordinates
-    pure subroutine s_locate_cell(pos, cell, scoord)
+    subroutine s_locate_cell(pos, cell, scoord)
 
         real(wp), dimension(3), intent(in) :: pos
         real(wp), dimension(3), intent(out) :: scoord
@@ -1209,7 +1209,7 @@ contains
     !> The purpose of this procedure is to determine if the global coordinates of the bubbles
         !!      are present in the current MPI processor (including ghost cells).
         !! @param pos_part Spatial coordinates of the bubble
-    pure function particle_in_domain(pos_part)
+    function particle_in_domain(pos_part)
 
         logical :: particle_in_domain
         real(wp), dimension(3), intent(in) :: pos_part
@@ -1262,7 +1262,7 @@ contains
     !> The purpose of this procedure is to determine if the lagrangian bubble is located in the
         !!       physical domain. The ghost cells are not part of the physical domain.
         !! @param pos_part Spatial coordinates of the bubble
-    pure function particle_in_domain_physical(pos_part)
+    function particle_in_domain_physical(pos_part)
 
         logical :: particle_in_domain_physical
         real(wp), dimension(3), intent(in) :: pos_part
@@ -1281,7 +1281,7 @@ contains
         !! @param q Input scalar field
         !! @param dq Output gradient of q
         !! @param dir Gradient spatial direction
-    pure subroutine s_gradient_dir(q, dq, dir)
+    subroutine s_gradient_dir(q, dq, dir)
 
         type(scalar_field), intent(inout) :: q
         type(scalar_field), intent(inout) :: dq

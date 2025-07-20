@@ -464,7 +464,7 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables
 
-    pure subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
+    subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
                                                                gamma_K, pi_inf_K, qv_K, &
                                                                alpha_K, alpha_rho_K, Re_K, &
                                                                G_K, G)
@@ -543,7 +543,7 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables_acc
 
-    pure subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
+    subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
                                                                        gamma_K, pi_inf_K, qv_K, &
                                                                        alpha_K, alpha_rho_K, Re_K)
         $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_bubbles_acc', &
@@ -737,7 +737,7 @@ contains
     end subroutine s_initialize_variables_conversion_module
 
     !Initialize mv at the quadrature nodes based on the initialized moments and sigma
-    pure subroutine s_initialize_mv(qK_cons_vf, mv)
+    subroutine s_initialize_mv(qK_cons_vf, mv)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
@@ -770,7 +770,7 @@ contains
     end subroutine s_initialize_mv
 
     !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
-    pure subroutine s_initialize_pb(qK_cons_vf, mv, pb)
+    subroutine s_initialize_pb(qK_cons_vf, mv, pb)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
@@ -1622,7 +1622,7 @@ contains
     end subroutine s_finalize_variables_conversion_module
 
 #ifndef MFC_PRE_PROCESS
-    pure subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c)
+    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c)
         $:GPU_ROUTINE(function_name='s_compute_speed_of_sound', &
             & parallelism='[seq]', cray_inline=True)
 
@@ -1689,7 +1689,7 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-    pure subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
+    subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
         $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', &
             & parallelism='[seq]', cray_inline=True)
 
