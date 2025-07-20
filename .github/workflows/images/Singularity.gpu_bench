@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: nvcr.io/nvidia/nvhpc:23.11-devel-cuda12.3-ubuntu22.04
+From: nvcr.io/nvidia/nvhpc:23.11-runtime-cuda12.3-ubuntu20.04
 
 %files
     ../../../ /opt/MFC
