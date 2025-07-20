@@ -13,7 +13,6 @@ jobs:
         with:
           path: pr
 
-
       - name: Build & Store Images
         run: |
           sudo apt-get update
@@ -61,7 +60,10 @@ jobs:
           # rm -rf ~/.apptainer
           # sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm
           # sudo apt-get clean
-
+        env:
+          FC: nvfortran
+          CC: nvc
+          CXX: nvc++
       
       - name: Test Images
         run: |
