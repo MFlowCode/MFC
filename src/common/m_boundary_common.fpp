@@ -91,7 +91,7 @@ contains
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb_in, mv_in)
         else
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (int(bc_type(1, -1)%sf(0, k, l)))
@@ -115,12 +115,13 @@ contains
                     end if
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bc_x%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, 1, sys_size, pb_in, mv_in)
         else
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (int(bc_type(1, 1)%sf(0, k, l)))
@@ -144,6 +145,7 @@ contains
                     end if
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         ! Population of Buffers in y-direction
@@ -153,7 +155,7 @@ contains
         if (bc_y%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, -1, sys_size, pb_in, mv_in)
         else
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(2, -1)%sf(k, 0, l)))
@@ -180,12 +182,13 @@ contains
                     end if
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bc_y%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, 1, sys_size, pb_in, mv_in)
         else
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(2, 1)%sf(k, 0, l)))
@@ -209,6 +212,7 @@ contains
                     end if
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         ! Population of Buffers in z-direction
@@ -218,7 +222,7 @@ contains
         if (bc_z%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, -1, sys_size, pb_in, mv_in)
         else
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(3, -1)%sf(k, l, 0)))
@@ -242,12 +246,13 @@ contains
                     end if
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bc_z%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1, sys_size, pb_in, mv_in)
         else
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (int(bc_type(3, 1)%sf(k, l, 0)))
@@ -271,6 +276,7 @@ contains
                     end if
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
         ! END: Population of Buffers in z-direction
 
@@ -1162,7 +1168,7 @@ contains
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 1, -1, num_dims + 1)
         else
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (bc_type(1, -1)%sf(0, k, l))
@@ -1175,12 +1181,13 @@ contains
                     end select
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bc_x%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 1, 1, num_dims + 1)
         else
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (bc_type(1, 1)%sf(0, k, l))
@@ -1193,6 +1200,7 @@ contains
                     end select
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (n == 0) return
@@ -1201,7 +1209,7 @@ contains
         if (bc_y%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 2, -1, num_dims + 1)
         else
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (bc_type(2, -1)%sf(k, 0, l))
@@ -1214,12 +1222,13 @@ contains
                     end select
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bc_y%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 2, 1, num_dims + 1)
         else
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (bc_type(2, 1)%sf(k, 0, l))
@@ -1232,6 +1241,7 @@ contains
                     end select
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (p == 0) return
@@ -1240,7 +1250,7 @@ contains
         if (bc_z%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 3, -1, num_dims + 1)
         else
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (bc_type(3, -1)%sf(k, l, 0))
@@ -1253,12 +1263,13 @@ contains
                     end select
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bc_z%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 3, 1, num_dims + 1)
         else
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = -buff_size, n + buff_size
                 do k = -buff_size, m + buff_size
                     select case (bc_type(3, 1)%sf(k, l, 0))
@@ -1271,6 +1282,7 @@ contains
                     end select
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
     end subroutine s_populate_capillary_buffers
 

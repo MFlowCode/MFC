@@ -18,7 +18,7 @@ contains
 
         real(wp) :: divergence
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[divergence]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[divergence]')
         do x = ix_s%beg, ix_s%end
             do y = iy_s%beg, iy_s%end
                 do z = iz_s%beg, iz_s%end
@@ -56,6 +56,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_compute_fd_divergence
 

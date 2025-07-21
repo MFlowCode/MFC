@@ -28,7 +28,7 @@
     $:end_acc_directive
 #:enddef
 
-#:def ACC_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
+#:def ACC_PARALLEL_LOOP(code, collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None)
@@ -54,7 +54,10 @@
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
     #:set acc_directive = '!$acc parallel loop ' + &
         & clause_val + extraAccArgs_val.strip('\n')
+    #:set acc_end_directive = '!$acc end parallel loop'
     $:acc_directive
+    $:code
+    $:acc_end_directive
 #:enddef
 
 #:def ACC_ROUTINE(function_name=None, parallelism=None, nohost=False, extraAccArgs=None)

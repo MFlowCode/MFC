@@ -357,14 +357,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, &
-                    & vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R, &
-                    & G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, &
-                    & s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, &
-                    & Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, &
-                    & Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, &
-                    & pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, &
-                    & zcoef, vel_L_tmp, vel_R_tmp]')
+                #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R,G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -1002,6 +995,7 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
 
         #:endfor
@@ -1188,14 +1182,7 @@ contains
                 ! 6-EQUATION MODEL WITH HLLC
                 if (model_eqns == 3) then
                     !ME3
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, &
-                        & vel_K_Star, Re_L, Re_R, rho_avg, h_avg, &
-                        & gamma_avg, s_L, s_R, s_S, vel_avg_rms, &
-                        & alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R, &
-                        & Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, &
-                        & Phi_avg, h_iL, h_iR, h_avg_2, tau_e_L, &
-                        & tau_e_R, G_L, G_R, flux_ene_e, xi_field_L, &
-                        & xi_field_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, vel_K_Star, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, tau_e_L, tau_e_R, G_L, G_R, flux_ene_e, xi_field_L, xi_field_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1618,13 +1605,11 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
                 elseif (model_eqns == 4) then
                     !ME4
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, &
-                        & alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
-                        & rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, &
-                        & vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1871,14 +1856,10 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
                 elseif (model_eqns == 2 .and. bubbles_euler) then
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[R0_L, R0_R, V0_L, &
-                        & V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, &
-                        & vel_R, rho_avg, alpha_L, alpha_R, h_avg, &
-                        & gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, &
-                        & ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, &
-                        & pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2341,17 +2322,10 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 else
                     ! 5-EQUATION MODEL WITH HLLC
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, &
-                        & Re_L, Re_R, rho_avg, h_avg, gamma_avg, &
-                        & alpha_L, alpha_R, s_L, s_R, s_S, &
-                        & vel_avg_rms, pcorr, zcoef, vel_L_tmp, &
-                        & vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, &
-                        & Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, &
-                        & tau_e_R, xi_field_L, xi_field_R, Yi_avg, &
-                        & Phi_avg, h_iL, h_iR, h_avg_2]', &
-                        & copyin='[is1, is2, is3]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg,Phi_avg, h_iL, h_iR, h_avg_2]', copyin='[is1, is2, is3]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2855,6 +2829,7 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 end if
             end if
         #:endfor
@@ -2967,12 +2942,7 @@ contains
 
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, &
-                    & alpha_rho_R, vel, alpha_L, alpha_R, rho, pres, &
-                    & E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, &
-                    & c, c_fast, pres_mag, U_L, U_R, U_starL, &
-                    & U_starR, U_doubleL, U_doubleR, F_L, F_R, &
-                    & F_starL, F_starR, F_hlld]')
+                #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, rho, pres,E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -3144,6 +3114,7 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
         #:endfor
 
@@ -3346,7 +3317,7 @@ contains
         if (norm_dir == 1) then
 
             if (bc_x%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3355,9 +3326,10 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 if (viscous) then
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do k = isy%beg, isy%end
@@ -3367,9 +3339,10 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
                     if (n > 0) then
-                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        #:call GPU_PARALLEL_LOOP(collapse=3)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do k = isy%beg, isy%end
@@ -3379,9 +3352,10 @@ contains
                                 end do
                             end do
                         end do
+                        #:endcall GPU_PARALLEL_LOOP
 
                         if (p > 0) then
-                            $:GPU_PARALLEL_LOOP(collapse=3)
+                            #:call GPU_PARALLEL_LOOP(collapse=3)
                             do i = momxb, momxe
                                 do l = isz%beg, isz%end
                                     do k = isy%beg, isy%end
@@ -3391,6 +3365,7 @@ contains
                                     end do
                                 end do
                             end do
+                            #:endcall GPU_PARALLEL_LOOP
                         end if
 
                     end if
@@ -3401,7 +3376,7 @@ contains
 
             if (bc_x%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3410,10 +3385,11 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 if (viscous) then
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do k = isy%beg, isy%end
@@ -3423,9 +3399,10 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
                     if (n > 0) then
-                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        #:call GPU_PARALLEL_LOOP(collapse=3)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do k = isy%beg, isy%end
@@ -3435,9 +3412,10 @@ contains
                                 end do
                             end do
                         end do
+                        #:endcall GPU_PARALLEL_LOOP
 
                         if (p > 0) then
-                            $:GPU_PARALLEL_LOOP(collapse=3)
+                            #:call GPU_PARALLEL_LOOP(collapse=3)
                             do i = momxb, momxe
                                 do l = isz%beg, isz%end
                                     do k = isy%beg, isy%end
@@ -3447,6 +3425,7 @@ contains
                                     end do
                                 end do
                             end do
+                            #:endcall GPU_PARALLEL_LOOP
                         end if
 
                     end if
@@ -3460,7 +3439,7 @@ contains
         elseif (norm_dir == 2) then
 
             if (bc_y%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3469,10 +3448,11 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 if (viscous) then
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -3481,8 +3461,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -3491,9 +3472,10 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
                     if (p > 0) then
-                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        #:call GPU_PARALLEL_LOOP(collapse=3)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do j = isx%beg, isx%end
@@ -3502,6 +3484,7 @@ contains
                                 end do
                             end do
                         end do
+                        #:endcall GPU_PARALLEL_LOOP
                     end if
 
                 end if
@@ -3510,7 +3493,7 @@ contains
 
             if (bc_y%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3519,10 +3502,11 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 if (viscous) then
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -3531,8 +3515,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -3541,9 +3526,10 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
                     if (p > 0) then
-                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        #:call GPU_PARALLEL_LOOP(collapse=3)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do j = isx%beg, isx%end
@@ -3552,6 +3538,7 @@ contains
                                 end do
                             end do
                         end do
+                        #:endcall GPU_PARALLEL_LOOP
                     end if
 
                 end if
@@ -3563,7 +3550,7 @@ contains
         else
 
             if (bc_z%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3572,9 +3559,10 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 if (viscous) then
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -3583,7 +3571,8 @@ contains
                             end do
                         end do
                     end do
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:endcall GPU_PARALLEL_LOOP
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -3592,7 +3581,8 @@ contains
                             end do
                         end do
                     end do
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:endcall GPU_PARALLEL_LOOP
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -3601,13 +3591,14 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 end if
 
             end if
 
             if (bc_z%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3616,9 +3607,10 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 if (viscous) then
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -3627,8 +3619,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -3637,8 +3630,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -3647,6 +3641,7 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 end if
 
             end if
@@ -3690,7 +3685,7 @@ contains
 
             if (viscous .or. (surface_tension)) then
 
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3700,11 +3695,12 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
 
             if (qbmm) then
 
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3714,13 +3710,14 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
 
             ! Reshaping Inputted Data in y-direction
         elseif (norm_dir == 2) then
 
             if (viscous .or. (surface_tension)) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
@@ -3730,10 +3727,11 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
 
             if (qbmm) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3743,13 +3741,14 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
 
             ! Reshaping Inputted Data in z-direction
         else
 
             if (viscous .or. (surface_tension)) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
@@ -3759,10 +3758,11 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
 
             if (qbmm) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3772,6 +3772,7 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
 
         end if
@@ -3828,10 +3829,7 @@ contains
         integer :: i_vel             !!< Loop iterator for velocity components.
         integer :: idx_rp(3)         !!< Indices $(j,k,l)$ of 'right' point for averaging.
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_rp, avg_v_int, &
-            & avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, Re_s, Re_b, &
-            & vel_src_int, r_eff, divergence_cyl, stress_vector_shear, &
-            & stress_normal_bulk, div_v_term_const]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[idx_rp, avg_v_int, avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, Re_s, Re_b, vel_src_int, r_eff, divergence_cyl, stress_vector_shear, stress_normal_bulk, div_v_term_const]')
         do l = iz%beg, iz%end
             do k = iy%beg, iy%end
                 do j = ix%beg, ix%end
@@ -3937,6 +3935,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_compute_cylindrical_viscous_source_flux
 
@@ -3990,9 +3989,7 @@ contains
 
         real(wp) :: divergence_v   !< Velocity divergence at interface.
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, &
-            & current_tau_shear, current_tau_bulk, vel_src_at_interface, &
-            & Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, current_tau_shear, current_tau_bulk, vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx]')
         do l_loop = isz%beg, isz%end
             do k_loop = isy%beg, isy%end
                 do j_loop = isx%beg, isx%end
@@ -4073,6 +4070,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_compute_cartesian_viscous_source_flux
 
@@ -4157,7 +4155,7 @@ contains
 
         ! Reshaping Outputted Data in y-direction
         if (norm_dir == 2) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = is3%beg, is3%end
                     do j = is1%beg, is1%end
@@ -4168,9 +4166,10 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
             if (cyl_coord) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
@@ -4181,9 +4180,10 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = is3%beg, is3%end
                 do j = is1%beg, is1%end
                     do k = is2%beg, is2%end
@@ -4192,9 +4192,10 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
             if (riemann_solver == 1 .or. riemann_solver == 4) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
@@ -4205,11 +4206,12 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
             end if
             ! Reshaping Outputted Data in z-direction
         elseif (norm_dir == 3) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do j = is1%beg, is1%end
                     do k = is2%beg, is2%end
@@ -4221,8 +4223,9 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
             if (grid_geometry == 3) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
@@ -4234,9 +4237,10 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do j = is1%beg, is1%end
                 do k = is2%beg, is2%end
                     do l = is3%beg, is3%end
@@ -4245,9 +4249,10 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
             if (riemann_solver == 1 .or. riemann_solver == 4) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = advxb + 1, advxe
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
@@ -4258,10 +4263,11 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
             end if
         elseif (norm_dir == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -4272,8 +4278,9 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = is1%beg, is1%end
@@ -4282,9 +4289,10 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
             if (riemann_solver == 1 .or. riemann_solver == 4) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -4295,6 +4303,7 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
         end if
 

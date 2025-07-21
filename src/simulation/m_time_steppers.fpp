@@ -390,7 +390,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -402,10 +402,12 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
+
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -419,10 +421,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -436,6 +439,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
@@ -496,7 +500,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -508,10 +512,11 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -526,9 +531,10 @@ contains
                 end do
             end do
         end if
+        #:endcall GPU_PARALLEL_LOOP
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -542,6 +548,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
@@ -568,7 +575,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -581,9 +588,10 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -598,10 +606,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -616,6 +625,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
@@ -682,7 +692,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -694,10 +704,11 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -711,10 +722,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -728,6 +740,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
@@ -754,7 +767,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -767,9 +780,10 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -784,10 +798,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -802,6 +817,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
@@ -827,7 +843,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -840,9 +856,10 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -857,10 +874,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
             do i = 1, nb
                 do l = 0, p
                     do k = 0, n
@@ -875,6 +893,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
@@ -1002,7 +1021,7 @@ contains
                 idwint)
         end if
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -1019,6 +1038,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         #:call GPU_PARALLEL(copyout='[dt_local]', copyin='[max_dt]')
             dt_local = minval(max_dt)
@@ -1049,7 +1069,7 @@ contains
         call nvtxStartRange("RHS-BODYFORCES")
         call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
         do i = momxb, E_idx
             do l = 0, p
                 do k = 0, n
@@ -1060,6 +1080,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         call nvtxEndRange
 

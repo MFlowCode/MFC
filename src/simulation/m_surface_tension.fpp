@@ -85,9 +85,7 @@ contains
         integer :: j, k, l, i
 
         if (id == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, &
-                & w1R, w2R, w3R, w1, w2, w3, normWL, &
-                & normWR, normW]')
+            #:call GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -129,12 +127,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
         elseif (id == 2) then
 
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, &
-                & w1R, w2R, w3R, w1, w2, w3, normWL, normWR, &
-                & normW]')
+            #:call GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -176,12 +173,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
         elseif (id == 3) then
 
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, &
-                & w1R, w2R, w3R, w1, w2, w3, normWL, normWR, &
-                & normW]')
+            #:call GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -223,6 +219,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
         end if
 
@@ -243,7 +240,7 @@ contains
         isx%end = m; isy%end = n; isz%end = p
 
         ! compute gradient components
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -252,8 +249,9 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -262,9 +260,10 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         if (p > 0) then
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -273,9 +272,10 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -291,6 +291,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         call s_populate_capillary_buffers(c_divs, bc_type)
 
@@ -338,7 +339,7 @@ contains
         $:GPU_UPDATE(device='[is1,is2,is3,iv]')
 
         if (recon_dir == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -349,8 +350,9 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         else if (recon_dir == 2) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -361,8 +363,9 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         else if (recon_dir == 3) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -373,6 +376,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_reconstruct_cell_boundary_values_capillary

@@ -111,7 +111,7 @@ contains
     end function f_is_integer
 
     subroutine s_configure_coordinate_bounds(weno_polyn, buff_size, idwint, idwbuff, &
-                                                  viscous, bubbles_lagrange, m, n, p, num_dims, igr)
+                                             viscous, bubbles_lagrange, m, n, p, num_dims, igr)
 
         integer, intent(in) :: weno_polyn, m, n, p, num_dims
         integer, intent(inout) :: buff_size

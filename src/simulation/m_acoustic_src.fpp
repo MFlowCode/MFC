@@ -166,7 +166,7 @@ contains
 
         sim_time = t_step*dt
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -178,7 +178,7 @@ contains
                 end do
             end do
         end do
-        ! !$omp end target teams distribute parallel do simd
+        #:endcall GPU_PARALLEL_LOOP
 
         ! Keep outer loop sequel because different sources can have very different number of points
         do ai = 1, num_source
@@ -221,7 +221,7 @@ contains
 
             deallocate (phi_rn)
 
-            $:GPU_PARALLEL_LOOP(private='[myalpha,myalpha_rho]')
+            #:call GPU_PARALLEL_LOOP(private='[myalpha,myalpha_rho]')
             do i = 1, num_points
                 j = source_spatials(ai)%coord(1, i)
                 k = source_spatials(ai)%coord(2, i)
@@ -318,10 +318,11 @@ contains
                 end if
 
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end do
 
         ! Update the rhs variables
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -337,6 +338,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
     end subroutine s_acoustic_src_calculations
 
     !> This subroutine gives the temporally varying amplitude of the pulse
@@ -718,7 +720,7 @@ contains
     !! @param c Speed of sound
     !! @param ai Acoustic source index
     !! @return gauss_sigma_time_local Converted Gaussian sigma time
-    elemental function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
+    function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
         $:GPU_ROUTINE(parallelism='[seq]')
         logical, intent(in) :: gauss_conv_flag
         integer, intent(in) :: ai

@@ -433,7 +433,7 @@ contains
         end select
 
         if (.not. polytropic) then
-            $:GPU_PARALLEL_LOOP(collapse=5,private='[nb_q,nR,nR2,R,R2,nb_dot,nR_dot,nR2_dot,var,AX]')
+            #:call GPU_PARALLEL_LOOP(collapse=5,private='[nb_q,nR,nR2,R,R2,nb_dot,nR_dot,nR2_dot,var,AX]')
             do i = 1, nb
                 do q = 1, nnode
                     do l = 0, p
@@ -534,11 +534,12 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         ! The following block is not repeated and is left as is
         if (idir == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do q = 0, n
                     do i = 0, m
@@ -557,6 +558,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_compute_qbmm_rhs
@@ -712,10 +714,7 @@ contains
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
         $:GPU_UPDATE(device='[is1_qbmm,is2_qbmm,is3_qbmm]')
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, &
-            & abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, &
-            & n_tait, B_tait, pres, rho, nbub, c, alf, momsum, &
-            & drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')
         do id3 = is3_qbmm%beg, is3_qbmm%end
             do id2 = is2_qbmm%beg, is2_qbmm%end
                 do id1 = is1_qbmm%beg, is1_qbmm%end
@@ -852,6 +851,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
     contains
         ! Helper to select the correct coefficient routine

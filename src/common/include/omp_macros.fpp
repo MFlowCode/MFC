@@ -115,7 +115,7 @@
     $:omp_end_directive
 #:enddef
 
-#:def OMP_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
+#:def OMP_PARALLEL_LOOP(code, collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraOmpArgs=None)
@@ -144,7 +144,10 @@
     #! Hardcoding the parallelism for now
     #:set omp_directive = '!$omp target teams distribute parallel do simd ' + &
         & clause_val + extraOmpArgs_val.strip('\n')
+    #:set omp_end_directive = '!$omp end target teams distribute parallel do simd'
     $:omp_directive
+    $:code
+    $:omp_end_directive
 #:enddef
 
 #:def OMP_ROUTINE(function_name, nohost, extraOmpArgs)
@@ -178,25 +181,10 @@
 #:enddef
 
 #! Not implemented yet
-#:def OMP_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
-    #:set collapse_val = GEN_COLLAPSE_STR(collapse)
-    #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
-    #:if data_dependency is not None
-        #:assert isinstance(data_dependency, str)
-        #:assert (data_dependency == 'auto' or data_dependency == 'independent')
-        #:set data_dependency_val = data_dependency 
-    #:else
-        #:set data_dependency_val = ''
-    #:endif
-    #:set private_val = GEN_PRIVATE_STR(private, False)
-    #:set reduction_val = GEN_REDUCTION_STR(reduction, reductionOp)
-    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-    #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
-        & data_dependency_val.strip('\n') + private_val.strip('\n') + &
-        & reduction_val.strip('\n')
-    #:set acc_directive = '!$acc loop ' + &
-        & clause_val + extraAccArgs_val.strip('\n')
-    $:acc_directive
+#:def OMP_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraOmpArgs=None)
+    #! loop is going to be ignored since all loops right now are seq
+    #:set temp = ''
+    $:temp
 #:enddef
 
 #:def OMP_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, deviceptr=None, attach=None, default=None, extraOmpArgs=None)

@@ -77,7 +77,7 @@ contains
 
         $:GPU_UPDATE(device='[is1_viscous,is2_viscous,is3_viscous]')
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
@@ -88,9 +88,10 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
+
         if (shear_stress) then    ! Shear stresses
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, &
-                & alpha_rho_visc, Re_visc, tau_Re]')
+            #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -194,11 +195,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bulk_stress) then    ! Bulk stresses
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, &
-                & alpha_rho_visc, Re_visc, tau_Re]')
+            #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -297,13 +298,13 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (p == 0) return
 
         if (shear_stress) then    ! Shear stresses
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, &
-                & alpha_rho_visc, Re_visc, tau_Re]')
+            #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -408,11 +409,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bulk_stress) then    ! Bulk stresses
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, &
-                & alpha_rho_visc, Re_visc, tau_Re]')
+            #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -509,6 +510,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
     end subroutine s_compute_viscous_stress_tensor
 
@@ -593,7 +595,7 @@ contains
 
             $:GPU_UPDATE(device='[is1_viscous,is2_viscous,is3_viscous]')
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = iy%beg, iy%end
                     do j = is1_viscous%beg + 1, is1_viscous%end
@@ -607,8 +609,9 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end - 1
@@ -622,10 +625,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
             if (n > 0) then
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg + 1, is2_viscous%end
                         do k = is1_viscous%beg, is1_viscous%end
@@ -639,8 +643,9 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg, is2_viscous%end - 1
                         do k = is1_viscous%beg, is1_viscous%end
@@ -654,8 +659,9 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg + 1, is2_viscous%end
                         do k = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -673,8 +679,9 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg, is2_viscous%end - 1
                         do k = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -693,8 +700,9 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = is2_viscous%beg + 1, is2_viscous%end - 1
                         do j = is1_viscous%beg + 1, is1_viscous%end
@@ -713,8 +721,9 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = is2_viscous%beg + 1, is2_viscous%end - 1
                         do j = is1_viscous%beg, is1_viscous%end - 1
@@ -733,10 +742,11 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 if (p > 0) then
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do j = is3_viscous%beg + 1, is3_viscous%end
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg, is1_viscous%end
@@ -751,8 +761,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do j = is3_viscous%beg, is3_viscous%end - 1
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg, is1_viscous%end
@@ -767,8 +778,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do k = is2_viscous%beg, is2_viscous%end
                             do j = is1_viscous%beg + 1, is1_viscous%end
@@ -788,8 +800,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do k = is2_viscous%beg, is2_viscous%end
                             do j = is1_viscous%beg, is1_viscous%end - 1
@@ -809,8 +822,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do j = is2_viscous%beg + 1, is2_viscous%end
                             do k = is1_viscous%beg, is1_viscous%end
@@ -830,8 +844,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do j = is2_viscous%beg, is2_viscous%end - 1
                             do k = is1_viscous%beg, is1_viscous%end
@@ -851,8 +866,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do j = is3_viscous%beg + 1, is3_viscous%end
                         do l = is2_viscous%beg + 1, is2_viscous%end - 1
                             do k = is1_viscous%beg, is1_viscous%end
@@ -872,8 +888,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do j = is3_viscous%beg, is3_viscous%end - 1
                         do l = is2_viscous%beg + 1, is2_viscous%end - 1
                             do k = is1_viscous%beg, is1_viscous%end
@@ -893,7 +910,8 @@ contains
                             end do
                         end do
                     end do
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:endcall GPU_PARALLEL_LOOP
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do j = is3_viscous%beg + 1, is3_viscous%end
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -913,7 +931,8 @@ contains
                             end do
                         end do
                     end do
-                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    #:endcall GPU_PARALLEL_LOOP
+                    #:call GPU_PARALLEL_LOOP(collapse=3)
                     do j = is3_viscous%beg, is3_viscous%end - 1
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -932,6 +951,7 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
                     do i = iv%beg, iv%end
                         call s_compute_fd_gradient(q_prim_qp%vf(i), &
@@ -1023,7 +1043,7 @@ contains
         if (viscous) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    #:call GPU_PARALLEL_LOOP(collapse=4)
                     do i = iv%beg, iv%end
                         do l = is3_viscous%beg, is3_viscous%end
                             do j = is1_viscous%beg, is1_viscous%end
@@ -1034,8 +1054,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 elseif (norm_dir == 3) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    #:call GPU_PARALLEL_LOOP(collapse=4)
                     do i = iv%beg, iv%end
                         do j = is1_viscous%beg, is1_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
@@ -1046,8 +1067,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 elseif (norm_dir == 1) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    #:call GPU_PARALLEL_LOOP(collapse=4)
                     do i = iv%beg, iv%end
                         do l = is3_viscous%beg, is3_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
@@ -1058,6 +1080,7 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 end if
             end if
         end if
@@ -1122,7 +1145,7 @@ contains
         if (viscous) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    #:call GPU_PARALLEL_LOOP(collapse=4)
                     do i = iv%beg, iv%end
                         do l = is3_viscous%beg, is3_viscous%end
                             do j = is1_viscous%beg, is1_viscous%end
@@ -1133,8 +1156,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 elseif (norm_dir == 3) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    #:call GPU_PARALLEL_LOOP(collapse=4)
                     do i = iv%beg, iv%end
                         do j = is1_viscous%beg, is1_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
@@ -1145,8 +1169,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 elseif (norm_dir == 1) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    #:call GPU_PARALLEL_LOOP(collapse=4)
                     do i = iv%beg, iv%end
                         do l = is3_viscous%beg, is3_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
@@ -1157,6 +1182,7 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 end if
             end if
         end if
@@ -1210,7 +1236,7 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -1226,6 +1252,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
             ! END: First-Order Spatial Derivatives in x-direction
 
@@ -1238,7 +1265,7 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg + 1, is2_viscous%end - 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -1254,6 +1281,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
             ! END: First-Order Spatial Derivatives in y-direction
 
@@ -1266,7 +1294,7 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg + 1, is3_viscous%end - 1
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
@@ -1282,6 +1310,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
         end if
         ! END: First-Order Spatial Derivatives in z-direction
@@ -1321,7 +1350,7 @@ contains
 
         $:GPU_UPDATE(device='[is1_viscous,is2_viscous,is3_viscous]')
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
@@ -1331,9 +1360,10 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         if (n > 0) then
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
@@ -1343,10 +1373,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (p > 0) then
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
@@ -1356,9 +1387,10 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
-        $:GPU_PARALLEL_LOOP(collapse=2)
+        #:call GPU_PARALLEL_LOOP(collapse=2)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 grad_x%sf(idwbuff(1)%beg, k, l) = &
@@ -1369,8 +1401,9 @@ contains
                     (x_cc(idwbuff(1)%end) - x_cc(idwbuff(1)%end - 2))
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
         if (n > 0) then
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
                     grad_y%sf(j, idwbuff(2)%beg, l) = &
@@ -1381,8 +1414,9 @@ contains
                         (y_cc(idwbuff(2)%end) - y_cc(idwbuff(2)%end - 2))
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
             if (p > 0) then
-                $:GPU_PARALLEL_LOOP(collapse=2)
+                #:call GPU_PARALLEL_LOOP(collapse=2)
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_z%sf(j, k, idwbuff(3)%beg) = &
@@ -1393,49 +1427,54 @@ contains
                             (z_cc(idwbuff(3)%end) - z_cc(idwbuff(3)%end - 2))
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
         end if
 
         if (bc_x%beg <= BC_GHOST_EXTRAP) then
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     grad_x%sf(0, k, l) = (-3._wp*var%sf(0, k, l) + 4._wp*var%sf(1, k, l) - var%sf(2, k, l))/ &
                                          (x_cc(2) - x_cc(0))
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
         if (bc_x%end <= BC_GHOST_EXTRAP) then
-            $:GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     grad_x%sf(m, k, l) = (3._wp*var%sf(m, k, l) - 4._wp*var%sf(m - 1, k, l) + var%sf(m - 2, k, l))/ &
                                          (x_cc(m) - x_cc(m - 2))
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
         if (n > 0) then
             if (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_NULL) then
-                $:GPU_PARALLEL_LOOP(collapse=2)
+                #:call GPU_PARALLEL_LOOP(collapse=2)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_y%sf(j, 0, l) = (-3._wp*var%sf(j, 0, l) + 4._wp*var%sf(j, 1, l) - var%sf(j, 2, l))/ &
                                              (y_cc(2) - y_cc(0))
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
             if (bc_y%end <= BC_GHOST_EXTRAP) then
-                $:GPU_PARALLEL_LOOP(collapse=2)
+                #:call GPU_PARALLEL_LOOP(collapse=2)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_y%sf(j, n, l) = (3._wp*var%sf(j, n, l) - 4._wp*var%sf(j, n - 1, l) + var%sf(j, n - 2, l))/ &
                                              (y_cc(n) - y_cc(n - 2))
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
             if (p > 0) then
                 if (bc_z%beg <= BC_GHOST_EXTRAP) then
-                    $:GPU_PARALLEL_LOOP(collapse=2)
+                    #:call GPU_PARALLEL_LOOP(collapse=2)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
                             grad_z%sf(j, k, 0) = &
@@ -1443,9 +1482,10 @@ contains
                                 (z_cc(2) - z_cc(0))
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 end if
                 if (bc_z%end <= BC_GHOST_EXTRAP) then
-                    $:GPU_PARALLEL_LOOP(collapse=2)
+                    #:call GPU_PARALLEL_LOOP(collapse=2)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
                             grad_z%sf(j, k, p) = &
@@ -1453,6 +1493,7 @@ contains
                                 (z_cc(p) - z_cc(p - 2))
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 end if
             end if
         end if
