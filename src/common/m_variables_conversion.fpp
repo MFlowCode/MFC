@@ -873,9 +873,7 @@ contains
             end if
         #:endif
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, &
-            & nRtmp, rho_K, gamma_K, pi_inf_K,qv_K, &
-            & dyn_pres_K, rhoYks, B]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K,qv_K, dyn_pres_K, rhoYks, B]')
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -1165,6 +1163,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_convert_conservative_to_primitive_variables
 
@@ -1489,8 +1488,7 @@ contains
         ! Computing the flux variables from the primitive variables, without
         ! accounting for the contribution of either viscosity or capillarity
 #ifdef MFC_SIMULATION
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, &
-            & alpha_K, Re_K, Y_K]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1596,6 +1594,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 #endif
     end subroutine s_convert_primitive_to_flux_variables
 

@@ -99,7 +99,7 @@ contains
         integer :: i, j, k, l
 
         ! starting equilibrium solver
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[p_infOV, p_infpT, p_infSL, &
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[p_infOV, p_infpT, p_infSL, &
             & sk, hk, gk, ek, rhok,pS, pSOV, pSSL, &
             & TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, &
             & dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
@@ -272,6 +272,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_infinite_relaxation_k
 

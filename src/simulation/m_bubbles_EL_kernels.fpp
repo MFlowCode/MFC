@@ -55,7 +55,7 @@ contains
         real(wp), dimension(3) :: s_coord
         integer :: l
 
-        $:GPU_PARALLEL_LOOP(private='[l,s_coord,cell]')
+        #:call GPU_PARALLEL_LOOP(private='[l,s_coord,cell]')
         do l = 1, nBubs
 
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
@@ -90,6 +90,7 @@ contains
                 updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) + addFun3
             end if
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_deltafunc
 
@@ -120,7 +121,7 @@ contains
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
-        $:GPU_PARALLEL_LOOP(private='[nodecoord,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
+        #:call GPU_PARALLEL_LOOP(private='[nodecoord,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
         do l = 1, nBubs
             nodecoord(1:3) = 0
             center(1:3) = 0._wp
@@ -195,6 +196,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_gaussian
 

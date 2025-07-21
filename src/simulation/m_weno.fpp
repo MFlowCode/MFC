@@ -668,7 +668,7 @@ contains
 
         if (weno_order == 1) then
             if (weno_dir == 1) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -679,8 +679,9 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             else if (weno_dir == 2) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -691,8 +692,9 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             else if (weno_dir == 3) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -703,11 +705,12 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[beta,dvd,poly,omega,alpha,tau]')
+                    #:call GPU_PARALLEL_LOOP(collapse=4,private='[beta,dvd,poly,omega,alpha,tau]')
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -780,12 +783,13 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 end if
             #:endfor
         elseif (weno_order == 5) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    $:GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -894,6 +898,7 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
                     if (mp_weno) then
                         call s_preserve_monotonicity(v_rs_ws_${XYZ}$, vL_rs_vf_${XYZ}$, &
@@ -904,7 +909,7 @@ contains
         elseif (weno_order == 7) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    $:GPU_PARALLEL_LOOP(collapse=3,private='[poly,beta,alpha,omega,tau,delta,dvd,v]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[poly,beta,alpha,omega,tau,delta,dvd,v]')
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -1089,6 +1094,7 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
 
                 end if
             #:endfor
@@ -1126,7 +1132,7 @@ contains
         $:GPU_UPDATE(device='[v_size]')
 
         if (weno_dir == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
             do j = 1, v_size
                 do q = is3_weno%beg, is3_weno%end
                     do l = is2_weno%beg, is2_weno%end
@@ -1136,13 +1142,14 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in y-direction
         if (n == 0) return
 
         if (weno_dir == 2) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
             do j = 1, v_size
                 do q = is3_weno%beg, is3_weno%end
                     do l = is2_weno%beg, is2_weno%end
@@ -1152,13 +1159,14 @@ contains
                     end do
                 end do
             end do
+                #:endcall GPU_PARALLEL_LOOP
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in z-direction
         if (p == 0) return
 
         if (weno_dir == 3) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
             do j = 1, v_size
                 do q = is3_weno%beg, is3_weno%end
                     do l = is2_weno%beg, is2_weno%end
@@ -1168,6 +1176,7 @@ contains
                     end do
                 end do
             end do
+                #:endcall GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_initialize_weno
@@ -1217,7 +1226,7 @@ contains
         real(wp), parameter :: alpha_mp = 2._wp
         real(wp), parameter :: beta_mp = 4._wp/3._wp
 
-        $:GPU_PARALLEL_LOOP(collapse=4,private='[d]')
+        #:call GPU_PARALLEL_LOOP(collapse=4,private='[d]')
         do l = is3_weno%beg, is3_weno%end
             do k = is2_weno%beg, is2_weno%end
                 do j = is1_weno%beg, is1_weno%end
@@ -1342,6 +1351,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_preserve_monotonicity
 

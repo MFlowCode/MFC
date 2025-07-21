@@ -181,13 +181,13 @@
 
 #:enddef
 
-#:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
+#:def GPU_PARALLEL_LOOP(code, collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
     
-    #:set acc_code = ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
-    #:set omp_code = OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
+    #:set acc_code = ACC_PARALLEL_LOOP(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
+    #:set omp_code = OMP_PARALLEL_LOOP(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_code
@@ -237,25 +237,15 @@
 #endif
 #:enddef
 
-#:def GPU_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
-    #:set collapse_val = GEN_COLLAPSE_STR(collapse)
-    #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
-    #:if data_dependency is not None
-        #:assert isinstance(data_dependency, str)
-        #:assert (data_dependency == 'auto' or data_dependency == 'independent')
-        #:set data_dependency_val = data_dependency 
-    #:else
-        #:set data_dependency_val = ''
-    #:endif
-    #:set private_val = GEN_PRIVATE_STR(private, False)
-    #:set reduction_val = GEN_REDUCTION_STR(reduction, reductionOp)
-    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-    #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
-        & data_dependency_val.strip('\n') + private_val.strip('\n') + &
-        & reduction_val.strip('\n')
-    #:set acc_directive = '!$acc loop ' + &
-        & clause_val + extraAccArgs_val.strip('\n')
-    $:acc_directive
+#:def GPU_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None, extraOmpArgs=None)
+    #:set acc_code = ACC_LOOP(collapse=collapse, parallelism=parallelism, data_dependency=data_dependency, reduction=reduction, reductionOp=reductionOp, private=private, extraAccArgs=extraAccArgs)
+    #:set omp_code = OMP_LOOP(collapse=collapse, parallelism=parallelism, data_dependency=data_dependency, reduction=reduction, reductionOp=reductionOp, private=private, extraOmpArgs=extraOmpArgs)
+
+#if defined(MFC_OpenACC)
+    $:acc_code
+#elif defined(MFC_OpenMP)
+    $:omp_code
+#endif
 #:enddef
 
 #:def GPU_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, deviceptr=None, attach=None, default=None, extraAccArgs=None, extraOmpArgs=None)

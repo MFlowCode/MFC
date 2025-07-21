@@ -529,7 +529,7 @@ contains
         ! Subgrid p_inf model based on Maeda and Colonius (2018).
         if (lag_params%pressure_corrector) then
             ! Calculate velocity potentials (valid for one bubble per cell)
-            $:GPU_PARALLEL_LOOP(private='[k,cell]')
+            #:call GPU_PARALLEL_LOOP(private='[k,cell]')
             do k = 1, nBubs
                 call s_get_pinf(k, q_prim_vf, 2, paux, cell, preterm1, term2, Romega)
                 myR0 = bub_R0(k)
@@ -546,11 +546,12 @@ contains
                     bub_dphidt(k) = bub_dphidt(k)/(1._wp - term1_fac)
                 end if
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         ! Radial motion model
         adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(private='[k,myalpha_rho,myalpha,Re,cell]', &
+        #:call GPU_PARALLEL_LOOP(private='[k,myalpha_rho,myalpha,Re,cell]', &
             & reduction='[[adap_dt_stop_max]]',reductionOp='[MAX]', &
             & copy='[adap_dt_stop_max]',copyin='[stage]')
         do k = 1, nBubs
@@ -616,17 +617,19 @@ contains
             adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         ! Bubbles remain in a fixed position
-        $:GPU_PARALLEL_LOOP(collapse=2, private='[k]', copyin='[stage]')
+        #:call GPU_PARALLEL_LOOP(collapse=2, private='[k]', copyin='[stage]')
         do k = 1, nBubs
             do l = 1, 3
                 mtn_dposdt(k, l, stage) = 0._wp
                 mtn_dveldt(k, l, stage) = 0._wp
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         call nvtxEndRange
 
@@ -650,7 +653,7 @@ contains
         if (lag_params%solver_approach == 2) then
 
             if (p == 0) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -665,8 +668,9 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             else
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -680,13 +684,14 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
 
             do l = 1, num_dims
 
                 call s_gradient_dir(q_prim_vf(E_idx), q_beta%vf(3), l)
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -699,9 +704,10 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 !source in energy
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do k = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(2)%beg, idwbuff(2)%end
                         do i = idwbuff(1)%beg, idwbuff(1)%end
@@ -709,10 +715,11 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 call s_gradient_dir(q_beta%vf(3), q_beta%vf(4), l)
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -724,6 +731,7 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end do
 
         end if
@@ -769,7 +777,7 @@ contains
 
         call nvtxStartRange("BUBBLES-LAGRANGE-KERNELS")
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, q_beta_idx
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -779,12 +787,13 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         call s_smoothfunction(nBubs, intfc_rad, intfc_vel, &
                               mtn_s, mtn_pos, q_beta)
 
         !Store 1-beta
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -795,6 +804,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         call nvtxEndRange
 
@@ -1025,7 +1035,7 @@ contains
         integer :: k
 
         if (time_stepper == 1) then ! 1st order TVD RK
-            $:GPU_PARALLEL_LOOP(private='[k]')
+            #:call GPU_PARALLEL_LOOP(private='[k]')
             do k = 1, nBubs
                 !u{1} = u{n} +  dt * RHS{n}
                 intfc_rad(k, 1) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
@@ -1035,6 +1045,7 @@ contains
                 gas_p(k, 1) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                 gas_mv(k, 1) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
             call s_transfer_data_to_tmp()
             call s_write_void_evol(mytime)
@@ -1047,7 +1058,7 @@ contains
 
         elseif (time_stepper == 2) then ! 2nd order TVD RK
             if (stage == 1) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
+                #:call GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, nBubs
                     !u{1} = u{n} +  dt * RHS{n}
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
@@ -1057,9 +1068,10 @@ contains
                     gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
             elseif (stage == 2) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
+                #:call GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, nBubs
                     !u{1} = u{n} + (1/2) * dt * (RHS{n} + RHS{1})
                     intfc_rad(k, 1) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/2._wp
@@ -1069,6 +1081,7 @@ contains
                     gas_p(k, 1) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/2._wp
                     gas_mv(k, 1) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2._wp
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 call s_transfer_data_to_tmp()
                 call s_write_void_evol(mytime)
@@ -1083,7 +1096,7 @@ contains
 
         elseif (time_stepper == 3) then ! 3rd order TVD RK
             if (stage == 1) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
+                #:call GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, nBubs
                     !u{1} = u{n} +  dt * RHS{n}
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
@@ -1093,9 +1106,10 @@ contains
                     gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
             elseif (stage == 2) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
+                #:call GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, nBubs
                     !u{2} = u{n} + (1/4) * dt * [RHS{n} + RHS{1}]
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/4._wp
@@ -1105,8 +1119,9 @@ contains
                     gas_p(k, 2) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/4._wp
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4._wp
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             elseif (stage == 3) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
+                #:call GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, nBubs
                     !u{n+1} = u{n} + (2/3) * dt * [(1/4)* RHS{n} + (1/4)* RHS{1} + RHS{2}]
                     intfc_rad(k, 1) = intfc_rad(k, 1) + (2._wp/3._wp)*dt*(intfc_draddt(k, 1)/4._wp + intfc_draddt(k, 2)/4._wp + intfc_draddt(k, 3))
@@ -1116,6 +1131,7 @@ contains
                     gas_p(k, 1) = gas_p(k, 1) + (2._wp/3._wp)*dt*(gas_dpdt(k, 1)/4._wp + gas_dpdt(k, 2)/4._wp + gas_dpdt(k, 3))
                     gas_mv(k, 1) = gas_mv(k, 1) + (2._wp/3._wp)*dt*(gas_dmvdt(k, 1)/4._wp + gas_dmvdt(k, 2)/4._wp + gas_dmvdt(k, 3))
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 call s_transfer_data_to_tmp()
                 call s_write_void_evol(mytime)
@@ -1192,7 +1208,7 @@ contains
 
         integer :: k
 
-        $:GPU_PARALLEL_LOOP(private='[k]')
+        #:call GPU_PARALLEL_LOOP(private='[k]')
         do k = 1, nBubs
             gas_p(k, 2) = gas_p(k, 1)
             gas_mv(k, 2) = gas_mv(k, 1)
@@ -1203,6 +1219,7 @@ contains
             mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1)
             mtn_s(k, 1:3, 2) = mtn_s(k, 1:3, 1)
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_transfer_data_to_tmp
 
@@ -1291,7 +1308,7 @@ contains
 
         if (dir == 1) then
             ! Gradient in x dir.
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
@@ -1303,10 +1320,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         else
             if (dir == 2) then
                 ! Gradient in y dir.
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -1318,9 +1336,10 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             else
                 ! Gradient in z dir.
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -1332,6 +1351,7 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
         end if
 
@@ -1414,9 +1434,7 @@ contains
         lag_void_max = 0._wp
         lag_void_avg = 0._wp
         lag_vol = 0._wp
-        $:GPU_PARALLEL_LOOP(collapse=3, reduction='[[lag_vol, lag_void_avg], &
-            & [lag_void_max]]', reductionOp='[+, MAX]', &
-            & copy='[lag_vol, lag_void_avg, lag_void_max]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, reduction='[[lag_vol, lag_void_avg], [lag_void_max]]', reductionOp='[+, MAX]', copy='[lag_vol, lag_void_avg, lag_void_max]')
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -1429,6 +1447,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
 #ifdef MFC_MPI
         if (num_procs > 1) then
@@ -1600,7 +1619,7 @@ contains
 
         integer :: k
 
-        $:GPU_PARALLEL_LOOP(reduction='[[Rmax_glb], [Rmin_glb]]', &
+        #:call GPU_PARALLEL_LOOP(reduction='[[Rmax_glb], [Rmin_glb]]', &
             & reductionOp='[MAX, MIN]', copy='[Rmax_glb,Rmin_glb]')
         do k = 1, nBubs
             Rmax_glb = max(Rmax_glb, intfc_rad(k, 1)/bub_R0(k))
@@ -1608,6 +1627,7 @@ contains
             Rmax_stats(k) = max(Rmax_stats(k), intfc_rad(k, 1)/bub_R0(k))
             Rmin_stats(k) = min(Rmin_stats(k), intfc_rad(k, 1)/bub_R0(k))
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_calculate_lag_bubble_stats
 

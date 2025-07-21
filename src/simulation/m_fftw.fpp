@@ -141,7 +141,7 @@ contains
         if (bc_y%beg >= 0) return
 #if defined(MFC_GPU)
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, cmplx_size
@@ -149,8 +149,9 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
         do k = 1, sys_size
             do j = 0, m
                 do l = 0, p
@@ -158,6 +159,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         p_real => data_real_gpu
         p_cmplx => data_cmplx_gpu
@@ -175,7 +177,7 @@ contains
             Nfq = 3
             $:GPU_UPDATE(device='[Nfq]')
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, Nfq
@@ -183,6 +185,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
             #:call GPU_HOST_DATA(use_device='[p_real, p_fltr_cmplx]')
 #if defined(__PGI)
@@ -193,7 +196,7 @@ contains
 #endif
             #:endcall GPU_HOST_DATA
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
@@ -202,10 +205,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
             do i = 1, fourier_rings
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do k = 1, sys_size
                     do j = 0, m
                         do l = 1, cmplx_size
@@ -213,8 +217,9 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
-                $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
+                #:call GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
                 do k = 1, sys_size
                     do j = 0, m
                         do l = 0, p
@@ -222,6 +227,7 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 #:call GPU_HOST_DATA(use_device='[p_real, p_cmplx]')
 #if defined(__PGI)
@@ -235,7 +241,7 @@ contains
                 Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
                 $:GPU_UPDATE(device='[Nfq]')
 
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do k = 1, sys_size
                     do j = 0, m
                         do l = 1, Nfq
@@ -243,6 +249,7 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
                 #:call GPU_HOST_DATA(use_device='[p_real, p_fltr_cmplx]')
 #if defined(__PGI)
@@ -253,7 +260,7 @@ contains
 #endif
                 #:endcall GPU_HOST_DATA
 
-                $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
+                #:call GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
                 do k = 1, sys_size
                     do j = 0, m
                         do l = 0, p
@@ -262,6 +269,7 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
 
             end do
         #:endcall GPU_DATA

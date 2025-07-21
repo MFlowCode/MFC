@@ -76,7 +76,7 @@ contains
         real(wp) :: nR3bar
         integer(wp) :: i, j, k, l
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -89,6 +89,7 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_comp_alpha_from_n
 
@@ -103,7 +104,7 @@ contains
         if (idir == 1) then
 
             if (.not. qbmm) then
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                #:call GPU_PARALLEL_LOOP(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -115,11 +116,12 @@ contains
                         end do
                     end do
                 end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
 
         elseif (idir == 2) then
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -130,10 +132,11 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
         elseif (idir == 3) then
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -144,6 +147,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
 
         end if
 
@@ -173,7 +177,7 @@ contains
         integer :: dmBub_id !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -189,9 +193,10 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[Rtmp, Vtmp, myalpha_rho, myalpha]', &
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[Rtmp, Vtmp, myalpha_rho, myalpha]', &
             & reduction='[[adap_dt_stop_max]]', reductionOp='[MAX]', &
             & copy='[adap_dt_stop_max]')
         do l = 0, p
@@ -321,11 +326,12 @@ contains
                 end do
             end do
         end do
+        #:endcall GPU_PARALLEL_LOOP
 
         if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         if (.not. adap_dt) then
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do q = 0, n
                     do i = 0, m
@@ -344,6 +350,7 @@ contains
                     end do
                 end do
             end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
     end subroutine s_compute_bubble_EE_source
 

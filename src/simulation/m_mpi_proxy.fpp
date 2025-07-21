@@ -299,7 +299,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, p
                         do k = 0, n
                             do j = 0, gp_layers - 1
@@ -308,8 +308,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 #:elif mpi_dir == 2
-                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, p
                         do k = 0, gp_layers - 1
                             do j = -gp_layers, m + gp_layers
@@ -319,8 +320,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 #:else
-                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, gp_layers - 1
                         do k = -gp_layers, n + gp_layers
                             do j = -gp_layers, m + gp_layers
@@ -330,6 +332,7 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 #:endif
             end if
         #:endfor
@@ -347,7 +350,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, p
                         do k = 0, n
                             do j = -gp_layers, -1
@@ -356,8 +359,9 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 #:elif mpi_dir == 2
-                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, p
                         do k = -gp_layers, -1
                             do j = -gp_layers, m + gp_layers
@@ -367,9 +371,10 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 #:else
                     ! Unpacking buffer from bc_z%beg
-                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = -gp_layers, -1
                         do k = -gp_layers, n + gp_layers
                             do j = -gp_layers, m + gp_layers
@@ -380,6 +385,7 @@ contains
                             end do
                         end do
                     end do
+                    #:endcall GPU_PARALLEL_LOOP
                 #:endif
             end if
         #:endfor
