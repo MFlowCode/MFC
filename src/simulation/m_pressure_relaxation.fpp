@@ -71,13 +71,13 @@ contains
         integer :: j, k, l
 
         #:call GPU_PARALLEL_LOOP(collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    call s_relax_cell_pressure(q_cons_vf, j, k, l)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        call s_relax_cell_pressure(q_cons_vf, j, k, l)
+                    end do
                 end do
             end do
-        end do
         #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_pressure_relaxation_procedure
