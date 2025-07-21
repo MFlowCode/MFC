@@ -529,147 +529,147 @@ contains
                         end do
                     end do
                 end do
-                end if
-                #:endcall GPU_PARALLEL_LOOP
+            #:endcall GPU_PARALLEL_LOOP
+        end if
 
-                if (qbmm .and. (.not. polytropic)) then
-                    #:call GPU_PARALLEL_LOOP(collapse=5)
-                        do i = 1, nb
-                            do l = 0, p
-                                do k = 0, n
-                                    do j = 0, m
-                                        do q = 1, nnode
-                                            mv_ts(2)%sf(j, k, l, q, i) = &
-                                                mv_ts(1)%sf(j, k, l, q, i) &
-                                                + dt*rhs_mv(j, k, l, q, i)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                    #:endcall GPU_PARALLEL_LOOP
-                end if
-
-                if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
-
-                if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
-
-                if (model_eqns == 3 .and. (.not. relax)) then
-                    call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
-                end if
-
-                if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
-
-                if (ib) then
-                    if (qbmm .and. .not. polytropic) then
-                        call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
-                    else
-                        call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
-                    end if
-                end if
-
-                ! Stage 2 of 2
-
-                call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
-
-                if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
-
-                #:call GPU_PARALLEL_LOOP(collapse=4)
-                    do i = 1, sys_size
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                                        (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                                         + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                                         + dt*rhs_vf(i)%sf(j, k, l))/2._wp
+        if (qbmm .and. (.not. polytropic)) then
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    mv_ts(2)%sf(j, k, l, q, i) = &
+                                        mv_ts(1)%sf(j, k, l, q, i) &
+                                        + dt*rhs_mv(j, k, l, q, i)
                                 end do
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                end do
+            #:endcall GPU_PARALLEL_LOOP
+        end if
 
-                if (qbmm .and. (.not. polytropic)) then
-                    #:call GPU_PARALLEL_LOOP(collapse=5)
-                        do i = 1, nb
-                            do l = 0, p
-                                do k = 0, n
-                                    do j = 0, m
-                                        do q = 1, nnode
-                                            pb_ts(1)%sf(j, k, l, q, i) = &
-                                                (pb_ts(1)%sf(j, k, l, q, i) &
-                                                 + pb_ts(2)%sf(j, k, l, q, i) &
-                                                 + dt*rhs_pb(j, k, l, q, i))/2._wp
-                                        end do
-                                    end do
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
+
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+
+        if (model_eqns == 3 .and. (.not. relax)) then
+            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        end if
+
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+            end if
+        end if
+
+        ! Stage 2 of 2
+
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
+
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                (q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                 + q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                                 + dt*rhs_vf(i)%sf(j, k, l))/2._wp
+                        end do
+                    end do
+                end do
+            end do
+        #:endcall GPU_PARALLEL_LOOP
+
+        if (qbmm .and. (.not. polytropic)) then
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    pb_ts(1)%sf(j, k, l, q, i) = &
+                                        (pb_ts(1)%sf(j, k, l, q, i) &
+                                         + pb_ts(2)%sf(j, k, l, q, i) &
+                                         + dt*rhs_pb(j, k, l, q, i))/2._wp
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
-                end if
+                    end do
+                end do
+            #:endcall GPU_PARALLEL_LOOP
+        end if
 
-                if (qbmm .and. (.not. polytropic)) then
-                    #:call GPU_PARALLEL_LOOP(collapse=5)
-                        do i = 1, nb
-                            do l = 0, p
-                                do k = 0, n
-                                    do j = 0, m
-                                        do q = 1, nnode
-                                            mv_ts(1)%sf(j, k, l, q, i) = &
-                                                (mv_ts(1)%sf(j, k, l, q, i) &
-                                                 + mv_ts(2)%sf(j, k, l, q, i) &
-                                                 + dt*rhs_mv(j, k, l, q, i))/2._wp
-                                        end do
-                                    end do
+        if (qbmm .and. (.not. polytropic)) then
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    mv_ts(1)%sf(j, k, l, q, i) = &
+                                        (mv_ts(1)%sf(j, k, l, q, i) &
+                                         + mv_ts(2)%sf(j, k, l, q, i) &
+                                         + dt*rhs_mv(j, k, l, q, i))/2._wp
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
-                end if
+                    end do
+                end do
+            #:endcall GPU_PARALLEL_LOOP
+        end if
 
-                if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
-                if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
-                if (model_eqns == 3 .and. (.not. relax)) then
-                    call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
-                end if
+        if (model_eqns == 3 .and. (.not. relax)) then
+            call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+        end if
 
-                if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-                if (ib) then
-                    if (qbmm .and. .not. polytropic) then
-                        call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-                    else
-                        call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-                    end if
-                end if
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+            end if
+        end if
 
-                call nvtxEndRange
+        call nvtxEndRange
 
-                call cpu_time(finish)
+        call cpu_time(finish)
 
-            end subroutine s_2nd_order_tvd_rk
+    end subroutine s_2nd_order_tvd_rk
 
-            !> 3rd order TVD RK time-stepping algorithm
+    !> 3rd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-            impure subroutine s_3rd_order_tvd_rk(t_step, time_avg)
+    impure subroutine s_3rd_order_tvd_rk(t_step, time_avg)
 
-                integer, intent(IN) :: t_step
-                real(wp), intent(INOUT) :: time_avg
+        integer, intent(IN) :: t_step
+        real(wp), intent(INOUT) :: time_avg
 
-                integer :: i, j, k, l, q !< Generic loop iterator
+        integer :: i, j, k, l, q !< Generic loop iterator
 
-                real(wp) :: start, finish
+        real(wp) :: start, finish
 
-                ! Stage 1 of 3
+        ! Stage 1 of 3
 
-                if (.not. adap_dt) then
-                    call cpu_time(start)
-                    call nvtxStartRange("TIMESTEP")
-                end if
+        if (.not. adap_dt) then
+            call cpu_time(start)
+            call nvtxStartRange("TIMESTEP")
+        end if
 
-                call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
 
         if (run_time_info) then
             if (igr) then
@@ -679,338 +679,338 @@ contains
             end if
         end if
 
-                if (probe_wrt) then
-                    call s_time_step_cycling(t_step)
-                end if
+        if (probe_wrt) then
+            call s_time_step_cycling(t_step)
+        end if
 
-                if (cfl_dt) then
-                    if (mytime >= t_stop) return
-                else
-                    if (t_step == t_step_stop) return
-                end if
+        if (cfl_dt) then
+            if (mytime >= t_stop) return
+        else
+            if (t_step == t_step_stop) return
+        end if
 
-                if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-                #:call GPU_PARALLEL_LOOP(collapse=4)
-                    do i = 1, sys_size
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                                        q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                                        + dt*rhs_vf(i)%sf(j, k, l)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                + dt*rhs_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+        #:endcall GPU_PARALLEL_LOOP
+
+        !Evolve pb and mv for non-polytropic qbmm
+        if (qbmm .and. (.not. polytropic)) then
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    pb_ts(2)%sf(j, k, l, q, i) = &
+                                        pb_ts(1)%sf(j, k, l, q, i) &
+                                        + dt*rhs_pb(j, k, l, q, i)
                                 end do
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                end do
+            #:endcall GPU_PARALLEL_LOOP
+        end if
 
-                !Evolve pb and mv for non-polytropic qbmm
-                if (qbmm .and. (.not. polytropic)) then
-                    #:call GPU_PARALLEL_LOOP(collapse=5)
-                        do i = 1, nb
-                            do l = 0, p
-                                do k = 0, n
-                                    do j = 0, m
-                                        do q = 1, nnode
-                                            pb_ts(2)%sf(j, k, l, q, i) = &
-                                                pb_ts(1)%sf(j, k, l, q, i) &
-                                                + dt*rhs_pb(j, k, l, q, i)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                    #:endcall GPU_PARALLEL_LOOP
-                end if
-
-                if (qbmm .and. (.not. polytropic)) then
-                    #:call GPU_PARALLEL_LOOP(collapse=5)
-                        do i = 1, nb
-                            do l = 0, p
-                                do k = 0, n
-                                    do j = 0, m
-                                        do q = 1, nnode
-                                            mv_ts(2)%sf(j, k, l, q, i) = &
-                                                mv_ts(1)%sf(j, k, l, q, i) &
-                                                + dt*rhs_mv(j, k, l, q, i)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                    #:endcall GPU_PARALLEL_LOOP
-                end if
-
-                if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
-
-                if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
-
-                if (model_eqns == 3 .and. (.not. relax)) then
-                    call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
-                end if
-
-                if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
-
-                if (ib) then
-                    if (qbmm .and. .not. polytropic) then
-                        call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
-                    else
-                        call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
-                    end if
-                end if
-
-                ! Stage 2 of 3
-
-                call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
-
-                if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
-
-                #:call GPU_PARALLEL_LOOP(collapse=4)
-                    do i = 1, sys_size
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                                        (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                                         + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                                         + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+        if (qbmm .and. (.not. polytropic)) then
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    mv_ts(2)%sf(j, k, l, q, i) = &
+                                        mv_ts(1)%sf(j, k, l, q, i) &
+                                        + dt*rhs_mv(j, k, l, q, i)
                                 end do
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                end do
+            #:endcall GPU_PARALLEL_LOOP
+        end if
 
-                if (qbmm .and. (.not. polytropic)) then
-                    #:call GPU_PARALLEL_LOOP(collapse=5)
-                        do i = 1, nb
-                            do l = 0, p
-                                do k = 0, n
-                                    do j = 0, m
-                                        do q = 1, nnode
-                                            pb_ts(2)%sf(j, k, l, q, i) = &
-                                                (3._wp*pb_ts(1)%sf(j, k, l, q, i) &
-                                                 + pb_ts(2)%sf(j, k, l, q, i) &
-                                                 + dt*rhs_pb(j, k, l, q, i))/4._wp
-                                        end do
-                                    end do
-                                end do
-                            end do
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
+
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+
+        if (model_eqns == 3 .and. (.not. relax)) then
+            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        end if
+
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+            end if
+        end if
+
+        ! Stage 2 of 3
+
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
+
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                 + q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                                 + dt*rhs_vf(i)%sf(j, k, l))/4._wp
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
-                end if
+                    end do
+                end do
+            end do
+        #:endcall GPU_PARALLEL_LOOP
 
-                if (qbmm .and. (.not. polytropic)) then
-                    #:call GPU_PARALLEL_LOOP(collapse=5)
-                        do i = 1, nb
-                            do l = 0, p
-                                do k = 0, n
-                                    do j = 0, m
-                                        do q = 1, nnode
-                                            mv_ts(2)%sf(j, k, l, q, i) = &
-                                                (3._wp*mv_ts(1)%sf(j, k, l, q, i) &
-                                                 + mv_ts(2)%sf(j, k, l, q, i) &
-                                                 + dt*rhs_mv(j, k, l, q, i))/4._wp
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                    #:endcall GPU_PARALLEL_LOOP
-                end if
-
-                if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
-
-                if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
-
-                if (model_eqns == 3 .and. (.not. relax)) then
-                    call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
-                end if
-
-                if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
-
-                if (ib) then
-                    if (qbmm .and. .not. polytropic) then
-                        call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
-                    else
-                        call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
-                    end if
-                end if
-
-                ! Stage 3 of 3
-                call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
-
-                if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
-
-                #:call GPU_PARALLEL_LOOP(collapse=4)
-                    do i = 1, sys_size
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                                        (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                                         + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                                         + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+        if (qbmm .and. (.not. polytropic)) then
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    pb_ts(2)%sf(j, k, l, q, i) = &
+                                        (3._wp*pb_ts(1)%sf(j, k, l, q, i) &
+                                         + pb_ts(2)%sf(j, k, l, q, i) &
+                                         + dt*rhs_pb(j, k, l, q, i))/4._wp
                                 end do
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                end do
+            #:endcall GPU_PARALLEL_LOOP
+        end if
 
-                if (qbmm .and. (.not. polytropic)) then
-                    #:call GPU_PARALLEL_LOOP(collapse=5)
-                        do i = 1, nb
-                            do l = 0, p
-                                do k = 0, n
-                                    do j = 0, m
-                                        do q = 1, nnode
-                                            pb_ts(1)%sf(j, k, l, q, i) = &
-                                                (pb_ts(1)%sf(j, k, l, q, i) &
-                                                 + 2._wp*pb_ts(2)%sf(j, k, l, q, i) &
-                                                 + 2._wp*dt*rhs_pb(j, k, l, q, i))/3._wp
-                                        end do
-                                    end do
+        if (qbmm .and. (.not. polytropic)) then
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    mv_ts(2)%sf(j, k, l, q, i) = &
+                                        (3._wp*mv_ts(1)%sf(j, k, l, q, i) &
+                                         + mv_ts(2)%sf(j, k, l, q, i) &
+                                         + dt*rhs_mv(j, k, l, q, i))/4._wp
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
-                end if
+                    end do
+                end do
+            #:endcall GPU_PARALLEL_LOOP
+        end if
 
-                if (qbmm .and. (.not. polytropic)) then
-                    #:call GPU_PARALLEL_LOOP(collapse=5)
-                        do i = 1, nb
-                            do l = 0, p
-                                do k = 0, n
-                                    do j = 0, m
-                                        do q = 1, nnode
-                                            mv_ts(1)%sf(j, k, l, q, i) = &
-                                                (mv_ts(1)%sf(j, k, l, q, i) &
-                                                 + 2._wp*mv_ts(2)%sf(j, k, l, q, i) &
-                                                 + 2._wp*dt*rhs_mv(j, k, l, q, i))/3._wp
-                                        end do
-                                    end do
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
+
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+
+        if (model_eqns == 3 .and. (.not. relax)) then
+            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        end if
+
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+            end if
+        end if
+
+        ! Stage 3 of 3
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
+
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
+
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                (q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                 + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                                 + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+                        end do
+                    end do
+                end do
+            end do
+        #:endcall GPU_PARALLEL_LOOP
+
+        if (qbmm .and. (.not. polytropic)) then
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    pb_ts(1)%sf(j, k, l, q, i) = &
+                                        (pb_ts(1)%sf(j, k, l, q, i) &
+                                         + 2._wp*pb_ts(2)%sf(j, k, l, q, i) &
+                                         + 2._wp*dt*rhs_pb(j, k, l, q, i))/3._wp
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
-                end if
+                    end do
+                end do
+            #:endcall GPU_PARALLEL_LOOP
+        end if
 
-                if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
+        if (qbmm .and. (.not. polytropic)) then
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    mv_ts(1)%sf(j, k, l, q, i) = &
+                                        (mv_ts(1)%sf(j, k, l, q, i) &
+                                         + 2._wp*mv_ts(2)%sf(j, k, l, q, i) &
+                                         + 2._wp*dt*rhs_mv(j, k, l, q, i))/3._wp
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            #:endcall GPU_PARALLEL_LOOP
+        end if
 
-                if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
-                if (model_eqns == 3 .and. (.not. relax)) then
-                    call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
-                end if
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
-                call nvtxStartRange("RHS-ELASTIC")
-                if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(1)%vf, q_prim_vf)
-                call nvtxEndRange
+        if (model_eqns == 3 .and. (.not. relax)) then
+            call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+        end if
 
-                if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        call nvtxStartRange("RHS-ELASTIC")
+        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(1)%vf, q_prim_vf)
+        call nvtxEndRange
 
-                if (ib) then
-                    if (qbmm .and. .not. polytropic) then
-                        call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-                    else
-                        call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-                    end if
-                end if
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-                if (.not. adap_dt) then
-                    call nvtxEndRange
-                    call cpu_time(finish)
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+            end if
+        end if
 
-                    time = time + (finish - start)
-                end if
-            end subroutine s_3rd_order_tvd_rk
+        if (.not. adap_dt) then
+            call nvtxEndRange
+            call cpu_time(finish)
 
-            !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
+            time = time + (finish - start)
+        end if
+    end subroutine s_3rd_order_tvd_rk
+
+    !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
         !!      the flux term and adaptive time stepping algorithm for
         !!      the source term
         !! @param t_step Current time-step
-            subroutine s_strang_splitting(t_step, time_avg)
+    subroutine s_strang_splitting(t_step, time_avg)
 
-                integer, intent(in) :: t_step
-                real(wp), intent(inout) :: time_avg
+        integer, intent(in) :: t_step
+        real(wp), intent(inout) :: time_avg
 
-                real(wp) :: start, finish
+        real(wp) :: start, finish
 
-                call cpu_time(start)
+        call cpu_time(start)
 
-                call nvtxStartRange("TIMESTEP")
+        call nvtxStartRange("TIMESTEP")
 
-                ! Stage 1 of 3
-                call s_adaptive_dt_bubble(1)
+        ! Stage 1 of 3
+        call s_adaptive_dt_bubble(1)
 
-                ! Stage 2 of 3
-                call s_3rd_order_tvd_rk(t_step, time_avg)
+        ! Stage 2 of 3
+        call s_3rd_order_tvd_rk(t_step, time_avg)
 
-                ! Stage 3 of 3
-                call s_adaptive_dt_bubble(3)
+        ! Stage 3 of 3
+        call s_adaptive_dt_bubble(3)
 
-                call nvtxEndRange
+        call nvtxEndRange
 
-                call cpu_time(finish)
+        call cpu_time(finish)
 
-                time = time + (finish - start)
+        time = time + (finish - start)
 
-            end subroutine s_strang_splitting
+    end subroutine s_strang_splitting
 
-            !> Bubble source part in Strang operator splitting scheme
+    !> Bubble source part in Strang operator splitting scheme
         !! @param t_step Current time-step
-            impure subroutine s_adaptive_dt_bubble(stage)
+    impure subroutine s_adaptive_dt_bubble(stage)
 
-                integer, intent(in) :: stage
+        integer, intent(in) :: stage
 
-                type(vector_field) :: gm_alpha_qp
+        type(vector_field) :: gm_alpha_qp
 
-                call s_convert_conservative_to_primitive_variables( &
-                    q_cons_ts(1)%vf, &
-                    q_T_sf, &
-                    q_prim_vf, &
-                    idwint)
+        call s_convert_conservative_to_primitive_variables( &
+            q_cons_ts(1)%vf, &
+            q_T_sf, &
+            q_prim_vf, &
+            idwint)
 
-                if (bubbles_euler) then
+        if (bubbles_euler) then
 
             call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, divu)
             call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-                elseif (bubbles_lagrange) then
+        elseif (bubbles_lagrange) then
 
-                    call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-                    call s_compute_bubble_EL_dynamics(q_prim_vf, stage)
-                    call s_transfer_data_to_tmp()
-                    call s_smear_voidfraction()
-                    if (stage == 3) then
-                        if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
-                        if (lag_params%write_bubbles) then
-                            $:GPU_UPDATE(host='[gas_p,gas_mv,intfc_rad,intfc_vel]')
-                            call s_write_lag_particles(mytime)
-                        end if
-                        call s_write_void_evol(mytime)
-                    end if
-
+            call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+            call s_compute_bubble_EL_dynamics(q_prim_vf, stage)
+            call s_transfer_data_to_tmp()
+            call s_smear_voidfraction()
+            if (stage == 3) then
+                if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
+                if (lag_params%write_bubbles) then
+                    $:GPU_UPDATE(host='[gas_p,gas_mv,intfc_rad,intfc_vel]')
+                    call s_write_lag_particles(mytime)
                 end if
+                call s_write_void_evol(mytime)
+            end if
 
-            end subroutine s_adaptive_dt_bubble
+        end if
 
-            impure subroutine s_compute_dt()
+    end subroutine s_adaptive_dt_bubble
 
-                real(wp) :: rho        !< Cell-avg. density
-                real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
-                real(wp) :: vel_sum    !< Cell-avg. velocity sum
-                real(wp) :: pres       !< Cell-avg. pressure
-                real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
-                real(wp) :: gamma      !< Cell-avg. sp. heat ratio
-                real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
-                real(wp) :: c          !< Cell-avg. sound speed
-                real(wp) :: H          !< Cell-avg. enthalpy
-                real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
-                type(vector_field) :: gm_alpha_qp
+    impure subroutine s_compute_dt()
 
-                real(wp) :: dt_local
-                integer :: j, k, l !< Generic loop iterators
+        real(wp) :: rho        !< Cell-avg. density
+        real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
+        real(wp) :: vel_sum    !< Cell-avg. velocity sum
+        real(wp) :: pres       !< Cell-avg. pressure
+        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(wp) :: gamma      !< Cell-avg. sp. heat ratio
+        real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
+        real(wp) :: c          !< Cell-avg. sound speed
+        real(wp) :: H          !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
+        type(vector_field) :: gm_alpha_qp
+
+        real(wp) :: dt_local
+        integer :: j, k, l !< Generic loop iterators
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables( &
@@ -1030,30 +1030,30 @@ contains
                         call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
                     end if
 
-                                ! Compute mixture sound speed
-                                call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
+                        ! Compute mixture sound speed
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
 
-                                call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
-                            end do
-                        end do
+                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                end do
+            end do
+        #:endcall GPU_PARALLEL_LOOP
 
         #:call GPU_PARALLEL(copyout='[dt_local]', copyin='[max_dt]')
             dt_local = minval(max_dt)
         #:endcall GPU_PARALLEL
 
-                if (num_procs == 1) then
-                    dt = dt_local
-                else
-                    call s_mpi_allreduce_min(dt_local, dt)
-                end if
+        if (num_procs == 1) then
+            dt = dt_local
+        else
+            call s_mpi_allreduce_min(dt_local, dt)
+        end if
 
-                $:GPU_UPDATE(device='[dt]')
+        $:GPU_UPDATE(device='[dt]')
 
-            end subroutine s_compute_dt
+    end subroutine s_compute_dt
 
-            !> This subroutine applies the body forces source term at each
+    !> This subroutine applies the body forces source term at each
         !! Runge-Kutta stage
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
 
@@ -1061,9 +1061,9 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf_in
         type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
 
-                real(wp), intent(in) :: ldt !< local dt
+        real(wp), intent(in) :: ldt !< local dt
 
-                integer :: i, j, k, l
+        integer :: i, j, k, l
 
         call nvtxStartRange("RHS-BODYFORCES")
         call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
@@ -1081,16 +1081,16 @@ contains
         end do
         #:endcall GPU_PARALLEL_LOOP
 
-                call nvtxEndRange
+        call nvtxEndRange
 
-            end subroutine s_apply_bodyforces
+    end subroutine s_apply_bodyforces
 
-            !> This subroutine saves the temporary q_prim_vf vector
+    !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main
         !! @param t_step current time-step
-            subroutine s_time_step_cycling(t_step)
+    subroutine s_time_step_cycling(t_step)
 
-                integer, intent(in) :: t_step
+        integer, intent(in) :: t_step
 
         integer :: i, j, k, l !< Generic loop iterator
 
@@ -1159,12 +1159,12 @@ contains
             #:endcall GPU_PARALLEL_LOOP
         end if
 
-            end subroutine s_time_step_cycling
+    end subroutine s_time_step_cycling
 
-            !> Module deallocation and/or disassociation procedures
-            impure subroutine s_finalize_time_steppers_module
+    !> Module deallocation and/or disassociation procedures
+    impure subroutine s_finalize_time_steppers_module
 
-                integer :: i, j !< Generic loop iterators
+        integer :: i, j !< Generic loop iterators
 
         ! Deallocating the cell-average conservative variables
         do i = 1, num_ts
@@ -1175,18 +1175,18 @@ contains
             @:DEALLOCATE(q_cons_ts(i)%vf)
         end do
 
-                @:DEALLOCATE(q_cons_ts)
+        @:DEALLOCATE(q_cons_ts)
 
-                ! Deallocating the cell-average primitive ts variables
-                if (probe_wrt) then
-                    do i = 0, 3
-                        do j = 1, sys_size
-                            @:DEALLOCATE(q_prim_ts(i)%vf(j)%sf)
-                        end do
-                        @:DEALLOCATE(q_prim_ts(i)%vf)
-                    end do
-                    @:DEALLOCATE(q_prim_ts)
-                end if
+        ! Deallocating the cell-average primitive ts variables
+        if (probe_wrt) then
+            do i = 0, 3
+                do j = 1, sys_size
+                    @:DEALLOCATE(q_prim_ts(i)%vf(j)%sf)
+                end do
+                @:DEALLOCATE(q_prim_ts(i)%vf)
+            end do
+            @:DEALLOCATE(q_prim_ts)
+        end if
 
         if (.not. igr) then
             ! Deallocating the cell-average primitive variables
@@ -1229,20 +1229,20 @@ contains
             end if
         end if
 
-                @:DEALLOCATE(q_prim_vf)
+        @:DEALLOCATE(q_prim_vf)
 
-                ! Deallocating the cell-average RHS variables
-                do i = 1, sys_size
-                    @:DEALLOCATE(rhs_vf(i)%sf)
-                end do
+        ! Deallocating the cell-average RHS variables
+        do i = 1, sys_size
+            @:DEALLOCATE(rhs_vf(i)%sf)
+        end do
 
-                @:DEALLOCATE(rhs_vf)
+        @:DEALLOCATE(rhs_vf)
 
-                ! Writing the footer of and closing the run-time information file
-                if (proc_rank == 0 .and. run_time_info) then
-                    call s_close_run_time_information_file()
-                end if
+        ! Writing the footer of and closing the run-time information file
+        if (proc_rank == 0 .and. run_time_info) then
+            call s_close_run_time_information_file()
+        end if
 
-            end subroutine s_finalize_time_steppers_module
+    end subroutine s_finalize_time_steppers_module
 
-        end module m_time_steppers
+end module m_time_steppers

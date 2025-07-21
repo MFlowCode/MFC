@@ -140,4 +140,38 @@
     $:code
     $:end_acc_directive
 #:enddef
+
+#:def ACC_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraAccArgs=None)
+    #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
+    #:set create_val = GEN_CREATE_STR(create)
+    #:set attach_val = GEN_ATTACH_STR(attach)
+    #! #:set to_val = GEN_TO_STR(copyin)
+    #! #:set alloc_val = GEN_ALLOC_STR(create)
+    #! #:set alloc_val2 = GEN_ALLOC_STR(attach)
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #! #:set extraMpArgs_val = ''
+    #:set acc_clause_val = copyin_val.strip('\n') + create_val.strip('\n') + attach_val.strip('\n')
+    #! #:set mp_clause_val = to_val.strip('\n') + alloc_val.strip('\n') + alloc_val2.strip('\n')
+    #:set acc_directive = '!$acc enter data ' + acc_clause_val + extraAccArgs_val.strip('\n')
+    $:acc_directive
+#:enddef
+
+#:def ACC_EXIT_DATA(copyout=None, delete=None, detach=None, extraAccArgs=None)
+    #:set copyout_val = GEN_COPYOUT_STR(copyout)
+    #:set delete_val = GEN_DELETE_STR(delete)
+    #:set detach_val = GEN_DETACH_STR(detach)
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #:set clause_val = copyout_val.strip('\n') + delete_val.strip('\n') + detach_val.strip('\n')
+    #:set acc_directive = '!$acc exit data ' + clause_val + extraAccArgs_val.strip('\n')
+    $:acc_directive
+#:enddef
+
+#:def ACC_UPDATE(host=None, device=None, extraAccArgs=None)
+    #:set host_val = GEN_HOST_STR(host)
+    #:set device_val = GEN_DEVICE_STR(device)
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #:set clause_val = host_val.strip('\n') + device_val.strip('\n')
+    #:set acc_directive = '!$acc update ' + clause_val + extraAccArgs_val.strip('\n')
+    $:acc_directive
+#:enddef
 ! New line at end of file is required for FYPP

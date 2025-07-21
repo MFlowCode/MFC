@@ -48,6 +48,11 @@
     $:create_val
 #:enddef
 
+#:def OMP_DELETE_STR(delete)
+    #:set create_val = OMP_MAP_STR('release', delete)
+    $:create_val
+#:enddef
+
 #:def OMP_NOCREATE_STR(no_create)
     #:if no_create is not None
         #:stop 'no_create is not supported yet'
@@ -76,7 +81,7 @@
 
 #:def OMP_TO_STR(to)
     #! Not yet implemented
-    #:set to_val = ''
+    #:set to_val = GEN_PARENTHESES_CLAUSE('to', to)
     $:to_val
 #:enddef
 
@@ -213,5 +218,34 @@
     $:omp_directive
     $:code
     $:end_omp_directive
+#:enddef
+
+#:def OMP_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraOmpArgs=None)
+    #:set copyin_val = OMP_COPYIN_STR(copyin).strip('\n') + OMP_COPYIN_STR(copyinReadOnly).strip('\n')
+    #:set create_val = OMP_CREATE_STR(create)
+    #:set attach_val = OMP_MAP_STR('to', attach)
+    #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
+    #:set omp_clause_val = to_val.strip('\n') + alloc_val.strip('\n') + alloc_val2.strip('\n')
+    #:set omp_directive = '!$omp target enter data ' + omp_clause_val + extraOmpArgs_val.strip('\n')
+    $:omp_directive
+#:enddef
+
+#:def OMP_EXIT_DATA(copyout=None, delete=None, detach=None, extraOmpArgs=None)
+    #:set copyout_val = OMP_COPYOUT_STR(copyout)
+    #:set delete_val = OMP_DELETE_STR(delete)
+    #:set detach_val = OMP_MAP_STR('from', detach)
+    #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
+    #:set clause_val = copyout_val.strip('\n') + delete_val.strip('\n') + detach_val.strip('\n')
+    #:set omp_directive = '!$omp target exit data ' + clause_val + extraOmpArgs.strip('\n')
+    $:omp_directive
+#:enddef
+
+#:def OMP_UPDATE(host=None, device=None, extraAccArgs=None)
+    #:set host_val = OMP_FROM_STR(host)
+    #:set device_val = OMP_TO_STR(device)
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #:set clause_val = host_val.strip('\n') + device_val.strip('\n')
+    #:set acc_directive = '!$acc update ' + clause_val + extraAccArgs_val.strip('\n')
+    $:acc_directive
 #:enddef
 ! New line at end of file is required for FYPP
