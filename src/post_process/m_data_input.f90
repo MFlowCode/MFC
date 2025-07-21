@@ -196,22 +196,22 @@ contains
     !> Helper subroutine to allocate field arrays for given dimensionality
     !!  @param start_idx Starting index for allocation
     !!  @param end_x, end_y, end_z End indices for each dimension
-    impure subroutine s_allocate_field_arrays(start_idx, end_x, end_y, end_z)
+    impure subroutine s_allocate_field_arrays(local_start_idx, end_x, end_y, end_z)
 
-        integer, intent(in) :: start_idx, end_x, end_y, end_z
+        integer, intent(in) :: local_start_idx, end_x, end_y, end_z
         integer :: i
 
         do i = 1, sys_size
-            allocate (q_cons_vf(i)%sf(start_idx:end_x, start_idx:end_y, start_idx:end_z))
-            allocate (q_prim_vf(i)%sf(start_idx:end_x, start_idx:end_y, start_idx:end_z))
+            allocate (q_cons_vf(i)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+            allocate (q_prim_vf(i)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
         end do
 
         if (ib) then
-            allocate (ib_markers%sf(start_idx:end_x, start_idx:end_y, start_idx:end_z))
+            allocate (ib_markers%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
         end if
 
         if (chemistry) then
-            allocate (q_T_sf%sf(start_idx:end_x, start_idx:end_y, start_idx:end_z))
+            allocate (q_T_sf%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
         end if
 
     end subroutine s_allocate_field_arrays

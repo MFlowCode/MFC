@@ -58,7 +58,6 @@ module m_fftw
 #else
     type(c_ptr) :: fwd_plan_gpu, bwd_plan_gpu
 #endif
-    integer :: ierr
 
     integer, allocatable :: gpu_fft_size(:), iembed(:), oembed(:)
 
@@ -72,16 +71,18 @@ contains
         !!      applying the Fourier filter in the azimuthal direction.
     impure subroutine s_initialize_fftw_module
 
+        integer :: ierr !< Generic flag used to identify and report GPU errors
+
         ! Size of input array going into DFT
         real_size = p + 1
         ! Size of output array coming out of DFT
         cmplx_size = (p + 1)/2 + 1
 
         x_size = m + 1
-
         batch_size = x_size*sys_size
 
 #if defined(MFC_OpenACC)
+
         rank = 1; istride = 1; ostride = 1
 
         allocate (gpu_fft_size(1:rank), iembed(1:rank), oembed(1:rank))
@@ -134,11 +135,11 @@ contains
         real(c_double), pointer :: p_real(:)
         complex(c_double_complex), pointer :: p_cmplx(:), p_fltr_cmplx(:)
         integer :: i, j, k, l !< Generic loop iterators
+        integer :: ierr !< Generic flag used to identify and report GPU errors
 
         ! Restrict filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
 #if defined(MFC_OpenACC)
-
         $:GPU_PARALLEL_LOOP(collapse=3)
         do k = 1, sys_size
             do j = 0, m
@@ -302,6 +303,7 @@ contains
     impure subroutine s_finalize_fftw_module
 
 #if defined(MFC_OpenACC)
+        integer :: ierr !< Generic flag used to identify and report GPU errors
         @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
 #if defined(__PGI)
 

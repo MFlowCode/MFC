@@ -92,11 +92,11 @@ contains
 
     end subroutine s_comp_alpha_from_n
 
-    pure subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu)
+    pure subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu_in)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), intent(inout) :: divu !< matrix for div(u)
+        type(scalar_field), intent(inout) :: divu_in !< matrix for div(u)
 
         integer :: j, k, l
 
@@ -107,8 +107,8 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            divu%sf(j, k, l) = 0._wp
-                            divu%sf(j, k, l) = &
+                            divu_in%sf(j, k, l) = 0._wp
+                            divu_in%sf(j, k, l) = &
                                 5.e-1_wp/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &
                                                 q_prim_vf(contxe + idir)%sf(j - 1, k, l))
 
@@ -123,9 +123,9 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        divu%sf(j, k, l) = divu%sf(j, k, l) + &
-                                           5.e-1_wp/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
-                                                           q_prim_vf(contxe + idir)%sf(j, k - 1, l))
+                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + &
+                                              5.e-1_wp/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
+                                                              q_prim_vf(contxe + idir)%sf(j, k - 1, l))
 
                     end do
                 end do
@@ -137,9 +137,9 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        divu%sf(j, k, l) = divu%sf(j, k, l) + &
-                                           5.e-1_wp/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
-                                                           q_prim_vf(contxe + idir)%sf(j, k, l - 1))
+                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + &
+                                              5.e-1_wp/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
+                                                              q_prim_vf(contxe + idir)%sf(j, k, l - 1))
 
                     end do
                 end do
@@ -153,13 +153,14 @@ contains
         !!      that are needed for the bubble modeling
         !!  @param q_prim_vf Primitive variables
         !!  @param q_cons_vf Conservative variables
-    impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf)
+    impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf, divu_in)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), intent(in) :: divu_in !< matrix for div(u)
 
         real(wp) :: rddot
-        real(wp) :: pb, mv, vflux, pbdot
+        real(wp) :: pb_local, mv_local, vflux, pbdot
         real(wp) :: n_tait, B_tait
         real(wp), dimension(nb) :: Rtmp, Vtmp
         real(wp) :: myR, myV, alf, myP, myRho, R2Vav, R3
@@ -270,16 +271,16 @@ contains
                         myV = q_prim_vf(vs(q))%sf(j, k, l)
 
                         if (.not. polytropic) then
-                            pb = q_prim_vf(ps(q))%sf(j, k, l)
-                            mv = q_prim_vf(ms(q))%sf(j, k, l)
-                            call s_bwproperty(pb, q, chi_vw, k_mw, rho_mw)
-                            call s_vflux(myR, myV, pb, mv, q, vflux)
-                            pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q)
+                            pb_local = q_prim_vf(ps(q))%sf(j, k, l)
+                            mv_local = q_prim_vf(ms(q))%sf(j, k, l)
+                            call s_bwproperty(pb_local, q, chi_vw, k_mw, rho_mw)
+                            call s_vflux(myR, myV, pb_local, mv_local, q, vflux)
+                            pbdot = f_bpres_dot(vflux, myR, myV, pb_local, mv_local, q)
 
                             bub_p_src(j, k, l, q) = nbub*pbdot
                             bub_m_src(j, k, l, q) = nbub*vflux*4._wp*pi*(myR**2._wp)
                         else
-                            pb = 0._wp; mv = 0._wp; vflux = 0._wp; pbdot = 0._wp
+                            pb_local = 0._wp; mv_local = 0._wp; vflux = 0._wp; pbdot = 0._wp
                         end if
 
                         ! Adaptive time stepping
@@ -288,8 +289,8 @@ contains
                         if (adap_dt) then
 
                             call s_advance_step(myRho, myP, myR, myV, R0(q), &
-                                                pb, pbdot, alf, n_tait, B_tait, &
-                                                bub_adv_src(j, k, l), divu%sf(j, k, l), &
+                                                pb_local, pbdot, alf, n_tait, B_tait, &
+                                                bub_adv_src(j, k, l), divu_in%sf(j, k, l), &
                                                 dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
                                                 dmBeta_t, dmCson, adap_dt_stop)
 
@@ -298,8 +299,8 @@ contains
 
                         else
                             rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
-                                            pb, pbdot, alf, n_tait, B_tait, &
-                                            bub_adv_src(j, k, l), divu%sf(j, k, l), &
+                                            pb_local, pbdot, alf, n_tait, B_tait, &
+                                            bub_adv_src(j, k, l), divu_in%sf(j, k, l), &
                                             dmCson)
                             bub_v_src(j, k, l, q) = nbub*rddot
                             bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)

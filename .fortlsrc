@@ -26,7 +26,9 @@
     "pp_suffixes": [".fpp"],
     "pp_defs": {
         "MFC": 1,
-        "MFC_DOUBLE_PRECISION": 1
+        "MFC_SINGLE_PRECISION": 1,
+        "MFC_OPENACC": 1,
+        "MFC_MPI": 1
     },
     "lowercase_intrinsics": true,
     "debug_log": false,
@@ -60,26 +62,11 @@
     "disable_diagnostics_for_external_modules": true,
     "max_line_length": -1,
     "max_comment_line_length": -1,
-    "symbol_skip_mem": [
-        "mpi_*"
-    ],
     "disable_var_diagnostics": false,
     "disable_fypp": false,
     "fypp_strict": false,
-    "error_suppression_list": [
-        "include-not-found",
-        "mod-not-found",
-        "module-not-found",
-        "declared-twice",
-        "no-matching-declaration",
-        "invalid-parent",
-        "parsing-error",
-        "fypp-error",
-        "preprocessor-error",
-        "implicit-type"
-    ],
     "incremental_sync": false,
-    "debug_parser": false,
+    "debug_parser": true,
     "skip_parse_errors": true,
     "disable_parser": [
         "src/post_process/m_data_output.fpp",

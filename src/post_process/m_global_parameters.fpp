@@ -197,8 +197,6 @@ module m_global_parameters
     integer :: mpi_info_int
     !> @}
 
-    integer, private :: ierr
-
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
     !! Database of the physical parameters of each of the fluids that is present
     !! in the flow. These include the stiffened gas equation of state parameters,
@@ -903,6 +901,10 @@ contains
 
     !> Subroutine to initialize parallel infrastructure
     impure subroutine s_initialize_parallel_io
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+#endif
 
         num_dims = 1 + min(1, n) + min(1, p)
 

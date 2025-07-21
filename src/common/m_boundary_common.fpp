@@ -79,17 +79,17 @@ contains
     !>  The purpose of this procedure is to populate the buffers
     !!      of the primitive variables, depending on the selected
     !!      boundary conditions.
-    impure subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb, mv)
+    impure subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb_in, mv_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
         integer :: k, l
 
         ! Population of Buffers in x-direction
         if (bc_x%beg >= 0) then
-            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb, mv)
+            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb_in, mv_in)
         else
             $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
@@ -98,9 +98,9 @@ contains
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, 1, -1, k, l)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, 1, -1, k, l, pb, mv)
+                        call s_symmetry(q_prim_vf, 1, -1, k, l, pb_in, mv_in)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, 1, -1, k, l, pb, mv)
+                        call s_periodic(q_prim_vf, 1, -1, k, l, pb_in, mv_in)
                     case (BC_SLIP_WALL)
                         call s_slip_wall(q_prim_vf, 1, -1, k, l)
                     case (BC_NO_SLIP_WALL)
@@ -111,14 +111,14 @@ contains
 
                     if (qbmm .and. (.not. polytropic) .and. &
                         (bc_type(1, -1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
-                        call s_qbmm_extrapolation(1, -1, k, l, pb, mv)
+                        call s_qbmm_extrapolation(1, -1, k, l, pb_in, mv_in)
                     end if
                 end do
             end do
         end if
 
         if (bc_x%end >= 0) then
-            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, 1, sys_size, pb, mv)
+            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, 1, sys_size, pb_in, mv_in)
         else
             $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
@@ -127,9 +127,9 @@ contains
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP) ! Ghost-cell extrap. BC at end
                         call s_ghost_cell_extrapolation(q_prim_vf, 1, 1, k, l)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, 1, 1, k, l, pb, mv)
+                        call s_symmetry(q_prim_vf, 1, 1, k, l, pb_in, mv_in)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, 1, 1, k, l, pb, mv)
+                        call s_periodic(q_prim_vf, 1, 1, k, l, pb_in, mv_in)
                     case (BC_SLIP_WALL)
                         call s_slip_wall(q_prim_vf, 1, 1, k, l)
                     case (BC_NO_SLIP_WALL)
@@ -140,7 +140,7 @@ contains
 
                     if (qbmm .and. (.not. polytropic) .and. &
                         (bc_type(1, 1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
-                        call s_qbmm_extrapolation(1, 1, k, l, pb, mv)
+                        call s_qbmm_extrapolation(1, 1, k, l, pb_in, mv_in)
                     end if
                 end do
             end do
@@ -151,7 +151,7 @@ contains
         if (n == 0) return
 
         if (bc_y%beg >= 0) then
-            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, -1, sys_size, pb, mv)
+            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, -1, sys_size, pb_in, mv_in)
         else
             $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
@@ -160,11 +160,11 @@ contains
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, 2, -1, k, l)
                     case (BC_AXIS)
-                        call s_axis(q_prim_vf, pb, mv, k, l)
+                        call s_axis(q_prim_vf, pb_in, mv_in, k, l)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, 2, -1, k, l, pb, mv)
+                        call s_symmetry(q_prim_vf, 2, -1, k, l, pb_in, mv_in)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, 2, -1, k, l, pb, mv)
+                        call s_periodic(q_prim_vf, 2, -1, k, l, pb_in, mv_in)
                     case (BC_SLIP_WALL)
                         call s_slip_wall(q_prim_vf, 2, -1, k, l)
                     case (BC_NO_SLIP_WALL)
@@ -176,14 +176,14 @@ contains
                     if (qbmm .and. (.not. polytropic) .and. &
                         (bc_type(2, -1)%sf(k, 0, l) <= BC_GHOST_EXTRAP) .and. &
                         (bc_type(2, -1)%sf(k, 0, l) /= BC_AXIS)) then
-                        call s_qbmm_extrapolation(2, -1, k, l, pb, mv)
+                        call s_qbmm_extrapolation(2, -1, k, l, pb_in, mv_in)
                     end if
                 end do
             end do
         end if
 
         if (bc_y%end >= 0) then
-            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, 1, sys_size, pb, mv)
+            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, 1, sys_size, pb_in, mv_in)
         else
             $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, p
@@ -192,9 +192,9 @@ contains
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, 2, 1, k, l)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, 2, 1, k, l, pb, mv)
+                        call s_symmetry(q_prim_vf, 2, 1, k, l, pb_in, mv_in)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, 2, 1, k, l, pb, mv)
+                        call s_periodic(q_prim_vf, 2, 1, k, l, pb_in, mv_in)
                     case (BC_SLIP_WALL)
                         call s_slip_wall(q_prim_vf, 2, 1, k, l)
                     case (BC_NO_SLIP_WALL)
@@ -205,7 +205,7 @@ contains
 
                     if (qbmm .and. (.not. polytropic) .and. &
                         (bc_type(2, 1)%sf(k, 0, l) <= BC_GHOST_EXTRAP)) then
-                        call s_qbmm_extrapolation(2, 1, k, l, pb, mv)
+                        call s_qbmm_extrapolation(2, 1, k, l, pb_in, mv_in)
                     end if
                 end do
             end do
@@ -216,7 +216,7 @@ contains
         if (p == 0) return
 
         if (bc_z%beg >= 0) then
-            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, -1, sys_size, pb, mv)
+            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, -1, sys_size, pb_in, mv_in)
         else
             $:GPU_PARALLEL_LOOP(collapse=2)
             do l = -buff_size, n + buff_size
@@ -225,9 +225,9 @@ contains
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, 3, -1, k, l)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, 3, -1, k, l, pb, mv)
+                        call s_symmetry(q_prim_vf, 3, -1, k, l, pb_in, mv_in)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, 3, -1, k, l, pb, mv)
+                        call s_periodic(q_prim_vf, 3, -1, k, l, pb_in, mv_in)
                     case (BC_SLIP_WALL)
                         call s_slip_wall(q_prim_vf, 3, -1, k, l)
                     case (BC_NO_SLIP_WALL)
@@ -238,14 +238,14 @@ contains
 
                     if (qbmm .and. (.not. polytropic) .and. &
                         (bc_type(3, -1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
-                        call s_qbmm_extrapolation(3, -1, k, l, pb, mv)
+                        call s_qbmm_extrapolation(3, -1, k, l, pb_in, mv_in)
                     end if
                 end do
             end do
         end if
 
         if (bc_z%end >= 0) then
-            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1, sys_size, pb, mv)
+            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1, sys_size, pb_in, mv_in)
         else
             $:GPU_PARALLEL_LOOP(collapse=2)
             do l = -buff_size, n + buff_size
@@ -254,9 +254,9 @@ contains
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, 3, 1, k, l)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, 3, 1, k, l, pb, mv)
+                        call s_symmetry(q_prim_vf, 3, 1, k, l, pb_in, mv_in)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, 3, 1, k, l, pb, mv)
+                        call s_periodic(q_prim_vf, 3, 1, k, l, pb_in, mv_in)
                     case (BC_SlIP_WALL)
                         call s_slip_wall(q_prim_vf, 3, 1, k, l)
                     case (BC_NO_SLIP_WALL)
@@ -267,7 +267,7 @@ contains
 
                     if (qbmm .and. (.not. polytropic) .and. &
                         (bc_type(3, 1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
-                        call s_qbmm_extrapolation(3, 1, k, l, pb, mv)
+                        call s_qbmm_extrapolation(3, 1, k, l, pb_in, mv_in)
                     end if
                 end do
             end do
@@ -337,10 +337,10 @@ contains
 
     end subroutine s_ghost_cell_extrapolation
 
-    pure subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
+    pure subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
@@ -380,10 +380,10 @@ contains
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
-                                pb(-j, k, l, q, i) = &
-                                    pb(j - 1, k, l, q, i)
-                                mv(-j, k, l, q, i) = &
-                                    mv(j - 1, k, l, q, i)
+                                pb_in(-j, k, l, q, i) = &
+                                    pb_in(j - 1, k, l, q, i)
+                                mv_in(-j, k, l, q, i) = &
+                                    mv_in(j - 1, k, l, q, i)
                             end do
                         end do
                     end do
@@ -420,10 +420,10 @@ contains
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
-                                pb(m + j, k, l, q, i) = &
-                                    pb(m - (j - 1), k, l, q, i)
-                                mv(m + j, k, l, q, i) = &
-                                    mv(m - (j - 1), k, l, q, i)
+                                pb_in(m + j, k, l, q, i) = &
+                                    pb_in(m - (j - 1), k, l, q, i)
+                                mv_in(m + j, k, l, q, i) = &
+                                    mv_in(m - (j - 1), k, l, q, i)
                             end do
                         end do
                     end do
@@ -462,10 +462,10 @@ contains
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
-                                pb(k, -j, l, q, i) = &
-                                    pb(k, j - 1, l, q, i)
-                                mv(k, -j, l, q, i) = &
-                                    mv(k, j - 1, l, q, i)
+                                pb_in(k, -j, l, q, i) = &
+                                    pb_in(k, j - 1, l, q, i)
+                                mv_in(k, -j, l, q, i) = &
+                                    mv_in(k, j - 1, l, q, i)
                             end do
                         end do
                     end do
@@ -502,10 +502,10 @@ contains
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
-                                pb(k, n + j, l, q, i) = &
-                                    pb(k, n - (j - 1), l, q, i)
-                                mv(k, n + j, l, q, i) = &
-                                    mv(k, n - (j - 1), l, q, i)
+                                pb_in(k, n + j, l, q, i) = &
+                                    pb_in(k, n - (j - 1), l, q, i)
+                                mv_in(k, n + j, l, q, i) = &
+                                    mv_in(k, n - (j - 1), l, q, i)
                             end do
                         end do
                     end do
@@ -544,10 +544,10 @@ contains
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
-                                pb(k, l, -j, q, i) = &
-                                    pb(k, l, j - 1, q, i)
-                                mv(k, l, -j, q, i) = &
-                                    mv(k, l, j - 1, q, i)
+                                pb_in(k, l, -j, q, i) = &
+                                    pb_in(k, l, j - 1, q, i)
+                                mv_in(k, l, -j, q, i) = &
+                                    mv_in(k, l, j - 1, q, i)
                             end do
                         end do
                     end do
@@ -584,10 +584,10 @@ contains
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
-                                pb(k, l, p + j, q, i) = &
-                                    pb(k, l, p - (j - 1), q, i)
-                                mv(k, l, p + j, q, i) = &
-                                    mv(k, l, p - (j - 1), q, i)
+                                pb_in(k, l, p + j, q, i) = &
+                                    pb_in(k, l, p - (j - 1), q, i)
+                                mv_in(k, l, p + j, q, i) = &
+                                    mv_in(k, l, p - (j - 1), q, i)
                             end do
                         end do
                     end do
@@ -597,10 +597,10 @@ contains
 
     end subroutine s_symmetry
 
-    pure subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb, mv)
+    pure subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
@@ -619,10 +619,10 @@ contains
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
-                                pb(-j, k, l, q, i) = &
-                                    pb(m - (j - 1), k, l, q, i)
-                                mv(-j, k, l, q, i) = &
-                                    mv(m - (j - 1), k, l, q, i)
+                                pb_in(-j, k, l, q, i) = &
+                                    pb_in(m - (j - 1), k, l, q, i)
+                                mv_in(-j, k, l, q, i) = &
+                                    mv_in(m - (j - 1), k, l, q, i)
                             end do
                         end do
                     end do
@@ -639,10 +639,10 @@ contains
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
-                                pb(m + j, k, l, q, i) = &
-                                    pb(j - 1, k, l, q, i)
-                                mv(m + j, k, l, q, i) = &
-                                    mv(j - 1, k, l, q, i)
+                                pb_in(m + j, k, l, q, i) = &
+                                    pb_in(j - 1, k, l, q, i)
+                                mv_in(m + j, k, l, q, i) = &
+                                    mv_in(j - 1, k, l, q, i)
                             end do
                         end do
                     end do
@@ -661,10 +661,10 @@ contains
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
-                                pb(k, -j, l, q, i) = &
-                                    pb(k, n - (j - 1), l, q, i)
-                                mv(k, -j, l, q, i) = &
-                                    mv(k, n - (j - 1), l, q, i)
+                                pb_in(k, -j, l, q, i) = &
+                                    pb_in(k, n - (j - 1), l, q, i)
+                                mv_in(k, -j, l, q, i) = &
+                                    mv_in(k, n - (j - 1), l, q, i)
                             end do
                         end do
                     end do
@@ -681,10 +681,10 @@ contains
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
-                                pb(k, n + j, l, q, i) = &
-                                    pb(k, (j - 1), l, q, i)
-                                mv(k, n + j, l, q, i) = &
-                                    mv(k, (j - 1), l, q, i)
+                                pb_in(k, n + j, l, q, i) = &
+                                    pb_in(k, (j - 1), l, q, i)
+                                mv_in(k, n + j, l, q, i) = &
+                                    mv_in(k, (j - 1), l, q, i)
                             end do
                         end do
                     end do
@@ -703,10 +703,10 @@ contains
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
-                                pb(k, l, -j, q, i) = &
-                                    pb(k, l, p - (j - 1), q, i)
-                                mv(k, l, -j, q, i) = &
-                                    mv(k, l, p - (j - 1), q, i)
+                                pb_in(k, l, -j, q, i) = &
+                                    pb_in(k, l, p - (j - 1), q, i)
+                                mv_in(k, l, -j, q, i) = &
+                                    mv_in(k, l, p - (j - 1), q, i)
                             end do
                         end do
                     end do
@@ -723,10 +723,10 @@ contains
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
-                                pb(k, l, p + j, q, i) = &
-                                    pb(k, l, j - 1, q, i)
-                                mv(k, l, p + j, q, i) = &
-                                    mv(k, l, j - 1, q, i)
+                                pb_in(k, l, p + j, q, i) = &
+                                    pb_in(k, l, j - 1, q, i)
+                                mv_in(k, l, p + j, q, i) = &
+                                    mv_in(k, l, j - 1, q, i)
                             end do
                         end do
                     end do
@@ -736,10 +736,10 @@ contains
 
     end subroutine s_periodic
 
-    pure subroutine s_axis(q_prim_vf, pb, mv, k, l)
+    pure subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
         integer, intent(in) :: k, l
 
         integer :: j, q, i
@@ -784,10 +784,10 @@ contains
             do i = 1, nb
                 do q = 1, nnode
                     do j = 1, buff_size
-                        pb(k, -j, l, q, i) = &
-                            pb(k, j - 1, l - ((p + 1)/2), q, i)
-                        mv(k, -j, l, q, i) = &
-                            mv(k, j - 1, l - ((p + 1)/2), q, i)
+                        pb_in(k, -j, l, q, i) = &
+                            pb_in(k, j - 1, l - ((p + 1)/2), q, i)
+                        mv_in(k, -j, l, q, i) = &
+                            mv_in(k, j - 1, l - ((p + 1)/2), q, i)
                     end do
                 end do
             end do
@@ -1079,9 +1079,9 @@ contains
 
     end subroutine s_dirichlet
 
-    pure subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb, mv)
+    pure subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb_in, mv_in)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
 
@@ -1092,8 +1092,8 @@ contains
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
-                            pb(-j, k, l, q, i) = pb(0, k, l, q, i)
-                            mv(-j, k, l, q, i) = mv(0, k, l, q, i)
+                            pb_in(-j, k, l, q, i) = pb_in(0, k, l, q, i)
+                            mv_in(-j, k, l, q, i) = mv_in(0, k, l, q, i)
                         end do
                     end do
                 end do
@@ -1101,8 +1101,8 @@ contains
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
-                            pb(m + j, k, l, q, i) = pb(m, k, l, q, i)
-                            mv(m + j, k, l, q, i) = mv(m, k, l, q, i)
+                            pb_in(m + j, k, l, q, i) = pb_in(m, k, l, q, i)
+                            mv_in(m + j, k, l, q, i) = mv_in(m, k, l, q, i)
                         end do
                     end do
                 end do
@@ -1112,8 +1112,8 @@ contains
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
-                            pb(k, -j, l, q, i) = pb(k, 0, l, q, i)
-                            mv(k, -j, l, q, i) = mv(k, 0, l, q, i)
+                            pb_in(k, -j, l, q, i) = pb_in(k, 0, l, q, i)
+                            mv_in(k, -j, l, q, i) = mv_in(k, 0, l, q, i)
                         end do
                     end do
                 end do
@@ -1121,8 +1121,8 @@ contains
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
-                            pb(k, n + j, l, q, i) = pb(k, n, l, q, i)
-                            mv(k, n + j, l, q, i) = mv(k, n, l, q, i)
+                            pb_in(k, n + j, l, q, i) = pb_in(k, n, l, q, i)
+                            mv_in(k, n + j, l, q, i) = mv_in(k, n, l, q, i)
                         end do
                     end do
                 end do
@@ -1132,8 +1132,8 @@ contains
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
-                            pb(k, l, -j, q, i) = pb(k, l, 0, q, i)
-                            mv(k, l, -j, q, i) = mv(k, l, 0, q, i)
+                            pb_in(k, l, -j, q, i) = pb_in(k, l, 0, q, i)
+                            mv_in(k, l, -j, q, i) = mv_in(k, l, 0, q, i)
                         end do
                     end do
                 end do
@@ -1141,8 +1141,8 @@ contains
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
-                            pb(k, l, p + j, q, i) = pb(k, l, p, q, i)
-                            mv(k, l, p + j, q, i) = mv(k, l, p, q, i)
+                            pb_in(k, l, p + j, q, i) = pb_in(k, l, p, q, i)
+                            mv_in(k, l, p + j, q, i) = mv_in(k, l, p, q, i)
                         end do
                     end do
                 end do
@@ -1657,11 +1657,11 @@ contains
 #endif
     end subroutine s_create_mpi_types
 
-    subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath, old_grid)
+    subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath, old_grid_in)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
-        logical :: old_grid
+        logical :: old_grid_in
 
         character(LEN=*), intent(in) :: step_dirpath
 
@@ -1670,7 +1670,7 @@ contains
 
         character(len=10) :: status
 
-        if (old_grid) then
+        if (old_grid_in) then
             status = 'old'
         else
             status = 'new'
