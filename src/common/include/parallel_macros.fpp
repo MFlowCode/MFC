@@ -274,6 +274,17 @@
     $:end_acc_directive
 #:enddef
 
+#:def TEMP_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
+    #:set acc_code = ACC_ENTER_DATA(copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, create=create, no_create=no_create, attach=attach, extraAccArgs=extraAccArgs)
+    #:set omp_code = OMP_ENTER_DATA(copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, create=create, no_create=no_create, attach=attach, extraOmpArgs=extraOmpArgs)
+
+#if defined(MFC_OpenACC)
+    $:acc_code
+#elif defined(MFC_OpenMP)
+    $:omp_code
+#endif
+#:enddef
+
 #:def GPU_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraAccArgs=None)
     #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
     #:set create_val = GEN_CREATE_STR(create)
@@ -286,7 +297,6 @@
     #:set acc_clause_val = copyin_val.strip('\n') + create_val.strip('\n') + attach_val.strip('\n')
     #! #:set mp_clause_val = to_val.strip('\n') + alloc_val.strip('\n') + alloc_val2.strip('\n')
     #:set acc_directive = '!$acc enter data ' + acc_clause_val + extraAccArgs_val.strip('\n')
-    #! #:set mp_directive = '!$omp target enter data ' + mp_clause_val + extraMpArgs_val.strip('\n')
     $:acc_directive
 #:enddef
 
@@ -297,14 +307,6 @@
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
     #:set clause_val = copyout_val.strip('\n') + delete_val.strip('\n') + detach_val.strip('\n')
     #:set acc_directive = '!$acc exit data ' + clause_val + extraAccArgs_val.strip('\n')
-    $:acc_directive
-#:enddef
-
-#:def GPU_CACHE(cache, extraAccArgs=None)
-    #:set cache_val = GEN_PARENTHESES_CLAUSE('cache', cache)
-    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-    #:set clause_val = cache_val.strip('\n')
-    #:set acc_directive = '!$acc ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
 #:enddef
 
