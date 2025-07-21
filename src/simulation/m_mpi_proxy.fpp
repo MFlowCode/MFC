@@ -300,38 +300,38 @@ contains
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
                     #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, gp_layers - 1
-                                r = (j + gp_layers*(k + (n + 1)*l))
-                                ib_buff_send(r) = ib_markers%sf(j + pack_offset, k, l)
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, gp_layers - 1
+                                    r = (j + gp_layers*(k + (n + 1)*l))
+                                    ib_buff_send(r) = ib_markers%sf(j + pack_offset, k, l)
+                                end do
                             end do
                         end do
-                    end do
                     #:endcall GPU_PARALLEL_LOOP
                 #:elif mpi_dir == 2
                     #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                    do l = 0, p
-                        do k = 0, gp_layers - 1
-                            do j = -gp_layers, m + gp_layers
-                                r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                     (k + gp_layers*l))
-                                ib_buff_send(r) = ib_markers%sf(j, k + pack_offset, l)
+                        do l = 0, p
+                            do k = 0, gp_layers - 1
+                                do j = -gp_layers, m + gp_layers
+                                    r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
+                                         (k + gp_layers*l))
+                                    ib_buff_send(r) = ib_markers%sf(j, k + pack_offset, l)
+                                end do
                             end do
                         end do
-                    end do
                     #:endcall GPU_PARALLEL_LOOP
                 #:else
                     #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                    do l = 0, gp_layers - 1
-                        do k = -gp_layers, n + gp_layers
-                            do j = -gp_layers, m + gp_layers
-                                r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                     ((k + gp_layers) + (n + 2*gp_layers + 1)*l))
-                                ib_buff_send(r) = ib_markers%sf(j, k, l + pack_offset)
+                        do l = 0, gp_layers - 1
+                            do k = -gp_layers, n + gp_layers
+                                do j = -gp_layers, m + gp_layers
+                                    r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
+                                         ((k + gp_layers) + (n + 2*gp_layers + 1)*l))
+                                    ib_buff_send(r) = ib_markers%sf(j, k, l + pack_offset)
+                                end do
                             end do
                         end do
-                    end do
                     #:endcall GPU_PARALLEL_LOOP
                 #:endif
             end if
@@ -351,40 +351,40 @@ contains
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
                     #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                    do l = 0, p
-                        do k = 0, n
-                            do j = -gp_layers, -1
-                                r = (j + gp_layers*((k + 1) + (n + 1)*l))
-                                ib_markers%sf(j + unpack_offset, k, l) = ib_buff_recv(r)
+                        do l = 0, p
+                            do k = 0, n
+                                do j = -gp_layers, -1
+                                    r = (j + gp_layers*((k + 1) + (n + 1)*l))
+                                    ib_markers%sf(j + unpack_offset, k, l) = ib_buff_recv(r)
+                                end do
                             end do
                         end do
-                    end do
                     #:endcall GPU_PARALLEL_LOOP
                 #:elif mpi_dir == 2
                     #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                    do l = 0, p
-                        do k = -gp_layers, -1
-                            do j = -gp_layers, m + gp_layers
-                                r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                     ((k + gp_layers) + gp_layers*l))
-                                ib_markers%sf(j, k + unpack_offset, l) = ib_buff_recv(r)
+                        do l = 0, p
+                            do k = -gp_layers, -1
+                                do j = -gp_layers, m + gp_layers
+                                    r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
+                                         ((k + gp_layers) + gp_layers*l))
+                                    ib_markers%sf(j, k + unpack_offset, l) = ib_buff_recv(r)
+                                end do
                             end do
                         end do
-                    end do
                     #:endcall GPU_PARALLEL_LOOP
                 #:else
                     ! Unpacking buffer from bc_z%beg
                     #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                    do l = -gp_layers, -1
-                        do k = -gp_layers, n + gp_layers
-                            do j = -gp_layers, m + gp_layers
-                                r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                     ((k + gp_layers) + (n + 2*gp_layers + 1)* &
-                                      (l + gp_layers)))
-                                ib_markers%sf(j, k, l + unpack_offset) = ib_buff_recv(r)
+                        do l = -gp_layers, -1
+                            do k = -gp_layers, n + gp_layers
+                                do j = -gp_layers, m + gp_layers
+                                    r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
+                                         ((k + gp_layers) + (n + 2*gp_layers + 1)* &
+                                          (l + gp_layers)))
+                                    ib_markers%sf(j, k, l + unpack_offset) = ib_buff_recv(r)
+                                end do
                             end do
                         end do
-                    end do
                     #:endcall GPU_PARALLEL_LOOP
                 #:endif
             end if

@@ -462,9 +462,9 @@ contains
         !!  @param fCson Speed of sound (EL)
         !!  @param adap_dt_stop Fail-safe exit if max iteration count reached
     subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                   fntait, fBtait, f_bub_adv_src, f_divu, &
-                                   bub_id, fmass_v, fmass_n, fbeta_c, &
-                                   fbeta_t, fCson, adap_dt_stop)
+                              fntait, fBtait, f_bub_adv_src, f_divu, &
+                              bub_id, fmass_v, fmass_n, fbeta_c, &
+                              fbeta_t, fCson, adap_dt_stop)
         $:GPU_ROUTINE(function_name='s_advance_step',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -595,8 +595,8 @@ contains
         !!  @param fCson Speed of sound (EL)
         !!  @param h Time step size
     subroutine s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                        fntait, fBtait, f_bub_adv_src, f_divu, &
-                                        fCson, h)
+                                   fntait, fBtait, f_bub_adv_src, f_divu, &
+                                   fCson, h)
         $:GPU_ROUTINE(function_name='s_initial_substep_h',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -677,10 +677,10 @@ contains
         !!  @param myPb_tmp Internal bubble pressure at each stage (EL)
         !!  @param myMv_tmp Mass of vapor in the bubble at each stage (EL)
     subroutine s_advance_substep(err, fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                      fntait, fBtait, f_bub_adv_src, f_divu, &
-                                      bub_id, fmass_v, fmass_n, fbeta_c, &
-                                      fbeta_t, fCson, h, &
-                                      myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
+                                 fntait, fBtait, f_bub_adv_src, f_divu, &
+                                 bub_id, fmass_v, fmass_n, fbeta_c, &
+                                 fbeta_t, fCson, h, &
+                                 myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
         $:GPU_ROUTINE(function_name='s_advance_substep',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -779,7 +779,7 @@ contains
         !!  @param fdPbdt_tmp Rate of change of the internal bubble pressure
         !!  @param fdMvdt_tmp Rate of change of the mass of vapor in the bubble
     elemental subroutine s_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, &
-                                           fmass_n, fbeta_c, fbeta_t, fdPbdt_tmp, advance_EL)
+                                      fmass_n, fbeta_c, fbeta_t, fdPbdt_tmp, advance_EL)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(IN) :: fR_tmp, fV_tmp, fPb_tmp, fMv_tmp
         real(wp), intent(IN) :: fmass_n, fbeta_c, fbeta_t

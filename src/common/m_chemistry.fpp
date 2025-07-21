@@ -100,32 +100,32 @@ contains
         real(wp), dimension(num_species) :: omega
 
         #:call GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega]')
-        do z = bounds(3)%beg, bounds(3)%end
-            do y = bounds(2)%beg, bounds(2)%end
-                do x = bounds(1)%beg, bounds(1)%end
+            do z = bounds(3)%beg, bounds(3)%end
+                do y = bounds(2)%beg, bounds(2)%end
+                    do x = bounds(1)%beg, bounds(1)%end
 
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do eqn = chemxb, chemxe
-                        Ys(eqn - chemxb + 1) = q_prim_qp(eqn)%sf(x, y, z)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eqn = chemxb, chemxe
+                            Ys(eqn - chemxb + 1) = q_prim_qp(eqn)%sf(x, y, z)
+                        end do
+
+                        rho = q_cons_qp(contxe)%sf(x, y, z)
+                        T = q_T_sf%sf(x, y, z)
+
+                        call get_net_production_rates(rho, T, Ys, omega)
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eqn = chemxb, chemxe
+
+                            omega_m = molecular_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+
+                            rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
+
+                        end do
+
                     end do
-
-                    rho = q_cons_qp(contxe)%sf(x, y, z)
-                    T = q_T_sf%sf(x, y, z)
-
-                    call get_net_production_rates(rho, T, Ys, omega)
-
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do eqn = chemxb, chemxe
-
-                        omega_m = molecular_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
-
-                        rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
-
-                    end do
-
                 end do
             end do
-        end do
         #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_compute_chemistry_reaction_flux

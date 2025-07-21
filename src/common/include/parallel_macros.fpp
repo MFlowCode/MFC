@@ -1,4 +1,3 @@
-#:mute
 #:include 'shared_parallel_macros.fpp'
 #:include 'omp_macros.fpp'
 #:include 'acc_macros.fpp'
@@ -109,8 +108,6 @@
     $:link_val
 #:enddef
 
-
-
 #:def GEN_PARALLELISM_STR(parallelism)
     #:if parallelism is not None
         #:assert isinstance(parallelism, str)
@@ -167,7 +164,7 @@
 #:def GPU_PARALLEL(code, private=None, default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
-    
+
     #:set acc_code = ACC_PARALLEL(code, private, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
     #:set omp_code = OMP_PARALLEL(code, private, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
 
@@ -185,7 +182,7 @@
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
-    
+
     #:set acc_code = ACC_PARALLEL_LOOP(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
     #:set omp_code = OMP_PARALLEL_LOOP(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
 
@@ -346,6 +343,4 @@
 #endif
 
 #:enddef
-
-#:endmute
 ! New line at end of file is required for FYPP
