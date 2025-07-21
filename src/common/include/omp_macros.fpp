@@ -17,22 +17,8 @@
         #:assert isinstance(default, str)
         #:assert (default == 'present' or default == 'none')
         #:if default == 'present'
-            #:set default_val = 'defaultmap(present:all) '
-        #:elif default == 'none'
-            #:stop 'Not Supported Yet'
-        #:endif
-    #:else
-        #:set default_val = ''
-    #:endif
-    $:default_val
-#:enddef
-
-#:def OMP_DEFAULT_STR(default)
-    #:if default is not None
-        #:assert isinstance(default, str)
-        #:assert (default == 'present' or default == 'none')
-        #:if default == 'present'
-            #:set default_val = 'defaultmap(present:aggregate) defaultmap(present:allocatable) '
+            #! #:set default_val = 'defaultmap(present:aggregate) defaultmap(present:allocatable) '
+            #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(present:allocatable) defaultmap(present:pointer)'
         #:elif default == 'none'
             #:stop 'Not Supported Yet'
         #:endif
@@ -81,11 +67,17 @@
 #:enddef
 
 #:def OMP_ATTACH_STR(attach)
-    #:if attach is not None
-        #:stop 'attach is not supported yet'
-    #:endif
+    #! #:if attach is not None
+        #! #:stop 'attach is not supported yet'
+    #! #:endif
     #:set attach_val = ''
     $:attach_val
+#:enddef
+
+#:def OMP_TO_STR(to)
+    #! Not yet implemented
+    #:set to_val = ''
+    $:to_val
 #:enddef
 
 #:def OMP_PARALLELISM_STR(parallelism)
@@ -130,7 +122,7 @@
     
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
     #:set parallelism_val = OMP_PARALLELISM_STR(parallelism)
-    #! #:set default_val = OMP_DEFAULT_STR(default)
+    #:set default_val = OMP_DEFAULT_STR(default)
     #:set default_val = ''
     #:set private_val = GEN_PRIVATE_STR(private, False).strip('\n') + GEN_PRIVATE_STR(firstprivate, True).strip('\n')
     #:set reduction_val = GEN_REDUCTION_STR(reduction, reductionOp)
@@ -153,5 +145,85 @@
     #:set omp_directive = '!$omp target teams distribute parallel do simd ' + &
         & clause_val + extraOmpArgs_val.strip('\n')
     $:omp_directive
+#:enddef
+
+#:def OMP_ROUTINE(function_name, nohost, extraOmpArgs)
+    #:assert isinstance(nohost, bool)
+    #:if nohost == True
+        #:set nohost_val = 'device_type(nohost) '
+    #:else
+        #:set nohost_val = 'device_type(any) '
+    #:endif
+    #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
+    #:if function_name is not None
+        #:set function_name_val = '(' + function_name + ') '
+    #:else
+        #:set function_name_val = ''
+    #:endif
+    #:set clause_val = nohost_val.strip('\n')
+    #:set omp_directive = '!$omp declare target ' + &
+        & clause_val + extraOmpArgs_val.strip('\n')
+    $:omp_directive
+#:enddef
+
+#:def OMP_DECLARE(copyin=None, copyinReadOnly=None, create=None, link=None, extraOmpArgs=None)
+    #:set copyin_val = OMP_TO_STR(copyin).strip('\n') + OMP_TO_STR(copyinReadOnly).strip('\n')
+    #:set create_val = GEN_CLAUSE('(', create)
+    #:set link_val = GEN_LINK_STR(link)
+    #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
+    #:set clause_val = copyin_val.strip('\n') + &
+        & create_val.strip('\n') + link_val.strip('\n')
+    #:set omp_directive = '!$omp declare target ' + clause_val + extraOmpArgs_val.strip('\n')
+    $:omp_directive
+#:enddef
+
+#! Not implemented yet
+#:def OMP_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
+    #:set collapse_val = GEN_COLLAPSE_STR(collapse)
+    #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
+    #:if data_dependency is not None
+        #:assert isinstance(data_dependency, str)
+        #:assert (data_dependency == 'auto' or data_dependency == 'independent')
+        #:set data_dependency_val = data_dependency 
+    #:else
+        #:set data_dependency_val = ''
+    #:endif
+    #:set private_val = GEN_PRIVATE_STR(private, False)
+    #:set reduction_val = GEN_REDUCTION_STR(reduction, reductionOp)
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
+        & data_dependency_val.strip('\n') + private_val.strip('\n') + &
+        & reduction_val.strip('\n')
+    #:set acc_directive = '!$acc loop ' + &
+        & clause_val + extraAccArgs_val.strip('\n')
+    $:acc_directive
+#:enddef
+
+#:def OMP_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, deviceptr=None, attach=None, default=None, extraOmpArgs=None)
+    #:assert code is not None
+    #:assert isinstance(code, str)
+    #:if code == '' or code.isspace()
+        #:stop 'GPU_DATA macro has no effect on the code as it is not surrounding any code'
+    #:endif
+    #:set copy_val = OMP_COPY_STR(copy)
+    #:set copyin_val = OMP_COPYIN_STR(copyin).strip('\n') + OMP_COPYIN_STR(copyinReadOnly).strip('\n')
+    #:set copyout_val = OMP_COPYOUT_STR(copyout)
+    #:set create_val = OMP_CREATE_STR(create)
+    #:set no_create_val = OMP_NOCREATE_STR(no_create)
+    #:set present_val = OMP_PRESENT_STR(present)
+    #:set deviceptr_val = OMP_DEVICEPTR_STR(deviceptr)
+    #:set attach_val = OMP_ATTACH_STR(attach)
+    #:set default_val = OMP_DEFAULT_STR(default)
+    #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
+    #:set clause_val = copy_val.strip('\n') + copyin_val.strip('\n') + &
+        & copyout_val.strip('\n') + create_val.strip('\n') + &
+        & no_create_val.strip('\n') + present_val.strip('\n') + & 
+        & deviceptr_val.strip('\n') + attach_val.strip('\n') + &
+        & default_val.strip('\n')
+    #:set omp_directive = '!$omp target data ' + clause_val + extraOmpArgs_val.strip('\n')
+    #:set end_omp_directive = '!$omp end target data'
+    $:omp_directive
+    $:code
+    $:end_omp_directive
 #:enddef
 ! New line at end of file is required for FYPP
