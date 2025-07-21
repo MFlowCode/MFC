@@ -101,7 +101,7 @@ contains
         real(wp), dimension(2), intent(inout) :: Re
 
         real(wp), dimension(num_fluids) :: alpha_rho, Gs
-        real(wp) :: qv, E, G
+        real(wp) :: qv, E, G_local
 
         integer :: i
 
@@ -129,7 +129,7 @@ contains
 
         if (elasticity) then
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
-                                                            alpha_rho, Re, G, Gs)
+                                                            alpha_rho, Re, G_local, Gs)
         elseif (bubbles_euler) then
             call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         else
@@ -164,7 +164,7 @@ contains
 
         ! Adjust energy for hyperelasticity
         if (hyperelasticity) then
-            E = E + G*q_prim_vf(xiend + 1)%sf(j, k, l)
+            E = E + G_local*q_prim_vf(xiend + 1)%sf(j, k, l)
         end if
 
         H = (E + pres)/rho

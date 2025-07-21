@@ -21,8 +21,8 @@ module m_surface_tension
     implicit none
 
     private; public :: s_initialize_surface_tension_module, &
- s_compute_capilary_source_flux, &
- s_get_capilary, &
+ s_compute_capillary_source_flux, &
+ s_get_capillary, &
  s_finalize_surface_tension_module
 
     !> @name color function gradient components and magnitude
@@ -65,7 +65,7 @@ contains
         end if
     end subroutine s_initialize_surface_tension_module
 
-    pure subroutine s_compute_capilary_source_flux( &
+    pure subroutine s_compute_capillary_source_flux( &
         vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
         flux_src_vf, &
         id, isx, isy, isz)
@@ -111,7 +111,7 @@ contains
                         normW = (normWL + normWR)/2._wp
 
                         if (normW > capillary_cutoff) then
-                            @:compute_capilary_stress_tensor()
+                            @:compute_capillary_stress_tensor()
 
                             do i = 1, num_dims
 
@@ -158,7 +158,7 @@ contains
                         normW = (normWL + normWR)/2._wp
 
                         if (normW > capillary_cutoff) then
-                            @:compute_capilary_stress_tensor()
+                            @:compute_capillary_stress_tensor()
 
                             do i = 1, num_dims
 
@@ -205,7 +205,7 @@ contains
                         normW = (normWL + normWR)/2._wp
 
                         if (normW > capillary_cutoff) then
-                            @:compute_capilary_stress_tensor()
+                            @:compute_capillary_stress_tensor()
 
                             do i = 1, num_dims
 
@@ -226,9 +226,9 @@ contains
 
         end if
 
-    end subroutine s_compute_capilary_source_flux
+    end subroutine s_compute_capillary_source_flux
 
-    impure subroutine s_get_capilary(q_prim_vf, bc_type)
+    impure subroutine s_get_capillary(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
@@ -301,7 +301,7 @@ contains
             call s_reconstruct_cell_boundary_values_capillary(c_divs, gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, i)
         end do
 
-    end subroutine s_get_capilary
+    end subroutine s_get_capillary
 
     subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                             norm_dir)

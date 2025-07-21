@@ -316,23 +316,23 @@ contains
     !>  Subroutine that computes bubble wall properties for vapor bubbles
         !!  @param pb Internal bubble pressure
         !!  @param iR0 Current bubble size index
-    pure elemental subroutine s_bwproperty(pb, iR0, chi_vw, k_mw, rho_mw)
+    pure elemental subroutine s_bwproperty(pb_in, iR0, chi_vw_out, k_mw_out, rho_mw_out)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in) :: pb
+        real(wp), intent(in) :: pb_in
         integer, intent(in) :: iR0
-        real(wp), intent(out) :: chi_vw  !< Bubble wall properties (Ando 2010)
-        real(wp), intent(out) :: k_mw    !< Bubble wall properties (Ando 2010)
-        real(wp), intent(out) :: rho_mw  !< Bubble wall properties (Ando 2010)
+        real(wp), intent(out) :: chi_vw_out  !< Bubble wall properties (Ando 2010)
+        real(wp), intent(out) :: k_mw_out    !< Bubble wall properties (Ando 2010)
+        real(wp), intent(out) :: rho_mw_out  !< Bubble wall properties (Ando 2010)
         real(wp) :: x_vw
 
         ! mass fraction of vapor
-        chi_vw = 1._wp/(1._wp + R_v/R_n*(pb/pv - 1._wp))
+        chi_vw_out = 1._wp/(1._wp + R_v/R_n*(pb_in/pv - 1._wp))
         ! mole fraction of vapor & thermal conductivity of gas mixture
-        x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
-        k_mw = x_vw*k_v(iR0)/(x_vw + (1._wp - x_vw)*phi_vn) &
-               + (1._wp - x_vw)*k_n(iR0)/(x_vw*phi_nv + 1._wp - x_vw)
+        x_vw = M_n*chi_vw_out/(M_v + (M_n - M_v)*chi_vw_out)
+        k_mw_out = x_vw*k_v(iR0)/(x_vw + (1._wp - x_vw)*phi_vn) &
+                   + (1._wp - x_vw)*k_n(iR0)/(x_vw*phi_nv + 1._wp - x_vw)
         ! gas mixture density
-        rho_mw = pv/(chi_vw*R_v*Tw)
+        rho_mw_out = pv/(chi_vw_out*R_v*Tw)
 
     end subroutine s_bwproperty
 
