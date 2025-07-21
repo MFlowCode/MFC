@@ -45,8 +45,11 @@ module m_ibm
 
     integer :: num_gps !< Number of ghost points
     integer :: num_inner_gps !< Number of ghost points
+#if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[gp_layers,num_gps,num_inner_gps]')
-
+#elif defined(MFC_OpenMP)
+    $:GPU_DECLARE(create='[num_gps,num_inner_gps]')
+#endif
 contains
 
     !>  Allocates memory for the variables in the IBM module
