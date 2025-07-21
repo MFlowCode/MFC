@@ -178,6 +178,7 @@ contains
                 end do
             end do
         end do
+        ! !$omp end target teams distribute parallel do simd
 
         ! Keep outer loop sequel because different sources can have very different number of points
         do ai = 1, num_source
@@ -200,7 +201,8 @@ contains
             allocate (phi_rn(1:bb_num_freq(ai)))
 
             if (pulse(ai) == 4) then
-                call random_number(phi_rn(1:bb_num_freq(ai)))
+                ! call random_number(phi_rn(1:bb_num_freq(ai)))
+                phi_rn(1:bb_num_freq(ai)) = 1
                 ! Ensure all the ranks have the same random phase shift
                 call s_mpi_send_random_number(phi_rn, bb_num_freq(ai))
             end if

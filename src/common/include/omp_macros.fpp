@@ -17,8 +17,8 @@
         #:assert isinstance(default, str)
         #:assert (default == 'present' or default == 'none')
         #:if default == 'present'
-            #! #:set default_val = 'defaultmap(present:aggregate) defaultmap(present:allocatable) '
-            #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(present:allocatable) defaultmap(present:pointer)'
+            #! #:set default_val = 'defaultmap(present:aggregate) defaultmap(present:allocatable) defaultmap(present:pointer)'
+            #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(tofrom:allocatable) defaultmap(tofrom:pointer)'
         #:elif default == 'none'
             #:stop 'Not Supported Yet'
         #:endif
@@ -98,7 +98,7 @@
     #:set no_create_val = OMP_NOCREATE_STR(no_create)
     #:set present_val = OMP_PRESENT_STR(present)
     #:set deviceptr_val = OMP_DEVICEPTR_STR(deviceptr)
-    #:set attach_val = OMP_ATTACH_STR(attach)
+    #:set attach_val = OMP_MAP_STR('tofrom', attach)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set omp_clause_val = default_val.strip('\n') + private_val.strip('\n') + reduction_val.strip('\n') + &
         & copy_val.strip('\n') + copyin_val.strip('\n') + &
@@ -106,7 +106,7 @@
         & no_create_val.strip('\n') + present_val.strip('\n') + &
         & deviceptr_val.strip('\n') + attach_val.strip('\n'))
     
-    #:set omp_clause_val = 'defaultmap(firstprivate:scalar) ' + omp_clause_val.strip('\n')
+    #:set omp_clause_val = omp_clause_val.strip('\n')
     #:set omp_directive = '!$omp target teams ' + omp_clause_val + extraOmpArgs_val.strip('\n')
 
     #:set end_omp_directive = '!$omp end target teams'
@@ -133,7 +133,7 @@
     #:set no_create_val = OMP_NOCREATE_STR(no_create)
     #:set present_val = OMP_PRESENT_STR(present)
     #:set deviceptr_val = OMP_DEVICEPTR_STR(deviceptr)
-    #:set attach_val = OMP_ATTACH_STR(attach)
+    #:set attach_val = OMP_MAP_STR('tofrom', attach)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
         & default_val.strip('\n') + private_val.strip('\n') + reduction_val.strip('\n') + &
@@ -212,7 +212,7 @@
     #:set no_create_val = OMP_NOCREATE_STR(no_create)
     #:set present_val = OMP_PRESENT_STR(present)
     #:set deviceptr_val = OMP_DEVICEPTR_STR(deviceptr)
-    #:set attach_val = OMP_ATTACH_STR(attach)
+    #:set attach_val = OMP_MAP_STR('tofrom', attach)
     #:set default_val = OMP_DEFAULT_STR(default)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set clause_val = copy_val.strip('\n') + copyin_val.strip('\n') + &

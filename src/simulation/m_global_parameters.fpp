@@ -184,6 +184,7 @@ module m_global_parameters
     #:endfor
     real(wp), dimension(3) :: accel_bf
     $:GPU_DECLARE(create='[accel_bf]')
+    $:GPU_DECLARE(create='[k_x,w_x,p_x,g_x,k_y,w_y,p_y,g_y,k_z,w_z,p_z,g_z]')
 
     integer :: cpu_start, cpu_end, cpu_rate
 
