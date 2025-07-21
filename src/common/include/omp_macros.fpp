@@ -80,9 +80,13 @@
 #:enddef
 
 #:def OMP_TO_STR(to)
-    #! Not yet implemented
     #:set to_val = GEN_PARENTHESES_CLAUSE('to', to)
     $:to_val
+#:enddef
+
+#:def OMP_FROM_STR(to)
+    #:set from_val = GEN_PARENTHESES_CLAUSE('from', to)
+    $:from_val
 #:enddef
 
 #:def OMP_PARALLELISM_STR(parallelism)
@@ -225,7 +229,7 @@
     #:set create_val = OMP_CREATE_STR(create)
     #:set attach_val = OMP_MAP_STR('to', attach)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
-    #:set omp_clause_val = to_val.strip('\n') + alloc_val.strip('\n') + alloc_val2.strip('\n')
+    #:set omp_clause_val = copyin_val.strip('\n') + create_val.strip('\n') + attach_val.strip('\n')
     #:set omp_directive = '!$omp target enter data ' + omp_clause_val + extraOmpArgs_val.strip('\n')
     $:omp_directive
 #:enddef
@@ -236,16 +240,16 @@
     #:set detach_val = OMP_MAP_STR('from', detach)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set clause_val = copyout_val.strip('\n') + delete_val.strip('\n') + detach_val.strip('\n')
-    #:set omp_directive = '!$omp target exit data ' + clause_val + extraOmpArgs.strip('\n')
+    #:set omp_directive = '!$omp target exit data ' + clause_val + extraOmpArgs_val.strip('\n')
     $:omp_directive
 #:enddef
 
-#:def OMP_UPDATE(host=None, device=None, extraAccArgs=None)
+#:def OMP_UPDATE(host=None, device=None, extraOmpArgs=None)
     #:set host_val = OMP_FROM_STR(host)
     #:set device_val = OMP_TO_STR(device)
-    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set clause_val = host_val.strip('\n') + device_val.strip('\n')
-    #:set acc_directive = '!$acc update ' + clause_val + extraAccArgs_val.strip('\n')
+    #:set acc_directive = '!$omp target update ' + clause_val + extraOmpArgs_val.strip('\n')
     $:acc_directive
 #:enddef
 ! New line at end of file is required for FYPP
