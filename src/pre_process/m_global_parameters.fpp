@@ -254,7 +254,6 @@ module m_global_parameters
     real(wp) :: gamma_m, gamma_n, mu_n
     real(wp) :: poly_sigma
     integer :: dist_type !1 = binormal, 2 = lognormal-normal
-    integer :: R0_type   !1 = simpson
     !> @}
 
     !> @name Surface Tension Modeling
@@ -495,7 +494,6 @@ contains
         sigV = dflt_real
         rhoRV = 0._wp
         dist_type = dflt_int
-        R0_type = dflt_int
 
         R_n = dflt_real
         R_v = dflt_real
@@ -782,7 +780,7 @@ contains
                 if (nb == 1) then
                     weight(:) = 1._wp
                     R0(:) = 1._wp
-                    V0(:) = 0._wp
+                    V0(:) = 1._wp
                 else if (nb > 1) then
                     V0(:) = 1._wp
                 else
