@@ -21,6 +21,10 @@ jobs:
           sudo apt-get install -y apptainer
           sudo apptainer config fakeroot --enable $(whoami)
 
+          sudo rm -rf /tmp/*
+          docker system prune -af || true
+          sudo apt-get clean
+
           mkdir -p ~/.ssh
           echo "${{secrets.SSH_PRIVATE_KEY}}" >~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
