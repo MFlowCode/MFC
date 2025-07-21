@@ -108,7 +108,7 @@ contains
         #:endfor
 
         #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',     &
-            &  'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat', &
+            &  'mp_weno', 'rdma_mpi', 'powell', 'cont_damage', 'bc_io', &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
             & 'parallel_io', 'hypoelasticity', 'bubbles_euler', 'polytropic',    &
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
@@ -119,7 +119,7 @@ contains
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
             & 'shear_stress', 'bulk_stress', 'bubbles_lagrange',     &
-            & 'hyperelasticity', 'bc_io', 'powell', 'cont_damage' ]
+            & 'hyperelasticity']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
