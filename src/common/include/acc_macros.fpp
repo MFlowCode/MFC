@@ -1,5 +1,65 @@
 #:include 'shared_parallel_macros.fpp'
 
+#:def GEN_COPY_STR(copy)
+    #:set copy_val = GEN_PARENTHESES_CLAUSE('copy', copy)
+    $:copy_val
+#:enddef
+
+#:def GEN_COPYIN_STR(copyin, readonly)
+    #:assert isinstance(readonly, bool)
+    #:set copyin_val = GEN_PARENTHESES_CLAUSE('copyin', copyin)
+    #:if copyin is not None and readonly == True
+        #:set index = copyin_val.find('copyin(') + len('copyin(')
+        #:set copyin_val = copyin_val[:index] + 'readonly:' + copyin_val[index:]
+    #:endif
+    $:copyin_val
+#:enddef
+
+#:def GEN_COPYOUT_STR(copyout)
+    #:set copyout_val = GEN_PARENTHESES_CLAUSE('copyout', copyout)
+    $:copyout_val
+#:enddef
+
+#:def GEN_CREATE_STR(create)
+    #:set create_val = GEN_PARENTHESES_CLAUSE('create', create)
+    $:create_val
+#:enddef
+
+#:def GEN_NOCREATE_STR(no_create)
+    #:set nocreate_val = GEN_PARENTHESES_CLAUSE('no_create', no_create)
+    $:nocreate_val
+#:enddef
+
+#:def GEN_DELETE_STR(delete)
+    #:set delete_val = GEN_PARENTHESES_CLAUSE('delete', delete)
+    $:delete_val
+#:enddef
+
+#:def GEN_PRESENT_STR(present)
+    #:set present_val = GEN_PARENTHESES_CLAUSE('present', present)
+    $:present_val
+#:enddef
+
+#:def GEN_DEVICEPTR_STR(deviceptr)
+    #:set deviceptr_val = GEN_PARENTHESES_CLAUSE('deviceptr', deviceptr)
+    $:deviceptr_val
+#:enddef
+
+#:def GEN_ATTACH_STR(attach)
+    #:set attach_val = GEN_PARENTHESES_CLAUSE('attach', attach)
+    $:attach_val
+#:enddef
+
+#:def GEN_DETACH_STR(detach)
+    #:set detach_val = GEN_PARENTHESES_CLAUSE('detach', detach)
+    $:detach_val
+#:enddef
+
+#:def GEN_LINK_STR(link)
+    #:set link_val = GEN_PARENTHESES_CLAUSE('link', link)
+    $:link_val
+#:enddef
+
 #:def ACC_PARALLEL(code, private=None, default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None)

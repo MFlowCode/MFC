@@ -1,3 +1,10 @@
+#:def ASSERT_LIST(data, datatype)
+    #:assert data is not None
+    #:assert isinstance(data, list)
+    #:assert len(data) != 0
+    #:assert all(isinstance(element, datatype) for element in data)
+#:enddef
+
 #:def GEN_CLAUSE(clause_name, clause_str)
     #:set clause_regex = re.compile(',(?![^(]*\\))')
     #:assert isinstance(clause_name, str)
@@ -38,6 +45,7 @@
     #:endif
     $:clause_str
 #:enddef
+
 
 #:def GEN_PRIVATE_STR(private, initialized_values)
     #:assert isinstance(initialized_values, bool)
