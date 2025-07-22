@@ -165,7 +165,6 @@ module m_global_parameters
     integer :: hyper_model     !< hyperelasticity solver algorithm
     logical :: elasticity      !< elasticity modeling, true for hyper or hypo
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
-    logical :: cu_tensor
     logical :: shear_stress  !< Shear stresses
     logical :: bulk_stress   !< Bulk stresses
     logical :: cont_damage   !< Continuum damage modeling
@@ -497,7 +496,7 @@ module m_global_parameters
     real(wp) :: mytime       !< Current simulation time
     real(wp) :: finaltime    !< Final simulation time
 
-    logical :: weno_flat, riemann_flat, rdma_mpi
+    logical :: rdma_mpi
 
     type(pres_field), allocatable, dimension(:) :: pb_ts
 
@@ -589,8 +588,6 @@ contains
         hyper_model = dflt_int
         b_size = dflt_int
         tensor_size = dflt_int
-        weno_flat = .true.
-        riemann_flat = .true.
         rdma_mpi = .false.
         shear_stress = .false.
         bulk_stress = .false.
@@ -697,9 +694,6 @@ contains
         ! Surface tension
         sigma = dflt_real
         surface_tension = .false.
-
-        ! Cuda aware MPI
-        cu_tensor = .false.
 
         bodyForces = .false.
         bf_x = .false.; bf_y = .false.; bf_z = .false.
