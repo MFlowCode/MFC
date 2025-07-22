@@ -554,18 +554,19 @@ contains
                 end do
             end if ! end allocation of viscous variables
 
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do id = 1, num_dims
-                do i = 1, sys_size
-                    do l = idwbuff(3)%beg, idwbuff(3)%end
-                        do k = idwbuff(2)%beg, idwbuff(2)%end
-                            do j = idwbuff(1)%beg, idwbuff(1)%end
-                                flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0._wp
+            #:call GPU_PARALLEL_LOOP(collapse=4)
+                do id = 1, num_dims
+                    do i = 1, sys_size
+                        do l = idwbuff(3)%beg, idwbuff(3)%end
+                            do k = idwbuff(2)%beg, idwbuff(2)%end
+                                do j = idwbuff(1)%beg, idwbuff(1)%end
+                                    flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0._wp
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
 
         end if ! end allocation for .not. igr
 
@@ -637,37 +638,37 @@ contains
         if (.not. igr) then
             ! Association/Population of Working Variables
             #:call GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
-                            q_cons_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
+                do i = 1, sys_size
+                    do l = idwbuff(3)%beg, idwbuff(3)%end
+                        do k = idwbuff(2)%beg, idwbuff(2)%end
+                            do j = idwbuff(1)%beg, idwbuff(1)%end
+                                q_cons_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
-            end do
-        #:endcall GPU_PARALLEL_LOOP
+            #:endcall GPU_PARALLEL_LOOP
 
             ! Converting Conservative to Primitive Variables
 
             if (mpp_lim .and. bubbles_euler) then
                 #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
-                            alf_sum%sf(j, k, l) = 0._wp
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = advxb, advxe - 1
-                                alf_sum%sf(j, k, l) = alf_sum%sf(j, k, l) + q_cons_qp%vf(i)%sf(j, k, l)
-                            end do
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = advxb, advxe - 1
-                                q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1._wp - q_cons_qp%vf(alf_idx)%sf(j, k, l)) &
-                                                              /alf_sum%sf(j, k, l)
+                    do l = idwbuff(3)%beg, idwbuff(3)%end
+                        do k = idwbuff(2)%beg, idwbuff(2)%end
+                            do j = idwbuff(1)%beg, idwbuff(1)%end
+                                alf_sum%sf(j, k, l) = 0._wp
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = advxb, advxe - 1
+                                    alf_sum%sf(j, k, l) = alf_sum%sf(j, k, l) + q_cons_qp%vf(i)%sf(j, k, l)
+                                end do
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = advxb, advxe - 1
+                                    q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1._wp - q_cons_qp%vf(alf_idx)%sf(j, k, l)) &
+                                                                  /alf_sum%sf(j, k, l)
+                                end do
                             end do
                         end do
                     end do
-                end do
                 #:endcall GPU_PARALLEL_LOOP
             end if
         end if
@@ -728,16 +729,17 @@ contains
             if (igr) then
 
                 if (id == 1) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do l = -1, p + 1
-                        do k = -1, n + 1
-                            do j = -1, m + 1
-                                do i = 1, sys_size
-                                    rhs_vf(i)%sf(j, k, l) = 0._wp
+                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                        do l = -1, p + 1
+                            do k = -1, n + 1
+                                do j = -1, m + 1
+                                    do i = 1, sys_size
+                                        rhs_vf(i)%sf(j, k, l) = 0._wp
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                    #:endcall GPU_PARALLEL_LOOP
                 end if
 
                 call nvtxStartRange("IGR_RIEMANN")
@@ -978,16 +980,16 @@ contains
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
             if (.not. igr) then
                 #:call GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = idwbuff(3)%beg, idwbuff(3)%end
-                        do k = idwbuff(2)%beg, idwbuff(2)%end
-                            do j = idwbuff(1)%beg, idwbuff(1)%end
-                                q_prim_vf(i)%sf(j, k, l) = q_prim_qp%vf(i)%sf(j, k, l)
+                    do i = 1, sys_size
+                        do l = idwbuff(3)%beg, idwbuff(3)%end
+                            do k = idwbuff(2)%beg, idwbuff(2)%end
+                                do j = idwbuff(1)%beg, idwbuff(1)%end
+                                    q_prim_vf(i)%sf(j, k, l) = q_prim_qp%vf(i)%sf(j, k, l)
+                                end do
                             end do
                         end do
                     end do
-                end do
-            #:endcall GPU_PARALLEL_LOOP
+                #:endcall GPU_PARALLEL_LOOP
             end if
         end if
 
@@ -1483,51 +1485,51 @@ contains
 
             if (surface_tension) then
                 #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rhs_vf(c_idx)%sf(j, k, l) = &
-                                rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dx(j)* &
-                                q_prim_vf(c_idx)%sf(j, k, l)* &
-                                (flux_src_n_in(advxb)%sf(j, k, l) - &
-                                 flux_src_n_in(advxb)%sf(j - 1, k, l))
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(c_idx)%sf(j, k, l) = &
+                                    rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dx(j)* &
+                                    q_prim_vf(c_idx)%sf(j, k, l)* &
+                                    (flux_src_n_in(advxb)%sf(j, k, l) - &
+                                     flux_src_n_in(advxb)%sf(j - 1, k, l))
+                            end do
                         end do
                     end do
-                end do
                 #:endcall GPU_PARALLEL_LOOP
             end if
 
             #:call GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = momxb, E_idx
-                            rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
-                                (flux_src_n_in(i)%sf(j - 1, k, l) &
-                                 - flux_src_n_in(i)%sf(j, k, l))
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = momxb, E_idx
+                                rhs_vf(i)%sf(j, k, l) = &
+                                    rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
+                                    (flux_src_n_in(i)%sf(j - 1, k, l) &
+                                     - flux_src_n_in(i)%sf(j, k, l))
+                            end do
                         end do
                     end do
                 end do
-            end do
             #:endcall GPU_PARALLEL_LOOP
 
         elseif (idir == 2) then ! y-direction
 
             if (surface_tension) then
                 #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rhs_vf(c_idx)%sf(j, k, l) = &
-                                rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dy(k)* &
-                                q_prim_vf(c_idx)%sf(j, k, l)* &
-                                (flux_src_n_in(advxb)%sf(j, k, l) - &
-                                 flux_src_n_in(advxb)%sf(j, k - 1, l))
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(c_idx)%sf(j, k, l) = &
+                                    rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dy(k)* &
+                                    q_prim_vf(c_idx)%sf(j, k, l)* &
+                                    (flux_src_n_in(advxb)%sf(j, k, l) - &
+                                     flux_src_n_in(advxb)%sf(j, k - 1, l))
+                            end do
                         end do
                     end do
-                end do
                 #:endcall GPU_PARALLEL_LOOP
             end if
 
@@ -1566,36 +1568,36 @@ contains
                 end if
 
                 #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 1, n
-                        do j = 0, m
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = momxb, E_idx
-                                rhs_vf(i)%sf(j, k, l) = &
-                                    rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
-                                    (flux_src_n_in(i)%sf(j, k - 1, l) &
-                                     - flux_src_n_in(i)%sf(j, k, l))
+                    do l = 0, p
+                        do k = 1, n
+                            do j = 0, m
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = momxb, E_idx
+                                    rhs_vf(i)%sf(j, k, l) = &
+                                        rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
+                                        (flux_src_n_in(i)%sf(j, k - 1, l) &
+                                         - flux_src_n_in(i)%sf(j, k, l))
+                                end do
                             end do
                         end do
                     end do
-                end do
                 #:endcall GPU_PARALLEL_LOOP
 
             else
                 #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = momxb, E_idx
-                                rhs_vf(i)%sf(j, k, l) = &
-                                    rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
-                                    (flux_src_n_in(i)%sf(j, k - 1, l) &
-                                     - flux_src_n_in(i)%sf(j, k, l))
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = momxb, E_idx
+                                    rhs_vf(i)%sf(j, k, l) = &
+                                        rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
+                                        (flux_src_n_in(i)%sf(j, k - 1, l) &
+                                         - flux_src_n_in(i)%sf(j, k, l))
+                                end do
                             end do
                         end do
                     end do
-                end do
                 #:endcall GPU_PARALLEL_LOOP
             end if
 
@@ -1605,19 +1607,19 @@ contains
                 if ((bc_y%beg == -2) .or. (bc_y%beg == -14)) then
 
                     #:call GPU_PARALLEL_LOOP(collapse=3)
-                    do l = 0, p
-                        do k = 1, n
-                            do j = 0, m
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = momxb, E_idx
-                                    rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) - 5.e-1_wp/y_cc(k)* &
-                                        (flux_src_n_in(i)%sf(j, k - 1, l) &
-                                         + flux_src_n_in(i)%sf(j, k, l))
+                        do l = 0, p
+                            do k = 1, n
+                                do j = 0, m
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = momxb, E_idx
+                                        rhs_vf(i)%sf(j, k, l) = &
+                                            rhs_vf(i)%sf(j, k, l) - 5.e-1_wp/y_cc(k)* &
+                                            (flux_src_n_in(i)%sf(j, k - 1, l) &
+                                             + flux_src_n_in(i)%sf(j, k, l))
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
                     #:endcall GPU_PARALLEL_LOOP
 
                     if (viscous) then
@@ -1637,19 +1639,19 @@ contains
                 else
 
                     #:call GPU_PARALLEL_LOOP(collapse=3)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = momxb, E_idx
-                                    rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) - 5.e-1_wp/y_cc(k)* &
-                                        (flux_src_n_in(i)%sf(j, k - 1, l) &
-                                         + flux_src_n_in(i)%sf(j, k, l))
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = momxb, E_idx
+                                        rhs_vf(i)%sf(j, k, l) = &
+                                            rhs_vf(i)%sf(j, k, l) - 5.e-1_wp/y_cc(k)* &
+                                            (flux_src_n_in(i)%sf(j, k - 1, l) &
+                                             + flux_src_n_in(i)%sf(j, k, l))
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
                     #:endcall GPU_PARALLEL_LOOP
                 end if
             end if
@@ -1658,53 +1660,53 @@ contains
 
             if (surface_tension) then
                 #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rhs_vf(c_idx)%sf(j, k, l) = &
-                                rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dz(l)* &
-                                q_prim_vf(c_idx)%sf(j, k, l)* &
-                                (flux_src_n_in(advxb)%sf(j, k, l) - &
-                                 flux_src_n_in(advxb)%sf(j, k, l - 1))
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(c_idx)%sf(j, k, l) = &
+                                    rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dz(l)* &
+                                    q_prim_vf(c_idx)%sf(j, k, l)* &
+                                    (flux_src_n_in(advxb)%sf(j, k, l) - &
+                                     flux_src_n_in(advxb)%sf(j, k, l - 1))
+                            end do
                         end do
                     end do
-                end do
                 #:endcall GPU_PARALLEL_LOOP
             end if
 
             #:call GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = momxb, E_idx
-                            rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
-                                (flux_src_n_in(i)%sf(j, k, l - 1) &
-                                 - flux_src_n_in(i)%sf(j, k, l))
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = momxb, E_idx
+                                rhs_vf(i)%sf(j, k, l) = &
+                                    rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
+                                    (flux_src_n_in(i)%sf(j, k, l - 1) &
+                                     - flux_src_n_in(i)%sf(j, k, l))
+                            end do
                         end do
                     end do
                 end do
-            end do
             #:endcall GPU_PARALLEL_LOOP
 
             if (grid_geometry == 3) then
                 #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rhs_vf(momxb + 1)%sf(j, k, l) = &
-                                rhs_vf(momxb + 1)%sf(j, k, l) + 5.e-1_wp* &
-                                (flux_src_n_in(momxe)%sf(j, k, l - 1) &
-                                 + flux_src_n_in(momxe)%sf(j, k, l))
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(momxb + 1)%sf(j, k, l) = &
+                                    rhs_vf(momxb + 1)%sf(j, k, l) + 5.e-1_wp* &
+                                    (flux_src_n_in(momxe)%sf(j, k, l - 1) &
+                                     + flux_src_n_in(momxe)%sf(j, k, l))
 
-                            rhs_vf(momxe)%sf(j, k, l) = &
-                                rhs_vf(momxe)%sf(j, k, l) - 5.e-1_wp* &
-                                (flux_src_n_in(momxb + 1)%sf(j, k, l - 1) &
-                                 + flux_src_n_in(momxb + 1)%sf(j, k, l))
+                                rhs_vf(momxe)%sf(j, k, l) = &
+                                    rhs_vf(momxe)%sf(j, k, l) - 5.e-1_wp* &
+                                    (flux_src_n_in(momxb + 1)%sf(j, k, l - 1) &
+                                     + flux_src_n_in(momxb + 1)%sf(j, k, l))
+                            end do
                         end do
                     end do
-                end do
                 #:endcall GPU_PARALLEL_LOOP
             end if
         end if

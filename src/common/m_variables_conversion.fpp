@@ -879,27 +879,27 @@ contains
                     do j = ibounds(1)%beg, ibounds(1)%end
                         dyn_pres_K = 0._wp
 
-                      if (igr) then
-                          if (num_fluids == 1) then
-                              alpha_rho_K(1) = qK_cons_vf(contxb)%sf(j, k, l)
-                              alpha_K(1) = qK_cons_vf(advxb)%sf(j, k, l)
-                          else
-                              $:GPU_LOOP(parallelism='[seq]')
-                              do i = 1, num_fluids - 1
-                                  alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-                                  alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-                              end do
+                        if (igr) then
+                            if (num_fluids == 1) then
+                                alpha_rho_K(1) = qK_cons_vf(contxb)%sf(j, k, l)
+                                alpha_K(1) = qK_cons_vf(advxb)%sf(j, k, l)
+                            else
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids - 1
+                                    alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                                    alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                                end do
 
-                              alpha_rho_K(num_fluids) = qK_cons_vf(num_fluids)%sf(j, k, l)
-                              alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
-                          end if
-                      else
-                          $:GPU_LOOP(parallelism='[seq]')
-                          do i = 1, num_fluids
-                              alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-                              alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-                          end do
-                      end if
+                                alpha_rho_K(num_fluids) = qK_cons_vf(num_fluids)%sf(j, k, l)
+                                alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
+                            end if
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids
+                                alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                                alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                            end do
+                        end if
 
                         if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION

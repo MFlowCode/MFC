@@ -108,8 +108,8 @@ contains
                             w3 = (w3L + w3R)/2._wp
                             normW = (normWL + normWR)/2._wp
 
-                        if (normW > capillary_cutoff) then
-                            @:compute_capillary_stress_tensor()
+                            if (normW > capillary_cutoff) then
+                                @:compute_capillary_stress_tensor()
 
                                 do i = 1, num_dims
 
@@ -154,8 +154,8 @@ contains
                             w3 = (w3L + w3R)/2._wp
                             normW = (normWL + normWR)/2._wp
 
-                        if (normW > capillary_cutoff) then
-                            @:compute_capillary_stress_tensor()
+                            if (normW > capillary_cutoff) then
+                                @:compute_capillary_stress_tensor()
 
                                 do i = 1, num_dims
 
@@ -200,8 +200,8 @@ contains
                             w3 = (w3L + w3R)/2._wp
                             normW = (normWL + normWR)/2._wp
 
-                        if (normW > capillary_cutoff) then
-                            @:compute_capillary_stress_tensor()
+                            if (normW > capillary_cutoff) then
+                                @:compute_capillary_stress_tensor()
 
                                 do i = 1, num_dims
 
@@ -276,21 +276,21 @@ contains
         end if
 
         #:call GPU_PARALLEL_LOOP(collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    c_divs(num_dims + 1)%sf(j, k, l) = 0._wp
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, num_dims
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        c_divs(num_dims + 1)%sf(j, k, l) = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_dims
+                            c_divs(num_dims + 1)%sf(j, k, l) = &
+                                c_divs(num_dims + 1)%sf(j, k, l) + &
+                                c_divs(i)%sf(j, k, l)**2._wp
+                        end do
                         c_divs(num_dims + 1)%sf(j, k, l) = &
-                            c_divs(num_dims + 1)%sf(j, k, l) + &
-                            c_divs(i)%sf(j, k, l)**2._wp
+                            sqrt(c_divs(num_dims + 1)%sf(j, k, l))
                     end do
-                    c_divs(num_dims + 1)%sf(j, k, l) = &
-                        sqrt(c_divs(num_dims + 1)%sf(j, k, l))
                 end do
             end do
-        end do
         #:endcall GPU_PARALLEL_LOOP
 
         call s_populate_capillary_buffers(c_divs, bc_type)

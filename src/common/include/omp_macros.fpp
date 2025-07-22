@@ -17,8 +17,8 @@
         #:assert isinstance(default, str)
         #:assert (default == 'present' or default == 'none')
         #:if default == 'present'
-            #! #:set default_val = 'defaultmap(present:aggregate) defaultmap(present:allocatable) defaultmap(present:pointer)'
-            #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(tofrom:allocatable) defaultmap(tofrom:pointer)'
+            #! #:set default_val = 'defaultmap(present:aggregate) defaultmap(present:allocatable) defaultmap(present:pointer) '
+            #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(tofrom:allocatable) defaultmap(tofrom:pointer) '
         #:elif default == 'none'
             #:stop 'Not Supported Yet'
         #:endif
@@ -113,12 +113,12 @@
         & copy_val.strip('\n') + copyin_val.strip('\n') + &
         & copyout_val.strip('\n') + create_val.strip('\n') + &
         & no_create_val.strip('\n') + present_val.strip('\n') + &
-        & deviceptr_val.strip('\n') + attach_val.strip('\n'))
+        & deviceptr_val.strip('\n') + attach_val.strip('\n')
     
     #:set omp_clause_val = omp_clause_val.strip('\n')
     #:set omp_directive = '!$omp target teams ' + omp_clause_val + extraOmpArgs_val.strip('\n')
 
-    #:set end_omp_directive = '!$omp end target teams'
+    #:set omp_end_directive = '!$omp end target teams'
     $:omp_directive
     $:code
     $:omp_end_directive
