@@ -17,7 +17,8 @@ module m_muscl
 
     private; public :: s_initialize_muscl_module, &
  s_muscl, &
- s_finalize_muscl_module
+ s_finalize_muscl_module, &
+ s_interface_compression
 
     integer :: v_size
     $:GPU_DECLARE(create='[v_size]')

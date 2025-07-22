@@ -1056,7 +1056,6 @@ contains
                                 do l = is3_viscous%beg, is3_viscous%end
                                     do k = is2_viscous%beg, is2_viscous%end
                                         do j = is1_viscous%beg, is1_viscous%end
-                                            print *, i, l, k, j
                                             vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
                                             vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
                                         end do
