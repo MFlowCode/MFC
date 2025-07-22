@@ -31,11 +31,6 @@ module m_mpi_proxy
     integer, allocatable, dimension(:) :: displs
     !> @}
 
-    !> @name Generic flags used to identify and report MPI errors
-    !> @{
-    integer, private :: ierr
-    !> @}
-
 contains
 
     !>  Computation of parameters, allocation procedures, and/or
@@ -45,6 +40,7 @@ contains
 #ifdef MFC_MPI
 
         integer :: i !< Generic loop iterator
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Allocating and configuring the receive counts and the displacement
         ! vector variables used in variable-gather communication procedures.
@@ -85,6 +81,7 @@ contains
 
 #ifdef MFC_MPI
         integer :: i !< Generic loop iterator
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Logistics
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
@@ -150,6 +147,7 @@ contains
         real(wp), dimension(1:, 0:), intent(INOUT) :: spatial_extents
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Simulation is 3D
         if (p > 0) then
@@ -267,6 +265,7 @@ contains
     impure subroutine s_mpi_defragment_1d_grid_variable
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Silo-HDF5 database format
         if (format == 1) then
@@ -306,6 +305,7 @@ contains
         real(wp), dimension(1:2, 0:num_procs - 1), intent(inout) :: data_extents
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Minimum flow variable extent
         call MPI_GATHERV(minval(q_sf), 1, mpi_p, &
@@ -333,6 +333,7 @@ contains
         real(wp), dimension(0:m), intent(inout) :: q_root_sf
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Gathering the sub-domain flow variable data from all the processes
         ! and putting it back together for the entire computational domain

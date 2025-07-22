@@ -82,16 +82,16 @@ module m_start_up
 
         !! @param q_cons_vf Conservative variables
         !! @param ib_markers track if a cell is within the immersed boundary
-        impure subroutine s_read_abstract_ic_data_files(q_cons_vf, ib_markers)
+        impure subroutine s_read_abstract_ic_data_files(q_cons_vf_in, ib_markers_in)
 
             import :: scalar_field, integer_field, sys_size, pres_field
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(inout) :: q_cons_vf
+                intent(inout) :: q_cons_vf_in
 
             type(integer_field), &
-                intent(inout) :: ib_markers
+                intent(inout) :: ib_markers_in
 
         end subroutine s_read_abstract_ic_data_files
 
@@ -409,14 +409,14 @@ contains
         !!      all new initial condition.
         !! @param q_cons_vf Conservative variables
         !! @param ib_markers track if a cell is within the immersed boundary
-    impure subroutine s_read_serial_ic_data_files(q_cons_vf, ib_markers)
+    impure subroutine s_read_serial_ic_data_files(q_cons_vf_in, ib_markers_in)
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(inout) :: q_cons_vf
+            intent(inout) :: q_cons_vf_in
 
         type(integer_field), &
-            intent(inout) :: ib_markers
+            intent(inout) :: ib_markers_in
 
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc !<
         ! Generic string used to store the address of a particular file
@@ -446,7 +446,7 @@ contains
             if (file_check) then
                 open (1, FILE=trim(file_loc), FORM='unformatted', &
                       STATUS='old', ACTION='read')
-                read (1) q_cons_vf(i)%sf
+                read (1) q_cons_vf_in(i)%sf
                 close (1)
             else
                 call s_mpi_abort('File q_cons_vf'//trim(file_num)// &
@@ -517,7 +517,7 @@ contains
             if (file_check) then
                 open (1, FILE=trim(file_loc), FORM='unformatted', &
                       STATUS='old', ACTION='read')
-                read (1) ib_markers%sf(0:m, 0:n, 0:p)
+                read (1) ib_markers_in%sf(0:m, 0:n, 0:p)
                 close (1)
             else
                 call s_mpi_abort('File ib.dat is missing in ' &
@@ -645,14 +645,14 @@ contains
         !!      all new initial condition.
         !! @param q_cons_vf Conservative variables
         !! @param ib_markers track if a cell is within the immersed boundary
-    impure subroutine s_read_parallel_ic_data_files(q_cons_vf, ib_markers)
+    impure subroutine s_read_parallel_ic_data_files(q_cons_vf_in, ib_markers_in)
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(inout) :: q_cons_vf
+            intent(inout) :: q_cons_vf_in
 
         type(integer_field), &
-            intent(inout) :: ib_markers
+            intent(inout) :: ib_markers_in
 
 #ifdef MFC_MPI
 
@@ -683,9 +683,9 @@ contains
 
             ! Initialize MPI data I/O
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+                call s_initialize_mpi_data(q_cons_vf_in, ib_markers_in, levelset, levelset_norm)
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                call s_initialize_mpi_data(q_cons_vf_in)
             end if
 
             ! Size of local arrays

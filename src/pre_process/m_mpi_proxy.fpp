@@ -23,9 +23,6 @@ module m_mpi_proxy
 
     implicit none
 
-    integer, private :: ierr !<
-    !! Generic flag used to identify and report MPI errors
-
 contains
     !> Since only processor with rank 0 is in charge of reading
             !!       and checking the consistency of the user provided inputs,
@@ -38,6 +35,8 @@ contains
 
         ! Generic loop iterator
         integer :: i
+        ! Generic flag used to identify and report MPI errors
+        integer :: ierr
 
         ! Logistics
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
