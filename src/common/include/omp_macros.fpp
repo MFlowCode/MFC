@@ -132,7 +132,6 @@
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
     #:set parallelism_val = OMP_PARALLELISM_STR(parallelism)
     #:set default_val = OMP_DEFAULT_STR(default)
-    #:set default_val = ''
     #:set private_val = GEN_PRIVATE_STR(private, False).strip('\n') + GEN_PRIVATE_STR(firstprivate, True).strip('\n')
     #:set reduction_val = GEN_REDUCTION_STR(reduction, reductionOp)
     #:set copy_val = OMP_COPY_STR(copy)
