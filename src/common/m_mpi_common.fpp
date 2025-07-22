@@ -845,7 +845,7 @@ contains
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
                 #:if rdma_mpi
-                    #:call GPU_HOST_DATA(use_device='[buff_send, buff_recv]')
+                    #:call GPU_HOST_DATA(use_device_addr='[buff_send, buff_recv]')
                         call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
 
                         call MPI_SENDRECV( &

@@ -234,4 +234,37 @@
     #:set acc_directive = '!$acc update ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
 #:enddef
+
+#:def ACC_HOST_DATA(code, use_device=None, extraAccArgs=None)
+    #:assert code is not None
+    #:assert isinstance(code, str)
+    #:if code == '' or code.isspace()
+        #:stop 'GPU_HOST_DATA macro has no effect on the code as it is not surrounding any code'
+    #:endif
+    #:set use_device_val = GEN_USE_DEVICE_STR(use_device)
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #:set clause_val = use_device_val.strip('\n')
+    #:set acc_directive = '!$acc host_data ' + clause_val + extraAccArgs_val.strip('\n')
+    #:set end_acc_directive = '!$acc end host_data'
+    $:acc_directive
+    $:code
+    $:end_acc_directive
+#:enddef
+
+#:def ACC_ATOMIC(atomic, extraAccArgs=None)
+    #:assert isinstance(atomic, str)
+    #:assert (atomic == 'read' or atomic == 'write' or atomic == 'update' or atomic == 'capture')
+    #:set atomic_val = atomic
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #:set clause_val = atomic_val.strip('\n')
+    #:set acc_directive = '!$acc atomic ' + clause_val + extraAccArgs_val.strip('\n')
+    $:acc_directive
+#:enddef
+
+#:def ACC_WAIT(extraAccArgs=None)
+    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #:set clause_val = ''
+    #:set acc_directive = '!$acc wait ' + clause_val + extraAccArgs_val.strip('\n')
+    $:acc_directive
+#:enddef
 ! New line at end of file is required for FYPP
