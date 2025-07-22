@@ -14,8 +14,13 @@ From: ubuntu:24.04
     apt update -y && apt install -y \
         build-essential git tar wget make cmake gcc g++ \
         python3 python3-venv python3-pip\
-        openmpi-bin libopenmpi-dev libfftw3-dev hpl-2.3
+        openmpi-bin libopenmpi-dev libfftw3-dev\
+        libatlas-base-dev mpich libmpich-dev gfortran
         
+    wget https://www.netlib.org/benchmark/hpl/hpl-2.3.tar.gz
+    tar -xzvf hpl-2.3.tar.gz
+    mv hpl-2.3 hpl
+
     cd /opt/MFC
     rm -rf build
     ./mfc.sh build -j $(nproc)
