@@ -31,6 +31,8 @@ jobs:
           ssh-keyscan -H ap40.uw.osg-htc.org >> ~/.ssh/known_hosts
 
           mkdir -p /tmp/mfc_tmp
+          ssh ${{secrets.SSH_USER}} "mkdir -p MFC"
+
           (cd pr/.github/workflows/images && sudo apptainer build --force --tmpdir /tmp/mfc_tmp mfc_cpu.sif Singularity.cpu)
           scp pr/.github/workflows/images/mfc_cpu.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu.sif
           ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_cpu.sif /ospool/ap40/data/mohammed.al-mahrouqi"
