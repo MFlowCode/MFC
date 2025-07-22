@@ -8,13 +8,6 @@ jobs:
     name: Build Singularity Images
     runs-on: ubuntu-latest
     steps:
-
-      - name: Free up disk space
-        run: |
-            sudo rm -rf /opt/hostedtoolcache
-            sudo rm -rf /usr/local/lib/android
-            sudo docker image prune -a -f || true
-
       - name: Clone - PR
         uses: actions/checkout@v4
         with:
@@ -28,9 +21,9 @@ jobs:
           sudo apt-get install -y apptainer
           sudo apptainer config fakeroot --enable $(whoami)
 
-          sudo rm -rf /tmp/*
-          docker system prune -af || true
           sudo apt-get clean
+          sudo rm -rf /tmp/* /var/lib/apt/lists/* /opt/hostedtoolcache /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm /home/runner/.cache /home/runner/work/_temp
+          docker system prune -af || true
 
           mkdir -p ~/.ssh
           echo "${{secrets.SSH_PRIVATE_KEY}}" >~/.ssh/id_rsa
