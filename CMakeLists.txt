@@ -479,17 +479,6 @@ function(MFC_SETUP_TARGET)
                     "-foffload-options=-lgfortran\ -lm"
                     "-fno-exceptions")
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
-                find_package(cuTENSOR)
-                if (NOT cuTENSOR_FOUND)
-                    message(WARNING
-                        "Failed to locate the NVIDIA cuTENSOR library. MFC will be "
-                        "built without support for it, disallowing the use of "
-                        "cu_tensor=T. This can result in degraded performance.")
-                else()
-                    target_link_libraries     (${a_target} PRIVATE cuTENSOR::cuTENSOR)
-                    target_compile_definitions(${a_target} PRIVATE MFC_cuTENSOR)
-                endif()
-
                 foreach (cc ${MFC_CUDA_CC})
                     target_compile_options(${a_target}
                         PRIVATE -gpu=cc${cc}
