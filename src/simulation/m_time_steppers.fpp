@@ -1072,34 +1072,65 @@ contains
 
         integer, intent(in) :: t_step
 
-        integer :: i !< Generic loop iterator
-
-        do i = 1, sys_size
-            $:GPU_UPDATE(host='[q_prim_vf(i)%sf]')
-        end do
+        integer :: i, j, k, l !< Generic loop iterator
 
         if (t_step == t_step_start) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
-                q_prim_ts(3)%vf(i)%sf(:, :, :) = q_prim_vf(i)%sf(:, :, :)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
             end do
         elseif (t_step == t_step_start + 1) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
-                q_prim_ts(2)%vf(i)%sf(:, :, :) = q_prim_vf(i)%sf(:, :, :)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
             end do
         elseif (t_step == t_step_start + 2) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
-                q_prim_ts(1)%vf(i)%sf(:, :, :) = q_prim_vf(i)%sf(:, :, :)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
             end do
         elseif (t_step == t_step_start + 3) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
-                q_prim_ts(0)%vf(i)%sf(:, :, :) = q_prim_vf(i)%sf(:, :, :)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
             end do
         else ! All other timesteps
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
-                q_prim_ts(3)%vf(i)%sf(:, :, :) = q_prim_ts(2)%vf(i)%sf(:, :, :)
-                q_prim_ts(2)%vf(i)%sf(:, :, :) = q_prim_ts(1)%vf(i)%sf(:, :, :)
-                q_prim_ts(1)%vf(i)%sf(:, :, :) = q_prim_ts(0)%vf(i)%sf(:, :, :)
-                q_prim_ts(0)%vf(i)%sf(:, :, :) = q_prim_vf(i)%sf(:, :, :)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_ts(2)%vf(i)%sf(j, k, l)
+                            q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_ts(1)%vf(i)%sf(j, k, l)
+                            q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_ts(0)%vf(i)%sf(j, k, l)
+                            q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
             end do
         end if
 
