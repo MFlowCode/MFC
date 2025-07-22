@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: nvcr.io/nvidia/nvhpc:23.11-runtime-cuda12.3-ubuntu20.04
+From: nvcr.io/nvidia/nvhpc:23.11-devel-cuda12.3-ubuntu22.04
 
 %files
     ../../../ /opt/MFC
@@ -19,8 +19,15 @@ From: nvcr.io/nvidia/nvhpc:23.11-runtime-cuda12.3-ubuntu20.04
         python3 python3-venv python3-pip\
         openmpi-bin libopenmpi-dev libfftw3-dev
 
+    wget https://developer.download.nvidia.com/compute/nvidia-hpc-benchmarks/25.04/local_installers/nvidia-hpc-benchmarks-local-repo-ubuntu2404-25.04_1.0-1_amd64.deb -O /tmp/nvidia-hpc-benchmarks.deb
+    dpkg -i /tmp/nvidia-hpc-benchmarks.deb
+    cp /var/nvidia-hpc-benchmarks-local-repo-ubuntu2404-25.04/nvidia-hpc-benchmarks-*-keyring.gpg /usr/share/keyrings/
+    apt update -y
+    apt install -y nvidia-hpc-benchmarks
+
     cd /opt/MFC
     rm -rf build
+
     export CC=nvc
     export CXX=nvc++
     export FC=nvfortran

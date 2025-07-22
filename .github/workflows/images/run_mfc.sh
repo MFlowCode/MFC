@@ -1,6 +1,4 @@
 #!/bin/bash
-# Create a writable directory for test outputs
-mkdir -p /tmp/mfc_tmp
 cd /tmp/mfc_tmp
 
 # Copy MFC to writable location

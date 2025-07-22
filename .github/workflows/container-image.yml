@@ -32,40 +32,43 @@ jobs:
 
           mkdir -p /tmp/mfc_tmp
 
-          # (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu.sif Singularity.cpu)
-          # scp pr/.github/workflows/images/mfc_cpu.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu.sif
-          # ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_cpu.sif /ospool/ap40/data/mohammed.al-mahrouqi"
-          # rm -rf pr/.github/workflows/images/mfc_cpu.sif
-          # rm -rf ~/.apptainer
-          # sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm
-          # sudo apt-get clean
+          (cd pr/.github/workflows/images && sudo apptainer build --force --tmpdir /tmp/mfc_tmp mfc_cpu.sif Singularity.cpu)
+          scp pr/.github/workflows/images/mfc_cpu.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu.sif
+          ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_cpu.sif /ospool/ap40/data/mohammed.al-mahrouqi"
+          rm -rf pr/.github/workflows/images/mfc_cpu.sif
+          rm -rf ~/.apptainer
+          sudo rm -rf /tmp/* /var/lib/apt/lists/* /opt/hostedtoolcache /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm /home/runner/.cache /home/runner/work/_temp
+          sudo apt-get clean
 
 
-          # (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu_bench.sif Singularity.cpu_bench)
-          # scp pr/.github/workflows/images/mfc_cpu_bench.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu_bench.sif
-          # ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_cpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi"
-          # rm -rf pr/.github/workflows/images/mfc_cpu_bench.sif
-          # rm -rf ~/.apptainer
-          # sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm
-          # sudo apt-get clean
+          (cd pr/.github/workflows/images && sudo apptainer build --force --tmpdir /tmp/mfc_tmp mfc_cpu_bench.sif Singularity.cpu_bench)
+          scp pr/.github/workflows/images/mfc_cpu_bench.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu_bench.sif
+          ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_cpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi"
+          rm -rf pr/.github/workflows/images/mfc_cpu_bench.sif
+          rm -rf ~/.apptainer
+          sudo rm -rf /tmp/* /var/lib/apt/lists/* /opt/hostedtoolcache /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm /home/runner/.cache /home/runner/work/_temp
+          sudo apt-get clean
 
 
           (cd pr/.github/workflows/images && sudo apptainer build --force --tmpdir /tmp/mfc_tmp mfc_gpu.sif Singularity.gpu)
-          # scp pr/.github/workflows/images/mfc_gpu.sif ${{secrets.SSH_USER}}:MFC/mfc_gpu.sif
-          # ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_gpu.sif /ospool/ap40/data/mohammed.al-mahrouqi"
-          # rm -rf pr/.github/workflows/images/mfc_gpu.sif
-          # rm -rf ~/.apptainer
-          # sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm
-          # sudo apt-get clean
+          scp pr/.github/workflows/images/mfc_gpu.sif ${{secrets.SSH_USER}}:MFC/mfc_gpu.sif
+          ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_gpu.sif /ospool/ap40/data/mohammed.al-mahrouqi"
+          rm -rf pr/.github/workflows/images/mfc_gpu.sif
+          rm -rf ~/.apptainer
+          sudo rm -rf /tmp/* /var/lib/apt/lists/* /opt/hostedtoolcache /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm /home/runner/.cache /home/runner/work/_temp
+          sudo apt-get clean
           
 
-          # (cd pr/.github/workflows/images && sudo apptainer build mfc_gpu_bench.sif Singularity.gpu_bench)
-          # scp pr/.github/workflows/images/mfc_gpu_bench.sif ${{secrets.SSH_USER}}:MFC/mfc_gpu_bench.sif
-          # ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_gpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi"
-          # rm -rf pr/.github/workflows/images/mfc_gpu_bench.sif
-          # rm -rf ~/.apptainer
-          # sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm
-          # sudo apt-get clean
+          (cd pr/.github/workflows/images && sudo apptainer build --force --tmpdir /tmp/mfc_tmp mfc_gpu_bench.sif Singularity.gpu_bench)
+          scp pr/.github/workflows/images/mfc_gpu_bench.sif ${{secrets.SSH_USER}}:MFC/mfc_gpu_bench.sif
+          ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_gpu_bench.sif /ospool/ap40/data/mohammed.al-mahrouqi"
+          rm -rf pr/.github/workflows/images/mfc_gpu_bench.sif
+          rm -rf ~/.apptainer
+          sudo rm -rf /tmp/* /var/lib/apt/lists/* /opt/hostedtoolcache /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm /home/runner/.cache /home/runner/work/_temp
+          sudo apt-get clean
+
+          scp pr/.github/workflows/images/run_mfc.sh ${{secrets.SSH_USER}}:MFC/run_mfc.sh
+
         env:
           FC: nvfortran
           CC: nvc
