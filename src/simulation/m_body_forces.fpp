@@ -10,9 +10,7 @@ module m_body_forces
 
     use m_nvtx
 
-#ifdef MFC_OpenACC
-    use openacc
-#endif
+! $:USE_GPU_MODULE()
 
     implicit none
 

@@ -24,9 +24,7 @@ module m_weno
 
     use m_variables_conversion !< State variables type conversion procedures
 
-#ifdef MFC_OPENACC
-    use openacc
-#endif
+    ! $:USE_GPU_MODULE()
 
     use m_mpi_proxy
 

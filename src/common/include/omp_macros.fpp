@@ -94,6 +94,16 @@
     $:temp
 #:enddef
 
+#:def OMP_USE_DEVICE_ADDR_STR(use_device_addr)
+      #:set use_device_addr_val = GEN_PARENTHESES_CLAUSE('use_device_addr', use_device_addr)
+      $:use_device_addr_val
+#:enddef
+
+#:def OMP_USE_DEVICE_PTR_STR(use_device_ptr)
+      #:set use_device_ptr_val = GEN_PARENTHESES_CLAUSE('use_device_ptr', use_device_ptr)
+      $:use_device_ptr_val
+#:enddef
+
 #:def OMP_PARALLEL(code, private=None, default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraOmpArgs=None)
@@ -250,5 +260,39 @@
     #:set clause_val = host_val.strip('\n') + device_val.strip('\n')
     #:set acc_directive = '!$omp target update ' + clause_val + extraOmpArgs_val.strip('\n')
     $:acc_directive
+#:enddef
+
+#:def OMP_HOST_DATA(code, use_device_addr, use_device_ptr, extraOmpArgs)
+    #:assert code is not None
+    #:assert isinstance(code, str)
+    #:if code == '' or code.isspace()
+        #:stop 'GPU_HOST_DATA macro has no effect on the code as it is not surrounding any code'
+    #:endif
+    #:set use_device_addr_val = OMP_USE_DEVICE_ADDR_STR(use_device_addr)
+    #:set use_device_ptr_val = OMP_USE_DEVICE_PTR_STR(use_device_ptr)
+    #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
+    #:set clause_val = use_device_addr_val.strip('\n') + use_device_ptr_val.strip('\n')
+    #:set omp_directive = '!$omp target data ' + clause_val + extraOmpArgs_val.strip('\n')
+    #:set omp_end_directive = '!$omp end target data'
+    $:omp_directive
+    $:code
+    $:omp_end_directive
+#:enddef
+
+#:def OMP_ATOMIC(atomic, extraOmpArgs=None)
+    #:assert isinstance(atomic, str)
+    #:assert (atomic == 'read' or atomic == 'write' or atomic == 'update' or atomic == 'capture')
+    #:set atomic_val = atomic
+    #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
+    #:set clause_val = atomic_val.strip('\n')
+    #:set omp_directive = '!$omp atomic ' + clause_val + extraOmpArgs_val.strip('\n')
+    $:omp_directive
+#:enddef
+
+#:def OMP_WAIT(extraOmpArgs=None)
+    #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
+    #:set clause_val = ''
+    #:set omp_directive = '!$omp barrier ' + clause_val + extraOmpArgs_val.strip('\n')
+    $:omp_directive
 #:enddef
 ! New line at end of file is required for FYPP

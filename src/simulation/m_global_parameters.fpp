@@ -21,9 +21,7 @@ module m_global_parameters
 
     use m_helper_basic         !< Functions to compare floating point numbers
 
-#ifdef MFC_OpenACC
-    use openacc
-#endif
+    ! $:USE_GPU_MODULE()
 
     implicit none
 

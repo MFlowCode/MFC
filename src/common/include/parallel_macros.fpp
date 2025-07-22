@@ -152,20 +152,32 @@
 #endif
 #:enddef
 
-#:def GPU_HOST_DATA(code, use_device=None, extraAccArgs=None)
-    #:assert code is not None
-    #:assert isinstance(code, str)
-    #:if code == '' or code.isspace()
-        #:stop 'GPU_HOST_DATA macro has no effect on the code as it is not surrounding any code'
+#:def GPU_HOST_DATA(code, use_device_addr=None, use_device_ptr=None, extraAccArgs=None, extraOmpArgs=None)
+
+    #:if use_device_addr is not None and use_device_ptr is not None
+      #:set use_device_addr_end_index = len(use_device_addr) - 1
+      #:set use_device = use_device_addr + use_device_ptr
+      $:use_device[use_device_addr_end_index] = ','
+      $:use_device[use_device_addr_end_index + 1] = ' '
+    #:elif use_device_addr is not None or use_device_ptr is not None
+      #:if use_device_addr is not None
+        #:set use_device = use_device_addr
+      #:else
+        #:set use_device = use_device_ptr
+      #:endif
+    #:else
+      #:set use_device = None
     #:endif
-    #:set use_device_val = GEN_USE_DEVICE_STR(use_device)
-    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-    #:set clause_val = use_device_val.strip('\n')
-    #:set acc_directive = '!$acc host_data ' + clause_val + extraAccArgs_val.strip('\n')
-    #:set end_acc_directive = '!$acc end host_data'
-    $:acc_directive
+    #:set acc_code = ACC_HOST_DATA(code=code, use_device=use_device, extraAccArgs=extraAccArgs)
+    #:set omp_code = OMP_HOST_DATA(code=code, use_device_addr=use_device_addr, use_device_ptr=use_device_ptr, extraOmpArgs=extraOmpArgs)
+
+#if defined(MFC_OpenACC)
+    $:acc_code
+#elif defined(MFC_OpenMP)
+    $:omp_code
+#else
     $:code
-    $:end_acc_directive
+#endif
 #:enddef
 
 #:def GPU_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
@@ -190,14 +202,15 @@
 #endif
 #:enddef
 
-#:def GPU_ATOMIC(atomic, extraAccArgs=None)
-    #:assert isinstance(atomic, str)
-    #:assert (atomic == 'read' or atomic == 'write' or atomic == 'update' or atomic == 'capture')
-    #:set atomic_val = atomic
-    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-    #:set clause_val = atomic_val.strip('\n')
-    #:set acc_directive = '!$acc atomic ' + clause_val + extraAccArgs_val.strip('\n')
-    $:acc_directive
+#:def GPU_ATOMIC(atomic, extraAccArgs=None, extraOmpArgs=None)
+    #:set acc_code = ACC_ATOMIC(atomic=atomic, extraAccArgs=extraAccArgs)
+    #:set omp_code = OMP_ATOMIC(atomic=atomic, extraOmpArgs=extraOmpArgs)
+
+#if defined(MFC_OpenACC)
+    $:acc_code
+#elif defined(MFC_OpenMP)
+    $:omp_code
+#endif
 #:enddef
 
 #:def GPU_UPDATE(host=None, device=None, extraAccArgs=None, extraOmpArgs=None)
@@ -211,11 +224,15 @@
 #endif
 #:enddef
 
-#:def GPU_WAIT(extraAccArgs=None)
-    #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
-    #:set clause_val = ''
-    #:set acc_directive = '!$acc wait ' + clause_val + extraAccArgs_val.strip('\n')
-    $:acc_directive
+#:def GPU_WAIT(extraAccArgs=None, extraOmpArgs=None)
+    #:set acc_code = ACC_WAIT(extraAccArgs=extraAccArgs)
+    #:set omp_code = OMP_WAIT(extraOmpArgs=extraOmpArgs)
+
+#if defined(MFC_OpenACC)
+    $:acc_code
+#elif defined(MFC_OpenMP)
+    $:omp_code
+#endif
 #:enddef
 
 #:def USE_GPU_MODULE()

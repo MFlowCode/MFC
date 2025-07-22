@@ -69,11 +69,6 @@ module m_start_up
     use m_helper_basic          !< Functions to compare floating point numbers
 
     $:USE_GPU_MODULE()
-!     #if defined(MFC_OpenACC)
-!     use openacc
-! #elif defined(MFC_OpenMP)
-!     use omp_lib
-! #endif
 
     use m_nvtx
 
