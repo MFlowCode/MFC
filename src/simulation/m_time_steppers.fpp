@@ -1021,14 +1021,14 @@ contains
         end if
 
         #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    if (igr) then
-                        call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-                    else
-                        call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-                    end if
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (igr) then
+                            call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+                        else
+                            call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+                        end if
 
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
@@ -1069,16 +1069,16 @@ contains
         call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
 
         #:call GPU_PARALLEL_LOOP(collapse=4)
-        do i = momxb, E_idx
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + &
-                                                   ldt*rhs_vf_in(i)%sf(j, k, l)
+            do i = momxb, E_idx
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + &
+                                                       ldt*rhs_vf_in(i)%sf(j, k, l)
+                        end do
                     end do
                 end do
             end do
-        end do
         #:endcall GPU_PARALLEL_LOOP
 
         call nvtxEndRange
@@ -1096,66 +1096,66 @@ contains
 
         if (t_step == t_step_start) then
             #:call GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
-            end do
             #:endcall GPU_PARALLEL_LOOP
         elseif (t_step == t_step_start + 1) then
             #:call GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
-            end do
             #:endcall GPU_PARALLEL_LOOP
         elseif (t_step == t_step_start + 2) then
             #:call GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
-            end do
             #:endcall GPU_PARALLEL_LOOP
         elseif (t_step == t_step_start + 3) then
             #:call GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
-            end do
             #:endcall GPU_PARALLEL_LOOP
         else ! All other timesteps
             #:call GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_ts(2)%vf(i)%sf(j, k, l)
-                            q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_ts(1)%vf(i)%sf(j, k, l)
-                            q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_ts(0)%vf(i)%sf(j, k, l)
-                            q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_ts(2)%vf(i)%sf(j, k, l)
+                                q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_ts(1)%vf(i)%sf(j, k, l)
+                                q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_ts(0)%vf(i)%sf(j, k, l)
+                                q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
-            end do
             #:endcall GPU_PARALLEL_LOOP
         end if
 

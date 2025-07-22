@@ -46,7 +46,6 @@
     $:clause_str
 #:enddef
 
-
 #:def GEN_PRIVATE_STR(private, initialized_values)
     #:assert isinstance(initialized_values, bool)
     #:if initialized_values == True

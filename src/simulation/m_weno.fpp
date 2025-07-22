@@ -1150,16 +1150,16 @@ contains
 
         if (weno_dir == 2) then
             #:call GPU_PARALLEL_LOOP(collapse=4)
-            do j = 1, v_size
-                do q = is3_weno%beg, is3_weno%end
-                    do l = is2_weno%beg, is2_weno%end
-                        do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
-                            v_rs_ws_y(k, l, q, j) = v_vf(j)%sf(l, k, q)
+                do j = 1, v_size
+                    do q = is3_weno%beg, is3_weno%end
+                        do l = is2_weno%beg, is2_weno%end
+                            do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
+                                v_rs_ws_y(k, l, q, j) = v_vf(j)%sf(l, k, q)
+                            end do
                         end do
                     end do
                 end do
-            end do
-                #:endcall GPU_PARALLEL_LOOP
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in z-direction
@@ -1167,16 +1167,16 @@ contains
 
         if (weno_dir == 3) then
             #:call GPU_PARALLEL_LOOP(collapse=4)
-            do j = 1, v_size
-                do q = is3_weno%beg, is3_weno%end
-                    do l = is2_weno%beg, is2_weno%end
-                        do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
-                            v_rs_ws_z(k, l, q, j) = v_vf(j)%sf(q, l, k)
+                do j = 1, v_size
+                    do q = is3_weno%beg, is3_weno%end
+                        do l = is2_weno%beg, is2_weno%end
+                            do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
+                                v_rs_ws_z(k, l, q, j) = v_vf(j)%sf(q, l, k)
+                            end do
                         end do
                     end do
                 end do
-            end do
-                #:endcall GPU_PARALLEL_LOOP
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_initialize_weno
