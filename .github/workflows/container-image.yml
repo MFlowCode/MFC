@@ -30,6 +30,8 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ap40.uw.osg-htc.org >> ~/.ssh/known_hosts
 
+          mkdir -p /tmp/mfc_tmp
+
           # (cd pr/.github/workflows/images && sudo apptainer build mfc_cpu.sif Singularity.cpu)
           # scp pr/.github/workflows/images/mfc_cpu.sif ${{secrets.SSH_USER}}:MFC/mfc_cpu.sif
           # ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_cpu.sif /ospool/ap40/data/mohammed.al-mahrouqi"
@@ -48,7 +50,7 @@ jobs:
           # sudo apt-get clean
 
 
-          (cd pr/.github/workflows/images && sudo apptainer build --force mfc_gpu.sif Singularity.gpu)
+          (cd pr/.github/workflows/images && sudo apptainer build --force --tmpdir /tmp/mfc_tmp mfc_gpu.sif Singularity.gpu)
           # scp pr/.github/workflows/images/mfc_gpu.sif ${{secrets.SSH_USER}}:MFC/mfc_gpu.sif
           # ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/mfc_gpu.sif /ospool/ap40/data/mohammed.al-mahrouqi"
           # rm -rf pr/.github/workflows/images/mfc_gpu.sif
