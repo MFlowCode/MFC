@@ -63,7 +63,7 @@ jobs:
             condor_wait logfile
           "
 
-      - name: Migrate Images to ODSF
+      - name: Migrate Images from ODSF
         run: |
           scp -r ${{secrets.SSH_USER}}:/ospool/ap40/data/mohammed.al-mahrouqi/* pr/.github/workflows/images/
 
