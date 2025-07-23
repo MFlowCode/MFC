@@ -649,7 +649,7 @@ contains
         real(wp), dimension(contxe) :: alpha_rho, dalpha_rho_ds, mf
         real(wp), dimension(2) :: Re_cbc
         real(wp), dimension(num_vels) :: vel, dvel_ds
-        real(wp), dimension(num_fluids) :: adv, dadv_ds
+        real(wp), dimension(num_fluids) :: adv_local, dadv_ds
         real(wp), dimension(sys_size) :: L
         real(wp), dimension(3) :: lambda
 
@@ -769,7 +769,7 @@ contains
                 end if
 
                 ! FD2 or FD4 of RHS at j = 0
-                $:GPU_PARALLEL_LOOP(collapse=2, private='[alpha_rho, vel, adv, &
+                $:GPU_PARALLEL_LOOP(collapse=2, private='[alpha_rho, vel, adv_local, &
                     & mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, &
                     & dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, &
                     & dYs_ds, h_k, Cp_i, Gamma_i, Xs]')
@@ -797,13 +797,13 @@ contains
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, advxe - E_idx
-                            adv(i) = q_prim_rs${XYZ}$_vf(0, k, r, E_idx + i)
+                            adv_local(i) = q_prim_rs${XYZ}$_vf(0, k, r, E_idx + i)
                         end do
 
                         if (bubbles_euler) then
-                            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc)
+                            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, adv_local, alpha_rho, Re_cbc)
                         else
-                            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc)
+                            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, adv_local, alpha_rho, Re_cbc)
                         end if
 
                         $:GPU_LOOP(parallelism='[seq]')
@@ -841,7 +841,7 @@ contains
                         H = (E + pres)/rho
 
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, 0._wp, c)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv_local, vel_K_sum, 0._wp, c)
 
                         ! First-Order Spatial Derivatives of Primitive Variables
 
@@ -934,7 +934,7 @@ contains
                                 end if
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = E_idx, advxe - 1
-                                    L(i) = c*Ma*(adv(i + 1 - E_idx) - alpha_in(i + 1 - E_idx, ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                    L(i) = c*Ma*(adv_local(i + 1 - E_idx) - alpha_in(i + 1 - E_idx, ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
                                 L(advxe) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
@@ -1003,7 +1003,7 @@ contains
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, advxe - E_idx
-                                dadv_dt(i) = -L(momxe + i) !+ adv(i) * vel(dir_idx(1))/y_cc(n)
+                                dadv_dt(i) = -L(momxe + i) !+ adv_local(i) * vel(dir_idx(1))/y_cc(n)
                             end do
                         else
                             $:GPU_LOOP(parallelism='[seq]')

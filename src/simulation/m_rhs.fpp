@@ -595,15 +595,15 @@ contains
 
     end subroutine s_initialize_rhs_module
 
-    impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, stage)
+    impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, rhs_pb
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv_in, rhs_mv
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in) :: stage
@@ -653,7 +653,7 @@ contains
 
         if (igr) then
             call nvtxStartRange("RHS-COMMUNICATION")
-            call s_populate_variables_buffers(bc_type, q_cons_vf, pb, mv)
+            call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in)
             call nvtxEndRange
         else
             call nvtxStartRange("RHS-CONVERT")
@@ -665,7 +665,7 @@ contains
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")
-            call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb, mv)
+            call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in)
             call nvtxEndRange
         end if
 
@@ -679,7 +679,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, mv, rhs_mv, idwbuff(1), idwbuff(2), idwbuff(3))
+        if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, idwbuff(1), idwbuff(2), idwbuff(3))
 
         if (viscous .and. .not. igr) then
             call nvtxStartRange("RHS-VISCOUS")
@@ -697,7 +697,7 @@ contains
 
         if (surface_tension) then
             call nvtxStartRange("RHS-SURFACE-TENSION")
-            call s_get_capilary(q_prim_qp%vf, bc_type)
+            call s_get_capillary(q_prim_qp%vf, bc_type)
             call nvtxEndRange
         end if
 
@@ -873,7 +873,7 @@ contains
                                             q_prim_qp%vf, &
                                             rhs_vf, &
                                             flux_n(id)%vf, &
-                                            pb, &
+                                            pb_in, &
                                             rhs_pb)
                     call nvtxEndRange
                 end if
@@ -920,7 +920,8 @@ contains
             call s_compute_bubble_EE_source( &
                 q_cons_qp%vf(1:sys_size), &
                 q_prim_qp%vf(1:sys_size), &
-                rhs_vf)
+                rhs_vf, &
+                divu)
             call nvtxEndRange
         end if
 
@@ -1449,13 +1450,13 @@ contains
 
     end subroutine s_compute_advection_source_term
 
-    subroutine s_compute_additional_physics_rhs(idir, q_prim_vf, rhs_vf, flux_src_n, &
+    subroutine s_compute_additional_physics_rhs(idir, q_prim_vf, rhs_vf, flux_src_n_in, &
                                                 dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), dimension(sys_size), intent(in) :: flux_src_n
+        type(scalar_field), dimension(sys_size), intent(in) :: flux_src_n_in
         type(scalar_field), dimension(sys_size), intent(in) :: dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf
 
         integer :: i, j, k, l
@@ -1470,8 +1471,8 @@ contains
                             rhs_vf(c_idx)%sf(j, k, l) = &
                                 rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dx(j)* &
                                 q_prim_vf(c_idx)%sf(j, k, l)* &
-                                (flux_src_n(advxb)%sf(j, k, l) - &
-                                 flux_src_n(advxb)%sf(j - 1, k, l))
+                                (flux_src_n_in(advxb)%sf(j, k, l) - &
+                                 flux_src_n_in(advxb)%sf(j - 1, k, l))
                         end do
                     end do
                 end do
@@ -1485,8 +1486,8 @@ contains
                         do i = momxb, E_idx
                             rhs_vf(i)%sf(j, k, l) = &
                                 rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
-                                (flux_src_n(i)%sf(j - 1, k, l) &
-                                 - flux_src_n(i)%sf(j, k, l))
+                                (flux_src_n_in(i)%sf(j - 1, k, l) &
+                                 - flux_src_n_in(i)%sf(j, k, l))
                         end do
                     end do
                 end do
@@ -1502,8 +1503,8 @@ contains
                             rhs_vf(c_idx)%sf(j, k, l) = &
                                 rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dy(k)* &
                                 q_prim_vf(c_idx)%sf(j, k, l)* &
-                                (flux_src_n(advxb)%sf(j, k, l) - &
-                                 flux_src_n(advxb)%sf(j, k - 1, l))
+                                (flux_src_n_in(advxb)%sf(j, k, l) - &
+                                 flux_src_n_in(advxb)%sf(j, k - 1, l))
                         end do
                     end do
                 end do
@@ -1550,8 +1551,8 @@ contains
                             do i = momxb, E_idx
                                 rhs_vf(i)%sf(j, k, l) = &
                                     rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
-                                    (flux_src_n(i)%sf(j, k - 1, l) &
-                                     - flux_src_n(i)%sf(j, k, l))
+                                    (flux_src_n_in(i)%sf(j, k - 1, l) &
+                                     - flux_src_n_in(i)%sf(j, k, l))
                             end do
                         end do
                     end do
@@ -1566,8 +1567,8 @@ contains
                             do i = momxb, E_idx
                                 rhs_vf(i)%sf(j, k, l) = &
                                     rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
-                                    (flux_src_n(i)%sf(j, k - 1, l) &
-                                     - flux_src_n(i)%sf(j, k, l))
+                                    (flux_src_n_in(i)%sf(j, k - 1, l) &
+                                     - flux_src_n_in(i)%sf(j, k, l))
                             end do
                         end do
                     end do
@@ -1587,8 +1588,8 @@ contains
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, k, l) = &
                                         rhs_vf(i)%sf(j, k, l) - 5.e-1_wp/y_cc(k)* &
-                                        (flux_src_n(i)%sf(j, k - 1, l) &
-                                         + flux_src_n(i)%sf(j, k, l))
+                                        (flux_src_n_in(i)%sf(j, k - 1, l) &
+                                         + flux_src_n_in(i)%sf(j, k, l))
                                 end do
                             end do
                         end do
@@ -1617,8 +1618,8 @@ contains
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, k, l) = &
                                         rhs_vf(i)%sf(j, k, l) - 5.e-1_wp/y_cc(k)* &
-                                        (flux_src_n(i)%sf(j, k - 1, l) &
-                                         + flux_src_n(i)%sf(j, k, l))
+                                        (flux_src_n_in(i)%sf(j, k - 1, l) &
+                                         + flux_src_n_in(i)%sf(j, k, l))
                                 end do
                             end do
                         end do
@@ -1637,8 +1638,8 @@ contains
                             rhs_vf(c_idx)%sf(j, k, l) = &
                                 rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dz(l)* &
                                 q_prim_vf(c_idx)%sf(j, k, l)* &
-                                (flux_src_n(advxb)%sf(j, k, l) - &
-                                 flux_src_n(advxb)%sf(j, k, l - 1))
+                                (flux_src_n_in(advxb)%sf(j, k, l) - &
+                                 flux_src_n_in(advxb)%sf(j, k, l - 1))
                         end do
                     end do
                 end do
@@ -1652,8 +1653,8 @@ contains
                         do i = momxb, E_idx
                             rhs_vf(i)%sf(j, k, l) = &
                                 rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
-                                (flux_src_n(i)%sf(j, k, l - 1) &
-                                 - flux_src_n(i)%sf(j, k, l))
+                                (flux_src_n_in(i)%sf(j, k, l - 1) &
+                                 - flux_src_n_in(i)%sf(j, k, l))
                         end do
                     end do
                 end do
@@ -1666,13 +1667,13 @@ contains
                         do j = 0, m
                             rhs_vf(momxb + 1)%sf(j, k, l) = &
                                 rhs_vf(momxb + 1)%sf(j, k, l) + 5.e-1_wp* &
-                                (flux_src_n(momxe)%sf(j, k, l - 1) &
-                                 + flux_src_n(momxe)%sf(j, k, l))
+                                (flux_src_n_in(momxe)%sf(j, k, l - 1) &
+                                 + flux_src_n_in(momxe)%sf(j, k, l))
 
                             rhs_vf(momxe)%sf(j, k, l) = &
                                 rhs_vf(momxe)%sf(j, k, l) - 5.e-1_wp* &
-                                (flux_src_n(momxb + 1)%sf(j, k, l - 1) &
-                                 + flux_src_n(momxb + 1)%sf(j, k, l))
+                                (flux_src_n_in(momxb + 1)%sf(j, k, l - 1) &
+                                 + flux_src_n_in(momxb + 1)%sf(j, k, l))
                         end do
                     end do
                 end do
@@ -1729,7 +1730,6 @@ contains
 
         if (n > 0) then
             if (p > 0) then
-
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
                             weno_dir, &
@@ -1741,7 +1741,6 @@ contains
                             is1, is2, is3)
             end if
         else
-
             call s_weno(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
                         weno_dir, &
