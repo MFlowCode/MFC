@@ -258,8 +258,8 @@
     #:set device_val = OMP_TO_STR(device)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set clause_val = host_val.strip('\n') + device_val.strip('\n')
-    #:set acc_directive = '!$omp target update ' + clause_val + extraOmpArgs_val.strip('\n')
-    $:acc_directive
+    #:set omp_directive = '!$omp target update ' + clause_val + extraOmpArgs_val.strip('\n')
+    $:omp_directive
 #:enddef
 
 #:def OMP_HOST_DATA(code, use_device_addr, use_device_ptr, extraOmpArgs)
