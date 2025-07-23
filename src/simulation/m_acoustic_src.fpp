@@ -183,7 +183,7 @@ contains
         ! Keep outer loop sequel because different sources can have very different number of points
         do ai = 1, num_source
             ! Skip if the pulse has not started yet for sine and square waves
-            if (sim_time < delay(ai) .and. (pulse(ai) == 1 .or. pulse(ai) == 3)) cycle
+            ! if (sim_time < delay(ai) .and. (pulse(ai) == 1 .or. pulse(ai) == 3)) cycle
 
             ! Decide if frequency need to be converted from wavelength
             freq_conv_flag = f_is_default(frequency(ai))
