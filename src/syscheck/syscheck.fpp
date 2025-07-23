@@ -73,7 +73,6 @@ program syscheck
     @:ACC(integer, parameter :: N = 100)
     @:OMP(integer :: num_devices_omp)
 
-
     @:MPIC(call mpi_init(ierr))
     @:MPIC(call mpi_comm_rank(MPI_COMM_WORLD, rank, ierr))
     @:MPIC(call mpi_barrier(MPI_COMM_WORLD, ierr))
@@ -97,7 +96,6 @@ program syscheck
     ! @:OMPC('num_devices_omp = omp_get_num_devices()')
     ! @:OMPC(call assert(num_devices_omp > 0))
     ! @:OMPC(call omp_set_default_device(mod(rank, nRanks)))
-
 
     @:MPIC(call mpi_barrier(MPI_COMM_WORLD, ierr))
     @:MPIC(call mpi_finalize(ierr))
