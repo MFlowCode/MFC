@@ -194,18 +194,18 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
-	    $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
+	    # $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
     )
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-O0>
-            $<$<COMPILE_LANGUAGE:Fortran>:-C>
-            $<$<COMPILE_LANGUAGE:Fortran>:-g>
-            $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
+            # $<$<COMPILE_LANGUAGE:Fortran>:-C>
+            # $<$<COMPILE_LANGUAGE:Fortran>:-g>
+            # $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
             $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform>
-            $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
+            # $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
         )
     endif()
 
@@ -480,11 +480,19 @@ function(MFC_SETUP_TARGET)
                 if (NOT TARGET OpenMP::OpenMP_Fortran)
                     message(FATAL_ERROR "OpenMP + Fortran is unsupported.")
                 endif()
-
+                set(ENV{OMP_TARGET_OFFLOAD} [MANDATORY])
                 target_link_libraries(${a_target} PRIVATE OpenMP::OpenMP_Fortran)
                 target_compile_definitions(${a_target} PRIVATE MFC_OpenMP MFC_GPU)
+
                 if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
-                    target_compile_options(${a_target} PRIVATE "-mp=gpu")
+                    target_compile_options(${a_target} PRIVATE "-target=gpu" "-Minfo=mp")
+                    set_target_properties(${a_target} PROPERTIES Fortran_FLAGS "-mp=gpu -gpu=ccall")
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
+                    target_compile_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
+                    target_link_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+                    target_compile_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64 )
+                    target_link_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
                 endif()
             endif()
 
@@ -502,7 +510,7 @@ function(MFC_SETUP_TARGET)
                 endforeach()
 
                 target_compile_options(${a_target}
-                    PRIVATE -gpu=keep,ptxinfo,lineinfo
+                    PRIVATE -gpu=lineinfo
                 )
 
                 # GH-200 Unified Memory Support
@@ -518,7 +526,7 @@ function(MFC_SETUP_TARGET)
 
                 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
                     target_compile_options(${a_target}
-                        PRIVATE -gpu=autocompare,debug
+                        PRIVATE -gpu=debug
                     )
                 endif()
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
