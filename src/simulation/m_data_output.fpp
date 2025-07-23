@@ -1,4 +1,3 @@
-
 !! @file m_data_output.f90
 !! @brief Contains module m_data_output
 
@@ -985,10 +984,10 @@ contains
     !!  @param t_step Current time-step
     !!  @param q_com Center of mass information
     !!  @param moments Higher moment information
-    impure subroutine s_write_com_files(t_step, c_mass)
+    impure subroutine s_write_com_files(t_step, c_mass_in)
 
         integer, intent(in) :: t_step
-        real(wp), dimension(num_fluids, 5), intent(in) :: c_mass
+        real(wp), dimension(num_fluids, 5), intent(in) :: c_mass_in
         integer :: i !< Generic loop iterator
         real(wp) :: nondim_time !< Non-dimensional time
 
@@ -1004,28 +1003,28 @@ contains
                 do i = 1, num_fluids ! Loop through fluids
                     write (i + 120, '(6X,4F24.12)') &
                         nondim_time, &
-                        c_mass(i, 1), &
-                        c_mass(i, 2), &
-                        c_mass(i, 5)
+                        c_mass_in(i, 1), &
+                        c_mass_in(i, 2), &
+                        c_mass_in(i, 5)
                 end do
             elseif (p == 0) then ! 2D simulation
                 do i = 1, num_fluids ! Loop through fluids
                     write (i + 120, '(6X,5F24.12)') &
                         nondim_time, &
-                        c_mass(i, 1), &
-                        c_mass(i, 2), &
-                        c_mass(i, 3), &
-                        c_mass(i, 5)
+                        c_mass_in(i, 1), &
+                        c_mass_in(i, 2), &
+                        c_mass_in(i, 3), &
+                        c_mass_in(i, 5)
                 end do
             else ! 3D simulation
                 do i = 1, num_fluids ! Loop through fluids
                     write (i + 120, '(6X,6F24.12)') &
                         nondim_time, &
-                        c_mass(i, 1), &
-                        c_mass(i, 2), &
-                        c_mass(i, 3), &
-                        c_mass(i, 4), &
-                        c_mass(i, 5)
+                        c_mass_in(i, 1), &
+                        c_mass_in(i, 2), &
+                        c_mass_in(i, 3), &
+                        c_mass_in(i, 4), &
+                        c_mass_in(i, 5)
                 end do
             end if
         end if
@@ -1071,7 +1070,7 @@ contains
         real(wp) :: max_pres
         real(wp), dimension(2) :: Re
         real(wp), dimension(6) :: tau_e
-        real(wp) :: G
+        real(wp) :: G_local
         real(wp) :: dyn_p, T
         real(wp) :: damage_state
 
@@ -1152,7 +1151,7 @@ contains
                     if (elasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
                                                             rho, gamma, pi_inf, qv, &
-                                                            Re, G, fluid_pp(:)%G)
+                                                            Re, G_local, fluid_pp(:)%G)
                     else
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
                                                             rho, gamma, pi_inf, qv)
@@ -1166,7 +1165,7 @@ contains
                     if (elasticity) then
                         if (cont_damage) then
                             damage_state = q_cons_vf(damage_idx)%sf(j - 2, k, l)
-                            G = G*max((1._wp - damage_state), 0._wp)
+                            G_local = G_local*max((1._wp - damage_state), 0._wp)
                         end if
 
                         call s_compute_pressure( &
@@ -1174,7 +1173,7 @@ contains
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
                             dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
-                            q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
+                            q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G_local)
                     else
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
@@ -1267,7 +1266,7 @@ contains
                         ! Computing/Sharing necessary state variables
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, &
                                                             rho, gamma, pi_inf, qv, &
-                                                            Re, G, fluid_pp(:)%G)
+                                                            Re, G_local, fluid_pp(:)%G)
                         do s = 1, num_vels
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
@@ -1277,7 +1276,7 @@ contains
                         if (elasticity) then
                             if (cont_damage) then
                                 damage_state = q_cons_vf(damage_idx)%sf(j - 2, k - 2, l)
-                                G = G*max((1._wp - damage_state), 0._wp)
+                                G_local = G_local*max((1._wp - damage_state), 0._wp)
                             end if
 
                             call s_compute_pressure( &
@@ -1288,7 +1287,7 @@ contains
                                 pres, &
                                 T, &
                                 q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
-                                q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
+                                q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G_local)
                         else
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
                                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
@@ -1357,7 +1356,7 @@ contains
                             ! Computing/Sharing necessary state variables
                             call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l - 2, &
                                                                 rho, gamma, pi_inf, qv, &
-                                                                Re, G, fluid_pp(:)%G)
+                                                                Re, G_local, fluid_pp(:)%G)
                             do s = 1, num_vels
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l - 2)/rho
                             end do
@@ -1373,7 +1372,7 @@ contains
                             if (elasticity) then
                                 if (cont_damage) then
                                     damage_state = q_cons_vf(damage_idx)%sf(j - 2, k - 2, l - 2)
-                                    G = G*max((1._wp - damage_state), 0._wp)
+                                    G_local = G_local*max((1._wp - damage_state), 0._wp)
                                 end if
 
                                 call s_compute_pressure( &
@@ -1382,7 +1381,7 @@ contains
                                     dyn_p, pi_inf, gamma, rho, qv, &
                                     rhoYks, pres, T, &
                                     q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
-                                    q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G)
+                                    q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G_local)
                             else
                                 call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
                                                         q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &

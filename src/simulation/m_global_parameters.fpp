@@ -165,7 +165,6 @@ module m_global_parameters
     integer :: hyper_model     !< hyperelasticity solver algorithm
     logical :: elasticity      !< elasticity modeling, true for hyper or hypo
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
-    logical :: cu_tensor
     logical :: shear_stress  !< Shear stresses
     logical :: bulk_stress   !< Bulk stresses
     logical :: cont_damage   !< Continuum damage modeling
@@ -243,8 +242,6 @@ module m_global_parameters
     character(LEN=name_len) :: mpiiofs
     integer :: mpi_info_int
     !> @}
-
-    integer, private :: ierr
 
     !> @name Annotations of the structure of the state and flux vectors in terms of the
     !! size and the configuration of the system of equations to which they belong
@@ -499,7 +496,7 @@ module m_global_parameters
     real(wp) :: mytime       !< Current simulation time
     real(wp) :: finaltime    !< Final simulation time
 
-    logical :: weno_flat, riemann_flat, rdma_mpi
+    logical :: rdma_mpi
 
     type(pres_field), allocatable, dimension(:) :: pb_ts
 
@@ -591,8 +588,6 @@ contains
         hyper_model = dflt_int
         b_size = dflt_int
         tensor_size = dflt_int
-        weno_flat = .true.
-        riemann_flat = .true.
         rdma_mpi = .false.
         shear_stress = .false.
         bulk_stress = .false.
@@ -699,9 +694,6 @@ contains
         ! Surface tension
         sigma = dflt_real
         surface_tension = .false.
-
-        ! Cuda aware MPI
-        cu_tensor = .false.
 
         bodyForces = .false.
         bf_x = .false.; bf_y = .false.; bf_z = .false.
@@ -1317,6 +1309,10 @@ contains
 
     !> Initializes parallel infrastructure
     impure subroutine s_initialize_parallel_io
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+#endif
 
         #:if not MFC_CASE_OPTIMIZATION
             num_dims = 1 + min(1, n) + min(1, p)

@@ -57,11 +57,6 @@ contains
 #if !defined(MFC_OpenACC) && !(defined(__PGI) || defined(_CRAYFTN))
         @:PROHIBIT(rdma_mpi, "Unsupported value of rdma_mpi for the current compiler")
 #endif
-
-#ifndef MFC_cuTENSOR
-        @:PROHIBIT(cu_tensor, "MFC was not built with the NVIDIA cuTENSOR library")
-#endif
-
     end subroutine s_check_inputs_compilers
 
     impure subroutine s_check_inputs_igr
@@ -82,6 +77,7 @@ contains
         @:PROHIBIT(mhd, "IGR does not support magnetohydrodynamics")
         @:PROHIBIT(hyperelasticity, "IGR does not support hyperelasticity")
         @:PROHIBIT(cyl_coord, "IGR does not support cylindrical or axisymmetric coordinates")
+        @:PROHIBIT(probe_wrt, "IGR does not support probe writes")
 
         #:for DIR in [('x'), ('y'), ('z')]
             #:for LOC in [('beg'), ('end')]

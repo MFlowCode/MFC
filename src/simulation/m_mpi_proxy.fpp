@@ -42,11 +42,6 @@ module m_mpi_proxy
     !! immersed boundary markers, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
-    !> @name Generic flags used to identify and report MPI errors
-    !> @{
-    integer, private :: ierr
-    !> @}
-
     integer :: i_halo_size
     $:GPU_DECLARE(create='[i_halo_size]')
 
@@ -88,6 +83,7 @@ contains
 #ifdef MFC_MPI
 
         integer :: i, j !< Generic loop iterator
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
@@ -108,7 +104,7 @@ contains
         #:endfor
 
         #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',     &
-            &  'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat', &
+            &  'mp_weno', 'rdma_mpi', 'powell', 'cont_damage', 'bc_io', &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
             & 'parallel_io', 'hypoelasticity', 'bubbles_euler', 'polytropic',    &
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
@@ -119,7 +115,7 @@ contains
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
             & 'shear_stress', 'bulk_stress', 'bubbles_lagrange',     &
-            & 'hyperelasticity', 'bc_io', 'powell', 'cont_damage' ]
+            & 'hyperelasticity']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -259,6 +255,7 @@ contains
         integer :: pack_offset, unpack_offset
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         call nvtxStartRange("IB-MARKER-COMM-PACKBUF")
 
@@ -396,6 +393,7 @@ contains
         real(wp), intent(inout), dimension(1:num_freq) :: phi_rn
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
         call MPI_BCAST(phi_rn, num_freq, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
 
