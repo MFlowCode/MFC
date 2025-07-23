@@ -155,18 +155,18 @@
 #:def GPU_HOST_DATA(code, use_device_addr=None, use_device_ptr=None, extraAccArgs=None, extraOmpArgs=None)
 
     #:if use_device_addr is not None and use_device_ptr is not None
-      #:set use_device_addr_end_index = len(use_device_addr) - 1
-      #:set use_device = use_device_addr + use_device_ptr
-      $:use_device[use_device_addr_end_index] = ','
-      $:use_device[use_device_addr_end_index + 1] = ' '
+        #:set use_device_addr_end_index = len(use_device_addr) - 1
+        #:set use_device = use_device_addr + use_device_ptr
+        $:use_device[use_device_addr_end_index] = ','
+        $:use_device[use_device_addr_end_index + 1] = ' '
     #:elif use_device_addr is not None or use_device_ptr is not None
-      #:if use_device_addr is not None
-        #:set use_device = use_device_addr
-      #:else
-        #:set use_device = use_device_ptr
-      #:endif
+        #:if use_device_addr is not None
+            #:set use_device = use_device_addr
+        #:else
+            #:set use_device = use_device_ptr
+        #:endif
     #:else
-      #:set use_device = None
+        #:set use_device = None
     #:endif
     #:set acc_code = ACC_HOST_DATA(code=code, use_device=use_device, extraAccArgs=extraAccArgs)
     #:set omp_code = OMP_HOST_DATA(code=code, use_device_addr=use_device_addr, use_device_ptr=use_device_ptr, extraOmpArgs=extraOmpArgs)
