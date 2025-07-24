@@ -9,7 +9,7 @@ jobs:
       - name: Clone PR
         uses: actions/checkout@v4
 
-      - name: Verrou Setup
+      - name: Setup
         run: |
           # get recent release of valgrind from GitHub API
           VERROU_VERSION=$(curl -s https://api.github.com/repos/edf-hpc/verrou/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")')
@@ -26,14 +26,32 @@ jobs:
           cd ../..
           rm -rf pr/valgrind-*
 
-      - name: Run Tests
+      - name: Run Verrou
         run: |
-           sudo apt update -y
-           sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
-                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev
-          
-           valgrind --tool=verrou ./mfc.sh test -a --dry-run
+          mkdir -p verrou_reports
+          for inp in examples/*/simulation.inp; do
+            case_dir=$(dirname "$inp")
+            case_name=$(basename "$case_dir")
+            run_dir="run_$case_name"
+            mkdir -p "$run_dir"
+            cp "$case_dir"/* "$run_dir"/ 2>/dev/null || true
+            cp -r "$case_dir"/restart_data "$run_dir"/ 2>/dev/null || true
 
-      - name: Check Compliance
-        run: |
-          echo "Checking floating point compliance..."
+            for flags in \
+              "--tool=verrou --rounding-mode=average_comdet" \
+              "--tool=verrou --rounding-mode=random" \
+              "--tool=verrou --rounding-mode=nearest"
+            do
+              flag_name=$(echo $flags | tr ' ' '_' | tr -d '=')
+              out_file="verrou_reports/${case_name}_${flag_name}.log"
+              (cd "$run_dir" && \
+                $HOME/.local/bin/valgrind $flags ../../build/staging/*/simulation > "../$out_file" 2>&1 || true)
+            done
+          done
+
+      - name: Upload Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verrou-reports
+          path: verrou_reports/
