@@ -28,26 +28,30 @@ jobs:
 
       - name: Run Verrou
         run: |
+          for case in examples/*/case.py; do
+              ./mfc.sh run "$case"
+          done  
+          
           mkdir -p verrou_reports
-          for inp in examples/*/simulation.inp; do
-            case_dir=$(dirname "$inp")
-            case_name=$(basename "$case_dir")
-            run_dir="run_$case_name"
-            mkdir -p "$run_dir"
-            cp "$case_dir"/* "$run_dir"/ 2>/dev/null || true
-            cp -r "$case_dir"/restart_data "$run_dir"/ 2>/dev/null || true
+            for inp in examples/*/simulation.inp; do
+              case_dir=$(dirname "$inp")
+              case_name=$(basename "$case_dir")
+              run_dir="run_$case_name"
+              mkdir -p "$run_dir"
+              cp "$case_dir"/* "$run_dir"/ 2>/dev/null || true
+              cp -r "$case_dir"/restart_data "$run_dir"/ 2>/dev/null || true
 
-            for flags in \
-              "--tool=verrou --rounding-mode=average_comdet" \
-              "--tool=verrou --rounding-mode=random" \
-              "--tool=verrou --rounding-mode=nearest"
-            do
-              flag_name=$(echo $flags | tr ' ' '_' | tr -d '=')
-              out_file="verrou_reports/${case_name}_${flag_name}.log"
-              (cd "$run_dir" && \
-                $HOME/.local/bin/valgrind $flags ../../build/staging/*/simulation > "../$out_file" 2>&1 || true)
+              for flags in \
+                "--tool=verrou --rounding-mode=average_comdet" \
+                "--tool=verrou --rounding-mode=random" \
+                "--tool=verrou --rounding-mode=nearest"
+              do
+                flag_name=$(echo $flags | tr ' ' '_' | tr -d '=*?:"<>|')
+                out_file="verrou_reports/${case_name}_${flag_name}.log"
+                (cd "$run_dir" && \
+                  $HOME/.local/bin/valgrind $flags ../../build/staging/*/simulation > "../$out_file" 2>&1 || true)
+              done
             done
-          done
 
       - name: Upload Artifacts
         if: always()
