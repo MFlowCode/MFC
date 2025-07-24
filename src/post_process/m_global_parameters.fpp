@@ -588,7 +588,7 @@ contains
                 if (nb == 1) then
                     weight(:) = 1._wp
                     R0(:) = 1._wp
-                else if (nb < 1)
+                else if (nb < 1) then
                     stop 'Invalid value of nb'
                 end if
 
