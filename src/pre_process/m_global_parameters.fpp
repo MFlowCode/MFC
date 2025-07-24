@@ -923,7 +923,9 @@ contains
             grid_geometry = 3
         end if
 
-        allocate (logic_grid(0:m, 0:n, 0:p))
+        if(.not. igr) then 
+            allocate (logic_grid(0:m, 0:n, 0:p))
+        end if
 
     end subroutine s_initialize_global_parameters_module
 
