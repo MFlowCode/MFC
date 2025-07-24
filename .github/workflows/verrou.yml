@@ -28,7 +28,7 @@ jobs:
 
       - name: Run Verrou
         run: |
-          ./mfc.sh build -t pre_process simulation --no-mpi
+          ./mfc.sh build -t pre_process simulation
           
           for case in examples/*/case.py; do
               ./mfc.sh run "$case"
