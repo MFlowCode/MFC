@@ -41,7 +41,7 @@ module m_global_parameters
     !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
     type(cell_num_bounds) :: cells_bounds
 
-    integer(8) :: nGlobal ! Total number of cells in global domain
+    integer(kind=8) :: nGlobal ! Total number of cells in global domain
 
     !> @name Cylindrical coordinates (either axisymmetric or full 3D)
     !> @{
@@ -153,6 +153,10 @@ module m_global_parameters
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
 
+
+    !! Locations of the domain bounds in the x-, y- and z-coordinate directions
+    type(bounds_info) :: x_domain, y_domain, z_domain 
+
     integer :: num_bc_patches
     logical :: bc_io
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
@@ -209,6 +213,7 @@ module m_global_parameters
     integer :: format !< Format of the database file(s)
 
     integer :: precision !< Floating point precision of the database file(s)
+    logical :: down_sample !< down sampling of the database file(s)
 
     logical :: output_partial_domain !< Specify portion of domain to output for post-processing
 
@@ -403,6 +408,7 @@ contains
         format = dflt_int
 
         precision = dflt_int
+        down_sample = .false.
 
         alpha_rho_wrt = .false.
         rho_wrt = .false.
@@ -467,6 +473,13 @@ contains
         z_output%beg = dflt_real
         z_output%end = dflt_real
 
+        x_domain%beg = dflt_real
+        x_domain%end = dflt_real
+        y_domain%beg = dflt_real
+        y_domain%end = dflt_real
+        z_domain%beg = dflt_real
+        z_domain%end = dflt_real
+
         ! MHD
         Bx0 = dflt_real
 
@@ -513,17 +526,13 @@ contains
             mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
-            if (igr) then
-                if (num_fluids == 1) then
-                    adv_idx%end = adv_idx%beg
-                else
-                    adv_idx%end = E_idx + num_fluids - 1
-                end if
-            else
-                adv_idx%end = E_idx + num_fluids
-            end if
+            adv_idx%end = E_idx + num_fluids
 
-            sys_size = adv_idx%end
+            if (igr) then
+                sys_size = adv_idx%end - 1
+            else
+                sys_size = adv_idx%end
+            end if
 
             if (bubbles_euler) then
                 alf_idx = adv_idx%end

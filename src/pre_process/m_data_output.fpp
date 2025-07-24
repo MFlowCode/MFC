@@ -35,14 +35,18 @@ module m_data_output
 
     use m_thermochem, only: species_names
 
+    use m_helper
+
     implicit none
 
-    private; 
+    private;
     public :: s_write_serial_data_files, &
               s_write_parallel_data_files, &
               s_write_data_files, &
               s_initialize_data_output_module, &
               s_finalize_data_output_module
+
+    type(scalar_field), allocatable, dimension(:) :: q_cons_temp
 
     abstract interface
 
@@ -59,7 +63,7 @@ module m_data_output
             ! Conservative variables
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(in) :: q_cons_vf, q_prim_vf
+                intent(inout) :: q_cons_vf, q_prim_vf
 
             type(integer_field), &
                 dimension(1:num_dims, -1:1), &
@@ -99,7 +103,7 @@ contains
     impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
         type(scalar_field), &
             dimension(sys_size), &
-            intent(in) :: q_cons_vf, q_prim_vf
+            intent(inout) :: q_cons_vf, q_prim_vf
 
         ! BC types
         type(integer_field), &
@@ -562,7 +566,7 @@ contains
         ! Conservative variables
         type(scalar_field), &
             dimension(sys_size), &
-            intent(in) :: q_cons_vf, q_prim_vf
+            intent(inout) :: q_cons_vf, q_prim_vf
 
         type(integer_field), &
             dimension(1:num_dims, -1:1), &
@@ -593,8 +597,21 @@ contains
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist, dir_check
 
-        ! Generic loop iterator
-        integer :: i
+        ! Generic loop iterators
+        integer :: i, j, k, l
+
+        ! Downsample variables
+        integer :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
+
+        if(down_sample) then
+            if((mod(m+1,3) > 0) .or. (mod(n+1,3) > 0) .or. (mod(p+1,3) > 0)) then
+                print *, "WARNING: ATTEMPTING TO RUN DOWN SAMPLING WITH local problem size not divisible by 3"
+            end if
+            call s_populate_variables_buffers(bc_type, q_cons_vf)
+            call s_downsample_data(q_cons_vf, q_cons_temp, &
+                                    m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
+        end if
+
 
         if (file_per_process) then
             if (proc_rank == 0) then
@@ -609,11 +626,15 @@ contains
             call DelayFileAccess(proc_rank)
 
             ! Initialize MPI data I/O
-            if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers, &
-                                           levelset, levelset_norm)
+            if (down_sample) then
+                call s_initialize_mpi_data_ds(q_cons_temp)
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                                               levelset, levelset_norm)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
             end if
 
             ! Open the file to write all flow variables
@@ -631,17 +652,31 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
 
-            ! Size of local arrays
-            data_size = (m + 1)*(n + 1)*(p + 1)
+            if(down_sample) then
+                 ! Size of local arrays
+                data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
 
-            ! Resize some integers so MPI can write even the biggest files
-            m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-            n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-            p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-            MOK = int(1._wp, MPI_OFFSET_KIND)
-            str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                ! Resize some integers so MPI can write even the biggest files
+                m_MOK = int(m_glb_ds + 3, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb_ds + 3, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb_ds + 3, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            else
+                ! Size of local arrays
+                data_size = (m + 1)*(n + 1)*(p + 1)
+
+                ! Resize some integers so MPI can write even the biggest files
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            end if
 
             ! Write the data for each variable
             if (bubbles_euler) then
@@ -661,13 +696,23 @@ contains
                     end do
                 end if
             else
-                do i = 1, sys_size !TODO: check if this is right
-                    !            do i = 1, adv_idx%end
-                    var_MOK = int(i, MPI_OFFSET_KIND)
+                if (down_sample) then
+                     do i = 1, sys_size !TODO: check if this is right
+                        !            do i = 1, adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            mpi_p, status, ierr)
-                end do
+                        call MPI_FILE_WRITE_ALL(ifile, q_cons_temp(i)%sf, data_size, &
+                                                mpi_p, status, ierr)
+                    end do
+                else
+                    do i = 1, sys_size !TODO: check if this is right
+                        !            do i = 1, adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                                mpi_p, status, ierr)
+                    end do
+                end if
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
@@ -887,6 +932,8 @@ contains
         logical :: dir_check
         integer :: i
 
+        integer :: m_ds, n_ds, p_ds !< down sample dimensions
+
         if (parallel_io .neqv. .true.) then
             ! Setting the address of the time-step directory
             write (t_step_dir, '(A,I0,A)') '/p_all/p', proc_rank, '/0'
@@ -968,12 +1015,32 @@ contains
 
         close (1)
 
+        if(down_sample) then
+            m_ds = INT((m+1)/3) - 1
+            n_ds = INT((n+1)/3) - 1
+            p_ds = INT((p+1)/3) - 1
+
+            allocate(q_cons_temp(1:sys_size))
+            do i = 1, sys_size
+                allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
+            end do
+        end if
+
     end subroutine s_initialize_data_output_module
 
     !> Resets s_write_data_files pointer
     impure subroutine s_finalize_data_output_module
 
+        integer :: i
+
         s_write_data_files => null()
+
+        if (down_sample) then
+            do i = 1, sys_size
+                deallocate(q_cons_temp(i)%sf)
+            end do
+            deallocate(q_cons_temp)
+        end if
 
     end subroutine s_finalize_data_output_module
 

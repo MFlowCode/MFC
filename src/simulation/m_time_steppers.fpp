@@ -77,12 +77,23 @@ module m_time_steppers
 
     $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt]')
 
+#if defined(FRONTIER_UNIFIED)
+   real(wp), pointer, contiguous, dimension(:,:,:,:) :: q_cons_ts_pool_host, q_cons_ts_pool_device
+   integer(kind=8) :: pool_dims(4), pool_starts(4)
+#endif
+
 contains
 
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
     impure subroutine s_initialize_time_steppers_module
+#ifdef FRONTIER_UNIFIED
+        use hipfort
+        use hipfort_hipmalloc
+        use hipfort_check
+        use openacc
+#endif
 
         integer :: i, j !< Generic loop iterators
 
@@ -100,6 +111,48 @@ contains
             @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
         end do
 
+#ifdef FRONTIER_UNIFIED
+        if (proc_rank == 0 .and. num_ts /= 2) then
+            call s_mpi_abort("Frontier unified memory assumes time_stepper = 2/3")
+        end if
+
+        ! Allocate to memory regions using hip calls
+        ! that we will attach pointers to
+        do i=1,3
+            pool_dims(i) = idwbuff(i)%end - idwbuff(i)%beg + 1
+            pool_starts(i) = idwbuff(i)%beg
+        end do
+        pool_dims(4) = sys_size
+        pool_starts(4) = 1
+
+	    ! Doing hipMalloc then mapping should be most performant
+        call hipCheck(hipMalloc(q_cons_ts_pool_device, dims8=pool_dims, lbounds8=pool_starts))
+	    ! Without this map CCE will still create a device copy, because it's silly like that
+	    call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
+
+	    ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
+	    ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
+	    ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
+	    call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
+
+        do j = 1, sys_size
+            ! q_cons_ts(1) lives on the device
+            q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                  idwbuff(2)%beg:idwbuff(2)%end, &
+                                  idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_device(:,:,:,j)
+            ! q_cons_ts(2) lives on the host
+            q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                  idwbuff(2)%beg:idwbuff(2)%end, &
+                                  idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
+        end do
+
+        do i = 1, num_ts
+            @:ACC_SETUP_VFs(q_cons_ts(i))
+            do j = 1, sys_size
+                $:GPU_UPDATE(device='[q_cons_ts(i)%vf(j)]')
+            enddo
+        end do
+#else
         do i = 1, num_ts
             do j = 1, sys_size
                 @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -108,6 +161,7 @@ contains
             end do
             @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
+#endif
 
         ! Allocating the cell-average primitive ts variables
         if (probe_wrt) then
@@ -496,6 +550,22 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
+#ifdef FRONTIER_UNIFIED
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
+                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l)
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+#else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -508,6 +578,7 @@ contains
                 end do
             end do
         end do
+#endif
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
@@ -563,11 +634,29 @@ contains
         end if
 
         ! Stage 2 of 2
-
+#if defined(FRONTIER_UNIFIED)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+#else
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+#endif
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
+#ifdef FRONTIER_UNIFIED
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                    end do
+                end do
+            end do
+        end do
+#else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -581,6 +670,7 @@ contains
                 end do
             end do
         end do
+#endif
 
         if (qbmm .and. (.not. polytropic)) then
             $:GPU_PARALLEL_LOOP(collapse=5)
@@ -682,6 +772,22 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
+#ifdef FRONTIER_UNIFIED
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
+                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l)
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+#else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -694,6 +800,7 @@ contains
                 end do
             end do
         end do
+#endif
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
@@ -749,11 +856,29 @@ contains
         end if
 
         ! Stage 2 of 3
-
+#if defined(FRONTIER_UNIFIED)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+#else
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+#endif
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
+#if defined(FRONTIER_UNIFIED)
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (3._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                    end do
+                end do
+            end do
+        end do
+#else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -767,6 +892,7 @@ contains
                 end do
             end do
         end do
+#endif
 
         if (qbmm .and. (.not. polytropic)) then
             $:GPU_PARALLEL_LOOP(collapse=5)
@@ -823,10 +949,29 @@ contains
         end if
 
         ! Stage 3 of 3
+#ifdef FRONTIER_UNIFIED
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
+#else
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
+#endif
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
+#ifdef FRONTIER_UNIFIED
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + 2._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+                    end do
+                end do
+            end do
+        end do
+#else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -840,6 +985,7 @@ contains
                 end do
             end do
         end do
+#endif
 
         if (qbmm .and. (.not. polytropic)) then
             $:GPU_PARALLEL_LOOP(collapse=5)
@@ -1138,19 +1284,34 @@ contains
 
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_time_steppers_module
+#ifdef FRONTIER_UNIFIED
+        use hipfort
+        use hipfort_hipmalloc
+        use hipfort_check
+#endif
 
         integer :: i, j !< Generic loop iterators
 
         ! Deallocating the cell-average conservative variables
         do i = 1, num_ts
+#ifdef FRONTIER_UNIFIED
+            do j = 1, sys_size
+                nullify(q_cons_ts(i)%vf(j)%sf)
+            end do
+#else
             do j = 1, sys_size
                 @:DEALLOCATE(q_cons_ts(i)%vf(j)%sf)
             end do
-
+#endif
             @:DEALLOCATE(q_cons_ts(i)%vf)
         end do
 
         @:DEALLOCATE(q_cons_ts)
+
+#ifdef FRONTIER_UNIFIED
+        call hipCheck(hipHostFree(q_cons_ts_pool_host))
+        call hipCheck(hipFree(q_cons_ts_pool_device))
+#endif
 
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then

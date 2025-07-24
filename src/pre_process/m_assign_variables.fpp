@@ -341,10 +341,12 @@ contains
 
         ! Computing Mixture Variables of Current Patch
 
-        ! Volume fraction(s)
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha(i - E_idx)
-        end do
+        if (.not. igr .or. num_fluids > 1) then
+            ! Volume fraction(s)
+            do i = adv_idx%beg, adv_idx%end
+                q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha(i - E_idx)
+            end do
+        end if
 
         if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
@@ -384,10 +386,13 @@ contains
             end do
         end if
 
-        ! Volume fraction(s)
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha(i - E_idx)
-        end do
+
+        if (.not. igr .or. num_fluids > 1) then
+            ! Volume fraction(s)
+            do i = adv_idx%beg, adv_idx%end
+                q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha(i - E_idx)
+            end do
+        end if
 
         if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
@@ -458,12 +463,14 @@ contains
             (eta*patch_icpp(patch_id)%pres &
              + (1._wp - eta)*orig_prim_vf(E_idx))
 
-        ! Volume fractions \alpha
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf(j, k, l) = &
-                eta*patch_icpp(patch_id)%alpha(i - E_idx) &
-                + (1._wp - eta)*orig_prim_vf(i)
-        end do
+        if (.not. igr .or. num_fluids > 1) then
+            ! Volume fractions \alpha
+            do i = adv_idx%beg, adv_idx%end
+                q_prim_vf(i)%sf(j, k, l) = &
+                    eta*patch_icpp(patch_id)%alpha(i - E_idx) &
+                    + (1._wp - eta)*orig_prim_vf(i)
+            end do
+        end if
 
         if (mhd) then
             if (n == 0) then ! 1D: By, Bz
