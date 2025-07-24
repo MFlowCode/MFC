@@ -2,20 +2,6 @@
 #:include 'omp_macros.fpp'
 #:include 'acc_macros.fpp'
 
-#:def GEN_PARALLELISM_STR(parallelism)
-    #:if parallelism is not None
-        #:assert isinstance(parallelism, str)
-        #:assert parallelism[0] == '[' and parallelism[-1] == ']'
-        #:set parallelism_list = [x.strip() for x in parallelism.strip('[]').split(',')]
-        $:ASSERT_LIST(parallelism_list, str)
-        #:assert all((element == 'gang' or element == 'worker' or &
-            & element == 'vector' or element == 'seq') for element in parallelism_list)
-        #:set parallelism_val = ' '.join(parallelism_list) + ' '
-    #:else
-        #:set parallelism_val = ''
-    #:endif
-    $:parallelism_val
-#:enddef
 
 #:def GPU_PARALLEL(code, private=None, default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
@@ -46,6 +32,8 @@
     $:acc_code
 #elif defined(MFC_OpenMP)
     $:omp_code
+#else
+    $:code
 #endif
 #:enddef
 
