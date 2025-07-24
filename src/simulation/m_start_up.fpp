@@ -1412,7 +1412,7 @@ contains
         if (chemistry) then
             $:GPU_UPDATE(device='[q_T_sf%sf]')
         end if
-        $:GPU_UPDATE(device='[nb,R0ref,Ca,Web,Re_inv,weight,R0,V0, &
+        $:GPU_UPDATE(device='[nb,R0ref,Ca,Web,Re_inv,weight,R0, &
             & bubbles_euler,polytropic,polydisperse,qbmm, &
             & ptil,bubble_model,thermal,poly_sigma,adv_n,adap_dt, &
             & adap_dt_tol,n_idx,pi_fac,low_Mach]')

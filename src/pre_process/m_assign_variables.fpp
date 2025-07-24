@@ -406,7 +406,7 @@ contains
         if (bubbles_euler) then
             do i = 1, nb
                 muR = R0(i)*patch_icpp(smooth_patch_id)%r0
-                muV = V0(i)*patch_icpp(smooth_patch_id)%v0
+                muV = patch_icpp(smooth_patch_id)%v0
                 if (qbmm) then
                     ! Initialize the moment set
                     if (dist_type == 1) then
@@ -611,7 +611,7 @@ contains
         if (bubbles_euler) then
             do i = 1, nb
                 muR = R0(i)*patch_icpp(patch_id)%r0
-                muV = V0(i)*patch_icpp(patch_id)%v0
+                muV = patch_icpp(patch_id)%v0
                 if (qbmm) then
                     ! Initialize the moment set
                     if (dist_type == 1) then
