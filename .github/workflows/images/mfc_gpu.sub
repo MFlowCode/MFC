@@ -6,7 +6,7 @@ executable = run_mfc.sh
 
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT
-transfer_input_files = osdf:///ospool/ap40/data/mohammed.al-mahrouqi/mfc_gpu.sif, run_mfc.sh
+transfer_input_files = mfc_gpu.sif, run_mfc.sh
 transfer_executable = True
 
 log = mfc_gpu_$(Cluster)_$(Process).log

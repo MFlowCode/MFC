@@ -40,7 +40,6 @@ jobs:
             def="Singularity.${img}"
             (cd pr/.github/workflows/images && sudo apptainer build --force --tmpdir /tmp/mfc_tmp "$sif" "$def")
             scp "pr/.github/workflows/images/$sif" "pr/.github/workflows/images/$sub" ${{secrets.SSH_USER}}:MFC/
-            ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/$sif /ospool/ap40/data/mohammed.al-mahrouqi"
             rm -rf "pr/.github/workflows/images/$sif"
             rm -rf ~/.apptainer
             sudo rm -rf /tmp/* /var/lib/apt/lists/* /opt/hostedtoolcache /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/lib/jvm /home/runner/.cache /home/runner/work/_temp
@@ -55,17 +54,28 @@ jobs:
           scp pr/.github/workflows/images/*.sub ${{secrets.SSH_USER}}:MFC/
 
           ssh ${{secrets.SSH_USER}} "
-            condor_submit MFC/mfc_cpu.sub
-            condor_submit MFC/mfc_cpu_bench.sub
-            condor_submit MFC/mfc_gpu.sub
-            condor_submit MFC/mfc_gpu_bench.sub
+            cd ~/MFC
+            condor_submit mfc_cpu.sub
+            condor_submit mfc_cpu_bench.sub
+            condor_submit mfc_gpu.sub
+            condor_submit mfc_gpu_bench.sub
 
-            condor_wait logfile
+            read CPU CPU_BENCH GPU GPU_BENCH< <(ls -1v *.log | sed -E 's/.*_([0-9]+)_[0-9]+\.log/\1/' | awk '!seen[$0]++' | head -n4 | xargs)
+
+            for cluster in $CPU $CPU_BENCH $GPU $GPU_BENCH; do
+              for log in *${cluster}_*.log; do
+                condor_wait "$log"
+                awk '/SlotName:/, /Memory =/ {block = block $0 ORS} /Memory =/ {last = block; block=""} END {print last}' "$log"
+                awk '/Partitionable Resources/,/TimeSlotBusy \(s\)/ {block = block $0 ORS} /TimeSlotBusy \(s\)/ {last = block; block=""} END {if(last) print last}' "$log"
+              done
+            done
           "
 
-      - name: Migrate Images from ODSF
+      - name: Migrate Images & Logs
         run: |
           scp -r ${{secrets.SSH_USER}}:/ospool/ap40/data/mohammed.al-mahrouqi/* pr/.github/workflows/images/
+          scp -r ${{secrets.SSH_USER}}:MFC/*.{log,err,out} pr/.github/workflows/images/
+          ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/*.sif /ospool/ap40/data/mohammed.al-mahrouqi"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4

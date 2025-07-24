@@ -8,6 +8,7 @@ From: nvcr.io/nvidia/nvhpc:23.11-devel-cuda12.3-ubuntu22.04
     export OMPI_ALLOW_RUN_AS_ROOT=1
     export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     export PATH="/opt/MFC:$PATH"
+    cd /opt/MFC
 
 %post
     export DEBIAN_FRONTEND=noninteractive
