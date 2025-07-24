@@ -13,7 +13,7 @@ jobs:
         with:
           path: pr
 
-      - name: Build & Store Images
+      - name: Containerize Images
         run: |
           sudo apt-get update
           sudo apt-get install -y software-properties-common openssh-client
@@ -70,12 +70,12 @@ jobs:
               done
             done
           "
+          scp -r ${{secrets.SSH_USER}}:MFC/ pr/.github/workflows/images/
+          grep -i 'error' pr/.github/workflows/images/*.out && { echo "Error found in log files."; exit 1; }
 
-      - name: Migrate Images & Logs
+      - name: Store Images
         run: |
-          scp -r ${{secrets.SSH_USER}}:/ospool/ap40/data/mohammed.al-mahrouqi/* pr/.github/workflows/images/
-          scp -r ${{secrets.SSH_USER}}:MFC/*.{log,err,out} pr/.github/workflows/images/
-          ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/*.sif /ospool/ap40/data/mohammed.al-mahrouqi"
+          ssh ${{secrets.SSH_USER}} "mv /home/mohammed.al-mahrouqi/MFC/*.sif /ospool/ap40/data/mohammed.al-mahrouqi"  
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
