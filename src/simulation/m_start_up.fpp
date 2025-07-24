@@ -1361,9 +1361,9 @@ contains
 
         call acc_set_device_num(dev, devtype)
 #elif defined(MFC_OpenMP)
-    !  devNum = omp_get_num_devices()
-    !  dev = mod(local_rank, devNum)
-    !  call omp_set_default_device(dev)
+    devNum = omp_get_num_devices()
+    dev = mod(local_rank, devNum)
+    call omp_set_default_device(dev)
 #endif
 #endif
 
