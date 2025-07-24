@@ -1147,10 +1147,12 @@ contains
                         end do
                     end if
 
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = advxb, advxe
-                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
-                    end do
+                    if (.not. igr .or. num_fluids > 1) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = advxb, advxe
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                        end do
+                    end if
 
                     if (surface_tension) then
                         qK_prim_vf(c_idx)%sf(j, k, l) = qK_cons_vf(c_idx)%sf(j, k, l)

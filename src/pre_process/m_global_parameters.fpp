@@ -605,10 +605,14 @@ contains
             adv_idx%end = E_idx + num_fluids
 
             if (igr) then
-                sys_size = adv_idx%end - 1
+                adv_idx%beg = E_idx + 1
+                adv_idx%end = E_idx + num_fluids - 1
             else
-                sys_size = adv_idx%end
+                adv_idx%beg = E_idx + 1
+                adv_idx%end = E_idx + num_fluids
             end if
+
+            sys_size = adv_idx%end
 
             if (bubbles_euler) then
                 alf_idx = adv_idx%end
@@ -870,7 +874,7 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        call s_configure_coordinate_bounds(weno_polyn, buff_size, &
+        call s_configure_coordinate_bounds(weno_polyn, igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
                                            num_dims, igr)

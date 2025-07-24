@@ -529,10 +529,14 @@ contains
             adv_idx%end = E_idx + num_fluids
 
             if (igr) then
-                sys_size = adv_idx%end - 1
+                adv_idx%beg = E_idx + 1
+                adv_idx%end = E_idx + num_fluids - 1
             else
-                sys_size = adv_idx%end
+                adv_idx%beg = E_idx + 1
+                adv_idx%end = E_idx + num_fluids
             end if
+
+            sys_size = adv_idx%end
 
             if (bubbles_euler) then
                 alf_idx = adv_idx%end

@@ -110,10 +110,10 @@ contains
         res = f_approx_equal(var, real(nint(var), wp))
     end function f_is_integer
 
-    pure subroutine s_configure_coordinate_bounds(weno_polyn, buff_size, idwint, idwbuff, &
+    pure subroutine s_configure_coordinate_bounds(weno_polyn, igr_order, buff_size, idwint, idwbuff, &
                                                   viscous, bubbles_lagrange, m, n, p, num_dims, igr)
 
-        integer, intent(in) :: weno_polyn, m, n, p, num_dims
+        integer, intent(in) :: weno_polyn, m, n, p, num_dims, igr_order
         integer, intent(inout) :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
         logical, intent(in) :: viscous, bubbles_lagrange
@@ -125,9 +125,9 @@ contains
         ! the next one
         if (igr) then
             if (viscous) then
-                buff_size = 6
+                buff_size = (igr_order - 1) / 2 + 2
             else
-                buff_size = 4
+                buff_size = (igr_order - 1) / 2 + 1
             end if
         else
             if (viscous) then

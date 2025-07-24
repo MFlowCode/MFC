@@ -386,7 +386,6 @@ contains
             end do
         end if
 
-
         if (.not. igr .or. num_fluids > 1) then
             ! Volume fraction(s)
             do i = adv_idx%beg, adv_idx%end
