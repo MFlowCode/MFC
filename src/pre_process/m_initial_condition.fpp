@@ -92,10 +92,11 @@ contains
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
-        allocate (ib_markers%sf(0:m, 0:n, 0:p))
-
-        allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
-        allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+        if (ib) then
+            allocate (ib_markers%sf(0:m, 0:n, 0:p))
+            allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
+            allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+        end if
 
         if (qbmm .and. .not. polytropic) then
             !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
@@ -227,7 +228,10 @@ contains
 
         ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
-        deallocate (ib_markers%sf)
+
+        if (ib) then
+            deallocate (ib_markers%sf, levelset%sf, levelset_norm%sf)
+        end if
 
     end subroutine s_finalize_initial_condition_module
 
