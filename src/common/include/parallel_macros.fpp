@@ -17,44 +17,6 @@
     $:parallelism_val
 #:enddef
 
-#:def GEN_COLLAPSE_STR(collapse)
-    #:if collapse is not None
-        #:set collapse = int(collapse)
-        #:assert isinstance(collapse, int)
-        #:assert collapse > 1
-        #:set collapse_val = 'collapse(' + str(collapse) + ') '
-    #:else
-        #:set collapse_val = ''
-    #:endif
-    $:collapse_val
-#:enddef
-
-#:def GEN_DEFAULT_STR(default)
-    #:if default is not None
-        #:assert isinstance(default, str)
-        #:assert (default == 'present' or default == 'none')
-        #:set default_val = 'default(' + default + ') '
-    #:else
-        #:set default_val = ''
-    #:endif
-    $:default_val
-#:enddef
-
-#:def GEN_HOST_STR(host)
-    #:set host_val = GEN_PARENTHESES_CLAUSE('host', host)
-    $:host_val
-#:enddef
-
-#:def GEN_DEVICE_STR(device)
-    #:set device_val = GEN_PARENTHESES_CLAUSE('device', device)
-    $:device_val
-#:enddef
-
-#:def GEN_USE_DEVICE_STR(use_device)
-    #:set use_device_val = GEN_PARENTHESES_CLAUSE('use_device', use_device)
-    $:use_device_val
-#:enddef
-
 #:def GPU_PARALLEL(code, private=None, default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)

@@ -44,7 +44,7 @@
 #:enddef
 
 #:def OMP_CREATE_STR(create)
-    #:set create_val = OMP_MAP_STR('alloc', create)
+    #:set create_val = OMP_MAP_STR('always,alloc', create)
     $:create_val
 #:enddef
 

@@ -194,18 +194,18 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
-	    # $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
+	    $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
     )
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-O0>
-            # $<$<COMPILE_LANGUAGE:Fortran>:-C>
-            # $<$<COMPILE_LANGUAGE:Fortran>:-g>
-            # $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
+            $<$<COMPILE_LANGUAGE:Fortran>:-C>
+            $<$<COMPILE_LANGUAGE:Fortran>:-g>
+            $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
             $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform>
-            # $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
+            $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
         )
     endif()
 
@@ -234,14 +234,14 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
         elseif(CMAKE_Fortran_COMPILER_VERSION VERSION_LESS "23.11")
             message(STATUS "LTO/IPO is not supported in NVHPC Version < 23.11. Use a newer version of NVHPC for best performance.")
         else()
-            message(STATUS "Performing IPO using -Mextract followed by -Minline")
-            set(NVHPC_USE_TWO_PASS_IPO TRUE)
+            # message(STATUS "Performing IPO using -Mextract followed by -Minline")
+            # set(NVHPC_USE_TWO_PASS_IPO TRUE)
         endif()
     else()
         CHECK_IPO_SUPPORTED(RESULT SUPPORTS_IPO OUTPUT IPO_ERROR)
         if (SUPPORTS_IPO)
             message(STATUS "Enabled IPO / LTO")
-            set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+            # set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 	    else()
             message(STATUS "IPO / LTO is NOT available")
         endif()
@@ -401,14 +401,14 @@ function(MFC_SETUP_TARGET)
     # Here we need to split into "library" and "executable" to perform IPO on the NVIDIA compiler.
     # A little hacky, but it *is* an edge-case for *one* compiler.
     if (NVHPC_USE_TWO_PASS_IPO)
-        add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
-        target_compile_options(${ARGS_TARGET}_lib PRIVATE
-		    $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>
-	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
-    	)
-        add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
-        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib)
-        list(PREPEND IPO_TARGETS ${ARGS_TARGET}_lib)
+      #   add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
+      #   target_compile_options(${ARGS_TARGET}_lib PRIVATE
+		  #   $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>
+	    #     $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
+    	# )
+      #   add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
+      #   target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib)
+      #   list(PREPEND IPO_TARGETS ${ARGS_TARGET}_lib)
     endif()
 
     foreach (a_target ${IPO_TARGETS})
@@ -481,11 +481,12 @@ function(MFC_SETUP_TARGET)
                     message(FATAL_ERROR "OpenMP + Fortran is unsupported.")
                 endif()
                 set(ENV{OMP_TARGET_OFFLOAD} [MANDATORY])
-                target_link_libraries(${a_target} PRIVATE OpenMP::OpenMP_Fortran)
+                # target_link_libraries(${a_target} PRIVATE OpenMP::OpenMP_Fortran)
                 target_compile_definitions(${a_target} PRIVATE MFC_OpenMP MFC_GPU)
 
                 if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
-                    target_compile_options(${a_target} PRIVATE "-target=gpu" "-Minfo=mp")
+                    target_compile_options(${a_target} PRIVATE "-mp=gpu" "-Minfo=mp")
+                    target_link_options(${a_target} PRIVATE "-mp=gpu")
                     set_target_properties(${a_target} PROPERTIES Fortran_FLAGS "-mp=gpu -gpu=ccall")
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
                     target_compile_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
