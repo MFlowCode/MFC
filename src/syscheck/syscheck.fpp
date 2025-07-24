@@ -93,9 +93,9 @@ program syscheck
     @:ACCC('!$acc update host(arr(1:N))')
     @:ACCC('!$acc exit data delete(arr)')
 
-    ! @:OMPC('num_devices_omp = omp_get_num_devices()')
-    ! @:OMPC(call assert(num_devices_omp > 0))
-    ! @:OMPC(call omp_set_default_device(mod(rank, nRanks)))
+    @:OMPC('num_devices_omp = omp_get_num_devices()')
+    @:OMPC(call assert(num_devices_omp > 0))
+    @:OMPC(call omp_set_default_device(mod(rank, nRanks)))
 
     @:MPIC(call mpi_barrier(MPI_COMM_WORLD, ierr))
     @:MPIC(call mpi_finalize(ierr))

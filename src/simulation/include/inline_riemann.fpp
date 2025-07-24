@@ -34,13 +34,13 @@
 
     if (chemistry) then
         eps = 0.001_wp
-        call get_species_enthalpies_rt(T_L, h_iL)
-        call get_species_enthalpies_rt(T_R, h_iR)
+        ! call get_species_enthalpies_rt(T_L, h_iL)
+        ! call get_species_enthalpies_rt(T_R, h_iR)
 
         h_iL = h_iL*gas_constant/molecular_weights*T_L
         h_iR = h_iR*gas_constant/molecular_weights*T_R
-        call get_species_specific_heats_r(T_L, Cp_iL)
-        call get_species_specific_heats_r(T_R, Cp_iR)
+        ! call get_species_specific_heats_r(T_L, Cp_iL)
+        ! call get_species_specific_heats_r(T_R, Cp_iR)
 
         h_avg_2 = (sqrt(rho_L)*h_iL + sqrt(rho_R)*h_iR)/(sqrt(rho_L) + sqrt(rho_R))
         Yi_avg = (sqrt(rho_L)*Ys_L + sqrt(rho_R)*Ys_R)/(sqrt(rho_L) + sqrt(rho_R))

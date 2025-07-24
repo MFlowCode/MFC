@@ -181,8 +181,8 @@ contains
 
             T_guess = T
 
-            call get_temperature(e_Per_Kg - Pdyn_Per_Kg, T_guess, Y_rs, .true., T)
-            call get_pressure(rho, T, Y_rs, pres)
+            ! call get_temperature(e_Per_Kg - Pdyn_Per_Kg, T_guess, Y_rs, .true., T)
+            ! call get_pressure(rho, T, Y_rs, pres)
 
         #:endif
 
@@ -1306,9 +1306,9 @@ contains
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
 
-                        call get_mixture_molecular_weight(Ys, mix_mol_weight)
+                        ! call get_mixture_molecular_weight(Ys, mix_mol_weight)
                         T = q_prim_vf(E_idx)%sf(j, k, l)*mix_mol_weight/(gas_constant*rho)
-                        call get_mixture_energy_mass(T, Ys, e_mix)
+                        ! call get_mixture_energy_mass(T, Ys, e_mix)
 
                         q_cons_vf(E_idx)%sf(j, k, l) = &
                             dyn_pres + rho*e_mix
@@ -1534,10 +1534,10 @@ contains
                                 Y_K(i - chemxb + 1) = qK_prim_vf(j, k, l, i)
                             end do
                             !Computing the energy from the internal energy of the mixture
-                            call get_mixture_molecular_weight(Y_k, mix_mol_weight)
+                            ! call get_mixture_molecular_weight(Y_k, mix_mol_weight)
                             R_gas = gas_constant/mix_mol_weight
                             T_K = pres_K/rho_K/R_gas
-                            call get_mixture_energy_mass(T_K, Y_K, E_K)
+                            ! call get_mixture_energy_mass(T_K, Y_K, E_K)
                             E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
                         else
                             ! Computing the energy from the pressure
