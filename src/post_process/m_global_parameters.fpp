@@ -798,7 +798,11 @@ contains
         allocate (MPI_IO_DATA%view(1:sys_size))
         allocate (MPI_IO_DATA%var(1:sys_size))
         do i = 1, sys_size
-            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+            if(down_sample) then
+                allocate (MPI_IO_DATA%var(i)%sf(-1:m+1, -1:n+1, -1:p+1))
+            else
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+            end if
             MPI_IO_DATA%var(i)%sf => null()
         end do
 

@@ -531,7 +531,7 @@ contains
                                                mpi_p, status, ierr)
                     end do
                 else
-                    do i = 1, adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                                mpi_p, status, ierr)
@@ -609,7 +609,9 @@ contains
             if (p > 0) then
                 call s_allocate_field_arrays(-buff_size, m + buff_size, n + buff_size, p + buff_size)
                 if(down_sample) then
-                    allocate(q_cons_temp(i)%sf(-1:m+1,-1:n+1,-1:p+1))
+                    do i = 1, sys_size
+                        allocate(q_cons_temp(i)%sf(-1:m+1,-1:n+1,-1:p+1))
+                    end do
                 end if
             else
                 ! Simulation is 2D
