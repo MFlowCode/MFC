@@ -86,6 +86,18 @@
     $:reduction_val
 #:enddef
 
+#:def GEN_COLLAPSE_STR(collapse)
+    #:if collapse is not None
+        #:set collapse = int(collapse)
+        #:assert isinstance(collapse, int)
+        #:assert collapse > 1
+        #:set collapse_val = 'collapse(' + str(collapse) + ') '
+    #:else
+        #:set collapse_val = ''
+    #:endif
+    $:collapse_val
+#:enddef
+
 #:def GEN_EXTRA_ARGS_STR(extraArgs)
     #:if extraArgs is not None
         #:assert isinstance(extraArgs, str)
