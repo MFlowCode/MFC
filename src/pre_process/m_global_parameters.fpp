@@ -927,7 +927,7 @@ contains
             grid_geometry = 3
         end if
 
-        if(.not. igr) then 
+        if (.not. igr) then
             allocate (logic_grid(0:m, 0:n, 0:p))
         end if
 

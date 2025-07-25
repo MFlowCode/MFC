@@ -96,6 +96,7 @@ contains
             allocate (ib_markers%sf(0:m, 0:n, 0:p))
             allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
             allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+            ib_markers%sf = 0
         end if
 
         if (qbmm .and. .not. polytropic) then
@@ -166,7 +167,6 @@ contains
         ! extent of application that the overwrite permissions give a patch
         ! when it is being applied in the domain.
         patch_id_fp = 0
-        ib_markers%sf = 0
 
     end subroutine s_initialize_initial_condition_module
 
@@ -187,7 +187,12 @@ contains
                                                                idwbuff)
         end if
 
-        call s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers%sf, levelset, levelset_norm)
+        if (ib) then
+            call s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers%sf, levelset, levelset_norm)
+        else
+            call s_apply_domain_patches(patch_id_fp, q_prim_vf)
+        end if
+
         if (num_bc_patches > 0) call s_apply_boundary_patches(q_prim_vf, bc_type)
 
         if (perturb_flow) call s_perturb_surrounding_flow(q_prim_vf)

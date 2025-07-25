@@ -153,9 +153,8 @@ module m_global_parameters
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
 
-
     !! Locations of the domain bounds in the x-, y- and z-coordinate directions
-    type(bounds_info) :: x_domain, y_domain, z_domain 
+    type(bounds_info) :: x_domain, y_domain, z_domain
 
     integer :: num_bc_patches
     logical :: bc_io
@@ -802,8 +801,8 @@ contains
         allocate (MPI_IO_DATA%view(1:sys_size))
         allocate (MPI_IO_DATA%var(1:sys_size))
         do i = 1, sys_size
-            if(down_sample) then
-                allocate (MPI_IO_DATA%var(i)%sf(-1:m+1, -1:n+1, -1:p+1))
+            if (down_sample) then
+                allocate (MPI_IO_DATA%var(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
             else
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
             end if

@@ -39,7 +39,7 @@ module m_data_output
 
     implicit none
 
-    private;
+    private; 
     public :: s_write_serial_data_files, &
               s_write_parallel_data_files, &
               s_write_data_files, &
@@ -55,7 +55,7 @@ module m_data_output
         !! @param ib_markers track if a cell is within the immersed boundary
         !! @param levelset closest distance from every cell to the IB
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-        impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
+        impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, bc_type, ib_markers, levelset, levelset_norm)
 
             import :: scalar_field, integer_field, sys_size, m, n, p, &
                 pres_field, levelset_field, levelset_norm_field, num_dims
@@ -71,15 +71,15 @@ module m_data_output
 
             ! IB markers
             type(integer_field), &
-                intent(in) :: ib_markers
+                intent(in), optional :: ib_markers
 
             ! Levelset
             type(levelset_field), &
-                intent(IN) :: levelset
+                intent(IN), optional :: levelset
 
             ! Levelset Norm
             type(levelset_norm_field), &
-                intent(IN) :: levelset_norm
+                intent(IN), optional :: levelset_norm
 
         end subroutine s_write_abstract_data_files
     end interface
@@ -100,7 +100,7 @@ contains
         !! @param ib_markers track if a cell is within the immersed boundary
         !! @param levelset closest distance from every cell to the IB
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-    impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
+    impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, bc_type, ib_markers, levelset, levelset_norm)
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: q_cons_vf, q_prim_vf
@@ -112,15 +112,15 @@ contains
 
         ! IB markers
         type(integer_field), &
-            intent(in) :: ib_markers
+            intent(in), optional :: ib_markers
 
         ! Levelset
         type(levelset_field), &
-            intent(IN) :: levelset
+            intent(IN), optional :: levelset
 
         ! Levelset Norm
         type(levelset_norm_field), &
-            intent(IN) :: levelset_norm
+            intent(IN), optional :: levelset_norm
 
         logical :: file_exist !< checks if file exists
 
@@ -195,14 +195,15 @@ contains
             end if
         end if
 
-        ! Outputting IB Markers
-        file_loc = trim(t_step_dir)//'/ib.dat'
-
-        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
-        write (1) ib_markers%sf
-        close (1)
-
         if (ib) then
+
+            ! Outputting IB Markers
+            file_loc = trim(t_step_dir)//'/ib.dat'
+
+            open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+            write (1) ib_markers%sf
+            close (1)
+
             do i = 1, num_ibs
                 if (patch_ib(i)%geometry == 4) then
 
@@ -219,20 +220,20 @@ contains
                     close (1)
                 end if
             end do
+
+            ! Outtputting Levelset Info
+            file_loc = trim(t_step_dir)//'/levelset.dat'
+
+            open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+            write (1) levelset%sf
+            close (1)
+
+            file_loc = trim(t_step_dir)//'/levelset_norm.dat'
+
+            open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+            write (1) levelset_norm%sf
+            close (1)
         end if
-
-        ! Outtputting Levelset Info
-        file_loc = trim(t_step_dir)//'/levelset.dat'
-
-        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
-        write (1) levelset%sf
-        close (1)
-
-        file_loc = trim(t_step_dir)//'/levelset_norm.dat'
-
-        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
-        write (1) levelset_norm%sf
-        close (1)
 
         ! Outputting Conservative Variables
         do i = 1, sys_size
@@ -426,6 +427,7 @@ contains
                 end do
                 close (2)
             end do
+
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
@@ -478,6 +480,7 @@ contains
                 end do
                 close (2)
             end do
+
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
@@ -561,7 +564,7 @@ contains
         !! @param ib_markers track if a cell is within the immersed boundary
         !! @param levelset closest distance from every cell to the IB
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-    impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, bc_type, ib_markers, levelset, levelset_norm)
 
         ! Conservative variables
         type(scalar_field), &
@@ -574,15 +577,15 @@ contains
 
         ! IB markers
         type(integer_field), &
-            intent(in) :: ib_markers
+            intent(in), optional :: ib_markers
 
         ! Levelset
         type(levelset_field), &
-            intent(IN) :: levelset
+            intent(IN), optional :: levelset
 
         ! Levelset Norm
         type(levelset_norm_field), &
-            intent(IN) :: levelset_norm
+            intent(IN), optional :: levelset_norm
 
 #ifdef MFC_MPI
 
@@ -603,15 +606,14 @@ contains
         ! Downsample variables
         integer :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
 
-        if(down_sample) then
-            if((mod(m+1,3) > 0) .or. (mod(n+1,3) > 0) .or. (mod(p+1,3) > 0)) then
+        if (down_sample) then
+            if ((mod(m + 1, 3) > 0) .or. (mod(n + 1, 3) > 0) .or. (mod(p + 1, 3) > 0)) then
                 print *, "WARNING: ATTEMPTING TO RUN DOWN SAMPLING WITH local problem size not divisible by 3"
             end if
             call s_populate_variables_buffers(bc_type, q_cons_vf)
             call s_downsample_data(q_cons_vf, q_cons_temp, &
-                                    m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
+                                   m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
         end if
-
 
         if (file_per_process) then
             if (proc_rank == 0) then
@@ -652,8 +654,8 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
 
-            if(down_sample) then
-                 ! Size of local arrays
+            if (down_sample) then
+                ! Size of local arrays
                 data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
 
                 ! Resize some integers so MPI can write even the biggest files
@@ -697,7 +699,7 @@ contains
                 end if
             else
                 if (down_sample) then
-                     do i = 1, sys_size !TODO: check if this is right
+                    do i = 1, sys_size !TODO: check if this is right
                         !            do i = 1, adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -1015,14 +1017,14 @@ contains
 
         close (1)
 
-        if(down_sample) then
-            m_ds = INT((m+1)/3) - 1
-            n_ds = INT((n+1)/3) - 1
-            p_ds = INT((p+1)/3) - 1
+        if (down_sample) then
+            m_ds = int((m + 1)/3) - 1
+            n_ds = int((n + 1)/3) - 1
+            p_ds = int((p + 1)/3) - 1
 
-            allocate(q_cons_temp(1:sys_size))
+            allocate (q_cons_temp(1:sys_size))
             do i = 1, sys_size
-                allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
+                allocate (q_cons_temp(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
             end do
         end if
 
@@ -1037,9 +1039,9 @@ contains
 
         if (down_sample) then
             do i = 1, sys_size
-                deallocate(q_cons_temp(i)%sf)
+                deallocate (q_cons_temp(i)%sf)
             end do
-            deallocate(q_cons_temp)
+            deallocate (q_cons_temp)
         end if
 
     end subroutine s_finalize_data_output_module

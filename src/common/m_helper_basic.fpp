@@ -124,11 +124,7 @@ contains
         ! the physical computational domain from one time-step iteration to
         ! the next one
         if (igr) then
-            if (viscous) then
-                buff_size = (igr_order - 1) / 2 + 2
-            else
-                buff_size = (igr_order - 1) / 2 + 1
-            end if
+            buff_size = (igr_order - 1)/2 + 2
         else
             if (viscous) then
                 buff_size = 2*weno_polyn + 2

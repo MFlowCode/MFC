@@ -115,10 +115,10 @@ contains
 
             call s_update_cell_bounds(cells_bounds, m, n, p)
 
-            if(down_sample) then
-                m = INT((m+1)/3) - 1
-                n = INT((n+1)/3) - 1
-                p = INT((p+1)/3) - 1
+            if (down_sample) then
+                m = int((m + 1)/3) - 1
+                n = int((n + 1)/3) - 1
+                p = int((p + 1)/3) - 1
             end if
 
             ! Store m,n,p into global m,n,p

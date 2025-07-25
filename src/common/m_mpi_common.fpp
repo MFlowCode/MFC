@@ -300,9 +300,9 @@ contains
         sf_start_idx = (/0, 0, 0/)
 
 #ifndef MFC_POST_PROCESS
-        m_ds = INT((m+1)/3) - 1
-        n_ds = INT((n+1)/3) - 1
-        p_ds = INT((p+1)/3) - 1
+        m_ds = int((m + 1)/3) - 1
+        n_ds = int((n + 1)/3) - 1
+        p_ds = int((p + 1)/3) - 1
 #else
         m_ds = m
         n_ds = n
@@ -311,7 +311,7 @@ contains
 
 #ifdef MFC_POST_PROCESS
         do i = 1, sys_size
-            MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(-1:m_ds+1, -1:n_ds+1, -1:p_ds+1)
+            MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1)
         end do
 #endif
         ! Define global(g) and local(l) sizes for flow variables

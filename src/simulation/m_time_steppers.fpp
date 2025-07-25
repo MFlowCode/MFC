@@ -78,8 +78,8 @@ module m_time_steppers
     $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt]')
 
 #if defined(FRONTIER_UNIFIED)
-   real(wp), pointer, contiguous, dimension(:,:,:,:) :: q_cons_ts_pool_host, q_cons_ts_pool_device
-   integer(kind=8) :: pool_dims(4), pool_starts(4)
+    real(wp), pointer, contiguous, dimension(:, :, :, :) :: q_cons_ts_pool_host, q_cons_ts_pool_device
+    integer(kind=8) :: pool_dims(4), pool_starts(4)
 #endif
 
 contains
@@ -118,39 +118,39 @@ contains
 
         ! Allocate to memory regions using hip calls
         ! that we will attach pointers to
-        do i=1,3
+        do i = 1, 3
             pool_dims(i) = idwbuff(i)%end - idwbuff(i)%beg + 1
             pool_starts(i) = idwbuff(i)%beg
         end do
         pool_dims(4) = sys_size
         pool_starts(4) = 1
 
-	    ! Doing hipMalloc then mapping should be most performant
+        ! Doing hipMalloc then mapping should be most performant
         call hipCheck(hipMalloc(q_cons_ts_pool_device, dims8=pool_dims, lbounds8=pool_starts))
-	    ! Without this map CCE will still create a device copy, because it's silly like that
-	    call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
+        ! Without this map CCE will still create a device copy, because it's silly like that
+        call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
 
-	    ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
-	    ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
-	    ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
-	    call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
+        ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
+        ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
+        ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
+        call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
 
         do j = 1, sys_size
             ! q_cons_ts(1) lives on the device
             q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                   idwbuff(2)%beg:idwbuff(2)%end, &
-                                  idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_device(:,:,:,j)
+                                  idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_device(:, :, :, j)
             ! q_cons_ts(2) lives on the host
             q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                   idwbuff(2)%beg:idwbuff(2)%end, &
-                                  idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
+                                  idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:, :, :, j)
         end do
 
         do i = 1, num_ts
             @:ACC_SETUP_VFs(q_cons_ts(i))
             do j = 1, sys_size
                 $:GPU_UPDATE(device='[q_cons_ts(i)%vf(j)]')
-            enddo
+            end do
         end do
 #else
         do i = 1, num_ts
@@ -1296,7 +1296,7 @@ contains
         do i = 1, num_ts
 #ifdef FRONTIER_UNIFIED
             do j = 1, sys_size
-                nullify(q_cons_ts(i)%vf(j)%sf)
+                nullify (q_cons_ts(i)%vf(j)%sf)
             end do
 #else
             do j = 1, sys_size

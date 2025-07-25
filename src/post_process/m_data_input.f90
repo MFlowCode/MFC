@@ -355,7 +355,7 @@ contains
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))
 
-        if(down_sample) then
+        if (down_sample) then
             delx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
             do i = 0, m_glb
                 x_cb_glb(i - 1) = x_domain%beg + delx*real(i, wp)
@@ -384,7 +384,7 @@ contains
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         if (n > 0) then
-            if(down_sample) then
+            if (down_sample) then
                 dely = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
                 do i = 0, n_glb
                     y_cb_glb(i - 1) = y_domain%beg + dely*real(i, wp)
@@ -413,7 +413,7 @@ contains
             y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
             if (p > 0) then
-                if(down_sample) then
+                if (down_sample) then
                     delz = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
                     do i = 0, p_glb
                         z_cb_glb(i - 1) = z_domain%beg + delz*real(i, wp)
@@ -486,7 +486,7 @@ contains
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                if(down_sample) then
+                if (down_sample) then
                     call s_initialize_mpi_data_ds(q_cons_temp)
                 else
                     ! Initialize MPI data I/O
@@ -497,7 +497,7 @@ contains
                     end if
                 end if
 
-                if(down_sample) then
+                if (down_sample) then
                     ! Size of local arrays
                     data_size = (m + 3)*(n + 3)*(p + 3)
 
@@ -541,9 +541,9 @@ contains
                 call s_mpi_barrier()
                 call MPI_FILE_CLOSE(ifile, ierr)
 
-                if(down_sample) then
+                if (down_sample) then
                     do i = 1, sys_size
-                        q_cons_vf(i)%sf(0:m,0:n,0:p) = q_cons_temp(i)%sf(0:m,0:n,0:p)
+                        q_cons_vf(i)%sf(0:m, 0:n, 0:p) = q_cons_temp(i)%sf(0:m, 0:n, 0:p)
                     end do
                 end if
 
@@ -608,9 +608,9 @@ contains
             ! Simulation is 3D
             if (p > 0) then
                 call s_allocate_field_arrays(-buff_size, m + buff_size, n + buff_size, p + buff_size)
-                if(down_sample) then
+                if (down_sample) then
                     do i = 1, sys_size
-                        allocate(q_cons_temp(i)%sf(-1:m+1,-1:n+1,-1:p+1))
+                        allocate (q_cons_temp(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
                     end do
                 end if
             else

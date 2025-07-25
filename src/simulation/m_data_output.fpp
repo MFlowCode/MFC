@@ -36,7 +36,7 @@ module m_data_output
 
     implicit none
 
-    private;
+    private; 
     public :: s_initialize_data_output_module, &
               s_open_run_time_information_file, &
               s_open_com_files, &
@@ -74,8 +74,7 @@ module m_data_output
     real(wp) :: Rc_min !< Rc criterion maximum
     !> @}
 
-
-    type(scalar_field), allocatable, dimension(:) :: q_cons_temp 
+    type(scalar_field), allocatable, dimension(:) :: q_cons_temp
 
 contains
 
@@ -821,10 +820,10 @@ contains
         ! Down sampling variables
         integer :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
 
-        if(down_sample) then
+        if (down_sample) then
             call s_populate_variables_buffers(bc_type, q_cons_vf)
             call s_downsample_data(q_cons_vf, q_cons_temp, &
-                                    m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
+                                   m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
         end if
 
         if (present(beta)) then
@@ -838,7 +837,7 @@ contains
             call s_int_to_str(t_step, t_step_string)
 
             ! Initialize MPI data I/O
-            if(down_sample) then
+            if (down_sample) then
                 call s_initialize_mpi_data_ds(q_cons_temp)
             else
                 if (ib) then
@@ -872,7 +871,7 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
 
-            if(down_sample) then
+            if (down_sample) then
                 ! Size of local arrays
                 data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
 
@@ -916,7 +915,7 @@ contains
                     end do
                 end if
             else
-                if(down_sample) then
+                if (down_sample) then
                     do i = 1, sys_size !TODO: check if correct (sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -1816,13 +1815,13 @@ contains
         end if
 
         if (down_sample) then
-            m_ds = INT((m+1)/3) - 1
-            n_ds = INT((n+1)/3) - 1
-            p_ds = INT((p+1)/3) - 1
+            m_ds = int((m + 1)/3) - 1
+            n_ds = int((n + 1)/3) - 1
+            p_ds = int((p + 1)/3) - 1
 
-            allocate(q_cons_temp(1:sys_size))
+            allocate (q_cons_temp(1:sys_size))
             do i = 1, sys_size
-                allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
+                allocate (q_cons_temp(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
             end do
         end if
 
@@ -1847,9 +1846,9 @@ contains
 
         if (down_sample) then
             do i = 1, sys_size
-                deallocate(q_cons_temp(i)%sf)
+                deallocate (q_cons_temp(i)%sf)
             end do
-            deallocate(q_cons_temp)
+            deallocate (q_cons_temp)
         end if
 
     end subroutine s_finalize_data_output_module

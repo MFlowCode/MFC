@@ -635,32 +635,32 @@ contains
         integer :: ix, iy, iz, x_id, y_id, z_id
         integer, intent(inout) :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
 
-        m_ds = INT((m+1)/3) - 1
-        n_ds = INT((n+1)/3) - 1
-        p_ds = INT((p+1)/3) - 1
+        m_ds = int((m + 1)/3) - 1
+        n_ds = int((n + 1)/3) - 1
+        p_ds = int((p + 1)/3) - 1
 
-        m_glb_ds = INT((m_glb+1)/3) - 1
-        n_glb_ds = INT((n_glb+1)/3) - 1
-        p_glb_ds = INT((p_glb+1)/3) - 1
+        m_glb_ds = int((m_glb + 1)/3) - 1
+        n_glb_ds = int((n_glb + 1)/3) - 1
+        p_glb_ds = int((p_glb + 1)/3) - 1
 
         do i = 1, sys_size
             $:GPU_UPDATE(host='[q_cons_vf(i)%sf]')
         end do
 
-        do l = -1, p_ds+1
-            do k = -1, n_ds+1
-                do j = -1, m_ds+1
+        do l = -1, p_ds + 1
+            do k = -1, n_ds + 1
+                do j = -1, m_ds + 1
                     x_id = 3*j + 1
                     y_id = 3*k + 1
                     z_id = 3*l + 1
                     do i = 1, sys_size
-                        q_cons_temp(i)%sf(j,k,l) = 0
+                        q_cons_temp(i)%sf(j, k, l) = 0
 
                         do iz = -1, 1
                             do iy = -1, 1
                                 do ix = -1, 1
-                                    q_cons_temp(i)%sf(j,k,l) = q_cons_temp(i)%sf(j,k,l) &
-                                    + (1._wp / 27._wp)*q_cons_vf(i)%sf(x_id+ix,y_id+iy,z_id+iz)
+                                    q_cons_temp(i)%sf(j, k, l) = q_cons_temp(i)%sf(j, k, l) &
+                                                                 + (1._wp/27._wp)*q_cons_vf(i)%sf(x_id + ix, y_id + iy, z_id + iz)
                                 end do
                             end do
                         end do
