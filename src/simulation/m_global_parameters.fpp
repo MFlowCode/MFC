@@ -409,7 +409,8 @@ module m_global_parameters
     logical :: adv_n        !< Solve the number density equation and compute alpha from number density
     logical :: adap_dt      !< Adaptive step size control
     real(wp) :: adap_dt_tol !< Tolerance to control adaptive step size
-    $:GPU_DECLARE(create='[adv_n,adap_dt,adap_dt_tol]')
+    integer :: adap_dt_max_iters !< Maximum number of iterations
+    $:GPU_DECLARE(create='[adv_n,adap_dt,adap_dt_tol,adap_dt_max_iters]')
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
@@ -676,6 +677,7 @@ contains
         adv_n = .false.
         adap_dt = .false.
         adap_dt_tol = dflt_real
+        adap_dt_max_iters = 100
 
         pi_fac = 1._wp
 
@@ -1254,7 +1256,7 @@ contains
         $:GPU_UPDATE(device='[momxb,momxe,advxb,advxe,contxb,contxe, &
             & bubxb,bubxe,intxb,intxe,sys_size,buff_size,E_idx, &
             & alf_idx,n_idx,adv_n,adap_dt,pi_fac,strxb,strxe, &
-            & chemxb,chemxe,c_idx]')
+            & chemxb,chemxe,c_idx,adap_dt_tol,adap_dt_max_iters]')
         $:GPU_UPDATE(device='[b_size,xibeg,xiend,tensor_size]')
 
         $:GPU_UPDATE(device='[species_idx]')

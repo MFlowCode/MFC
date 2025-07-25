@@ -285,6 +285,7 @@ SIMULATION.update({
     'pi_fac': ParamType.REAL,
     'adap_dt': ParamType.LOG,
     'adap_dt_tol': ParamType.REAL,
+    'adap_dt_max_iters': ParamType.INT,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
     'n_start': ParamType.INT,
