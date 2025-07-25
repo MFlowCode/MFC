@@ -677,7 +677,7 @@ contains
         adv_n = .false.
         adap_dt = .false.
         adap_dt_tol = dflt_real
-        adap_dt_max_iters = 100
+        adap_dt_max_iters = dflt_adap_dt_max_iters
 
         pi_fac = 1._wp
 
