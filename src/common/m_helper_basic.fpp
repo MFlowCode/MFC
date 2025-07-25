@@ -161,7 +161,7 @@ contains
     !! @param m Number of cells in x-axis
     !! @param n Number of cells in y-axis
     !! @param p Number of cells in z-axis
-    pure elemental subroutine s_update_cell_bounds(bounds, m, n, p)
+     elemental subroutine s_update_cell_bounds(bounds, m, n, p)
         type(cell_num_bounds), intent(out) :: bounds
         integer, intent(in) :: m, n, p
 

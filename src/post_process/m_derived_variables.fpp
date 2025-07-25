@@ -117,7 +117,7 @@ contains
         !!      ratio. The latter is stored in the derived flow quantity
         !!      storage variable, q_sf.
         !!  @param q_sf Specific heat ratio
-    pure subroutine s_derive_specific_heat_ratio(q_sf)
+     subroutine s_derive_specific_heat_ratio(q_sf)
 
         real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
@@ -144,7 +144,7 @@ contains
         !!      values of the liquid stiffness, which are stored in the
         !!      derived flow quantity storage variable, q_sf.
         !!  @param q_sf Liquid stiffness
-    pure subroutine s_derive_liquid_stiffness(q_sf)
+     subroutine s_derive_liquid_stiffness(q_sf)
 
         real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
@@ -173,7 +173,7 @@ contains
         !!      derived flow quantity storage variable, q_sf.
         !! @param q_prim_vf Primitive variables
         !! @param q_sf Speed of sound
-    pure subroutine s_derive_sound_speed(q_prim_vf, q_sf)
+     subroutine s_derive_sound_speed(q_prim_vf, q_sf)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -230,7 +230,7 @@ contains
         !!  @param i Component indicator
         !!  @param q_prim_vf Primitive variables
         !!  @param q_sf Flux limiter
-    pure subroutine s_derive_flux_limiter(i, q_prim_vf, q_sf)
+     subroutine s_derive_flux_limiter(i, q_prim_vf, q_sf)
 
         integer, intent(in) :: i
 
@@ -324,7 +324,7 @@ contains
         !!  @param b right-hane-side
         !!  @param sol Solution
         !!  @param ndim Problem size
-    pure subroutine s_solve_linear_system(A, b, sol, ndim)
+     subroutine s_solve_linear_system(A, b, sol, ndim)
 
         integer, intent(in) :: ndim
         real(wp), dimension(ndim, ndim), intent(inout) :: A
@@ -374,7 +374,7 @@ contains
         !!  @param i Vorticity component indicator
         !!  @param q_prim_vf Primitive variables
         !!  @param q_sf Vorticity component
-    pure subroutine s_derive_vorticity_component(i, q_prim_vf, q_sf)
+     subroutine s_derive_vorticity_component(i, q_prim_vf, q_sf)
 
         integer, intent(in) :: i
 
@@ -476,7 +476,7 @@ contains
         !!      quantity storage variable, q_sf.
         !!  @param q_prim_vf Primitive variables
         !!  @param q_sf Q_M
-    pure subroutine s_derive_qm(q_prim_vf, q_sf)
+     subroutine s_derive_qm(q_prim_vf, q_sf)
         type(scalar_field), &
             dimension(sys_size), &
             intent(in) :: q_prim_vf

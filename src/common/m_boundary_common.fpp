@@ -26,9 +26,6 @@ module m_boundary_common
     type(scalar_field), dimension(:, :), allocatable :: bc_buffers
     $:GPU_DECLARE(create='[bc_buffers]')
 
-    type(scalar_field), dimension(1) :: jac_sf
-    $:GPU_DECLARE(create='[jac_sf]')
-
 #ifdef MFC_MPI
     integer, dimension(1:3, -1:1) :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
 #endif
@@ -1475,15 +1472,12 @@ contains
 
     end subroutine s_color_function_ghost_cell_extrapolation
 
-    impure subroutine s_populate_F_igr_buffers(bc_type, jac)
+    impure subroutine s_populate_F_igr_buffers(bc_type, jac_sf)
 
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
-        real(wp), target, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(inout) :: jac
+        type(scalar_field), dimension(1:), intent(inout) :: jac_sf
 
         integer :: j, k, l
-
-        jac_sf(1)%sf => jac
-        $:GPU_UPDATE(device='[jac_sf(1)%sf]')
 
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 1, -1, 1)
@@ -1494,15 +1488,15 @@ contains
                         select case (bc_type(1, -1)%sf(0, k, l))
                         case (BC_PERIODIC)
                             do j = 1, buff_size
-                                jac(-j, k, l) = jac(m - j + 1, k, l)
+                                jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(m - j + 1, k, l)
                             end do
                         case (BC_REFLECTIVE)
                             do j = 1, buff_size
-                                jac(-j, k, l) = jac(j - 1, k, l)
+                                jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(j - 1, k, l)
                             end do
                         case default
                             do j = 1, buff_size
-                                jac(-j, k, l) = jac(0, k, l)
+                                jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(0, k, l)
                             end do
                         end select
                     end do
@@ -1520,15 +1514,15 @@ contains
                         select case (bc_type(1, 1)%sf(0, k, l))
                         case (BC_PERIODIC)
                             do j = 1, buff_size
-                                jac(m + j, k, l) = jac(j - 1, k, l)
+                                jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(j - 1, k, l)
                             end do
                         case (BC_REFLECTIVE)
                             do j = 1, buff_size
-                                jac(m + j, k, l) = jac(m - (j - 1), k, l)
+                                jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(m - (j - 1), k, l)
                             end do
                         case default
                             do j = 1, buff_size
-                                jac(m + j, k, l) = jac(m, k, l)
+                                jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(m, k, l)
                             end do
                         end select
                     end do
@@ -1548,15 +1542,15 @@ contains
                         select case (bc_type(2, -1)%sf(k, 0, l))
                         case (BC_PERIODIC)
                             do j = 1, buff_size
-                                jac(k, -j, l) = jac(k, n - j + 1, l)
+                                jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, n - j + 1, l)
                             end do
                         case (BC_REFLECTIVE)
                             do j = 1, buff_size
-                                jac(k, -j, l) = jac(k, j - 1, l)
+                                jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, j - 1, l)
                             end do
                         case default
                             do j = 1, buff_size
-                                jac(k, -j, l) = jac(k, 0, l)
+                                jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, 0, l)
                             end do
                         end select
                     end do
@@ -1574,15 +1568,15 @@ contains
                         select case (bc_type(2, 1)%sf(k, 0, l))
                         case (BC_PERIODIC)
                             do j = 1, buff_size
-                                jac(k, n + j, l) = jac(k, j - 1, l)
+                                jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, j - 1, l)
                             end do
                         case (BC_REFLECTIVE)
                             do j = 1, buff_size
-                                jac(k, n + j, l) = jac(k, n - (j - 1), l)
+                                jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, n - (j - 1), l)
                             end do
                         case default
                             do j = 1, buff_size
-                                jac(k, n + j, l) = jac(k, n, l)
+                                jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, n, l)
                             end do
                         end select
                     end do
@@ -1601,15 +1595,15 @@ contains
                         select case (bc_type(3, -1)%sf(k, l, 0))
                         case (BC_PERIODIC)
                             do j = 1, buff_size
-                                jac(k, l, -j) = jac(k, l, p - j + 1)
+                                jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, p - j + 1)
                             end do
                         case (BC_REFLECTIVE)
                             do j = 1, buff_size
-                                jac(k, l, -j) = jac(k, l, j - 1)
+                                jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, j - 1)
                             end do
                         case default
                             do j = 1, buff_size
-                                jac(k, l, -j) = jac(k, l, 0)
+                                jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, 0)
                             end do
                         end select
                     end do
@@ -1626,15 +1620,15 @@ contains
                         select case (bc_type(3, 1)%sf(k, l, 0))
                         case (BC_PERIODIC)
                             do j = 1, buff_size
-                                jac(k, l, p + j) = jac(k, l, j - 1)
+                                jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, j - 1)
                             end do
                         case (BC_REFLECTIVE)
                             do j = 1, buff_size
-                                jac(k, l, p + j) = jac(k, l, p - (j - 1))
+                                jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, p - (j - 1))
                             end do
                         case default
                             do j = 1, buff_size
-                                jac(k, l, p + j) = jac(k, l, p)
+                                jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, p)
                             end do
                         end select
                     end do
