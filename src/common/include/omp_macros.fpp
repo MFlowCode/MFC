@@ -160,7 +160,7 @@
         & no_create_val.strip('\n') + present_val.strip('\n') + &
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
     #! Hardcoding the parallelism for now
-    #:set omp_directive = '!$omp target teams loop bind(teams) ' + &
+    #:set omp_directive = '!$omp target teams loop ' + &
         & clause_val + extraOmpArgs_val.strip('\n')
     #:set omp_end_directive = '!$omp end target teams loop'
     $:omp_directive
@@ -201,7 +201,7 @@
 #! Not implemented yet
 #:def OMP_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraOmpArgs=None)
     #! loop is going to be ignored since all loops right now are seq
-    #:set temp = ''
+    #:set temp = '!$omp loop bind(thread)'
     $:temp
 #:enddef
 
