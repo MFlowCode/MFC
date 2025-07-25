@@ -52,7 +52,6 @@ module m_fftw
     complex(dp), allocatable, target :: data_cmplx_gpu(:)
     complex(dp), allocatable, target :: data_fltr_cmplx_gpu(:)
     $:GPU_DECLARE(create='[data_real_gpu,data_cmplx_gpu,data_fltr_cmplx_gpu]')
-    !$omp declare target (data_real_gpu,data_cmplx_gpu,data_fltr_cmplx_gpu)
 
 #if defined(__PGI)
     integer :: fwd_plan_gpu, bwd_plan_gpu
