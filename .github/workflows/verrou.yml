@@ -41,6 +41,12 @@ jobs:
         run: |                    
           export PATH="$HOME/.local/bin:$PATH"
           mkdir -p verrou_reports
+          # Find the simulation executable once, use absolute path
+          SIM_EXE=$(find "$PWD/build/staging" -type f -name simulation | head -n 1)
+          if [ ! -x "$SIM_EXE" ]; then
+            echo "ERROR: simulation executable not found!"
+            exit 1
+          fi
           for inp in examples/*/simulation.inp; do
             case_dir=$(dirname "$inp")
             case_name=$(basename "$case_dir")
@@ -58,10 +64,13 @@ jobs:
               out_file="verrou_reports/${case_name}_${flag_name}.log"
               (
                 cd "$run_dir"
-                output=$(valgrind $flags ../../build/staging/*/simulation 2>&1 || true)
-                echo "===== ${case_name} ${flags} ====="
-                echo "$output"
+                output=$(valgrind $flags "$SIM_EXE" 2>&1 || true)
                 echo "$output" > "../$out_file"
+                # Only display if ERROR SUMMARY is nonzero
+                if echo "$output" | grep -qE "ERROR SUMMARY: [1-9][0-9]*"; then
+                  echo "===== ${case_name} ${flags} ====="
+                  echo "$output"
+                fi
               )
             done
           done
