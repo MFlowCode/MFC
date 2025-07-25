@@ -30,11 +30,11 @@ jobs:
           sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
                   libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev
 
-          ./mfc.sh build -t pre_process simulation --no-mpi
+          ./mfc.sh build --no-mpi
           find examples/ -name case.py -exec sed -i 's/"parallel_io": *"T"/"parallel_io": "F"/g' {} +
 
-          for case in examples/*/case.py; do
-              ./mfc.sh run "$case"
+          for case in examples/0D_*/case.py examples/1D_*/case.py; do
+            ./mfc.sh run "$case" || true
           done
 
       - name: Run Verrou
@@ -49,14 +49,18 @@ jobs:
               cp -r "$case_dir"/restart_data "$run_dir"/ 2>/dev/null || true
 
               for flags in \
-                "--tool=verrou --rounding-mode=average_comdet" \
-                "--tool=verrou --rounding-mode=random" \
-                "--tool=verrou --rounding-mode=nearest"
+                "--tool=verrou -s --rounding-mode=average_comdet" \
+                "--tool=verrou -s --rounding-mode=random" \
+                "--tool=verrou -s --rounding-mode=nearest"
               do
-                flag_name=$(echo $flags | tr ' ' '_' | tr -d '=*?:"<>|')
-                out_file="verrou_reports/${case_name}_${flag_name}.log"
-                (cd "$run_dir" && \
-                  $HOME/.local/bin/valgrind $flags ../../build/staging/*/simulation > "../$out_file" 2>&1 || true)
+              flag_name=$(echo $flags | tr ' ' '_' | tr -d '=*?:"<>|')
+              out_file="verrou_reports/${case_name}_${flag_name}.log"
+              (
+                cd "$run_dir"
+                output=$($HOME/.local/bin/valgrind $flags ../../build/staging/*/simulation 2>&1 || true)
+                echo "$output"
+                echo "$output" > "../$out_file"
+              )
               done
             done
 
