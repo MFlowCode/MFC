@@ -23,9 +23,13 @@ module m_igr
  s_igr_sigma_x, &
  s_igr_flux_add, &
  s_finalize_igr_module
+    real(wp), allocatable, target, dimension(:, :, :) :: jac
 
-    real(wp), allocatable, dimension(:, :, :) :: jac, jac_rhs, jac_old
+    real(wp), allocatable, dimension(:, :, :) :: jac_rhs, jac_old
     $:GPU_DECLARE(create='[jac, jac_rhs, jac_old]')
+
+    type(scalar_field), dimension(1) :: jac_sf
+    $:GPU_DECLARE(create='[jac_sf]')
 
     real(wp), allocatable, dimension(:, :) :: Res
     $:GPU_DECLARE(create='[Res]')
@@ -161,6 +165,10 @@ contains
             end if
         #:endif
 
+        jac_sf(1)%sf => jac
+        $:GPU_ENTER_DATA(copyin='[jac_sf(1)%sf]')
+        $:GPU_ENTER_DATA(attach='[jac_sf(1)%sf]')
+
     end subroutine s_initialize_igr_module
 
     subroutine s_igr_iterative_solve(q_cons_vf, bc_type, t_step)
@@ -247,7 +255,7 @@ contains
                 end do
             #:endcall GPU_PARALLEL_LOOP
 
-            call s_populate_F_igr_buffers(bc_type, jac)
+            call s_populate_F_igr_buffers(bc_type, jac_sf)
 
             if (igr_iter_solver == 1) then ! Jacobi iteration
                 #:call GPU_PARALLEL_LOOP(collapse=3)
