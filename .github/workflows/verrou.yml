@@ -34,7 +34,8 @@ jobs:
           find examples/ -name case.py -exec sed -i 's/"parallel_io": *"T"/"parallel_io": "F"/g' {} +
 
           for case in examples/0D_*/case.py examples/1D_*/case.py; do
-            ./mfc.sh run "$case" || true
+            echo "Running: $case"
+            ./mfc.sh run "$case" >> cases.log 2>&1 || true
           done
 
       - name: Run Verrou
@@ -81,3 +82,4 @@ jobs:
         with:
           name: verrou-reports
           path: verrou_reports/
+          
