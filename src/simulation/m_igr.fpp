@@ -24,8 +24,12 @@ module m_igr
  s_igr_flux_add, &
  s_finalize_igr_module
 
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+    real(wp), pointer, contiguous, dimension(:, :, :) :: jac,jac_rhs,jac_old
+#else
     real(wp), allocatable, dimension(:, :, :) :: jac, jac_rhs, jac_old
     $:GPU_DECLARE(create='[jac, jac_rhs, jac_old]')
+#endif
 
     real(wp), allocatable, dimension(:, :) :: Res
     $:GPU_DECLARE(create='[Res]')
@@ -79,9 +83,35 @@ module m_igr
 
     integer :: i, j, k, l, q, r
 
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+    real(wp), allocatable, dimension(:, :, :, :), pinned, target :: m_igr_pool_host
+    real(wp), allocatable, dimension(:, :, :), pinned, target :: m_igr_pool_host2
+#endif
+
 contains
 
     subroutine s_initialize_igr_module()
+
+        integer :: igr_temps_on_gpu = 3
+        integer :: igr_temps_on_cpu = 0
+        integer :: pool_idx = 1
+        character(len=10) :: igr_temps_on_gpu_str
+
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        call get_environment_variable("NVIDIA_IGR_TEMPS_ON_GPU", igr_temps_on_gpu_str)
+
+        if (trim(igr_temps_on_gpu_str) == "0") then
+            igr_temps_on_gpu = 0 ! jac, jac_rhs and jac_old on CPU
+        elseif (trim(igr_temps_on_gpu_str) == "1") then
+            igr_temps_on_gpu = 1 ! jac on GPU, jac_rhs on CPU, jac_old on CPU
+        elseif (trim(igr_temps_on_gpu_str) == "2") then
+            igr_temps_on_gpu = 2 ! jac and jac_rhs on GPU, jac_old on CPU
+        elseif (trim(igr_temps_on_gpu_str) == "3") then
+            igr_temps_on_gpu = 3 ! jac, jac_rhs and jac_old on GPU
+        else ! default on GPU
+            igr_temps_on_gpu = 3
+        endif
+#endif
 
         if (viscous) then
             @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
@@ -91,8 +121,73 @@ contains
                 end do
             end do
             $:GPU_UPDATE(device='[Res, Re_idx, Re_size]')
+            @:PREFER_GPU(Res)
+            @:PREFER_GPU(Re_idx)
         end if
 
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+           igr_temps_on_cpu = 3 - igr_temps_on_gpu
+
+           if ( igr_temps_on_cpu >= 1 ) then
+               !allocate(m_igr_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
+               !                         idwbuff(2)%beg:idwbuff(2)%end, &
+               !                         idwbuff(3)%beg:idwbuff(3)%end, &
+               !                         1:igr_temps_on_cpu))
+
+               !There was a dimensionality change for jac_rhs, using a different pineed pool
+               if ( igr_temps_on_cpu == 1 ) then
+                   allocate(m_igr_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
+                                            idwbuff(2)%beg:idwbuff(2)%end, &
+                                            idwbuff(3)%beg:idwbuff(3)%end, &
+                                            1:igr_temps_on_cpu))
+
+                elseif (igr_temps_on_cpu >=2 ) then
+                   allocate(m_igr_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
+                                            idwbuff(2)%beg:idwbuff(2)%end, &
+                                            idwbuff(3)%beg:idwbuff(3)%end, &
+                                            1:igr_temps_on_cpu-1))
+                   allocate(m_igr_pool_host2(-1:m,-1:n,-1:p)) 
+               endif
+
+               pool_idx = 1
+               if ( igr_temps_on_cpu >= 1 ) then
+                   !print*, 'jac_old on CPU'
+                   jac_old(idwbuff(1)%beg:idwbuff(1)%end, &
+                       idwbuff(2)%beg:idwbuff(2)%end, &
+                       idwbuff(3)%beg:idwbuff(3)%end) => m_igr_pool_host(:,:,:,pool_idx)
+                   pool_idx = pool_idx + 1
+               end if
+               if ( igr_temps_on_cpu >= 2 ) then
+                   jac_rhs(-1:m,-1:n,-1:p) => m_igr_pool_host2(:,:,:)
+               end if
+               if ( igr_temps_on_cpu >= 3 ) then
+                   !print*, 'jac on CPU'
+                   jac(idwbuff(1)%beg:idwbuff(1)%end, &
+                       idwbuff(2)%beg:idwbuff(2)%end, &
+                       idwbuff(3)%beg:idwbuff(3)%end) => m_igr_pool_host(:,:,:,pool_idx)
+                   pool_idx = pool_idx + 1
+               end if
+           end if
+           if ( igr_temps_on_gpu >= 1 ) then
+                !print*, 'jac on GPU'
+                @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, &
+                             idwbuff(2)%beg:idwbuff(2)%end, &
+                             idwbuff(3)%beg:idwbuff(3)%end))
+                @:PREFER_GPU(jac)
+           endif
+           if ( igr_temps_on_gpu >= 2 ) then
+                !print*, 'jac_rhs on GPU'
+                @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
+                @:PREFER_GPU(jac_rhs)
+           endif
+           if ( igr_temps_on_gpu >= 3 ) then
+                !print*, 'jac_old on GPU'
+                @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, &
+                             idwbuff(2)%beg:idwbuff(2)%end, &
+                             idwbuff(3)%beg:idwbuff(3)%end))
+                @:PREFER_GPU(jac_old)
+           endif
+#else
         @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, &
             idwbuff(2)%beg:idwbuff(2)%end, &
             idwbuff(3)%beg:idwbuff(3)%end))
@@ -103,6 +198,7 @@ contains
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
         end if
+#endif
 
         $:GPU_PARALLEL_LOOP(collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end

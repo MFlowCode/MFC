@@ -77,6 +77,10 @@ module m_time_steppers
 
     $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt]')
 
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+    real(wp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
+#endif
+
 contains
 
     !> The computation of parameters, the allocation of memory,
@@ -85,6 +89,33 @@ contains
     impure subroutine s_initialize_time_steppers_module
 
         integer :: i, j !< Generic loop iterators
+
+        integer :: vars_on_gpu = 0
+        character(len=10) :: vars_on_gpu_str
+
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        call get_environment_variable("NVIDIA_VARS_ON_GPU", vars_on_gpu_str)
+
+        if (trim(vars_on_gpu_str) == "0") then
+            vars_on_gpu = 0
+        elseif (trim(vars_on_gpu_str) == "1") then
+            vars_on_gpu = 1
+        elseif (trim(vars_on_gpu_str) == "2") then
+            vars_on_gpu = 2
+        elseif (trim(vars_on_gpu_str) == "3") then
+            vars_on_gpu = 3
+        elseif (trim(vars_on_gpu_str) == "4") then
+            vars_on_gpu = 4
+        elseif (trim(vars_on_gpu_str) == "5") then
+            vars_on_gpu = 5
+        elseif (trim(vars_on_gpu_str) == "6") then
+            vars_on_gpu = 6
+        elseif (trim(vars_on_gpu_str) == "7") then
+            vars_on_gpu = 7
+        else ! default
+            vars_on_gpu = 0
+        endif
+#endif
 
         ! Setting number of time-stages for selected time-stepping scheme
         if (time_stepper == 1) then
@@ -95,11 +126,35 @@ contains
 
         ! Allocating the cell-average conservative variables
         @:ALLOCATE(q_cons_ts(1:num_ts))
+        @:PREFER_GPU(q_cons_ts)
 
         do i = 1, num_ts
             @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
+            @:PREFER_GPU(q_cons_ts(i)%vf)
         end do
 
+        !!
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+           allocate(q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
+                                        idwbuff(2)%beg:idwbuff(2)%end, &
+                                        idwbuff(3)%beg:idwbuff(3)%end, &
+                                        1:sys_size))
+           do i = 1, num_ts
+                do j = 1, sys_size
+                    if ( i == 1 ) then
+                        @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                            idwbuff(2)%beg:idwbuff(2)%end, &
+                            idwbuff(3)%beg:idwbuff(3)%end))
+                        @:PREFER_GPU(q_cons_ts(i)%vf(j)%sf)
+                    else
+                        q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                            idwbuff(2)%beg:idwbuff(2)%end, &
+                            idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
+                    end if
+                end do
+                @:ACC_SETUP_VFs(q_cons_ts(i))
+            end do
+#else
         do i = 1, num_ts
             do j = 1, sys_size
                 @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -108,6 +163,7 @@ contains
             end do
             @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
+#endif
 
         ! Allocating the cell-average primitive ts variables
         if (probe_wrt) then
@@ -682,6 +738,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
+#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -694,6 +751,22 @@ contains
                 end do
             end do
         end do
+#else
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
+                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l)
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+#endif
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
@@ -750,10 +823,15 @@ contains
 
         ! Stage 2 of 3
 
+#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+#else
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg,2)
+#endif
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
+#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -767,6 +845,21 @@ contains
                 end do
             end do
         end do
+#else
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (3._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                    end do
+                end do
+            end do
+        end do
+#endif
 
         if (qbmm .and. (.not. polytropic)) then
             $:GPU_PARALLEL_LOOP(collapse=5)
@@ -823,10 +916,15 @@ contains
         end if
 
         ! Stage 3 of 3
+#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
+#else
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg,3)
+#endif
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
+#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -840,6 +938,21 @@ contains
                 end do
             end do
         end do
+#else
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + 2._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+                    end do
+                end do
+            end do
+        end do
+#endif
 
         if (qbmm .and. (.not. polytropic)) then
             $:GPU_PARALLEL_LOOP(collapse=5)
@@ -1143,14 +1256,28 @@ contains
 
         ! Deallocating the cell-average conservative variables
         do i = 1, num_ts
+#if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+            do j = 1, sys_size
+                if ( i == 1 ) then
+                    @:DEALLOCATE(q_cons_ts(i)%vf(j)%sf)
+                else
+                    nullify(q_cons_ts(i)%vf(j)%sf)
+                end if
+            end do
+#else
             do j = 1, sys_size
                 @:DEALLOCATE(q_cons_ts(i)%vf(j)%sf)
             end do
+#endif
 
             @:DEALLOCATE(q_cons_ts(i)%vf)
         end do
 
         @:DEALLOCATE(q_cons_ts)
+
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        deallocate(q_cons_ts_pool_host)
+#endif
 
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then

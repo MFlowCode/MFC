@@ -12,11 +12,113 @@
 #endif
 #:enddef
 
+#:def PREFER_GPU(*args)
+#ifdef MFC_SIMULATION
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+    block
+    use cudafor
+    intrinsic :: minval, maxval, sum
+    integer :: istat
+    integer :: prefer_gpu_mode
+    character(len=10) :: prefer_gpu_mode_str
+
+    ! environment variable
+    call get_environment_variable("NVIDIA_MANUAL_GPU_HINTS", prefer_gpu_mode_str)
+    if (trim(prefer_gpu_mode_str) == "0") then ! OFF
+        prefer_gpu_mode = 0
+    elseif (trim(prefer_gpu_mode_str) == "1") then ! ON
+        prefer_gpu_mode = 1
+    else ! default
+        prefer_gpu_mode = 0
+    endif
+
+    if (prefer_gpu_mode .eq. 1) then
+    #:for arg in args
+        !print*, "Moving ${arg}$ to GPU => ", SHAPE(${arg}$)
+        ! unset
+        istat = cudaMemAdvise( c_devloc(${arg}$), SIZEOF(${arg}$), cudaMemAdviseUnSetPreferredLocation, cudaCpuDeviceId )
+        if (istat /= cudaSuccess) then
+            write(*,"('Error code: ',I0, ': ')") istat
+            write(*,*) cudaGetErrorString(istat)
+        endif
+        ! set
+        istat = cudaMemAdvise( c_devloc(${arg}$), SIZEOF(${arg}$), cudaMemAdviseSetPreferredLocation, 0 )
+        if (istat /= cudaSuccess) then
+            write(*,"('Error code: ',I0, ': ')") istat
+            write(*,*) cudaGetErrorString(istat)
+        endif
+    #:endfor
+    end if
+    end block
+#endif
+#endif
+#:enddef
+
+
+#:def PARSE(s)
+${s if s.rfind(')') == -1 else next((s[:i] for i in range(s.rfind(')'), -1, -1) if s[i] == '(' and s.count('(', i, s.rfind(')')+1) == s.count(')', i, s.rfind(')')+1)), s)}$
+#:enddef
+
 #:def ALLOCATE(*args)
     @:LOG({'@:ALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
     #:set allocated_variables = ', '.join(args)
     allocate (${allocated_variables}$)
     $:GPU_ENTER_DATA(create=('[' + allocated_variables + ']'))
+
+
+#ifdef MFC_SIMULATION
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+    block
+    use cudafor
+    intrinsic :: minval, maxval, sum
+    integer :: istat, stream_id
+    integer :: alloc_mode
+    character(len=10) :: alloc_mode_str
+
+    ! environment variable
+    call get_environment_variable("NVIDIA_ALLOC_MODE", alloc_mode_str)
+    if (trim(alloc_mode_str) == "0") then ! no CPU first touch, no preferred location CPU
+        alloc_mode = 0
+    elseif (trim(alloc_mode_str) == "1") then ! CPU first touch, no preferred location CPU
+        alloc_mode = 1
+    elseif (trim(alloc_mode_str) == "2") then ! no CPU first touch, preferred location CPU
+        alloc_mode = 2
+    elseif (trim(alloc_mode_str) == "3") then ! CPU first touch, preferred location CPU
+        alloc_mode = 3
+    else ! default
+        alloc_mode = 0
+    endif
+
+    stream_id = 0
+
+    ! prefetch to CPU
+    if ((alloc_mode .eq. 1) .or. (alloc_mode .eq. 3)) then
+    #:for arg in args
+        istat = cudaMemPrefetchAsync( c_devloc(@{PARSE(${arg}$)}@), SIZEOF(@{PARSE(${arg}$)}@), cudaCpuDeviceId, stream_id )
+        !print*, "! @{PARSE(${arg}$)}@ with shape",  SHAPE(@{PARSE(${arg}$)}@), "=> prefetch to CPU"
+        if (istat /= cudaSuccess) then
+            write(*,"('Error code: ',I0, ': ')") istat
+            write(*,*) cudaGetErrorString(istat)
+        endif
+    #:endfor
+    endif
+
+    ! memadvise preferred location
+    if ((alloc_mode .eq. 2) .or. (alloc_mode .eq. 3)) then
+    #:for arg in args
+        istat = cudaMemAdvise( c_devloc(@{PARSE(${arg}$)}@), SIZEOF(@{PARSE(${arg}$)}@), cudaMemAdviseSetPreferredLocation, cudaCpuDeviceId )
+        !print*, "! @{PARSE(${arg}$)}@ with shape",  SHAPE(@{PARSE(${arg}$)}@), "=> preferred location CPU"
+        if (istat /= cudaSuccess) then
+            write(*,"('Error code: ',I0, ': ')") istat
+            write(*,*) cudaGetErrorString(istat)
+        endif
+    #:endfor
+    endif
+
+    end block
+#endif
+#endif
+
 #:enddef ALLOCATE
 
 #:def DEALLOCATE(*args)
