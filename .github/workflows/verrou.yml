@@ -11,12 +11,6 @@ jobs:
 
       - name: Setup
         run: |
-          sudo apt update -y
-          sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
-                  libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev
-
-          ./mfc.sh build -t pre_process simulation
-
           # get recent release of valgrind from GitHub API
             VERROU_VERSION=$(curl -s https://api.github.com/repos/edf-hpc/verrou/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")')
             VERROU_NUMBER=${VERROU_VERSION#v}
@@ -32,12 +26,18 @@ jobs:
             cd ../..
             rm -rf pr/valgrind-*
 
-      - name: Run Verrou
-        run: |          
+          sudo apt update -y
+          sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
+                  libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev
+
+          ./mfc.sh build -t pre_process simulation
+
           for case in examples/*/case.py; do
               ./mfc.sh run "$case"
-          done  
-          
+          done
+
+      - name: Run Verrou
+        run: |                    
           mkdir -p verrou_reports
             for inp in examples/*/simulation.inp; do
               case_dir=$(dirname "$inp")
