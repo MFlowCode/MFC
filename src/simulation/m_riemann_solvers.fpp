@@ -357,7 +357,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R,G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp]', extraOmpArgs='defaultmap(firstprivate:scalar) bind(teams, parallel)')
+                        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R,G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
                         do l = is3%beg, is3%end
                           do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -480,8 +480,8 @@ contains
                                     ! call get_mixture_molecular_weight(Ys_L, MW_L)
                                     ! call get_mixture_molecular_weight(Ys_R, MW_R)
 
-                                    ! Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
-                                    ! Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
+                                    Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
+                                    Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
 
                                     R_gas_L = gas_constant/MW_L
                                     R_gas_R = gas_constant/MW_R
@@ -496,8 +496,8 @@ contains
                                         Gamma_iL = Cp_iL/(Cp_iL - 1.0_wp)
                                         Gamma_iR = Cp_iR/(Cp_iR - 1.0_wp)
 
-                                        ! gamma_L = sum(Xs_L(:)/(Gamma_iL(:) - 1.0_wp))
-                                        ! gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0_wp))
+                                        gamma_L = sum(Xs_L(:)/(Gamma_iL(:) - 1.0_wp))
+                                        gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0_wp))
                                     else if (chem_params%gamma_method == 2) then
                                         ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
                                         ! call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
@@ -524,8 +524,8 @@ contains
                                     vdotB%L = vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3)
                                     vdotB%R = vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3)
 
-                                    ! b4%L(1:3) = B%L(1:3)/Ga%L + Ga%L*vel_L(1:3)*vdotB%L
-                                    ! b4%R(1:3) = B%R(1:3)/Ga%R + Ga%R*vel_R(1:3)*vdotB%R
+                                    b4%L(1:3) = B%L(1:3)/Ga%L + Ga%L*vel_L(1:3)*vdotB%L
+                                    b4%R(1:3) = B%R(1:3)/Ga%R + Ga%R*vel_R(1:3)*vdotB%R
                                     B2%L = B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp
                                     B2%R = B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp
 
@@ -536,8 +536,8 @@ contains
                                     H_L = 1._wp + (gamma_L + 1)*pres_L/rho_L
                                     H_R = 1._wp + (gamma_R + 1)*pres_R/rho_R
 
-                                    ! cm%L(1:3) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(1:3) - vdotB%L*B%L(1:3)
-                                    ! cm%R(1:3) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(1:3) - vdotB%R*B%R(1:3)
+                                    cm%L(1:3) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(1:3) - vdotB%L*B%L(1:3)
+                                    cm%R(1:3) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(1:3) - vdotB%R*B%R(1:3)
 
                                     E_L = rho_L*H_L*Ga%L**2 - pres_L + 0.5_wp*(B2%L + vel_L_rms*B2%L - vdotB%L**2._wp) - rho_L*Ga%L
                                     E_R = rho_R*H_R*Ga%R**2 - pres_R + 0.5_wp*(B2%R + vel_R_rms*B2%R - vdotB%R**2._wp) - rho_R*Ga%R
