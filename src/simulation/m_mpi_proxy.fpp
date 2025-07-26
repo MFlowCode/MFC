@@ -98,8 +98,8 @@ contains
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', &
             & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',  'fd_order',     &
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
-            & 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
-            & 'num_bc_patches', 'num_igr_iters', 'num_igr_warm_start_iters']
+            & 'num_source','relax_model','num_ibs','n_start','num_igr_iters',  &
+            & 'num_bc_patches','num_igr_warm_start_iters','adap_dt_max_iters'  ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
