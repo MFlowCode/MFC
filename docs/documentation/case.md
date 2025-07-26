@@ -745,7 +745,6 @@ Implementation of the parameters into the model follow [Ando (2010)](references.
 | `polydisperse`   | Logical	| Polydispersity in equilibrium bubble radius R0 |
 | `nb` 			     | Integer	| Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
 | `poly_sigma` 	       | Real 		|	Standard deviation for probability density function of polydisperse bubble populations |
-| `R0_type` 	       | Integer 		|	Quadrature rule for probability density function of polydisperse bubble populations |
 | `Ca` 			     | Real		  | Cavitation number |
 | `Web` 			   | Real		  | Weber number |
 | `Re_inv` 		   | Real		  | Inverse Reynolds number |
@@ -763,14 +762,11 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - `thermal` specifies a model for heat transfer across the bubble interface by an integer from 1 through 3.
 `thermal = 1`, `2`, and `3` correspond to no heat transfer (adiabatic gas compression), isothermal heat transfer, and heat transfer with a constant heat transfer coefficient based on [Preston et al., 2007](references.md), respectively.
 
-- `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius.
+- `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius. Simpson's rule is used for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 
 - `R0ref` specifies the reference bubble radius.
 
 - `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibrium bubble radius.
-
-- `R0_type` specifies the quadrature rule for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
-`R0_type = 1` corresponds to Simpson's rule.
 
 - `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 
