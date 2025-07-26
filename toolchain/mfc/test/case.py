@@ -77,7 +77,6 @@ BASE_CFG = {
     'qbmm'                          : 'F',
     'dist_type'                     : 2,
     'poly_sigma'                    : 0.3,
-    'R0_type'                       : 1,
     'sigR'                          : 0.1,
     'sigV'                          : 0.1,
     'rhoRV'                         : 0.0,
