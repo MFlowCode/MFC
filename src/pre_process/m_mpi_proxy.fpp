@@ -46,7 +46,7 @@ contains
             & 'weno_order', 'precision', 'perturb_flow_fluid', &
             & 'perturb_sph_fluid', 'num_patches', 'thermal', 'nb', 'dist_type',&
             & 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters', &
-            & 'num_bc_patches', 'mixlayer_perturb_nk' ]
+            & 'num_bc_patches', 'mixlayer_perturb_nk', 'igr_order' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -58,7 +58,7 @@ contains
             & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
             & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',&
             & 'bubbles_lagrange', 'bc_io', 'mhd', 'relativity', 'cont_damage', &
-            & 'igr' ]
+            & 'igr', 'down_sample' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)

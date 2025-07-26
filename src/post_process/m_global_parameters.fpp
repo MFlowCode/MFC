@@ -41,7 +41,7 @@ module m_global_parameters
     !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
     type(cell_num_bounds) :: cells_bounds
 
-    integer(8) :: nGlobal ! Total number of cells in global domain
+    integer(kind=8) :: nGlobal ! Total number of cells in global domain
 
     !> @name Cylindrical coordinates (either axisymmetric or full 3D)
     !> @{
@@ -153,6 +153,9 @@ module m_global_parameters
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
 
+    !! Locations of the domain bounds in the x-, y- and z-coordinate directions
+    type(bounds_info) :: x_domain, y_domain, z_domain
+
     integer :: num_bc_patches
     logical :: bc_io
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
@@ -209,6 +212,7 @@ module m_global_parameters
     integer :: format !< Format of the database file(s)
 
     integer :: precision !< Floating point precision of the database file(s)
+    logical :: down_sample !< down sampling of the database file(s)
 
     logical :: output_partial_domain !< Specify portion of domain to output for post-processing
 
@@ -403,6 +407,7 @@ contains
         format = dflt_int
 
         precision = dflt_int
+        down_sample = .false.
 
         alpha_rho_wrt = .false.
         rho_wrt = .false.
@@ -467,6 +472,13 @@ contains
         z_output%beg = dflt_real
         z_output%end = dflt_real
 
+        x_domain%beg = dflt_real
+        x_domain%end = dflt_real
+        y_domain%beg = dflt_real
+        y_domain%end = dflt_real
+        z_domain%beg = dflt_real
+        z_domain%end = dflt_real
+
         ! MHD
         Bx0 = dflt_real
 
@@ -513,13 +525,13 @@ contains
             mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
+            adv_idx%end = E_idx + num_fluids
+
             if (igr) then
-                if (num_fluids == 1) then
-                    adv_idx%end = adv_idx%beg
-                else
-                    adv_idx%end = E_idx + num_fluids - 1
-                end if
+                adv_idx%beg = E_idx + 1
+                adv_idx%end = E_idx + num_fluids - 1
             else
+                adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
             end if
 
@@ -782,7 +794,11 @@ contains
         allocate (MPI_IO_DATA%view(1:sys_size))
         allocate (MPI_IO_DATA%var(1:sys_size))
         do i = 1, sys_size
-            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+            if (down_sample) then
+                allocate (MPI_IO_DATA%var(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
+            else
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+            end if
             MPI_IO_DATA%var(i)%sf => null()
         end do
 
