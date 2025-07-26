@@ -398,8 +398,7 @@ module m_global_parameters
 
     real(wp), dimension(:), allocatable :: weight !< Simpson quadrature weights
     real(wp), dimension(:), allocatable :: R0     !< Bubble sizes
-    real(wp), dimension(:), allocatable :: V0     !< Bubble velocities
-    $:GPU_DECLARE(create='[weight,R0,V0]')
+    $:GPU_DECLARE(create='[weight,R0]')
 
     logical :: bubbles_euler      !< Bubbles euler on/off
     logical :: polytropic   !< Polytropic  switch
@@ -424,10 +423,9 @@ module m_global_parameters
     integer, parameter :: nmom = 6 !< Number of carried moments per R0 location
     integer :: nmomsp    !< Number of moments required by ensemble-averaging
     integer :: nmomtot   !< Total number of carried moments moments/transport equations
-    integer :: R0_type
 
     real(wp) :: pi_fac   !< Factor for artificial pi_inf
-    $:GPU_DECLARE(create='[qbmm, nmomsp,nmomtot,R0_type,pi_fac]')
+    $:GPU_DECLARE(create='[qbmm, nmomsp,nmomtot,pi_fac]')
 
     #:if not MFC_CASE_OPTIMIZATION
         $:GPU_DECLARE(create='[nb]')
@@ -671,8 +669,6 @@ contains
             num_fluids = dflt_int
         #:endif
 
-        R0_type = dflt_int
-
         adv_n = .false.
         adap_dt = .false.
         adap_dt_tol = dflt_real
@@ -902,7 +898,7 @@ contains
                         sys_size = n_idx
                     end if
 
-                    @:ALLOCATE(weight(nb), R0(nb), V0(nb))
+                    @:ALLOCATE(weight(nb), R0(nb))
                     @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
 
@@ -943,11 +939,7 @@ contains
                     if (nb == 1) then
                         weight(:) = 1._wp
                         R0(:) = 1._wp
-                        V0(:) = 1._wp
-                    else if (nb > 1) then
-                        V0(:) = 1._wp
-                        !R0 and weight initialized in s_simpson
-                    else
+                    else if (nb < 1) then
                         stop 'Invalid value of nb'
                     end if
 
@@ -1019,7 +1011,7 @@ contains
 
                     @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
-                    @:ALLOCATE(weight(nb), R0(nb), V0(nb))
+                    @:ALLOCATE(weight(nb), R0(nb))
 
                     do i = 1, nb
                         if (polytropic) then
@@ -1039,10 +1031,7 @@ contains
                     if (nb == 1) then
                         weight(:) = 1._wp
                         R0(:) = 1._wp
-                        V0(:) = 0._wp
-                    else if (nb > 1) then
-                        V0(:) = 1._wp
-                    else
+                    else if (nb < 1) then
                         stop 'Invalid value of nb'
                     end if
 
@@ -1280,7 +1269,7 @@ contains
         #:endif
 
         $:GPU_ENTER_DATA(copyin='[nb,R0ref,Ca,Web,Re_inv,weight,R0, &
-            & V0,bubbles_euler,polytropic,polydisperse,qbmm,R0_type, &
+            & bubbles_euler,polytropic,polydisperse,qbmm, &
             & ptil,bubble_model,thermal,poly_sigma]')
         $:GPU_ENTER_DATA(copyin='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,pv, &
             & M_n,M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T, &
