@@ -242,7 +242,7 @@ contains
 
         integer, intent(in) :: mpi_dir, pbc_loc
 
-        integer :: i, j, k, l, r, q !< Generic loop iterators
+        integer :: j, k, l, r !< Generic loop iterators
 
         integer :: buffer_counts(1:3), buffer_count
 
@@ -250,7 +250,7 @@ contains
         integer :: beg_end(1:2), grid_dims(1:3)
         integer :: dst_proc, src_proc, recv_tag, send_tag
 
-        logical :: beg_end_geq_0, qbmm_comm
+        logical :: beg_end_geq_0
 
         integer :: pack_offset, unpack_offset
 

@@ -49,8 +49,8 @@ contains
     !> This subroutine should dispatch to the correct relaxation solver based
         !!      some parameter. It replaces the procedure pointer, which CCE
         !!      is breaking on.
-    impure subroutine s_relaxation_solver(q_cons_vf)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+    impure subroutine s_relaxation_solver()
+        !type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         ! This is empty because in current master the procedure pointer
         ! was never assigned
         @:ASSERT(.false., "s_relaxation_solver called but it currently does nothing")
