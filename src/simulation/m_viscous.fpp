@@ -12,6 +12,9 @@ module m_viscous
 
     use m_weno
 
+    use m_muscl                !< Monotonic Upstream-centered (MUSCL)
+                               !! schemes for conservation laws
+
     use m_helper
 
     use m_finite_differences
@@ -976,97 +979,98 @@ contains
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
-        integer :: weno_dir !< Coordinate direction of the WENO reconstruction
+        integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
 
-        ! Reconstruction in s1-direction
+        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
+            if (recon_type == ${TYPE}$) then
+                ! Reconstruction in s1-direction
 
-        if (norm_dir == 1) then
-            is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
-            weno_dir = 1; is1_viscous%beg = is1_viscous%beg + weno_polyn
-            is1_viscous%end = is1_viscous%end - weno_polyn
+                if (norm_dir == 1) then
+                    is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
+                    recon_dir = 1; is1_viscous%beg = is1_viscous%beg + ${SCHEME}$_polyn
+                    is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
 
-        elseif (norm_dir == 2) then
-            is1_viscous = iy; is2_viscous = ix; is3_viscous = iz
-            weno_dir = 2; is1_viscous%beg = is1_viscous%beg + weno_polyn
-            is1_viscous%end = is1_viscous%end - weno_polyn
+                elseif (norm_dir == 2) then
+                    is1_viscous = iy; is2_viscous = ix; is3_viscous = iz
+                    recon_dir = 2; is1_viscous%beg = is1_viscous%beg + ${SCHEME}$_polyn
+                    is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
 
-        else
-            is1_viscous = iz; is2_viscous = iy; is3_viscous = ix
-            weno_dir = 3; is1_viscous%beg = is1_viscous%beg + weno_polyn
-            is1_viscous%end = is1_viscous%end - weno_polyn
+                else
+                    is1_viscous = iz; is2_viscous = iy; is3_viscous = ix
+                    recon_dir = 3; is1_viscous%beg = is1_viscous%beg + ${SCHEME}$_polyn
+                    is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
 
-        end if
+                end if
 
-        $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
+                $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
+                if (n > 0) then
+                    if (p > 0) then
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
+                                           vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
+                                           recon_dir, &
+                                           is1_viscous, is2_viscous, is3_viscous)
+                    else
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
+                                           vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
+                                           recon_dir, &
+                                           is1_viscous, is2_viscous, is3_viscous)
+                    end if
+                else
+                    call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
+                                       vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
+                                       recon_dir, &
+                                       is1_viscous, is2_viscous, is3_viscous)
+                end if
 
-        if (n > 0) then
-            if (p > 0) then
-                call s_weno(v_vf(iv%beg:iv%end), &
-                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                            weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
-            else
-                call s_weno(v_vf(iv%beg:iv%end), &
-                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                            weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
-            end if
-        else
-            call s_weno(v_vf(iv%beg:iv%end), &
-                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                        weno_dir, &
-                        is1_viscous, is2_viscous, is3_viscous)
-        end if
-
-        if (viscous) then
-            if (weno_Re_flux) then
-                if (norm_dir == 2) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3_viscous%beg, is3_viscous%end
-                            do j = is1_viscous%beg, is1_viscous%end
-                                do k = is2_viscous%beg, is2_viscous%end
-                                    vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
-                                    vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (norm_dir == 3) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = iv%beg, iv%end
-                        do j = is1_viscous%beg, is1_viscous%end
-                            do k = is2_viscous%beg, is2_viscous%end
+                if (viscous) then
+                    if (weno_Re_flux) then
+                        if (norm_dir == 2) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = iv%beg, iv%end
                                 do l = is3_viscous%beg, is3_viscous%end
-                                    vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
-                                    vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
+                                    do j = is1_viscous%beg, is1_viscous%end
+                                        do k = is2_viscous%beg, is2_viscous%end
+                                            vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
+                                            vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
+                                        end do
+                                    end do
                                 end do
                             end do
-                        end do
-                    end do
-                elseif (norm_dir == 1) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3_viscous%beg, is3_viscous%end
-                            do k = is2_viscous%beg, is2_viscous%end
+                        elseif (norm_dir == 3) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = iv%beg, iv%end
                                 do j = is1_viscous%beg, is1_viscous%end
-                                    vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
-                                    vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
+                                    do k = is2_viscous%beg, is2_viscous%end
+                                        do l = is3_viscous%beg, is3_viscous%end
+                                            vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
+                                            vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
+                                        end do
+                                    end do
                                 end do
                             end do
-                        end do
-                    end do
+                        elseif (norm_dir == 1) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = iv%beg, iv%end
+                                do l = is3_viscous%beg, is3_viscous%end
+                                    do k = is2_viscous%beg, is2_viscous%end
+                                        do j = is1_viscous%beg, is1_viscous%end
+                                            vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
+                                            vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                        end if
+                    end if
                 end if
             end if
-        end if
-
+        #:endfor
     end subroutine s_reconstruct_cell_boundary_values_visc
 
     subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                              norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
-
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, iv%beg:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
@@ -1074,93 +1078,96 @@ contains
 
         integer, intent(IN) :: norm_dir
 
-        integer :: weno_dir !< Coordinate direction of the WENO reconstruction
+        integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
-        ! Reconstruction in s1-direction
 
-        if (norm_dir == 1) then
-            is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
-            weno_dir = 1; is1_viscous%beg = is1_viscous%beg + weno_polyn
-            is1_viscous%end = is1_viscous%end - weno_polyn
+        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
+            if (recon_type == ${TYPE}$) then
+                ! Reconstruction in s1-direction
 
-        elseif (norm_dir == 2) then
-            is1_viscous = iy; is2_viscous = ix; is3_viscous = iz
-            weno_dir = 2; is1_viscous%beg = is1_viscous%beg + weno_polyn
-            is1_viscous%end = is1_viscous%end - weno_polyn
+                if (norm_dir == 1) then
+                    is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
+                    recon_dir = 1; is1_viscous%beg = is1_viscous%beg + ${SCHEME}$_polyn
+                    is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
 
-        else
-            is1_viscous = iz; is2_viscous = iy; is3_viscous = ix
-            weno_dir = 3; is1_viscous%beg = is1_viscous%beg + weno_polyn
-            is1_viscous%end = is1_viscous%end - weno_polyn
+                elseif (norm_dir == 2) then
+                    is1_viscous = iy; is2_viscous = ix; is3_viscous = iz
+                    recon_dir = 2; is1_viscous%beg = is1_viscous%beg + ${SCHEME}$_polyn
+                    is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
 
-        end if
+                else
+                    is1_viscous = iz; is2_viscous = iy; is3_viscous = ix
+                    recon_dir = 3; is1_viscous%beg = is1_viscous%beg + ${SCHEME}$_polyn
+                    is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
 
-        $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
+                end if
+                $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
+                if (n > 0) then
+                    if (p > 0) then
 
-        if (n > 0) then
-            if (p > 0) then
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
+                                           vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
+                                           recon_dir, &
+                                           is1_viscous, is2_viscous, is3_viscous)
+                    else
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
+                                           vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
+                                           recon_dir, &
+                                           is1_viscous, is2_viscous, is3_viscous)
+                    end if
+                else
 
-                call s_weno(v_vf(iv%beg:iv%end), &
-                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                            weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
-            else
-                call s_weno(v_vf(iv%beg:iv%end), &
-                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                            weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
-            end if
-        else
+                    call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
+                                       vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
+                                       recon_dir, &
+                                       is1_viscous, is2_viscous, is3_viscous)
+                end if
 
-            call s_weno(v_vf(iv%beg:iv%end), &
-                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                        weno_dir, &
-                        is1_viscous, is2_viscous, is3_viscous)
-        end if
-
-        if (viscous) then
-            if (weno_Re_flux) then
-                if (norm_dir == 2) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3_viscous%beg, is3_viscous%end
-                            do j = is1_viscous%beg, is1_viscous%end
-                                do k = is2_viscous%beg, is2_viscous%end
-                                    vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
-                                    vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (norm_dir == 3) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = iv%beg, iv%end
-                        do j = is1_viscous%beg, is1_viscous%end
-                            do k = is2_viscous%beg, is2_viscous%end
+                if (viscous) then
+                    if (weno_Re_flux) then
+                        if (norm_dir == 2) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = iv%beg, iv%end
                                 do l = is3_viscous%beg, is3_viscous%end
-                                    vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
-                                    vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
+                                    do j = is1_viscous%beg, is1_viscous%end
+                                        do k = is2_viscous%beg, is2_viscous%end
+                                            vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
+                                            vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
+                                        end do
+                                    end do
                                 end do
                             end do
-                        end do
-                    end do
-                elseif (norm_dir == 1) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3_viscous%beg, is3_viscous%end
-                            do k = is2_viscous%beg, is2_viscous%end
+                        elseif (norm_dir == 3) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = iv%beg, iv%end
                                 do j = is1_viscous%beg, is1_viscous%end
-                                    vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
-                                    vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
+                                    do k = is2_viscous%beg, is2_viscous%end
+                                        do l = is3_viscous%beg, is3_viscous%end
+                                            vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
+                                            vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
+                                        end do
+                                    end do
                                 end do
                             end do
-                        end do
-                    end do
+                        elseif (norm_dir == 1) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = iv%beg, iv%end
+                                do l = is3_viscous%beg, is3_viscous%end
+                                    do k = is2_viscous%beg, is2_viscous%end
+                                        do j = is1_viscous%beg, is1_viscous%end
+                                            vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
+                                            vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                        end if
+                    end if
                 end if
             end if
-        end if
 
+        #:endfor
     end subroutine s_reconstruct_cell_boundary_values_visc_deriv
 
     !>  The purpose of this subroutine is to employ the inputted

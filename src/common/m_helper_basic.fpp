@@ -1,4 +1,4 @@
-!>
+
 !! @file m_helper_basic.f90
 !! @brief Contains module m_helper_basic
 
@@ -110,10 +110,9 @@ contains
         res = f_approx_equal(var, real(nint(var), wp))
     end function f_is_integer
 
-    pure subroutine s_configure_coordinate_bounds(weno_polyn, buff_size, idwint, idwbuff, &
+    pure subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, buff_size, idwint, idwbuff, &
                                                   viscous, bubbles_lagrange, m, n, p, num_dims, igr)
-
-        integer, intent(in) :: weno_polyn, m, n, p, num_dims
+        integer, intent(in) :: recon_type, weno_polyn, muscl_polyn, m, n, p, num_dims
         integer, intent(inout) :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
         logical, intent(in) :: viscous, bubbles_lagrange
@@ -129,12 +128,14 @@ contains
             else
                 buff_size = 4
             end if
-        else
+        elseif (recon_type == WENO_TYPE) then
             if (viscous) then
                 buff_size = 2*weno_polyn + 2
             else
                 buff_size = weno_polyn + 2
             end if
+        elseif (recon_type == MUSCL_TYPE) then
+            buff_size = muscl_polyn + 2
         end if
 
         ! Correction for smearing function in the lagrangian subgrid bubble model

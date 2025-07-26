@@ -1075,10 +1075,17 @@ contains
             !! Remaining number of cells, in a particular coordinate direction,
             !! after the majority is divided up among the available processors
 
-        integer :: recon_order !< reconstruction order
+        integer :: recon_order !<
+            !! WENO or MUSCL reconstruction order
 
         integer :: i, j !< Generic loop iterators
         integer :: ierr !< Generic flag used to identify and report MPI errors
+
+        if (recon_type == WENO_TYPE) then
+            recon_order = weno_order
+        else
+            recon_order = muscl_order
+        end if
 
         if (num_procs == 1 .and. parallel_io) then
             do i = 1, num_dims
@@ -1215,7 +1222,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     call s_mpi_abort('Unsupported combination of values '// &
                                      'of num_procs, m, n, p and '// &
-                                     'weno/igr_order. Exiting.')
+                                     'weno/muscl/igr_order. Exiting.')
                 end if
 
                 ! Creating new communicator using the Cartesian topology
@@ -1352,7 +1359,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     call s_mpi_abort('Unsupported combination of values '// &
                                      'of num_procs, m, n and '// &
-                                     'weno/igr_order. Exiting.')
+                                     'weno/muscl/igr_order. Exiting.')
                 end if
 
                 ! Creating new communicator using the Cartesian topology

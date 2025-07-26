@@ -30,6 +30,8 @@ module m_weno
 
     use m_mpi_proxy
 
+    use m_muscl !< For Interface Compression
+
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
     !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they
@@ -1094,6 +1096,11 @@ contains
             #:endfor
         end if
 
+        if (int_comp) then
+            call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, &
+                                         vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
+                                         weno_dir, is1_weno_d, is2_weno_d, is3_weno_d)
+        end if
     end subroutine s_weno
 
     !> The computation of parameters, the allocation of memory,

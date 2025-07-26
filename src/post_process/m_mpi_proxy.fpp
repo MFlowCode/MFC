@@ -91,7 +91,7 @@ contains
             & 'model_eqns', 'num_fluids', 'bc_x%beg', 'bc_x%end', 'bc_y%beg',  &
             & 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'flux_lim', 'format',        &
             & 'precision', 'fd_order', 'thermal', 'nb', 'relax_model',         &
-            & 'n_start', 'num_ibs' ]
+            & 'n_start', 'num_ibs', 'muscl_order' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

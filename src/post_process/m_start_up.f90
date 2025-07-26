@@ -89,7 +89,7 @@ contains
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
             cfl_target, surface_tension, bubbles_lagrange, &
             sim_data, hyperelasticity, Bx0, relativity, cont_damage, &
-            num_bc_patches, igr, igr_order
+            num_bc_patches, igr, igr_order, recon_type, muscl_order
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
