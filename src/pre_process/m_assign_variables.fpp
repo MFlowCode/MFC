@@ -409,8 +409,8 @@ contains
         ! Bubbles euler variables
         if (bubbles_euler) then
             do i = 1, nb
-                muR = R0(i)*patch_icpp(smooth_patch_id)%r0 ! = R0(i)
-                muV = V0(i)*patch_icpp(smooth_patch_id)%v0 ! = 0
+                muR = R0(i)*patch_icpp(smooth_patch_id)%r0
+                muV = patch_icpp(smooth_patch_id)%v0
                 if (qbmm) then
                     ! Initialize the moment set
                     if (dist_type == 1) then
@@ -616,8 +616,8 @@ contains
         ! Smoothed bubble variables
         if (bubbles_euler) then
             do i = 1, nb
-                muR = R0(i)*patch_icpp(patch_id)%r0 ! = 1*R0(i)
-                muV = V0(i)*patch_icpp(patch_id)%v0 ! = 1*V0(i)
+                muR = R0(i)*patch_icpp(patch_id)%r0
+                muV = patch_icpp(patch_id)%v0
                 if (qbmm) then
                     ! Initialize the moment set
                     if (dist_type == 1) then
@@ -636,12 +636,6 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
                 else
-                    ! q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = &
-                    !     (eta * R0(i)*patch_icpp(patch_id)%r0 &
-                    !     + (1._wp-eta)*orig_prim_vf(bub_idx%rs(i)))
-                    ! q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = &
-                    !     (eta * V0(i)*patch_icpp(patch_id)%v0 &
-                    !     + (1._wp-eta)*orig_prim_vf(bub_idx%vs(i)))
                     q_prim_vf(bub_idx%rs(i))%sf(j, k, l) = muR
                     q_prim_vf(bub_idx%vs(i))%sf(j, k, l) = muV
 

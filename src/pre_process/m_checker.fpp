@@ -145,11 +145,10 @@ contains
     end subroutine s_check_inputs_grid_stretching
 
     !> Checks constraints on the QBMM and polydisperse bubble parameters
-        !! (qbmm, polydisperse, dist_type, rhoRV, and R0_type)
+        !! (qbmm, polydisperse, dist_type and rhoRV)
     impure subroutine s_check_inputs_qbmm_and_polydisperse
         @:PROHIBIT(qbmm .and. dist_type == dflt_int, "dist_type must be set if using QBMM")
         @:PROHIBIT(qbmm .and. dist_type /= 1 .and. rhoRV > 0._wp, "rhoRV cannot be used with dist_type != 1")
-        @:PROHIBIT(polydisperse .and. R0_type == dflt_int, "R0 type must be set if using Polydisperse")
     end subroutine s_check_inputs_qbmm_and_polydisperse
 
     !> Checks constraints on initial partial density perturbation
