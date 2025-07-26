@@ -94,7 +94,6 @@ contains
         use hipfort_check
         use openacc
 #endif
-
         integer :: i, j !< Generic loop iterators
 
         ! Setting number of time-stages for selected time-stepping scheme
@@ -112,10 +111,6 @@ contains
         end do
 
 #ifdef FRONTIER_UNIFIED
-        if (proc_rank == 0 .and. num_ts /= 2) then
-            call s_mpi_abort("Frontier unified memory assumes time_stepper = 2/3")
-        end if
-
         ! Allocate to memory regions using hip calls
         ! that we will attach pointers to
         do i = 1, 3
@@ -133,17 +128,21 @@ contains
         ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
         ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
         ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
-        call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
+        if (num_ts == 2) then
+            call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
+        end if
 
         do j = 1, sys_size
             ! q_cons_ts(1) lives on the device
             q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                   idwbuff(2)%beg:idwbuff(2)%end, &
                                   idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_device(:, :, :, j)
-            ! q_cons_ts(2) lives on the host
-            q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                                  idwbuff(2)%beg:idwbuff(2)%end, &
-                                  idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:, :, :, j)
+            if (num_ts == 2) then
+                ! q_cons_ts(2) lives on the host
+                q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                      idwbuff(2)%beg:idwbuff(2)%end, &
+                                      idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:, :, :, j)
+            end if
         end do
 
         do i = 1, num_ts
@@ -520,6 +519,7 @@ contains
         real(wp), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
+        integer :: dest
         real(wp) :: start, finish
 
         ! Stage 1 of 2
@@ -565,6 +565,8 @@ contains
                 end do
             end do
         end do
+
+        dest = 1 ! Result in q_cons_ts(1)%vf
 #else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -578,6 +580,8 @@ contains
                 end do
             end do
         end do
+
+        dest = 2 ! Result in q_cons_ts(2)%vf
 #endif
 
         !Evolve pb and mv for non-polytropic qbmm
@@ -615,21 +619,21 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
             else
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
             end if
         end if
 
@@ -656,6 +660,8 @@ contains
                 end do
             end do
         end do
+
+        dest = 1 ! Result in q_cons_ts(1)%vf
 #else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -670,6 +676,8 @@ contains
                 end do
             end do
         end do
+
+        dest = 1 ! Result in q_cons_ts(1)%vf
 #endif
 
         if (qbmm .and. (.not. polytropic)) then
@@ -708,21 +716,21 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
             end if
         end if
 
@@ -740,6 +748,7 @@ contains
         real(wp), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
+        integer :: dest
 
         real(wp) :: start, finish
 
@@ -787,6 +796,8 @@ contains
                 end do
             end do
         end do
+
+        dest = 1 ! result in q_cons_ts(1)%vf
 #else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -800,6 +811,8 @@ contains
                 end do
             end do
         end do
+
+        dest = 2 ! result in q_cons_ts(2)%vf
 #endif
 
         !Evolve pb and mv for non-polytropic qbmm
@@ -837,21 +850,21 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
             else
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
             end if
         end if
 
@@ -878,6 +891,8 @@ contains
                 end do
             end do
         end do
+
+        dest = 1 ! Result in q_cons_ts(1)%vf
 #else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -892,6 +907,8 @@ contains
                 end do
             end do
         end do
+
+        dest = 2 ! Result in q_cons_ts(2)%vf
 #endif
 
         if (qbmm .and. (.not. polytropic)) then
@@ -930,21 +947,21 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt/4._wp)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
             else
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
             end if
         end if
 
@@ -971,6 +988,8 @@ contains
                 end do
             end do
         end do
+
+        dest = 1 ! Result in q_cons_ts(1)%vf
 #else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -985,6 +1004,8 @@ contains
                 end do
             end do
         end do
+
+        dest = 1 ! Result in q_cons_ts(2)%vf
 #endif
 
         if (qbmm .and. (.not. polytropic)) then
@@ -1023,25 +1044,25 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
         end if
 
         call nvtxStartRange("RHS-ELASTIC")
-        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(1)%vf, q_prim_vf)
+        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(dest)%vf, q_prim_vf)
         call nvtxEndRange
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
             end if
         end if
 
