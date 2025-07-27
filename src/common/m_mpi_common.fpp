@@ -413,6 +413,7 @@ contains
         integer, intent(inout) :: var_loc
 
 #ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Temporary storage variable that holds the reduced sum value
         integer :: var_glb
@@ -423,7 +424,6 @@ contains
                         MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
         var_loc = var_glb
-
 #endif
 
     end subroutine s_mpi_reduce_int_sum
@@ -1102,7 +1102,7 @@ contains
 
         integer :: recon_order !< reconstruction order
 
-        integer :: i, j !< Generic loop iterators
+        integer :: i, j, k !< Generic loop iterators
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! temp array to store neighbor rank coordinates

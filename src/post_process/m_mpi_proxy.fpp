@@ -104,17 +104,12 @@ contains
             & 'file_per_process', 'relax', 'cf_wrt', 'igr',                    &
             & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',          &
             & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange',        &
-<<<<<<< HEAD
             & 'output_partial_domain', 'relativity', 'cont_damage',            &
             & 'lag_header', 'lag_txt_wrt', 'lag_db_wrt', 'lag_id_wrt',         &
             & 'lag_pos_wrt', 'lag_pos_prev_wrt', 'lag_vel_wrt', 'lag_rad_wrt', &
             & 'lag_rvel_wrt', 'lag_r0_wrt', 'lag_rmax_wrt', 'lag_rmin_wrt',    &
             & 'lag_dphidt_wrt', 'lag_pres_wrt', 'lag_mv_wrt', 'lag_mg_wrt',    &
             & 'lag_betaT_wrt', 'lag_betaC_wrt', 'bc_io' ]
-=======
-            & 'output_partial_domain', 'relativity', 'cont_damage', 'bc_io' ]
-
->>>>>>> upstream/master
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

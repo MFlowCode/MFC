@@ -90,6 +90,7 @@ contains
 
         integer :: i, j, k
         integer :: real_size, int_size, nReal, lag_num_ts
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         call MPI_Pack_size(1, mpi_p, MPI_COMM_WORLD, real_size, ierr)
         call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
@@ -140,13 +141,9 @@ contains
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', &
             & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',  'fd_order',     &
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
-<<<<<<< HEAD
-            & 'R0_type', 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
-            & 'num_bc_patches', 'lag_params%vel_model']
-=======
             & 'num_source','relax_model','num_ibs','n_start','num_igr_iters',  &
-            & 'num_bc_patches','num_igr_warm_start_iters','adap_dt_max_iters'  ]
->>>>>>> upstream/master
+            & 'num_bc_patches','num_igr_warm_start_iters','adap_dt_max_iters', &
+            & 'lag_params%vel_model']
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -667,6 +664,7 @@ contains
         integer :: position, bub_id, lag_num_ts, tag, partner, send_tag, recv_tag, nbubs, p_recv_size
 
         integer :: i, j, k, l, q
+        integer :: ierr !< Generic flag used to identify and report MPI errors
 
         do k = nidx(3)%beg, nidx(3)%end
             do j = nidx(2)%beg, nidx(2)%end

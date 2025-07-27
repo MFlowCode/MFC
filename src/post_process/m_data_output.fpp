@@ -1614,6 +1614,8 @@ contains
         character(len=64), dimension(num_procs) :: var_names
         integer, dimension(num_procs) :: var_types
         real(wp) :: dummy_data
+
+        integer :: ierr !< Generic flag used to identify and report database errors
         integer :: i
 
         dummy_data = 0._wp
