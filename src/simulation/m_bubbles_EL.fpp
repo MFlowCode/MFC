@@ -293,7 +293,7 @@ contains
         integer :: i
 
         real(wp) :: pliq, volparticle, concvap, totalmass, kparticle, cpparticle
-        real(wp) :: omegaN, PeG, PeT, rhol, pcrit, qv, gamma, pi_inf, dynP
+        real(wp) :: omegaN_local, PeG, PeT, rhol, pcrit, qv, gamma, pi_inf, dynP
         integer, dimension(3) :: cell
         real(wp), dimension(2) :: Re
         real(wp) :: massflag, heatflag, Re_trans, Im_trans
@@ -373,21 +373,21 @@ contains
 
         ! Bubble natural frequency
         concvap = gas_mv(bub_id, 1)/(gas_mv(bub_id, 1) + gas_mg(bub_id))
-        omegaN = (3._wp*(gas_p(bub_id, 1) - pv*(massflag)) + 4._wp*(1._wp/Web)/bub_R0(bub_id))/rhol
+        omegaN_local = (3._wp*(gas_p(bub_id, 1) - pv*(massflag)) + 4._wp*(1._wp/Web)/bub_R0(bub_id))/rhol
         if (pv*(massflag) > gas_p(bub_id, 1)) then
             call s_mpi_abort("Lagrange bubble initially located in a region with pressure below the vapor pressure.")
         end if
-        omegaN = sqrt(omegaN/bub_R0(bub_id)**2._wp)
+        omegaN_local = sqrt(omegaN_local/bub_R0(bub_id)**2._wp)
 
         cpparticle = concvap*cp_v + (1._wp - concvap)*cp_n
         kparticle = concvap*k_vl + (1._wp - concvap)*k_nl
 
         ! Mass and heat transfer coefficients (based on Preston 2007)
-        PeT = totalmass/volparticle*cpparticle*bub_R0(bub_id)**2._wp*omegaN/kparticle
+        PeT = totalmass/volparticle*cpparticle*bub_R0(bub_id)**2._wp*omegaN_local/kparticle
         call s_transcoeff(1._wp, PeT, Re_trans, Im_trans)
         gas_betaT(bub_id) = Re_trans*(heatflag)*kparticle
 
-        PeG = bub_R0(bub_id)**2._wp*omegaN/lag_params%diffcoefvap
+        PeG = bub_R0(bub_id)**2._wp*omegaN_local/lag_params%diffcoefvap
         call s_transcoeff(1._wp, PeG, Re_trans, Im_trans)
         gas_betaC(bub_id) = Re_trans*(massflag)*lag_params%diffcoefvap
 

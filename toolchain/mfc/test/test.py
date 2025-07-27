@@ -72,6 +72,12 @@ def __filter(cases_) -> typing.List[TestCase]:
                 cases.remove(case)
                 skipped_cases.append(case)
 
+    for case in cases[:]:
+        if ARG("gpu"):
+            skip = ['Gauss Seidel']
+            if any(label in case.trace for label in skip):
+                cases.remove(case)
+
     if ARG("no_examples"):
         example_cases = [case for case in cases if "Example" in case.trace]
         skipped_cases += example_cases

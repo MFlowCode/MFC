@@ -1,7 +1,6 @@
 # Case Files
 
-Example Python case files, also referred to as *input files*, can be found in the [examples/](https://github.com/MFlowCode/MFC/tree/master/examples) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented
-in the user manual. A commented, tutorial script
+Example Python case files, also referred to as *input files*, can be found in the [examples/](https://github.com/MFlowCode/MFC/tree/master/examples) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented in the user manual. A commented, tutorial script
 can also be found in [examples/3d_sphbubcollapse/](https://github.com/MFlowCode/MFC/blob/master/examples/3D_sphbubcollapse/case.py).
 
 ## Basic Skeleton
@@ -380,6 +379,8 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `mixture_err`          | Logical | Mixture properties correction |
 | `time_stepper`         | Integer | Runge--Kutta order [1-3] |
 | `adap_dt`              | Logical | Strang splitting scheme with adaptive time stepping |
+| `adap_dt_tol`          | Real    | Tolerance for adaptive time stepping in Strang splitting scheme|
+| `adap_dt_max_iters`    | Integer | Max iteration for adaptive time stepping in Strang splitting scheme |
 | `weno_order`	         | Integer | WENO order [1,3,5] |
 | `weno_eps`	         | Real    | WENO perturbation (avoid division by zero) |
 | `mapped_weno`	         | Logical | WENO-M (WENO with mapping of nonlinear weights) |
@@ -409,6 +410,13 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `surface_tension`      | Logical | Activate surface tension |
 | `viscous`              | Logical | Activate viscosity |
 | `hypoelasticity`       | Logical | Activate hypoelasticity* |
+| `igr`                  | Logical | Enable solution via information geometric regularization (IGR) [Cao (2024)](references.md) |
+| `igr_order`            | Integer | Order of reconstruction for IGR [3,5] |
+| `alf_factor`           | Real    | Alpha factor for IGR entropic pressure (default 10) |
+| `igr_pres_lim`         | Logical | Limit IGR pressure to avoid negative values (default F) |
+| `igr_iter_solver`      | Integer | Solution method for IGR elliptic solve [1] Jacobi [2] Gauss-Seidel |
+| `num_igr_iters`        | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
+| `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.
@@ -447,7 +455,7 @@ The effect and use of the source term are assessed by [Schmidmayer et al., 2019]
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer.
 Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md)).
 
-- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles_euler = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`. Additionally, it can be used with ``bubbles_lagrange = 'T'`` and `time_stepper = 3`
+- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles_euler = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`. Additionally, it can be used with ``bubbles_lagrange = 'T'`` and `time_stepper = 3`. `adap_dt_tol` and `adap_dt_max_iters` are 1e-4 and 100, respectively, by default.
 
 - `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, 5, and 7, that correspond to the 1st, 3rd, 5th, and 7th order, respectively.
 
@@ -502,7 +510,7 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 | `type`*                | Integer | The geometry of the patch. [1]: Line [2]: Circle [3]: Rectangle |
 | `x[y,z]_centroid`*     | Real    | Centroid of the boundary patch in the x[y,z]-direction          |
 | `length_x[y,z]`*       | Real    | Length of the boundary patch in the x[y,z]-direction            |
-| `radius`*              | Real    | Radius of the boundary patch                                    |
+| `radiue`*              | Real    | Radius of the boundary patch                                    |
 *: These parameters should be prepended with `patch_bc(j)%` where $j$ is the patch index.
 
 Boundary condition patches can be used with the following boundary condition types:
@@ -737,7 +745,6 @@ Implementation of the parameters into the model follow [Ando (2010)](references.
 | `polydisperse`   | Logical	| Polydispersity in equilibrium bubble radius R0 |
 | `nb` 			     | Integer	| Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
 | `poly_sigma` 	       | Real 		|	Standard deviation for probability density function of polydisperse bubble populations |
-| `R0_type` 	       | Integer 		|	Quadrature rule for probability density function of polydisperse bubble populations |
 | `Ca` 			     | Real		  | Cavitation number |
 | `Web` 			   | Real		  | Weber number |
 | `Re_inv` 		   | Real		  | Inverse Reynolds number |
@@ -755,14 +762,11 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - `thermal` specifies a model for heat transfer across the bubble interface by an integer from 1 through 3.
 `thermal = 1`, `2`, and `3` correspond to no heat transfer (adiabatic gas compression), isothermal heat transfer, and heat transfer with a constant heat transfer coefficient based on [Preston et al., 2007](references.md), respectively.
 
-- `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius.
+- `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius. Simpson's rule is used for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 
 - `R0ref` specifies the reference bubble radius.
 
 - `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibrium bubble radius.
-
-- `R0_type` specifies the quadrature rule for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
-`R0_type = 1` corresponds to Simpson's rule.
 
 - `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 
