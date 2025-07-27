@@ -96,6 +96,8 @@ class Case:
 
     # pylint: disable=too-many-locals
     def __get_pre_fpp(self, print: bool) -> str:
+        # generates the content of an FFP file that will hold the functions for
+        # some initial condition
         DATA = {
             1: {'ptypes': [1, 15, 16],                         'sf_idx': 'i, 0, 0'},
             2: {'ptypes': [2,  3,  4,  5,  6,  7, 17, 18, 21], 'sf_idx': 'i, j, 0'},
@@ -104,6 +106,8 @@ class Case:
 
         patches = {}
 
+        # iterates over the parameters and checks if they are defined as an
+        # analytical function. If so, append it to the `patches`` object
         for key, val in self.params.items():
             if not self.__is_ic_analytical(key, val):
                 continue
@@ -117,12 +121,16 @@ class Case:
 
         srcs = []
 
+        # for each analytical patch that is required to be added, generate
+        # the string that contains that function.
         for pid, items in patches.items():
             ptype = self.params[f"patch_icpp({pid})%geometry"]
 
             if ptype not in DATA['ptypes']:
                 raise common.MFCException(f"Patch #{pid} of type {ptype} cannot be analytically defined.")
 
+            # function that defines how we will replace variable names with
+            # values from the case file
             def rhs_replace(match):
                 return {
                     'x': 'x_cc(i)', 'y': 'y_cc(j)', 'z': 'z_cc(k)',
@@ -137,6 +145,8 @@ class Case:
                 }.get(match.group(), match.group())
 
             lines = []
+            # perform the replacement of strings for each analytic function
+            # to generate some fortran string representing the code passed in
             for attribute, expr in items:
                 if print:
                     cons.print(f"* Codegen: {attribute} = {expr}")
@@ -153,6 +163,9 @@ class Case:
 
                 lines.append(f"        {lhs} = {rhs}")
 
+            # concatenates all of the analytic lines into a single string with
+            # each element separated by new line characters. Then write those
+            # new lines as a fully concatenated string with fortran syntax
             srcs.append(f"""\
     if (patch_id == {pid}) then
 {f'{chr(10)}'.join(lines)}
@@ -168,7 +181,6 @@ class Case:
 {f'{chr(10)}{chr(10)}'.join(srcs)}
 #:enddef
 """
-
         return content
 
     def __get_sim_fpp(self, print: bool) -> str:
@@ -189,9 +201,14 @@ class Case:
             wenoz  = 1 if self.params.get("wenoz", 'F') == 'T' else 0
             teno   = 1 if self.params.get("teno", 'F') == 'T' else 0
             wenojs = 0 if (mapped_weno or wenoz or teno) else 1
+            igr = 1 if self.params.get("igr", 'F') == 'T' else 0
 
-            weno_order = int(self.params["weno_order"])
-            weno_polyn = int((self.params["weno_order"] - 1) / 2)
+            weno_order = int(self.params.get("weno_order",1))
+            weno_polyn = int((self.params.get("weno_order",1) - 1) / 2)
+
+            if self.params.get("igr", "F") == 'T':
+                weno_order = 5
+                weno_polyn = 3
 
             if teno:
                 weno_num_stencils = weno_order - 3
@@ -206,6 +223,9 @@ class Case:
 
             mhd = 1 if self.params.get("mhd", 'F') == 'T' else 0
             relativity = 1 if self.params.get("relativity", 'F') == 'T' else 0
+            viscous = 1 if self.params.get("viscous", 'F') == 'T' else 0
+            igr = 1 if self.params.get("igr", 'F') == 'T' else 0
+            igr_pres_lim = 1 if self.params.get("igr_pres_lim", 'F') == 'T' else 0
 
             # Throw error if wenoz_q is required but not set
             return f"""\
@@ -225,6 +245,11 @@ class Case:
 #:set wenoz_q               = {self.params.get("wenoz_q", -1)}
 #:set mhd                   = {mhd}
 #:set relativity            = {relativity}
+#:set igr                   = {igr}
+#:set igr_iter_solver       = {self.params.get("igr_iter_solver", 1)}
+#:set igr_pres_lim          = {igr_pres_lim}
+#:set igr_order             = {self.params.get("igr_order", 3)}
+#:set viscous               = {viscous}
 """
 
         return """\

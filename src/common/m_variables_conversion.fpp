@@ -389,13 +389,27 @@ contains
         ! Computing the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
 
-        do i = 1, num_fluids
-            alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
-            alpha_K(i) = q_vf(advxb + i - 1)%sf(k, l, r)
-        end do
+        if (igr) then
+            if (num_fluids == 1) then
+                alpha_rho_K(1) = q_vf(contxb)%sf(k, l, r)
+                alpha_K(1) = q_vf(advxb)%sf(k, l, r)
+            else
+                do i = 1, num_fluids - 1
+                    alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
+                    alpha_K(i) = q_vf(advxb + i - 1)%sf(k, l, r)
+                end do
+
+                alpha_rho_K(num_fluids) = q_vf(num_fluids)%sf(k, l, r)
+                alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
+            end if
+        else
+            do i = 1, num_fluids
+                alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
+                alpha_K(i) = q_vf(advxb + i - 1)%sf(k, l, r)
+            end do
+        end if
 
         if (mpp_lim) then
-
             do i = 1, num_fluids
                 alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
@@ -637,7 +651,7 @@ contains
 #ifdef MFC_SIMULATION
 
         if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+            @:ALLOCATE(Res(1:2, 1:Re_size_max))
             do i = 1, 2
                 do j = 1, Re_size(i)
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
@@ -867,11 +881,27 @@ contains
                 do j = ibounds(1)%beg, ibounds(1)%end
                     dyn_pres_K = 0._wp
 
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, num_fluids
-                        alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-                        alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-                    end do
+                    if (igr) then
+                        if (num_fluids == 1) then
+                            alpha_rho_K(1) = qK_cons_vf(contxb)%sf(j, k, l)
+                            alpha_K(1) = qK_cons_vf(advxb)%sf(j, k, l)
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids - 1
+                                alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                                alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                            end do
+
+                            alpha_rho_K(num_fluids) = qK_cons_vf(num_fluids)%sf(j, k, l)
+                            alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
+                        end if
+                    else
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                            alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                        end do
+                    end if
 
                     if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION

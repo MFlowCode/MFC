@@ -35,7 +35,9 @@ module m_helper
               associated_legendre, &
               spherical_harmonic_func, &
               double_factorial, &
-              factorial
+              factorial, &
+              f_cut_on, &
+              f_cut_off
 
 contains
 
@@ -77,11 +79,11 @@ contains
         real(wp), optional, intent(in) :: div
 
         integer :: i, j
-        integer :: m, n
+        integer :: local_m, local_n
         real(wp) :: c
 
-        m = size(A, 1)
-        n = size(A, 2)
+        local_m = size(A, 1)
+        local_n = size(A, 2)
 
         if (present(div)) then
             c = div
@@ -89,10 +91,10 @@ contains
             c = 1._wp
         end if
 
-        print *, m, n
+        print *, local_m, local_n
 
-        do i = 1, m
-            do j = 1, n
+        do i = 1, local_m
+            do j = 1, local_n
                 write (*, fmt="(F12.4)", advance="no") A(i, j)/c
             end do
             write (*, fmt="(A1)") " "
@@ -216,7 +218,7 @@ contains
     end subroutine s_initialize_nonpoly
 
     !> Computes the transfer coefficient for the non-polytropic bubble compression process
-        !! @param omega natural frqeuencies
+        !! @param omega natural frequencies
         !! @param peclet Peclet number
         !! @param Re_trans Real part of the transport coefficients
         !! @param Im_trans Imaginary part of the transport coefficients
@@ -249,10 +251,10 @@ contains
     end subroutine s_int_to_str
 
     !> Computes the Simpson weights for quadrature
-    subroutine s_simpson(weight, R0)
+    subroutine s_simpson(local_weight, local_R0)
 
-        real(wp), dimension(:), intent(inout) :: weight
-        real(wp), dimension(:), intent(inout) :: R0
+        real(wp), dimension(:), intent(inout) :: local_weight
+        real(wp), dimension(:), intent(inout) :: local_R0
 
         integer :: ir
         real(wp) :: R0mn, R0mx, dphi, tmp, sd
@@ -266,7 +268,7 @@ contains
         do ir = 1, nb
             phi(ir) = log(R0mn) &
                       + (ir - 1._wp)*log(R0mx/R0mn)/(nb - 1._wp)
-            R0(ir) = exp(phi(ir))
+            local_R0(ir) = exp(phi(ir))
         end do
         dphi = phi(2) - phi(1)
 
@@ -275,15 +277,15 @@ contains
             ! Gaussian
             tmp = exp(-0.5_wp*(phi(ir)/sd)**2)/sqrt(2._wp*pi)/sd
             if (mod(ir, 2) == 0) then
-                weight(ir) = tmp*4._wp*dphi/3._wp
+                local_weight(ir) = tmp*4._wp*dphi/3._wp
             else
-                weight(ir) = tmp*2._wp*dphi/3._wp
+                local_weight(ir) = tmp*2._wp*dphi/3._wp
             end if
         end do
         tmp = exp(-0.5_wp*(phi(1)/sd)**2)/sqrt(2._wp*pi)/sd
-        weight(1) = tmp*dphi/3._wp
+        local_weight(1) = tmp*dphi/3._wp
         tmp = exp(-0.5_wp*(phi(nb)/sd)**2)/sqrt(2._wp*pi)/sd
-        weight(nb) = tmp*dphi/3._wp
+        local_weight(nb) = tmp*dphi/3._wp
     end subroutine s_simpson
 
     !> This procedure computes the cross product of two vectors.
@@ -316,40 +318,40 @@ contains
     !> This procedure creates a transformation matrix.
     !! @param  p Parameters for the transformation.
     !! @return Transformation matrix.
-    pure function f_create_transform_matrix(p, center) result(out_matrix)
+    pure function f_create_transform_matrix(param, center) result(out_matrix)
 
-        type(ic_model_parameters), intent(in) :: p
-        t_vec3, optional, intent(in) :: center
-        t_mat4x4 :: sc, rz, rx, ry, tr, t_back, t_to_origin, out_matrix
+        type(ic_model_parameters), intent(in) :: param
+        real(wp), dimension(1:3), optional, intent(in) :: center
+        real(wp), dimension(1:4, 1:4) :: sc, rz, rx, ry, tr, t_back, t_to_origin, out_matrix
 
         sc = transpose(reshape([ &
-                               p%scale(1), 0._wp, 0._wp, 0._wp, &
-                               0._wp, p%scale(2), 0._wp, 0._wp, &
-                               0._wp, 0._wp, p%scale(3), 0._wp, &
+                               param%scale(1), 0._wp, 0._wp, 0._wp, &
+                               0._wp, param%scale(2), 0._wp, 0._wp, &
+                               0._wp, 0._wp, param%scale(3), 0._wp, &
                                0._wp, 0._wp, 0._wp, 1._wp], shape(sc)))
 
         rz = transpose(reshape([ &
-                               cos(p%rotate(3)), -sin(p%rotate(3)), 0._wp, 0._wp, &
-                               sin(p%rotate(3)), cos(p%rotate(3)), 0._wp, 0._wp, &
+                               cos(param%rotate(3)), -sin(param%rotate(3)), 0._wp, 0._wp, &
+                               sin(param%rotate(3)), cos(param%rotate(3)), 0._wp, 0._wp, &
                                0._wp, 0._wp, 1._wp, 0._wp, &
                                0._wp, 0._wp, 0._wp, 1._wp], shape(rz)))
 
         rx = transpose(reshape([ &
                                1._wp, 0._wp, 0._wp, 0._wp, &
-                               0._wp, cos(p%rotate(1)), -sin(p%rotate(1)), 0._wp, &
-                               0._wp, sin(p%rotate(1)), cos(p%rotate(1)), 0._wp, &
+                               0._wp, cos(param%rotate(1)), -sin(param%rotate(1)), 0._wp, &
+                               0._wp, sin(param%rotate(1)), cos(param%rotate(1)), 0._wp, &
                                0._wp, 0._wp, 0._wp, 1._wp], shape(rx)))
 
         ry = transpose(reshape([ &
-                               cos(p%rotate(2)), 0._wp, sin(p%rotate(2)), 0._wp, &
+                               cos(param%rotate(2)), 0._wp, sin(param%rotate(2)), 0._wp, &
                                0._wp, 1._wp, 0._wp, 0._wp, &
-                               -sin(p%rotate(2)), 0._wp, cos(p%rotate(2)), 0._wp, &
+                               -sin(param%rotate(2)), 0._wp, cos(param%rotate(2)), 0._wp, &
                                0._wp, 0._wp, 0._wp, 1._wp], shape(ry)))
 
         tr = transpose(reshape([ &
-                               1._wp, 0._wp, 0._wp, p%translate(1), &
-                               0._wp, 1._wp, 0._wp, p%translate(2), &
-                               0._wp, 0._wp, 1._wp, p%translate(3), &
+                               1._wp, 0._wp, 0._wp, param%translate(1), &
+                               0._wp, 1._wp, 0._wp, param%translate(2), &
+                               0._wp, 0._wp, 1._wp, param%translate(3), &
                                0._wp, 0._wp, 0._wp, 1._wp], shape(tr)))
 
         if (present(center)) then
@@ -379,8 +381,8 @@ contains
     !! @param matrix Transformation matrix.
     pure subroutine s_transform_vec(vec, matrix)
 
-        t_vec3, intent(inout) :: vec
-        t_mat4x4, intent(in) :: matrix
+        real(wp), dimension(1:3), intent(inout) :: vec
+        real(wp), dimension(1:4, 1:4), intent(in) :: matrix
 
         real(wp), dimension(1:4) :: tmp
 
@@ -395,7 +397,7 @@ contains
     pure subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
         type(t_triangle), intent(inout) :: triangle
-        t_mat4x4, intent(in) :: matrix, matrix_n
+        real(wp), dimension(1:4, 1:4), intent(in) :: matrix, matrix_n
 
         integer :: i
 
@@ -413,7 +415,7 @@ contains
     pure subroutine s_transform_model(model, matrix, matrix_n)
 
         type(t_model), intent(inout) :: model
-        t_mat4x4, intent(in) :: matrix, matrix_n
+        real(wp), dimension(1:4, 1:4), intent(in) :: matrix, matrix_n
 
         integer :: i
 
@@ -482,18 +484,18 @@ contains
     !! @param x is the input value
     !! @param l is the degree
     !! @return P is the unassociated legendre polynomial evaluated at x
-    pure recursive function unassociated_legendre(x, l) result(P)
+    pure recursive function unassociated_legendre(x, l) result(result_P)
 
         integer, intent(in) :: l
         real(wp), intent(in) :: x
-        real(wp) :: P
+        real(wp) :: result_P
 
         if (l == 0) then
-            P = 1._wp
+            result_P = 1._wp
         else if (l == 1) then
-            P = x
+            result_P = x
         else
-            P = ((2*l - 1)*x*unassociated_legendre(x, l - 1) - (l - 1)*unassociated_legendre(x, l - 2))/l
+            result_P = ((2*l - 1)*x*unassociated_legendre(x, l - 1) - (l - 1)*unassociated_legendre(x, l - 2))/l
         end if
 
     end function unassociated_legendre
@@ -502,20 +504,20 @@ contains
     !! @param x is the x coordinate
     !! @param phi is the phi coordinate
     !! @param l is the degree
-    !! @param m is the order
+    !! @param m_order is the order
     !! @return Y is the spherical harmonic function evaluated at x and phi
-    pure recursive function spherical_harmonic_func(x, phi, l, m) result(Y)
+    pure recursive function spherical_harmonic_func(x, phi, l, m_order) result(Y)
 
-        integer, intent(in) :: l, m
+        integer, intent(in) :: l, m_order
         real(wp), intent(in) :: x, phi
-        real(wp) :: Y, prefactor, pi
+        real(wp) :: Y, prefactor, local_pi
 
-        pi = acos(-1._wp)
-        prefactor = sqrt((2*l + 1)/(4*pi)*factorial(l - m)/factorial(l + m)); 
-        if (m == 0) then
-            Y = prefactor*associated_legendre(x, l, m); 
-        elseif (m > 0) then
-            Y = (-1._wp)**m*sqrt(2._wp)*prefactor*associated_legendre(x, l, m)*cos(m*phi); 
+        local_pi = acos(-1._wp)
+        prefactor = sqrt((2*l + 1)/(4*local_pi)*factorial(l - m_order)/factorial(l + m_order)); 
+        if (m_order == 0) then
+            Y = prefactor*associated_legendre(x, l, m_order); 
+        elseif (m_order > 0) then
+            Y = (-1._wp)**m_order*sqrt(2._wp)*prefactor*associated_legendre(x, l, m_order)*cos(m_order*phi); 
         end if
 
     end function spherical_harmonic_func
@@ -524,57 +526,103 @@ contains
     !! at x with inputs l and m
     !! @param x is the input value
     !! @param l is the degree
-    !! @param m is the order
+    !! @param m_order is the order
     !! @return P is the associated legendre polynomial evaluated at x
-    pure recursive function associated_legendre(x, l, m) result(P)
+    pure recursive function associated_legendre(x, l, m_order) result(result_P)
 
-        integer, intent(in) :: l, m
+        integer, intent(in) :: l, m_order
         real(wp), intent(in) :: x
-        real(wp) :: P
+        real(wp) :: result_P
 
-        if (m <= 0 .and. l <= 0) then
-            P = 1; 
-        elseif (l == 1 .and. m <= 0) then
-            P = x; 
-        elseif (l == 1 .and. m == 1) then
-            P = -(1 - x**2)**(1._wp/2._wp); 
-        elseif (m == l) then
-            P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2); 
-        elseif (m == l - 1) then
-            P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1); 
+        if (m_order <= 0 .and. l <= 0) then
+            result_P = 1; 
+        elseif (l == 1 .and. m_order <= 0) then
+            result_P = x; 
+        elseif (l == 1 .and. m_order == 1) then
+            result_P = -(1 - x**2)**(1._wp/2._wp); 
+        elseif (m_order == l) then
+            result_P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2); 
+        elseif (m_order == l - 1) then
+            result_P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1); 
         else
-            P = ((2*l - 1)*x*associated_legendre(x, l - 1, m) - (l + m - 1)*associated_legendre(x, l - 2, m))/(l - m); 
+            result_P = ((2*l - 1)*x*associated_legendre(x, l - 1, m_order) - (l + m_order - 1)*associated_legendre(x, l - 2, m_order))/(l - m_order); 
         end if
 
     end function associated_legendre
 
     !> This function calculates the double factorial value of an integer
-    !! @param n is the input integer
+    !! @param n_in is the input integer
     !! @return R is the double factorial value of n
-    pure elemental function double_factorial(n) result(R)
+    pure elemental function double_factorial(n_in) result(R_result)
 
-        integer, intent(in) :: n
+        integer, intent(in) :: n_in
         integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
-        integer(kind=int64_kind) :: R
+        integer(kind=int64_kind) :: R_result
         integer :: i
 
-        R = product((/(i, i=n, 1, -2)/))
+        R_result = product((/(i, i=n_in, 1, -2)/))
 
     end function double_factorial
 
     !> The following function calculates the factorial value of an integer
-    !! @param n is the input integer
+    !! @param n_in is the input integer
     !! @return R is the factorial value of n
-    pure elemental function factorial(n) result(R)
+    pure elemental function factorial(n_in) result(R_result)
 
-        integer, intent(in) :: n
+        integer, intent(in) :: n_in
         integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
-        integer(kind=int64_kind) :: R
+        integer(kind=int64_kind) :: R_result
 
         integer :: i
 
-        R = product((/(i, i=n, 1, -1)/))
+        R_result = product((/(i, i=n_in, 1, -1)/))
 
     end function factorial
+
+    !> This function calculates a smooth cut-on function that is zero for x values
+    !! smaller than zero and goes to one. It can be used for generating smooth
+    !! initial conditions
+    !! @param x is the input value
+    !! @param eps is the smoothing parameter
+    !! @return fx is the cut-on function evaluated at x
+    function f_cut_on(x, eps) result(fx)
+
+        real(wp), intent(in) :: x, eps
+        real(wp) :: fx
+
+        fx = 1 - f_gx(x/eps)/(f_gx(x/eps) + f_gx(1 - x/eps))
+
+    end function f_cut_on
+
+    !> This function calculates a smooth cut-off function that is one for x values
+    !! smaller than zero and goes to zero. It can be used for generating smooth
+    !! initial conditions
+    !! @param x is the input value
+    !! @param eps is the smoothing parameter
+    !! @return fx is the cut-ff function evaluated at x
+    function f_cut_off(x, eps) result(fx)
+
+        real(wp), intent(in) :: x, eps
+        real(wp) :: fx
+
+        fx = f_gx(x/eps)/(f_gx(x/eps) + f_gx(1 - x/eps))
+
+    end function f_cut_off
+
+    !> This function is a helper function for the functions f_cut_on and f_cut_off
+    !! @param x is the input value
+    !! @return gx is the result
+    function f_gx(x) result(gx)
+
+        real(wp), intent(in) :: x
+        real(wp) :: gx
+
+        if (x > 0) then
+            gx = exp(-1._wp/x)
+        else
+            gx = 0._wp
+        end if
+
+    end function f_gx
 
 end module m_helper

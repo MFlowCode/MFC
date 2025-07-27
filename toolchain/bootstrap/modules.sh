@@ -1,5 +1,23 @@
 #!/bin/bash
 
+# Function to display help message
+show_help() {
+  echo "Usage: $(basename "$0") [OPTIONS]"
+  echo "This function loads in modules for a specific computer and mode"
+  echo ""
+  echo "Options:"
+  echo "  -h, --help                  Display this help message and exit."
+  echo "  -c, --computer COMPUTER     Configures for COMPUTER environment."
+  echo "                 Options:     Ascent (a) | Frontier (f) | Summit (s) | Wombat (w)"
+  echo "                              Bridges2 (b) | Expanse (e) | Delta (d) | DeltaAI (dai)"
+  echo "                              Phoenix (p) | Richardson (r) | Oscar (o)"
+  echo "                              Carpenter Cray (cc) | Carpenter GNU (c) |  Nautilus (n)"
+  echo "  -m, --mode MODE             Configures into MODE."
+  echo "                 Options:     gpu (g) | cpu (c)"
+  echo ""
+  exit 0
+}
+
 unset u_c
 unset u_cg
 
@@ -12,6 +30,7 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -c|--computer) u_c="$2";  shift; shift; ;;
         -m|--mode)     u_cg="$2"; shift; shift; ;;
+        -h|--help)     show_help; shift; shift; ;;
         -*|--*)        echo "Unknown option $1"; return; ;;
     esac
 done

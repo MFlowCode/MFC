@@ -1,7 +1,6 @@
 # Case Files
 
-Example Python case files, also referred to as *input files*, can be found in the [examples/](https://github.com/MFlowCode/MFC/tree/master/examples) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented
-in the user manual. A commented, tutorial script
+Example Python case files, also referred to as *input files*, can be found in the [examples/](https://github.com/MFlowCode/MFC/tree/master/examples) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented in the user manual. A commented, tutorial script
 can also be found in [examples/3d_sphbubcollapse/](https://github.com/MFlowCode/MFC/blob/master/examples/3D_sphbubcollapse/case.py).
 
 ## Basic Skeleton
@@ -225,6 +224,7 @@ end if
 Some patch configurations are not adequately handled with the above analytic variable definitions.
 In this case, a hard coded patch can be used.
 Hard coded patches can be added by adding additional hard coded patch identifiers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`.
+When using a hard coded patch, the `patch_icpp(patch_id)%%hcid` must be set to the hard-coded patch id.
 For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
 
 ```f90
@@ -232,7 +232,7 @@ For example, to add a 2D Hardcoded patch with an id of 200, one would add the fo
         ! Primitive variables assignment
 ```
 
-and use `patch_icpp(i)%%geometry = 7` and `patch_icpp(i)%%hcid = 200` in the input file.
+and use `patch_icpp(i)%%hcid = 200` in the input file.
 Additional variables can be declared in `Hardcoded1[2,3]DVariables` and used in `hardcoded1[2,3]D`.
 As a convention, any hard coded patches that are part of the MFC master branch should be identified as 1[2,3]xx where the first digit indicates the number of dimensions.
 
@@ -312,8 +312,8 @@ These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch 
 
 #### Parameter Descriptions
 
-- `geometry` defines the type of geometry of a patch with an integer number.
-Definitions for currently implemented patch types are list in table [Immersed Boundary Patch Type](#immersed-boundary-patch-types)
+- `geometry` defines the type of geometry of an immersed boundary patch with an integer number.
+Definitions for currently implemented immersed boundary patch types are listed in table [Immersed Boundary Patch Type](#immersed-boundary-patch-types).
 
 - `x[y,z]_centroid` is the centroid location of the patch in the x[y,z]-direction
 
@@ -379,6 +379,8 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `mixture_err`          | Logical | Mixture properties correction |
 | `time_stepper`         | Integer | Runge--Kutta order [1-3] |
 | `adap_dt`              | Logical | Strang splitting scheme with adaptive time stepping |
+| `adap_dt_tol`          | Real    | Tolerance for adaptive time stepping in Strang splitting scheme|
+| `adap_dt_max_iters`    | Integer | Max iteration for adaptive time stepping in Strang splitting scheme |
 | `weno_order`	         | Integer | WENO order [1,3,5] |
 | `weno_eps`	         | Real    | WENO perturbation (avoid division by zero) |
 | `mapped_weno`	         | Logical | WENO-M (WENO with mapping of nonlinear weights) |
@@ -408,6 +410,13 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `surface_tension`      | Logical | Activate surface tension |
 | `viscous`              | Logical | Activate viscosity |
 | `hypoelasticity`       | Logical | Activate hypoelasticity* |
+| `igr`                  | Logical | Enable solution via information geometric regularization (IGR) [Cao (2024)](references.md) |
+| `igr_order`            | Integer | Order of reconstruction for IGR [3,5] |
+| `alf_factor`           | Real    | Alpha factor for IGR entropic pressure (default 10) |
+| `igr_pres_lim`         | Logical | Limit IGR pressure to avoid negative values (default F) |
+| `igr_iter_solver`      | Integer | Solution method for IGR elliptic solve [1] Jacobi [2] Gauss-Seidel |
+| `num_igr_iters`        | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
+| `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.
@@ -446,7 +455,7 @@ The effect and use of the source term are assessed by [Schmidmayer et al., 2019]
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer.
 Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md)).
 
-- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles_euler = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`. Additionally, it can be used with ``bubbles_lagrange = 'T'`` and `time_stepper = 3`
+- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles_euler = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`. Additionally, it can be used with ``bubbles_lagrange = 'T'`` and `time_stepper = 3`. `adap_dt_tol` and `adap_dt_max_iters` are 1e-4 and 100, respectively, by default.
 
 - `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, 5, and 7, that correspond to the 1st, 3rd, 5th, and 7th order, respectively.
 
@@ -501,7 +510,7 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 | `type`*                | Integer | The geometry of the patch. [1]: Line [2]: Circle [3]: Rectangle |
 | `x[y,z]_centroid`*     | Real    | Centroid of the boundary patch in the x[y,z]-direction          |
 | `length_x[y,z]`*       | Real    | Length of the boundary patch in the x[y,z]-direction            |
-| `radius`*              | Real    | Radius of the boundary patch                                    |
+| `radiue`*              | Real    | Radius of the boundary patch                                    |
 *: These parameters should be prepended with `patch_bc(j)%` where $j$ is the patch index.
 
 Boundary condition patches can be used with the following boundary condition types:
@@ -736,7 +745,6 @@ Implementation of the parameters into the model follow [Ando (2010)](references.
 | `polydisperse`   | Logical	| Polydispersity in equilibrium bubble radius R0 |
 | `nb` 			     | Integer	| Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
 | `poly_sigma` 	       | Real 		|	Standard deviation for probability density function of polydisperse bubble populations |
-| `R0_type` 	       | Integer 		|	Quadrature rule for probability density function of polydisperse bubble populations |
 | `Ca` 			     | Real		  | Cavitation number |
 | `Web` 			   | Real		  | Weber number |
 | `Re_inv` 		   | Real		  | Inverse Reynolds number |
@@ -754,14 +762,11 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - `thermal` specifies a model for heat transfer across the bubble interface by an integer from 1 through 3.
 `thermal = 1`, `2`, and `3` correspond to no heat transfer (adiabatic gas compression), isothermal heat transfer, and heat transfer with a constant heat transfer coefficient based on [Preston et al., 2007](references.md), respectively.
 
-- `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius.
+- `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius. Simpson's rule is used for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 
 - `R0ref` specifies the reference bubble radius.
 
 - `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibrium bubble radius.
-
-- `R0_type` specifies the quadrature rule for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
-`R0_type = 1` corresponds to Simpson's rule.
 
 - `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 
@@ -824,7 +829,7 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `perturb_sph_fluid`    | Integer | Fluid component whose partial density is to be perturbed |
 | `mixlayer_vel_profile` | Logical | Set the mean streamwise velocity to hyperbolic tangent profile |
 | `mixlayer_vel_coef`    | Real    | Coefficient for the hyperbolic tangent profile of a mixing layer |
-| `mixlayer_perturb`     | Logical | Perturb the initial velocity field by instability waves |
+| `mixlayer_perturb`     | Logical | Perturb the initial velocity field using a spectrum-based synthetic turbulence generation method |
 
 The table lists velocity field parameters.
 The parameters are optionally used to define initial velocity profiles and perturbations.
@@ -996,16 +1001,16 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | 3    | Rectangle 	        | 2     | N      | Coordinate-aligned. Requires `[x,y]_centroid` and `length_[x,y]`. |
 | 4    | Sweep line 		| 2     | Y      | Not coordinate aligned. Requires `[x,y]_centroid` and `normal(i)`. |
 | 5    | Ellipse 		    | 2     | Y      | Requires `[x,y]_centroid` and `radii(i)`. |
-| 6    | N/A 		        | 2     | N      | No longer exists. Empty. |
-| 7    | 2D Hardcoded 	    | 2     | N      | Assigns the primitive variables as analytical functions. |
+| 6    | N/A 		        | N/A   | N/A    | No longer exists. Empty. |
+| 7    | N/A        	    | N/A   | N/A    | No longer exists. Empty. |
 | 8    | Sphere 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radius` |
 | 9    | Cuboid 		    | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `length_[x,y,z]`. |
 | 10   | Cylinder 		    | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_[x,y,z]`. |
 | 11   | Sweep plane 	    | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
-| 13   | 3D Hardcoded 	    | 3     | N      | Assigns the primitive variables as analytical functions |
+| 13   | N/A        	    | N/A   | N/A    | No longer exists. Empty. |
 | 14   | Spherical Harmonic | 3     | N      | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |
-| 15   | 1D Hardcoded      | 1     | N      | Assigns the primitive variables as analytical functions  |
+| 15   | N/A                | N/A   | N/A    | No longer exists. Empty.  |
 | 16   | 1D bubble pulse    | 1     | N      | Requires `x_centroid`, `length_x` |
 | 17   | Spiral             | 2     | N      | Requires `[x,y]_centroid` |
 | 18   | 2D Varcircle       | 2     | Y      | Requires `[x,y]_centroid`, `radius`, and `thickness` |

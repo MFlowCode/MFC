@@ -9,6 +9,8 @@
 - [Running MFC](running.md)
 - [Flow Visualization](visualization.md)
 - [Performance](expectedPerformance.md)
+- [GPU Parallelization](gpuParallelization.md)
+- [GPU Debugging](gpuDebugging.md)
 - [MFC's Authors](authors.md)
 - [References](references.md)
 

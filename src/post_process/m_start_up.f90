@@ -93,7 +93,7 @@ contains
             lag_id_wrt, lag_pos_wrt, lag_pos_prev_wrt, lag_vel_wrt, &
             lag_rad_wrt, lag_rvel_wrt, lag_r0_wrt, lag_rmax_wrt, &
             lag_rmin_wrt, lag_dphidt_wrt, lag_pres_wrt, lag_mv_wrt, &
-            lag_mg_wrt, lag_betaT_wrt, lag_betaC_wrt
+            lag_mg_wrt, lag_betaT_wrt, lag_betaC_wrt, igr, igr_order
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -115,6 +115,9 @@ contains
             end if
 
             close (1)
+
+            call s_update_cell_bounds(cells_bounds, m, n, p)
+
             ! Store m,n,p into global m,n,p
             m_glb = m
             n_glb = n
@@ -181,6 +184,7 @@ contains
                     t_step
             end if
         end if
+
         ! Populating the grid and conservative variables
         call s_read_data_files(t_step)
 
@@ -464,7 +468,20 @@ contains
             if (alpha_wrt(num_fluids) &
                 .or. &
                 (cons_vars_wrt .or. prim_vars_wrt)) then
-                q_sf(:, :, :) = q_cons_vf(adv_idx%end)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                if (igr) then
+                    do k = z_beg, z_end
+                        do j = y_beg, y_end
+                            do i = x_beg, x_end
+                                q_sf(i, j, k) = 1._wp
+                                do l = 1, num_fluids - 1
+                                    q_sf(i, j, k) = q_sf(i, j, k) - q_cons_vf(E_idx + l)%sf(i, j, k)
+                                end do
+                            end do
+                        end do
+                    end do
+                else
+                    q_sf(:, :, :) = q_cons_vf(adv_idx%end)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                end if
                 write (varname, '(A,I0)') 'alpha', num_fluids
                 call s_write_variable_to_formatted_database_file(varname, t_step)
 

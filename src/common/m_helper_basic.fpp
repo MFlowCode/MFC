@@ -10,13 +10,14 @@ module m_helper_basic
 
     implicit none
 
-    private; 
+    private;
     public :: f_approx_equal, &
               f_approx_in_array, &
               f_is_default, &
               f_all_default, &
               f_is_integer, &
-              s_configure_coordinate_bounds
+              s_configure_coordinate_bounds, &
+              s_update_cell_bounds
 
 contains
 
@@ -109,23 +110,32 @@ contains
         res = f_approx_equal(var, real(nint(var), wp))
     end function f_is_integer
 
-    subroutine s_configure_coordinate_bounds(weno_polyn, buff_size, idwint, idwbuff, &
-                                             viscous, bubbles_lagrange, m, n, p, &
-                                             num_dims, fd_number)
+    pure subroutine s_configure_coordinate_bounds(weno_polyn, buff_size, idwint, idwbuff, &
+                                                  viscous, bubbles_lagrange, m, n, p, num_dims, &
+                                                  igr, fd_number)
 
         integer, intent(in) :: weno_polyn, m, n, p, num_dims, fd_number
         integer, intent(inout) :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
         logical, intent(in) :: viscous, bubbles_lagrange
+        logical, intent(in) :: igr
 
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
         ! the next one
-        if (viscous) then
-            buff_size = 2*weno_polyn + 2
+        if (igr) then
+            if (viscous) then
+                buff_size = 6
+            else
+                buff_size = 4
+            end if
         else
-            buff_size = weno_polyn + 2
+            if (viscous) then
+                buff_size = 2*weno_polyn + 2
+            else
+                buff_size = weno_polyn + 2
+            end if
         end if
 
         ! Correction for smearing function in the lagrangian subgrid bubble model
@@ -146,5 +156,25 @@ contains
         idwbuff(3)%end = idwint(3)%end - idwbuff(3)%beg
 
     end subroutine s_configure_coordinate_bounds
+
+    !> Updates the min and max number of cells in each set of axes
+    !! @param bounds Min ans max values to update
+    !! @param m Number of cells in x-axis
+    !! @param n Number of cells in y-axis
+    !! @param p Number of cells in z-axis
+    pure elemental subroutine s_update_cell_bounds(bounds, m, n, p)
+        type(cell_num_bounds), intent(out) :: bounds
+        integer, intent(in) :: m, n, p
+
+        bounds%mn_max = max(m, n)
+        bounds%np_max = max(n, p)
+        bounds%mp_max = max(m, p)
+        bounds%mnp_max = max(m, n, p)
+        bounds%mn_min = min(m, n)
+        bounds%np_min = min(n, p)
+        bounds%mp_min = min(m, p)
+        bounds%mnp_min = min(m, n, p)
+
+    end subroutine s_update_cell_bounds
 
 end module m_helper_basic

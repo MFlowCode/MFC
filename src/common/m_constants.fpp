@@ -26,6 +26,9 @@ module m_constants
     integer, parameter :: num_bc_patches_max = 10
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
+    integer, parameter :: dflt_num_igr_iters = 2 !< number of iterations for IGR elliptic solve
+    integer, parameter :: dflt_num_igr_warm_start_iters = 50 !< default number of iterations for IGR elliptic solve
+    real(wp), parameter :: dflt_alf_factor = 10._wp !< scaling factor for IGR alpha
     integer, parameter :: gp_layers = 3 !< Number of ghost point layers for IBM
     real(wp), parameter :: capillary_cutoff = 1.e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
     real(wp), parameter :: acoustic_spatial_support_width = 2.5_wp !< Spatial support width of acoustic source, used in s_source_spatial
@@ -54,7 +57,8 @@ module m_constants
 
     ! Strang Splitting constants
     real(wp), parameter :: dflt_adap_dt_tol = 1.e-4_wp !< Default tolerance for adaptive step size
-    integer, parameter :: adap_dt_max_iters = 100 !< Maximum number of iterations
+    integer, parameter :: dflt_adap_dt_max_iters = 100 !< Default max iteration for adaptive step size
+
     ! Constants of the algorithm described by Heirer, E. Hairer S.P.Nørsett G. Wanner, Solving Ordinary Differential Equations I, Chapter II.4
     ! to choose the initial time step size for the adaptive time stepping routine
     real(wp), parameter :: threshold_first_guess = 1.e-5_wp
