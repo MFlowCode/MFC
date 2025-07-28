@@ -160,7 +160,7 @@
         & no_create_val.strip('\n') + present_val.strip('\n') + &
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
     #! Hardcoding the parallelism for now
-    #:set omp_directive = '!$omp target teams loop defaultmap(firstprivate:scalar) bind(teams)' + &
+    #:set omp_directive = '!$omp target teams loop defaultmap(firstprivate:scalar) bind(teams,parallel)' + &
         & clause_val + extraOmpArgs_val.strip('\n')
     #:set omp_end_directive = '!$omp end target teams loop'
     $:omp_directive

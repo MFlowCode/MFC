@@ -175,9 +175,9 @@ contains
                 gp = ghost_points(i)
                 j = gp%loc(1)
                 k = gp%loc(2)
-                l = gp%loc(3)
-                patch_id = ghost_points(i)%ib_patch_id
-
+                l = gp%loc(3) 
+                patch_id = ghost_points(i)%ib_patch_id                
+                
                 ! Calculate physical location of GP
                 if (p > 0) then
                     physical_loc = [x_cc(j), y_cc(k), z_cc(l)]
@@ -202,7 +202,6 @@ contains
                     call s_interpolate_image_point(q_prim_vf, gp, &
                                                    alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
                 end if
-
                 dyn_pres = 0._wp
 
                 ! Set q_prim_vf params at GP so that mixture vars calculated properly
@@ -214,8 +213,7 @@ contains
 
                 if (surface_tension) then
                     q_prim_vf(c_idx)%sf(j, k, l) = c_IP
-                end if
-
+                end if                
                 if (model_eqns /= 4) then
                     ! If in simulation, use acc mixture subroutines
                     if (elasticity) then
@@ -259,7 +257,7 @@ contains
                 ! Set color function
                 if (surface_tension) then
                     q_cons_vf(c_idx)%sf(j, k, l) = c_IP
-                end if
+                end if 
 
                 ! Set Energy
                 if (bubbles_euler) then
@@ -267,10 +265,10 @@ contains
                 else
                     q_cons_vf(E_idx)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
                 end if
-
                 ! Set bubble vars
                 if (bubbles_euler .and. .not. qbmm) then
                     call s_comp_n_from_prim(alpha_IP(1), r_IP, nbub, weight)
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, nb
                         q_cons_vf(bubxb + (q - 1)*2)%sf(j, k, l) = nbub*r_IP(q)
                         q_cons_vf(bubxb + (q - 1)*2 + 1)%sf(j, k, l) = nbub*v_IP(q)
@@ -286,15 +284,20 @@ contains
                 if (qbmm) then
 
                     nbub = nmom_IP(1)
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, nb*nmom
                         q_cons_vf(bubxb + q - 1)%sf(j, k, l) = nbub*nmom_IP(q)
                     end do
+                    
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, nb
                         q_cons_vf(bubxb + (q - 1)*nmom)%sf(j, k, l) = nbub
                     end do
 
                     if (.not. polytropic) then
+                        $:GPU_LOOP(parallelism='[seq]')
                         do q = 1, nb
+                            $:GPU_LOOP(parallelism='[seq]')
                             do r = 1, nnode
                                 pb_in(j, k, l, r, q) = presb_IP((q - 1)*nnode + r)
                                 mv_in(j, k, l, r, q) = massv_IP((q - 1)*nnode + r)
