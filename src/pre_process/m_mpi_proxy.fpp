@@ -45,7 +45,7 @@ contains
             & 'loops_x', 'loops_y', 'loops_z', 'model_eqns', 'num_fluids',     &
             & 'weno_order', 'precision', 'perturb_flow_fluid', &
             & 'perturb_sph_fluid', 'num_patches', 'thermal', 'nb', 'dist_type',&
-            & 'R0_type', 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters', &
+            & 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters', &
             & 'num_bc_patches', 'mixlayer_perturb_nk', 'recon_type', 'muscl_order']
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
