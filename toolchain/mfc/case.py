@@ -203,17 +203,18 @@ class Case:
             wenojs = 0 if (mapped_weno or wenoz or teno) else 1
             igr = 1 if self.params.get("igr", 'F') == 'T' else 0
 
-            if self.params.get("igr", "F") == 'T':
-                weno_order = 5
-                weno_polyn = 3
-
             recon_type = self.params.get("recon_type", 1)
+
             # This fixes a bug on Frontier to do with allocating 0:0 arrays
             weno_order = int(self.params.get("weno_order", 0))
             if recon_type == 1:
                 weno_polyn = int((weno_order - 1) / 2)
             else:
                 weno_polyn = 1
+
+            if self.params.get("igr", "F") == 'T':
+                weno_order = 5
+                weno_polyn = 3
 
             if teno:
                 weno_num_stencils = weno_order - 3
