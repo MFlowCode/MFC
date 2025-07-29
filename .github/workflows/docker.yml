@@ -24,13 +24,19 @@ jobs:
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Setup
         uses: docker/setup-buildx-action@v3
 
       - name: Stage
         run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "TAG=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
+
           sudo mkdir -p /mnt/share
           sudo chmod 777 /mnt/share
           cp -r mfc/* /mnt/share/
@@ -53,7 +59,7 @@ jobs:
             FC_COMPILER=${{ contains(matrix.config.name, 'gpu') && 'nvfortran' || 'gfortran' }}
             COMPILER_PATH=${{ contains(matrix.config.name, 'gpu') && '/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/bin' || '/usr/bin' }}
             COMPILER_LD_LIBRARY_PATH=${{ contains(matrix.config.name, 'gpu') && '/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/lib' || '/usr/lib' }}
-          tags: sbryngelson/mfc:${{ github.ref_name }}-${{ matrix.config.name }}
+          tags: sbryngelson/mfc:${{ env.TAG }}-${{ matrix.config.name }}
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
