@@ -28,6 +28,13 @@ module m_precision_select
     integer, parameter :: wp = double_precision
 #endif
 
+    ! Set the storage preceision (stp) to half if mixed precision is requested
+#ifdef MFC_MIXED_PRECISION
+    integer, parameter :: stp = half_precision
+#else
+    integer, parameter :: stp = wp
+#endif
+
 #ifdef MFC_MPI
     ! Set mpi_p based on wp using the merge intrinsic function
     integer, parameter :: mpi_p = merge(MPI_DOUBLE_PRECISION, MPI_REAL, wp == double_precision)
