@@ -249,6 +249,7 @@ module m_global_parameters
     logical :: c_wrt
     logical, dimension(3) :: omega_wrt
     logical :: qm_wrt
+    logical :: liutex_wrt
     logical :: schlieren_wrt
     logical :: cf_wrt
     logical :: ib
@@ -426,6 +427,7 @@ contains
         c_wrt = .false.
         omega_wrt = .false.
         qm_wrt = .false.
+        liutex_wrt = .false.
         schlieren_wrt = .false.
         sim_data = .false.
         cf_wrt = .false.
@@ -819,7 +821,7 @@ contains
         buff_size = max(offset_x%beg, offset_x%end, offset_y%beg, &
                         offset_y%end, offset_z%beg, offset_z%end)
 
-        if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt) then
+        if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt .or. liutex_wrt) then
             fd_number = max(1, fd_order/2)
             buff_size = buff_size + fd_number
         end if

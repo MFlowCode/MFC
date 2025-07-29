@@ -81,7 +81,7 @@ contains
             E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
             heat_ratio_wrt, pi_inf_wrt, pres_inf_wrt, &
             cons_vars_wrt, prim_vars_wrt, c_wrt, &
-            omega_wrt, qm_wrt, schlieren_wrt, schlieren_alpha, &
+            omega_wrt, qm_wrt, liutex_wrt, schlieren_wrt, schlieren_alpha, &
             fd_order, mixture_err, alt_soundspeed, &
             flux_lim, flux_wrt, cyl_coord, &
             parallel_io, rhoref, pref, bubbles_euler, qbmm, sigR, &
@@ -205,7 +205,13 @@ contains
         integer, intent(inout) :: t_step
         character(LEN=name_len), intent(inout) :: varname
         real(wp), intent(inout) :: pres, c, H
-
+        real(wp) :: theta1, theta2
+        real(wp), dimension(-offset_x%beg:m + offset_x%end, &
+                            -offset_y%beg:n + offset_y%end, &
+                            -offset_z%beg:p + offset_z%end) :: liutex_mag
+        real(wp), dimension(-offset_x%beg:m + offset_x%end, &
+                            -offset_y%beg:n + offset_y%end, &
+                            -offset_z%beg:p + offset_z%end, 3) :: liutex_axis
         integer :: i, j, k, l
 
         integer :: x_beg, x_end, y_beg, y_end, z_beg, z_end
@@ -244,21 +250,21 @@ contains
         call s_write_grid_to_formatted_database_file(t_step)
 
         ! Computing centered finite-difference coefficients in x-direction
-        if (omega_wrt(2) .or. omega_wrt(3) .or. qm_wrt .or. schlieren_wrt) then
+        if (omega_wrt(2) .or. omega_wrt(3) .or. qm_wrt .or. liutex_wrt .or. schlieren_wrt) then
             call s_compute_finite_difference_coefficients(m, x_cc, &
                                                           fd_coeff_x, buff_size, &
                                                           fd_number, fd_order, offset_x)
         end if
 
         ! Computing centered finite-difference coefficients in y-direction
-        if (omega_wrt(1) .or. omega_wrt(3) .or. qm_wrt .or. (n > 0 .and. schlieren_wrt)) then
+        if (omega_wrt(1) .or. omega_wrt(3) .or. qm_wrt .or. liutex_wrt .or. (n > 0 .and. schlieren_wrt)) then
             call s_compute_finite_difference_coefficients(n, y_cc, &
                                                           fd_coeff_y, buff_size, &
                                                           fd_number, fd_order, offset_y)
         end if
 
         ! Computing centered finite-difference coefficients in z-direction
-        if (omega_wrt(1) .or. omega_wrt(2) .or. qm_wrt .or. (p > 0 .and. schlieren_wrt)) then
+        if (omega_wrt(1) .or. omega_wrt(2) .or. qm_wrt .or. liutex_wrt .or. (p > 0 .and. schlieren_wrt)) then
             call s_compute_finite_difference_coefficients(p, z_cc, &
                                                           fd_coeff_z, buff_size, &
                                                           fd_number, fd_order, offset_z)
@@ -596,6 +602,32 @@ contains
             varname(:) = ' '
         end if
 
+        ! Adding Liutex magnitude to the formatted database file
+        if (liutex_wrt) then
+
+            ! Compute Liutex vector and its magnitude
+            call s_derive_liutex(q_prim_vf, liutex_mag, liutex_axis)
+
+            ! Liutex magnitude
+            q_sf = liutex_mag
+
+            write (varname, '(A)') 'liutex_mag'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+
+            varname(:) = ' '
+
+            ! Liutex axis
+            do i = 1, 3
+              q_sf = liutex_axis(:,:,:,i)
+
+              write (varname, '(A,I0)') 'liutex_axis', i
+              call s_write_variable_to_formatted_database_file(varname, t_step)
+
+              varname(:) = ' '
+            end do
+
+        end if
+
         ! Adding numerical Schlieren function to formatted database file
         if (schlieren_wrt) then
 
@@ -733,10 +765,6 @@ contains
         ! leads to the termination of the post-process.
         if (proc_rank == 0) then
             call s_assign_default_values_to_user_inputs()
-
-            call s_lapack_example_solve_linear_system()
-            call s_lapack_example_eigenvalues()
-
             call s_read_input_file()
             call s_check_input_file()
 
