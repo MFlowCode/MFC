@@ -35,12 +35,24 @@ class MFCConfig:
     def make_options(self) -> typing.List[str]:
         """ Returns a list of options that could be passed to mfc.sh again.
             Example: --no-debug --mpi --no-gpu --no-gcov --no-unified"""
-        return [ f"--{'no-' if not v else ''}{k}" for k, v in self.items() ]
+        options = []
+        for k, v in self.items():
+            if (k == 'gpu'):
+                options.append(f"--{v}-{k}")
+            else:
+                options.append(f"--{'no-' if not v else ''}{k}")
+        return options
 
     def make_slug(self) -> str:
         """ Sort the items by key, then join them with underscores. This uniquely 
             identifies the configuration. Example: no-debug_no-gpu_no_mpi_no-gcov """
-        return '_'.join([ f"{'no-' if not v else ''}{k}" for k, v in sorted(self.items(), key=lambda x: x[0]) ])
+        options = []
+        for k, v in sorted(self.items(), key=lambda x: x[0]):
+            if (k == 'gpu'):
+                options.append(f"--{v}-{k}")
+            else:
+                options.append(f"--{'no-' if not v else ''}{k}")
+        return '_'.join(options)
 
     def __eq__(self, other) -> bool:
         """ Check if two MFCConfig objects are equal, field by field. """
