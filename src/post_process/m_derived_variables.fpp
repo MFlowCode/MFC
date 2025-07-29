@@ -581,10 +581,8 @@ contains
                       -offset_z%beg:p + offset_z%end, nm), &
             intent(out) :: liutex_axis !< Liutex rigid rotation axis
 
-        real(wp), dimension(nm) :: omega !< Vorticity
-
-        character :: ivl = 'N' !< compute left eigenvectors
-        character :: ivr = 'V' !< compute right eigenvectors
+        character, parameter :: ivl = 'N' !< compute left eigenvectors
+        character, parameter :: ivr = 'V' !< compute right eigenvectors
         real(wp), dimension(nm, nm) :: vgt !< velocity gradient tensor
         real(wp), dimension(nm) :: lr, li !< real and imaginary parts of eigenvalues
         real(wp), dimension(nm, nm) :: vl, vr !< left and right eigenvectors
@@ -628,11 +626,6 @@ contains
                         end do
                     end do
 
-                    ! Compute vorticity
-                    omega(1) = vgt(3, 2) - vgt(2, 3)
-                    omega(2) = vgt(1, 3) - vgt(3, 1)
-                    omega(3) = vgt(2, 1) - vgt(1, 2)
-
                     ! Call appropriate LAPACK routine based on precision
 #ifdef MFC_SINGLE_PRECISION
                     call cgeev(ivl, ivr, nm, vgt, nm, lr, li, vl, nm, vr, nm, work, lwork, info)
@@ -653,14 +646,16 @@ contains
                     eigvec_mag = sqrt(eigvec(1)**2._wp &
                                       + eigvec(2)**2._wp &
                                       + eigvec(3)**2._wp)
-                    if (eigvec_mag /= 0._wp) then
+                    if (eigvec_mag .gt. sgm_eps) then
                         eigvec = eigvec/eigvec_mag
+                    else
+                        eigvec = 0._wp
                     end if
 
                     ! Compute vorticity projected on the eigenvector
-                    omega_proj = omega(1)*eigvec(1) &
-                                 + omega(2)*eigvec(2) &
-                                 + omega(3)*eigvec(3)
+                    omega_proj = (vgt(3, 2) - vgt(2, 3))*eigvec(1) &
+                                 + (vgt(1, 3) - vgt(3, 1))*eigvec(2) &
+                                 + (vgt(2, 1) - vgt(1, 2))*eigvec(3)
 
                     ! As eigenvector can have +/- signs, we can choose the sign
                     ! so that omega_proj is positive
