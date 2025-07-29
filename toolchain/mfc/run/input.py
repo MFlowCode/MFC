@@ -73,11 +73,12 @@ class MFCInputFile(Case):
         # Determine the real type based on the single precision flag
         real_type = 'real(sp)' if ARG('single') else 'real(dp)'
 
-        directive_str = None
         if (ARG("gpu") == gpuConfigOptions.MP.value):
             directive_str = 'mp'
         elif (ARG("gpu") == gpuConfigOptions.ACC.value):
             directive_str = 'acc'
+        else:
+            directive_str = None
 
         # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
         common.file_write(
