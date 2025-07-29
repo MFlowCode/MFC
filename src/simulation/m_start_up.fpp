@@ -1383,10 +1383,10 @@ contains
                 "case-optimized", &
 #:endif
                 m, n, p, num_procs, &
-#ifdef MFC_OpenACC
-!&<
+#if defined(MFC_OpenACC)
                 "with OpenACC offloading"
-!&>
+#elif defined(MFC_OpenMP)
+                "with OpenMP offloading"
 #else
                 "on CPUs"
 #endif

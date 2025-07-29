@@ -112,7 +112,7 @@ contains
                         rho = q_cons_qp(contxe)%sf(x, y, z)
                         T = q_T_sf%sf(x, y, z)
 
-                        ! call get_net_production_rates(rho, T, Ys, omega)
+                        call get_net_production_rates(rho, T, Ys, omega)
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do eqn = chemxb, chemxe

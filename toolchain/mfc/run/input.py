@@ -73,13 +73,19 @@ class MFCInputFile(Case):
         # Determine the real type based on the single precision flag
         real_type = 'real(sp)' if ARG('single') else 'real(dp)'
 
+        gpu_type = None
+        if (ARG("gpu") == "mp"):
+            directive_str = 'mp'
+        elif (ARG("gpu") == "acc"):
+            directive_str = 'acc'
+
         # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
         common.file_write(
             os.path.join(modules_dir, "m_thermochem.f90"),
             pyro.FortranCodeGenerator().generate(
                 "m_thermochem",
                 self.get_cantera_solution(),
-                pyro.CodeGenerationOptions(scalar_type = real_type)
+                pyro.CodeGenerationOptions(scalar_type = real_type, directive_offload = directive_str)
             ),
             True
         )
