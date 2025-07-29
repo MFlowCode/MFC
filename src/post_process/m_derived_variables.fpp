@@ -81,7 +81,7 @@ contains
         ! s_compute_finite_difference_coefficients.
 
         ! Allocating centered finite-difference coefficients in x-direction
-        if (omega_wrt(2) .or. omega_wrt(3) .or. schlieren_wrt .or. liutex_wrt)  then
+        if (omega_wrt(2) .or. omega_wrt(3) .or. schlieren_wrt .or. liutex_wrt) then
             allocate (fd_coeff_x(-fd_number:fd_number, &
                                  -offset_x%beg:m + offset_x%end))
         end if
@@ -558,7 +558,7 @@ contains
     end subroutine s_derive_qm
 
     !> This subroutine gets as inputs the primitive variables. From those
-        !!      inputs, it proceeds to calculate the Liutex vector and its 
+        !!      inputs, it proceeds to calculate the Liutex vector and its
         !!      magnitude based on Xu et al. (2019).
         !!  @param q_prim_vf Primitive variables
         !!  @param liutex_mag Liutex magnitude
@@ -588,9 +588,9 @@ contains
         real(wp), dimension(nm, nm) :: vgt !< velocity gradient tensor
         real(wp), dimension(nm) :: lr, li !< real and imaginary parts of eigenvalues
         real(wp), dimension(nm, nm) :: vl, vr !< left and right eigenvectors
-        integer, parameter :: lwork = 4*nm !< size of work array (4*nm recommended) 
+        integer, parameter :: lwork = 4*nm !< size of work array (4*nm recommended)
         real(wp), dimension(lwork) :: work !< work array
-        integer :: info      
+        integer :: info
 
         real(wp), dimension(nm) :: eigvec !< real eigenvector
         real(wp) :: eigvec_mag !< magnitude of real eigenvector
@@ -607,7 +607,7 @@ contains
 
                     ! Get velocity gradient tensor (VGT)
                     vgt(:, :) = 0._wp
-                    
+
                     do r = -fd_number, fd_number
                         do i = 1, 3
                             ! d()/dx
@@ -629,38 +629,38 @@ contains
                     end do
 
                     ! Compute vorticity
-                    omega(1) = vgt(3,2) - vgt(2,3)
-                    omega(2) = vgt(1,3) - vgt(3,1)
-                    omega(3) = vgt(2,1) - vgt(1,2)
+                    omega(1) = vgt(3, 2) - vgt(2, 3)
+                    omega(2) = vgt(1, 3) - vgt(3, 1)
+                    omega(3) = vgt(2, 1) - vgt(1, 2)
 
                     ! Call appropriate LAPACK routine based on precision
 #ifdef MFC_SINGLE_PRECISION
-                    call cgeev(ivl,ivr,nm,vgt,nm,lr,li,vl,nm,vr,nm,work,lwork,info)
+                    call cgeev(ivl, ivr, nm, vgt, nm, lr, li, vl, nm, vr, nm, work, lwork, info)
 #else
-                    call dgeev(ivl,ivr,nm,vgt,nm,lr,li,vl,nm,vr,nm,work,lwork,info)
+                    call dgeev(ivl, ivr, nm, vgt, nm, lr, li, vl, nm, vr, nm, work, lwork, info)
 #endif
 
                     ! Find real eigenvector
                     idx = 1
                     do r = 2, 3
-                        if (abs(li(r)) .lt. abs(li(idx))) then
+                        if (abs(li(r)) < abs(li(idx))) then
                             idx = r
                         end if
                     end do
-                    eigvec = vr(:,idx)
+                    eigvec = vr(:, idx)
 
                     ! Normalize real eigenvector if it is effectively non-zero
                     eigvec_mag = sqrt(eigvec(1)**2._wp &
-                                    + eigvec(2)**2._wp &
-                                    + eigvec(3)**2._wp)
+                                      + eigvec(2)**2._wp &
+                                      + eigvec(3)**2._wp)
                     if (eigvec_mag /= 0._wp) then
-                        eigvec = eigvec / eigvec_mag
+                        eigvec = eigvec/eigvec_mag
                     end if
 
                     ! Compute vorticity projected on the eigenvector
                     omega_proj = omega(1)*eigvec(1) &
-                               + omega(2)*eigvec(2) &
-                               + omega(3)*eigvec(3)
+                                 + omega(2)*eigvec(2) &
+                                 + omega(3)*eigvec(3)
 
                     ! As eigenvector can have +/- signs, we can choose the sign
                     ! so that omega_proj is positive
@@ -673,8 +673,8 @@ contains
                     lci = li(mod(idx, 3) + 1)
 
                     ! Compute Liutex magnitude
-                    alpha = omega_proj**2._wp - 4._wp*lci**2._wp ! (2*alpha)^2 
-                    if (alpha .gt. 0._wp) then
+                    alpha = omega_proj**2._wp - 4._wp*lci**2._wp ! (2*alpha)^2
+                    if (alpha > 0._wp) then
                         liutex_mag(j, k, l) = omega_proj - sqrt(alpha)
                     else
                         liutex_mag(j, k, l) = omega_proj

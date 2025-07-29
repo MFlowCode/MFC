@@ -45,8 +45,6 @@ module m_start_up
 
     use m_chemistry
 
-    use m_lapack_example
-
     implicit none
 
 contains
@@ -618,12 +616,12 @@ contains
 
             ! Liutex axis
             do i = 1, 3
-              q_sf = liutex_axis(:,:,:,i)
+                q_sf = liutex_axis(:, :, :, i)
 
-              write (varname, '(A,I0)') 'liutex_axis', i
-              call s_write_variable_to_formatted_database_file(varname, t_step)
+                write (varname, '(A,I0)') 'liutex_axis', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
 
-              varname(:) = ' '
+                varname(:) = ' '
             end do
 
         end if
