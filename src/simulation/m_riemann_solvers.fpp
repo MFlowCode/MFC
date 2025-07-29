@@ -477,8 +477,8 @@ contains
                                         Ys_R(i - chemxb + 1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                     end do
 
-                                    ! call get_mixture_molecular_weight(Ys_L, MW_L)
-                                    ! call get_mixture_molecular_weight(Ys_R, MW_R)
+                                    call get_mixture_molecular_weight(Ys_L, MW_L)
+                                    call get_mixture_molecular_weight(Ys_R, MW_R)
 
                                     Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
                                     Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
@@ -488,8 +488,8 @@ contains
                                     T_L = pres_L/rho_L/R_gas_L
                                     T_R = pres_R/rho_R/R_gas_R
 
-                                    ! call get_species_specific_heats_r(T_L, Cp_iL)
-                                    ! call get_species_specific_heats_r(T_R, Cp_iR)
+                                    call get_species_specific_heats_r(T_L, Cp_iL)
+                                    call get_species_specific_heats_r(T_R, Cp_iR)
 
                                     if (chem_params%gamma_method == 1) then
                                         ! gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
@@ -500,10 +500,10 @@ contains
                                         gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0_wp))
                                     else if (chem_params%gamma_method == 2) then
                                         ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
-                                        ! call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
-                                        ! call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
-                                        ! call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
-                                        ! call get_mixture_specific_heat_cv_mass(T_R, Ys_R, Cv_R)
+                                        call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
+                                        call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
+                                        call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
+                                        call get_mixture_specific_heat_cv_mass(T_R, Ys_R, Cv_R)
 
                                         Gamm_L = Cp_L/Cv_L
                                         gamma_L = 1.0_wp/(Gamm_L - 1.0_wp)
@@ -511,8 +511,8 @@ contains
                                         gamma_R = 1.0_wp/(Gamm_R - 1.0_wp)
                                     end if
 
-                                    ! call get_mixture_energy_mass(T_L, Ys_L, E_L)
-                                    ! call get_mixture_energy_mass(T_R, Ys_R, E_R)
+                                    call get_mixture_energy_mass(T_L, Ys_L, E_L)
+                                    call get_mixture_energy_mass(T_R, Ys_R, E_R)
 
                                     E_L = rho_L*E_L + 5.e-1*rho_L*vel_L_rms
                                     E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms
@@ -2446,8 +2446,8 @@ contains
                                             Ys_R(i - chemxb + 1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                         end do
 
-                                        ! call get_mixture_molecular_weight(Ys_L, MW_L)
-                                        ! call get_mixture_molecular_weight(Ys_R, MW_R)
+                                        call get_mixture_molecular_weight(Ys_L, MW_L)
+                                        call get_mixture_molecular_weight(Ys_R, MW_R)
 
                                         Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
                                         Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
@@ -2458,8 +2458,8 @@ contains
                                         T_L = pres_L/rho_L/R_gas_L
                                         T_R = pres_R/rho_R/R_gas_R
 
-                                        ! call get_species_specific_heats_r(T_L, Cp_iL)
-                                        ! call get_species_specific_heats_r(T_R, Cp_iR)
+                                        call get_species_specific_heats_r(T_L, Cp_iL)
+                                        call get_species_specific_heats_r(T_R, Cp_iR)
 
                                         if (chem_params%gamma_method == 1) then
                                             !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
@@ -2470,10 +2470,10 @@ contains
                                             gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0_wp))
                                         else if (chem_params%gamma_method == 2) then
                                             !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
-                                            ! call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
-                                            ! call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
-                                            ! call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
-                                            ! call get_mixture_specific_heat_cv_mass(T_R, Ys_R, Cv_R)
+                                            call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
+                                            call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
+                                            call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
+                                            call get_mixture_specific_heat_cv_mass(T_R, Ys_R, Cv_R)
 
                                             Gamm_L = Cp_L/Cv_L
                                             gamma_L = 1.0_wp/(Gamm_L - 1.0_wp)
@@ -2481,8 +2481,8 @@ contains
                                             gamma_R = 1.0_wp/(Gamm_R - 1.0_wp)
                                         end if
 
-                                        ! call get_mixture_energy_mass(T_L, Ys_L, E_L)
-                                        ! call get_mixture_energy_mass(T_R, Ys_R, E_R)
+                                        call get_mixture_energy_mass(T_L, Ys_L, E_L)
+                                        call get_mixture_energy_mass(T_R, Ys_R, E_R)
 
                                         E_L = rho_L*E_L + 5.e-1*rho_L*vel_L_rms
                                         E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms

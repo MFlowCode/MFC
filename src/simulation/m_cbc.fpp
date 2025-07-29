@@ -818,21 +818,21 @@ contains
                                     Ys(i - chemxb + 1) = q_prim_rs${XYZ}$_vf(0, k, r, i)
                                 end do
 
-                                ! call get_mixture_molecular_weight(Ys, Mw)
+                                call get_mixture_molecular_weight(Ys, Mw)
                                 R_gas = gas_constant/Mw
                                 T = pres/rho/R_gas
-                                ! call get_mixture_specific_heat_cp_mass(T, Ys, Cp)
-                                ! call get_mixture_energy_mass(T, Ys, e_mix)
+                                call get_mixture_specific_heat_cp_mass(T, Ys, Cp)
+                                call get_mixture_energy_mass(T, Ys, e_mix)
                                 E = rho*e_mix + 5.e-1_wp*rho*vel_K_sum
                                 if (chem_params%gamma_method == 1) then
                                     !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
-                                    ! call get_mole_fractions(Mw, Ys, Xs)
-                                    ! call get_species_specific_heats_r(T, Cp_i)
+                                    call get_mole_fractions(Mw, Ys, Xs)
+                                    call get_species_specific_heats_r(T, Cp_i)
                                     Gamma_i = Cp_i/(Cp_i - 1.0_wp)
                                     gamma = sum(Xs(:)/(Gamma_i(:) - 1.0_wp))
                                 else if (chem_params%gamma_method == 2) then
                                     !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
-                                    ! call get_mixture_specific_heat_cv_mass(T, Ys, Cv)
+                                    call get_mixture_specific_heat_cv_mass(T, Ys, Cv)
                                     gamma = 1.0_wp/(Cp/Cv - 1.0_wp)
                                 end if
                             else
@@ -1045,7 +1045,7 @@ contains
 
                             if (chemistry) then
                                 ! Evolution of LODI equation of energy for real gases adjusted to perfect gas, doi:10.1006/jcph.2002.6990
-                                ! call get_species_enthalpies_rt(T, h_k)
+                                call get_species_enthalpies_rt(T, h_k)
                                 sum_Enthalpies = 0._wp
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_species
