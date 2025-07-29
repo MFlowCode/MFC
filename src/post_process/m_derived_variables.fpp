@@ -646,7 +646,7 @@ contains
                     eigvec_mag = sqrt(eigvec(1)**2._wp &
                                       + eigvec(2)**2._wp &
                                       + eigvec(3)**2._wp)
-                    if (eigvec_mag .gt. sgm_eps) then
+                    if (eigvec_mag > sgm_eps) then
                         eigvec = eigvec/eigvec_mag
                     else
                         eigvec = 0._wp
