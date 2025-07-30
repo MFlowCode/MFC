@@ -189,7 +189,7 @@ They are organized below.
 * Ideal weak scaling to 100% of the largest GPU and superchip supercomputers
  	* \>36K AMD APUs (MI300A) on [LLNL El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan)
    	* \>3K AMD APUs (MI300A) on [LLNL Tuolumne](https://hpc.llnl.gov/hardware/compute-platforms/tuolumne)
-	* \>33K AMD GPUs (MI250X) on the first exascale computer, [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) 
+	* \>33K AMD GPUs (MI250X) on [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) 
 	* \>10K NVIDIA GPUs (V100) on [OLCF Summit](https://www.olcf.ornl.gov/summit/) 
 * Near compute roofline behavior
 * RDMA (remote data memory access; GPU-GPU direct communication) via GPU-aware MPI on NVIDIA (CUDA-aware MPI) and AMD GPU systems
