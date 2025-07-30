@@ -136,6 +136,7 @@ contains
         integer :: i, j, k, l !< Generic loop iterators
         integer :: ierr !< Generic flag used to identify and report GPU errors
 
+#if 0
         ! Restrict filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
 #if defined(MFC_GPU)
@@ -302,6 +303,7 @@ contains
                 end do
             end do
         end do
+#endif
 #endif
     end subroutine s_apply_fourier_filter
 

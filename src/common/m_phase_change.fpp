@@ -42,7 +42,7 @@ module m_phase_change
     real(wp) :: A, B, C, D
     !> @}
 
-    $:GPU_DECLARE(create='[max_iter,pCr,TCr,mixM,lp,vp,A,B,C,D]')
+    $:GPU_DECLARE(create='[A,B,C,D]')
 
 contains
 

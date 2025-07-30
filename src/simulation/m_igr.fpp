@@ -23,16 +23,16 @@ module m_igr
  s_igr_sigma_x, &
  s_igr_flux_add, &
  s_finalize_igr_module
-    real(wp), allocatable, target, dimension(:, :, :) :: jac
 
+    real(wp), allocatable, target, dimension(: ,:, :) :: jac
     real(wp), allocatable, dimension(:, :, :) :: jac_rhs, jac_old
     $:GPU_DECLARE(create='[jac, jac_rhs, jac_old]')
 
     type(scalar_field), dimension(1) :: jac_sf
     $:GPU_DECLARE(create='[jac_sf]')
 
-    real(wp), allocatable, dimension(:, :) :: Res
-    $:GPU_DECLARE(create='[Res]')
+    real(wp), allocatable, dimension(:, :) :: Res_igr
+    $:GPU_DECLARE(create='[Res_igr]')
 
     real(wp) :: alf_igr
     $:GPU_DECLARE(create='[alf_igr]')
@@ -88,13 +88,13 @@ contains
     subroutine s_initialize_igr_module()
 
         if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+            @:ALLOCATE(Res_igr(1:2, 1:maxval(Re_size)))
             do i = 1, 2
                 do j = 1, Re_size(i)
-                    Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
+                    Res_igr(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-            $:GPU_UPDATE(device='[Res, Re_idx, Re_size]')
+            $:GPU_UPDATE(device='[Res_igr, Re_idx, Re_size]')
         end if
 
         @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -128,7 +128,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             if (igr_order == 3) then
-                vidxb = -1; vidxe = 2; 
+                vidxb = -1; vidxe = 2;
                 $:GPU_UPDATE(device='[vidxb, vidxe]')
 
                 @:ALLOCATE(coeff_L(0:2))
@@ -144,7 +144,7 @@ contains
                 $:GPU_UPDATE(device='[coeff_R]')
 
             elseif (igr_order == 5) then
-                vidxb = -2; vidxe = 3; 
+                vidxb = -2; vidxe = 3;
                 $:GPU_UPDATE(device='[vidxb, vidxe]')
 
                 @:ALLOCATE(coeff_L(-1:3))
@@ -516,8 +516,8 @@ contains
                                     mu_L = 0._wp; mu_R = 0._wp
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
-                                        mu_L = alpha_L(i)/Res(1, i) + mu_L
-                                        mu_R = alpha_R(i)/Res(1, i) + mu_R
+                                        mu_L = alpha_L(i)/Res_igr(1, i) + mu_L
+                                        mu_R = alpha_R(i)/Res_igr(1, i) + mu_R
                                     end do
 
                                     $:GPU_ATOMIC(atomic='update')
@@ -938,8 +938,8 @@ contains
                                     mu_R = 0._wp
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
-                                        mu_L = alpha_L(i)/Res(1, i) + mu_L
-                                        mu_R = alpha_R(i)/Res(1, i) + mu_R
+                                        mu_L = alpha_L(i)/Res_igr(1, i) + mu_L
+                                        mu_R = alpha_R(i)/Res_igr(1, i) + mu_R
                                     end do
 
                                     $:GPU_ATOMIC(atomic='update')
@@ -1362,8 +1362,8 @@ contains
                                     mu_R = 0._wp
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
-                                        mu_L = alpha_L(i)/Res(1, i) + mu_L
-                                        mu_R = alpha_R(i)/Res(1, i) + mu_R
+                                        mu_L = alpha_L(i)/Res_igr(1, i) + mu_L
+                                        mu_R = alpha_R(i)/Res_igr(1, i) + mu_R
                                     end do
 
                                     $:GPU_ATOMIC(atomic='update')
@@ -1762,8 +1762,8 @@ contains
                                     mu_R = 0._wp
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
-                                        mu_L = alpha_L(i)/Res(1, i) + mu_L
-                                        mu_R = alpha_R(i)/Res(1, i) + mu_R
+                                        mu_L = alpha_L(i)/Res_igr(1, i) + mu_L
+                                        mu_R = alpha_R(i)/Res_igr(1, i) + mu_R
                                     end do
 
                                     $:GPU_ATOMIC(atomic='update')
@@ -2218,8 +2218,8 @@ contains
                                 mu_R = 0._wp
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    mu_L = alpha_L(i)/Res(1, i) + mu_L
-                                    mu_R = alpha_R(i)/Res(1, i) + mu_R
+                                    mu_L = alpha_L(i)/Res_igr(1, i) + mu_L
+                                    mu_R = alpha_R(i)/Res_igr(1, i) + mu_R
                                 end do
 
                                 $:GPU_ATOMIC(atomic='update')
@@ -2502,7 +2502,7 @@ contains
 
     end subroutine s_igr_riemann_solver
 
-    pure subroutine s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
+    subroutine s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                          E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
                                          pres_L, pres_R, cfl)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -2607,7 +2607,7 @@ contains
     subroutine s_finalize_igr_module()
 
         if (viscous) then
-            @:DEALLOCATE(Res)
+            @:DEALLOCATE(Res_igr)
         end if
 
         @:DEALLOCATE(jac, jac_rhs)

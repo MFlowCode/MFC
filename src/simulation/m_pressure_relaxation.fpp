@@ -23,8 +23,8 @@ module m_pressure_relaxation
     real(wp), allocatable, dimension(:) :: gamma_min, pres_inf
     $:GPU_DECLARE(create='[gamma_min, pres_inf]')
 
-    real(wp), allocatable, dimension(:, :) :: Res
-    $:GPU_DECLARE(create='[Res]')
+    real(wp), allocatable, dimension(:, :) :: Res_pr
+    $:GPU_DECLARE(create='[Res_pr]')
 
 contains
 
@@ -42,13 +42,13 @@ contains
         $:GPU_UPDATE(device='[gamma_min, pres_inf]')
 
         if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:Re_size_max))
+            @:ALLOCATE(Res_pr(1:2, 1:Re_size_max))
             do i = 1, 2
                 do j = 1, Re_size(i)
-                    Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
+                    Res_pr(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-            $:GPU_UPDATE(device='[Res, Re_idx, Re_size]')
+            $:GPU_UPDATE(device='[Res_pr, Re_idx, Re_size]')
         end if
 
     end subroutine s_initialize_pressure_relaxation_module
@@ -58,7 +58,7 @@ contains
 
         @:DEALLOCATE(gamma_min, pres_inf)
         if (viscous) then
-            @:DEALLOCATE(Res)
+            @:DEALLOCATE(Res_pr)
         end if
 
     end subroutine s_finalize_pressure_relaxation_module
@@ -288,7 +288,7 @@ contains
                     if (Re_size(i) > 0) Re(i) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, Re_size(i)
-                        Re(i) = alpha(Re_idx(i, q))/Res(i, q) + Re(i)
+                        Re(i) = alpha(Re_idx(i, q))/Res_pr(i, q) + Re(i)
                     end do
                     Re(i) = 1._wp/max(Re(i), sgm_eps)
                 end do

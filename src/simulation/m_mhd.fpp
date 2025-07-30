@@ -21,10 +21,10 @@ module m_mhd
  s_finalize_mhd_powell_module, &
  s_compute_mhd_powell_rhs
 
-    real(wp), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
-    real(wp), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
-    real(wp), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
-    $:GPU_DECLARE(create='[du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz]')
+    real(wp), allocatable, dimension(:, :, :) :: du_dx_mhd, du_dy_mhd, du_dz_mhd
+    real(wp), allocatable, dimension(:, :, :) :: dv_dx_mhd, dv_dy_mhd, dv_dz_mhd
+    real(wp), allocatable, dimension(:, :, :) :: dw_dx_mhd, dw_dy_mhd, dw_dz_mhd
+    $:GPU_DECLARE(create='[du_dx_mhd,du_dy_mhd,du_dz_mhd,dv_dx_mhd,dv_dy_mhd,dv_dz_mhd,dw_dx_mhd,dw_dy_mhd,dw_dz_mhd]')
 
     real(wp), allocatable, dimension(:, :) :: fd_coeff_x_h
     real(wp), allocatable, dimension(:, :) :: fd_coeff_y_h
@@ -38,10 +38,10 @@ contains
         ! Additional safety check beyond m_checker
         if (n == 0) call s_mpi_abort('Fatal Error: Powell correction is not applicable for 1D')
 
-        @:ALLOCATE(du_dx(0:m,0:n,0:p), dv_dx(0:m,0:n,0:p), dw_dx(0:m,0:n,0:p))
-        @:ALLOCATE(du_dy(0:m,0:n,0:p), dv_dy(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p))
+        @:ALLOCATE(du_dx_mhd(0:m,0:n,0:p), dv_dx_mhd(0:m,0:n,0:p), dw_dx_mhd(0:m,0:n,0:p))
+        @:ALLOCATE(du_dy_mhd(0:m,0:n,0:p), dv_dy_mhd(0:m,0:n,0:p), dw_dy_mhd(0:m,0:n,0:p))
         if (p > 0) then
-            @:ALLOCATE(dw_dx(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p), dw_dz(0:m,0:n,0:p))
+            @:ALLOCATE(dw_dx_mhd(0:m,0:n,0:p), dw_dy_mhd(0:m,0:n,0:p), dw_dz_mhd(0:m,0:n,0:p))
         end if
 
         @:ALLOCATE(fd_coeff_x_h(-fd_number:fd_number, 0:m))
@@ -135,12 +135,12 @@ contains
 
     impure subroutine s_finalize_mhd_powell_module
 
-        @:DEALLOCATE(du_dx, dv_dx, dw_dx)
+        @:DEALLOCATE(du_dx_mhd, dv_dx_mhd, dw_dx_mhd)
         @:DEALLOCATE(fd_coeff_x_h)
-        @:DEALLOCATE(du_dy, dv_dy, dw_dy)
+        @:DEALLOCATE(du_dy_mhd, dv_dy_mhd, dw_dy_mhd)
         @:DEALLOCATE(fd_coeff_y_h)
         if (p > 0) then
-            @:DEALLOCATE(dw_dx, dw_dy, dw_dz)
+            @:DEALLOCATE(dw_dx_mhd, dw_dy_mhd, dw_dz_mhd)
             @:DEALLOCATE(fd_coeff_z_h)
         end if
 

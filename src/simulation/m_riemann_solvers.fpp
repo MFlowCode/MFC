@@ -107,11 +107,11 @@ module m_riemann_solvers
 
     $:GPU_DECLARE(create='[is1,is2,is3,isx,isy,isz]')
 
-    real(wp), allocatable, dimension(:) :: Gs
-    $:GPU_DECLARE(create='[Gs]')
+    real(wp), allocatable, dimension(:) :: Gs_rs
+    $:GPU_DECLARE(create='[Gs_rs]')
 
-    real(wp), allocatable, dimension(:, :) :: Res
-    $:GPU_DECLARE(create='[Res]')
+    real(wp), allocatable, dimension(:, :) :: Res_gs
+    $:GPU_DECLARE(create='[Res_gs]')
 
 contains
 
@@ -357,7 +357,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R,G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R,G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
                         do l = is3%beg, is3%end
                           do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -459,9 +459,9 @@ contains
 
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do q = 1, Re_size(i)
-                                            Re_L(i) = alpha_L(Re_idx(i, q))/Res(i, q) &
+                                            Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) &
                                                       + Re_L(i)
-                                            Re_R(i) = alpha_R(Re_idx(i, q))/Res(i, q) &
+                                            Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) &
                                                       + Re_R(i)
                                         end do
 
@@ -561,8 +561,8 @@ contains
 
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
-                                        G_L = G_L + alpha_L(i)*Gs(i)
-                                        G_R = G_R + alpha_R(i)*Gs(i)
+                                        G_L = G_L + alpha_L(i)*Gs_rs(i)
+                                        G_R = G_R + alpha_R(i)*Gs_rs(i)
                                     end do
 
                                     if (cont_damage) then
@@ -595,8 +595,8 @@ contains
                                 !
                                 !    $:GPU_LOOP(parallelism='[seq]')
                                 !    do i = 1, num_fluids
-                                !        G_L = G_L + alpha_L(i)*Gs(i)
-                                !        G_R = G_R + alpha_R(i)*Gs(i)
+                                !        G_L = G_L + alpha_L(i)*Gs_rs(i)
+                                !        G_R = G_R + alpha_R(i)*Gs_rs(i)
                                 !    end do
                                 !    ! Elastic contribution to energy if G large enough
                                 !    if ((G_L > 1.e-3_wp) .and. (G_R > 1.e-3_wp)) then
@@ -1267,7 +1267,7 @@ contains
 
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 1, Re_size(i)
-                                                Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
+                                                Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) &
                                                           + Re_L(i)
                                             end do
 
@@ -1283,7 +1283,7 @@ contains
 
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 1, Re_size(i)
-                                                Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
+                                                Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) &
                                                           + Re_R(i)
                                             end do
 
@@ -1305,8 +1305,8 @@ contains
                                         G_L = 0._wp; G_R = 0._wp
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, num_fluids
-                                            G_L = G_L + alpha_L(i)*Gs(i)
-                                            G_R = G_R + alpha_R(i)*Gs(i)
+                                            G_L = G_L + alpha_L(i)*Gs_rs(i)
+                                            G_R = G_R + alpha_R(i)*Gs_rs(i)
                                         end do
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, strxe - strxb + 1
@@ -1334,8 +1334,8 @@ contains
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, num_fluids
                                             ! Mixture left and right shear modulus
-                                            G_L = G_L + alpha_L(i)*Gs(i)
-                                            G_R = G_R + alpha_R(i)*Gs(i)
+                                            G_L = G_L + alpha_L(i)*Gs_rs(i)
+                                            G_R = G_R + alpha_R(i)*Gs_rs(i)
                                         end do
                                         ! Elastic contribution to energy if G large enough
                                         if (G_L > verysmall .and. G_R > verysmall) then
@@ -1951,7 +1951,7 @@ contains
 
                                                 $:GPU_LOOP(parallelism='[seq]')
                                                 do q = 1, Re_size(i)
-                                                    Re_L(i) = (1._wp - qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q)))/Res(i, q) &
+                                                    Re_L(i) = (1._wp - qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q)))/Res_gs(i, q) &
                                                               + Re_L(i)
                                                 end do
 
@@ -1967,7 +1967,7 @@ contains
 
                                                 $:GPU_LOOP(parallelism='[seq]')
                                                 do q = 1, Re_size(i)
-                                                    Re_R(i) = (1._wp - qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q)))/Res(i, q) &
+                                                    Re_R(i) = (1._wp - qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q)))/Res_gs(i, q) &
                                                               + Re_R(i)
                                                 end do
 
@@ -2414,7 +2414,7 @@ contains
 
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 1, Re_size(i)
-                                                Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
+                                                Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) &
                                                           + Re_L(i)
                                             end do
 
@@ -2430,7 +2430,7 @@ contains
 
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 1, Re_size(i)
-                                                Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
+                                                Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) &
                                                           + Re_R(i)
                                             end do
 
@@ -2508,8 +2508,8 @@ contains
                                         G_R = 0._wp
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, num_fluids
-                                            G_L = G_L + alpha_L(i)*Gs(i)
-                                            G_R = G_R + alpha_R(i)*Gs(i)
+                                            G_L = G_L + alpha_L(i)*Gs_rs(i)
+                                            G_R = G_R + alpha_R(i)*Gs_rs(i)
                                         end do
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, strxe - strxb + 1
@@ -2538,8 +2538,8 @@ contains
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, num_fluids
                                             ! Mixture left and right shear modulus
-                                            G_L = G_L + alpha_L(i)*Gs(i)
-                                            G_R = G_R + alpha_R(i)*Gs(i)
+                                            G_L = G_L + alpha_L(i)*Gs_rs(i)
+                                            G_R = G_R + alpha_R(i)*Gs_rs(i)
                                         end do
                                         ! Elastic contribution to energy if G large enough
                                         if (G_L > verysmall .and. G_R > verysmall) then
@@ -3133,24 +3133,24 @@ contains
         ! the Riemann problem solution
         integer :: i, j
 
-        @:ALLOCATE(Gs(1:num_fluids))
+        @:ALLOCATE(Gs_rs(1:num_fluids))
 
         do i = 1, num_fluids
-            Gs(i) = fluid_pp(i)%G
+            Gs_rs(i) = fluid_pp(i)%G
         end do
-        $:GPU_UPDATE(device='[Gs]')
+        $:GPU_UPDATE(device='[Gs_rs]')
 
         if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:Re_size_max))
+            @:ALLOCATE(Res_gs(1:2, 1:Re_size_max))
         end if
 
         if (viscous) then
             do i = 1, 2
                 do j = 1, Re_size(i)
-                    Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
+                    Res_gs(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-            $:GPU_UPDATE(device='[Res,Re_idx,Re_size]')
+            $:GPU_UPDATE(device='[Res_gs,Re_idx,Re_size]')
         end if
 
         $:GPU_ENTER_DATA(copyin='[is1,is2,is3,isx,isy,isz]')
@@ -4084,8 +4084,6 @@ contains
     subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        implicit none
-
         ! Arguments
         real(wp), dimension(num_dims, num_dims), intent(in) :: vel_grad_avg
         real(wp), intent(in) :: Re_shear
@@ -4117,8 +4115,6 @@ contains
     !! @param[out] tau_bulk_out Calculated bulk stress tensor (stress on i-face, i-direction).
     subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
         $:GPU_ROUTINE(parallelism='[seq]')
-
-        implicit none
 
         ! Arguments
         real(wp), intent(in) :: Re_bulk
