@@ -165,7 +165,9 @@ They are organized below.
 
 * Shock and interface capturing schemes
 	* First-order upwinding
- 	* WENO reconstructions of order 3, 5, and 7
+ 	* MUSCL (order 2)
+  		* Slope limiters: minmod, monotonized central, Van Albada, Van Leer, superbee
+ 	* WENO reconstructions (orders 3, 5, and 7)
   	* WENO variants: WENO-JS, WENO-M, WENO-Z, TENO
    	* Monotonicity-preserving reconstructions
 	* Reliable handling of large density ratios
@@ -197,7 +199,7 @@ They are organized below.
 
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
-	* \>300 Regression tests with each PR.
+	* Approx. 500 Regression tests with each PR.
  		* Performed with GNU (GCC), Intel (oneAPI), Cray (CCE), and NVIDIA (NVHPC) compilers on NVIDIA and AMD GPUs.
 		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups
