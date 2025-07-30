@@ -53,10 +53,10 @@ module m_variables_conversion
     $:GPU_DECLARE(create='[gammas,gs_min,pi_infs,ps_inf,cvs,qvs,qvps]')
 #endif
 
-    real(wp), allocatable, dimension(:) :: Gs
-    integer, allocatable, dimension(:) :: bubrs
-    real(wp), allocatable, dimension(:, :) :: Res
-    $:GPU_DECLARE(create='[bubrs,Gs,Res]')
+    real(wp), allocatable, dimension(:) :: Gs_vc
+    integer, allocatable, dimension(:) :: bubrs_vc
+    real(wp), allocatable, dimension(:, :) :: Res_vc
+    $:GPU_DECLARE(create='[bubrs_vc,Gs_vc,Res_vc]')
 
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
     $:GPU_DECLARE(create='[is1b,is2b,is3b,is1e,is2e,is3e]')
@@ -516,7 +516,7 @@ contains
         if (present(G_K)) then
             G_K = 0._wp
             do i = 1, num_fluids
-                !TODO: change to use Gs directly here?
+                !TODO: change to use Gs_vc directly here?
                 !TODO: Make this changes as well for GPUs
                 G_K = G_K + alpha_K(i)*G(i)
             end do
@@ -531,7 +531,7 @@ contains
                 if (Re_size(i) > 0) Re_K(i) = 0._wp
 
                 do j = 1, Re_size(i)
-                    Re_K(i) = alpha_K(Re_idx(i, j))/Res(i, j) &
+                    Re_K(i) = alpha_K(Re_idx(i, j))/Res_vc(i, j) &
                               + Re_K(i)
                 end do
 
@@ -594,7 +594,7 @@ contains
                     if (Re_size(i) > 0) Re_K(i) = 0._wp
 
                     do j = 1, Re_size(i)
-                        Re_K(i) = (1._wp - alpha_K(Re_idx(i, j)))/Res(i, j) &
+                        Re_K(i) = (1._wp - alpha_K(Re_idx(i, j)))/Res_vc(i, j) &
                                   + Re_K(i)
                     end do
 
@@ -624,7 +624,7 @@ contains
         @:ALLOCATE(cvs    (1:num_fluids))
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
-        @:ALLOCATE(Gs     (1:num_fluids))
+        @:ALLOCATE(Gs_vc     (1:num_fluids))
 #else
         @:ALLOCATE(gammas (1:num_fluids))
         @:ALLOCATE(gs_min (1:num_fluids))
@@ -633,46 +633,46 @@ contains
         @:ALLOCATE(cvs    (1:num_fluids))
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
-        @:ALLOCATE(Gs     (1:num_fluids))
+        @:ALLOCATE(Gs_vc     (1:num_fluids))
 #endif
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
             gs_min(i) = 1.0_wp/gammas(i) + 1.0_wp
             pi_infs(i) = fluid_pp(i)%pi_inf
-            Gs(i) = fluid_pp(i)%G
+            Gs_vc(i) = fluid_pp(i)%G
             ps_inf(i) = pi_infs(i)/(1.0_wp + gammas(i))
             cvs(i) = fluid_pp(i)%cv
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
         end do
-        $:GPU_UPDATE(device='[gammas,gs_min,pi_infs,ps_inf,cvs,qvs,qvps,Gs]')
+        $:GPU_UPDATE(device='[gammas,gs_min,pi_infs,ps_inf,cvs,qvs,qvps,Gs_vc]')
 
 #ifdef MFC_SIMULATION
 
         if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:Re_size_max))
+            @:ALLOCATE(Res_vc(1:2, 1:Re_size_max))
             do i = 1, 2
                 do j = 1, Re_size(i)
-                    Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
+                    Res_vc(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
 
-            $:GPU_UPDATE(device='[Res,Re_idx,Re_size]')
+            $:GPU_UPDATE(device='[Res_vc,Re_idx,Re_size]')
         end if
 #endif
 
         if (bubbles_euler) then
 #ifdef MFC_SIMULATION
-            @:ALLOCATE(bubrs(1:nb))
+            @:ALLOCATE(bubrs_vc(1:nb))
 #else
-            @:ALLOCATE(bubrs(1:nb))
+            @:ALLOCATE(bubrs_vc(1:nb))
 #endif
 
             do i = 1, nb
-                bubrs(i) = bub_idx%rs(i)
+                bubrs_vc(i) = bub_idx%rs(i)
             end do
-            $:GPU_UPDATE(device='[bubrs]')
+            $:GPU_UPDATE(device='[bubrs_vc]')
         end if
 
 #ifdef MFC_POST_PROCESS
@@ -906,7 +906,7 @@ contains
                             ! If in simulation, use acc mixture subroutines
                             if (elasticity) then
                                 call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-                                                                                alpha_rho_K, Re_K, G_K, Gs)
+                                                                                alpha_rho_K, Re_K, G_K, Gs_vc)
                             else if (bubbles_euler) then
                                 call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                                         alpha_K, alpha_rho_K, Re_K)
@@ -1073,7 +1073,7 @@ contains
                         if (bubbles_euler) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, nb
-                                nRtmp(i) = qK_cons_vf(bubrs(i))%sf(j, k, l)
+                                nRtmp(i) = qK_cons_vf(bubrs_vc(i))%sf(j, k, l)
                             end do
 
                             vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
@@ -1517,7 +1517,7 @@ contains
                         if (elasticity) then
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                             alpha_K, alpha_rho_K, Re_K, &
-                                                                            G_K, Gs)
+                                                                            G_K, Gs_vc)
                         else if (bubbles_euler) then
                             call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, &
                                                                                     pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K)
@@ -1607,14 +1607,14 @@ contains
 #endif
 
 #ifdef MFC_SIMULATION
-        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
+        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
         if (bubbles_euler) then
-            @:DEALLOCATE(bubrs)
+            @:DEALLOCATE(bubrs_vc)
         end if
 #else
-        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
+        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
         if (bubbles_euler) then
-            @:DEALLOCATE(bubrs)
+            @:DEALLOCATE(bubrs_vc)
         end if
 #endif
 

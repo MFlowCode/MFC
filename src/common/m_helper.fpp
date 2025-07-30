@@ -14,7 +14,7 @@ module m_helper
 
     implicit none
 
-    private; 
+    private;
     public :: s_comp_n_from_prim, &
               s_comp_n_from_cons, &
               s_initialize_nonpoly, &
@@ -292,7 +292,7 @@ contains
     !! @param a First vector.
     !! @param b Second vector.
     !! @return The cross product of the two vectors.
-    function f_cross(a, b) result(c)
+    pure function f_cross(a, b) result(c)
 
         real(wp), dimension(3), intent(in) :: a, b
         real(wp), dimension(3) :: c
@@ -513,11 +513,11 @@ contains
         real(wp) :: Y, prefactor, local_pi
 
         local_pi = acos(-1._wp)
-        prefactor = sqrt((2*l + 1)/(4*local_pi)*factorial(l - m_order)/factorial(l + m_order)); 
+        prefactor = sqrt((2*l + 1)/(4*local_pi)*factorial(l - m_order)/factorial(l + m_order));
         if (m_order == 0) then
-            Y = prefactor*associated_legendre(x, l, m_order); 
+            Y = prefactor*associated_legendre(x, l, m_order);
         elseif (m_order > 0) then
-            Y = (-1._wp)**m_order*sqrt(2._wp)*prefactor*associated_legendre(x, l, m_order)*cos(m_order*phi); 
+            Y = (-1._wp)**m_order*sqrt(2._wp)*prefactor*associated_legendre(x, l, m_order)*cos(m_order*phi);
         end if
 
     end function spherical_harmonic_func
@@ -535,17 +535,17 @@ contains
         real(wp) :: result_P
 
         if (m_order <= 0 .and. l <= 0) then
-            result_P = 1; 
+            result_P = 1;
         elseif (l == 1 .and. m_order <= 0) then
-            result_P = x; 
+            result_P = x;
         elseif (l == 1 .and. m_order == 1) then
-            result_P = -(1 - x**2)**(1._wp/2._wp); 
+            result_P = -(1 - x**2)**(1._wp/2._wp);
         elseif (m_order == l) then
-            result_P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2); 
+            result_P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2);
         elseif (m_order == l - 1) then
-            result_P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1); 
+            result_P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1);
         else
-            result_P = ((2*l - 1)*x*associated_legendre(x, l - 1, m_order) - (l + m_order - 1)*associated_legendre(x, l - 2, m_order))/(l - m_order); 
+            result_P = ((2*l - 1)*x*associated_legendre(x, l - 1, m_order) - (l + m_order - 1)*associated_legendre(x, l - 2, m_order))/(l - m_order);
         end if
 
     end function associated_legendre

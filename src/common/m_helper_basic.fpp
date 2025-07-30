@@ -89,10 +89,11 @@ contains
     !! @param var_array Array to check.
     logical function f_all_default(var_array) result(res)
         real(wp), intent(in) :: var_array(:)
-        ! logical :: res_array(size(var_array))
-        ! integer :: i
 
         res = all(f_is_default(var_array))
+
+        !logical :: res_array(size(var_array))
+        !integer :: i
 
         ! do i = 1, size(var_array)
         !     res_array(i) = f_is_default(var_array(i))
@@ -161,7 +162,7 @@ contains
     !! @param m Number of cells in x-axis
     !! @param n Number of cells in y-axis
     !! @param p Number of cells in z-axis
-     elemental subroutine s_update_cell_bounds(bounds, m, n, p)
+    elemental subroutine s_update_cell_bounds(bounds, m, n, p)
         type(cell_num_bounds), intent(out) :: bounds
         integer, intent(in) :: m, n, p
 

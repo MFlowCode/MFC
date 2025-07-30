@@ -19,21 +19,21 @@ module m_hypoelastic
  s_compute_hypoelastic_rhs, &
  s_compute_damage_state
 
-    real(wp), allocatable, dimension(:) :: Gs
-    $:GPU_DECLARE(create='[Gs]')
+    real(wp), allocatable, dimension(:) :: Gs_hypo
+    $:GPU_DECLARE(create='[Gs_hypo]')
 
-    real(wp), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
-    real(wp), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
-    real(wp), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
-    $:GPU_DECLARE(create='[du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz]')
+    real(wp), allocatable, dimension(:, :, :) :: du_dx_hypo, du_dy_hypo, du_dz_hypo
+    real(wp), allocatable, dimension(:, :, :) :: dv_dx_hypo, dv_dy_hypo, dv_dz_hypo
+    real(wp), allocatable, dimension(:, :, :) :: dw_dx_hypo, dw_dy_hypo, dw_dz_hypo
+    $:GPU_DECLARE(create='[du_dx_hypo,du_dy_hypo,du_dz_hypo,dv_dx_hypo,dv_dy_hypo,dv_dz_hypo,dw_dx_hypo,dw_dy_hypo,dw_dz_hypo]')
 
     real(wp), allocatable, dimension(:, :, :) :: rho_K_field, G_K_field
     $:GPU_DECLARE(create='[rho_K_field,G_K_field]')
 
-    real(wp), allocatable, dimension(:, :) :: fd_coeff_x_h
-    real(wp), allocatable, dimension(:, :) :: fd_coeff_y_h
-    real(wp), allocatable, dimension(:, :) :: fd_coeff_z_h
-    $:GPU_DECLARE(create='[fd_coeff_x_h,fd_coeff_y_h,fd_coeff_z_h]')
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_x_hypo
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_y_hypo
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_z_hypo
+    $:GPU_DECLARE(create='[fd_coeff_x_hypo,fd_coeff_y_hypo,fd_coeff_z_hypo]')
 
 contains
 
@@ -41,43 +41,43 @@ contains
 
         integer :: i
 
-        @:ALLOCATE(Gs(1:num_fluids))
+        @:ALLOCATE(Gs_hypo(1:num_fluids))
         @:ALLOCATE(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
-        @:ALLOCATE(du_dx(0:m,0:n,0:p))
+        @:ALLOCATE(du_dx_hypo(0:m,0:n,0:p))
         if (n > 0) then
-            @:ALLOCATE(du_dy(0:m,0:n,0:p), dv_dx(0:m,0:n,0:p), dv_dy(0:m,0:n,0:p))
+            @:ALLOCATE(du_dy_hypo(0:m,0:n,0:p), dv_dx_hypo(0:m,0:n,0:p), dv_dy_hypo(0:m,0:n,0:p))
             if (p > 0) then
-                @:ALLOCATE(du_dz(0:m,0:n,0:p), dv_dz(0:m,0:n,0:p))
-                @:ALLOCATE(dw_dx(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p), dw_dz(0:m,0:n,0:p))
+                @:ALLOCATE(du_dz_hypo(0:m,0:n,0:p), dv_dz_hypo(0:m,0:n,0:p))
+                @:ALLOCATE(dw_dx_hypo(0:m,0:n,0:p), dw_dy_hypo(0:m,0:n,0:p), dw_dz_hypo(0:m,0:n,0:p))
             end if
         end if
 
         do i = 1, num_fluids
-            Gs(i) = fluid_pp(i)%G
+            Gs_hypo(i) = fluid_pp(i)%G
         end do
-        $:GPU_UPDATE(device='[Gs]')
+        $:GPU_UPDATE(device='[Gs_hypo]')
 
-        @:ALLOCATE(fd_coeff_x_h(-fd_number:fd_number, 0:m))
+        @:ALLOCATE(fd_coeff_x_hypo(-fd_number:fd_number, 0:m))
         if (n > 0) then
-            @:ALLOCATE(fd_coeff_y_h(-fd_number:fd_number, 0:n))
+            @:ALLOCATE(fd_coeff_y_hypo(-fd_number:fd_number, 0:n))
         end if
         if (p > 0) then
-            @:ALLOCATE(fd_coeff_z_h(-fd_number:fd_number, 0:p))
+            @:ALLOCATE(fd_coeff_z_hypo(-fd_number:fd_number, 0:p))
         end if
 
         ! Computing centered finite difference coefficients
-        call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_h, buff_size, &
+        call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_hypo, buff_size, &
                                                       fd_number, fd_order)
-        $:GPU_UPDATE(device='[fd_coeff_x_h]')
+        $:GPU_UPDATE(device='[fd_coeff_x_hypo]')
         if (n > 0) then
-            call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_h, buff_size, &
+            call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_hypo, buff_size, &
                                                           fd_number, fd_order)
-            $:GPU_UPDATE(device='[fd_coeff_y_h]')
+            $:GPU_UPDATE(device='[fd_coeff_y_hypo]')
         end if
         if (p > 0) then
-            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_h, buff_size, &
+            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_hypo, buff_size, &
                                                           fd_number, fd_order)
-            $:GPU_UPDATE(device='[fd_coeff_z_h]')
+            $:GPU_UPDATE(device='[fd_coeff_z_hypo]')
         end if
 
     end subroutine s_initialize_hypoelastic_module
@@ -108,7 +108,7 @@ contains
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
-                            du_dx(k, l, q) = 0._wp
+                            du_dx_hypo(k, l, q) = 0._wp
                         end do
                     end do
                 end do
@@ -120,8 +120,8 @@ contains
                         do k = 0, m
                             $:GPU_LOOP(parallelism='[seq]')
                             do r = -fd_number, fd_number
-                                du_dx(k, l, q) = du_dx(k, l, q) &
-                                                 + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                                du_dx_hypo(k, l, q) = du_dx_hypo(k, l, q) &
+                                                 + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
                             end do
 
                         end do
@@ -134,7 +134,7 @@ contains
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                                du_dy(k, l, q) = 0._wp; dv_dx(k, l, q) = 0._wp; dv_dy(k, l, q) = 0._wp
+                                du_dy_hypo(k, l, q) = 0._wp; dv_dx_hypo(k, l, q) = 0._wp; dv_dy_hypo(k, l, q) = 0._wp
                             end do
                         end do
                     end do
@@ -146,12 +146,12 @@ contains
                             do k = 0, m
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do r = -fd_number, fd_number
-                                    du_dy(k, l, q) = du_dy(k, l, q) &
-                                                     + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
-                                    dv_dx(k, l, q) = dv_dx(k, l, q) &
-                                                     + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
-                                    dv_dy(k, l, q) = dv_dy(k, l, q) &
-                                                     + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                                    du_dy_hypo(k, l, q) = du_dy_hypo(k, l, q) &
+                                                     + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
+                                    dv_dx_hypo(k, l, q) = dv_dx_hypo(k, l, q) &
+                                                     + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
+                                    dv_dy_hypo(k, l, q) = dv_dy_hypo(k, l, q) &
+                                                     + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
                                 end do
                             end do
                         end do
@@ -165,8 +165,8 @@ contains
                         do q = 0, p
                             do l = 0, n
                                 do k = 0, m
-                                    du_dz(k, l, q) = 0._wp; dv_dz(k, l, q) = 0._wp; dw_dx(k, l, q) = 0._wp; 
-                                    dw_dy(k, l, q) = 0._wp; dw_dz(k, l, q) = 0._wp; 
+                                    du_dz_hypo(k, l, q) = 0._wp; dv_dz_hypo(k, l, q) = 0._wp; dw_dx_hypo(k, l, q) = 0._wp; 
+                                    dw_dy_hypo(k, l, q) = 0._wp; dw_dz_hypo(k, l, q) = 0._wp; 
                                 end do
                             end do
                         end do
@@ -178,16 +178,16 @@ contains
                                 do k = 0, m
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do r = -fd_number, fd_number
-                                        du_dz(k, l, q) = du_dz(k, l, q) &
-                                                         + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
-                                        dv_dz(k, l, q) = dv_dz(k, l, q) &
-                                                         + q_prim_vf(momxb + 1)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
-                                        dw_dx(k, l, q) = dw_dx(k, l, q) &
-                                                         + q_prim_vf(momxe)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
-                                        dw_dy(k, l, q) = dw_dy(k, l, q) &
-                                                         + q_prim_vf(momxe)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
-                                        dw_dz(k, l, q) = dw_dz(k, l, q) &
-                                                         + q_prim_vf(momxe)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
+                                        du_dz_hypo(k, l, q) = du_dz_hypo(k, l, q) &
+                                                         + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
+                                        dv_dz_hypo(k, l, q) = dv_dz_hypo(k, l, q) &
+                                                         + q_prim_vf(momxb + 1)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
+                                        dw_dx_hypo(k, l, q) = dw_dx_hypo(k, l, q) &
+                                                         + q_prim_vf(momxe)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
+                                        dw_dy_hypo(k, l, q) = dw_dy_hypo(k, l, q) &
+                                                         + q_prim_vf(momxe)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
+                                        dw_dz_hypo(k, l, q) = dw_dz_hypo(k, l, q) &
+                                                         + q_prim_vf(momxe)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
                                     end do
                                 end do
                             end do
@@ -203,7 +203,7 @@ contains
                             rho_K = 0._wp; G_K = 0._wp
                             do i = 1, num_fluids
                                 rho_K = rho_K + q_prim_vf(i)%sf(k, l, q) !alpha_rho_K(1)
-                                G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs(i)  !alpha_K(1) * Gs(1)
+                                G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs_hypo(i)  !alpha_K(1) * Gs_hypo(1)
                             end do
 
                             if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(damage_idx)%sf(k, l, q)), 0._wp)
@@ -229,7 +229,7 @@ contains
                                 rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
                                 ((4._wp*G_K_field(k, l, q)/3._wp) + &
                                  q_prim_vf(strxb)%sf(k, l, q))* &
-                                du_dx(k, l, q)
+                                du_dx_hypo(k, l, q)
                         end do
                     end do
                 end do
@@ -241,31 +241,31 @@ contains
                     do l = 0, n
                         do k = 0, m
                             rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                        (q_prim_vf(strxb + 1)%sf(k, l, q)*du_dy(k, l, q) + &
-                                                         q_prim_vf(strxb + 1)%sf(k, l, q)*du_dy(k, l, q) - &
-                                                         q_prim_vf(strxb)%sf(k, l, q)*dv_dy(k, l, q) - &
-                                                         2._wp*G_K_field(k, l, q)*(1._wp/3._wp)*dv_dy(k, l, q))
+                                                        (q_prim_vf(strxb + 1)%sf(k, l, q)*du_dy_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 1)%sf(k, l, q)*du_dy_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb)%sf(k, l, q)*dv_dy_hypo(k, l, q) - &
+                                                         2._wp*G_K_field(k, l, q)*(1._wp/3._wp)*dv_dy_hypo(k, l, q))
 
                             rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                            (q_prim_vf(strxb + 1)%sf(k, l, q)*du_dx(k, l, q) + &
-                                                             q_prim_vf(strxb)%sf(k, l, q)*dv_dx(k, l, q) - &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*du_dx(k, l, q) + &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*du_dy(k, l, q) + &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dy(k, l, q) - &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dy(k, l, q) + &
-                                                             2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(du_dy(k, l, q) + &
-                                                                                                     dv_dx(k, l, q)))
+                                                            (q_prim_vf(strxb + 1)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb)%sf(k, l, q)*dv_dx_hypo(k, l, q) - &
+                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*du_dy_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dy_hypo(k, l, q) - &
+                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                             2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(du_dy_hypo(k, l, q) + &
+                                                                                                     dv_dx_hypo(k, l, q)))
 
                             rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                            (q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dx(k, l, q) + &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dx(k, l, q) - &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*du_dx(k, l, q) + &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy(k, l, q) + &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy(k, l, q) - &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy(k, l, q) + &
-                                                             2._wp*G_K_field(k, l, q)*(dv_dy(k, l, q) - (1._wp/3._wp)* &
-                                                                                       (du_dx(k, l, q) + &
-                                                                                        dv_dy(k, l, q))))
+                                                            (q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dx_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dx_hypo(k, l, q) - &
+                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy_hypo(k, l, q) - &
+                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                             2._wp*G_K_field(k, l, q)*(dv_dy_hypo(k, l, q) - (1._wp/3._wp)* &
+                                                                                       (du_dx_hypo(k, l, q) + &
+                                                                                        dv_dy_hypo(k, l, q))))
                         end do
                     end do
                 end do
@@ -277,62 +277,62 @@ contains
                     do l = 0, n
                         do k = 0, m
                             rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                        (q_prim_vf(strxb + 3)%sf(k, l, q)*du_dz(k, l, q) + &
-                                                         q_prim_vf(strxb + 3)%sf(k, l, q)*du_dz(k, l, q) - &
-                                                         q_prim_vf(strxb)%sf(k, l, q)*dw_dz(k, l, q) - &
-                                                         2._wp*G_K_field(k, l, q)*(1._wp/3._wp)*dw_dz(k, l, q))
+                                                        (q_prim_vf(strxb + 3)%sf(k, l, q)*du_dz_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 3)%sf(k, l, q)*du_dz_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
+                                                         2._wp*G_K_field(k, l, q)*(1._wp/3._wp)*dw_dz_hypo(k, l, q))
 
                             rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                            (q_prim_vf(strxb + 4)%sf(k, l, q)*du_dz(k, l, q) + &
-                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dz(k, l, q) - &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dw_dz(k, l, q))
+                                                            (q_prim_vf(strxb + 4)%sf(k, l, q)*du_dz_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dz_hypo(k, l, q) - &
+                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dw_dz_hypo(k, l, q))
 
                             rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                            (q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dz(k, l, q) + &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dz(k, l, q) - &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dw_dz(k, l, q) - &
-                                                             2._wp*G_K_field(k, l, q)*(1._wp/3._wp)*dw_dz(k, l, q))
+                                                            (q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dz_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dz_hypo(k, l, q) - &
+                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
+                                                             2._wp*G_K_field(k, l, q)*(1._wp/3._wp)*dw_dz_hypo(k, l, q))
 
                             rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                            (q_prim_vf(strxb + 3)%sf(k, l, q)*du_dx(k, l, q) + &
-                                                             q_prim_vf(strxb)%sf(k, l, q)*dw_dx(k, l, q) - &
-                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*du_dx(k, l, q) + &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*du_dy(k, l, q) + &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dw_dy(k, l, q) - &
-                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dy(k, l, q) + &
-                                                             q_prim_vf(strxb + 5)%sf(k, l, q)*du_dz(k, l, q) + &
-                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*dw_dz(k, l, q) - &
-                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*dw_dz(k, l, q) + &
-                                                             2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(du_dz(k, l, q) + &
-                                                                                                     dw_dx(k, l, q)))
+                                                            (q_prim_vf(strxb + 3)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb)%sf(k, l, q)*dw_dx_hypo(k, l, q) - &
+                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*du_dy_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dw_dy_hypo(k, l, q) - &
+                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 5)%sf(k, l, q)*du_dz_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
+                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*dw_dz_hypo(k, l, q) + &
+                                                             2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(du_dz_hypo(k, l, q) + &
+                                                                                                     dw_dx_hypo(k, l, q)))
 
                             rhs_vf(strxb + 4)%sf(k, l, q) = rhs_vf(strxb + 4)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                            (q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dx(k, l, q) + &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dw_dx(k, l, q) - &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*du_dx(k, l, q) + &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dy(k, l, q) + &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dw_dy(k, l, q) - &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dy(k, l, q) + &
-                                                             q_prim_vf(strxb + 5)%sf(k, l, q)*dv_dz(k, l, q) + &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dw_dz(k, l, q) - &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dw_dz(k, l, q) + &
-                                                             2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(dv_dz(k, l, q) + &
-                                                                                                     dw_dy(k, l, q)))
+                                                            (q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dx_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dw_dx_hypo(k, l, q) - &
+                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dw_dy_hypo(k, l, q) - &
+                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 5)%sf(k, l, q)*dv_dz_hypo(k, l, q) + &
+                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
+                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dw_dz_hypo(k, l, q) + &
+                                                             2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(dv_dz_hypo(k, l, q) + &
+                                                                                                     dw_dy_hypo(k, l, q)))
 
                             rhs_vf(strxe)%sf(k, l, q) = rhs_vf(strxe)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                        (q_prim_vf(strxe - 2)%sf(k, l, q)*dw_dx(k, l, q) + &
-                                                         q_prim_vf(strxe - 2)%sf(k, l, q)*dw_dx(k, l, q) - &
-                                                         q_prim_vf(strxe)%sf(k, l, q)*du_dx(k, l, q) + &
-                                                         q_prim_vf(strxe - 1)%sf(k, l, q)*dw_dy(k, l, q) + &
-                                                         q_prim_vf(strxe - 1)%sf(k, l, q)*dw_dy(k, l, q) - &
-                                                         q_prim_vf(strxe)%sf(k, l, q)*dv_dy(k, l, q) + &
-                                                         q_prim_vf(strxe)%sf(k, l, q)*dw_dz(k, l, q) + &
-                                                         q_prim_vf(strxe)%sf(k, l, q)*dw_dz(k, l, q) - &
-                                                         q_prim_vf(strxe)%sf(k, l, q)*dw_dz(k, l, q) + &
-                                                         2._wp*G_K_field(k, l, q)*(dw_dz(k, l, q) - (1._wp/3._wp)* &
-                                                                                   (du_dx(k, l, q) + &
-                                                                                    dv_dy(k, l, q) + &
-                                                                                    dw_dz(k, l, q))))
+                                                        (q_prim_vf(strxe - 2)%sf(k, l, q)*dw_dx_hypo(k, l, q) + &
+                                                         q_prim_vf(strxe - 2)%sf(k, l, q)*dw_dx_hypo(k, l, q) - &
+                                                         q_prim_vf(strxe)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                         q_prim_vf(strxe - 1)%sf(k, l, q)*dw_dy_hypo(k, l, q) + &
+                                                         q_prim_vf(strxe - 1)%sf(k, l, q)*dw_dy_hypo(k, l, q) - &
+                                                         q_prim_vf(strxe)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                         q_prim_vf(strxe)%sf(k, l, q)*dw_dz_hypo(k, l, q) + &
+                                                         q_prim_vf(strxe)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
+                                                         q_prim_vf(strxe)%sf(k, l, q)*dw_dz_hypo(k, l, q) + &
+                                                         2._wp*G_K_field(k, l, q)*(dw_dz_hypo(k, l, q) - (1._wp/3._wp)* &
+                                                                                   (du_dx_hypo(k, l, q) + &
+                                                                                    dv_dy_hypo(k, l, q) + &
+                                                                                    dw_dz_hypo(k, l, q))))
                         end do
                     end do
                 end do
@@ -364,7 +364,7 @@ contains
                             rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + &
                                                             rho_K_field(k, l, q)*( &
                                                             -(q_prim_vf(strxb + 3)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q))* &
-                                                            (du_dx(k, l, q) + dv_dy(k, l, q) + q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)) &
+                                                            (du_dx_hypo(k, l, q) + dv_dy_hypo(k, l, q) + q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)) &
                                                             + 2._wp*(q_prim_vf(strxb + 3)%sf(k, l, q) + G_K_field(k, l, q))*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l))
                         end do
                     end do
@@ -377,16 +377,16 @@ contains
 
     impure subroutine s_finalize_hypoelastic_module()
 
-        @:DEALLOCATE(Gs)
+        @:DEALLOCATE(Gs_hypo)
         @:DEALLOCATE(rho_K_field, G_K_field)
-        @:DEALLOCATE(du_dx)
-        @:DEALLOCATE(fd_coeff_x_h)
+        @:DEALLOCATE(du_dx_hypo)
+        @:DEALLOCATE(fd_coeff_x_hypo)
         if (n > 0) then
-            @:DEALLOCATE(du_dy,dv_dx,dv_dy)
-            @:DEALLOCATE(fd_coeff_y_h)
+            @:DEALLOCATE(du_dy_hypo,dv_dx_hypo,dv_dy_hypo)
+            @:DEALLOCATE(fd_coeff_y_hypo)
             if (p > 0) then
-                @:DEALLOCATE(du_dz, dv_dz, dw_dx, dw_dy, dw_dz)
-                @:DEALLOCATE(fd_coeff_z_h)
+                @:DEALLOCATE(du_dz_hypo, dv_dz_hypo, dw_dx_hypo, dw_dy_hypo, dw_dz_hypo)
+                @:DEALLOCATE(fd_coeff_z_hypo)
             end if
         end if
 

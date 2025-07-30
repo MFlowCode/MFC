@@ -852,8 +852,9 @@ contains
                                       flux_gsrc_n(id)%vf, &
                                       id, irx, iry, irz)
                 call nvtxEndRange
-                ! $:GPU_UPDATE(host='[flux_n(1)%vf(1)%sf]')
-                ! print *, "FLUX", flux_n(1)%vf(1)%sf(100:300, 0, 0)
+
+                !$:GPU_UPDATE(host='[flux_n(1)%vf(1)%sf]')
+                !print *, "FLUX", flux_n(1)%vf(1)%sf(100:300, 0, 0)
 
                 ! Additional physics and source terms
                 ! RHS addition for advection source
