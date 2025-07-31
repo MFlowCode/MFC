@@ -5,34 +5,35 @@
 
  include(FindPackageHandleStandardArgs)
 
- # Special handling for Cray systems which have optimized math libraries
- if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
-     # On Cray systems, LAPACK is typically provided by the cray-libsci package
-     find_library(LAPACK_LIBRARY
-         NAMES sci_cray sci_gnu sci_intel sci_pgi sci
-         NAMES_PER_DIR
-     )
-     set(BLAS_LIBRARY "")  # BLAS is included in the sci library
- else()
-     # Find LAPACK library for other compilers
-     find_library(LAPACK_LIBRARY
-         NAMES         lapack
-         PATH_SUFFIXES lapack
-         NAMES_PER_DIR
-     )
+ # First, try to find a custom-built LAPACK (e.g., from ExternalProject)
+# This will be in CMAKE_PREFIX_PATH or CMAKE_FIND_ROOT_PATH
+find_library(LAPACK_LIBRARY
+    NAMES         lapack
+    PATH_SUFFIXES lib lib64 lapack
+    NAMES_PER_DIR
+)
 
-     # Find BLAS library (required by LAPACK)
-     find_library(BLAS_LIBRARY
-         NAMES         blas openblas
-         PATH_SUFFIXES blas
-         NAMES_PER_DIR
-     )
+# Find BLAS library (required by LAPACK for non-Cray systems)
+find_library(BLAS_LIBRARY
+    NAMES         blas openblas
+    PATH_SUFFIXES lib lib64 blas
+    NAMES_PER_DIR
+)
 
-     # Some LAPACK implementations include BLAS
-     if (NOT BLAS_LIBRARY)
-         set(BLAS_LIBRARY "")
-     endif()
- endif()
+# Special handling for Cray systems which have optimized math libraries
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND NOT LAPACK_LIBRARY)
+    # On Cray systems, LAPACK is typically provided by the cray-libsci package
+    find_library(LAPACK_LIBRARY
+        NAMES sci_cray sci_gnu sci_intel sci_pgi sci
+        NAMES_PER_DIR
+    )
+    set(BLAS_LIBRARY "")  # BLAS is included in the sci library
+endif()
+
+# Some LAPACK implementations include BLAS
+if (NOT BLAS_LIBRARY)
+    set(BLAS_LIBRARY "")
+endif()
 
  FIND_PACKAGE_HANDLE_STANDARD_ARGS(
      LAPACK
