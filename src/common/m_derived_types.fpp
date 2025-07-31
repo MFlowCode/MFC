@@ -17,17 +17,17 @@ module m_derived_types
 
     !> Derived type adding the field position (fp) as an attribute
     type field_position
-        real(wp), allocatable, dimension(:, :, :) :: fp !< Field position
+        real(stp), allocatable, dimension(:, :, :) :: fp !< Field position
     end type field_position
 
     !> Derived type annexing a scalar field (SF)
     type scalar_field
-        real(wp), pointer, dimension(:, :, :) :: sf => null()
+        real(stp), pointer, dimension(:, :, :) :: sf => null()
     end type scalar_field
 
     !> Derived type for bubble variables pb and mv at quadrature nodes (qbmm)
     type pres_field
-        real(wp), pointer, dimension(:, :, :, :, :) :: sf => null()
+        real(stp), pointer, dimension(:, :, :, :, :) :: sf => null()
     end type pres_field
 
     !> Derived type annexing an integer scalar field (SF)
@@ -37,12 +37,12 @@ module m_derived_types
 
     !> Derived type for levelset
     type levelset_field
-        real(wp), pointer, dimension(:, :, :, :) :: sf => null()
+        real(stp), pointer, dimension(:, :, :, :) :: sf => null()
     end type levelset_field
 
     !> Derived type for levelset norm
     type levelset_norm_field
-        real(wp), pointer, dimension(:, :, :, :, :) :: sf => null()
+        real(stp), pointer, dimension(:, :, :, :, :) :: sf => null()
     end type levelset_norm_field
 
     type mpi_io_var
