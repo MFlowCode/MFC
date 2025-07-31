@@ -136,7 +136,7 @@ contains
         integer :: i, j, k, l !< Generic loop iterators
         integer :: ierr !< Generic flag used to identify and report GPU errors
 
-#if 0
+#:block UNDEF_CCE
         ! Restrict filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
 #if defined(MFC_GPU)
@@ -304,7 +304,8 @@ contains
             end do
         end do
 #endif
-#endif
+#:endblock UNDEF_CCE
+
     end subroutine s_apply_fourier_filter
 
     !>  The purpose of this subroutine is to destroy the fftw plan
