@@ -105,7 +105,9 @@ module m_global_parameters
     integer :: relax_model     !< Phase change relaxation model
     logical :: mpp_lim         !< Maximum volume fraction limiter
     integer :: sys_size        !< Number of unknowns in the system of equations
+    integer :: recon_type      !< Which type of reconstruction to use
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
+    integer :: muscl_order     !< Order of accuracy for the MUSCL reconstruction
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: mhd             !< Magnetohydrodynamics
@@ -359,7 +361,9 @@ contains
         ! Simulation algorithm parameters
         model_eqns = dflt_int
         num_fluids = dflt_int
+        recon_type = WENO_TYPE
         weno_order = dflt_int
+        muscl_order = dflt_int
         mixture_err = .false.
         alt_soundspeed = .false.
         relax = .false.
