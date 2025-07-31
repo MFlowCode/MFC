@@ -81,13 +81,16 @@ module m_global_parameters
     integer :: model_eqns            !< Multicomponent flow model
     logical :: relax                 !< activate phase change
     integer :: relax_model           !< Relax Model
-    real(wp) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
-    real(wp) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
+    real(wp) :: palpha_eps           !< trigger parameter for the p relaxation procedure, phase change model
+    real(wp) :: ptgalpha_eps         !< trigger parameter for the pTg relaxation procedure, phase change model
     integer :: num_fluids            !< Number of different fluids present in the flow
     logical :: mpp_lim               !< Alpha limiter
     integer :: sys_size              !< Number of unknowns in the system of equations
-    integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
+    integer :: recon_type            !< Reconstruction Type
+    integer :: weno_polyn            !< Degree of the WENO polynomials (polyn)
+    integer :: muscl_polyn           !< Degree of the MUSCL polynomials (polyn)
     integer :: weno_order            !< Order of accuracy for the WENO reconstruction
+    integer :: muscl_order           !< Order of accuracy for the MUSCL reconstruction
     logical :: hypoelasticity        !< activate hypoelasticity
     logical :: hyperelasticity       !< activate hyperelasticity
     logical :: elasticity            !< elasticity modeling, true for hyper or hypo
@@ -343,9 +346,11 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         num_fluids = dflt_int
+        recon_type = WENO_TYPE
         weno_order = dflt_int
         igr = .false.
         igr_order = dflt_int
+        muscl_order = dflt_int
 
         hypoelasticity = .false.
         hyperelasticity = .false.
@@ -560,7 +565,11 @@ contains
 
         integer :: i, j, fac
 
-        weno_polyn = (weno_order - 1)/2
+        if (recon_type == WENO_TYPE) then
+            weno_polyn = (weno_order - 1)/2
+        elseif (recon_type == MUSCL_TYPE) then
+            muscl_polyn = muscl_order
+        end if
 
         ! Determining the layout of the state vectors and overall size of
         ! the system of equations, given the dimensionality and choice of
@@ -863,7 +872,7 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        call s_configure_coordinate_bounds(weno_polyn, buff_size, &
+        call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
                                            num_dims, igr)
