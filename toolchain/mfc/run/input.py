@@ -71,7 +71,7 @@ class MFCInputFile(Case):
         common.create_directory(modules_dir)
 
         # Determine the real type based on the single precision flag
-        real_type = 'real(sp)' if ARG('single') else 'real(dp)'
+        real_type = 'real(sp)' if (ARG('single') or ARG('mixed')) else 'real(dp)'
 
         # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
         common.file_write(
