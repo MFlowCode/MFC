@@ -530,7 +530,7 @@ function(MFC_SETUP_TARGET)
 
                 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
                     target_compile_options(${a_target}
-                        PRIVATE -gpu=autocompare,debug
+                        PRIVATE -gpu=debug
                     )
                 endif()
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")

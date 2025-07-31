@@ -234,7 +234,7 @@
 #:def OMP_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraOmpArgs=None)
     #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
         #:set omp_directive = '!$omp loop bind(thread)'
-    #:elif MFC_COMPILER == CRAY_COMPILER_ID or MFC_COMPILER == AMD_COMPILER_ID
+    #:elif MFC_COMPILER == CCE_COMPILER_ID or MFC_COMPILER == AMD_COMPILER_ID
         #:set omp_directive = ''
     #:else
         #:set omp_directive = ''
