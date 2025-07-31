@@ -2943,6 +2943,7 @@ contains
 
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
+                #:block UNDEF_AMD
                 #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, rho, pres,E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3116,6 +3117,7 @@ contains
                         end do
                     end do
                 #:endcall GPU_PARALLEL_LOOP
+                #:endblock UNDEF_AMD
             end if
         #:endfor
 
