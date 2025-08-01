@@ -34,14 +34,20 @@
     if (prefer_gpu_mode .eq. 1) then
     #:for arg in args
         !print*, "Moving ${arg}$ to GPU => ", SHAPE(${arg}$)
-        ! unset
-        istat = cudaMemAdvise( c_devloc(${arg}$), SIZEOF(${arg}$), cudaMemAdviseUnSetPreferredLocation, cudaCpuDeviceId )
+        ! set preferred location GPU
+        istat = cudaMemAdvise( c_devloc(${arg}$), SIZEOF(${arg}$), cudaMemAdviseSetPreferredLocation, 0 )
         if (istat /= cudaSuccess) then
             write(*,"('Error code: ',I0, ': ')") istat
             write(*,*) cudaGetErrorString(istat)
         endif
-        ! set
-        istat = cudaMemAdvise( c_devloc(${arg}$), SIZEOF(${arg}$), cudaMemAdviseSetPreferredLocation, 0 )
+        ! set accessed by CPU
+        istat = cudaMemAdvise( c_devloc(${arg}$), SIZEOF(${arg}$), cudaMemAdviseSetAccessedBy, cudaCpuDeviceId )
+        if (istat /= cudaSuccess) then
+            write(*,"('Error code: ',I0, ': ')") istat
+            write(*,*) cudaGetErrorString(istat)
+        endif
+        ! prefetch to GPU - physically populate memory pages
+        istat = cudaMemPrefetchAsync( c_devloc(${arg}$), SIZEOF(${arg}$), 0, 0 )
         if (istat /= cudaSuccess) then
             write(*,"('Error code: ',I0, ': ')") istat
             write(*,*) cudaGetErrorString(istat)
