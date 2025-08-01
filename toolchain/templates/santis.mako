@@ -38,10 +38,9 @@ export FI_MR_CACHE_MONITOR=disabled
 export MPICH_NO_BUFFER_ALIAS_CHECK=1
 
 # CUSTOM env vars to MFC
-export NVIDIA_ALLOC_MODE=0                    # do nothing
+export MFC_OUT_OF_CORE=1                      # out of core
 export NVIDIA_MANUAL_GPU_HINTS=1              # prefloc GPU on some
 export NVIDIA_IGR_TEMPS_ON_GPU=3              # jac, jac_rhs, and jac_old on GPU
-export NVIDIA_VARS_ON_GPU=7                   # q_cons_ts(1)%vf%sf for j=1-7 on GPU
 
 # NSYS
 export NSYS=1                                 # enable nsys profiling
