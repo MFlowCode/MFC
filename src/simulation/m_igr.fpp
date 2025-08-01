@@ -24,8 +24,16 @@ module m_igr
  s_igr_flux_add, &
  s_finalize_igr_module
 
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+    integer, dimension(3) :: temp_on_gpu
+    real(wp), pointer, contiguous, dimension(:, :, :) :: jac,jac_rhs,jac_old
+    real(wp), allocatable, dimension(:, :, :), pinned, target :: pool_host1
+    real(wp), allocatable, dimension(:, :, :), pinned, target :: pool_host2
+    real(wp), allocatable, dimension(:, :, :), pinned, target :: pool_host3
+#else
     real(wp), allocatable, dimension(:, :, :) :: jac, jac_rhs, jac_old
     $:GPU_DECLARE(create='[jac, jac_rhs, jac_old]')
+#endif
 
     real(wp), allocatable, dimension(:, :) :: Res
     $:GPU_DECLARE(create='[Res]')
@@ -82,6 +90,47 @@ module m_igr
 contains
 
     subroutine s_initialize_igr_module()
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        integer :: igr_temps_total
+        integer :: igr_temps_on_gpu
+        integer :: igr_temps_on_cpu
+        character(len=10) :: igr_temps_on_gpu_str
+
+        ! initialize
+        if (igr_iter_solver == 1) then ! Jacobi iteration
+            igr_temps_total = 3
+        else
+            igr_temps_total = 2
+        end if
+        igr_temps_on_gpu = igr_temps_total
+        igr_temps_on_cpu = 0
+
+        call get_environment_variable("NVIDIA_IGR_TEMPS_ON_GPU", igr_temps_on_gpu_str)
+
+        if (trim(igr_temps_on_gpu_str) == "0") then
+            igr_temps_on_gpu = 0 ! jac, jac_rhs and jac_old on CPU
+        else if (trim(igr_temps_on_gpu_str) == "1") then
+            igr_temps_on_gpu = 1 ! jac on GPU, jac_rhs on CPU, jac_old on CPU
+        else if (trim(igr_temps_on_gpu_str) == "2") then
+            igr_temps_on_gpu = 2 ! jac and jac_rhs on GPU, jac_old on CPU
+        else if (trim(igr_temps_on_gpu_str) == "3") then
+            igr_temps_on_gpu = 3 ! jac, jac_rhs and jac_old on GPU
+        else ! default on GPU
+            igr_temps_on_gpu = 3
+        end if
+
+        ! trim if needed
+        if ( igr_temps_on_gpu > igr_temps_total ) then
+            igr_temps_on_gpu = igr_temps_total
+        end if
+        igr_temps_on_cpu = igr_temps_total - igr_temps_on_gpu
+
+        ! create map
+        temp_on_gpu(1:3) = -1
+        temp_on_gpu(1:igr_temps_total) = 0
+        temp_on_gpu(1:igr_temps_on_gpu) = 1
+        print*, temp_on_gpu(1:3)
+#endif
 
         if (viscous) then
             @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
@@ -95,6 +144,7 @@ contains
             @:PREFER_GPU(Re_idx)
         end if
 
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, &
             idwbuff(2)%beg:idwbuff(2)%end, &
             idwbuff(3)%beg:idwbuff(3)%end))
@@ -109,6 +159,55 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end))
             @:PREFER_GPU(jac_old)
         end if
+#else
+
+        if ( temp_on_gpu(1) == 1 ) then
+            @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end))
+            @:PREFER_GPU(jac)
+        else
+            print*, 'jac on CPU'
+
+            allocate(pool_host1(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end))
+
+            jac(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end) => pool_host1(:,:,:)
+        end if
+
+        if ( temp_on_gpu(2) == 1 ) then
+            @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
+            @:PREFER_GPU(jac_rhs)
+        else
+            print*, 'jac_rhs on CPU'
+
+            allocate(pool_host2(-1:m,-1:n,-1:p))
+
+            jac_rhs(-1:m,-1:n,-1:p) => pool_host2(:,:,:)
+        end if
+
+        if (igr_iter_solver == 1) then ! Jacobi iteration
+            if ( temp_on_gpu(3) == 1 ) then
+                @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, &
+                    idwbuff(2)%beg:idwbuff(2)%end, &
+                    idwbuff(3)%beg:idwbuff(3)%end))
+                @:PREFER_GPU(jac_old)
+            else
+                print*, 'jac_old on CPU'
+
+                allocate(pool_host3(idwbuff(1)%beg:idwbuff(1)%end, &
+                    idwbuff(2)%beg:idwbuff(2)%end, &
+                    idwbuff(3)%beg:idwbuff(3)%end))
+
+                jac_old(idwbuff(1)%beg:idwbuff(1)%end, &
+                    idwbuff(2)%beg:idwbuff(2)%end, &
+                    idwbuff(3)%beg:idwbuff(3)%end) => pool_host3(:,:,:)
+            end if
+        end if
+#endif
 
         $:GPU_PARALLEL_LOOP(collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -2618,11 +2717,36 @@ contains
             @:DEALLOCATE(Res)
         end if
 
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         @:DEALLOCATE(jac, jac_rhs)
 
         if (igr_iter_solver == 1) then ! Jacobi iteration
             @:DEALLOCATE(jac_old)
         end if
+#else
+        if (temp_on_gpu(1) == 1) then
+            @:DEALLOCATE(jac)
+        else
+            nullify(jac)
+            deallocate(pool_host1)
+        end if
+
+        if (temp_on_gpu(2) == 1) then
+            @:DEALLOCATE(jac_rhs)
+        else
+            nullify(jac_rhs)
+            deallocate(pool_host2)
+        end if
+
+        if (igr_iter_solver == 1) then ! Jacobi iteration
+            if (temp_on_gpu(3) == 1) then
+                @:DEALLOCATE(jac_old)
+            else
+                nullify(jac_old)
+                deallocate(pool_host3)
+            end if
+        end if
+#endif
 
         #:if not MFC_CASE_OPTIMIZATION
             @:DEALLOCATE(coeff_L, coeff_R)
