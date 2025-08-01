@@ -432,7 +432,6 @@ contains
                     offset = 0
                     call MPI_FILE_SET_VIEW(ifile, offset, mpi_p, filetype, 'native', mpi_info_int, ierr)
 
-
                     call MPI_FILE_READ(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
