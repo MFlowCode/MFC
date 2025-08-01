@@ -12,7 +12,7 @@ cmake_minimum_required(VERSION 3.20)
 # We include C as a language because - for some reason -
 # FIND_LIBRARY_USE_LIB64_PATHS is otherwise ignored.
 
-project(MFC LANGUAGES C CXX Fortran)
+project(MFC LANGUAGES C CUDA CXX Fortran)
 
 # Build options exposed to users and their default values.
 
@@ -27,6 +27,7 @@ option(MFC_SYSCHECK      "Build syscheck"                                    OFF
 option(MFC_DOCUMENTATION "Build documentation"                               OFF)
 option(MFC_ALL           "Build everything"                                  OFF)
 option(MFC_SINGLE_PRECISION "Build single precision"                         OFF)
+option(MFC_MIXED_PRECISION "Build mixed precision"                           OFF)
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
