@@ -75,7 +75,13 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
+    integer, private :: out_of_core
+
     $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt]')
+
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+    real(wp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
+#endif
 
 contains
 
@@ -85,6 +91,21 @@ contains
     impure subroutine s_initialize_time_steppers_module
 
         integer :: i, j !< Generic loop iterators
+
+        character(len=10) :: out_of_core_str
+        out_of_core = 0
+
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        call get_environment_variable("MFC_OUT_OF_CORE", out_of_core_str)
+
+        if (trim(out_of_core_str) == "0") then
+            out_of_core = 0
+        elseif (trim(out_of_core_str) == "1") then
+            out_of_core = 1
+        else ! default
+            out_of_core = 0
+        endif
+#endif
 
         ! Setting number of time-stages for selected time-stepping scheme
         if (time_stepper == 1) then
@@ -102,12 +123,33 @@ contains
             @:PREFER_GPU(q_cons_ts(i)%vf)
         end do
 
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        if ( out_of_core == 1 ) then
+           allocate(q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
+                                        idwbuff(2)%beg:idwbuff(2)%end, &
+                                        idwbuff(3)%beg:idwbuff(3)%end, &
+                                        1:sys_size))
+        end if
+#endif
+
         do i = 1, num_ts
             do j = 1, sys_size
-                @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end))
-                @:PREFER_GPU(q_cons_ts(i)%vf(j)%sf)
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+                if ( i <= (num_ts - out_of_core) ) then
+                    !print*, "q_cons_ts", i, j, "on GPU"
+#endif
+                    @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end))
+                    @:PREFER_GPU(q_cons_ts(i)%vf(j)%sf)
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+                else
+                    !print*, "q_cons_ts", i, j, "on CPU"
+                    q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
+                end if
+#endif
             end do
             @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
@@ -1205,13 +1247,29 @@ contains
         ! Deallocating the cell-average conservative variables
         do i = 1, num_ts
             do j = 1, sys_size
-                @:DEALLOCATE(q_cons_ts(i)%vf(j)%sf)
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+                if ( i <= (num_ts - out_of_core) ) then
+                    !print*, "q_cons_ts", i, j, "dealloc"
+#endif
+                    @:DEALLOCATE(q_cons_ts(i)%vf(j)%sf)
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+                else
+                    !print*, "q_cons_ts", i, j, "nullify"
+                    nullify(q_cons_ts(i)%vf(j)%sf)
+                end if
+#endif
             end do
 
             @:DEALLOCATE(q_cons_ts(i)%vf)
         end do
 
         @:DEALLOCATE(q_cons_ts)
+
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        if ( out_of_core == 1 ) then
+            deallocate(q_cons_ts_pool_host)
+        end if
+#endif
 
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then
