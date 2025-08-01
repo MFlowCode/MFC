@@ -37,6 +37,9 @@ module m_cbc
         molecular_weights, get_species_specific_heats_r, &
         get_mole_fractions, get_species_specific_heats_r
 
+    #:block DEF_AMD
+      use m_chemistry, only: molecular_weights_nonparameter
+    #:endblock DEF_AMD
     implicit none
 
     private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
@@ -773,7 +776,6 @@ contains
                 end if
 
                 ! FD2 or FD4 of RHS at j = 0
-                #:block UNDEF_AMD
                 #:call GPU_PARALLEL_LOOP(collapse=2, private='[alpha_rho, vel, adv_local, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, h_k, Cp_i, Gamma_i, Xs]')
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1050,8 +1052,15 @@ contains
                                 sum_Enthalpies = 0._wp
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_species
+                                    #:block UNDEF_AMD
                                     h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
                                     sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
+                                    #:endblock UNDEF_AMD
+
+                                    #:block DEF_AMD
+                                    h_k(i) = h_k(i)*gas_constant/molecular_weights_nonparameter(i)*T
+                                    sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights_nonparameter(i)*Cp/R_gas)*dYs_dt(i)
+                                    #:endblock DEF_AMD
                                 end do
                                 flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
                                                                        + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2)/(c*c) + sum_Enthalpies)
@@ -1106,7 +1115,6 @@ contains
                         end do
                     end do
                 #:endcall GPU_PARALLEL_LOOP
-                #:endblock UNDEF_AMD
             end if
         #:endfor
 

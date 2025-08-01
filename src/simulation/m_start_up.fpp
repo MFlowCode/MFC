@@ -1453,6 +1453,15 @@ contains
 
         $:GPU_UPDATE(device='[igr, igr_order]')
 
+        #:block DEF_AMD
+        block
+          use m_thermochem, only: molecular_weights
+          use m_chemistry, only: molecular_weights_nonparameter
+          molecular_weights_nonparameter(:) = molecular_weights(:)
+          $:GPU_UPDATE(device='[molecular_weights_nonparameter]')
+        end block
+        #:endblock
+
     end subroutine s_initialize_gpu_vars
 
     impure subroutine s_finalize_modules
