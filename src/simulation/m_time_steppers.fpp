@@ -404,13 +404,18 @@ contains
     !> 1st order TVD RK time-stepping algorithm
         !! @param t_step Current time step
     impure subroutine s_1st_order_tvd_rk(t_step, time_avg)
-
+#ifdef _CRAYFTN
+        !DIR$ OPTIMIZE (-haggress)
+#endif
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
 
+        real(wp) :: start, finish
+
         ! Stage 1 of 1
+        call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
@@ -509,12 +514,24 @@ contains
 
         call nvtxEndRange
 
+        call cpu_time(finish)
+
+        wall_time = abs(finish - start)
+
+        if (t_step >= 2) then
+            wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
+        else
+            wall_time_avg = 0._wp
+        end if
+
     end subroutine s_1st_order_tvd_rk
 
     !> 2nd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
     impure subroutine s_2nd_order_tvd_rk(t_step, time_avg)
-
+#ifdef _CRAYFTN
+        !DIR$ OPTIMIZE (-haggress)
+#endif
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
 
@@ -738,12 +755,22 @@ contains
 
         call cpu_time(finish)
 
+        wall_time = abs(finish - start)
+
+        if (t_step >= 2) then
+            wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
+        else
+            wall_time_avg = 0._wp
+        end if
+
     end subroutine s_2nd_order_tvd_rk
 
     !> 3rd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
     impure subroutine s_3rd_order_tvd_rk(t_step, time_avg)
-
+#ifdef _CRAYFTN
+        !DIR$ OPTIMIZE (-haggress)
+#endif
         integer, intent(IN) :: t_step
         real(wp), intent(INOUT) :: time_avg
 
@@ -1070,7 +1097,14 @@ contains
             call nvtxEndRange
             call cpu_time(finish)
 
-            time = time + (finish - start)
+            wall_time = abs(finish - start)
+
+            if (t_step >= 2) then
+                wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
+            else
+                wall_time_avg = 0._wp
+            end if
+
         end if
     end subroutine s_3rd_order_tvd_rk
 
@@ -1102,7 +1136,13 @@ contains
 
         call cpu_time(finish)
 
-        time = time + (finish - start)
+        wall_time = abs(finish - start)
+
+        if (t_step >= 2) then
+            wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
+        else
+            wall_time_avg = 0._wp
+        end if
 
     end subroutine s_strang_splitting
 

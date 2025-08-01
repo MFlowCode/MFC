@@ -27,7 +27,8 @@ module m_global_parameters
 
     implicit none
 
-    real(wp) :: time = 0
+    real(wp) :: wall_time = 0
+    real(wp) :: wall_time_avg = 0
 
     ! Logistics
     integer :: num_procs             !< Number of processors
