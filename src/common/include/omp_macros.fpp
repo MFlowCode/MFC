@@ -84,13 +84,15 @@
     $:deviceptr_val
 #:enddef
 
-#:def OMP_ATTACH_STR(attach)
-    #! #:if attach is not None
-        #! #:stop 'attach is not supported yet'
-    #! #:endif
-    #:set attach_val = ''
-    $:attach_val
-#:enddef
+#! #:def OMP_ATTACH_STR(attach)
+    #! #:set attach_val = OMP_MAP_STR('always,to', attach)
+    #! $:attach_val
+#! #:enddef
+
+#! #:def OMP_DETACH_STR(detach)
+    #! #:set detach_val = OMP_MAP_STR('always,from', detach)
+    #! $:detach_val
+#! #:enddef
 
 #:def OMP_TO_STR(to)
     #:set to_val = GEN_PARENTHESES_CLAUSE('to', to)
@@ -130,7 +132,7 @@
     #:set no_create_val = OMP_NOCREATE_STR(no_create)
     #:set present_val = OMP_PRESENT_STR(present)
     #:set deviceptr_val = OMP_DEVICEPTR_STR(deviceptr)
-    #:set attach_val = OMP_MAP_STR('tofrom', attach)
+    #:set attach_val = OMP_MAP_STR('always,tofrom', attach)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set omp_clause_val = default_val.strip('\n') + private_val.strip('\n') + reduction_val.strip('\n') + &
         & copy_val.strip('\n') + copyin_val.strip('\n') + &
@@ -164,7 +166,7 @@
     #:set no_create_val = OMP_NOCREATE_STR(no_create)
     #:set present_val = OMP_PRESENT_STR(present)
     #:set deviceptr_val = OMP_DEVICEPTR_STR(deviceptr)
-    #:set attach_val = OMP_MAP_STR('tofrom', attach)
+    #:set attach_val = OMP_MAP_STR('always,tofrom', attach)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
         & default_val.strip('\n') + private_val.strip('\n') + reduction_val.strip('\n') + &
@@ -255,7 +257,7 @@
     #:set no_create_val = OMP_NOCREATE_STR(no_create)
     #:set present_val = OMP_PRESENT_STR(present)
     #:set deviceptr_val = OMP_DEVICEPTR_STR(deviceptr)
-    #:set attach_val = OMP_MAP_STR('tofrom', attach)
+    #:set attach_val = OMP_MAP_STR('always,tofrom', attach)
     #:set default_val = OMP_DEFAULT_STR(default)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set clause_val = copy_val.strip('\n') + copyin_val.strip('\n') + &
@@ -273,7 +275,7 @@
 #:def OMP_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraOmpArgs=None)
     #:set copyin_val = OMP_COPYIN_STR(copyin).strip('\n') + OMP_COPYIN_STR(copyinReadOnly).strip('\n')
     #:set create_val = OMP_CREATE_STR(create)
-    #:set attach_val = OMP_MAP_STR('to', attach)
+    #:set attach_val = OMP_MAP_STR('always,to', attach)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set omp_clause_val = copyin_val.strip('\n') + create_val.strip('\n') + attach_val.strip('\n')
     #:set omp_directive = '!$omp target enter data ' + omp_clause_val + extraOmpArgs_val.strip('\n')
@@ -283,7 +285,7 @@
 #:def OMP_EXIT_DATA(copyout=None, delete=None, detach=None, extraOmpArgs=None)
     #:set copyout_val = OMP_COPYOUT_STR(copyout)
     #:set delete_val = OMP_DELETE_STR(delete)
-    #:set detach_val = OMP_MAP_STR('from', detach)
+    #:set detach_val = OMP_MAP_STR('always,from', detach)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set clause_val = copyout_val.strip('\n') + delete_val.strip('\n') + detach_val.strip('\n')
     #:set omp_directive = '!$omp target exit data ' + clause_val + extraOmpArgs_val.strip('\n')
@@ -339,8 +341,20 @@
     #:endif
 #:enddef
 
+#:def DEF_AMD(code)
+    #:if MFC_COMPILER == AMD_COMPILER_ID
+        $:code
+    #:endif
+#:enddef
+
 #:def UNDEF_CCE(code)
     #:if MFC_COMPILER != CCE_COMPILER_ID
+        $:code
+    #:endif
+#:enddef
+
+#:def DEF_CCE(code)
+    #:if MFC_COMPILER == CCE_COMPILER_ID
         $:code
     #:endif
 #:enddef
