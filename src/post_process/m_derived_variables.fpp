@@ -628,7 +628,7 @@ contains
 
                     ! Call appropriate LAPACK routine based on precision
 #ifdef MFC_SINGLE_PRECISION
-                    call cgeev(ivl, ivr, nm, vgt, nm, lr, li, vl, nm, vr, nm, work, lwork, info)
+                    call sgeev(ivl, ivr, nm, vgt, nm, lr, li, vl, nm, vr, nm, work, lwork, info)
 #else
                     call dgeev(ivl, ivr, nm, vgt, nm, lr, li, vl, nm, vr, nm, work, lwork, info)
 #endif
