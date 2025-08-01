@@ -91,17 +91,23 @@ contains
                 end do
             end do
             $:GPU_UPDATE(device='[Res, Re_idx, Re_size]')
+            @:PREFER_GPU(Res)
+            @:PREFER_GPU(Re_idx)
         end if
 
         @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, &
             idwbuff(2)%beg:idwbuff(2)%end, &
             idwbuff(3)%beg:idwbuff(3)%end))
+        @:PREFER_GPU(jac)
+
         @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
+        @:PREFER_GPU(jac_rhs)
 
         if (igr_iter_solver == 1) then ! Jacobi iteration
             @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
+            @:PREFER_GPU(jac_old)
         end if
 
         $:GPU_PARALLEL_LOOP(collapse=3)
