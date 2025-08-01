@@ -346,6 +346,13 @@ contains
             end do
         end do
 
+        print *,  "This is the size of one of the elements in a vector field: ", SIZEOF(q_cons_ts(2)%vf(1)%sf(1, 1, 1))  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
+        print *,  "This is the size of an half precision value: ", hp  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
+        print *,  "This is the size of an single precision value: ", sp  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
+        print *,  "This is the size of an double precision value: ", dp  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
+        print *,  "This is the size of wp precision value: ", wp  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
+        print *,  "This is the size of stp double precision value: ", stp  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
+
     end subroutine s_initialize_time_steppers_module
 
     !> 1st order TVD RK time-stepping algorithm
@@ -652,6 +659,8 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterator
 
         real(wp) :: start, finish
+
+        print *,  "This is the size of one of the elements in a vector field: ", SIZEOF(q_cons_ts(2)%vf(1)%sf(1, 1, 1))  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
 
         ! Stage 1 of 3
 
