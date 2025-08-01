@@ -1634,12 +1634,11 @@ contains
         real(wp), intent(out) :: c
 
         real(wp) :: blkmod1, blkmod2
-        real(wp) :: Tolerance
 
         integer :: q
 
         if (chemistry) then
-            if (avg_state == 1 .and. abs(c_c) > Tolerance) then
+            if (avg_state == 1 .and. abs(c_c) > Chem_Tolerance) then
                 c = sqrt(c_c - (gamma - 1.0_wp)*(vel_sum - H))
             else
                 c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)

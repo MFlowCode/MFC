@@ -2326,12 +2326,12 @@ contains
                     #:endcall GPU_PARALLEL_LOOP
                 else
                     ! 5-EQUATION MODEL WITH HLLC
-                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg,Phi_avg, h_iL, h_iR, h_avg_2]', copyin='[is1, is2, is3]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[T_L, T_R, vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg,Phi_avg, h_iL, h_iR, h_avg_2]', copyin='[is1, is2, is3]')
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 do j = is1%beg, is1%end
 
-                                    !idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
+                                    idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
 
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
@@ -2459,7 +2459,7 @@ contains
                                         T_R = pres_R/rho_R/R_gas_R
 
                                         call get_species_specific_heats_r(T_L, Cp_iL)
-                                        call get_species_specific_heats_r(T_R, Cp_iR)
+                                        call get_species_specific_heats_r(T_R, Cp_iR)                                       
 
                                         if (chem_params%gamma_method == 1) then
                                             !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
@@ -2554,20 +2554,20 @@ contains
                                     end if
 
                                     H_L = (E_L + pres_L)/rho_L
-                                    H_R = (E_R + pres_R)/rho_R
+                                    H_R = (E_R + pres_R)/rho_R     
 
                                     @:compute_average_state()
 
                                     call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                                  vel_L_rms, 0._wp, c_L)
+                                                                 vel_L_rms, 0._wp, c_L)
 
                                     call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                                  vel_R_rms, 0._wp, c_R)
+                                                                 vel_R_rms, 0._wp, c_R)
 
                                     !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    ! variables are placeholders to call the subroutine.
+                                    !  variables are placeholders to call the subroutine.
                                     call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                                  vel_avg_rms, c_sum_Yi_Phi, c_avg)
+                                                                 vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
                                     if (viscous) then
                                         $:GPU_LOOP(parallelism='[seq]')
