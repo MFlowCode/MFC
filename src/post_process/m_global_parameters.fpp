@@ -153,9 +153,6 @@ module m_global_parameters
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
 
-    !! Locations of the domain bounds in the x-, y- and z-coordinate directions
-    type(bounds_info) :: x_domain, y_domain, z_domain
-
     integer :: num_bc_patches
     logical :: bc_io
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
@@ -471,13 +468,6 @@ contains
         y_output%end = dflt_real
         z_output%beg = dflt_real
         z_output%end = dflt_real
-
-        x_domain%beg = dflt_real
-        x_domain%end = dflt_real
-        y_domain%beg = dflt_real
-        y_domain%end = dflt_real
-        z_domain%beg = dflt_real
-        z_domain%end = dflt_real
 
         ! MHD
         Bx0 = dflt_real

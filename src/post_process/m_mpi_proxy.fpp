@@ -129,9 +129,7 @@ contains
         #:for VAR in [ 'pref', 'rhoref', 'R0ref', 'poly_sigma', 'Web', 'Ca', &
             & 'Re_inv', 'Bx0', 'sigma', 't_save', 't_stop',   &
             & 'x_output%beg', 'x_output%end', 'y_output%beg', &
-            & 'y_output%end', 'z_output%beg', 'z_output%end', &
-            & 'x_domain%beg', 'y_domain%beg', 'z_domain%beg', &
-            & 'x_domain%end', 'y_domain%end', 'z_domain%end']
+            & 'y_output%end', 'z_output%beg', 'z_output%end']
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(schlieren_alpha(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)

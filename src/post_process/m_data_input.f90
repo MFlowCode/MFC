@@ -334,7 +334,7 @@ contains
 
         real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
-        integer :: ifile, ierr, data_size
+        integer :: ifile, ierr, data_size, filetype, stride
         integer, dimension(MPI_STATUS_SIZE) :: status
 
         integer(KIND=MPI_OFFSET_KIND) :: disp
@@ -342,6 +342,7 @@ contains
         integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
         integer(KIND=MPI_OFFSET_KIND) :: NVARS_MOK
         integer(KIND=MPI_OFFSET_KIND) :: MOK
+        integer(kind=MPI_OFFSET_KIND) :: offset
         real(wp) :: delx, dely, delz
 
         character(LEN=path_len + 2*name_len) :: file_loc
@@ -356,24 +357,29 @@ contains
         allocate (z_cb_glb(-1:p_glb))
 
         if (down_sample) then
-            delx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
-            do i = 0, m_glb
-                x_cb_glb(i - 1) = x_domain%beg + delx*real(i, wp)
-            end do
-            x_cb_glb(m_glb) = x_domain%end
+            stride = 3
         else
-            ! Read in cell boundary locations in x-direction
-            file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'x_cb.dat'
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            stride = 1
+        end if
 
-            if (file_exist) then
-                data_size = m_glb + 2
-                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                call MPI_FILE_READ(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
-                call MPI_FILE_CLOSE(ifile, ierr)
-            else
-                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
-            end if
+        ! Read in cell boundary locations in x-direction
+        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'x_cb.dat'
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+        if (file_exist) then
+            data_size = m_glb + 2
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+            call MPI_TYPE_VECTOR(data_size, 1, stride, mpi_p, filetype, ierr)
+            call MPI_TYPE_COMMIT(filetype, ierr)
+
+            offset = 0
+            call MPI_FILE_SET_VIEW(ifile, offset, mpi_p, filetype, 'native', mpi_info_int, ierr)
+
+            call MPI_FILE_READ(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
+            call MPI_FILE_CLOSE(ifile, ierr)
+        else
+            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
         end if
 
         ! Assigning local cell boundary locations
@@ -384,25 +390,24 @@ contains
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         if (n > 0) then
-            if (down_sample) then
-                dely = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
-                do i = 0, n_glb
-                    y_cb_glb(i - 1) = y_domain%beg + dely*real(i, wp)
-                end do
-                y_cb_glb(n_glb) = y_domain%end
-            else
-                ! Read in cell boundary locations in y-direction
-                file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'y_cb.dat'
-                inquire (FILE=trim(file_loc), EXIST=file_exist)
+            ! Read in cell boundary locations in y-direction
+            file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'y_cb.dat'
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-                if (file_exist) then
-                    data_size = n_glb + 2
-                    call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                    call MPI_FILE_READ(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
-                    call MPI_FILE_CLOSE(ifile, ierr)
-                else
-                    call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
-                end if
+            if (file_exist) then
+                data_size = n_glb + 2
+                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                call MPI_TYPE_VECTOR(data_size, 1, stride, mpi_p, filetype, ierr)
+                call MPI_TYPE_COMMIT(filetype, ierr)
+
+                offset = 0
+                call MPI_FILE_SET_VIEW(ifile, offset, mpi_p, filetype, 'native', mpi_info_int, ierr)
+
+                call MPI_FILE_READ(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
+                call MPI_FILE_CLOSE(ifile, ierr)
+            else
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
 
             ! Assigning local cell boundary locations
@@ -413,25 +418,25 @@ contains
             y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
             if (p > 0) then
-                if (down_sample) then
-                    delz = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
-                    do i = 0, p_glb
-                        z_cb_glb(i - 1) = z_domain%beg + delz*real(i, wp)
-                    end do
-                    z_cb_glb(p_glb) = z_domain%end
-                else
-                    ! Read in cell boundary locations in z-direction
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'z_cb.dat'
-                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                ! Read in cell boundary locations in z-direction
+                file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'z_cb.dat'
+                inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-                    if (file_exist) then
-                        data_size = p_glb + 2
-                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                        call MPI_FILE_READ(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
-                        call MPI_FILE_CLOSE(ifile, ierr)
-                    else
-                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
-                    end if
+                if (file_exist) then
+                    data_size = p_glb + 2
+                    call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                    call MPI_TYPE_VECTOR(data_size, 1, stride, mpi_p, filetype, ierr)
+                    call MPI_TYPE_COMMIT(filetype, ierr)
+
+                    offset = 0
+                    call MPI_FILE_SET_VIEW(ifile, offset, mpi_p, filetype, 'native', mpi_info_int, ierr)
+
+
+                    call MPI_FILE_READ(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
+                    call MPI_FILE_CLOSE(ifile, ierr)
+                else
+                    call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
                 end if
 
                 ! Assigning local cell boundary locations
