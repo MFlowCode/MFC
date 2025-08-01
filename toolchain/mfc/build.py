@@ -133,7 +133,7 @@ class MFCTarget:
             # Location prefix to install bin/, lib/, include/, etc.
             # See: https://cmake.org/cmake/help/latest/command/install.html.
             f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
-            f"-DMFC_SINGLE_PRECISION={'ON' if (ARG('single') or ARG('mixed')) else 'OFF'}"
+            f"-DMFC_SINGLE_PRECISION={'ON' if (ARG('single') or ARG('mixed')) else 'OFF'}",
             f"-DMFC_MIXED_PRECISION={'ON' if ARG('mixed') else 'OFF'}"
         ]
 
