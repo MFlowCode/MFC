@@ -1308,16 +1308,25 @@ contains
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
         @:ALLOCATE(x_cc(-buff_size:m + buff_size))
         @:ALLOCATE(dx(-buff_size:m + buff_size))
+        @:PREFER_GPU(x_cb)
+        @:PREFER_GPU(x_cc)
+        @:PREFER_GPU(dx)
 
         if (n == 0) return; 
         @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE(dy(-buff_size:n + buff_size))
+        @:PREFER_GPU(y_cb)
+        @:PREFER_GPU(y_cc)
+        @:PREFER_GPU(dy)
 
         if (p == 0) return; 
         @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
+        @:PREFER_GPU(z_cb)
+        @:PREFER_GPU(z_cc)
+        @:PREFER_GPU(dz)
 
     end subroutine s_initialize_global_parameters_module
 

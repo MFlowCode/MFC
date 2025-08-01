@@ -95,9 +95,11 @@ contains
 
         ! Allocating the cell-average conservative variables
         @:ALLOCATE(q_cons_ts(1:num_ts))
+        @:PREFER_GPU(q_cons_ts)
 
         do i = 1, num_ts
             @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
+            @:PREFER_GPU(q_cons_ts(i)%vf)
         end do
 
         do i = 1, num_ts
@@ -105,6 +107,7 @@ contains
                 @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
+                @:PREFER_GPU(q_cons_ts(i)%vf(j)%sf)
             end do
             @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
@@ -304,11 +307,13 @@ contains
 
         ! Allocating the cell-average RHS variables
         @:ALLOCATE(rhs_vf(1:sys_size))
+        @:PREFER_GPU(rhs_vf)
 
         if (igr) then
             do i = 1, sys_size
                 @:ALLOCATE(rhs_vf(i)%sf(-1:m+1,-1:n+1,-1:p+1))
                 @:ACC_SETUP_SFs(rhs_vf(i))
+                @:PREFER_GPU(rhs_vf(i)%sf)
             end do
         else
             do i = 1, sys_size
@@ -650,6 +655,7 @@ contains
         real(wp), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
+        integer :: dest
 
         real(wp) :: start, finish
 
@@ -682,6 +688,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
+#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -694,6 +701,24 @@ contains
                 end do
             end do
         end do
+        dest = 2 ! result in q_cons_ts(2)%vf
+#else
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l)
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+        dest = 1 ! result in q_cons_ts(1)%vf
+#endif
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
@@ -750,10 +775,11 @@ contains
 
         ! Stage 2 of 3
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+        call s_compute_rhs(q_cons_ts(dest)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
+#if  !defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -767,6 +793,23 @@ contains
                 end do
             end do
         end do
+        dest = 2 ! result in q_cons_ts(2)%vf
+#else
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (3._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                    end do
+                end do
+            end do
+        end do
+        dest = 1 ! result in q_cons_ts(1)%vf
+#endif
 
         if (qbmm .and. (.not. polytropic)) then
             $:GPU_PARALLEL_LOOP(collapse=5)
@@ -823,10 +866,11 @@ contains
         end if
 
         ! Stage 3 of 3
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
+        call s_compute_rhs(q_cons_ts(dest)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
+#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -840,6 +884,23 @@ contains
                 end do
             end do
         end do
+        dest = 1 ! result in q_cons_ts(1)%vf
+#else
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + 2._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+                    end do
+                end do
+            end do
+        end do
+        dest = 1 ! result in q_cons_ts(1)%vf
+#endif
 
         if (qbmm .and. (.not. polytropic)) then
             $:GPU_PARALLEL_LOOP(collapse=5)
