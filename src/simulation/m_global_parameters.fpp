@@ -114,9 +114,13 @@ module m_global_parameters
     logical :: prim_vars_wrt
 
     #:if MFC_CASE_OPTIMIZATION
+        integer, parameter :: recon_type = ${recon_type}$ !< Reconstruction type
         integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
+        integer, parameter :: muscl_polyn = ${muscl_polyn}$ !< Degree of the MUSCL polynomials (polyn)
         integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
+        integer, parameter :: muscl_order = ${muscl_order}$ !< Order of the MUSCL order
         integer, parameter :: weno_num_stencils = ${weno_num_stencils}$ !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
+        integer, parameter :: muscl_lim = ${muscl_lim}$ !< MUSCL Limiter
         integer, parameter :: num_fluids = ${num_fluids}$           !< number of fluids in the simulation
         logical, parameter :: wenojs = (${wenojs}$ /= 0)            !< WENO-JS (default)
         logical, parameter :: mapped_weno = (${mapped_weno}$ /= 0)  !< WENO-M (WENO with mapping of nonlinear weights)
@@ -131,9 +135,13 @@ module m_global_parameters
         logical, parameter :: igr_pres_lim = (${igr_pres_lim}$ /= 0)!< Limit to positive pressures for IGR
         logical, parameter :: viscous = (${viscous}$ /= 0)          !< Viscous effects
     #:else
+        integer :: recon_type     !< Reconstruction Type
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
+        integer :: muscl_polyn    !< Degree of the MUSCL polynomials (polyn)i
         integer :: weno_order     !< Order of the WENO reconstruction
+        integer :: muscl_order    !< Order of the MUSCL reconstruction
         integer :: weno_num_stencils    !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
+        integer :: muscl_lim      !< MUSCL Limiter
         integer :: num_fluids     !< number of fluids in the simulation
         logical :: wenojs         !< WENO-JS (default)
         logical :: mapped_weno    !< WENO-M (WENO with mapping of nonlinear weights)
@@ -163,6 +171,9 @@ module m_global_parameters
     logical :: mixture_err     !< Mixture properties correction
     logical :: hypoelasticity  !< hypoelasticity modeling
     logical :: hyperelasticity !< hyperelasticity modeling
+    logical :: int_comp        !< THINC interface compression
+    real(wp) :: ic_eps         !< THINC Epsilon to compress on surface cells
+    real(wp) :: ic_beta        !< THINC Sharpness Parameter
     integer :: hyper_model     !< hyperelasticity solver algorithm
     logical :: elasticity      !< elasticity modeling, true for hyper or hypo
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
@@ -193,6 +204,7 @@ module m_global_parameters
         $:GPU_DECLARE(create='[weno_num_stencils,num_fluids,wenojs]')
         $:GPU_DECLARE(create='[mapped_weno, wenoz,teno,wenoz_q,mhd,relativity]')
         $:GPU_DECLARE(create='[igr_iter_solver,igr_order,viscous,igr_pres_lim,igr]')
+        $:GPU_DECLARE(create='[recon_type, muscl_order, muscl_polyn, muscl_lim]')
     #:endif
 
     $:GPU_DECLARE(create='[mpp_lim,model_eqns,mixture_err,alt_soundspeed]')
@@ -587,6 +599,9 @@ contains
         ptgalpha_eps = dflt_real
         hypoelasticity = .false.
         hyperelasticity = .false.
+        int_comp = .false.
+        ic_eps = dflt_ic_eps
+        ic_beta = dflt_ic_beta
         elasticity = .false.
         hyper_model = dflt_int
         b_size = dflt_int
@@ -670,7 +685,10 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             nb = 1
+            recon_type = WENO_TYPE
             weno_order = dflt_int
+            muscl_order = dflt_int
+            muscl_lim = dflt_int
             num_fluids = dflt_int
         #:endif
 
@@ -810,13 +828,17 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
-            weno_polyn = (weno_order - 1)/2
-            if (teno) then
-                weno_num_stencils = weno_order - 3
-            else
-                weno_num_stencils = weno_polyn
+            if (recon_type == WENO_TYPE) then
+                weno_polyn = (weno_order - 1)/2
+                if (teno) then
+                    weno_num_stencils = weno_order - 3
+                else
+                    weno_num_stencils = weno_polyn
+                end if
+            elseif (recon_type == MUSCL_TYPE) then
+                muscl_polyn = muscl_order
             end if
-            $:GPU_UPDATE(device='[weno_polyn]')
+            $:GPU_UPDATE(device='[weno_polyn, muscl_polyn]')
             $:GPU_UPDATE(device='[weno_num_stencils]')
             $:GPU_UPDATE(device='[nb]')
             $:GPU_UPDATE(device='[num_dims,num_vels,num_fluids]')
@@ -1205,7 +1227,8 @@ contains
             fd_number = max(1, fd_order/2)
         end if
 
-        call s_configure_coordinate_bounds(weno_polyn, igr_order, buff_size, &
+        call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
+                                           igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
                                            num_dims, igr)
@@ -1272,6 +1295,7 @@ contains
             $:GPU_UPDATE(device='[wenojs,mapped_weno,wenoz,teno]')
             $:GPU_UPDATE(device='[wenoz_q]')
             $:GPU_UPDATE(device='[mhd, relativity]')
+            $:GPU_UPDATE(device='[muscl_order, muscl_lim]')
         #:endif
 
         $:GPU_ENTER_DATA(copyin='[nb,R0ref,Ca,Web,Re_inv,weight,R0, &

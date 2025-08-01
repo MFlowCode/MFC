@@ -64,6 +64,8 @@ COMMON = {
     'igr': ParamType.LOG,
     'igr_order': ParamType.INT,
     'down_sample': ParamType.LOG,
+    'recon_type': ParamType.INT,
+    'muscl_order': ParamType.INT,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -305,6 +307,12 @@ SIMULATION.update({
     'alf_factor': ParamType.REAL,
     'igr_iter_solver': ParamType.INT,
     'igr_pres_lim': ParamType.LOG,
+    'recon_type': ParamType.INT,
+    'muscl_order': ParamType.INT,
+    'muscl_lim': ParamType.INT,
+    'int_comp': ParamType.LOG,
+    'ic_eps': ParamType.REAL,
+    'ic_beta': ParamType.REAL,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
@@ -485,7 +493,7 @@ ALL.update(POST_PROCESS)
 
 CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order",
                      "num_fluids", "mhd", "relativity", "igr_order", "viscous",
-                     "igr_iter_solver", "igr", "igr_pres_lim"]
+                     "igr_iter_solver", "igr", "igr_pres_lim", "recon_type", "muscl_order", "muscl_lim" ]
 
 _properties = { k: v.value for k, v in ALL.items() }
 

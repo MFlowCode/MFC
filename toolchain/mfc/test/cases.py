@@ -170,6 +170,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
+    def alter_muscl():
+        for muscl_order in [1, 2]:
+            stack.push(f"muscl_order={muscl_order}", {'muscl_order': muscl_order, 'recon_type':2, 'weno_order':0})
+
+            if muscl_order == 1:
+                for int_comp in ["T", "F"]:
+                    cases.append(define_case_d(stack, f"int_comp={int_comp}", {'int_comp': int_comp}))
+            elif muscl_order == 2:
+                for int_comp in ["T", "F"]:
+                    stack.push(f"int_comp={int_comp}", {'int_comp': int_comp})
+                    cases.append(define_case_d(stack, f"muscl_lim=1", {'muscl_lim': 1}))
+                    stack.pop()
+                for muscl_lim in [2,3,4,5]:
+                    cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {'muscl_lim': muscl_lim}))
+            stack.pop()
+
     def alter_riemann_solvers(num_fluids):
         for riemann_solver in [1, 2]:
             stack.push(f"riemann_solver={riemann_solver}", {'riemann_solver': riemann_solver})
@@ -937,6 +953,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_bcs(dimInfo)
             alter_grcbc(dimInfo)
             alter_weno(dimInfo)
+            alter_muscl()
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()

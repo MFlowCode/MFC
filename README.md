@@ -165,7 +165,9 @@ They are organized below.
 
 * Shock and interface capturing schemes
 	* First-order upwinding
- 	* WENO reconstructions of order 3, 5, and 7
+ 	* MUSCL (order 2)
+  		* Slope limiters: minmod, monotonized central, Van Albada, Van Leer, superbee
+ 	* WENO reconstructions (orders 3, 5, and 7)
   	* WENO variants: WENO-JS, WENO-M, WENO-Z, TENO
    	* Monotonicity-preserving reconstructions
 	* Reliable handling of large density ratios
@@ -187,7 +189,7 @@ They are organized below.
 * Ideal weak scaling to 100% of the largest GPU and superchip supercomputers
  	* \>36K AMD APUs (MI300A) on [LLNL El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan)
    	* \>3K AMD APUs (MI300A) on [LLNL Tuolumne](https://hpc.llnl.gov/hardware/compute-platforms/tuolumne)
-	* \>33K AMD GPUs (MI250X) on the first exascale computer, [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) 
+	* \>33K AMD GPUs (MI250X) on [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) 
 	* \>10K NVIDIA GPUs (V100) on [OLCF Summit](https://www.olcf.ornl.gov/summit/) 
 * Near compute roofline behavior
 * RDMA (remote data memory access; GPU-GPU direct communication) via GPU-aware MPI on NVIDIA (CUDA-aware MPI) and AMD GPU systems
@@ -197,7 +199,7 @@ They are organized below.
 
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
-	* \>300 Regression tests with each PR.
+	* Approx. 500 Regression tests with each PR.
  		* Performed with GNU (GCC), Intel (oneAPI), Cray (CCE), and NVIDIA (NVHPC) compilers on NVIDIA and AMD GPUs.
 		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups

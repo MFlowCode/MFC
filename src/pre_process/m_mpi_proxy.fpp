@@ -43,10 +43,11 @@ contains
 
         #:for VAR in ['t_step_old', 't_step_start', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
             & 'loops_x', 'loops_y', 'loops_z', 'model_eqns', 'num_fluids',     &
-            & 'weno_order', 'precision', 'perturb_flow_fluid', &
+            & 'weno_order', 'precision', 'perturb_flow_fluid',                 &
             & 'perturb_sph_fluid', 'num_patches', 'thermal', 'nb', 'dist_type',&
             & 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters', &
-            & 'num_bc_patches', 'mixlayer_perturb_nk', 'igr_order' ]
+            & 'num_bc_patches', 'mixlayer_perturb_nk', 'recon_type',           &
+            & 'muscl_order', 'igr_order' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -148,4 +149,3 @@ contains
     end subroutine s_mpi_bcast_user_inputs
 
 end module m_mpi_proxy
-
