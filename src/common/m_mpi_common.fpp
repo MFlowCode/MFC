@@ -38,7 +38,9 @@ module m_mpi_common
     !! average primitive variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
     $:GPU_DECLARE(create='[buff_send, buff_recv]')
+#endif
 
     integer :: halo_size
     $:GPU_DECLARE(create='[halo_size]')
@@ -78,7 +80,13 @@ contains
 
         $:GPU_UPDATE(device='[halo_size, v_size]')
 
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         @:ALLOCATE(buff_send(0:halo_size), buff_recv(0:halo_size))
+#else
+        ALLOCATE(buff_send(0:halo_size), buff_recv(0:halo_size))
+        !$acc enter data create(capture:buff_send)
+        !$acc enter data create(capture:buff_recv)
+#endif
 #endif
 
     end subroutine s_initialize_mpi_common_module
