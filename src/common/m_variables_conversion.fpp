@@ -1363,7 +1363,7 @@ contains
                                 q_cons_vf(n_idx)%sf(j, k, l) = q_prim_vf(n_idx)%sf(j, k, l)
                                 nbub = q_prim_vf(n_idx)%sf(j, k, l)
                             else
-                                call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
+                                call s_comp_n_from_prim(real(q_prim_vf(alf_idx)%sf(j, k, l), kind=wp), Rtmp, nbub, weight)
                             end if
                         else
                             !Initialize R3 averaging over R0 and R directions

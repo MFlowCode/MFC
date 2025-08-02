@@ -1466,7 +1466,7 @@ contains
     impure subroutine s_populate_F_igr_buffers(bc_type, jac)
 
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
-        real(wp), target, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(inout) :: jac
+        real(stp), target, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(inout) :: jac
 
         integer :: j, k, l
 
