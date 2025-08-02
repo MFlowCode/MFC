@@ -2182,7 +2182,7 @@ contains
 
                             ! Correct the sign of the levelset
                             if (patch_id_fp(i, j, k) > 0) then
-                                STL_levelset%sf(i, j, k, patch_id) = -abs(STL_levelset%sf(i, j, k, patch_id))
+                                STL_levelset%sf(i, j, k, patch_id) = -real(abs(real(STL_levelset%sf(i, j, k, patch_id), kind=wp)), kind=stp) ! TODO :: Make sure this isn't slow. It feels bad.
                             end if
 
                             ! Correct the sign of the levelset_norm
@@ -2208,7 +2208,7 @@ contains
 
                             ! Correct the sign of the levelset
                             if (patch_id_fp(i, j, k) > 0) then
-                                STL_levelset%sf(i, j, 0, patch_id) = -abs(STL_levelset%sf(i, j, 0, patch_id))
+                                STL_levelset%sf(i, j, 0, patch_id) = -real(abs(real(STL_levelset%sf(i, j, 0, patch_id), kind=wp)), kind=stp)
                             end if
 
                             ! Get the boundary normals

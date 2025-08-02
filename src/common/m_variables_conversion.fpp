@@ -741,7 +741,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
-        real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: mv
+        real(stp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: mv
 
         integer :: i, j, k, l
         real(wp) :: mu, sig, nbub_sc
@@ -773,8 +773,8 @@ contains
     pure subroutine s_initialize_pb(qK_cons_vf, mv, pb)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
-        real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
-        real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: pb
+        real(stp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
+        real(stp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: pb
 
         integer :: i, j, k, l
         real(wp) :: mu, sig, nbub_sc
