@@ -57,7 +57,7 @@ if engine == 'batch':
                         "${target.get_install_binpath(case)}")
             elif [ "$binary" == "mpirun" ]; then
                 (set -x; ${profiler}     \
-                    $binary -np ${nodes*tasks_per_node}            \
+                    $binary --allow-run-as-root -np ${nodes*tasks_per_node} \
                             "${target.get_install_binpath(case)}")
             elif [ "$binary" == "mpiexec" ]; then
                 (set -x; ${profiler}                               \

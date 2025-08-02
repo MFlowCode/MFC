@@ -135,17 +135,17 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             -Wall
-            -Wextra
+            -Wextra	
             -fcheck=all,no-array-temps
             -fbacktrace
             -fimplicit-none
             -fsignaling-nans
             -finit-real=snan
             -finit-integer=-99999999
-            -Wintrinsic-shadow
-            -Wunderflow
-            -Wrealloc-lhs
-            -Wsurprising
+            -Wintrinsic-shadow	
+            -Wunderflow	
+            -Wrealloc-lhs	
+            -Wsurprising	
 	    )
     endif()
 
@@ -163,7 +163,6 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         "SHELL:-h acc_model=auto_async_none"
         "SHELL: -h acc_model=no_fast_addr"
         "SHELL: -h list=adm"
-        "SHELL: -munsafe-fp-atomics" # Not unsafe for operations we do
     )
 
     add_link_options("SHELL:-hkeepfiles")
@@ -173,6 +172,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
                 "SHELL:-h acc_model=auto_async_none"
                 "SHELL: -h acc_model=no_fast_addr"
                 "SHELL: -K trap=fp" "SHELL: -G2"
+
         )
         add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
     endif()
@@ -486,23 +486,23 @@ function(MFC_SETUP_TARGET)
                 endforeach()
 
                 target_compile_options(${a_target}
-                    PRIVATE -gpu=keep,ptxinfo,lineinfo
+                    PRIVATE -gpu=keep,ptxinfo,lineinfo,fastmath
                 )
 
                 # GH-200 Unified Memory Support
                 if (MFC_Unified)
                     target_compile_options(${ARGS_TARGET}
-                        PRIVATE -gpu=unified
+                        PRIVATE -gpu=mem:unified -cuda
                     )
                     # "This option must appear in both the compile and link lines" -- NVHPC Docs
                     target_link_options(${ARGS_TARGET}
-                        PRIVATE -gpu=unified
+                        PRIVATE -gpu=mem:unified -cuda
                     )
                 endif()
 
                 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
                     target_compile_options(${a_target}
-                        PRIVATE -gpu=autocompare,debug
+                        PRIVATE -gpu=autocompare,debug -cuda
                     )
                 endif()
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
@@ -513,9 +513,15 @@ function(MFC_SETUP_TARGET)
             target_compile_options(${a_target} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")
         endif()
 
-        if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
-            find_package(CUDAToolkit REQUIRED)
-            target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
+        if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR
+            CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+
+            if (TARGET CUDA::nvToolsExt) # CUDA <= 12.8
+                target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
+            else() # CUDA >= 12.9
+                target_link_libraries(${a_target}  PRIVATE nvhpcwrapnvtx )
+            endif()
+            target_link_options(${a_target} PRIVATE "-cudalib=nvtx")
         endif()
     endforeach()
 
