@@ -35,6 +35,15 @@ module m_constants
     real(wp), parameter :: broadband_spectral_level_constant = 20._wp !< The constant to scale the spectral level at the lower frequency bound
     real(wp), parameter :: broadband_spectral_level_growth_rate = 10._wp !< The spectral level constant to correct the magnitude at each frqeuency to ensure the source is overall broadband
 
+    ! Reconstruction Types
+    integer, parameter :: WENO_TYPE = 1 !< Using WENO for reconstruction type
+    integer, parameter :: MUSCL_TYPE = 2 !< Using MUSCL for reconstruction type
+
+    ! Interface Compression
+    real(wp), parameter :: dflt_ic_eps = 1e-4_wp !< Ensure compression is only applied to surface cells in THINC
+    real(wp), parameter :: dflt_ic_beta = 1.6_wp !< Sharpness parameter's default value used in THINC
+    integer, parameter :: moncon_cutoff = 1e-8_wp !< Monotonicity constraint's limiter to prevent extremas in THINC
+
     ! Chemistry
     real(wp), parameter :: dflt_T_guess = 1200._wp ! Default guess for temperature (when a previous value is not available)
 
@@ -55,7 +64,8 @@ module m_constants
 
     ! Strang Splitting constants
     real(wp), parameter :: dflt_adap_dt_tol = 1.e-4_wp !< Default tolerance for adaptive step size
-    integer, parameter :: adap_dt_max_iters = 100 !< Maximum number of iterations
+    integer, parameter :: dflt_adap_dt_max_iters = 100 !< Default max iteration for adaptive step size
+
     ! Constants of the algorithm described by Heirer, E. Hairer S.P.Nørsett G. Wanner, Solving Ordinary Differential Equations I, Chapter II.4
     ! to choose the initial time step size for the adaptive time stepping routine
     real(wp), parameter :: threshold_first_guess = 1.e-5_wp
