@@ -21,6 +21,7 @@ include(ExternalProject)
 option(MFC_FFTW    "Build the FFTW3 dependency" OFF)
 option(MFC_HDF5    "Build the HDF5  dependency" OFF)
 option(MFC_SILO    "Build the SILO  dependency" OFF)
+option(MFC_LAPACK  "Build the LAPACK  dependency" OFF)
 option(MFC_HIPFORT "Build the HIPFORT dependency" OFF)
 
 
@@ -97,6 +98,32 @@ if (MFC_SILO)
         )
     endif()
 endif()
+
+# LAPACK
+ if (MFC_LAPACK)
+     find_package(LAPACK QUIET)
+     if (LAPACK_FOUND)
+         message(STATUS "LAPACK found.")
+         add_custom_target(lapack)
+     else()
+         # Use reference LAPACK from netlib
+         find_package(Git REQUIRED)
+
+         ExternalProject_Add(lapack
+             GIT_REPOSITORY "https://github.com/Reference-LAPACK/lapack"
+             GIT_TAG        v3.12.0
+             GIT_SHALLOW    ON
+             GIT_PROGRESS   ON
+             CMAKE_ARGS     -DBUILD_SHARED_LIBS=OFF
+                            -DBUILD_TESTING=OFF
+                            -DCBLAS=OFF
+                            -DLAPACKE=OFF
+                            -DBUILD_DEPRECATED=OFF
+                            "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
+                            "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+         )
+     endif()
+ endif()
 
 # HIPFORT
 if (MFC_HIPFORT)

@@ -589,6 +589,7 @@ To restart the simulation from $k$-th time step, see [Restarting Cases](running.
 | `omega_wrt(i)`       | Logical | Add the $i$-direction vorticity to the database	 |
 | `schlieren_wrt`      | Logical | Add the numerical schlieren to the database|
 | `qm_wrt`             | Logical | Add the Q-criterion to the database|
+| `liutex_wrt`         | Logical | Add the Liutex to the database|
 | `tau_wrt`            | Logical | Add the elastic stress components to the database|
 | `fd_order`           | Integer | Order of finite differences for computing the vorticity and the numerical Schlieren function [1,2,4] |
 | `schlieren_alpha(i)` | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |
@@ -628,7 +629,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 - `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%beg` and `[x,y,z]_output%end`.
 This is useful for large domains where only a portion of the domain is of interest.
 It is not supported when `precision = 1` and `format = 1`. 
-It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_wrt`, `omega_wrt`, `ib`, `schlieren_wrt`, or `qm_wrt`.
+It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_wrt`, `omega_wrt`, `ib`, `schlieren_wrt`, `qm_wrt`, or 'liutex_wrt'.
 
 ### 8. Acoustic Source {#acoustic-source}
 

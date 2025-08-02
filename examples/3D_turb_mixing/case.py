@@ -96,6 +96,7 @@ print(
             "omega_wrt(2)": "T",
             "omega_wrt(3)": "T",
             "qm_wrt": "T",
+            "liutex_wrt": "T",
             # Patch 1
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": Lx / 2.0,

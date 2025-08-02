@@ -32,6 +32,8 @@ contains
         call s_check_inputs_flux_limiter
         call s_check_inputs_volume_fraction
         call s_check_inputs_vorticity
+        call s_check_inputs_qm
+        call s_check_inputs_liutex
         call s_check_inputs_schlieren
         call s_check_inputs_surface_tension
         call s_check_inputs_no_flow_variables
@@ -49,8 +51,7 @@ contains
     impure subroutine s_check_inputs_partial_domain
         @:PROHIBIT(output_partial_domain .and. format == 1)
         @:PROHIBIT(output_partial_domain .and. precision == 1)
-        @:PROHIBIT(output_partial_domain .and. any([flux_wrt, heat_ratio_wrt, pres_inf_wrt, c_wrt, schlieren_wrt, qm_wrt, ib, any(omega_wrt)]))
-
+        @:PROHIBIT(output_partial_domain .and. any([flux_wrt, heat_ratio_wrt, pres_inf_wrt, c_wrt, schlieren_wrt, qm_wrt, liutex_wrt, ib, any(omega_wrt)]))
         @:PROHIBIT(output_partial_domain .and. (f_is_default(x_output%beg) .or. f_is_default(x_output%end)))
         @:PROHIBIT(output_partial_domain .and. n /= 0 .and. (f_is_default(y_output%beg) .or. f_is_default(y_output%end)))
         @:PROHIBIT(output_partial_domain .and. p /= 0 .and. (f_is_default(z_output%beg) .or. f_is_default(z_output%end)))
@@ -109,6 +110,16 @@ contains
         @:PROHIBIT(p == 0 .and. (omega_wrt(1) .or. omega_wrt(2)))
         @:PROHIBIT(any(omega_wrt) .and. fd_order == dflt_int, "fd_order must be set for omega_wrt")
     end subroutine s_check_inputs_vorticity
+
+    !> Checks constraints on Q-criterion parameters
+    impure subroutine s_check_inputs_qm
+        @:PROHIBIT(n == 0 .and. qm_wrt)
+    end subroutine s_check_inputs_qm
+
+    !> Checks constraints on liutex parameters
+    impure subroutine s_check_inputs_liutex
+        @:PROHIBIT(n == 0 .and. liutex_wrt)
+    end subroutine s_check_inputs_liutex
 
     !> Checks constraints on numerical Schlieren parameters
         !! (schlieren_wrt and schlieren_alpha)
