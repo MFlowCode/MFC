@@ -37,20 +37,19 @@
 
 #:def HardcodedDimensionsExtrusion()
     integer :: xRows, yRows, nRows, iix, iiy, max_files
-    integer :: f, iter, ios, ios2, unit, unit2, idx, idy, index_x, index_y, jump, line_count, ycount
-    real(wp) :: x_len, x_step, y_len, y_step
+    integer :: f, iter, ios, ios2, unit, unit2, idx, idy, index_x, index_y, jump, line_count
+    real(wp) :: x_step, y_step
     real(wp) :: dummy_x, dummy_y, dummy_z, x0, y0
     integer :: global_offset_x, global_offset_y           ! MPI subdomain offset
     real(wp) :: delta_x, delta_y
     character(len=100), dimension(sys_size) :: fileNames ! Arrays to store all data from files
-    character(len=200) :: errmsg
+    !character(len=200) :: errmsg
     real(wp), allocatable :: stored_values(:, :, :)
     real(wp), allocatable :: x_coords(:), y_coords(:)
     logical :: files_loaded = .false.
-    real(wp) :: domain_xstart, domain_xend, domain_ystart, domain_yend
+    real(wp) :: domain_xstart
     character(len=*), parameter :: init_dir = "/home/MFC/FilesDirectory" ! For example /home/MFC/examples/1D_Shock/D/
     character(len=20) :: file_num_str     ! For storing the file number as a string
-    character(len=20) :: zeros_part       ! For the trailing zeros part
     character(len=6), parameter :: zeros_default = "000000"  ! Default zeros (can be changed)
 #:enddef
 
@@ -112,7 +111,7 @@
             do
                 read (unit2, *, iostat=ios2) dummy_x, dummy_y, dummy_z
                 if (ios2 /= 0) exit
-                if (dummy_x == x0 .and. dummy_y /= y0) then
+                if (f_approx_equal(dummy_x, x0) .and. (.not. f_approx_equal(dummy_y, y0))) then
                     yRows = yRows + 1
                 else
                     exit

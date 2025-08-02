@@ -945,8 +945,6 @@ contains
 
         integer, intent(in) :: stage
 
-        type(vector_field) :: gm_alpha_qp
-
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &
             q_T_sf, &
@@ -989,7 +987,6 @@ contains
         real(wp) :: c          !< Cell-avg. sound speed
         real(wp) :: H          !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
-        type(vector_field) :: gm_alpha_qp
 
         real(wp) :: dt_local
         integer :: j, k, l !< Generic loop iterators
