@@ -75,12 +75,11 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    integer, private :: out_of_core
-
     $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt]')
 
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
     real(wp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
+    integer, private :: out_of_core
 #endif
 
 contains
@@ -92,10 +91,10 @@ contains
 
         integer :: i, j !< Generic loop iterators
 
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
         character(len=10) :: out_of_core_str
         out_of_core = 0
 
-#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
         call get_environment_variable("MFC_OUT_OF_CORE", out_of_core_str)
 
         if (trim(out_of_core_str) == "0") then
