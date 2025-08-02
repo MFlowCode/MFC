@@ -91,19 +91,8 @@ contains
 
     subroutine s_initialize_igr_module()
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
-        integer :: igr_temps_total
-        integer :: igr_temps_on_gpu
-        integer :: igr_temps_on_cpu
+        integer :: igr_temps_on_gpu = 3
         character(len=10) :: igr_temps_on_gpu_str
-
-        ! initialize
-        if (igr_iter_solver == 1) then ! Jacobi iteration
-            igr_temps_total = 3
-        else
-            igr_temps_total = 2
-        end if
-        igr_temps_on_gpu = igr_temps_total
-        igr_temps_on_cpu = 0
 
         call get_environment_variable("NVIDIA_IGR_TEMPS_ON_GPU", igr_temps_on_gpu_str)
 
@@ -119,17 +108,10 @@ contains
             igr_temps_on_gpu = 3
         end if
 
-        ! trim if needed
-        if ( igr_temps_on_gpu > igr_temps_total ) then
-            igr_temps_on_gpu = igr_temps_total
-        end if
-        igr_temps_on_cpu = igr_temps_total - igr_temps_on_gpu
-
         ! create map
-        temp_on_gpu(1:3) = -1
-        temp_on_gpu(1:igr_temps_total) = 0
+        temp_on_gpu(1:3) = 0
         temp_on_gpu(1:igr_temps_on_gpu) = 1
-        print*, temp_on_gpu(1:3)
+        !print*, temp_on_gpu(1:3)
 #endif
 
         if (viscous) then
@@ -148,16 +130,12 @@ contains
         @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, &
             idwbuff(2)%beg:idwbuff(2)%end, &
             idwbuff(3)%beg:idwbuff(3)%end))
-        @:PREFER_GPU(jac)
-
         @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
-        @:PREFER_GPU(jac_rhs)
 
         if (igr_iter_solver == 1) then ! Jacobi iteration
             @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
-            @:PREFER_GPU(jac_old)
         end if
 #else
 
@@ -167,8 +145,7 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end))
             @:PREFER_GPU(jac)
         else
-            print*, 'jac on CPU'
-
+            !print*, 'jac on CPU'
             allocate(pool_host1(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
@@ -182,8 +159,7 @@ contains
             @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
             @:PREFER_GPU(jac_rhs)
         else
-            print*, 'jac_rhs on CPU'
-
+            !print*, 'jac_rhs on CPU'
             allocate(pool_host2(-1:m,-1:n,-1:p))
 
             jac_rhs(-1:m,-1:n,-1:p) => pool_host2(:,:,:)
@@ -196,8 +172,7 @@ contains
                     idwbuff(3)%beg:idwbuff(3)%end))
                 @:PREFER_GPU(jac_old)
             else
-                print*, 'jac_old on CPU'
-
+                !print*, 'jac_old on CPU'
                 allocate(pool_host3(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
