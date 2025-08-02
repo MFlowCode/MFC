@@ -63,6 +63,7 @@ COMMON = {
     'num_bc_patches': ParamType.INT,
     'igr': ParamType.LOG,
     'igr_order': ParamType.INT,
+    'down_sample': ParamType.LOG,
     'recon_type': ParamType.INT,
     'muscl_order': ParamType.INT,
 }
@@ -452,6 +453,10 @@ POST_PROCESS.update({
     'output_partial_domain': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
 })
+
+for cmp in ["x", "y", "z"]:
+    for prepend in ["domain%beg", "domain%end", "a", "b"]:
+        PRE_PROCESS[f"{cmp}_{prepend}"] = ParamType.REAL
 
 for cmp_id in range(1,3+1):
     cmp = ["x", "y", "z"][cmp_id-1]

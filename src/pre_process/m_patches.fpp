@@ -67,9 +67,10 @@ contains
     impure subroutine s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp, ib_markers_sf
-        type(levelset_field), intent(inout) :: levelset !< Levelset determined by models
-        type(levelset_norm_field), intent(inout) :: levelset_norm !< Levelset_norm determined by models
+        integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp
+        integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
+        type(levelset_field), intent(inout), optional :: levelset !< Levelset determined by models
+        type(levelset_norm_field), intent(inout), optional :: levelset_norm !< Levelset_norm determined by models
 
         integer :: i
 
@@ -122,16 +123,16 @@ contains
 
                 if (patch_ib(i)%geometry == 8) then
                     call s_sphere(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_sphere_levelset(levelset, levelset_norm, i)
+                    call s_sphere_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 9) then
                     call s_cuboid(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_cuboid_levelset(levelset, levelset_norm, i)
+                    call s_cuboid_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 10) then
                     call s_cylinder(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_cylinder_levelset(levelset, levelset_norm, i)
+                    call s_cylinder_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 11) then
                     call s_3D_airfoil(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_3D_airfoil_levelset(levelset, levelset_norm, i)
+                    call s_3D_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 12) then
                     call s_model(i, ib_markers_sf, q_prim_vf, ib, levelset, levelset_norm)
@@ -193,13 +194,13 @@ contains
                 end if
                 if (patch_ib(i)%geometry == 2) then
                     call s_circle(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_circle_levelset(levelset, levelset_norm, i)
+                    call s_circle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 3) then
                     call s_rectangle(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_rectangle_levelset(levelset, levelset_norm, i)
+                    call s_rectangle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 4) then
                     call s_airfoil(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_airfoil_levelset(levelset, levelset_norm, i)
+                    call s_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 5) then
                     call s_model(i, ib_markers_sf, q_prim_vf, ib, levelset, levelset_norm)

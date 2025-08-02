@@ -506,6 +506,12 @@ function(MFC_SETUP_TARGET)
                     )
                 endif()
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+                # Frontier Unified Memory Support
+                if (MFC_Unified)
+                    target_compile_options(${ARGS_TARGET}
+                        PRIVATE -DFRONTIER_UNIFIED)
+                endif()
+
                 find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
                 target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn)
             endif()
