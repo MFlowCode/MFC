@@ -569,10 +569,10 @@ contains
 
 #ifdef FRONTIER_UNIFIED
         $:GPU_PARALLEL_LOOP(collapse=4)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    do i = 1, sys_size
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l)
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
@@ -655,20 +655,16 @@ contains
         end if
 
         ! Stage 2 of 2
-#if defined(FRONTIER_UNIFIED)
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
-#else
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
-#endif
+        call s_compute_rhs(q_cons_ts(dest)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
 #ifdef FRONTIER_UNIFIED
         $:GPU_PARALLEL_LOOP(collapse=4)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    do i = 1, sys_size
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(2)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(1)%vf(i)%sf(j, k, l) &
@@ -810,10 +806,10 @@ contains
 
 #ifdef FRONTIER_UNIFIED
         $:GPU_PARALLEL_LOOP(collapse=4)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    do i = 1, sys_size
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l)
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
@@ -896,20 +892,16 @@ contains
         end if
 
         ! Stage 2 of 3
-#if defined(FRONTIER_UNIFIED)
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
-#else
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
-#endif
+        call s_compute_rhs(q_cons_ts(dest)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
 #if defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    do i = 1, sys_size
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (3._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(1)%vf(i)%sf(j, k, l) &
@@ -993,20 +985,16 @@ contains
         end if
 
         ! Stage 3 of 3
-#ifdef FRONTIER_UNIFIED
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
-#else
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
-#endif
+        call s_compute_rhs(q_cons_ts(dest)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
 #ifdef FRONTIER_UNIFIED
         $:GPU_PARALLEL_LOOP(collapse=4)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    do i = 1, sys_size
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(2)%vf(i)%sf(j, k, l) &
                              + 2._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
