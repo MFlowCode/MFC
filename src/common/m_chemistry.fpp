@@ -52,7 +52,7 @@ contains
                                  0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z))**2._wp
                     end do
 
-                    call get_temperature(energy, dflt_T_guess, Ys, .true., q_T_sf%sf(x, y, z))
+                    call get_temperature(energy, dflt_T_guess, Ys, .true., real(q_T_sf%sf(x, y, z), kind=wp))
                 end do
             end do
         end do
