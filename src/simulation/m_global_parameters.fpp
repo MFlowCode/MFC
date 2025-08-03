@@ -161,8 +161,8 @@ module m_global_parameters
     integer :: nv_uvm_igr_temps_on_gpu ! 0 => jac, jac_rhs, and jac_old on CPU
                                        ! 1 => jac on GPU, jac_rhs and jac_old on CPU
                                        ! 2 => jac and jac_rhs on GPU, jac_old on CPU
-                                       ! 4 => jac, jac_rhs, and jac_old on GPU (default)
-    logical :: nv_uvm_pref_gpu ! Enable pinned gpu memory (default TRUE)
+                                       ! 3 => jac, jac_rhs, and jac_old on GPU (default)
+    logical :: nv_uvm_pref_gpu ! Enable explicit gpu memory hints (default TRUE)
     !> @}
 
     real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
