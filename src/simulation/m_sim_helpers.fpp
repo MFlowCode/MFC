@@ -108,7 +108,7 @@ contains
         if (igr) then
             if (num_fluids == 1) then
                 alpha_rho(1) = q_prim_vf(contxb)%sf(j, k, l)
-                alpha(1) = q_prim_vf(advxb)%sf(j, k, l)
+                alpha(1) = 1._wp
             else
                 $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, num_fluids - 1

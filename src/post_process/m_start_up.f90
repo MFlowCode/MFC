@@ -89,7 +89,8 @@ contains
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
             cfl_target, surface_tension, bubbles_lagrange, &
             sim_data, hyperelasticity, Bx0, relativity, cont_damage, &
-            num_bc_patches, igr, igr_order, recon_type, muscl_order
+            num_bc_patches, igr, igr_order, down_sample, recon_type, &
+            muscl_order
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -114,12 +115,18 @@ contains
 
             call s_update_cell_bounds(cells_bounds, m, n, p)
 
+            if (down_sample) then
+                m = int((m + 1)/3) - 1
+                n = int((n + 1)/3) - 1
+                p = int((p + 1)/3) - 1
+            end if
+
             ! Store m,n,p into global m,n,p
             m_glb = m
             n_glb = n
             p_glb = p
 
-            nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
+            nGlobal = int(m_glb + 1, kind=8)*int(n_glb + 1, kind=8)*int(p_glb + 1, kind=8)
 
             if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
