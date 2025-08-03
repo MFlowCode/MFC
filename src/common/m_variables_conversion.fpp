@@ -124,7 +124,8 @@ contains
         real(wp), intent(in) :: pi_inf, gamma, rho, qv
         real(wp), intent(out) :: pres
         real(wp), intent(inout) :: T
-        real(wp), intent(in), optional :: stress, mom, G, pres_mag
+        real(stp), intent(in), optional :: stress, mom
+        real(wp), intent(in), optional :: G, pres_mag
 
         ! Chemistry
         real(wp), dimension(1:num_species), intent(in) :: rhoYks

@@ -290,7 +290,7 @@ contains
 
                             call s_advance_step(myRho, myP, myR, myV, R0(q), &
                                                 pb_local, pbdot, alf, n_tait, B_tait, &
-                                                bub_adv_src(j, k, l), divu_in%sf(j, k, l), &
+                                                bub_adv_src(j, k, l), real(divu_in%sf(j, k, l), kind=wp), &
                                                 dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
                                                 dmBeta_t, dmCson, adap_dt_stop)
 
@@ -300,7 +300,7 @@ contains
                         else
                             rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
                                             pb_local, pbdot, alf, n_tait, B_tait, &
-                                            bub_adv_src(j, k, l), divu_in%sf(j, k, l), &
+                                            bub_adv_src(j, k, l), real(divu_in%sf(j, k, l), kind=wp), &
                                             dmCson)
                             bub_v_src(j, k, l, q) = nbub*rddot
                             bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
