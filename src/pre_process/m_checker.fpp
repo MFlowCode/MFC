@@ -41,6 +41,14 @@ contains
 #ifndef MFC_MPI
         @:PROHIBIT(parallel_io, "MFC built with --no-mpi requires parallel_io=F")
 #endif
+        @:PROHIBIT(down_sample .and. (.not. parallel_io), "down sample with parallel_io = T")
+        @:PROHIBIT(down_sample .and. (.not. igr), "down sample with igr = T")
+        @:PROHIBIT(down_sample .and. (p == 0), "down sample with 3D only")
+        @:PROHIBIT(down_sample .and. (.not. file_per_process), "down sample with file_per_process = T")
+        @:PROHIBIT(down_sample .and. (MOD(m+1,3) > 0), "down sample with m divisible by 3")
+        @:PROHIBIT(down_sample .and. (MOD(n+1,3) > 0), "down sample with n divisible by 3")
+        @:PROHIBIT(down_sample .and. (MOD(p+1,3) > 0), "down sample with p divisible by 3")
+
     end subroutine s_check_parallel_io
 
     !> Checks constraints on the restart parameters

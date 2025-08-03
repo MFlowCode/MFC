@@ -1626,7 +1626,7 @@ contains
 
     impure subroutine s_create_mpi_types(bc_type)
 
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
 #ifdef MFC_MPI
         integer :: dir, loc
@@ -1659,9 +1659,9 @@ contains
 
     subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath, old_grid_in)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
-        logical :: old_grid_in
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        logical, intent(in) :: old_grid_in
 
         character(LEN=*), intent(in) :: step_dirpath
 
@@ -1700,8 +1700,8 @@ contains
 
     subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
         integer :: dir, loc
         character(len=path_len) :: file_loc, file_path
@@ -1870,7 +1870,7 @@ contains
 
     subroutine s_pack_boundary_condition_buffers(q_prim_vf)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer :: i, j, k
 
         do k = 0, p

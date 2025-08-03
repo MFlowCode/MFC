@@ -27,7 +27,8 @@ module m_global_parameters
 
     implicit none
 
-    real(wp) :: time = 0
+    real(wp) :: wall_time = 0
+    real(wp) :: wall_time_avg = 0
 
     ! Logistics
     integer :: num_procs             !< Number of processors
@@ -235,6 +236,8 @@ module m_global_parameters
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< shared file or not when using parallel io
     integer :: precision !< Precision of output files
+    logical :: down_sample !< down sample the output files
+    $:GPU_DECLARE(create='[down_sample]')
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
@@ -589,6 +592,7 @@ contains
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
+        down_sample = .false.
         relax = .false.
         relax_model = dflt_int
         palpha_eps = dflt_real
@@ -878,14 +882,20 @@ contains
                 mom_idx%beg = cont_idx%end + 1
                 mom_idx%end = cont_idx%end + num_vels
                 E_idx = mom_idx%end + 1
-                adv_idx%beg = E_idx + 1
+
                 if (igr) then
-                    if (num_fluids == 1) then
-                        adv_idx%end = adv_idx%beg
-                    else
-                        adv_idx%end = E_idx + num_fluids - 1
-                    end if
+                    ! Volume fractions are stored in the indices immediately following
+                    ! the energy equation. IGR tracks a total of (N-1) volume fractions
+                    ! for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
+                    ! then adv_idx%end < adv_idx%beg, which skips all loops over the
+                    ! volume fractions since there is no volume fraction to track
+                    adv_idx%beg = E_idx + 1 ! Alpha for fluid 1
+                    adv_idx%end = E_idx + num_fluids - 1
                 else
+                    ! Volume fractions are stored in the indices immediately following
+                    ! the energy equation. WENO/MUSCL + Riemann tracks a total of (N)
+                    ! volume fractions for N fluids, hence the lack of  "-1" in adv_idx%end
+                    adv_idx%beg = E_idx + 1
                     adv_idx%end = E_idx + num_fluids
                 end if
 
@@ -1179,10 +1189,12 @@ contains
             allocate (MPI_IO_DATA%var(1:sys_size))
         end if
 
-        do i = 1, sys_size
-            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-            MPI_IO_DATA%var(i)%sf => null()
-        end do
+        if (.not. down_sample) then
+            do i = 1, sys_size
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        end if
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
@@ -1223,7 +1235,8 @@ contains
             fd_number = max(1, fd_order/2)
         end if
 
-        call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, buff_size, &
+        call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
+                                           igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
                                            num_dims, igr)
