@@ -312,6 +312,8 @@ SIMULATION.update({
     'int_comp': ParamType.LOG,
     'ic_eps': ParamType.REAL,
     'ic_beta': ParamType.REAL,
+    'nv_uvm_igr_temps_on_gpu': ParamType.INT,
+    'nv_uvm_pref_gpu': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',

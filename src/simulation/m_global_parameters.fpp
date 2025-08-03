@@ -156,6 +156,15 @@ module m_global_parameters
         logical :: viscous        !< Viscous effects
     #:endif
 
+    !> @name Variables for our of core IGR computation on NVIDIA
+    !> @{
+    integer :: nv_uvm_igr_temps_on_gpu ! 0 => jac, jac_rhs, and jac_old on CPU
+                                       ! 1 => jac on GPU, jac_rhs and jac_old on CPU
+                                       ! 2 => jac and jac_rhs on GPU, jac_old on CPU
+                                       ! 4 => jac, jac_rhs, and jac_old on GPU (default)
+    logical :: nv_uvm_pref_gpu ! Enable pinned gpu memory (default TRUE)
+    !> @}
+
     real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
     real(wp) :: teno_CT        !< Smoothness threshold for TENO
     logical :: mp_weno        !< Monotonicity preserving (MP) WENO
@@ -569,6 +578,10 @@ contains
         n_start = dflt_int
         t_stop = dflt_real
         t_save = dflt_real
+
+        ! NVIDIA UVM options
+        nv_uvm_igr_temps_on_gpu = 3 ! => jac, jac_rhs, and jac_old on GPU (default)
+        nv_uvm_pref_gpu = .true.
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int

@@ -47,8 +47,8 @@ print(
             "cyl_coord": "F",
             "dt": dt,
             "t_step_start": 0,
-            "t_step_stop": Nt,
-            "t_step_save": int(Nt / 100),
+            "t_step_stop": 10, #Nt,
+            "t_step_save": 10, #int(Nt / 100),
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
@@ -96,6 +96,9 @@ print(
             "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1),
             "fluid_pp(1)%pi_inf": 0,
             "fluid_pp(1)%Re(1)": 1 / mu,
+            # NVIDIA UVM Options
+            "nv_uvm_igr_temps_on_gpu": 3,
+            "nv_uvm_pref_gpu": "T",
         }
     )
 )

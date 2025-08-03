@@ -25,11 +25,11 @@ module m_igr
  s_finalize_igr_module
 
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
-    integer, dimension(3) :: temp_on_gpu
+    integer, dimension(3) :: nv_uvm_temp_on_gpu
     real(wp), pointer, contiguous, dimension(:, :, :) :: jac,jac_rhs,jac_old
-    real(wp), allocatable, dimension(:, :, :), pinned, target :: pool_host1
-    real(wp), allocatable, dimension(:, :, :), pinned, target :: pool_host2
-    real(wp), allocatable, dimension(:, :, :), pinned, target :: pool_host3
+    real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_host_pool
+    real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_rhs_host_pool
+    real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_old_host_pool
 #else
     real(wp), allocatable, dimension(:, :, :) :: jac, jac_rhs, jac_old
     $:GPU_DECLARE(create='[jac, jac_rhs, jac_old]')
@@ -81,7 +81,6 @@ module m_igr
                                    5._wp/6._wp, & ! Index 0
                                    2._wp/6._wp & ! Index 1
                                    ]
-
         #:endif
     #:endif
 
@@ -90,29 +89,6 @@ module m_igr
 contains
 
     subroutine s_initialize_igr_module()
-#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
-        integer :: igr_temps_on_gpu = 3
-        character(len=10) :: igr_temps_on_gpu_str
-
-        call get_environment_variable("NVIDIA_IGR_TEMPS_ON_GPU", igr_temps_on_gpu_str)
-
-        if (trim(igr_temps_on_gpu_str) == "0") then
-            igr_temps_on_gpu = 0 ! jac, jac_rhs and jac_old on CPU
-        else if (trim(igr_temps_on_gpu_str) == "1") then
-            igr_temps_on_gpu = 1 ! jac on GPU, jac_rhs on CPU, jac_old on CPU
-        else if (trim(igr_temps_on_gpu_str) == "2") then
-            igr_temps_on_gpu = 2 ! jac and jac_rhs on GPU, jac_old on CPU
-        else if (trim(igr_temps_on_gpu_str) == "3") then
-            igr_temps_on_gpu = 3 ! jac, jac_rhs and jac_old on GPU
-        else ! default on GPU
-            igr_temps_on_gpu = 3
-        end if
-
-        ! create map
-        temp_on_gpu(1:3) = 0
-        temp_on_gpu(1:igr_temps_on_gpu) = 1
-        !print*, temp_on_gpu(1:3)
-#endif
 
         if (viscous) then
             @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
@@ -138,48 +114,47 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end))
         end if
 #else
+        ! create map
+        nv_uvm_temp_on_gpu(1:3) = 0
+        nv_uvm_temp_on_gpu(1:nv_uvm_igr_temps_on_gpu) = 1
 
-        if ( temp_on_gpu(1) == 1 ) then
+        if (nv_uvm_temp_on_gpu(1) == 1) then
             @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
             @:PREFER_GPU(jac)
         else
-            !print*, 'jac on CPU'
-            allocate(pool_host1(idwbuff(1)%beg:idwbuff(1)%end, &
+            allocate(jac_host_pool(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
 
             jac(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
-                idwbuff(3)%beg:idwbuff(3)%end) => pool_host1(:,:,:)
+                idwbuff(3)%beg:idwbuff(3)%end) => jac_host_pool(:,:,:)
         end if
 
-        if ( temp_on_gpu(2) == 1 ) then
+        if (nv_uvm_temp_on_gpu(2) == 1) then
             @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
             @:PREFER_GPU(jac_rhs)
         else
-            !print*, 'jac_rhs on CPU'
-            allocate(pool_host2(-1:m,-1:n,-1:p))
-
-            jac_rhs(-1:m,-1:n,-1:p) => pool_host2(:,:,:)
+            allocate(jac_rhs_host_pool(-1:m,-1:n,-1:p))
+            jac_rhs(-1:m,-1:n,-1:p) => jac_rhs_host_pool(:,:,:)
         end if
 
         if (igr_iter_solver == 1) then ! Jacobi iteration
-            if ( temp_on_gpu(3) == 1 ) then
+            if (nv_uvm_temp_on_gpu(3) == 1) then
                 @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
                 @:PREFER_GPU(jac_old)
             else
-                !print*, 'jac_old on CPU'
-                allocate(pool_host3(idwbuff(1)%beg:idwbuff(1)%end, &
+                allocate(jac_old_host_pool(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
 
                 jac_old(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end) => pool_host3(:,:,:)
+                    idwbuff(3)%beg:idwbuff(3)%end) => jac_old_host_pool(:,:,:)
             end if
         end if
 #endif
@@ -203,7 +178,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             if (igr_order == 3) then
-                vidxb = -1; vidxe = 2; 
+                vidxb = -1; vidxe = 2;
                 $:GPU_UPDATE(device='[vidxb, vidxe]')
 
                 @:ALLOCATE(coeff_L(0:2))
@@ -219,7 +194,7 @@ contains
                 $:GPU_UPDATE(device='[coeff_R]')
 
             elseif (igr_order == 5) then
-                vidxb = -2; vidxe = 3; 
+                vidxb = -2; vidxe = 3;
                 $:GPU_UPDATE(device='[vidxb, vidxe]')
 
                 @:ALLOCATE(coeff_L(-1:3))
@@ -2699,26 +2674,26 @@ contains
             @:DEALLOCATE(jac_old)
         end if
 #else
-        if (temp_on_gpu(1) == 1) then
+        if (nv_uvm_temp_on_gpu(1) == 1) then
             @:DEALLOCATE(jac)
         else
             nullify(jac)
-            deallocate(pool_host1)
+            deallocate(jac_host_pool)
         end if
 
-        if (temp_on_gpu(2) == 1) then
+        if (nv_uvm_temp_on_gpu(2) == 1) then
             @:DEALLOCATE(jac_rhs)
         else
             nullify(jac_rhs)
-            deallocate(pool_host2)
+            deallocate(jac_rhs_host_pool)
         end if
 
         if (igr_iter_solver == 1) then ! Jacobi iteration
-            if (temp_on_gpu(3) == 1) then
+            if (nv_uvm_temp_on_gpu(3) == 1) then
                 @:DEALLOCATE(jac_old)
             else
                 nullify(jac_old)
-                deallocate(pool_host3)
+                deallocate(jac_old_host_pool)
             end if
         end if
 #endif

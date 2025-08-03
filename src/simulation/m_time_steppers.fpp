@@ -79,7 +79,6 @@ module m_time_steppers
 
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
     real(wp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
-    integer, private :: out_of_core
 #endif
 
 contains
@@ -90,21 +89,6 @@ contains
     impure subroutine s_initialize_time_steppers_module
 
         integer :: i, j !< Generic loop iterators
-
-#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
-        character(len=10) :: out_of_core_str
-        out_of_core = 0
-
-        call get_environment_variable("MFC_OUT_OF_CORE", out_of_core_str)
-
-        if (trim(out_of_core_str) == "0") then
-            out_of_core = 0
-        elseif (trim(out_of_core_str) == "1") then
-            out_of_core = 1
-        else ! default
-            out_of_core = 0
-        endif
-#endif
 
         ! Setting number of time-stages for selected time-stepping scheme
         if (time_stepper == 1) then
@@ -123,35 +107,38 @@ contains
         end do
 
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
-        if ( out_of_core == 1 ) then
-           allocate(q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
-                                        idwbuff(2)%beg:idwbuff(2)%end, &
-                                        idwbuff(3)%beg:idwbuff(3)%end, &
-                                        1:sys_size))
-        end if
-#endif
+       allocate(q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
+                                    idwbuff(2)%beg:idwbuff(2)%end, &
+                                    idwbuff(3)%beg:idwbuff(3)%end, &
+                                    1:sys_size))
+
+        do j = 1, sys_size
+            ! q_cons_ts(1) lives on the device
+            @:ALLOCATE(q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end))
+            @:PREFER_GPU(q_cons_ts(1)%vf(j)%sf)
+            if (num_ts == 2) then
+                ! q_cons_ts(2) lives on the host
+                q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    idwbuff(2)%beg:idwbuff(2)%end, &
+                    idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
+            end if
+        end do
 
         do i = 1, num_ts
+            @:ACC_SETUP_VFs(q_cons_ts(i))
+        end do
+#else
+        do i = 1, num_ts
             do j = 1, sys_size
-#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
-                if ( i <= (num_ts - out_of_core) ) then
-                    !print*, "q_cons_ts", i, j, "on GPU"
-#endif
-                    @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                        idwbuff(2)%beg:idwbuff(2)%end, &
-                        idwbuff(3)%beg:idwbuff(3)%end))
-                    @:PREFER_GPU(q_cons_ts(i)%vf(j)%sf)
-#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
-                else
-                    !print*, "q_cons_ts", i, j, "on CPU"
-                    q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                        idwbuff(2)%beg:idwbuff(2)%end, &
-                        idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
-                end if
-#endif
+                @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    idwbuff(2)%beg:idwbuff(2)%end, &
+                    idwbuff(3)%beg:idwbuff(3)%end))
             end do
             @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
+#endif
 
         ! Allocating the cell-average primitive ts variables
         if (probe_wrt) then
@@ -513,6 +500,7 @@ contains
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(wp) :: start, finish
+        integer :: dest
 
         ! Stage 1 of 2
 
@@ -542,6 +530,24 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
+#if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l)
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+        dest = 1 ! Result in q_cons_ts(1)%vf
+#else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -554,6 +560,9 @@ contains
                 end do
             end do
         end do
+
+        dest = 2 ! Result in q_cons_ts(2)%vf
+#endif
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
@@ -590,30 +599,46 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
             else
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
             end if
         end if
 
         ! Stage 2 of 2
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+        call s_compute_rhs(q_cons_ts(dest)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
+#if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                    end do
+                end do
+            end do
+        end do
 
+        dest = 1 ! Result in q_cons_ts(1)%vf
+#else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -627,6 +652,9 @@ contains
                 end do
             end do
         end do
+
+        dest = 1 ! Result in q_cons_ts(1)%vf
+#endif
 
         if (qbmm .and. (.not. polytropic)) then
             $:GPU_PARALLEL_LOOP(collapse=5)
@@ -664,21 +692,21 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
             end if
         end if
 
@@ -729,21 +757,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-        dest = 2 ! result in q_cons_ts(2)%vf
-#else
+#if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -758,7 +772,23 @@ contains
                 end do
             end do
         end do
+
         dest = 1 ! result in q_cons_ts(1)%vf
+#else
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+        dest = 2 ! result in q_cons_ts(2)%vf
 #endif
 
         !Evolve pb and mv for non-polytropic qbmm
@@ -796,21 +826,21 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
             else
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
             end if
         end if
 
@@ -820,7 +850,23 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
-#if  !defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+#if  defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+         $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (3._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                    end do
+                end do
+            end do
+        end do
+
+        dest = 1 ! Result in q_cons_ts(1)%vf
+#else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -834,22 +880,8 @@ contains
                 end do
             end do
         end do
-        dest = 2 ! result in q_cons_ts(2)%vf
-#else
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (3._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
-                    end do
-                end do
-            end do
-        end do
-        dest = 1 ! result in q_cons_ts(1)%vf
+
+        dest = 2 ! Result in q_cons_ts(2)%vf
 #endif
 
         if (qbmm .and. (.not. polytropic)) then
@@ -888,21 +920,21 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt/4._wp)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
             else
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
             end if
         end if
 
@@ -911,22 +943,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
-#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
-                    end do
-                end do
-            end do
-        end do
-        dest = 1 ! result in q_cons_ts(1)%vf
-#else
+#if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -940,7 +957,24 @@ contains
                 end do
             end do
         end do
-        dest = 1 ! result in q_cons_ts(1)%vf
+
+        dest = 1 ! Result in q_cons_ts(1)%vf
+#else
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+                    end do
+                end do
+            end do
+        end do
+
+        dest = 1 ! Result in q_cons_ts(2)%vf
 #endif
 
         if (qbmm .and. (.not. polytropic)) then
@@ -979,25 +1013,25 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
         end if
 
         call nvtxStartRange("RHS-ELASTIC")
-        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(1)%vf, q_prim_vf)
+        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(dest)%vf, q_prim_vf)
         call nvtxEndRange
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
             end if
         end if
 
@@ -1007,6 +1041,7 @@ contains
 
             time = time + (finish - start)
         end if
+
     end subroutine s_3rd_order_tvd_rk
 
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
@@ -1244,30 +1279,20 @@ contains
         integer :: i, j !< Generic loop iterators
 
         ! Deallocating the cell-average conservative variables
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        do j = 1, sys_size
+            @:DEALLOCATE(q_cons_ts(1)%vf(j)%sf)
+            if (num_ts == 2) then
+                nullify(q_cons_ts(2)%vf(j)%sf)
+            end if
+        end do
+        deallocate(q_cons_ts_pool_host)
+#else
         do i = 1, num_ts
             do j = 1, sys_size
-#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
-                if ( i <= (num_ts - out_of_core) ) then
-                    !print*, "q_cons_ts", i, j, "dealloc"
-#endif
-                    @:DEALLOCATE(q_cons_ts(i)%vf(j)%sf)
-#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
-                else
-                    !print*, "q_cons_ts", i, j, "nullify"
-                    nullify(q_cons_ts(i)%vf(j)%sf)
-                end if
-#endif
+                @:ALLOCATE(q_cons_ts(i)%vf(j)%sf)
             end do
-
-            @:DEALLOCATE(q_cons_ts(i)%vf)
         end do
-
-        @:DEALLOCATE(q_cons_ts)
-
-#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
-        if ( out_of_core == 1 ) then
-            deallocate(q_cons_ts_pool_host)
-        end if
 #endif
 
         ! Deallocating the cell-average primitive ts variables
