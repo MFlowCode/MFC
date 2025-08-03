@@ -37,13 +37,8 @@ export FI_CXI_RX_MATCH_MODE=software
 export FI_MR_CACHE_MONITOR=disabled
 export MPICH_NO_BUFFER_ALIAS_CHECK=1
 
-# CUSTOM env vars to MFC
-export MFC_OUT_OF_CORE=1                      # out of core
-export NVIDIA_MANUAL_GPU_HINTS=1              # prefloc GPU on some
-export NVIDIA_IGR_TEMPS_ON_GPU=3              # jac, jac_rhs, and jac_old on GPU
-
 # NSYS
-export NSYS=1                                 # enable nsys profiling
+export NSYS=0                                 # enable nsys profiling
 export NSYS_FILE=myreport.qdrep
 
 ${helpers.template_prologue()}
