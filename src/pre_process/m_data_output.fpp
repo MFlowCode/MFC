@@ -39,7 +39,7 @@ module m_data_output
 
     implicit none
 
-    private;
+    private; 
     public :: s_write_serial_data_files, &
               s_write_parallel_data_files, &
               s_write_data_files, &
@@ -615,8 +615,8 @@ contains
             end if
             call s_mpi_allreduce_sum(loc_violations, glb_violations)
             if (proc_rank == 0 .and. nint(glb_violations) > 0) then
-                print*, "WARNING: Attempting to downsample data but there are" // &
-                        "processors with local problem sizes that are not divisible by 3."
+                print *, "WARNING: Attempting to downsample data but there are"// &
+                    "processors with local problem sizes that are not divisible by 3."
             end if
             call s_populate_variables_buffers(bc_type, q_cons_vf)
             call s_downsample_data(q_cons_vf, q_cons_temp, &
