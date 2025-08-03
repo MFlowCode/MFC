@@ -27,10 +27,10 @@ module m_compute_levelset
 
 contains
 
-    pure subroutine s_circle_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_circle_levelset(ib_patch_id, levelset, levelset_norm)
 
-        type(levelset_field), intent(INOUT) :: levelset
-        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+        type(levelset_field), intent(INOUT), optional :: levelset
+        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
         integer, intent(IN) :: ib_patch_id
 
         real(wp) :: radius, dist
@@ -63,10 +63,10 @@ contains
 
     end subroutine s_circle_levelset
 
-    pure subroutine s_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_airfoil_levelset(ib_patch_id, levelset, levelset_norm)
 
-        type(levelset_field), intent(INOUT) :: levelset
-        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+        type(levelset_field), intent(INOUT), optional :: levelset
+        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
         integer, intent(IN) :: ib_patch_id
 
         real(wp) :: dist, global_dist
@@ -146,10 +146,10 @@ contains
 
     end subroutine s_airfoil_levelset
 
-    pure subroutine s_3D_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_3D_airfoil_levelset(ib_patch_id, levelset, levelset_norm)
 
-        type(levelset_field), intent(INOUT) :: levelset
-        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+        type(levelset_field), intent(INOUT), optional :: levelset
+        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
         integer, intent(IN) :: ib_patch_id
 
         real(wp) :: dist, dist_surf, dist_side, global_dist
@@ -250,10 +250,10 @@ contains
     end subroutine s_3D_airfoil_levelset
 
     !>  Initialize IBM module
-    pure subroutine s_rectangle_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_rectangle_levelset(ib_patch_id, levelset, levelset_norm)
 
-        type(levelset_field), intent(INOUT) :: levelset
-        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+        type(levelset_field), intent(INOUT), optional :: levelset
+        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
 
         integer, intent(in) :: ib_patch_id
         real(wp) :: top_right(2), bottom_left(2)
@@ -347,10 +347,10 @@ contains
 
     end subroutine s_rectangle_levelset
 
-    pure subroutine s_cuboid_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_cuboid_levelset(ib_patch_id, levelset, levelset_norm)
 
-        type(levelset_field), intent(INOUT) :: levelset
-        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+        type(levelset_field), intent(INOUT), optional :: levelset
+        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
 
         integer, intent(IN) :: ib_patch_id
         real(wp) :: Right, Left, Bottom, Top, Front, Back
@@ -464,10 +464,10 @@ contains
 
     end subroutine s_cuboid_levelset
 
-    pure subroutine s_sphere_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_sphere_levelset(ib_patch_id, levelset, levelset_norm)
 
-        type(levelset_field), intent(INOUT) :: levelset
-        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+        type(levelset_field), intent(INOUT), optional :: levelset
+        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
         integer, intent(IN) :: ib_patch_id
 
         real(wp) :: radius, dist
@@ -501,10 +501,10 @@ contains
 
     end subroutine s_sphere_levelset
 
-    pure subroutine s_cylinder_levelset(levelset, levelset_norm, ib_patch_id)
+    pure subroutine s_cylinder_levelset(ib_patch_id, levelset, levelset_norm)
 
-        type(levelset_field), intent(INOUT) :: levelset
-        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+        type(levelset_field), intent(INOUT), optional :: levelset
+        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
         integer, intent(IN) :: ib_patch_id
 
         real(wp) :: radius

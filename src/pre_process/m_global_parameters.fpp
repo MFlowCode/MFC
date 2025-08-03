@@ -43,7 +43,7 @@ module m_global_parameters
     !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
     type(cell_num_bounds) :: cells_bounds
 
-    integer(8) :: nGlobal !< Global number of cells in the domain
+    integer(kind=8) :: nGlobal !< Global number of cells in the domain
 
     integer :: m_glb, n_glb, p_glb !< Global number of cells in each direction
 
@@ -146,6 +146,7 @@ module m_global_parameters
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< type of data output
     integer :: precision !< Precision of output files
+    logical :: down_sample !< Down-sample the output data
 
     logical :: mixlayer_vel_profile !< Set hyperbolic tangent streamwise velocity profile
     real(wp) :: mixlayer_vel_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
@@ -377,6 +378,7 @@ contains
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
+        down_sample = .false.
         viscous = .false.
         bubbles_lagrange = .false.
         mixlayer_vel_profile = .false.
@@ -606,14 +608,20 @@ contains
             mom_idx%beg = cont_idx%end + 1
             mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
-            adv_idx%beg = E_idx + 1
+
             if (igr) then
-                if (num_fluids == 1) then
-                    adv_idx%end = adv_idx%beg
-                else
-                    adv_idx%end = E_idx + num_fluids - 1
-                end if
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. IGR tracks a total of (N-1) volume fractions
+                ! for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
+                ! then adv_idx%end < adv_idx%beg, which skips all loops over the
+                ! volume fractions since there is no volume fraction to track
+                adv_idx%beg = E_idx + 1
+                adv_idx%end = E_idx + num_fluids - 1
             else
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. WENO/MUSCL + Riemann tracks a total of (N)
+                ! volume fractions for N fluids, hence the lack of  "-1" in adv_idx%end
+                adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
             end if
 
@@ -872,7 +880,8 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, buff_size, &
+        call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
+                                           igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
                                            num_dims, igr)
@@ -887,10 +896,12 @@ contains
             allocate (MPI_IO_DATA%var(1:sys_size))
         end if
 
-        do i = 1, sys_size
-            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-            MPI_IO_DATA%var(i)%sf => null()
-        end do
+        if (.not. down_sample) then
+            do i = 1, sys_size
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        end if
         if (qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
@@ -923,7 +934,9 @@ contains
             grid_geometry = 3
         end if
 
-        allocate (logic_grid(0:m, 0:n, 0:p))
+        if (.not. igr) then
+            allocate (logic_grid(0:m, 0:n, 0:p))
+        end if
 
     end subroutine s_initialize_global_parameters_module
 

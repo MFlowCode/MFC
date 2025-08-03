@@ -44,6 +44,10 @@ echo
     export MPICH_GPU_SUPPORT_ENABLED=0
 % endif
 
+%if unified:
+    export CRAY_ACC_USE_UNIFIED_MEM=1
+% endif
+
 ulimit -s unlimited
 
 % for target in targets:
