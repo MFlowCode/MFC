@@ -12,8 +12,7 @@ module m_sim_helpers
 
     private; public :: s_compute_enthalpy, &
  s_compute_stability_from_dt, &
- s_compute_dt_from_cfl, &
- s_upsample_data
+ s_compute_dt_from_cfl
 
 contains
 
@@ -293,43 +292,5 @@ contains
         end if
 
     end subroutine s_compute_dt_from_cfl
-
-    subroutine s_upsample_data(q_cons_vf, q_cons_temp)
-
-        type(scalar_field), intent(inout), dimension(sys_size) :: q_cons_vf, q_cons_temp
-        integer :: i, j, k, l
-        integer :: ix, iy, iz
-        integer :: x_id, y_id, z_id
-        real(wp), dimension(4) :: temp
-
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    do i = 1, sys_size
-
-                        ix = int(j/3._wp)
-                        iy = int(k/3._wp)
-                        iz = int(l/3._wp)
-
-                        x_id = j - int(3*ix) - 1
-                        y_id = k - int(3*iy) - 1
-                        z_id = l - int(3*iz) - 1
-
-                        temp(1) = (2._wp/3._wp)*q_cons_temp(i)%sf(ix, iy, iz) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix + x_id, iy, iz)
-                        temp(2) = (2._wp/3._wp)*q_cons_temp(i)%sf(ix, iy + y_id, iz) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix + x_id, iy + y_id, iz)
-                        temp(3) = (2._wp/3._wp)*temp(1) + (1._wp/3._wp)*temp(2)
-
-                        temp(1) = (2._wp/3._wp)*q_cons_temp(i)%sf(ix, iy, iz + z_id) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix + x_id, iy, iz + z_id)
-                        temp(2) = (2._wp/3._wp)*q_cons_temp(i)%sf(ix, iy + y_id, iz + z_id) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix + x_id, iy + y_id, iz + z_id)
-                        temp(4) = (2._wp/3._wp)*temp(1) + (1._wp/3._wp)*temp(2)
-
-                        q_cons_vf(i)%sf(j, k, l) = (2._wp/3._wp)*temp(3) + (1._wp/3._wp)*temp(4)
-
-                    end do
-                end do
-            end do
-        end do
-
-    end subroutine s_upsample_data
 
 end module m_sim_helpers

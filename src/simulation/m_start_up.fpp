@@ -538,7 +538,9 @@ contains
         integer :: i, j
 
         ! Downsampled data variables
-        integer :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
+        integer :: m_ds, n_ds, p_ds
+        integer :: m_glb_ds, n_glb_ds, p_glb_ds
+        integer :: m_glb_read, n_glb_read, p_glb_read ! data size of read
 
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))
@@ -658,28 +660,25 @@ contains
                 if(down_sample) then
                     ! Size of local arrays
                     data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
-
-                    ! Resize some integers so MPI can read even the biggest file
-                    m_MOK = int(m_glb_ds + 1, MPI_OFFSET_KIND)
-                    n_MOK = int(n_glb_ds + 1, MPI_OFFSET_KIND)
-                    p_MOK = int(p_glb_ds + 1, MPI_OFFSET_KIND)
-                    WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                    MOK = int(1._wp, MPI_OFFSET_KIND)
-                    str_MOK = int(name_len, MPI_OFFSET_KIND)
-                    NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                    m_glb_read = m_glb_ds + 1
+                    n_glb_read = n_glb_ds + 1
+                    p_glb_read = p_glb_ds + 1
                 else
                     ! Size of local arrays
                     data_size = (m + 1)*(n + 1)*(p + 1)
-
-                    ! Resize some integers so MPI can read even the biggest file
-                    m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-                    n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-                    p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                    WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                    MOK = int(1._wp, MPI_OFFSET_KIND)
-                    str_MOK = int(name_len, MPI_OFFSET_KIND)
-                    NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                    m_glb_read = m_glb + 1
+                    n_glb_read = n_glb + 1
+                    p_glb_read = p_glb + 1
                 end if
+
+                ! Resize some integers so MPI can read even the biggest file
+                m_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
+                n_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
+                p_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then

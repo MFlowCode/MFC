@@ -39,7 +39,7 @@ module m_data_output
 
     implicit none
 
-    private; 
+    private;
     public :: s_write_serial_data_files, &
               s_write_parallel_data_files, &
               s_write_data_files, &
@@ -602,13 +602,21 @@ contains
 
         ! Generic loop iterators
         integer :: i, j, k, l
+        real(wp) :: loc_violations, glb_violations
 
         ! Downsample variables
-        integer :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
+        integer :: m_ds, n_ds, p_ds
+        integer :: m_glb_ds, n_glb_ds, p_glb_ds
+        integer :: m_glb_save, n_glb_save, p_glb_save ! Size of array being saved
 
         if (down_sample) then
             if ((mod(m + 1, 3) > 0) .or. (mod(n + 1, 3) > 0) .or. (mod(p + 1, 3) > 0)) then
-                print *, "WARNING: ATTEMPTING TO RUN DOWN SAMPLING WITH local problem size not divisible by 3"
+                loc_violations = 1._wp
+            end if
+            call s_mpi_allreduce_sum(loc_violations, glb_violations)
+            if (proc_rank == 0 .and. nint(glb_violations) > 0) then
+                print*, "WARNING: Attempting to downsample data but there are" // &
+                        "processors with local problem sizes that are not divisible by 3."
             end if
             call s_populate_variables_buffers(bc_type, q_cons_vf)
             call s_downsample_data(q_cons_vf, q_cons_temp, &
@@ -657,28 +665,25 @@ contains
             if (down_sample) then
                 ! Size of local arrays
                 data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
-
-                ! Resize some integers so MPI can write even the biggest files
-                m_MOK = int(m_glb_ds + 3, MPI_OFFSET_KIND)
-                n_MOK = int(n_glb_ds + 3, MPI_OFFSET_KIND)
-                p_MOK = int(p_glb_ds + 3, MPI_OFFSET_KIND)
-                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                MOK = int(1._wp, MPI_OFFSET_KIND)
-                str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                m_glb_save = m_glb_ds + 3
+                n_glb_save = n_glb_ds + 3
+                p_glb_save = p_glb_ds + 3
             else
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
-
-                ! Resize some integers so MPI can write even the biggest files
-                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                MOK = int(1._wp, MPI_OFFSET_KIND)
-                str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                m_glb_save = m_glb + 1
+                n_glb_save = n_glb + 1
+                p_glb_save = p_glb + 1
             end if
+
+            ! Resize some integers so MPI can write even the biggest files
+            m_MOK = int(m_glb_save, MPI_OFFSET_KIND)
+            n_MOK = int(n_glb_save, MPI_OFFSET_KIND)
+            p_MOK = int(p_glb_save, MPI_OFFSET_KIND)
+            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            MOK = int(1._wp, MPI_OFFSET_KIND)
+            str_MOK = int(name_len, MPI_OFFSET_KIND)
+            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
             ! Write the data for each variable
             if (bubbles_euler) then

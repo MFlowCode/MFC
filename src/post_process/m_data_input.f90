@@ -504,28 +504,19 @@ contains
                 if (down_sample) then
                     ! Size of local arrays
                     data_size = (m + 3)*(n + 3)*(p + 3)
-
-                    ! Resize some integers so MPI can read even the biggest file
-                    m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-                    n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-                    p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                    WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                    MOK = int(1._wp, MPI_OFFSET_KIND)
-                    str_MOK = int(name_len, MPI_OFFSET_KIND)
-                    NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
                 else
                     ! Size of local arrays
                     data_size = (m + 1)*(n + 1)*(p + 1)
-
-                    ! Resize some integers so MPI can read even the biggest file
-                    m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-                    n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-                    p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                    WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                    MOK = int(1._wp, MPI_OFFSET_KIND)
-                    str_MOK = int(name_len, MPI_OFFSET_KIND)
-                    NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
                 end if
+
+                ! Resize some integers so MPI can read even the biggest file
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity .or. mhd) then

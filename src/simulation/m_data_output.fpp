@@ -818,7 +818,9 @@ contains
         integer :: alt_sys !< Altered system size for the lagrangian subgrid bubble model
 
         ! Down sampling variables
-        integer :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
+        integer :: m_ds, n_ds, p_ds
+        integer :: m_glb_ds, n_glb_ds, p_glb_ds
+        integer :: m_glb_save, n_glb_save, p_glb_save ! Global save size
 
         if (down_sample) then
             call s_populate_variables_buffers(bc_type, q_cons_vf)
@@ -874,28 +876,25 @@ contains
             if (down_sample) then
                 ! Size of local arrays
                 data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
-
-                ! Resize some integers so MPI can write even the biggest files
-                m_MOK = int(m_glb_ds + 1, MPI_OFFSET_KIND)
-                n_MOK = int(n_glb_ds + 1, MPI_OFFSET_KIND)
-                p_MOK = int(p_glb_ds + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                MOK = int(1._wp, MPI_OFFSET_KIND)
-                str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                m_glb_save = m_glb_ds + 1
+                n_glb_save = n_glb_ds + 1
+                p_glb_save = p_glb_ds + 1
             else
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
-
-                ! Resize some integers so MPI can write even the biggest files
-                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                MOK = int(1._wp, MPI_OFFSET_KIND)
-                str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                m_glb_save = m_glb + 1
+                n_glb_save = n_glb + 1
+                p_glb_save = p_glb + 1
             end if
+
+            ! Resize some integers so MPI can write even the biggest files
+            m_MOK = int(m_glb_save + 1, MPI_OFFSET_KIND)
+            n_MOK = int(n_glb_save + 1, MPI_OFFSET_KIND)
+            p_MOK = int(p_glb_save + 1, MPI_OFFSET_KIND)
+            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            MOK = int(1._wp, MPI_OFFSET_KIND)
+            str_MOK = int(name_len, MPI_OFFSET_KIND)
+            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
             if (bubbles_euler) then
                 ! Write the data for each variable
