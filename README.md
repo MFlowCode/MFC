@@ -90,7 +90,7 @@ It's rather straightforward.
 We'll give a brief intro. here for MacOS.
 Using [brew](https://brew.sh), install MFC's dependencies:
 ```shell
-brew install coreutils python cmake fftw hdf5 gcc boost open-mpi
+brew install coreutils python cmake fftw hdf5 gcc boost open-mpi lapack
 ```
 You're now ready to build and test MFC!
 Put it to a convenient directory via
@@ -199,7 +199,7 @@ They are organized below.
 
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
-	* Approx. 500 Regression tests with each PR.
+	* > 500 Regression tests with each PR.
  		* Performed with GNU (GCC), Intel (oneAPI), Cray (CCE), and NVIDIA (NVHPC) compilers on NVIDIA and AMD GPUs.
 		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups
