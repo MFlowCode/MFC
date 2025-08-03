@@ -24,10 +24,7 @@ jobs:
 
   self:
     name: "${{ matrix.name }} (${{ matrix.device }})"
-    if: ${{ github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && (
-             (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
-             (github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbryngelson')
-           ) }}
+    if: ${{ github.repository=='MFlowCode/MFC' && needs.file-changes.outputs.checkall=='true' && ((github.event_name=='pull_request_review' && github.event.review.state=='approved') || (github.event_name=='pull_request' && (github.event.pull_request.user.login=='sbryngelson' || github.event.pull_request.user.login=='wilfonba'))) }}
     needs: file-changes
     strategy:
       fail-fast: false
