@@ -371,7 +371,7 @@ contains
 
             ! Calculate and store the precise location of the image point
             patch_id = gp%ib_patch_id
-            dist = abs(levelset_in%sf(i, j, k, patch_id))
+            dist = abs(real(levelset_in%sf(i, j, k, patch_id), kind=wp))
             norm(:) = levelset_norm_in%sf(i, j, k, patch_id, :)
             ghost_points_in(q)%ip_loc(:) = physical_loc(:) + 2*dist*norm(:)
 
