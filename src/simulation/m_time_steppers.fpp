@@ -574,7 +574,6 @@ contains
         real(wp), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
-        integer :: dest
         real(wp) :: start, finish
         integer :: dest
 
@@ -810,9 +809,8 @@ contains
         real(wp), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
-        integer :: dest
-
         real(wp) :: start, finish
+        integer :: dest
 
         ! Stage 1 of 3
 
@@ -1385,7 +1383,11 @@ contains
         do j = 1, sys_size
             @:DEALLOCATE(q_cons_ts(1)%vf(j)%sf)
             if (num_ts == 2) then
-                nullify(q_cons_ts(2)%vf(j)%sf)
+                if (nv_uvm_out_of_core) then
+                    nullify(q_cons_ts(2)%vf(j)%sf)
+                else
+                    @:DEALLOCATE(q_cons_ts(2)%vf(j)%sf)
+                end if
             end if
         end do
         deallocate(q_cons_ts_pool_host)
