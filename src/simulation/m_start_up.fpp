@@ -1016,7 +1016,7 @@ contains
                         end if
                     end if
 
-                    call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._wp, &
+                    call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._stp, &
                                             dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag = pres_mag)
 
                     do i = 1, num_fluids
@@ -1192,7 +1192,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                        if (ieee_is_nan(real(q_cons_ts(1)%vf(i)%sf(j, k, l), kind=wp))) then
                             print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
                             error stop "NaN(s) in timestep output."
                         end if
