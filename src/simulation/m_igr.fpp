@@ -24,10 +24,10 @@ module m_igr
  s_igr_flux_add, &
  s_finalize_igr_module
 
-    real(wp), allocatable, dimension(:, :, :) :: jac, jac_rhs, jac_old
+    real(stp), allocatable, dimension(:, :, :) :: jac, jac_rhs, jac_old
     $:GPU_DECLARE(create='[jac, jac_rhs, jac_old]')
 
-    real(wp), allocatable, dimension(:, :) :: Res
+    real(stp), allocatable, dimension(:, :) :: Res
     $:GPU_DECLARE(create='[Res]')
 
     real(wp) :: alf_igr

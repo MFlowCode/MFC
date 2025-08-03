@@ -612,7 +612,7 @@ contains
                                                 pb_in, mv_in)
 
         type(scalar_field), dimension(1:), intent(inout) :: q_comm
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
+        real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
         integer, intent(in) :: mpi_dir, pbc_loc, nVar
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
