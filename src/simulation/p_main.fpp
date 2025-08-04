@@ -38,8 +38,8 @@ program p_main
 
     logical :: status
 
-    call ieee_set_halting_mode(ieee_invalid, .true.)  ! trap invalid ops
-    call ieee_set_halting_mode(ieee_divide_by_zero, .true.)  ! this being true fails, incidcating the error is divide by zero
+    ! call ieee_set_halting_mode(ieee_invalid, .true.)  ! trap invalid ops
+    ! call ieee_set_halting_mode(ieee_divide_by_zero, .true.)  ! this being true fails, incidcating the error is divide by zero
 
 
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
@@ -97,9 +97,7 @@ program p_main
             end if
         end if
 
-        print *, "Before s_perform_time_step"
         call s_perform_time_step(t_step, time_avg)
-        print *, "B"
 
         if (cfl_dt) then
             if (abs(mod(mytime, t_save)) < dt .or. mytime >= t_stop) then

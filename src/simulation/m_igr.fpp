@@ -206,7 +206,6 @@ contains
                             end if
                             fd_coeff = fd_coeff + q_cons_vf(i)%sf(j, k, l)
                         end do
-                        print *,  "After fluid loop"
 
                         fd_coeff = 1._wp/fd_coeff + alf_igr* &
                                    ((1._wp/dx(j)**2._wp)*(1._wp/rho_lx + 1._wp/rho_rx) + &
@@ -217,7 +216,6 @@ contains
                         end if
 
                         if (igr_iter_solver == 1) then ! Jacobi iteration
-                          print *, "Inside jacobi iteration"
                             if (num_dims == 3) then
                                 jac(j, k, l) = (alf_igr/fd_coeff)* &
                                                ((1._wp/dx(j)**2._wp)*(jac_old(j - 1, k, l)/rho_lx + jac_old(j + 1, k, l)/rho_rx) + &
@@ -225,20 +223,11 @@ contains
                                                 (1._wp/dz(l)**2._wp)*(jac_old(j, k, l - 1)/rho_lz + jac_old(j, k, l + 1)/rho_rz)) + &
                                                jac_rhs(j, k, l)/fd_coeff
                             else
-                                print *,  "Updating jac"
-                                print *, (alf_igr/fd_coeff)
-                                print *, (1._wp/dx(j)**2._wp)
-                                print *, real(jac_old(j - 1, k, l), kind=wp)/rho_lx
-                                print *, real(jac_old(j + 1, k, l), kind=wp)/rho_rx
-                                print *, (real(jac_old(j - 1, k, l), kind=wp)/rho_lx + real(jac_old(j + 1, k, l), kind=wp)/rho_rx)
-                                print *, (1._wp/dy(k)**2._wp)*(real(jac_old(j, k - 1, l), kind=wp)/rho_ly + real(jac_old(j, k + 1, l), kind=wp)/rho_ry)
-                                print *, real(jac_rhs(j, k, l), kind=wp)/fd_coeff
                                 jac(j, k, l) = (alf_igr/fd_coeff)* &
                                                ((1._wp/dx(j)**2._wp)*(real(jac_old(j - 1, k, l), kind=wp)/rho_lx + real(jac_old(j + 1, k, l), kind=wp)/rho_rx) + &
                                                 (1._wp/dy(k)**2._wp)*(real(jac_old(j, k - 1, l), kind=wp)/rho_ly + real(jac_old(j, k + 1, l), kind=wp)/rho_ry)) + &
                                                real(jac_rhs(j, k, l), kind=wp)/fd_coeff
                             end if
-                            print *, "Made it past to 1"
                         else ! Gauss Seidel iteration
                             if (num_dims == 3) then
                                 jac(j, k, l) = (alf_igr/fd_coeff)* &
@@ -257,7 +246,6 @@ contains
                 end do
             end do
 
-            print *,  "populating igr buffers"
             call s_populate_F_igr_buffers(bc_type, jac)
 
             if (igr_iter_solver == 1) then ! Jacobi iteration

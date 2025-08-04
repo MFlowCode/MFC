@@ -660,9 +660,7 @@ contains
             call nvtxStartRange("TIMESTEP")
         end if
 
-        print *, "Before s_compute_rhs"
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
-        print *, "After s_compute_rhs"
 
         if (run_time_info) then
             if (igr) then
