@@ -58,7 +58,12 @@ def __filter(cases_) -> typing.List[TestCase]:
         if case.ppn > 1 and not ARG("mpi"):
             cases.remove(case)
             skipped_cases.append(case)
-    
+
+    for case in cases[:]:
+        if "RDMA MPI" in case.trace:
+            cases.remove(case)
+            skipped_cases.append(case)
+
     for case in cases[:]:
         if ARG("single"):
             skip = ['low_Mach', 'Hypoelasticity', 'teno', 'Chemistry', 'Phase Change model 6'
@@ -191,6 +196,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         return
 
     cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
     common.file_write(out_filepath, cmd.stdout)

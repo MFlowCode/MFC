@@ -126,6 +126,7 @@ contains
 
         integer :: i
         logical :: is_cbc
+        type(int_bounds_info) :: idx1, idx2
 
         if (chemistry) then
             flux_cbc_index = sys_size
@@ -159,7 +160,7 @@ contains
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:sys_size))
 
-        if (weno_order > 1) then
+        if (weno_order > 1 .or. muscl_order > 1) then
 
             @:ALLOCATE(F_rsx_vf(0:buff_size, &
                 is2%beg:is2%end, &
@@ -202,7 +203,7 @@ contains
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:sys_size))
 
-            if (weno_order > 1) then
+            if (weno_order > 1 .or. muscl_order > 1) then
 
                 @:ALLOCATE(F_rsy_vf(0:buff_size, &
                     is2%beg:is2%end, &
@@ -247,7 +248,7 @@ contains
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:sys_size))
 
-            if (weno_order > 1) then
+            if (weno_order > 1 .or. muscl_order > 1) then
 
                 @:ALLOCATE(F_rsz_vf(0:buff_size, &
                     is2%beg:is2%end, &
@@ -272,13 +273,24 @@ contains
         ! Allocating the cell-width distribution in the s-direction
         @:ALLOCATE(ds(0:buff_size))
 
+        if (recon_type == WENO_TYPE) then
+            idx1%beg = 0
+            idx1%end = weno_polyn - 1
+            idx2%beg = 0
+            idx2%end = weno_order - 3
+        else if (recon_type == MUSCL_TYPE) then
+            idx1%beg = 0
+            idx1%end = muscl_polyn
+            idx2%beg = 0
+            idx2%end = muscl_order - 1
+        end if
         ! Allocating/Computing CBC Coefficients in x-direction
         if (all((/bc_x%beg, bc_x%end/) <= -5) .and. all((/bc_x%beg, bc_x%end/) >= -13)) then
 
             @:ALLOCATE(fd_coef_x(0:buff_size, -1:1))
 
-            if (weno_order > 1) then
-                @:ALLOCATE(pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
+            if (weno_order > 1 .or. muscl_order > 1) then
+                @:ALLOCATE(pi_coef_x(idx1%beg:idx1%end, idx2%beg:idx2%end, -1:1))
             end if
 
             call s_compute_cbc_coefficients(1, -1)
@@ -288,8 +300,8 @@ contains
 
             @:ALLOCATE(fd_coef_x(0:buff_size, -1:-1))
 
-            if (weno_order > 1) then
-                @:ALLOCATE(pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
+            if (weno_order > 1 .or. muscl_order > 1) then
+                @:ALLOCATE(pi_coef_x(idx1%beg:idx1%end, idx2%beg:idx2%end, -1:-1))
             end if
 
             call s_compute_cbc_coefficients(1, -1)
@@ -298,8 +310,8 @@ contains
 
             @:ALLOCATE(fd_coef_x(0:buff_size, 1:1))
 
-            if (weno_order > 1) then
-                @:ALLOCATE(pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
+            if (weno_order > 1 .or. muscl_order > 1) then
+                @:ALLOCATE(pi_coef_x(idx1%beg:idx1%end, idx2%beg:idx2%end, 1:1))
             end if
 
             call s_compute_cbc_coefficients(1, 1)
@@ -313,8 +325,8 @@ contains
 
                 @:ALLOCATE(fd_coef_y(0:buff_size, -1:1))
 
-                if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
+                if (weno_order > 1 .or. muscl_order > 1) then
+                    @:ALLOCATE(pi_coef_y(idx1%beg:idx1%end, idx2%beg:idx2%end, -1:1))
                 end if
 
                 call s_compute_cbc_coefficients(2, -1)
@@ -324,8 +336,8 @@ contains
 
                 @:ALLOCATE(fd_coef_y(0:buff_size, -1:-1))
 
-                if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
+                if (weno_order > 1 .or. muscl_order > 1) then
+                    @:ALLOCATE(pi_coef_y(idx1%beg:idx1%end, idx2%beg:idx2%end, -1:-1))
                 end if
 
                 call s_compute_cbc_coefficients(2, -1)
@@ -334,8 +346,8 @@ contains
 
                 @:ALLOCATE(fd_coef_y(0:buff_size, 1:1))
 
-                if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
+                if (weno_order > 1 .or. muscl_order > 1) then
+                    @:ALLOCATE(pi_coef_y(idx1%beg:idx1%end, idx2%beg:idx2%end, 1:1))
                 end if
 
                 call s_compute_cbc_coefficients(2, 1)
@@ -351,8 +363,8 @@ contains
 
                 @:ALLOCATE(fd_coef_z(0:buff_size, -1:1))
 
-                if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
+                if (weno_order > 1 .or. muscl_order > 1) then
+                    @:ALLOCATE(pi_coef_z(idx1%beg:idx1%end, idx2%beg:idx2%end, -1:1))
                 end if
 
                 call s_compute_cbc_coefficients(3, -1)
@@ -362,8 +374,8 @@ contains
 
                 @:ALLOCATE(fd_coef_z(0:buff_size, -1:-1))
 
-                if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
+                if (weno_order > 1 .or. muscl_order > 1) then
+                    @:ALLOCATE(pi_coef_z(idx1%beg:idx1%end, idx2%beg:idx2%end, -1:-1))
                 end if
 
                 call s_compute_cbc_coefficients(3, -1)
@@ -372,8 +384,8 @@ contains
 
                 @:ALLOCATE(fd_coef_z(0:buff_size, 1:1))
 
-                if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
+                if (weno_order > 1 .or. muscl_order > 1) then
+                    @:ALLOCATE(pi_coef_z(idx1%beg:idx1%end, idx2%beg:idx2%end, 1:1))
                 end if
 
                 call s_compute_cbc_coefficients(3, 1)
@@ -470,7 +482,7 @@ contains
 
         ! Computing CBC1 Coefficients
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (cbc_dir_in == ${CBC_DIR}$) then
+            if (cbc_dir_in == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
                 if (weno_order == 1) then
 
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
@@ -685,7 +697,7 @@ contains
         call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
 
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (cbc_dir == ${CBC_DIR}$) then
+            if (cbc_dir == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
 
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
                 if (weno_order == 3) then
@@ -1596,21 +1608,21 @@ contains
 
         ! Deallocating the cell-average primitive variables
         @:DEALLOCATE(q_prim_rsx_vf)
-        if (weno_order > 1) then
+        if (weno_order > 1 .or. muscl_order > 1) then
             @:DEALLOCATE(F_rsx_vf, F_src_rsx_vf)
         end if
         @:DEALLOCATE(flux_rsx_vf_l, flux_src_rsx_vf_l)
 
         if (n > 0) then
             @:DEALLOCATE(q_prim_rsy_vf)
-            if (weno_order > 1) then
+            if (weno_order > 1 .or. muscl_order > 1) then
                 @:DEALLOCATE(F_rsy_vf, F_src_rsy_vf)
             end if
             @:DEALLOCATE(flux_rsy_vf_l, flux_src_rsy_vf_l)
         end if
         if (p > 0) then
             @:DEALLOCATE(q_prim_rsz_vf)
-            if (weno_order > 1) then
+            if (weno_order > 1 .or. muscl_order > 1) then
                 @:DEALLOCATE(F_rsz_vf, F_src_rsz_vf)
             end if
             @:DEALLOCATE(flux_rsz_vf_l, flux_src_rsz_vf_l)
@@ -1625,7 +1637,7 @@ contains
         ! Deallocating CBC Coefficients in x-direction
         if (any((/bc_x%beg, bc_x%end/) <= -5) .and. any((/bc_x%beg, bc_x%end/) >= -13)) then
             @:DEALLOCATE(fd_coef_x)
-            if (weno_order > 1) then
+            if (weno_order > 1 .or. muscl_order > 1) then
                 @:DEALLOCATE(pi_coef_x)
             end if
         end if
@@ -1634,7 +1646,7 @@ contains
         if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5) .and. &
             any((/bc_y%beg, bc_y%end/) >= -13 .and. bc_y%beg /= -14)) then
             @:DEALLOCATE(fd_coef_y)
-            if (weno_order > 1) then
+            if (weno_order > 1 .or. muscl_order > 1) then
                 @:DEALLOCATE(pi_coef_y)
             end if
         end if
@@ -1642,7 +1654,7 @@ contains
         ! Deallocating CBC Coefficients in z-direction
         if (p > 0 .and. any((/bc_z%beg, bc_z%end/) <= -5) .and. any((/bc_z%beg, bc_z%end/) >= -13)) then
             @:DEALLOCATE(fd_coef_z)
-            if (weno_order > 1) then
+            if (weno_order > 1 .or. muscl_order > 1) then
                 @:DEALLOCATE(pi_coef_z)
             end if
         end if
