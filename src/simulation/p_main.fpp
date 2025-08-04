@@ -22,6 +22,8 @@ program p_main
 
     use m_nvtx
 
+    use, intrinsic :: ieee_exceptions, only: ieee_set_halting_mode, ieee_invalid, ieee_divide_by_zero
+
     implicit none
 
     integer :: t_step !< Iterator for the time-stepping loop
@@ -32,6 +34,13 @@ program p_main
     logical :: file_exists
     real(wp) :: start, finish
     integer :: nt
+
+
+    logical :: status
+
+    ! call ieee_set_halting_mode(ieee_invalid, .true.)  ! trap invalid ops
+    call ieee_set_halting_mode(ieee_divide_by_zero, .true.)  ! this being true fails, incidcating the error is divide by zero
+
 
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
 

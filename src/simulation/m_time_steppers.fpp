@@ -346,13 +346,6 @@ contains
             end do
         end do
 
-        print *,  "This is the size of a vector field element: ", SIZEOF(q_cons_ts(2)%vf(1)%sf(1, 1, 1))  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
-        print *,  "This is the size of hp precision: ", hp  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
-        print *,  "This is the size of sp precision: ", sp  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
-        print *,  "This is the size of dp precision: ", dp  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
-        print *,  "This is the size of wp precision: ", wp  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
-        print *,  "This is the size of stp precision: ", stp  ! THIS IS WHERE IT IS AAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
-
     end subroutine s_initialize_time_steppers_module
 
     !> 1st order TVD RK time-stepping algorithm
@@ -659,7 +652,7 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterator
 
         real(wp) :: start, finish
-
+        
         ! Stage 1 of 3
 
         if (.not. adap_dt) then
