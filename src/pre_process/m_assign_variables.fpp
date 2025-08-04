@@ -304,7 +304,7 @@ contains
 
         real(wp) :: Ys(1:num_species)
 
-        real(wp), dimension(sys_size) :: orig_prim_vf !<
+        real(stp), dimension(sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes
 
         integer :: i  !< Generic loop iterator
