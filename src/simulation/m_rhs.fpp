@@ -232,17 +232,16 @@ contains
         end if
 
         ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
-        @:ALLOCATE(flux_n(1:num_dims))
-        @:ALLOCATE(flux_src_n(1:num_dims))
-        @:ALLOCATE(flux_gsrc_n(1:num_dims))
+        if (.not. igr) then
+            @:ALLOCATE(flux_n(1:num_dims))
+            @:ALLOCATE(flux_src_n(1:num_dims))
+            @:ALLOCATE(flux_gsrc_n(1:num_dims))
 
-        do i = 1, num_dims
+            do i = 1, num_dims
 
-            @:ALLOCATE(flux_n(i)%vf(1:sys_size))
-            @:ALLOCATE(flux_src_n(i)%vf(1:sys_size))
-            @:ALLOCATE(flux_gsrc_n(i)%vf(1:sys_size))
-
-            if (.not. igr) then
+                @:ALLOCATE(flux_n(i)%vf(1:sys_size))
+                @:ALLOCATE(flux_src_n(i)%vf(1:sys_size))
+                @:ALLOCATE(flux_gsrc_n(i)%vf(1:sys_size))                
 
                 if (i == 1) then
                     do l = 1, sys_size
@@ -315,28 +314,29 @@ contains
                         $:GPU_ENTER_DATA(attach='[flux_src_n(i)%vf(l)%sf]')
                     end do
                 end if
-            end if
-        end do
-
-        ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
-
-        ! Allocation of dq_prim_ds_qp
-        @:ALLOCATE(dq_prim_dx_qp(1:1))
-        @:ALLOCATE(dq_prim_dy_qp(1:1))
-        @:ALLOCATE(dq_prim_dz_qp(1:1))
-
-        @:ALLOCATE(qL_prim(1:num_dims))
-        @:ALLOCATE(qR_prim(1:num_dims))
-
-        ! Allocation/Association of dqK_prim_ds_n
-        @:ALLOCATE(dqL_prim_dx_n(1:num_dims))
-        @:ALLOCATE(dqL_prim_dy_n(1:num_dims))
-        @:ALLOCATE(dqL_prim_dz_n(1:num_dims))
-        @:ALLOCATE(dqR_prim_dx_n(1:num_dims))
-        @:ALLOCATE(dqR_prim_dy_n(1:num_dims))
-        @:ALLOCATE(dqR_prim_dz_n(1:num_dims))
+            
+            end do
+            ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
+        end if
+        
 
         if (.not. igr) then
+
+            ! Allocation of dq_prim_ds_qp
+            @:ALLOCATE(dq_prim_dx_qp(1:1))
+            @:ALLOCATE(dq_prim_dy_qp(1:1))
+            @:ALLOCATE(dq_prim_dz_qp(1:1))
+
+            @:ALLOCATE(qL_prim(1:num_dims))
+            @:ALLOCATE(qR_prim(1:num_dims))
+
+            ! Allocation/Association of dqK_prim_ds_n
+            @:ALLOCATE(dqL_prim_dx_n(1:num_dims))
+            @:ALLOCATE(dqL_prim_dy_n(1:num_dims))
+            @:ALLOCATE(dqL_prim_dz_n(1:num_dims))
+            @:ALLOCATE(dqR_prim_dx_n(1:num_dims))
+            @:ALLOCATE(dqR_prim_dy_n(1:num_dims))
+            @:ALLOCATE(dqR_prim_dz_n(1:num_dims))
 
             do i = 1, num_dims
                 @:ALLOCATE(qL_prim(i)%vf(1:sys_size))
@@ -600,8 +600,10 @@ contains
         ! END: Allocation/Association of qK_cons_n and qK_prim_n
 
         ! Allocation of gm_alphaK_n
-        @:ALLOCATE(gm_alphaL_n(1:num_dims))
-        @:ALLOCATE(gm_alphaR_n(1:num_dims))
+        if(.not. igr) then 
+            @:ALLOCATE(gm_alphaL_n(1:num_dims))
+            @:ALLOCATE(gm_alphaR_n(1:num_dims))
+        end if
 
         if (alt_soundspeed) then
             @:ALLOCATE(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, 0:n, 0:p))
@@ -1977,15 +1979,14 @@ contains
                     @:DEALLOCATE(tau_re_vf)
                 end if
             end if
+            @:DEALLOCATE(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
+            @:DEALLOCATE(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
         end if
 
         if (mpp_lim .and. bubbles_euler) then
             $:GPU_EXIT_DATA(delete='[alf_sum%sf]')
             deallocate (alf_sum%sf)
-        end if
-
-        @:DEALLOCATE(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
-        @:DEALLOCATE(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
+        end if        
 
         if (.not. igr) then
             do i = num_dims, 1, -1

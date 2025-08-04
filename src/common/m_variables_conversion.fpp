@@ -824,15 +824,11 @@ contains
         real(wp), dimension(2) :: Re_K
         real(wp) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
 
-        #:if MFC_CASE_OPTIMIZATION
 #ifndef MFC_SIMULATION
             real(wp), dimension(:), allocatable :: nRtmp
 #else
             real(wp), dimension(nb) :: nRtmp
 #endif
-        #:else
-            real(wp), dimension(:), allocatable :: nRtmp
-        #:endif
 
         real(wp) :: rhoYks(1:num_species)
 
@@ -857,7 +853,6 @@ contains
         real(wp) :: f, dGa_dW, dp_dW, df_dW ! Functions within Newton-Raphson iteration
         integer :: iter ! Newton-Raphson iteration counter
 
-        #:if MFC_CASE_OPTIMIZATION
 #ifndef MFC_SIMULATION
             if (bubbles_euler) then
                 allocate (nRtmp(nb))
@@ -865,15 +860,8 @@ contains
                 allocate (nRtmp(0))
             end if
 #endif
-        #:else
-            if (bubbles_euler) then
-                allocate (nRtmp(nb))
-            else
-                allocate (nRtmp(0))
-            end if
-        #:endif
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K,qv_K, dyn_pres_K, rhoYks, B]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K,qv_K, dyn_pres_K, rhoYks, B, pres, vftmp, nbub_sc, G_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, dp_dW, df_dW, iter ]')
             do l = ibounds(3)%beg, ibounds(3)%end
                 do k = ibounds(2)%beg, ibounds(2)%end
                     do j = ibounds(1)%beg, ibounds(1)%end
@@ -1488,7 +1476,7 @@ contains
         ! Computing the flux variables from the primitive variables, without
         ! accounting for the contribution of either viscosity or capillarity
 #ifdef MFC_SIMULATION
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]')
             do l = is3b, is3e
                 do k = is2b, is2e
                     do j = is1b, is1e
