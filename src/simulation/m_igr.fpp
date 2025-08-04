@@ -206,7 +206,6 @@ contains
                             end if
                             fd_coeff = fd_coeff + q_cons_vf(i)%sf(j, k, l)
                         end do
-                        print *,  "After fluid loop"
 
                         fd_coeff = 1._wp/fd_coeff + alf_igr* &
                                    ((1._wp/dx(j)**2._wp)*(1._wp/rho_lx + 1._wp/rho_rx) + &
@@ -217,7 +216,6 @@ contains
                         end if
 
                         if (igr_iter_solver == 1) then ! Jacobi iteration
-                          print *, "Inside jacobi iteration"
                             if (num_dims == 3) then
                                 jac(j, k, l) = (alf_igr/fd_coeff)* &
                                                ((1._wp/dx(j)**2._wp)*(jac_old(j - 1, k, l)/rho_lx + jac_old(j + 1, k, l)/rho_rx) + &
@@ -226,9 +224,9 @@ contains
                                                jac_rhs(j, k, l)/fd_coeff
                             else
                                 jac(j, k, l) = (alf_igr/fd_coeff)* &
-                                               ((1._wp/dx(j)**2._wp)*(jac_old(j - 1, k, l)/rho_lx + jac_old(j + 1, k, l)/rho_rx) + &
-                                                (1._wp/dy(k)**2._wp)*(jac_old(j, k - 1, l)/rho_ly + jac_old(j, k + 1, l)/rho_ry)) + &
-                                               jac_rhs(j, k, l)/fd_coeff
+                                               ((1._wp/dx(j)**2._wp)*(real(jac_old(j - 1, k, l), kind=wp)/rho_lx + real(jac_old(j + 1, k, l), kind=wp)/rho_rx) + &
+                                                (1._wp/dy(k)**2._wp)*(real(jac_old(j, k - 1, l), kind=wp)/rho_ly + real(jac_old(j, k + 1, l), kind=wp)/rho_ry)) + &
+                                               real(jac_rhs(j, k, l), kind=wp)/fd_coeff
                             end if
                         else ! Gauss Seidel iteration
                             if (num_dims == 3) then
@@ -248,7 +246,6 @@ contains
                 end do
             end do
 
-            print *,  "populating igr buffers"
             call s_populate_F_igr_buffers(bc_type, jac)
 
             if (igr_iter_solver == 1) then ! Jacobi iteration
@@ -366,8 +363,6 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = -1, m
-                            print *, "(l, j, k) = ", l, j, k
-
                             dvel = 0._wp
                             vflux_L_arr = 0._wp
                             vflux_R_arr = 0._wp
@@ -460,7 +455,6 @@ contains
                                 if (num_fluids > 1) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
-                                      print *, "q_cons_vf before ", q_cons_vf(E_idx + i)%sf(j + q, k, l)
                                         alpha_L(i) = alpha_L(i) + coeff_L(q)*q_cons_vf(E_idx + i)%sf(j + q, k, l)
                                     end do
                                 else
@@ -515,7 +509,6 @@ contains
                                 mu_L = 0._wp; mu_R = 0._wp
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    print *,  "alpha_L/Res + mu", i,  alpha_L(i)/Res(1, i) + mu_L
                                     mu_L = alpha_L(i)/Res(1, i) + mu_L
                                     mu_R = alpha_R(i)/Res(1, i) + mu_R
                                 end do
@@ -588,7 +581,6 @@ contains
                             do q = vidxb, vidxe - 1
                                 E_R = E_R + coeff_R(q)*q_cons_vf(E_idx)%sf(j + q, k, l)
                             end do
-                            print *,  "Before get_defived_states"
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                       E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
@@ -682,7 +674,6 @@ contains
                                                          0.5_wp*cfl*(alpha_rho_R(i))*(1._wp/dx(j)))
                             end do
 
-                            print *,  "I'VE WAITED SOOOO LONG"
 
                             if (num_fluids > 1) then
                                 $:GPU_LOOP(parallelism='[seq]')
@@ -2529,12 +2520,8 @@ contains
         real(wp) :: a_L, a_R
 
         if (num_dims == 2) then
-            ! print *,  "Inside num_dims==2"
-            print *,  "Elements", E_L, pi_inf_L, rho_L, vel_L(1), vel_L(2), gamma_L
-            ! print *,  "Elements", E_R, pi_inf_R, rho_R, vel_R(1), vel_R(2), gamma_R
             pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp))/gamma_L
             pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp))/gamma_R
-            print *,  "pressure", pres_L, pres_R
 
             if (igr_pres_lim) then
                 pres_L = max(pres_L, 0._wp)
