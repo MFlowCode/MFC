@@ -722,7 +722,6 @@ contains
             call nvtxEndRange
         end if
 
-        print *, "Before Dimensional Splitting Loop"
         ! Dimensional Splitting Loop
         do id = 1, num_dims
 
@@ -742,18 +741,14 @@ contains
                 end if
 
 
-                print *,  "Before igr_riemann_solver"
                 call nvtxStartRange("IGR_RIEMANN")
                 call s_igr_riemann_solver(q_cons_vf, rhs_vf, id)
                 call nvtxEndRange
-                print *,  "After igr_riemann_solver"
 
 
                 if (id == 1) then
                     call nvtxStartRange("IGR_Jacobi")
-                    print *,  "before iterative solve"
                     call s_igr_iterative_solve(q_cons_vf, bc_type, t_step)
-                    print *,  "after iterative solve"
                     call nvtxEndRange
 
                     call nvtxStartRange("IGR_SIGMA")
@@ -915,7 +910,6 @@ contains
             end if
         end do
         ! END: Dimensional Splitting Loop
-        print *, "Exit dimensional splitting loop"
 
         if (ib) then
             $:GPU_PARALLEL_LOOP(collapse=3)
