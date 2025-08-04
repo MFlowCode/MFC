@@ -396,9 +396,10 @@ HANDLE_SOURCES(syscheck OFF)
 #  * FFTW     (optional) Should be linked with an FFTW-like library (fftw/cufftw),
 #             depending on whether OpenACC is enabled and which compiler is
 #             being used.
+#  * LAPACK   (optional) Should be linked with LAPACK
 
 function(MFC_SETUP_TARGET)
-    cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW" "TARGET" "SOURCES" ${ARGN})
+    cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW;LAPACK" "TARGET" "SOURCES" ${ARGN})
 
     add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
     set(IPO_TARGETS ${ARGS_TARGET})
@@ -466,6 +467,11 @@ function(MFC_SETUP_TARGET)
             endif()
         endif()
 
+				if (ARGS_LAPACK)
+					find_package(LAPACK REQUIRED)
+					target_link_libraries(${a_target} PRIVATE LAPACK::LAPACK)
+				endif()
+
         if (MFC_OpenACC AND ARGS_OpenACC)
             find_package(OpenACC)
 
@@ -511,6 +517,12 @@ function(MFC_SETUP_TARGET)
                     )
                 endif()
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+                # Frontier Unified Memory Support
+                if (MFC_Unified)
+                    target_compile_options(${ARGS_TARGET}
+                        PRIVATE -DFRONTIER_UNIFIED)
+                endif()
+
                 find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
                 target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn)
             endif()
@@ -546,7 +558,7 @@ endif()
 if (MFC_POST_PROCESS)
     MFC_SETUP_TARGET(TARGET  post_process
                      SOURCES "${post_process_SRCs}"
-                     MPI SILO HDF5 FFTW)
+                     MPI SILO HDF5 FFTW LAPACK)
 
     # -O0 is in response to https://github.com/MFlowCode/MFC-develop/issues/95
     target_compile_options(post_process PRIVATE -O0)
