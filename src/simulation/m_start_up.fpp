@@ -1280,6 +1280,8 @@ contains
 
         call s_initialize_rhs_module()
 
+        
+
         if (surface_tension) call s_initialize_surface_tension_module()
 
         if (relax) call s_initialize_phasechange_module()
