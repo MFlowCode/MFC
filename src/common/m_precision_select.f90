@@ -51,11 +51,4 @@ module m_precision_select
     integer, parameter :: mpi_2p = -100
 #endif
 
-use, intrinsic :: ieee_exceptions, only: ieee_set_halting_mode, ieee_invalid, ieee_divide_by_zero
-logical :: status
-
-! Put these intrensic calls somewhere
-! call ieee_set_halting_mode(ieee_invalid, .true.)  ! trap invalid ops
-! call ieee_set_halting_mode(ieee_divide_by_zero, .true.)  ! if interested
-
 end module m_precision_select
