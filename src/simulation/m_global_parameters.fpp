@@ -159,7 +159,7 @@ module m_global_parameters
 
     !> @name Variables for our of core IGR computation on NVIDIA
     !> @{
-    logical :: nv_uvm_out_of_core ! Enable out-or-core storage of q_cons_ts(2) in timestepping
+    logical :: nv_uvm_out_of_core ! Enable out-of-core storage of q_cons_ts(2) in timestepping (default FALSE)
     integer :: nv_uvm_igr_temps_on_gpu ! 0 => jac, jac_rhs, and jac_old on CPU
                                        ! 1 => jac on GPU, jac_rhs and jac_old on CPU
                                        ! 2 => jac and jac_rhs on GPU, jac_old on CPU
