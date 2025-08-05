@@ -707,7 +707,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(2)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                             + dt*rhs_vf(i)%sf(j, k, l))/2._wp
                     end do
                 end do
             end do
