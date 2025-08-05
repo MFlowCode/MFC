@@ -911,7 +911,6 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
-
 #if defined(FRONTIER_UNIFIED)
         #:call GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
