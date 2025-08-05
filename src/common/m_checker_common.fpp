@@ -49,7 +49,11 @@ contains
             call s_check_inputs_phase_change
             call s_check_inputs_ibm
 #endif
-            call s_check_inputs_weno
+            if (recon_type == WENO_TYPE) then
+                call s_check_inputs_weno
+            elseif (recon_type == MUSCL_TYPE) then
+                call s_check_inputs_muscl
+            end if
             call s_check_inputs_surface_tension
             call s_check_inputs_mhd
         end if
@@ -228,6 +232,15 @@ contains
         @:PROHIBIT(n > 0 .and. n + 1 < weno_order, "n must be at least weno_order - 1")
         @:PROHIBIT(p > 0 .and. p + 1 < weno_order, "p must be at least weno_order - 1")
     end subroutine s_check_inputs_weno
+
+    !> Check constraints regarding MUSCL order
+        !! Called by s_check_inputs_common for all three stages
+    impure subroutine s_check_inputs_muscl
+        @:PROHIBIT(all(muscl_order /= (/1, 2/)), "muscl_order must be 1, or 2")
+        @:PROHIBIT(m + 1 < muscl_order, "m must be at least muscl_order - 1")
+        @:PROHIBIT(n > 0 .and. n + 1 < muscl_order, "n must be at least muscl_order - 1")
+        @:PROHIBIT(p > 0 .and. p + 1 < muscl_order, "p must be at least muscl_order - 1")
+    end subroutine s_check_inputs_muscl
 
     !> Checks constraints on the boundary conditions in the x-direction.
         !! Called by s_check_inputs_common for all three stages

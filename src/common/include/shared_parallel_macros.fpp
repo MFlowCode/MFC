@@ -27,7 +27,7 @@
         #:set clause_str = re.sub(clause_regex, ';', clause_str)
         #:set clause_list = [x.strip() for x in clause_str.strip('[]').split(';')]
         $:ASSERT_LIST(clause_list, str)
-        #:set clause_str = clause_name + ', '.join(clause_list) + ') '
+        #:set clause_str = clause_name + ','.join(clause_list) + ') '
     #:else
         #:set clause_str = ''
     #:endif
