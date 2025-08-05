@@ -76,7 +76,7 @@ contains
         real(wp), dimension(3) :: v, B
         real(wp) :: divB, vdotB
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[v, B]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[v, B, r, divB, vdotB]')
             do q = 0, p
                 do l = 0, n
                     do k = 0, m

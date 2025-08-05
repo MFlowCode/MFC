@@ -714,7 +714,7 @@ contains
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
         $:GPU_UPDATE(device='[is1_qbmm,is2_qbmm,is3_qbmm]')
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T, i1, i2, j, q, r]')
             do id3 = is3_qbmm%beg, is3_qbmm%end
                 do id2 = is2_qbmm%beg, is2_qbmm%end
                     do id1 = is1_qbmm%beg, is1_qbmm%end
