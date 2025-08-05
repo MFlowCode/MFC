@@ -115,7 +115,8 @@ contains
         end do
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
-        if (nv_uvm_out_of_core) then
+        if (num_ts == 2 .and. nv_uvm_out_of_core) then
+            ! host allocation for q_cons_ts(2)%vf(j)%sf for all j
             allocate(q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
                                         idwbuff(2)%beg:idwbuff(2)%end, &
                                         idwbuff(3)%beg:idwbuff(3)%end, &
@@ -1390,7 +1391,9 @@ contains
                 end if
             end if
         end do
-        deallocate(q_cons_ts_pool_host)
+        if (num_ts == 2 .and. nv_uvm_out_of_core) then
+            deallocate(q_cons_ts_pool_host)
+        end if
 #elif defined(FRONTIER_UNIFIED)
         do i = 1, num_ts
             do j = 1, sys_size
@@ -1407,6 +1410,9 @@ contains
             end do
         end do
 #endif
+        do i = 1, num_ts
+            @:DEALLOCATE(q_cons_ts(i)%vf)
+        end do
 
         @:DEALLOCATE(q_cons_ts)
 
