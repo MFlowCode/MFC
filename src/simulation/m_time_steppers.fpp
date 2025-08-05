@@ -455,7 +455,7 @@ contains
                     do j = 0, m
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+                            + rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -471,7 +471,7 @@ contains
                             do q = 1, nnode
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
+                                    + rhs_pb(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -488,7 +488,7 @@ contains
                             do q = 1, nnode
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
+                                    + rhs_mv(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -496,7 +496,7 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 1._wp)
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -577,7 +577,7 @@ contains
                             q_cons_ts(1)%vf(i)%sf(j, k, l)
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+                            + rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -592,7 +592,7 @@ contains
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+                            + rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -611,7 +611,7 @@ contains
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
+                                    + rhs_pb(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -628,7 +628,7 @@ contains
                             do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
+                                    + rhs_mv(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -636,7 +636,7 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 1._wp)
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
@@ -668,7 +668,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(2)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                             + rhs_vf(i)%sf(j, k, l))/4._wp
                     end do
                 end do
             end do
@@ -684,7 +684,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/2._wp
+                             + rhs_vf(i)%sf(j, k, l))/2._wp
                     end do
                 end do
             end do
@@ -703,7 +703,7 @@ contains
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
                                      + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/2._wp
+                                     + rhs_pb(j, k, l, q, i))/2._wp
                             end do
                         end do
                     end do
@@ -721,7 +721,7 @@ contains
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/2._wp
+                                     + rhs_mv(j, k, l, q, i))/2._wp
                             end do
                         end do
                     end do
@@ -729,7 +729,7 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 2._wp/3._wp)
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
@@ -774,7 +774,7 @@ contains
         integer :: dest
 
         real(wp) :: start, finish
-        
+
         ! Stage 1 of 3
 
         if (.not. adap_dt) then
@@ -814,7 +814,7 @@ contains
                             q_cons_ts(1)%vf(i)%sf(j, k, l)
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+                            + rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -829,7 +829,7 @@ contains
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+                            + rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -848,7 +848,7 @@ contains
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
+                                    + rhs_pb(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -865,7 +865,7 @@ contains
                             do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
+                                    + rhs_mv(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -873,7 +873,7 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 1._wp)
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
@@ -905,7 +905,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (3._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                             + rhs_vf(i)%sf(j, k, l))/4._wp
                     end do
                 end do
             end do
@@ -921,7 +921,7 @@ contains
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                             + rhs_vf(i)%sf(j, k, l))/4._wp
                     end do
                 end do
             end do
@@ -940,7 +940,7 @@ contains
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     (3._wp*pb_ts(1)%sf(j, k, l, q, i) &
                                      + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/4._wp
+                                     + rhs_pb(j, k, l, q, i))/4._wp
                             end do
                         end do
                     end do
@@ -958,7 +958,7 @@ contains
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     (3._wp*mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/4._wp
+                                     + rhs_mv(j, k, l, q, i))/4._wp
                             end do
                         end do
                     end do
@@ -966,7 +966,7 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt/4._wp)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 1._wp/4._wp)
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 
@@ -998,7 +998,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(2)%vf(i)%sf(j, k, l) &
                              + 2._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+                             + 2._wp*rhs_vf(i)%sf(j, k, l))/3._wp
                     end do
                 end do
             end do
@@ -1014,7 +1014,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+                             + 2._wp*rhs_vf(i)%sf(j, k, l))/3._wp
                     end do
                 end do
             end do
@@ -1033,7 +1033,7 @@ contains
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
                                      + 2._wp*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2._wp*dt*rhs_pb(j, k, l, q, i))/3._wp
+                                     + 2._wp*rhs_pb(j, k, l, q, i))/3._wp
                             end do
                         end do
                     end do
@@ -1051,7 +1051,7 @@ contains
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
                                      + 2._wp*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2._wp*dt*rhs_mv(j, k, l, q, i))/3._wp
+                                     + 2._wp*rhs_mv(j, k, l, q, i))/3._wp
                             end do
                         end do
                     end do
@@ -1059,7 +1059,7 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 2._wp/3._wp)
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
 

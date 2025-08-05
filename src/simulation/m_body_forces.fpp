@@ -127,9 +127,9 @@ contains
                 do k = 0, n
                     do j = 0, m
                         rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
-                                                    rhoM(j, k, l)*accel_bf(1)
+                                                    dt*rhoM(j, k, l)*accel_bf(1)
                         rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
-                                                    q_cons_vf(momxb)%sf(j, k, l)*accel_bf(1)
+                                                    dt*q_cons_vf(momxb)%sf(j, k, l)*accel_bf(1)
                     end do
                 end do
             end do
@@ -142,9 +142,9 @@ contains
                 do k = 0, n
                     do j = 0, m
                         rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
-                                                        rhoM(j, k, l)*accel_bf(2)
+                                                        dt*rhoM(j, k, l)*accel_bf(2)
                         rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
-                                                    q_cons_vf(momxb + 1)%sf(j, k, l)*accel_bf(2)
+                                                    dt*q_cons_vf(momxb + 1)%sf(j, k, l)*accel_bf(2)
                     end do
                 end do
             end do
@@ -157,9 +157,9 @@ contains
                 do k = 0, n
                     do j = 0, m
                         rhs_vf(momxe)%sf(j, k, l) = rhs_vf(momxe)%sf(j, k, l) + &
-                                                    (rhoM(j, k, l))*accel_bf(3)
+                                                    dt*rhoM(j, k, l)*accel_bf(3)
                         rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
-                                                    q_cons_vf(momxe)%sf(j, k, l)*accel_bf(3)
+                                                    dt*q_cons_vf(momxe)%sf(j, k, l)*accel_bf(3)
                     end do
                 end do
             end do
