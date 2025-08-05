@@ -1883,13 +1883,13 @@ contains
                     @:DEALLOCATE(q_cons_qp%vf(j)%sf)
                     @:DEALLOCATE(q_prim_qp%vf(j)%sf)
                 else
-                    $:GPU_EXIT_DATA(detach='[q_prim_qp%vf(j)%sf]')
+                    !$:GPU_EXIT_DATA(detach='[q_prim_qp%vf(j)%sf]')
                     nullify (q_prim_qp%vf(j)%sf)
                 end if
             end do
 
             do j = adv_idx%beg, adv_idx%end
-                $:GPU_EXIT_DATA(detach='[q_prim_qp%vf(j)%sf]')
+                !$:GPU_EXIT_DATA(detach='[q_prim_qp%vf(j)%sf]')
                 nullify (q_prim_qp%vf(j)%sf)
             end do
 
