@@ -34,9 +34,9 @@ module m_muscl
     !! of the characteristic decomposition are stored in custom-constructed muscl-
     !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
-    real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
+    real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x_muscl, v_rs_ws_y_muscl, v_rs_ws_z_muscl
     !> @}
-    $:GPU_DECLARE(create='[v_rs_ws_x,v_rs_ws_y,v_rs_ws_z]')
+    $:GPU_DECLARE(create='[v_rs_ws_x_muscl,v_rs_ws_y_muscl,v_rs_ws_z_muscl]')
 
 contains
 
@@ -60,7 +60,7 @@ contains
 
         is3_muscl%end = p - is3_muscl%beg
 
-        @:ALLOCATE(v_rs_ws_x(is1_muscl%beg:is1_muscl%end, &
+        @:ALLOCATE(v_rs_ws_x_muscl(is1_muscl%beg:is1_muscl%end, &
             is2_muscl%beg:is2_muscl%end, is3_muscl%beg:is3_muscl%end, 1:sys_size))
 
         if (n == 0) return
@@ -77,7 +77,7 @@ contains
 
         is3_muscl%end = p - is3_muscl%beg
 
-        @:ALLOCATE(v_rs_ws_y(is2_muscl%beg:is2_muscl%end, &
+        @:ALLOCATE(v_rs_ws_y_muscl(is2_muscl%beg:is2_muscl%end, &
             is1_muscl%beg:is1_muscl%end, is3_muscl%beg:is3_muscl%end, 1:sys_size))
 
         if (p == 0) return
@@ -87,7 +87,7 @@ contains
         is1_muscl%beg = -buff_size; is1_muscl%end = m - is1_muscl%beg
         is3_muscl%beg = -buff_size; is3_muscl%end = p - is3_muscl%beg
 
-        @:ALLOCATE(v_rs_ws_z(is3_muscl%beg:is3_muscl%end, &
+        @:ALLOCATE(v_rs_ws_z_muscl(is3_muscl%beg:is3_muscl%end, &
             is2_muscl%beg:is2_muscl%end, is1_muscl%beg:is1_muscl%end, 1:sys_size))
 
     end subroutine s_initialize_muscl_module
@@ -168,10 +168,10 @@ contains
                                 do j = is1_muscl%beg, is1_muscl%end
                                     do i = 1, v_size
 
-                                        slopeL = v_rs_ws_${XYZ}$ (j + 1, k, l, i) - &
-                                                 v_rs_ws_${XYZ}$ (j, k, l, i)
-                                        slopeR = v_rs_ws_${XYZ}$ (j, k, l, i) - &
-                                                 v_rs_ws_${XYZ}$ (j - 1, k, l, i)
+                                        slopeL = v_rs_ws_${XYZ}$_muscl (j + 1, k, l, i) - &
+                                                 v_rs_ws_${XYZ}$_muscl (j, k, l, i)
+                                        slopeR = v_rs_ws_${XYZ}$_muscl (j, k, l, i) - &
+                                                 v_rs_ws_${XYZ}$_muscl (j - 1, k, l, i)
                                         slope = 0._wp
 
                                         if (muscl_lim == 1) then ! minmod
@@ -202,11 +202,11 @@ contains
 
                                         ! reconstruct from left side
                                         vL_rs_vf_${XYZ}$ (j, k, l, i) = &
-                                            v_rs_ws_${XYZ}$ (j, k, l, i) - (5.e-1_wp*slope)
+                                            v_rs_ws_${XYZ}$_muscl (j, k, l, i) - (5.e-1_wp*slope)
 
                                         ! reconstruct from the right side
                                         vR_rs_vf_${XYZ}$ (j, k, l, i) = &
-                                            v_rs_ws_${XYZ}$ (j, k, l, i) + (5.e-1_wp*slope)
+                                            v_rs_ws_${XYZ}$_muscl (j, k, l, i) + (5.e-1_wp*slope)
 
                                     end do
                                 end do
@@ -248,9 +248,9 @@ contains
                         do k = is2_muscl%beg, is2_muscl%end
                             do j = is1_muscl%beg, is1_muscl%end
 
-                                aCL = v_rs_ws_${XYZ}$ (j - 1, k, l, advxb)
-                                aC = v_rs_ws_${XYZ}$ (j, k, l, advxb)
-                                aCR = v_rs_ws_${XYZ}$ (j + 1, k, l, advxb)
+                                aCL = v_rs_ws_${XYZ}$_muscl (j - 1, k, l, advxb)
+                                aC = v_rs_ws_${XYZ}$_muscl (j, k, l, advxb)
+                                aCR = v_rs_ws_${XYZ}$_muscl (j + 1, k, l, advxb)
 
                                 moncon = (aCR - aC)*(aC - aCL)
 
@@ -323,7 +323,7 @@ contains
                     do q = is3_muscl%beg, is3_muscl%end
                         do l = is2_muscl%beg, is2_muscl%end
                             do k = is1_muscl%beg - muscl_polyn, is1_muscl%end + muscl_polyn
-                                v_rs_ws_x(k, l, q, j) = v_vf(j)%sf(k, l, q)
+                                v_rs_ws_x_muscl(k, l, q, j) = v_vf(j)%sf(k, l, q)
                             end do
                         end do
                     end do
@@ -340,7 +340,7 @@ contains
                     do q = is3_muscl%beg, is3_muscl%end
                         do l = is2_muscl%beg, is2_muscl%end
                             do k = is1_muscl%beg - muscl_polyn, is1_muscl%end + muscl_polyn
-                                v_rs_ws_y(k, l, q, j) = v_vf(j)%sf(l, k, q)
+                                v_rs_ws_y_muscl(k, l, q, j) = v_vf(j)%sf(l, k, q)
                             end do
                         end do
                     end do
@@ -356,7 +356,7 @@ contains
                     do q = is3_muscl%beg, is3_muscl%end
                         do l = is2_muscl%beg, is2_muscl%end
                             do k = is1_muscl%beg - muscl_polyn, is1_muscl%end + muscl_polyn
-                                v_rs_ws_z(k, l, q, j) = v_vf(j)%sf(q, l, k)
+                                v_rs_ws_z_muscl(k, l, q, j) = v_vf(j)%sf(q, l, k)
                             end do
                         end do
                     end do
@@ -368,15 +368,15 @@ contains
 
     subroutine s_finalize_muscl_module()
 
-        @:DEALLOCATE(v_rs_ws_x)
+        @:DEALLOCATE(v_rs_ws_x_muscl)
 
         if (n == 0) return
 
-        @:DEALLOCATE(v_rs_ws_y)
+        @:DEALLOCATE(v_rs_ws_y_muscl)
 
         if (p == 0) return
 
-        @:DEALLOCATE(v_rs_ws_z)
+        @:DEALLOCATE(v_rs_ws_z_muscl)
 
     end subroutine s_finalize_muscl_module
 end module m_muscl
