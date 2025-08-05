@@ -634,7 +634,7 @@ contains
         integer, intent(in) :: stage
 
         real(wp) :: t_start, t_finish
-        integer :: i, j, k, l, id !< Generic loop iterators
+        integer :: i, j, k, l, q, id !< Generic loop iterators
 
         call nvtxStartRange("COMPUTE-RHS")
 
@@ -744,11 +744,9 @@ contains
                     end do
                 end if
 
-
                 call nvtxStartRange("IGR_RIEMANN")
                 call s_igr_riemann_solver(q_cons_vf, rhs_vf, id)
                 call nvtxEndRange
-
 
                 if (id == 1) then
                     call nvtxStartRange("IGR_Jacobi")
@@ -977,6 +975,35 @@ contains
         end if
 
         if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, rhs_vf)
+
+        if (.not. igr) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(i)%sf(j, k, l) = dt*rhs_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+
+            if (qbmm .and. (.not. polytropic)) then
+                $:GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    rhs_pb(j, k, l, q, i) = dt*rhs_pb(j, k, l, q, i)
+                                    rhs_mv(j, k, l, q, i) = dt*rhs_mv(j, k, l, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+        end if
 
         ! END: Additional pphysics and source terms
 
