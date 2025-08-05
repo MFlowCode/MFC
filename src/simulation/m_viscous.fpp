@@ -1104,7 +1104,6 @@ contains
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
-
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
             if (recon_type == ${TYPE}$) then
                 ! Reconstruction in s1-direction

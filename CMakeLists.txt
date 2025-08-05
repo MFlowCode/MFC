@@ -463,10 +463,20 @@ function(MFC_SETUP_TARGET)
             endif()
         endif()
 
+<<<<<<< HEAD
         if (ARGS_LAPACK)
             find_package(LAPACK REQUIRED)
             target_link_libraries(${a_target} PRIVATE LAPACK::LAPACK)
         endif()
+=======
+				if (ARGS_LAPACK)
+					find_package(LAPACK REQUIRED)
+					target_link_libraries(${a_target} PRIVATE LAPACK::LAPACK)
+				endif()
+
+        if (MFC_OpenACC AND ARGS_OpenACC)
+            find_package(OpenACC)
+>>>>>>> upstream/master
 
         if ((MFC_OpenACC AND ARGS_OpenACC) OR (MFC_OpenMP AND ARGS_OpenMP))
             if ((MFC_OpenACC AND ARGS_OpenACC))
