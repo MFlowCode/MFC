@@ -188,8 +188,8 @@ contains
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar, &
             alf_factor, num_igr_iters, num_igr_warm_start_iters, &
-            int_comp, ic_eps, ic_beta, nv_uvm_igr_temps_on_gpu, &
-            nv_uvm_pref_gpu, down_sample
+            int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, &
+            nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
