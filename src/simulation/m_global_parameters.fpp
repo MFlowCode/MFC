@@ -159,11 +159,11 @@ module m_global_parameters
 
     !> @name Variables for our of core IGR computation on NVIDIA
     !> @{
+    logical :: nv_uvm_out_of_core ! Enable out-or-core storage of q_cons_ts(2) in timestepping
     integer :: nv_uvm_igr_temps_on_gpu ! 0 => jac, jac_rhs, and jac_old on CPU
                                        ! 1 => jac on GPU, jac_rhs and jac_old on CPU
                                        ! 2 => jac and jac_rhs on GPU, jac_old on CPU
                                        ! 3 => jac, jac_rhs, and jac_old on GPU (default)
-    logical :: nv_uvm_out_of_core ! Enable out-or-core storage of q_cons_ts(2) in timestepping
     logical :: nv_uvm_pref_gpu ! Enable explicit gpu memory hints (default TRUE)
     !> @}
 
@@ -584,8 +584,8 @@ contains
         t_save = dflt_real
 
         ! NVIDIA UVM options
-        nv_uvm_igr_temps_on_gpu = 3 ! => jac, jac_rhs, and jac_old on GPU (default)
         nv_uvm_out_of_core = .false.
+        nv_uvm_igr_temps_on_gpu = 3 ! => jac, jac_rhs, and jac_old on GPU (default)
         nv_uvm_pref_gpu = .true.
 
         ! Simulation algorithm parameters
