@@ -112,6 +112,8 @@ program p_main
         call system_clock(cpu_end)
     end do
 
+    print *,  "Save Done"
+
     call nvtxEndRange ! Simulation
 
     deallocate (proc_time, io_proc_time)

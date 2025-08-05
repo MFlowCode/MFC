@@ -522,7 +522,7 @@ contains
 
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
-        if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
+        if (.false.) then !(prim_vars_wrt .or. (n == 0 .and. p == 0)) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
                 $:GPU_UPDATE(host='[q_prim_vf(i)%sf(:,:,:)]')
