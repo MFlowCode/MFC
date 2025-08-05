@@ -379,6 +379,9 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `mixture_err`          | Logical | Mixture properties correction |
 | `time_stepper`         | Integer | Runge--Kutta order [1-3] |
 | `adap_dt`              | Logical | Strang splitting scheme with adaptive time stepping |
+| `recon_type`           | Integer | Reconstruction Type: [1] WENO; [2] MUSCL |
+| `adap_dt_tol`          | Real    | Tolerance for adaptive time stepping in Strang splitting scheme|
+| `adap_dt_max_iters`    | Integer | Max iteration for adaptive time stepping in Strang splitting scheme |
 | `weno_order`	         | Integer | WENO order [1,3,5] |
 | `weno_eps`	         | Real    | WENO perturbation (avoid division by zero) |
 | `mapped_weno`	         | Logical | WENO-M (WENO with mapping of nonlinear weights) |
@@ -388,6 +391,11 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `teno_CT`              | Real    | TENO threshold for smoothness detection |
 | `null_weights`         | Logical | Null WENO weights at boundaries |
 | `mp_weno`              | Logical | Monotonicity preserving WENO |
+| `muscl_order`          | Integer | MUSCL order [1,2] |
+| `muscl_lim`            | Integer | MUSCL Slope Limiter: [1] minmod; [2] monotonized central; [3] Van Albada; [4] Van Leer; [5] SUPERBEE |
+| `int_comp`             | Logical | THINC Interface Compression |
+| `ic_eps`               | Real | Interface compression threshold (default: 1e-4) |
+| `ic_beta`              | Real | Interface compression sharpness parameter (default: 1.6) |
 | `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD	(only for MHD) |
 | `low_Mach`             | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (Chen et al. 2022); [2] Velocity (Thornber et al. 2008)	 |
 | `avg_state`	         | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
@@ -453,7 +461,7 @@ The effect and use of the source term are assessed by [Schmidmayer et al., 2019]
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer.
 Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md)).
 
-- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles_euler = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`. Additionally, it can be used with ``bubbles_lagrange = 'T'`` and `time_stepper = 3`
+- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles_euler = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`. Additionally, it can be used with ``bubbles_lagrange = 'T'`` and `time_stepper = 3`. `adap_dt_tol` and `adap_dt_max_iters` are 1e-4 and 100, respectively, by default.
 
 - `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, 5, and 7, that correspond to the 1st, 3rd, 5th, and 7th order, respectively.
 
@@ -474,7 +482,14 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 
 - `mp_weno` activates monotonicity preservation in the WENO reconstruction (MPWENO) such that the values of reconstructed variables do not reside outside the range spanned by WENO stencil ([Balsara and Shu, 2000](references.md); [Suresh and Huynh, 1997](references.md)).
 
-- `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 3.
+- `muscl_order` specifies the order of the MUSCL scheme that is used for spatial reconstruction of variables by an integer of 1, or 2, that corresponds to the 1st, and 2nd order respectively. When using `muscl_order = 2`, `muscl_lim` must be defined. 
+
+- `muscl_lim` specifies the slope limiter that is used in 2nd order MUSCL Reconstruction by an integer from 1 through 5. 
+`muscl_lim = 1`, `2`, `3`, `4`, and `5` correspond to minmod, monotonized central, Van Albada, Van Leer, and SUPERBEE, respectively.
+
+- `int_comp` activates interface compression using THINC used in MUSCL Reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
+
+- `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 4.
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively ([Toro, 2013](references.md)).
 `riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations ([Miyoshi and Kusano, 2005](references.md)).
 
@@ -574,6 +589,7 @@ To restart the simulation from $k$-th time step, see [Restarting Cases](running.
 | `omega_wrt(i)`       | Logical | Add the $i$-direction vorticity to the database	 |
 | `schlieren_wrt`      | Logical | Add the numerical schlieren to the database|
 | `qm_wrt`             | Logical | Add the Q-criterion to the database|
+| `liutex_wrt`         | Logical | Add the Liutex to the database|
 | `tau_wrt`            | Logical | Add the elastic stress components to the database|
 | `fd_order`           | Integer | Order of finite differences for computing the vorticity and the numerical Schlieren function [1,2,4] |
 | `schlieren_alpha(i)` | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |
@@ -613,7 +629,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 - `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%beg` and `[x,y,z]_output%end`.
 This is useful for large domains where only a portion of the domain is of interest.
 It is not supported when `precision = 1` and `format = 1`. 
-It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_wrt`, `omega_wrt`, `ib`, `schlieren_wrt`, or `qm_wrt`.
+It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_wrt`, `omega_wrt`, `ib`, `schlieren_wrt`, `qm_wrt`, or 'liutex_wrt'.
 
 ### 8. Acoustic Source {#acoustic-source}
 
@@ -743,7 +759,6 @@ Implementation of the parameters into the model follow [Ando (2010)](references.
 | `polydisperse`   | Logical	| Polydispersity in equilibrium bubble radius R0 |
 | `nb` 			     | Integer	| Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
 | `poly_sigma` 	       | Real 		|	Standard deviation for probability density function of polydisperse bubble populations |
-| `R0_type` 	       | Integer 		|	Quadrature rule for probability density function of polydisperse bubble populations |
 | `Ca` 			     | Real		  | Cavitation number |
 | `Web` 			   | Real		  | Weber number |
 | `Re_inv` 		   | Real		  | Inverse Reynolds number |
@@ -761,14 +776,11 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - `thermal` specifies a model for heat transfer across the bubble interface by an integer from 1 through 3.
 `thermal = 1`, `2`, and `3` correspond to no heat transfer (adiabatic gas compression), isothermal heat transfer, and heat transfer with a constant heat transfer coefficient based on [Preston et al., 2007](references.md), respectively.
 
-- `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius.
+- `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius. Simpson's rule is used for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 
 - `R0ref` specifies the reference bubble radius.
 
 - `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibrium bubble radius.
-
-- `R0_type` specifies the quadrature rule for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
-`R0_type = 1` corresponds to Simpson's rule.
 
 - `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 

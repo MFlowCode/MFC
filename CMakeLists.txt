@@ -194,7 +194,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
-	      $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
     )
 
@@ -392,9 +392,10 @@ HANDLE_SOURCES(syscheck OFF)
 #  * FFTW     (optional) Should be linked with an FFTW-like library (fftw/cufftw),
 #             depending on whether OpenACC is enabled and which compiler is
 #             being used.
+#  * LAPACK   (optional) Should be linked with LAPACK
 
 function(MFC_SETUP_TARGET)
-    cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW;OpenMP" "TARGET" "SOURCES" ${ARGN})
+    cmake_parse_arguments(ARGS "OpenACC;OpenMP;MPI;SILO;HDF5;FFTW;LAPACK" "TARGET" "SOURCES" ${ARGN})
 
     add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
     set(IPO_TARGETS ${ARGS_TARGET})
@@ -460,6 +461,11 @@ function(MFC_SETUP_TARGET)
                 find_package(FFTW REQUIRED)
                 target_link_libraries(${a_target} PRIVATE FFTW::FFTW)
             endif()
+        endif()
+
+        if (ARGS_LAPACK)
+            find_package(LAPACK REQUIRED)
+            target_link_libraries(${a_target} PRIVATE LAPACK::LAPACK)
         endif()
 
         if ((MFC_OpenACC AND ARGS_OpenACC) OR (MFC_OpenMP AND ARGS_OpenMP))
@@ -534,6 +540,12 @@ function(MFC_SETUP_TARGET)
                     )
                 endif()
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+                # Frontier Unified Memory Support
+                if (MFC_Unified)
+                    target_compile_options(${ARGS_TARGET}
+                        PRIVATE -DFRONTIER_UNIFIED)
+                endif()
+
                 find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
                 target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn)
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
@@ -572,7 +584,7 @@ endif()
 if (MFC_POST_PROCESS)
     MFC_SETUP_TARGET(TARGET  post_process
                      SOURCES "${post_process_SRCs}"
-                     MPI SILO HDF5 FFTW)
+                     MPI SILO HDF5 FFTW LAPACK)
 
     # -O0 is in response to https://github.com/MFlowCode/MFC-develop/issues/95
     target_compile_options(post_process PRIVATE -O0)

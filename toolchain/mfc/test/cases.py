@@ -170,6 +170,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
+    def alter_muscl():
+        for muscl_order in [1, 2]:
+            stack.push(f"muscl_order={muscl_order}", {'muscl_order': muscl_order, 'recon_type':2, 'weno_order':0})
+
+            if muscl_order == 1:
+                for int_comp in ["T", "F"]:
+                    cases.append(define_case_d(stack, f"int_comp={int_comp}", {'int_comp': int_comp}))
+            elif muscl_order == 2:
+                for int_comp in ["T", "F"]:
+                    stack.push(f"int_comp={int_comp}", {'int_comp': int_comp})
+                    cases.append(define_case_d(stack, f"muscl_lim=1", {'muscl_lim': 1}))
+                    stack.pop()
+                for muscl_lim in [2,3,4,5]:
+                    cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {'muscl_lim': muscl_lim}))
+            stack.pop()
+
     def alter_riemann_solvers(num_fluids):
         for riemann_solver in [1, 2]:
             stack.push(f"riemann_solver={riemann_solver}", {'riemann_solver': riemann_solver})
@@ -346,9 +362,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_ppn(dimInfo):
         if len(dimInfo[0]) == 3:
             cases.append(define_case_d(stack, '2 MPI Ranks', {'m': 29, 'n': 29, 'p': 49}, ppn=2))
+            cases.append(define_case_d(stack, '2 MPI Ranks -> RDMA MPI', {'m': 29, 'n': 29, 'p': 49, 'rdma_mpi': 'T'}, ppn=2))
         else:
             cases.append(define_case_d(stack, '2 MPI Ranks', {}, ppn=2))
-
+            cases.append(define_case_d(stack, '2 MPI Ranks -> RDMA MPI', {'rdma_mpi': 'T'}, ppn=2))
 
     def alter_ib(dimInfo, six_eqn_model=False):
         for slip in [True, False]:
@@ -936,6 +953,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_bcs(dimInfo)
             alter_grcbc(dimInfo)
             alter_weno(dimInfo)
+            alter_muscl()
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()

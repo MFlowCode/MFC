@@ -50,6 +50,8 @@ module m_data_input
     type(scalar_field), allocatable, dimension(:), public :: q_cons_vf !<
     !! Conservative variables
 
+    type(scalar_field), allocatable, dimension(:), public :: q_cons_temp
+
     type(scalar_field), allocatable, dimension(:), public :: q_prim_vf !<
     !! Primitive variables
 
@@ -332,7 +334,7 @@ contains
 
         real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
-        integer :: ifile, ierr, data_size
+        integer :: ifile, ierr, data_size, filetype, stride
         integer, dimension(MPI_STATUS_SIZE) :: status
 
         integer(KIND=MPI_OFFSET_KIND) :: disp
@@ -340,6 +342,8 @@ contains
         integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
         integer(KIND=MPI_OFFSET_KIND) :: NVARS_MOK
         integer(KIND=MPI_OFFSET_KIND) :: MOK
+        integer(kind=MPI_OFFSET_KIND) :: offset
+        real(wp) :: delx, dely, delz
 
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
@@ -352,6 +356,12 @@ contains
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))
 
+        if (down_sample) then
+            stride = 3
+        else
+            stride = 1
+        end if
+
         ! Read in cell boundary locations in x-direction
         file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'x_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -359,6 +369,13 @@ contains
         if (file_exist) then
             data_size = m_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+            call MPI_TYPE_VECTOR(data_size, 1, stride, mpi_p, filetype, ierr)
+            call MPI_TYPE_COMMIT(filetype, ierr)
+
+            offset = 0
+            call MPI_FILE_SET_VIEW(ifile, offset, mpi_p, filetype, 'native', mpi_info_int, ierr)
+
             call MPI_FILE_READ(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
@@ -380,6 +397,13 @@ contains
             if (file_exist) then
                 data_size = n_glb + 2
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                call MPI_TYPE_VECTOR(data_size, 1, stride, mpi_p, filetype, ierr)
+                call MPI_TYPE_COMMIT(filetype, ierr)
+
+                offset = 0
+                call MPI_FILE_SET_VIEW(ifile, offset, mpi_p, filetype, 'native', mpi_info_int, ierr)
+
                 call MPI_FILE_READ(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             else
@@ -401,6 +425,13 @@ contains
                 if (file_exist) then
                     data_size = p_glb + 2
                     call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                    call MPI_TYPE_VECTOR(data_size, 1, stride, mpi_p, filetype, ierr)
+                    call MPI_TYPE_COMMIT(filetype, ierr)
+
+                    offset = 0
+                    call MPI_FILE_SET_VIEW(ifile, offset, mpi_p, filetype, 'native', mpi_info_int, ierr)
+
                     call MPI_FILE_READ(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
@@ -459,7 +490,33 @@ contains
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                call s_setup_mpi_io_params(data_size, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
+                if (down_sample) then
+                    call s_initialize_mpi_data_ds(q_cons_temp)
+                else
+                    ! Initialize MPI data I/O
+                    if (ib) then
+                        call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    else
+                        call s_initialize_mpi_data(q_cons_vf)
+                    end if
+                end if
+
+                if (down_sample) then
+                    ! Size of local arrays
+                    data_size = (m + 3)*(n + 3)*(p + 3)
+                else
+                    ! Size of local arrays
+                    data_size = (m + 1)*(n + 1)*(p + 1)
+                end if
+
+                ! Resize some integers so MPI can read even the biggest file
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity .or. mhd) then
@@ -469,7 +526,7 @@ contains
                                                mpi_p, status, ierr)
                     end do
                 else
-                    do i = 1, adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                                mpi_p, status, ierr)
@@ -478,6 +535,12 @@ contains
 
                 call s_mpi_barrier()
                 call MPI_FILE_CLOSE(ifile, ierr)
+
+                if (down_sample) then
+                    do i = 1, sys_size
+                        q_cons_vf(i)%sf(0:m, 0:n, 0:p) = q_cons_temp(i)%sf(0:m, 0:n, 0:p)
+                    end do
+                end if
 
                 call s_read_ib_data_files(trim(case_dir)//'/restart_data'//trim(mpiiofs))
             else
@@ -529,6 +592,7 @@ contains
         ! the simulation
         allocate (q_cons_vf(1:sys_size))
         allocate (q_prim_vf(1:sys_size))
+        allocate (q_cons_temp(1:sys_size))
 
         ! Allocating the parts of the conservative and primitive variables
         ! that do require the direct knowledge of the dimensionality of
@@ -539,6 +603,11 @@ contains
             ! Simulation is 3D
             if (p > 0) then
                 call s_allocate_field_arrays(-buff_size, m + buff_size, n + buff_size, p + buff_size)
+                if (down_sample) then
+                    do i = 1, sys_size
+                        allocate (q_cons_temp(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
+                    end do
+                end if
             else
                 ! Simulation is 2D
                 call s_allocate_field_arrays(-buff_size, m + buff_size, n + buff_size, 0)
@@ -579,10 +648,14 @@ contains
         do i = 1, sys_size
             deallocate (q_cons_vf(i)%sf)
             deallocate (q_prim_vf(i)%sf)
+            if (down_sample) then
+                deallocate (q_cons_temp(i)%sf)
+            end if
         end do
 
         deallocate (q_cons_vf)
         deallocate (q_prim_vf)
+        deallocate (q_cons_temp)
 
         if (ib) then
             deallocate (ib_markers%sf)
