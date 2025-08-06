@@ -169,7 +169,7 @@ contains
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
 
-        #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, j,k,l,q,rho,gamma,pi_inf,dyn_pres,G_K,qv_K,c_IP,nbub,patch_id]')
+        #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, j,k,l,q,qv_K,c_IP,nbub,patch_id]')
             do i = 1, num_gps
 
                 gp = ghost_points(i)
