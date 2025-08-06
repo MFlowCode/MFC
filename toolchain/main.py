@@ -58,7 +58,6 @@ if __name__ == "__main__":
     try:
         lock.init()
         state.gARG = args.parse(state.gCFG)
-        print(state.gARG)
 
         lock.switch(state.MFCConfig.from_dict(state.gARG))
 
