@@ -14,12 +14,12 @@ RUN apt-get update -y && \
             build-essential git make cmake gcc g++ gfortran \
             python3 python3-venv python3-pip \
             openmpi-bin libopenmpi-dev libfftw3-dev \
-            libatlas-base-dev mpich libmpich-dev; \
+            mpich libmpich-dev; \
     else \
         apt-get install -y \
             build-essential git make cmake \
             python3 python3-venv python3-pip \
-            libfftw3-dev libatlas-base-dev \
+            libfftw3-dev \
             openmpi-bin libopenmpi-dev; \
     fi && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -52,4 +52,4 @@ RUN cd /opt/MFC && \
     fi
 
 WORKDIR /opt/MFC
-ENTRYPOINT ["bash"]
+ENTRYPOINT ["tail", "-f", "/dev/null"]
