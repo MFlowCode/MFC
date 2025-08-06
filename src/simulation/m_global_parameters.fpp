@@ -1304,6 +1304,7 @@ contains
             $:GPU_UPDATE(device='[wenoz_q]')
             $:GPU_UPDATE(device='[mhd, relativity]')
             $:GPU_UPDATE(device='[muscl_order, muscl_lim]')
+            $:GPU_UPDATE(device='[igr, igr_order]')
             $:GPU_UPDATE(device='[num_fluids,num_dims,viscous,num_vels,nb,muscl_lim]')
         #:endif
 

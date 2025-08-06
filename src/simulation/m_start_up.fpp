@@ -1496,20 +1496,12 @@ contains
         if (chemistry) then
             $:GPU_UPDATE(device='[q_T_sf%sf]')
         end if
-        $:GPU_UPDATE(device='[nb,R0ref,Ca,Web,Re_inv,weight,R0, &
-            & bubbles_euler,polytropic,polydisperse,qbmm, &
-            & ptil,bubble_model,thermal,poly_sigma,adv_n,adap_dt, &
-            & adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
-        $:GPU_UPDATE(device='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,pv,M_n, &
-            & M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T,Re_trans_T, &
-            & Re_trans_c,Im_trans_T,Im_trans_c,omegaN,mul0,ss, &
-            & gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
-
+        
+        $:GPU_UPDATE(device='[adv_n,adap_dt,adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
         $:GPU_UPDATE(device='[acoustic_source, num_source]')
         $:GPU_UPDATE(device='[sigma, surface_tension]')
 
         $:GPU_UPDATE(device='[dx,dy,dz,x_cb,x_cc,y_cb,y_cc,z_cb,z_cc]')
-! #if defined(MFC_OpenACC)
         $:GPU_UPDATE(device='[bc_x%vb1,bc_x%vb2,bc_x%vb3,bc_x%ve1,bc_x%ve2,bc_x%ve3]')
         $:GPU_UPDATE(device='[bc_y%vb1,bc_y%vb2,bc_y%vb3,bc_y%ve1,bc_y%ve2,bc_y%ve3]')
         $:GPU_UPDATE(device='[bc_z%vb1,bc_z%vb2,bc_z%vb3,bc_z%ve1,bc_z%ve2,bc_z%ve3]')
@@ -1517,9 +1509,6 @@ contains
         $:GPU_UPDATE(device='[bc_x%grcbc_in,bc_x%grcbc_out,bc_x%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_y%grcbc_in,bc_y%grcbc_out,bc_y%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_z%grcbc_in,bc_z%grcbc_out,bc_z%grcbc_vel_out]')
-! #elif defined(MFC_OpenMP)
-!         $:GPU_UPDATE(device='[bc_x,bc_y,bc_z]')
-! #endif
 
         $:GPU_UPDATE(device='[relax, relax_model]')
         if (relax) then
@@ -1530,7 +1519,6 @@ contains
             $:GPU_UPDATE(device='[ib_markers%sf]')
         end if
 
-        $:GPU_UPDATE(device='[igr, igr_order]')
 
         #:block DEF_AMD
         block
