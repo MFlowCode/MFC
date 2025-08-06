@@ -6,7 +6,6 @@
 
 !> @brief The module contains the subroutines for the FFT routines
 module m_fftw
-
     use, intrinsic :: iso_c_binding
 
     use m_derived_types        !< Definitions of the derived types
@@ -334,5 +333,4 @@ contains
 #endif
 
     end subroutine s_finalize_fftw_module
-
 end module m_fftw
