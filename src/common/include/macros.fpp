@@ -12,6 +12,10 @@
 #endif
 #:enddef
 
+! Caution:
+! This macro requires the use of a binding script to set CUDA_VISIBLE_DEVICES, such that we have one GPU device per MPI rank.
+! That's because for both cudaMemAdvise (preferred location) and cudaMemPrefetchAsync we use location = device_id = 0.
+! For an example see misc/nvidia_uvm/bind.sh.
 #:def PREFER_GPU(*args)
 #ifdef MFC_SIMULATION
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
