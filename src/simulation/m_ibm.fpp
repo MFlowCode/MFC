@@ -140,7 +140,7 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: q_prim_vf !< Primitive Variables
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), optional, intent(INOUT) :: pb_in, mv_in
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), optional, intent(INOUT) :: pb_in, mv_in
 
         integer :: i, j, k, l, q, r!< Iterator variables
         integer :: patch_id !< Patch ID of ghost point
@@ -175,9 +175,9 @@ contains
                 gp = ghost_points(i)
                 j = gp%loc(1)
                 k = gp%loc(2)
-                l = gp%loc(3) 
-                patch_id = ghost_points(i)%ib_patch_id                
-                
+                l = gp%loc(3)
+                patch_id = ghost_points(i)%ib_patch_id
+
                 ! Calculate physical location of GP
                 if (p > 0) then
                     physical_loc = [x_cc(j), y_cc(k), z_cc(l)]
@@ -197,11 +197,12 @@ contains
                 else if (qbmm .and. .not. polytropic) then
                     call s_interpolate_image_point(q_prim_vf, gp, &
                                                    alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
-                                                   r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                                                   r_IP, v_IP, pb_IP, mv_IP, nmom_IP, real(pb_in, kind=wp), real(mv_in, kind=wp), presb_IP, massv_IP)
                 else
                     call s_interpolate_image_point(q_prim_vf, gp, &
                                                    alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
                 end if
+
                 dyn_pres = 0._wp
 
                 ! Set q_prim_vf params at GP so that mixture vars calculated properly
@@ -213,7 +214,7 @@ contains
 
                 if (surface_tension) then
                     q_prim_vf(c_idx)%sf(j, k, l) = c_IP
-                end if                
+                end if
                 if (model_eqns /= 4) then
                     ! If in simulation, use acc mixture subroutines
                     if (elasticity) then
@@ -257,7 +258,7 @@ contains
                 ! Set color function
                 if (surface_tension) then
                     q_cons_vf(c_idx)%sf(j, k, l) = c_IP
-                end if 
+                end if
 
                 ! Set Energy
                 if (bubbles_euler) then
@@ -288,7 +289,7 @@ contains
                     do q = 1, nb*nmom
                         q_cons_vf(bubxb + q - 1)%sf(j, k, l) = nbub*nmom_IP(q)
                     end do
-                    
+
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, nb
                         q_cons_vf(bubxb + (q - 1)*nmom)%sf(j, k, l) = nbub
@@ -373,7 +374,7 @@ contains
 
             ! Calculate and store the precise location of the image point
             patch_id = gp%ib_patch_id
-            dist = abs(levelset_in%sf(i, j, k, patch_id))
+            dist = abs(real(levelset_in%sf(i, j, k, patch_id), kind=wp))
             norm(:) = levelset_norm_in%sf(i, j, k, patch_id, :)
             ghost_points_in(q)%ip_loc(:) = physical_loc(:) + 2*dist*norm(:)
 

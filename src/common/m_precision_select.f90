@@ -13,9 +13,11 @@ module m_precision_select
     implicit none
 
     ! Define the available precision types
+    integer, parameter :: half_precision = 2 ! selected_real_kind(3, 4)
     integer, parameter :: single_precision = selected_real_kind(6, 37)
     integer, parameter :: double_precision = selected_real_kind(15, 307)
 
+    integer, parameter :: hp = half_precision
     integer, parameter :: sp = single_precision
     integer, parameter :: dp = double_precision
 
@@ -26,10 +28,24 @@ module m_precision_select
     integer, parameter :: wp = double_precision
 #endif
 
+    ! Set the storage preceision (stp) to half if mixed precision is requested
+#ifdef MFC_MIXED_PRECISION
+    integer, parameter :: stp = half_precision
+#else
+    integer, parameter :: stp = wp
+#endif
+
 #ifdef MFC_MPI
+
+#ifdef MFC_MIXED_PRECISION
+    integer, parameter :: mpi_p = MPI_SHORT
+    integer, parameter :: mpi_2p = MPI_FLOAT
+#else
     ! Set mpi_p based on wp using the merge intrinsic function
     integer, parameter :: mpi_p = merge(MPI_DOUBLE_PRECISION, MPI_REAL, wp == double_precision)
     integer, parameter :: mpi_2p = merge(MPI_2DOUBLE_PRECISION, MPI_2REAL, wp == double_precision)
+#endif
+
 #else
     integer, parameter :: mpi_p = -100  ! Default value when MPI is not used
     integer, parameter :: mpi_2p = -100

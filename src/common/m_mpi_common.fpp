@@ -28,12 +28,12 @@ module m_mpi_common
     $:GPU_DECLARE(create='[v_size]')
     !! Generic flags used to identify and report MPI errors
 
-    real(wp), private, allocatable, dimension(:) :: buff_send !<
+    real(stp), private, allocatable, dimension(:) :: buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
     !! primitive variables, for a single computational domain boundary at the
     !! time, to the relevant neighboring processor.
 
-    real(wp), private, allocatable, dimension(:) :: buff_recv !<
+    real(stp), private, allocatable, dimension(:) :: buff_recv !<
     !! buff_recv is utilized to receive and unpack the buffer of the cell-
     !! average primitive variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
@@ -663,7 +663,7 @@ contains
                                                 pb_in, mv_in)
 
         type(scalar_field), dimension(1:), intent(inout) :: q_comm
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
+        real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
         integer, intent(in) :: mpi_dir, pbc_loc, nVar
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
