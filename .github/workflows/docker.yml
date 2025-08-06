@@ -23,6 +23,8 @@ jobs:
             - { name: 'gpu', runner: 'ubuntu-22.04',     base_image: 'nvcr.io/nvidia/nvhpc:23.11-devel-cuda12.3-ubuntu22.04' }
             - { name: 'gpu', runner: 'ubuntu-22.04-arm', base_image: 'nvcr.io/nvidia/nvhpc:23.11-devel-cuda12.3-ubuntu22.04' }
     runs-on: ${{ matrix.config.runner }}
+    outputs:
+      tag: ${{ steps.clone.outputs.tag }}
     steps:
       - name: Login
         uses: docker/login-action@v3
@@ -37,14 +39,12 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Clone
+        id: clone
         run: |
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "TAG=${{ github.ref_name }}" >> $GITHUB_ENV
-          fi
-
-          git clone --branch ${{ env.TAG }} --depth 1 https://github.com/MFlowCode/MFC.git mfc
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          git clone --branch "$TAG" --depth 1 https://github.com/MFlowCode/MFC.git mfc
 
       - name: Stage
         run: |
@@ -56,7 +56,7 @@ jobs:
           cp mfc/.github/.dockerignore /mnt/share/
 
       - name: Build and Deploy
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           builder: default
           context: /mnt/share
@@ -83,23 +83,16 @@ jobs:
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Create and Push Manifest Lists
+        env:
+          TAG: ${{ needs.Container.outputs.tag }}
+          REGISTRY: ${{ secrets.DOCKERHUB_USERNAME }}/mfc
         run: |
-          docker manifest create ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-cpu \
-            ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-cpu-ubuntu-22.04 \
-            ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-cpu-ubuntu-22.04-arm
-          docker manifest push ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-cpu
-
-          docker manifest create ${{ secrets.DOCKERHUB_USERNAME }}/mfc:latest-cpu \
-            ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-cpu-ubuntu-22.04 \
-            ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-cpu-ubuntu-22.04-arm
-          docker manifest push ${{ secrets.DOCKERHUB_USERNAME }}/mfc:latest-cpu
-
-          docker manifest create ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-gpu \
-            ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-gpu-ubuntu-22.04 \
-            ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-gpu-ubuntu-22.04-arm
-          docker manifest push ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-gpu
-
-          docker manifest create ${{ secrets.DOCKERHUB_USERNAME }}/mfc:latest-gpu \
-            ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-gpu-ubuntu-22.04 \
-            ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-gpu-ubuntu-22.04-arm
-          docker manifest push ${{ secrets.DOCKERHUB_USERNAME }}/mfc:latest-gpu
+          docker manifest create $REGISTRY:$TAG-cpu $REGISTRY:$TAG-cpu-ubuntu-22.04 $REGISTRY:$TAG-cpu-ubuntu-22.04-arm
+          docker manifest create $REGISTRY:$TAG-gpu $REGISTRY:$TAG-gpu-ubuntu-22.04 $REGISTRY:$TAG-gpu-ubuntu-22.04-arm
+          docker manifest create $REGISTRY:latest-cpu $REGISTRY:$TAG-cpu-ubuntu-22.04 $REGISTRY:$TAG-cpu-ubuntu-22.04-arm
+          docker manifest create $REGISTRY:latest-gpu $REGISTRY:$TAG-gpu-ubuntu-22.04 $REGISTRY:$TAG-gpu-ubuntu-22.04-arm
+          
+          docker manifest push $REGISTRY:$TAG-cpu
+          docker manifest push $REGISTRY:$TAG-gpu
+          docker manifest push $REGISTRY:latest-cpu
+          docker manifest push $REGISTRY:latest-gpu
