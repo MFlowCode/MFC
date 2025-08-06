@@ -115,8 +115,8 @@ contains
         ! up. The conservative variables do not need to be similarly treated
         ! since they are computed directly from the primitive variables.
         do i = 1, sys_size
-            q_cons_vf(i)%sf = dflt_real
-            q_prim_vf(i)%sf = dflt_real
+            q_cons_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp) ! TODO :: remove this magic number
+            q_prim_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp)
         end do
 
         ! Allocating arrays to store the bc types

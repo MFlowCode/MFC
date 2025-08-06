@@ -304,7 +304,7 @@ contains
 
         real(wp) :: Ys(1:num_species)
 
-        real(wp), dimension(sys_size) :: orig_prim_vf !<
+        real(stp), dimension(sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes
 
         integer :: i  !< Generic loop iterator
@@ -672,11 +672,11 @@ contains
 
         if (bubbles_euler .and. (.not. polytropic) .and. (.not. qbmm)) then
             do i = 1, nb
-                if (f_is_default(q_prim_vf(bub_idx%ps(i))%sf(j, k, l))) then
+                if (f_is_default(real(q_prim_vf(bub_idx%ps(i))%sf(j, k, l), kind=wp))) then
                     q_prim_vf(bub_idx%ps(i))%sf(j, k, l) = pb0(i)
                     ! print *, 'setting to pb0'
                 end if
-                if (f_is_default(q_prim_vf(bub_idx%ms(i))%sf(j, k, l))) then
+                if (f_is_default(real(q_prim_vf(bub_idx%ms(i))%sf(j, k, l), kind=wp))) then
                     q_prim_vf(bub_idx%ms(i))%sf(j, k, l) = mass_v0(i)
                 end if
             end do

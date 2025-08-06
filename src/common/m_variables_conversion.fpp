@@ -119,12 +119,13 @@ contains
         $:GPU_ROUTINE(function_name='s_compute_pressure',parallelism='[seq]', &
             & cray_inline=True)
 
-        real(wp), intent(in) :: energy, alf
+        real(stp), intent(in) :: energy, alf
         real(wp), intent(in) :: dyn_p
         real(wp), intent(in) :: pi_inf, gamma, rho, qv
         real(wp), intent(out) :: pres
         real(wp), intent(inout) :: T
-        real(wp), intent(in), optional :: stress, mom, G, pres_mag
+        real(stp), intent(in), optional :: stress, mom
+        real(wp), intent(in), optional :: G, pres_mag
 
         ! Chemistry
         real(wp), dimension(1:num_species), intent(in) :: rhoYks
@@ -741,7 +742,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
-        real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: mv
+        real(stp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: mv
 
         integer :: i, j, k, l
         real(wp) :: mu, sig, nbub_sc
@@ -773,8 +774,8 @@ contains
     subroutine s_initialize_pb(qK_cons_vf, mv, pb)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
-        real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
-        real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: pb
+        real(stp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
+        real(stp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: pb
 
         integer :: i, j, k, l
         real(wp) :: mu, sig, nbub_sc
@@ -1354,7 +1355,7 @@ contains
                                 q_cons_vf(n_idx)%sf(j, k, l) = q_prim_vf(n_idx)%sf(j, k, l)
                                 nbub = q_prim_vf(n_idx)%sf(j, k, l)
                             else
-                                call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
+                                call s_comp_n_from_prim(real(q_prim_vf(alf_idx)%sf(j, k, l), kind=wp), Rtmp, nbub, weight)
                             end if
                         else
                             !Initialize R3 averaging over R0 and R directions
