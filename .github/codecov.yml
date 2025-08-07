@@ -1,4 +1,6 @@
 coverage:
+  strict_yaml_branch: default
+  max_report_age: off
   status:
     project:
       default:
