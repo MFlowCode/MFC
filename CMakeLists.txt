@@ -498,11 +498,11 @@ function(MFC_SETUP_TARGET)
                 # GH-200 Unified Memory Support
                 if (MFC_Unified)
                     target_compile_options(${ARGS_TARGET}
-                        PRIVATE -gpu=mem:unified -cuda
+                        PRIVATE -gpu=mem:unified:managedalloc -cuda
                     )
                     # "This option must appear in both the compile and link lines" -- NVHPC Docs
                     target_link_options(${ARGS_TARGET}
-                        PRIVATE -gpu=mem:unified -cuda
+                        PRIVATE -gpu=mem:unified:managedalloc -cuda
                     )
                 endif()
 

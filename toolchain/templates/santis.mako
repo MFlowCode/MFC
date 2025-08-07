@@ -27,7 +27,7 @@
 % endif
 
 # NVHPC and CUDA env vars
-export NV_ACC_USE_MALLOC=0                    # use cudaMallocManaged instead of malloc ( compiled using -gpu=mem:unified )
+export NV_ACC_USE_MALLOC=0                    # use cudaMallocManaged instead of malloc ( compiled using -gpu=mem:unified:managedalloc )
 export NVCOMPILER_ACC_NO_MEMHINTS=1           # disable implicit compiler hints
 #export CUDA_BUFFER_PAGE_IN_THRESHOLD_MS=0.001 # workaround for copying to/from unpopulated buffers on GH
 
