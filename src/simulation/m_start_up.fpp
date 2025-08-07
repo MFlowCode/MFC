@@ -1331,7 +1331,7 @@ contains
 
         call s_initialize_rhs_module()
 
-        
+
 
         if (surface_tension) call s_initialize_surface_tension_module()
 
@@ -1495,7 +1495,14 @@ contains
         if (chemistry) then
             $:GPU_UPDATE(device='[q_T_sf%sf]')
         end if
-        
+
+        $:GPU_UPDATE(device='[Ca,Re_inv,Web,R0ref,bubbles_euler,qbmm,polytropic, &
+            & polydisperse,bubble_model,thermal,poly_sigma,ptil,weight,R0]')
+        $:GPU_UPDATE(device='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,pv, &
+            & M_n,M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T, &
+            & Re_trans_T,Re_trans_c,Im_trans_T,Im_trans_c,omegaN, &
+            & mul0,ss,gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
+
         $:GPU_UPDATE(device='[adv_n,adap_dt,adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
         $:GPU_UPDATE(device='[acoustic_source, num_source]')
         $:GPU_UPDATE(device='[sigma, surface_tension]')
