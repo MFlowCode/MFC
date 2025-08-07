@@ -89,6 +89,15 @@ contains
 
     subroutine s_initialize_igr_module()
 
+print *, "Re_size = ", Re_size
+print *, "maxval(Re_size) = ", maxval(Re_size)
+print *, "idwbuff(1)%beg/end = ", idwbuff(1)%beg, idwbuff(1)%end
+print *, "idwbuff(2)%beg/end = ", idwbuff(2)%beg, idwbuff(2)%end
+print *, "idwbuff(3)%beg/end = ", idwbuff(3)%beg, idwbuff(3)%end
+print *, "m, n, p = ", m, n, p
+
+call sleep(1)
+
         if (viscous) then
             @:ALLOCATE(Res_igr(1:2, 1:maxval(Re_size)))
             do i = 1, 2
@@ -109,17 +118,18 @@ contains
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
         end if
-
+#if 0
         #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        jac(j, k, l) = 0._wp
-                        if (igr_iter_solver == 1) jac_old(j, k, l) = 0._wp
+                        jac(j, k, l) = 0._stp
+                        if (igr_iter_solver == 1) jac_old(j, k, l) = 0._stp
                     end do
                 end do
             end do
         #:endcall GPU_PARALLEL_LOOP
+#endif
 
         if (p == 0) then
             alf_igr = alf_factor*max(dx(1), dy(1))**2._wp

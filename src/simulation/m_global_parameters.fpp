@@ -1317,12 +1317,12 @@ contains
         @:ALLOCATE(x_cc(-buff_size:m + buff_size))
         @:ALLOCATE(dx(-buff_size:m + buff_size))
 
-        if (n == 0) return; 
+        if (n == 0) return;
         @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE(dy(-buff_size:n + buff_size))
 
-        if (p == 0) return; 
+        if (p == 0) return;
         @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
@@ -1405,10 +1405,10 @@ contains
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x_cb, x_cc, dx)
 
-        if (n == 0) return; 
+        if (n == 0) return;
         @:DEALLOCATE(y_cb, y_cc, dy)
 
-        if (p == 0) return; 
+        if (p == 0) return;
         @:DEALLOCATE(z_cb, z_cc, dz)
 
     end subroutine s_finalize_global_parameters_module

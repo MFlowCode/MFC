@@ -1663,8 +1663,8 @@ contains
                 sf_start_idx = (/0, 0, 0/)
                 sf_extents_loc = shape(bc_buffers(dir, loc)%sf)
 
-                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sf_extents_loc, sf_extents_loc, sf_start_idx, &
-                                              MPI_ORDER_FORTRAN, mpi_p, MPI_BC_BUFFER_TYPE(dir, loc), ierr)
+                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sf_extents_loc*mpi_io_tpe, sf_extents_loc*mpi_io_tpe, sf_start_idx, &
+                                              MPI_ORDER_FORTRAN, mpi_io_p, MPI_BC_BUFFER_TYPE(dir, loc), ierr)
                 call MPI_TYPE_COMMIT(MPI_BC_BUFFER_TYPE(dir, loc), ierr)
             end do
         end do
@@ -1763,7 +1763,7 @@ contains
         ! Write bc_buffers
         do dir = 1, num_dims
             do loc = -1, 1, 2
-                call MPI_File_set_view(file_id, int(offset, KIND=MPI_ADDRESS_KIND), mpi_p, MPI_BC_BUFFER_TYPE(dir, loc), 'native', MPI_INFO_NULL, ierr)
+                call MPI_File_set_view(file_id, int(offset, KIND=MPI_ADDRESS_KIND), mpi_io_p, MPI_BC_BUFFER_TYPE(dir, loc), 'native', MPI_INFO_NULL, ierr)
                 call MPI_File_write_all(file_id, bc_buffers(dir, loc)%sf, 1, MPI_BC_BUFFER_TYPE(dir, loc), MPI_STATUS_IGNORE, ierr)
                 offset = offset + sizeof(bc_buffers(dir, loc)%sf)
             end do
@@ -1870,7 +1870,7 @@ contains
         ! Read bc_buffers
         do dir = 1, num_dims
             do loc = -1, 1, 2
-                call MPI_File_set_view(file_id, int(offset, KIND=MPI_ADDRESS_KIND), mpi_p, MPI_BC_BUFFER_TYPE(dir, loc), 'native', MPI_INFO_NULL, ierr)
+                call MPI_File_set_view(file_id, int(offset, KIND=MPI_ADDRESS_KIND), mpi_io_p, MPI_BC_BUFFER_TYPE(dir, loc), 'native', MPI_INFO_NULL, ierr)
                 call MPI_File_read_all(file_id, bc_buffers(dir, loc)%sf, 1, MPI_BC_BUFFER_TYPE(dir, loc), MPI_STATUS_IGNORE, ierr)
                 offset = offset + sizeof(bc_buffers(dir, loc)%sf)
                 $:GPU_UPDATE(device='[bc_buffers(dir, loc)%sf]')
