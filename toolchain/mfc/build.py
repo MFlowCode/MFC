@@ -69,6 +69,9 @@ class MFCTarget:
         # <root>/install/<slug>/bin/<target>
         return os.sep.join([self.get_install_dirpath(case), "bin", self.name])
 
+    def get_home_dirpath(self, case: Case) -> str:
+        return os.sep.join([os.getcwd()])
+
     def is_configured(self, case: Case ) -> bool:
         # We assume that if the CMakeCache.txt file exists, then the target is
         # configured. (this isn't perfect, but it's good enough for now)
