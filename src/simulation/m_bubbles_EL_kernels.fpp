@@ -27,7 +27,7 @@ contains
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
         real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
-        type(vector_field), intent(inout) :: updatedvar
+        type(scalar_field), dimension(:), intent(inout) :: updatedvar
 
         smoothfunc:select case(lag_params%smooth_type)
         case (1)
@@ -45,7 +45,7 @@ contains
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s
         real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
-        type(vector_field), intent(inout) :: updatedvar
+        type(scalar_field), dimension(:), intent(inout) :: updatedvar
 
         integer, dimension(3) :: cell
         real(wp) :: strength_vel, strength_vol
@@ -75,19 +75,19 @@ contains
                 !Update void fraction field
                 addFun1 = strength_vol/Vol
                 $:GPU_ATOMIC(atomic='update')
-                updatedvar%vf(1)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(1)%sf(cell(1), cell(2), cell(3)) + addFun1
+                updatedvar(1)%sf(cell(1), cell(2), cell(3)) = updatedvar(1)%sf(cell(1), cell(2), cell(3)) + real(addFun1, kind=stp)
 
                 !Update time derivative of void fraction
                 addFun2 = strength_vel/Vol
                 $:GPU_ATOMIC(atomic='update')
-                updatedvar%vf(2)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(2)%sf(cell(1), cell(2), cell(3)) + addFun2
+                updatedvar(2)%sf(cell(1), cell(2), cell(3)) = updatedvar(2)%sf(cell(1), cell(2), cell(3)) + real(addFun2, kind=stp)
 
                 !Product of two smeared functions
                 !Update void fraction * time derivative of void fraction
                 if (lag_params%cluster_type >= 4) then
                     addFun3 = (strength_vol*strength_vel)/Vol
                     $:GPU_ATOMIC(atomic='update')
-                    updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) + addFun3
+                    updatedvar(5)%sf(cell(1), cell(2), cell(3)) = updatedvar(5)%sf(cell(1), cell(2), cell(3)) + real(addFun3, kind=stp)
                 end if
             end do
         #:endcall GPU_PARALLEL_LOOP
@@ -101,7 +101,7 @@ contains
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
         real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
-        type(vector_field), intent(inout) :: updatedvar
+        type(scalar_field), dimension(:), intent(inout) :: updatedvar
 
         real(wp), dimension(3) :: center
         integer, dimension(3) :: cell
@@ -172,25 +172,25 @@ contains
                             !Update void fraction field
                             addFun1 = func*strength_vol
                             $:GPU_ATOMIC(atomic='update')
-                            updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + addFun1
+                            updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun1, kind=stp)
 
                             !Update time derivative of void fraction
                             addFun2 = func*strength_vel
                             $:GPU_ATOMIC(atomic='update')
-                            updatedvar%vf(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar%vf(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + addFun2
+                            updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun2, kind=stp)
 
                             !Product of two smeared functions
                             !Update void fraction * time derivative of void fraction
                             if (lag_params%cluster_type >= 4) then
                                 addFun3 = func2*strength_vol*strength_vel
                                 $:GPU_ATOMIC(atomic='update')
-                                updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + addFun3
+                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun3, kind=stp)
                             end if
                         end do
                     end do
