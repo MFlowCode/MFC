@@ -33,7 +33,7 @@ module m_constants
     real(wp), parameter :: acoustic_spatial_support_width = 2.5_wp !< Spatial support width of acoustic source, used in s_source_spatial
     real(wp), parameter :: dflt_vcfl_dt = 100._wp !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
     real(wp), parameter :: broadband_spectral_level_constant = 20._wp !< The constant to scale the spectral level at the lower frequency bound
-    real(wp), parameter :: broadband_spectral_level_growth_rate = 10._wp !< The spectral level constant to correct the magnitude at each frqeuency to ensure the source is overall broadband
+    real(wp), parameter :: broadband_spectral_level_growth_rate = 10._wp !< The spectral level constant to correct the magnitude at each frequency to ensure the source is overall broadband
 
     ! Reconstruction Types
     integer, parameter :: WENO_TYPE = 1 !< Using WENO for reconstruction type
@@ -59,14 +59,14 @@ module m_constants
     real(wp), parameter :: initial_distance_buffer = 1.e12_wp !< Initialized levelset distance for the shortest path pair algorithm
 
     ! Lagrange bubbles constants
-    integer, parameter :: mapCells = 3 !< Number of cells around the bubble where the smoothening function will have effect
-    real(wp), parameter :: R_uni = 8314._wp ! Universal gas constant - J/kmol/K
+    integer, parameter :: mapCells = 3         !< Number of cells around the bubble where the smoothening function will have effect
+    real(wp), parameter :: R_uni = 8314._wp    !< Universal gas constant - J/kmol/K
 
     ! Strang Splitting constants
     real(wp), parameter :: dflt_adap_dt_tol = 1.e-4_wp !< Default tolerance for adaptive step size
     integer, parameter :: dflt_adap_dt_max_iters = 100 !< Default max iteration for adaptive step size
 
-    ! Constants of the algorithm described by Heirer, E. Hairer S.P.Nørsett G. Wanner, Solving Ordinary Differential Equations I, Chapter II.4
+    ! Constants of the algorithm described by Heirer, E. Hairer, S. P.Nørsett, G. Wanner, Solving Ordinary Differential Equations I, Chapter II.4
     ! to choose the initial time step size for the adaptive time stepping routine
     real(wp), parameter :: threshold_first_guess = 1.e-5_wp
     real(wp), parameter :: threshold_second_guess = 1.e-15_wp
