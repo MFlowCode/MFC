@@ -53,7 +53,7 @@ jobs:
         run:  |
           brew update
           brew upgrade
-          brew install coreutils python cmake fftw hdf5 gcc@15 boost open-mpi
+          brew install coreutils python cmake fftw hdf5 gcc@15 boost open-mpi lapack
           echo "FC=gfortran-15" >> $GITHUB_ENV
           echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
 
@@ -62,7 +62,8 @@ jobs:
         run: |
            sudo apt update -y
            sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
-                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev
+                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev \
+                    libblas-dev liblapack-dev
 
       - name: Setup Ubuntu (Intel)
         if:   matrix.os == 'ubuntu' && matrix.intel == true

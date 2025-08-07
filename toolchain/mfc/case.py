@@ -203,8 +203,14 @@ class Case:
             wenojs = 0 if (mapped_weno or wenoz or teno) else 1
             igr = 1 if self.params.get("igr", 'F') == 'T' else 0
 
-            weno_order = int(self.params.get("weno_order",1))
-            weno_polyn = int((self.params.get("weno_order",1) - 1) / 2)
+            recon_type = self.params.get("recon_type", 1)
+
+            # This fixes a bug on Frontier to do with allocating 0:0 arrays
+            weno_order = int(self.params.get("weno_order", 0))
+            if recon_type == 1:
+                weno_polyn = int((weno_order - 1) / 2)
+            else:
+                weno_polyn = 1
 
             if self.params.get("igr", "F") == 'T':
                 weno_order = 5
@@ -230,8 +236,12 @@ class Case:
             # Throw error if wenoz_q is required but not set
             return f"""\
 #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
+#:set recon_type            = {recon_type}
 #:set weno_order            = {weno_order}
 #:set weno_polyn            = {weno_polyn}
+#:set muscl_order           = {int(self.params.get("muscl_order", 0))}
+#:set muscl_polyn           = {int(self.params.get("muscl_order", 0))}
+#:set muscl_lim             = {int(self.params.get("muscl_lim", 1))}
 #:set weno_num_stencils     = {weno_num_stencils}
 #:set nb                    = {int(self.params.get("nb", 1))}
 #:set num_dims              = {num_dims}

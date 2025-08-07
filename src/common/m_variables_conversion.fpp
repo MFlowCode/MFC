@@ -392,7 +392,7 @@ contains
         if (igr) then
             if (num_fluids == 1) then
                 alpha_rho_K(1) = q_vf(contxb)%sf(k, l, r)
-                alpha_K(1) = q_vf(advxb)%sf(k, l, r)
+                alpha_K(1) = 1._wp
             else
                 do i = 1, num_fluids - 1
                     alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
@@ -884,7 +884,7 @@ contains
                     if (igr) then
                         if (num_fluids == 1) then
                             alpha_rho_K(1) = qK_cons_vf(contxb)%sf(j, k, l)
-                            alpha_K(1) = qK_cons_vf(advxb)%sf(j, k, l)
+                            alpha_K(1) = 1._wp
                         else
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids - 1
@@ -1147,10 +1147,12 @@ contains
                         end do
                     end if
 
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = advxb, advxe
-                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
-                    end do
+                    if (.not. igr .or. num_fluids > 1) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = advxb, advxe
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                        end do
+                    end if
 
                     if (surface_tension) then
                         qK_prim_vf(c_idx)%sf(j, k, l) = qK_cons_vf(c_idx)%sf(j, k, l)
@@ -1223,10 +1225,12 @@ contains
                     call s_convert_to_mixture_variables(q_prim_vf, j, k, l, &
                                                         rho, gamma, pi_inf, qv, Re_K, G, fluid_pp(:)%G)
 
-                    ! Transferring the advection equation(s) variable(s)
-                    do i = adv_idx%beg, adv_idx%end
-                        q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
-                    end do
+                    if (.not. igr .or. num_fluids > 1) then
+                        ! Transferring the advection equation(s) variable(s)
+                        do i = adv_idx%beg, adv_idx%end
+                            q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                        end do
+                    end if
 
                     if (relativity) then
 
