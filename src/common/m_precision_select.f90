@@ -36,19 +36,17 @@ module m_precision_select
 #endif
 
 #ifdef MFC_MPI
-
-#ifdef MFC_MIXED_PRECISION
-    integer, parameter :: mpi_p = MPI_SHORT
-    integer, parameter :: mpi_2p = MPI_FLOAT
-#else
     ! Set mpi_p based on wp using the merge intrinsic function
     integer, parameter :: mpi_p = merge(MPI_DOUBLE_PRECISION, MPI_REAL, wp == double_precision)
     integer, parameter :: mpi_2p = merge(MPI_2DOUBLE_PRECISION, MPI_2REAL, wp == double_precision)
-#endif
-
+    integer, parameter :: mpi_io_p = merge(mpi_p, MPI_BYTE, stp == half_precision)
+    ! MPI types per element. IE Real(kind=2) <=> 2 MPI_BYTE
+    integer, parameter :: mpi_io_tpe = merge(1, 2, stp == half_precision)
 #else
     integer, parameter :: mpi_p = -100  ! Default value when MPI is not used
     integer, parameter :: mpi_2p = -100
+    integer, parameter :: mpi_io_p = -100
+    integer, parameter :: mpi_io_tpe = -100
 #endif
 
 end module m_precision_select

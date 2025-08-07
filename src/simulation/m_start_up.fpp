@@ -673,7 +673,7 @@ contains
                 m_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 n_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 p_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                WP_MOK = int(4._wp, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
@@ -684,16 +684,16 @@ contains
                     do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           mpi_p, status, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                                           mpi_io_p, status, ierr)
                     end do
                     !Read pb and mv for non-polytropic qbmm
                     if (qbmm .and. .not. polytropic) then
                         do i = sys_size + 1, sys_size + 2*nb*nnode
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
-                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               mpi_p, status, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                                               mpi_io_p, status, ierr)
                         end do
                     end if
                 else
@@ -701,15 +701,16 @@ contains
                         do i = 1, sys_size
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
-                            call MPI_FILE_READ(ifile, q_cons_temp(i)%sf, data_size, &
-                                               mpi_p, status, ierr)
+                            call MPI_FILE_READ(ifile, q_cons_temp(i)%sf, data_size*mpi_io_tpe, &
+                                               mpi_io_p, status, ierr)
                         end do
                     else
                         do i = 1, sys_size
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
-                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               mpi_p, status, ierr)
+                            print*, "FFP", mpi_io_p, mpi_io_tpe; call sleep(1)
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                                               mpi_io_p, status, ierr)
                         end do
                     end if
                 end if
@@ -750,10 +751,10 @@ contains
 
                         disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_levelset_DATA%view, &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
-                                           mpi_p, status, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs * mpi_io_tpe, &
+                                           mpi_io_p, status, ierr)
 
                     else
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
@@ -770,10 +771,10 @@ contains
 
                         disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelsetnorm_DATA%view, &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_levelsetnorm_DATA%view, &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
-                                           mpi_p, status, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3 * mpi_io_tpe, &
+                                           mpi_io_p, status, ierr)
 
                     else
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
@@ -785,7 +786,6 @@ contains
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
         else
-
             ! Open the file to read conservative variables
             if (cfl_dt) then
                 write (file_loc, '(I0,A)') n_start, '.dat'
@@ -809,7 +809,6 @@ contains
 
                 end if
 
-
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
 
@@ -829,10 +828,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           mpi_p, status, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                                           mpi_io_p, status, ierr)
                     end do
                     !Read pb and mv for non-polytropic qbmm
                     if (qbmm .and. .not. polytropic) then
@@ -841,10 +840,10 @@ contains
                             ! Initial displacement to skip at beginning of file
                             disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
+                            call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
                                                    'native', mpi_info_int, ierr)
-                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               mpi_p, status, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                                               mpi_io_p, status, ierr)
                         end do
                     end if
                 else
@@ -853,12 +852,11 @@ contains
 
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
-
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
+                        print*, "HERE", i, mpi_io_tpe, mpi_io_p, data_size, disp;call sleep(1)
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           mpi_p, status, ierr)
-
+                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                                           mpi_io_p, status, ierr)
                     end do
                 end if
 
@@ -899,10 +897,10 @@ contains
 
                         disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_levelset_DATA%view, &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
-                                           mpi_p, status, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs * mpi_io_tpe, &
+                                           mpi_io_p, status, ierr)
 
                     else
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
@@ -919,10 +917,10 @@ contains
 
                         disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelsetnorm_DATA%view, &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_levelsetnorm_DATA%view, &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
-                                           mpi_p, status, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3 * mpi_io_tpe, &
+                                           mpi_io_p, status, ierr)
 
                     else
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
@@ -956,10 +954,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_airfoil_IB_DATA%view(1), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_airfoil_IB_DATA%view(1), &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(1:Np), 3*Np, &
-                                           mpi_p, status, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(1:Np), 3*Np * mpi_io_tpe, &
+                                           mpi_io_p, status, ierr)
 
                     end if
 
@@ -973,10 +971,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_airfoil_IB_DATA%view(2), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_airfoil_IB_DATA%view(2), &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(Np + 1:2*Np), 3*Np, &
-                                           mpi_p, status, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(Np + 1:2*Np), 3*Np * mpi_io_tpe, &
+                                           mpi_io_p, status, ierr)
                     end if
 
                     do i = 1, Np
@@ -1332,7 +1330,6 @@ contains
         call s_initialize_rhs_module()
 
 
-
         if (surface_tension) call s_initialize_surface_tension_module()
 
         if (relax) call s_initialize_phasechange_module()
@@ -1353,7 +1350,7 @@ contains
                 allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
             end do
         end if
-
+print*, "BEFORE READ";call sleep(1)
         ! Reading in the user provided initial condition and grid data
         if(down_sample) then
             call s_read_data_files(q_cons_temp)
@@ -1364,7 +1361,7 @@ contains
         else
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
-
+print*, "AFTER READ";call sleep(1)
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
         if (bodyForces) call s_initialize_body_forces_module()
@@ -1372,7 +1369,7 @@ contains
 
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
-
+print*, "AFTER GRID POPULATE";call sleep(1)
         ! Initialize the Temperature cache.
         if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_ts(1)%vf, idwint)
 
@@ -1390,7 +1387,7 @@ contains
             call s_initialize_cbc_module()
             call s_initialize_riemann_solvers_module()
         end if
-
+print*, "AFTER INITIALIZE SOME STUFF";call sleep(1)
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
 
@@ -1496,14 +1493,17 @@ contains
             $:GPU_UPDATE(device='[q_T_sf%sf]')
         end if
 
-        $:GPU_UPDATE(device='[Ca,Re_inv,Web,R0ref,bubbles_euler,qbmm,polytropic, &
-            & polydisperse,bubble_model,thermal,poly_sigma,ptil,weight,R0]')
-        $:GPU_UPDATE(device='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,pv, &
-            & M_n,M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T, &
-            & Re_trans_T,Re_trans_c,Im_trans_T,Im_trans_c,omegaN, &
-            & mul0,ss,gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
-
         $:GPU_UPDATE(device='[adv_n,adap_dt,adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
+
+        $:GPU_UPDATE(device='[R0ref,Ca,Web,Re_inv,weight,R0, &
+            & bubbles_euler,polytropic,polydisperse,qbmm, &
+            & ptil,bubble_model,thermal,poly_sigma,adv_n,adap_dt, &
+            & adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
+        $:GPU_UPDATE(device='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,pv,M_n, &
+            & M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T,Re_trans_T, &
+            & Re_trans_c,Im_trans_T,Im_trans_c,omegaN,mul0,ss, &
+            & gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
+
         $:GPU_UPDATE(device='[acoustic_source, num_source]')
         $:GPU_UPDATE(device='[sigma, surface_tension]')
 

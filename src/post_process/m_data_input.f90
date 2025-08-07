@@ -308,6 +308,7 @@ contains
                       STATUS='old', ACTION='read')
                 read (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
                 close (1)
+                print*, q_cons_vf(i)%sf(:,0,0)
             else
                 call s_mpi_abort('File q_cons_vf'//trim(file_num)// &
                                  '.dat is missing in '//trim(t_step_dir)// &
