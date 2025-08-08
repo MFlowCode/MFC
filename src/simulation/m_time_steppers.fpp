@@ -75,7 +75,7 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt]')
+    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt,bc_type]')
 
 #if defined(FRONTIER_UNIFIED)
     real(wp), pointer, contiguous, dimension(:, :, :, :) :: q_cons_ts_pool_host, q_cons_ts_pool_device
@@ -380,21 +380,21 @@ contains
         end if
 
         ! Allocating arrays to store the bc types
-        @:ALLOCATE(bc_type(1:num_dims,-1:1))
+        @:ALLOCATE(bc_type(1:num_dims,1:2))
 
-        @:ALLOCATE(bc_type(1,-1)%sf(0:0,0:n,0:p))
         @:ALLOCATE(bc_type(1,1)%sf(0:0,0:n,0:p))
+        @:ALLOCATE(bc_type(1,2)%sf(0:0,0:n,0:p))
         if (n > 0) then
-            @:ALLOCATE(bc_type(2,-1)%sf(-buff_size:m+buff_size,0:0,0:p))
             @:ALLOCATE(bc_type(2,1)%sf(-buff_size:m+buff_size,0:0,0:p))
+            @:ALLOCATE(bc_type(2,2)%sf(-buff_size:m+buff_size,0:0,0:p))
             if (p > 0) then
-                @:ALLOCATE(bc_type(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
                 @:ALLOCATE(bc_type(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+                @:ALLOCATE(bc_type(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
             end if
         end if
 
         do i = 1, num_dims
-            do j = -1, 1, 2
+            do j = 1, 2
                 @:ACC_SETUP_SFs(bc_type(i,j))
             end do
         end do

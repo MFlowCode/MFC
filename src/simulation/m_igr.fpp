@@ -176,7 +176,7 @@ contains
         !DIR$ OPTIMIZE (-haggress)
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
         integer, intent(in) :: t_step
 
         real(wp) :: rho_rx, rho_ry, rho_rz, rho_lx, rho_ly, rho_lz
@@ -286,7 +286,7 @@ contains
         real(wp) :: F_L, vel_L, rho_L, F_R, vel_R, rho_R
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[F_L, vel_L, alpha_rho_L, F_R, vel_R, alpha_rho_R]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[F_L, vel_L, alpha_rho_L, F_R, vel_R, alpha_rho_R, rho_L, rho_R]')
             do l = 0, p
                 do k = 0, n
                     do j = -1, m
@@ -294,6 +294,7 @@ contains
                         F_L = 0._wp; F_R = 0._wp
                         alpha_rho_L = 0._wp; alpha_rho_R = 0._wp
                         vel_L = 0._wp; vel_R = 0._wp
+                        rho_L = 0._wp; rho_R = 0._wp
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do q = vidxb + 1, vidxe
@@ -317,8 +318,14 @@ contains
                             F_R = F_R + coeff_R(q)*jac(j + q, k, l)
                         end do
 
-                        vel_L = vel_L/sum(alpha_rho_L)
-                        vel_R = vel_R/sum(alpha_rho_R)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            rho_L = rho_L + alpha_rho_L(i)
+                            rho_R = rho_R + alpha_rho_R(i)
+                        end do
+
+                        vel_L = vel_L / rho_L 
+                        vel_R = vel_R / rho_R
 
                         #:for LR in ['L', 'R']
                             $:GPU_ATOMIC(atomic='update')
@@ -383,7 +390,6 @@ contains
                                 #:endif
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do q = vidxb, vidxe
-                                    dvel_small = 0._wp
                                     !x-direction contributions
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = -1, 1
@@ -402,7 +408,13 @@ contains
                                                     q_cons_vf(momxb + 1)%sf(j + 1 + q, k, l)/rho_sf_small(1) - &
                                                     q_cons_vf(momxb + 1)%sf(j - 1 + q, k, l)/rho_sf_small(-1))
 
-                                    if (q == 0) dvel(:, 1) = dvel_small
+                                    if(q == 0) then
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_dims
+                                            dvel(i, 1) = dvel_small(i)
+                                        end do
+                                    end if
+
                                     if (q > vidxb) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(2))
                                         vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(4._wp*dvel_small(1))/3._wp
@@ -430,7 +442,12 @@ contains
                                                     q_cons_vf(momxb + 1)%sf(j + q, k + 1, l)/rho_sf_small(1) - &
                                                     q_cons_vf(momxb + 1)%sf(j + q, k - 1, l)/rho_sf_small(-1))
 
-                                    if (q == 0) dvel(:, 2) = dvel_small
+                                    if(q == 0) then
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_dims
+                                            dvel(i, 2) = dvel_small(i)
+                                        end do
+                                    end if
 
                                     if (q > vidxb) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(1))
@@ -497,20 +514,37 @@ contains
                                 end do
 
                                 if (num_fluids > 1) then
-                                    alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                    alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
+
+                                    alpha_L(num_fluids) = 1._wp
+                                    alpha_R(num_fluids) = 1._wp
+                                    
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_fluids - 1
+                                        alpha_L(num_fluids) = alpha_L(num_fluids) - alpha_L(i)
+                                        alpha_R(num_fluids) = alpha_R(num_fluids) - alpha_R(i)
+                                    end do
                                 end if
 
-                                rho_L = sum(alpha_rho_L)
-                                gamma_L = sum(alpha_L*gammas)
-                                pi_inf_L = sum(alpha_L*pi_infs)
+                                rho_L = 0._wp; rho_R = 0._wp
+                                gamma_L = 0._wp; gamma_R = 0._wp
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp
 
-                                rho_R = sum(alpha_rho_R)
-                                gamma_R = sum(alpha_R*gammas)
-                                pi_inf_R = sum(alpha_R*pi_infs)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    rho_L = rho_L +  alpha_rho_L(i)
+                                    gamma_L = gamma_L + alpha_L(i)*gammas(i)
+                                    pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
 
-                                vel_L = vel_L/rho_L
-                                vel_R = vel_R/rho_R
+                                    rho_R = rho_R +  alpha_rho_R(i)
+                                    gamma_R = gamma_R + alpha_R(i)*gammas(i)
+                                    pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                end do
+
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_dims
+                                    vel_L(i) = vel_L(i) / rho_L
+                                    vel_R(i) = vel_R(i) / rho_R
+                                end do
 
                                 if (viscous) then
                                     mu_L = 0._wp; mu_R = 0._wp
@@ -590,8 +624,8 @@ contains
                                 end do
 
                                 call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
-                                                          E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
-                                                          pres_L, pres_R, cfl)
+                                                         E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
+                                                         pres_L, pres_R, cfl)
 
                                 do i = 1, num_fluids
                                     $:GPU_ATOMIC(atomic='update')
@@ -763,7 +797,7 @@ contains
                                 #:endif
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do q = vidxb, vidxe
-                                    dvel_small = 0._wp
+
                                     !x-direction contributions
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = -1, 1
@@ -785,7 +819,13 @@ contains
                                                     q_cons_vf(momxb + 2)%sf(j + 1 + q, k, l)/rho_sf_small(1) - &
                                                     q_cons_vf(momxb + 2)%sf(j - 1 + q, k, l)/rho_sf_small(-1))
 
-                                    if (q == 0) dvel(:, 1) = dvel_small
+                                    if(q == 0) then
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_dims
+                                            dvel(i, 1) = dvel_small(i)
+                                        end do
+                                    end if
+
                                     if (q > vidxb) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(2))
                                         vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(3))
@@ -817,7 +857,12 @@ contains
                                     if (q == 0) dvel_small(3) = (1/(2._wp*dy(k)))*( &
                                                                 q_cons_vf(momxb + 2)%sf(j + q, k + 1, l)/rho_sf_small(1) - &
                                                                 q_cons_vf(momxb + 2)%sf(j + q, k - 1, l)/rho_sf_small(-1))
-                                    if (q == 0) dvel(:, 2) = dvel_small
+                                    if(q == 0) then
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_dims
+                                            dvel(i, 2) = dvel_small(i)
+                                        end do
+                                    end if
 
                                     if (q > vidxb) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(1))
@@ -848,7 +893,12 @@ contains
                                     dvel_small(3) = (1/(2._wp*dz(l)))*( &
                                                     q_cons_vf(momxb + 2)%sf(j + q, k, l + 1)/rho_sf_small(1) - &
                                                     q_cons_vf(momxb + 2)%sf(j + q, k, l - 1)/rho_sf_small(-1))
-                                    if (q == 0) dvel(:, 3) = dvel_small
+                                    if(q == 0) then
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_dims
+                                            dvel(i, 3) = dvel_small(i)
+                                        end do
+                                    end if
 
                                     if (q > vidxb) then
                                         vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(1))
@@ -918,20 +968,37 @@ contains
                                 end do
 
                                 if (num_fluids > 1) then
-                                    alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                    alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
+                                    
+                                    alpha_L(num_fluids) = 1._wp
+                                    alpha_R(num_fluids) = 1._wp
+
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_fluids - 1
+                                        alpha_L(num_fluids) = alpha_L(num_fluids) - alpha_L(i)
+                                        alpha_R(num_fluids) = alpha_R(num_fluids) - alpha_R(i)
+                                    end do
                                 end if
 
-                                rho_L = sum(alpha_rho_L)
-                                gamma_L = sum(alpha_L*gammas)
-                                pi_inf_L = sum(alpha_L*pi_infs)
+                                rho_L = 0._wp; rho_R = 0._wp
+                                gamma_L = 0._wp; gamma_R = 0._wp
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp
 
-                                rho_R = sum(alpha_rho_R)
-                                gamma_R = sum(alpha_R*gammas)
-                                pi_inf_R = sum(alpha_R*pi_infs)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    rho_L = rho_L +  alpha_rho_L(i)
+                                    gamma_L = gamma_L + alpha_L(i)*gammas(i)
+                                    pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
 
-                                vel_L = vel_L/rho_L
-                                vel_R = vel_R/rho_R
+                                    rho_R = rho_R +  alpha_rho_R(i)
+                                    gamma_R = gamma_R + alpha_R(i)*gammas(i)
+                                    pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                end do
+
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_dims
+                                    vel_L(i) = vel_L(i) / rho_L
+                                    vel_R(i) = vel_R(i) / rho_R
+                                end do
 
                                 if (viscous) then
                                     mu_L = 0._wp
@@ -1236,7 +1303,7 @@ contains
                                     #:endif
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do q = vidxb, vidxe
-                                        dvel_small = 0._wp
+
                                         !x-direction contributions
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = -1, 1
@@ -1342,20 +1409,37 @@ contains
                                 end do
 
                                 if (num_fluids > 1) then
-                                    alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                    alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
+                                    
+                                    alpha_L(num_fluids) = 1._wp
+                                    alpha_R(num_fluids) = 1._wp
+
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_fluids - 1
+                                        alpha_L(num_fluids) = alpha_L(num_fluids) - alpha_L(i)
+                                        alpha_R(num_fluids) = alpha_R(num_fluids) - alpha_R(i)
+                                    end do
                                 end if
 
-                                rho_L = sum(alpha_rho_L)
-                                gamma_L = sum(alpha_L*gammas)
-                                pi_inf_L = sum(alpha_L*pi_infs)
+                                rho_L = 0._wp; rho_R = 0._wp
+                                gamma_L = 0._wp; gamma_R = 0._wp
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp
 
-                                rho_R = sum(alpha_rho_R)
-                                gamma_R = sum(alpha_R*gammas)
-                                pi_inf_R = sum(alpha_R*pi_infs)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    rho_L = rho_L +  alpha_rho_L(i)
+                                    gamma_L = gamma_L + alpha_L(i)*gammas(i)
+                                    pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
 
-                                vel_L = vel_L/rho_L
-                                vel_R = vel_R/rho_R
+                                    rho_R = rho_R +  alpha_rho_R(i)
+                                    gamma_R = gamma_R + alpha_R(i)*gammas(i)
+                                    pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                end do
+
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_dims
+                                    vel_L(i) = vel_L(i) / rho_L
+                                    vel_R(i) = vel_R(i) / rho_R
+                                end do
 
                                 if (viscous) then
                                     mu_L = 0._wp
@@ -1605,7 +1689,7 @@ contains
                                     #:endif
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do q = vidxb, vidxe
-                                        dvel_small = 0._wp
+
                                         !x-direction contributions
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = -1, 1
@@ -1742,20 +1826,37 @@ contains
                                 end do
 
                                 if (num_fluids > 1) then
-                                    alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                    alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
+                                    
+                                    alpha_L(num_fluids) = 1._wp
+                                    alpha_R(num_fluids) = 1._wp
+
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_fluids - 1
+                                        alpha_L(num_fluids) = alpha_L(num_fluids) - alpha_L(i)
+                                        alpha_R(num_fluids) = alpha_R(num_fluids) - alpha_R(i)
+                                    end do
                                 end if
 
-                                rho_L = sum(alpha_rho_L)
-                                gamma_L = sum(alpha_L*gammas)
-                                pi_inf_L = sum(alpha_L*pi_infs)
+                                rho_L = 0._wp; rho_R = 0._wp
+                                gamma_L = 0._wp; gamma_R = 0._wp
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp
 
-                                rho_R = sum(alpha_rho_R)
-                                gamma_R = sum(alpha_R*gammas)
-                                pi_inf_R = sum(alpha_R*pi_infs)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    rho_L = rho_L +  alpha_rho_L(i)
+                                    gamma_L = gamma_L + alpha_L(i)*gammas(i)
+                                    pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
 
-                                vel_L = vel_L/rho_L
-                                vel_R = vel_R/rho_R
+                                    rho_R = rho_R +  alpha_rho_R(i)
+                                    gamma_R = gamma_R + alpha_R(i)*gammas(i)
+                                    pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                end do
+
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_dims
+                                    vel_L(i) = vel_L(i) / rho_L
+                                    vel_R(i) = vel_R(i) / rho_R
+                                end do
 
                                 if (viscous) then
                                     mu_L = 0._wp
@@ -2062,7 +2163,7 @@ contains
                                 #:endif
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do q = vidxb, vidxe
-                                    dvel_small = 0._wp
+
                                     !x-direction contributions
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = -1, 1
@@ -2198,20 +2299,37 @@ contains
                             end do
 
                             if (num_fluids > 1) then
-                                alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
-                                alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
-                            end if
+                                    
+                                    alpha_L(num_fluids) = 1._wp
+                                    alpha_R(num_fluids) = 1._wp
 
-                            rho_L = sum(alpha_rho_L)
-                            gamma_L = sum(alpha_L*gammas)
-                            pi_inf_L = sum(alpha_L*pi_infs)
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_fluids - 1
+                                        alpha_L(num_fluids) = alpha_L(num_fluids) - alpha_L(i)
+                                        alpha_R(num_fluids) = alpha_R(num_fluids) - alpha_R(i)
+                                    end do
+                                end if
 
-                            rho_R = sum(alpha_rho_R)
-                            gamma_R = sum(alpha_R*gammas)
-                            pi_inf_R = sum(alpha_R*pi_infs)
+                                rho_L = 0._wp; rho_R = 0._wp
+                                gamma_L = 0._wp; gamma_R = 0._wp
+                                pi_inf_L = 0._wp; pi_inf_R = 0._wp
 
-                            vel_L = vel_L/rho_L
-                            vel_R = vel_R/rho_R
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    rho_L = rho_L +  alpha_rho_L(i)
+                                    gamma_L = gamma_L + alpha_L(i)*gammas(i)
+                                    pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
+
+                                    rho_R = rho_R +  alpha_rho_R(i)
+                                    gamma_R = gamma_R + alpha_R(i)*gammas(i)
+                                    pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                end do
+
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_dims
+                                    vel_L(i) = vel_L(i) / rho_L
+                                    vel_R(i) = vel_R(i) / rho_R
+                                end do
 
                             if (viscous) then
                                 mu_L = 0._wp

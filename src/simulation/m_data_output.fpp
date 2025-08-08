@@ -101,7 +101,7 @@ contains
             intent(inout), optional :: beta
 
         type(integer_field), &
-            dimension(1:num_dims, -1:1), &
+            dimension(1:num_dims, 1:2), &
             intent(in) :: bc_type
 
         if (.not. parallel_io) then
@@ -402,7 +402,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
-        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the current time-step directory
@@ -797,7 +797,7 @@ contains
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
         type(integer_field), &
-            dimension(1:num_dims, -1:1), &
+            dimension(1:num_dims, 1:2), &
             intent(in) :: bc_type
 
 #ifdef MFC_MPI
