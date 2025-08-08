@@ -586,8 +586,10 @@ contains
                         if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4._wp*i2*Re_inv/rho
                         if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
                         coeffs(7, i1, i2) = 0._wp
+
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
+                        #:if not MFC_CASE_OPTIMIZATION or nterms > 7
                         coeffs(1, i1, i2) = -3._wp*i2/2._wp
                         coeffs(2, i1, i2) = -i2/c
                         coeffs(3, i1, i2) = i2/(2._wp*c*c)
@@ -628,6 +630,7 @@ contains
                         if (.not. f_is_default(Re_inv)) then
                             coeffs(32, i1, i2) = 12._wp*i2*gam*Re_inv/(rho*rho*c*c)
                         end if
+                        #:endif
                     end if
                 end if
             end do; end do
@@ -659,6 +662,7 @@ contains
                         coeffs(7, i1, i2) = i2*pv/rho
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
+                        #:if not MFC_CASE_OPTIMIZATION or nterms > 7
                         coeffs(1, i1, i2) = -3._wp*i2/2._wp
                         coeffs(2, i1, i2) = -i2/c
                         coeffs(3, i1, i2) = i2/(2._wp*c*c)
@@ -689,6 +693,7 @@ contains
                             end if
                             coeffs(26, i1, i2) = -12._wp*i2*gam*Re_inv/(rho*rho*c*c)
                         end if
+                        #:endif
                     end if
                 end if
             end do; end do
