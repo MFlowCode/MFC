@@ -89,12 +89,12 @@ contains
 
     subroutine s_initialize_igr_module()
 
-print *, "Re_size = ", Re_size
-print *, "maxval(Re_size) = ", maxval(Re_size)
-print *, "idwbuff(1)%beg/end = ", idwbuff(1)%beg, idwbuff(1)%end
-print *, "idwbuff(2)%beg/end = ", idwbuff(2)%beg, idwbuff(2)%end
-print *, "idwbuff(3)%beg/end = ", idwbuff(3)%beg, idwbuff(3)%end
-print *, "m, n, p = ", m, n, p
+!print *, "Re_size = ", Re_size
+!print *, "maxval(Re_size) = ", maxval(Re_size)
+!print *, "idwbuff(1)%beg/end = ", idwbuff(1)%beg, idwbuff(1)%end
+!print *, "idwbuff(2)%beg/end = ", idwbuff(2)%beg, idwbuff(2)%end
+!print *, "idwbuff(3)%beg/end = ", idwbuff(3)%beg, idwbuff(3)%end
+!print *, "m, n, p = ", m, n, p
 
 call sleep(1)
 
@@ -118,7 +118,7 @@ call sleep(1)
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
         end if
-#if 0
+
         #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -129,7 +129,6 @@ call sleep(1)
                 end do
             end do
         #:endcall GPU_PARALLEL_LOOP
-#endif
 
         if (p == 0) then
             alf_igr = alf_factor*max(dx(1), dy(1))**2._wp
@@ -237,29 +236,29 @@ call sleep(1)
 
                             if (igr_iter_solver == 1) then ! Jacobi iteration
                                 if (num_dims == 3) then
-                                    jac(j, k, l) = (alf_igr/fd_coeff)* &
+                                    jac(j, k, l) = real((alf_igr/fd_coeff)* &
                                                    ((1._wp/dx(j)**2._wp)*(jac_old(j - 1, k, l)/rho_lx + jac_old(j + 1, k, l)/rho_rx) + &
                                                     (1._wp/dy(k)**2._wp)*(jac_old(j, k - 1, l)/rho_ly + jac_old(j, k + 1, l)/rho_ry) + &
                                                     (1._wp/dz(l)**2._wp)*(jac_old(j, k, l - 1)/rho_lz + jac_old(j, k, l + 1)/rho_rz)) + &
-                                                   jac_rhs(j, k, l)/fd_coeff
+                                                   real(jac_rhs(j, k, l),kind=wp)/fd_coeff,kind=stp)
                                 else
-                                    jac(j, k, l) = (alf_igr/fd_coeff)* &
+                                    jac(j, k, l) = real((alf_igr/fd_coeff)* &
                                                    ((1._wp/dx(j)**2._wp)*(real(jac_old(j - 1, k, l), kind=wp)/rho_lx + real(jac_old(j + 1, k, l), kind=wp)/rho_rx) + &
                                                     (1._wp/dy(k)**2._wp)*(real(jac_old(j, k - 1, l), kind=wp)/rho_ly + real(jac_old(j, k + 1, l), kind=wp)/rho_ry)) + &
-                                                   real(jac_rhs(j, k, l), kind=wp)/fd_coeff
+                                                   real(jac_rhs(j, k, l), kind=wp)/fd_coeff,kind=stp)
                                 end if
                             else ! Gauss Seidel iteration
                                 if (num_dims == 3) then
-                                    jac(j, k, l) = (alf_igr/fd_coeff)* &
+                                    jac(j, k, l) = real((alf_igr/fd_coeff)* &
                                                    ((1._wp/dx(j)**2._wp)*(jac(j - 1, k, l)/rho_lx + jac(j + 1, k, l)/rho_rx) + &
                                                     (1._wp/dy(k)**2._wp)*(jac(j, k - 1, l)/rho_ly + jac(j, k + 1, l)/rho_ry) + &
                                                     (1._wp/dz(l)**2._wp)*(jac(j, k, l - 1)/rho_lz + jac(j, k, l + 1)/rho_rz)) + &
-                                                   jac_rhs(j, k, l)/fd_coeff
+                                                   real(jac_rhs(j, k, l),kind=wp)/fd_coeff,kind=stp)
                                 else
-                                    jac(j, k, l) = (alf_igr/fd_coeff)* &
+                                    jac(j, k, l) = real((alf_igr/fd_coeff)* &
                                                    ((1._wp/dx(j)**2._wp)*(jac(j - 1, k, l)/rho_lx + jac(j + 1, k, l)/rho_rx) + &
                                                     (1._wp/dy(k)**2._wp)*(jac(j, k - 1, l)/rho_ly + jac(j, k + 1, l)/rho_ry)) + &
-                                                   jac_rhs(j, k, l)/fd_coeff
+                                                   real(jac_rhs(j, k, l),kind=wp)/fd_coeff,kind=stp)
                                 end if
                             end if
                         end do
@@ -454,9 +453,9 @@ call sleep(1)
                                     end if
 
                                     if (q == 0) then
-                                        jac_rhs(j, k, l) = alf_igr*(2._wp*(dvel(1, 2)*dvel(2, 1)) &
-                                                                    + dvel(1, 1)**2._wp + dvel(2, 2)**2._wp &
-                                                                    + (dvel(1, 1) + dvel(2, 2))**2._wp)
+                                        jac_rhs(j, k, l) = real( alf_igr*(2._wp*(dvel(1, 2)*dvel(2, 1)) &
+                                                                  + dvel(1, 1)**2._wp + dvel(2, 2)**2._wp &
+                                                                  + (dvel(1, 1) + dvel(2, 2))**2._wp), kind=stp)
                                     end if
                                 end do
 
@@ -872,12 +871,12 @@ call sleep(1)
                                     end if
 
                                     if (q == 0) then
-                                        jac_rhs(j, k, l) = alf_igr*(2._wp*(dvel(1, 2)*dvel(2, 1) &
+                                        jac_rhs(j, k, l) = real(alf_igr*(2._wp*(dvel(1, 2)*dvel(2, 1) &
                                                                            + dvel(1, 3)*dvel(3, 1) &
                                                                            + dvel(2, 3)*dvel(3, 2)) &
                                                                     + dvel(1, 1)**2._wp + dvel(2, 2)**2._wp &
                                                                     + dvel(3, 3)**2._wp &
-                                                                    + (dvel(1, 1) + dvel(2, 2) + dvel(3, 3))**2._wp)
+                                                                    + (dvel(1, 1) + dvel(2, 2) + dvel(3, 3))**2._wp),kind=stp)
                                     end if
                                 end do
 
