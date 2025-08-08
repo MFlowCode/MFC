@@ -704,16 +704,14 @@ contains
                 end if
             else
                 if (down_sample) then
-                    do i = 1, sys_size !TODO: check if this is right
-                        !            do i = 1, adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, q_cons_temp(i)%sf, data_size*mpi_io_tpe, &
                                                 mpi_io_p, status, ierr)
                     end do
                 else
-                    do i = 1, sys_size !TODO: check if this is right
-                        !            do i = 1, adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
@@ -754,7 +752,7 @@ contains
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(4._wp, MPI_OFFSET_KIND)
+            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
