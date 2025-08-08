@@ -680,7 +680,6 @@ contains
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
-
                     do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
