@@ -708,10 +708,8 @@ contains
                         do i = 1, sys_size
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
-                            !print*, "FFP", mpi_io_p, mpi_io_tpe; call sleep(1)
                             call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
                                                mpi_io_p, status, ierr)
-                            !print *, "HEREEE"; call sleep(1)
                         end do
                     end if
                 end if
@@ -853,7 +851,7 @@ contains
 
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
-                        !print*, "HERE", i, mpi_io_tpe, mpi_io_p, data_size, disp;call sleep(1)
+
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
@@ -1351,7 +1349,7 @@ contains
                 allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
             end do
         end if
-!print*, "BEFORE READ";call sleep(1)
+
         ! Reading in the user provided initial condition and grid data
         if(down_sample) then
             call s_read_data_files(q_cons_temp)
@@ -1362,7 +1360,7 @@ contains
         else
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
-!print*, "AFTER READ";call sleep(1)
+
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
         if (bodyForces) call s_initialize_body_forces_module()
@@ -1370,7 +1368,7 @@ contains
 
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
-!print*, "AFTER GRID POPULATE";call sleep(1)
+
         ! Initialize the Temperature cache.
         if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_ts(1)%vf, idwint)
 
@@ -1388,7 +1386,7 @@ contains
             call s_initialize_cbc_module()
             call s_initialize_riemann_solvers_module()
         end if
-!print*, "AFTER INITIALIZE SOME STUFF";call sleep(1)
+
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
 
