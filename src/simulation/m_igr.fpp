@@ -89,15 +89,6 @@ contains
 
     subroutine s_initialize_igr_module()
 
-!print *, "Re_size = ", Re_size
-!print *, "maxval(Re_size) = ", maxval(Re_size)
-!print *, "idwbuff(1)%beg/end = ", idwbuff(1)%beg, idwbuff(1)%end
-!print *, "idwbuff(2)%beg/end = ", idwbuff(2)%beg, idwbuff(2)%end
-!print *, "idwbuff(3)%beg/end = ", idwbuff(3)%beg, idwbuff(3)%end
-!print *, "m, n, p = ", m, n, p
-
-call sleep(1)
-
         if (viscous) then
             @:ALLOCATE(Res_igr(1:2, 1:maxval(Re_size)))
             do i = 1, 2
