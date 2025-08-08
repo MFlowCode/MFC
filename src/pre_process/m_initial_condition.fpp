@@ -120,37 +120,37 @@ contains
         end do
 
         ! Allocating arrays to store the bc types
-        allocate (bc_type(1:num_dims, -1:1))
+        allocate (bc_type(1:num_dims, 1:2))
 
-        allocate (bc_type(1, -1)%sf(0:0, 0:n, 0:p))
         allocate (bc_type(1, 1)%sf(0:0, 0:n, 0:p))
+        allocate (bc_type(1, 2)%sf(0:0, 0:n, 0:p))
 
         do l = 0, p
             do k = 0, n
-                bc_type(1, -1)%sf(0, k, l) = bc_x%beg
-                bc_type(1, 1)%sf(0, k, l) = bc_x%end
+                bc_type(1, 1)%sf(0, k, l) = bc_x%beg
+                bc_type(1, 2)%sf(0, k, l) = bc_x%end
             end do
         end do
 
         if (n > 0) then
-            allocate (bc_type(2, -1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
             allocate (bc_type(2, 1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
+            allocate (bc_type(2, 2)%sf(-buff_size:m + buff_size, 0:0, 0:p))
 
             do l = 0, p
                 do j = -buff_size, m + buff_size
-                    bc_type(2, -1)%sf(j, 0, l) = bc_y%beg
-                    bc_type(2, 1)%sf(j, 0, l) = bc_y%end
+                    bc_type(2, 1)%sf(j, 0, l) = bc_y%beg
+                    bc_type(2, 2)%sf(j, 0, l) = bc_y%end
                 end do
             end do
 
             if (p > 0) then
-                allocate (bc_type(3, -1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
                 allocate (bc_type(3, 1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
+                allocate (bc_type(3, 2)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
 
                 do k = -buff_size, n + buff_size
                     do j = -buff_size, m + buff_size
-                        bc_type(3, -1)%sf(j, k, 0) = bc_z%beg
-                        bc_type(3, 1)%sf(j, k, 0) = bc_z%end
+                        bc_type(3, 1)%sf(j, k, 0) = bc_z%beg
+                        bc_type(3, 2)%sf(j, k, 0) = bc_z%end
                     end do
                 end do
             end if

@@ -66,7 +66,7 @@ module m_data_output
                 intent(inout) :: q_cons_vf, q_prim_vf
 
             type(integer_field), &
-                dimension(1:num_dims, -1:1), &
+                dimension(1:num_dims, 1:2), &
                 intent(in) :: bc_type
 
             ! IB markers
@@ -107,7 +107,7 @@ contains
 
         ! BC types
         type(integer_field), &
-            dimension(1:num_dims, -1:1), &
+            dimension(1:num_dims, 1:2), &
             intent(in) :: bc_type
 
         ! IB markers
@@ -572,7 +572,7 @@ contains
             intent(inout) :: q_cons_vf, q_prim_vf
 
         type(integer_field), &
-            dimension(1:num_dims, -1:1), &
+            dimension(1:num_dims, 1:2), &
             intent(in) :: bc_type
 
         ! IB markers
