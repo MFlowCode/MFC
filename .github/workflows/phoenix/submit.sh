@@ -2,16 +2,14 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: $0 [script.sh] [cpu|gpu]"
+    echo "Usage: $0 [cpu|gpu]"
     exit 1
 }
 
-[[ $# -eq 2 ]] || usage
+[[ $# -eq 1 ]] || usage
 
-sbatch_script="$1"
-device="$2"
-
-job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2"
+device="$1"
+job_slug="test-$1"
 
 # read the body of the user script
 sbatch_body=$(<"$sbatch_script")
@@ -49,6 +47,12 @@ JOBID=$(sbatch <<-EOT | awk '{print $4}'
 	${sbatch_common_opts}
 	${sbatch_device_opts}
 
+	export job_slug="${job_slug}"
+	export device="${device}"
+
+	echo "Job slug is:" $job_slug
+ 	echo "Device is:" $device
+
 	set -e -x
 
 	cd "\$SLURM_SUBMIT_DIR"
@@ -58,7 +62,45 @@ JOBID=$(sbatch <<-EOT | awk '{print $4}'
 	. ./mfc.sh load -c p -m $device
 
 	# user script contents
-	${sbatch_body}
+    tmpbuild=/storage/scratch1/6/sbryngelson3/mytmp_build
+    currentdir=$tmpbuild/run-$(( RANDOM % 900 ))
+    mkdir -p $tmpbuild
+    mkdir -p $currentdir
+    export TMPDIR=$currentdir
+
+    n_test_threads=8
+
+    build_opts=""
+    if [ "$device" = "gpu" ]; then
+        build_opts="--gpu"
+    fi
+    echo "build_opts =" $build_opts
+
+    if [[ "$device" == "cpu" ]]; then
+        echo "CPU BUILD"
+    elif [[ "$device" == "gpu" ]]; then
+        echo "GPU BUILD"
+    else
+      exit 1
+    fi
+
+    exit 1
+
+    ./mfc.sh test --dry-run -j $n_test_threads $build_opts
+
+    if [ "$device" = "gpu" ]; then
+        gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
+        gpu_ids=$(seq -s ' ' 0 $(($gpu_count-1))) # 0,1,2,...,gpu_count-1
+        device_opts="-g $gpu_ids"
+        n_test_threads=`expr $gpu_count \* 2`
+    fi
+
+    ./mfc.sh test --max-attempts 3 -a -j $n_test_threads $device_opts -- -c phoenix
+
+    sleep 10
+    rm -rf "$currentdir" || true
+
+    unset TMPDIR
 EOT
 )
 
