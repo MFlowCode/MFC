@@ -693,17 +693,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 'patch_icpp(1)%vel(1)': 1.0, 'patch_icpp(1)%vel(2)': 0.0, 'patch_icpp(1)%vel(3)': 0.0,
                 'patch_icpp(1)%pres': 17.8571428571, 'patch_icpp(1)%alpha_rho(1)': 1.0, 'patch_icpp(1)%alpha(1)': 1.0,
                 'patch_icpp(1)%r0': -1e6, 'patch_icpp(1)%v0': -1e6,
-                'patch_icpp(2)%geometry': -100, 
+                'patch_icpp(2)%geometry': -100,
                 'patch_icpp(2)%x_centroid': -1e6, 'patch_icpp(2)%length_x': -1e6,
-                'patch_icpp(2)%y_centroid': -1e6, 'patch_icpp(2)%length_y': -1e6, 
-                'patch_icpp(2)%z_centroid': -1e6, 'patch_icpp(2)%length_z': -1e6, 
-                'patch_icpp(2)%vel(1)': -1e6, 'patch_icpp(2)%vel(2)': -1e6, 'patch_icpp(2)%vel(3)': -1e6, 
+                'patch_icpp(2)%y_centroid': -1e6, 'patch_icpp(2)%length_y': -1e6,
+                'patch_icpp(2)%z_centroid': -1e6, 'patch_icpp(2)%length_z': -1e6,
+                'patch_icpp(2)%vel(1)': -1e6, 'patch_icpp(2)%vel(2)': -1e6, 'patch_icpp(2)%vel(3)': -1e6,
                 'patch_icpp(2)%r0': -1e6, 'patch_icpp(2)%v0': -1e6,
-                'patch_icpp(3)%geometry': -100, 
+                'patch_icpp(3)%geometry': -100,
                 'patch_icpp(3)%x_centroid': -1e6, 'patch_icpp(3)%length_x': -1e6,
-                'patch_icpp(3)%y_centroid': -1e6, 'patch_icpp(3)%length_y': -1e6, 
-                'patch_icpp(3)%z_centroid': -1e6, 'patch_icpp(3)%length_z': -1e6, 
-                'patch_icpp(3)%vel(1)': -1e6, 'patch_icpp(3)%vel(2)': -1e6, 'patch_icpp(3)%vel(3)': -1e6, 
+                'patch_icpp(3)%y_centroid': -1e6, 'patch_icpp(3)%length_y': -1e6,
+                'patch_icpp(3)%z_centroid': -1e6, 'patch_icpp(3)%length_z': -1e6,
+                'patch_icpp(3)%vel(1)': -1e6, 'patch_icpp(3)%vel(2)': -1e6, 'patch_icpp(3)%vel(3)': -1e6,
                 'patch_icpp(3)%r0': -1e6, 'patch_icpp(3)%v0': -1e6
             }))
 
@@ -993,11 +993,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                            "2D_lagrange_bubblescreen",
                            "3D_lagrange_bubblescreen", "2D_triple_point",
                            "1D_shuosher_analytical",
-                           "1D_titarevtorro_analytical", 
+                           "1D_titarevtorro_analytical",
                            "2D_acoustic_pulse_analytical",
                            "2D_isentropicvortex_analytical",
                            "2D_zero_circ_vortex_analytical",
-                           "3D_TaylorGreenVortex_analytical"]
+                           "3D_TaylorGreenVortex_analytical",
+                           "3D_IGR_TaylorGreenVortex_nvidia"]
             if path in casesToSkip:
                 continue
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"

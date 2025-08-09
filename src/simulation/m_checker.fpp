@@ -30,6 +30,7 @@ contains
 
         if (igr) then
             call s_check_inputs_igr
+            call s_check_inputs_nvidia_uvm
         else
             if (recon_type == WENO_TYPE) then
                 call s_check_inputs_weno
@@ -410,5 +411,14 @@ contains
         @:PROHIBIT(powell .and. n == 0, "Powell's method is not supported for 1D simulations")
         @:PROHIBIT(powell .and. fd_order == dflt_int, "fd_order must be set if Powell's method is enabled")
     end subroutine s_check_inputs_mhd
+
+    impure subroutine s_check_inputs_nvidia_uvm
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        @:PROHIBIT(nv_uvm_igr_temps_on_gpu > 3 .or. nv_uvm_igr_temps_on_gpu < 0, &
+            "nv_uvm_igr_temps_on_gpu must be in the range [0, 3]")
+        @:PROHIBIT(nv_uvm_igr_temps_on_gpu == 3 .and. igr_iter_solver == 2, &
+            "nv_uvm_igr_temps_on_gpu must be in the range [0, 2] for igr_iter_solver == 2")
+#endif
+    end subroutine s_check_inputs_nvidia_uvm
 
 end module m_checker
