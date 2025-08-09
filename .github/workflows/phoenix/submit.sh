@@ -2,102 +2,109 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: $0 [cpu|gpu]"
-    exit 1
+  echo "Usage: $0 [cpu|gpu]"
+  exit 1
 }
 
 [[ $# -eq 1 ]] || usage
 
 device="$1"
-job_slug="test-$1"
+job_slug="test-$device"
 
-# common SBATCH directives
-sbatch_common_opts="\
-#SBATCH -J MFC-test-$device    # job name
-#SBATCH --account=gts-sbryngelson3              # account
-#SBATCH -N1                                     # nodes
-#SBATCH -t 03:00:00                             # walltime
-#SBATCH -q embers                               # QOS
-#SBATCH -o $job_slug.out                        # stdout+stderr
-#SBATCH --mem-per-cpu=2G                        # default mem (overridden below)
-"
+# Build sbatch arguments (use CLI args instead of #SBATCH lines)
+sbatch_args=(
+  -J "MFC-test-$device"
+  --account=gts-sbryngelson3
+  -N 1
+  -t 03:00:00
+  -q embers
+  -o "${job_slug}.out"
+  --mem-per-cpu=2G
+  # Export variables for the job environment
+  --export=ALL,job_slug="$job_slug",device="$device"
+)
 
-# CPU vs GPU overrides
 if [[ "$device" == "cpu" ]]; then
-  sbatch_device_opts="\
-#SBATCH -p cpu-small
-#SBATCH --ntasks-per-node=24
-"
+  sbatch_args+=(
+    -p cpu-small
+    --ntasks-per-node=24
+  )
 elif [[ "$device" == "gpu" ]]; then
-  sbatch_device_opts="\
-#SBATCH -p gpu-v100,gpu-a100,gpu-h100,gpu-l40s
-#SBATCH --ntasks-per-node=4
-#SBATCH -G2
-"
+  sbatch_args+=(
+    -p gpu-v100,gpu-a100,gpu-h100,gpu-l40s
+    --ntasks-per-node=4
+    -G 2
+  )
 else
   usage
 fi
 
 # submit and capture the JobID
-JOBID=$(sbatch <<-EOT | awk '{print $4}'
-	#!/usr/bin/env bash
-	${sbatch_common_opts}
-	${sbatch_device_opts}
+JOBID=$(
+  sbatch "${sbatch_args[@]}" <<'EOT' | awk '{print $4}'
+#!/usr/bin/env bash
+set -euo pipefail
+set -x
 
-	export job_slug="${job_slug}"
-	export device="${device}"
+echo "Job slug is: $job_slug"
+echo "Device is:   $device"
 
-	echo "Job slug is:" $job_slug
- 	echo "Device is:" $device
+cd "$SLURM_SUBMIT_DIR"
+echo "Running in $(pwd)"
 
-	set -e -x
+# load your modules & env
+. ./mfc.sh load -c p -m "$device"
 
-	cd "\$SLURM_SUBMIT_DIR"
-	echo "Running in \$(pwd):"
+# user script contents
+tmpbuild=/storage/scratch1/6/sbryngelson3/mytmp_build
+mkdir -p "$tmpbuild"
+currentdir="$tmpbuild/run-$(( RANDOM % 900 ))"
+mkdir -p "$currentdir"
+export TMPDIR="$currentdir"
 
-	# load your modules & env
-	. ./mfc.sh load -c p -m $device
+n_test_threads=8
+build_opts=""
+if [[ "$device" == "gpu" ]]; then
+  build_opts="--gpu"
+fi
+echo "build_opts = $build_opts"
 
-	# user script contents
-    export tmpbuild=/storage/scratch1/6/sbryngelson3/mytmp_build
-    export currentdir=$tmpbuild/run-$(( RANDOM % 900 ))
-    mkdir -p $tmpbuild
-    mkdir -p $currentdir
-    export TMPDIR=$currentdir
+if [[ "$device" == "cpu" ]]; then
+  echo "CPU BUILD"
+elif [[ "$device" == "gpu" ]]; then
+  echo "GPU BUILD"
+else
+  echo "Unknown device: $device" >&2
+  exit 1
+fi
 
-    n_test_threads=8
+# Dry run (kept from your original)
+./mfc.sh test --dry-run -j "$n_test_threads" $build_opts
 
-    export build_opts=""
-    if [ "$device" = "gpu" ]; then
-        export build_opts="--gpu"
-    fi
-    echo "build_opts =" $build_opts
+# GPU-specific runtime options
+device_opts=""
+if [[ "$device" == "gpu" ]]; then
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    gpu_count=$(nvidia-smi -L | wc -l)
+  else
+    gpu_count=0
+  fi
 
-    if [[ "$device" == "cpu" ]]; then
-        echo "CPU BUILD"
-    elif [[ "$device" == "gpu" ]]; then
-        echo "GPU BUILD"
-    else
-      exit 1
-    fi
+  if [[ "$gpu_count" -gt 0 ]]; then
+    gpu_ids=$(seq -s ' ' 0 $(( gpu_count - 1 )))
+    device_opts="-g $gpu_ids"
+    n_test_threads=$(( gpu_count * 2 ))
+  else
+    echo "No GPUs detected; continuing without -g list"
+    device_opts=""
+  fi
+fi
 
-    exit 1
+./mfc.sh test --max-attempts 3 -a -j "$n_test_threads" ${device_opts:-} -- -c phoenix
 
-    ./mfc.sh test --dry-run -j $n_test_threads $build_opts
-
-    if [ "$device" = "gpu" ]; then
-        export gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
-        export gpu_ids=$(seq -s ' ' 0 $(($gpu_count-1))) # 0,1,2,...,gpu_count-1
-        export device_opts="-g $gpu_ids"
-        export n_test_threads=`expr $gpu_count \* 2`
-    fi
-
-    ./mfc.sh test --max-attempts 3 -a -j $n_test_threads $device_opts -- -c phoenix
-
-    sleep 10
-    rm -rf "$currentdir" || true
-
-    unset TMPDIR
+sleep 10
+rm -rf "$currentdir" || true
+unset TMPDIR
 EOT
 )
 
@@ -134,6 +141,8 @@ while :; do
 done
 
 # Now retrieve the exit code and exit with it
-EXIT_CODE=$(sacct -j "$JOBID" --noheader --format=ExitCode | head -1 | cut -d: -f1)
+# (small grace period in case accounting lags)
+sleep 2
+EXIT_CODE=$(sacct -j "$JOBID" --noheader --format=ExitCode | head -1 | cut -d: -f1 || echo 1)
 echo "Completed: SLURM job $JOBID exit code: $EXIT_CODE"
 exit "$EXIT_CODE"
