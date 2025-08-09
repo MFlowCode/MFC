@@ -59,17 +59,17 @@ JOBID=$(sbatch <<-EOT | awk '{print $4}'
 	. ./mfc.sh load -c p -m $device
 
 	# user script contents
-    tmpbuild=/storage/scratch1/6/sbryngelson3/mytmp_build
-    currentdir=$tmpbuild/run-$(( RANDOM % 900 ))
+    export tmpbuild=/storage/scratch1/6/sbryngelson3/mytmp_build
+    export currentdir=$tmpbuild/run-$(( RANDOM % 900 ))
     mkdir -p $tmpbuild
     mkdir -p $currentdir
     export TMPDIR=$currentdir
 
     n_test_threads=8
 
-    build_opts=""
+    export build_opts=""
     if [ "$device" = "gpu" ]; then
-        build_opts="--gpu"
+        export build_opts="--gpu"
     fi
     echo "build_opts =" $build_opts
 
@@ -86,10 +86,10 @@ JOBID=$(sbatch <<-EOT | awk '{print $4}'
     ./mfc.sh test --dry-run -j $n_test_threads $build_opts
 
     if [ "$device" = "gpu" ]; then
-        gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
-        gpu_ids=$(seq -s ' ' 0 $(($gpu_count-1))) # 0,1,2,...,gpu_count-1
-        device_opts="-g $gpu_ids"
-        n_test_threads=`expr $gpu_count \* 2`
+        export gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
+        export gpu_ids=$(seq -s ' ' 0 $(($gpu_count-1))) # 0,1,2,...,gpu_count-1
+        export device_opts="-g $gpu_ids"
+        export n_test_threads=`expr $gpu_count \* 2`
     fi
 
     ./mfc.sh test --max-attempts 3 -a -j $n_test_threads $device_opts -- -c phoenix
