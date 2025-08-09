@@ -16,7 +16,7 @@ sbatch_body=$(<"$sbatch_script")
 
 # common SBATCH directives
 sbatch_common_opts="\
-#SBATCH -J shb-${sbatch_script%%.sh}-$device    # job name
+#SBATCH -J MFC-benchmark-$device                # job name
 #SBATCH --account=gts-sbryngelson3              # account
 #SBATCH -N1                                     # nodes
 #SBATCH -t 02:00:00                             # walltime

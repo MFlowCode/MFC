@@ -11,12 +11,9 @@ usage() {
 device="$1"
 job_slug="test-$1"
 
-# read the body of the user script
-sbatch_body=$(<"$sbatch_script")
-
 # common SBATCH directives
 sbatch_common_opts="\
-#SBATCH -J shb-${sbatch_script%%.sh}-$device    # job name
+#SBATCH -J MFC-test-$device    # job name
 #SBATCH --account=gts-sbryngelson3              # account
 #SBATCH -N1                                     # nodes
 #SBATCH -t 03:00:00                             # walltime
