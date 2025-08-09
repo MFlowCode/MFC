@@ -79,17 +79,9 @@ jobs:
           wait %1 && wait %2
 
       - name: Bench (Master v. PR)
-        if: matrix.cluster == 'frontier'
         run: |
           (cd pr     && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }}) &
           (cd master && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }}) &
-          wait %1 && wait %2
-
-      - name: Bench (Master v. PR)
-        if: matrix.cluster == 'phoenix'
-        run: |
-          (cd pr     && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh ${{ matrix.device }}) &
-          (cd master && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh ${{ matrix.device }}) &
           wait %1 && wait %2
 
       - name: Generate & Post Comment

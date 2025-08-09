@@ -111,7 +111,7 @@ jobs:
 
       - name: Build & Test
         if:   matrix.lbl == 'gt'
-        run:  bash .github/workflows/phoenix/submit.sh ${{ matrix.device }}
+        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }}
 
       - name: Build
         if:   matrix.lbl == 'frontier'
