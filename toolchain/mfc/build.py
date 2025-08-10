@@ -66,17 +66,17 @@ class MFCTarget:
         name = compiler_name.lower()
         if "gfortran" in name:
             compiler = "gnu"
-        if "ifort" in name or "ifx" in name:
+        elif "ifort" in name or "ifx" in name:
             compiler = "intel"
-        if "nvfortran" in name:
+        elif "nvfortran" in name:
             compiler = "nvhpc"
-        if name == "ftn" or "cray" in name:
+        elif name == "ftn" or "cray" in name:
             compiler = "cray"
-        if "pgfortran" in name:
+        elif "pgfortran" in name:
             compiler = "pgi"
-        if "clang" in name:
+        elif "clang" in name:
             compiler = "clang"
-        if "flang" in name:
+        elif "flang" in name:
             compiler = "flang"
         return compiler
 
