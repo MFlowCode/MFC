@@ -1,5 +1,4 @@
 coverage:
-  strict_yaml_branch: default
   status:
     project:
       default:
