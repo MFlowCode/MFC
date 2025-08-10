@@ -52,6 +52,7 @@ class MFCTarget:
             cache = pathlib.Path(build_dir) / "CMakeCache.txt"
             if not cache.exists():
                 compiler = "unknown"
+                return compiler
 
             pat = re.compile(r"CMAKE_.*_COMPILER:FILEPATH=(.+)", re.IGNORECASE)
             compiler_name = ""
