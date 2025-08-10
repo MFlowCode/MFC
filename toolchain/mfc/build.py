@@ -39,12 +39,15 @@ class MFCTarget:
     def get_compiler_info(self) -> str:
         compiler = "unknown"
         with tempfile.TemporaryDirectory() as build_dir:
-            subprocess.run(
-                ["cmake", "-B", build_dir, "-S", ".", "-DCMAKE_VERBOSE_MAKEFILE=ON"],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            try:
+                subprocess.run(
+                    ["cmake", "-B", build_dir, "-S", ".", "-DCMAKE_VERBOSE_MAKEFILE=ON"],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                return "unknown"
 
             cache = pathlib.Path(build_dir) / "CMakeCache.txt"
             if not cache.exists():
