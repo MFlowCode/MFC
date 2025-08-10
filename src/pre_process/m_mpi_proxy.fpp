@@ -23,9 +23,6 @@ module m_mpi_proxy
 
     implicit none
 
-    integer, private :: ierr !<
-    !! Generic flag used to identify and report MPI errors
-
 contains
     !> Since only processor with rank 0 is in charge of reading
             !!       and checking the consistency of the user provided inputs,
@@ -38,16 +35,19 @@ contains
 
         ! Generic loop iterator
         integer :: i
+        ! Generic flag used to identify and report MPI errors
+        integer :: ierr
 
         ! Logistics
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in ['t_step_old', 't_step_start', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
             & 'loops_x', 'loops_y', 'loops_z', 'model_eqns', 'num_fluids',     &
-            & 'weno_order', 'precision', 'perturb_flow_fluid', &
+            & 'weno_order', 'precision', 'perturb_flow_fluid',                 &
             & 'perturb_sph_fluid', 'num_patches', 'thermal', 'nb', 'dist_type',&
-            & 'R0_type', 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters', &
-            & 'num_bc_patches', 'mixlayer_perturb_nk' ]
+            & 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters', &
+            & 'num_bc_patches', 'mixlayer_perturb_nk', 'recon_type',           &
+            & 'muscl_order', 'igr_order' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -58,7 +58,8 @@ contains
             & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
             & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
             & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',&
-            & 'bubbles_lagrange', 'bc_io', 'mhd', 'relativity', 'cont_damage']
+            & 'bubbles_lagrange', 'bc_io', 'mhd', 'relativity', 'cont_damage', &
+            & 'igr', 'down_sample' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
@@ -148,4 +149,3 @@ contains
     end subroutine s_mpi_bcast_user_inputs
 
 end module m_mpi_proxy
-

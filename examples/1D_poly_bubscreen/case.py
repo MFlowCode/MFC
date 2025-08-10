@@ -157,7 +157,6 @@ print(
             "bubbles_euler": "T",
             "bubble_model": 2,
             "polytropic": "T",
-            "R0_type": 1,
             "thermal": 3,
             "R0ref": myr0,
             "nb": 1,

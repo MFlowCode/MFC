@@ -101,29 +101,52 @@ contains
         real(wp), dimension(2), intent(inout) :: Re
 
         real(wp), dimension(num_fluids) :: alpha_rho, Gs
-        real(wp) :: qv, E, G
+        real(wp) :: qv, E, G_local
 
         integer :: i
 
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, num_fluids
-            alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-            alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
-        end do
+        if (igr) then
+            if (num_fluids == 1) then
+                alpha_rho(1) = q_prim_vf(contxb)%sf(j, k, l)
+                alpha(1) = 1._wp
+            else
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = 1, num_fluids - 1
+                    alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
+                    alpha(i) = q_prim_vf(advxb + i - 1)%sf(j, k, l)
+                end do
+
+                alpha_rho(num_fluids) = q_prim_vf(num_fluids)%sf(j, k, l)
+                alpha(num_fluids) = 1._wp - sum(alpha(1:num_fluids - 1))
+            end if
+        else
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
+                alpha(i) = q_prim_vf(advxb + i - 1)%sf(j, k, l)
+            end do
+        end if
 
         if (elasticity) then
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
-                                                            alpha_rho, Re, G, Gs)
+                                                            alpha_rho, Re, G_local, Gs)
         elseif (bubbles_euler) then
             call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         else
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
 
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, num_vels
-            vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
-        end do
+        if (igr) then
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_vels
+                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)/rho
+            end do
+        else
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_vels
+                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
+            end do
+        end if
 
         vel_sum = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
@@ -131,13 +154,17 @@ contains
             vel_sum = vel_sum + vel(i)**2._wp
         end do
 
-        pres = q_prim_vf(E_idx)%sf(j, k, l)
-
-        E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
+        if (igr) then
+            E = q_prim_vf(E_idx)%sf(j, k, l)
+            pres = (E - pi_inf - qv - 5.e-1_wp*rho*vel_sum)/gamma
+        else
+            pres = q_prim_vf(E_idx)%sf(j, k, l)
+            E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
+        end if
 
         ! Adjust energy for hyperelasticity
         if (hyperelasticity) then
-            E = E + G*q_prim_vf(xiend + 1)%sf(j, k, l)
+            E = E + G_local*q_prim_vf(xiend + 1)%sf(j, k, l)
         end if
 
         H = (E + pres)/rho

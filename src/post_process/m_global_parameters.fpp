@@ -41,7 +41,7 @@ module m_global_parameters
     !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
     type(cell_num_bounds) :: cells_bounds
 
-    integer(8) :: nGlobal ! Total number of cells in global domain
+    integer(kind=8) :: nGlobal ! Total number of cells in global domain
 
     !> @name Cylindrical coordinates (either axisymmetric or full 3D)
     !> @{
@@ -105,7 +105,9 @@ module m_global_parameters
     integer :: relax_model     !< Phase change relaxation model
     logical :: mpp_lim         !< Maximum volume fraction limiter
     integer :: sys_size        !< Number of unknowns in the system of equations
+    integer :: recon_type      !< Which type of reconstruction to use
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
+    integer :: muscl_order     !< Order of accuracy for the MUSCL reconstruction
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: mhd             !< Magnetohydrodynamics
@@ -116,6 +118,8 @@ module m_global_parameters
     integer :: b_size          !< Number of components in the b tensor
     integer :: tensor_size     !< Number of components in the nonsymmetric tensor
     logical :: cont_damage     !< Continuum damage modeling
+    logical :: igr             !< enable IGR
+    integer :: igr_order       !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     !> @}
 
@@ -195,8 +199,6 @@ module m_global_parameters
     integer :: mpi_info_int
     !> @}
 
-    integer, private :: ierr
-
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
     !! Database of the physical parameters of each of the fluids that is present
     !! in the flow. These include the stiffened gas equation of state parameters,
@@ -209,6 +211,7 @@ module m_global_parameters
     integer :: format !< Format of the database file(s)
 
     integer :: precision !< Floating point precision of the database file(s)
+    logical :: down_sample !< down sampling of the database file(s)
 
     logical :: output_partial_domain !< Specify portion of domain to output for post-processing
 
@@ -249,6 +252,7 @@ module m_global_parameters
     logical :: c_wrt
     logical, dimension(3) :: omega_wrt
     logical :: qm_wrt
+    logical :: liutex_wrt
     logical :: schlieren_wrt
     logical :: cf_wrt
     logical :: ib
@@ -282,7 +286,7 @@ module m_global_parameters
     integer :: nb
     real(wp) :: R0ref
     real(wp) :: Ca, Web, Re_inv
-    real(wp), dimension(:), allocatable :: weight, R0, V0
+    real(wp), dimension(:), allocatable :: weight, R0
     logical :: bubbles_euler
     logical :: qbmm
     logical :: polytropic
@@ -359,7 +363,9 @@ contains
         ! Simulation algorithm parameters
         model_eqns = dflt_int
         num_fluids = dflt_int
+        recon_type = WENO_TYPE
         weno_order = dflt_int
+        muscl_order = dflt_int
         mixture_err = .false.
         alt_soundspeed = .false.
         relax = .false.
@@ -374,6 +380,7 @@ contains
         b_size = dflt_int
         tensor_size = dflt_int
         cont_damage = .false.
+        igr = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -402,6 +409,7 @@ contains
         format = dflt_int
 
         precision = dflt_int
+        down_sample = .false.
 
         alpha_rho_wrt = .false.
         rho_wrt = .false.
@@ -425,6 +433,7 @@ contains
         c_wrt = .false.
         omega_wrt = .false.
         qm_wrt = .false.
+        liutex_wrt = .false.
         schlieren_wrt = .false.
         sim_data = .false.
         cf_wrt = .false.
@@ -511,8 +520,22 @@ contains
             mom_idx%beg = cont_idx%end + 1
             mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
-            adv_idx%beg = E_idx + 1
-            adv_idx%end = E_idx + num_fluids
+
+            if (igr) then
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. IGR tracks a total of (N-1) volume fractions
+                ! for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
+                ! then adv_idx%end < adv_idx%beg, which skips all loops over the
+                ! volume fractions since there is no volume fraction to track
+                adv_idx%beg = E_idx + 1 ! Alpha for fluid 1
+                adv_idx%end = E_idx + num_fluids - 1
+            else
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. WENO/MUSCL + Riemann tracks a total of (N)
+                ! volume fractions for N fluids, hence the lack of  "-1" in adv_idx%end
+                adv_idx%beg = E_idx + 1
+                adv_idx%end = E_idx + num_fluids
+            end if
 
             sys_size = adv_idx%end
 
@@ -547,7 +570,7 @@ contains
 
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
-                allocate (weight(nb), R0(nb), V0(nb))
+                allocate (weight(nb), R0(nb))
 
                 if (qbmm) then
                     allocate (bub_idx%moms(nb, nmom))
@@ -579,11 +602,7 @@ contains
                 if (nb == 1) then
                     weight(:) = 1._wp
                     R0(:) = 1._wp
-                    V0(:) = 0._wp
-                else if (nb > 1) then
-                    !call s_simpson
-                    V0(:) = 0._wp
-                else
+                else if (nb < 1) then
                     stop 'Invalid value of nb'
                 end if
 
@@ -650,7 +669,7 @@ contains
 
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
-                allocate (weight(nb), R0(nb), V0(nb))
+                allocate (weight(nb), R0(nb))
 
                 do i = 1, nb
                     if (polytropic .neqv. .true.) then
@@ -671,10 +690,7 @@ contains
                 if (nb == 1) then
                     weight(:) = 1._wp
                     R0(:) = 1._wp
-                    V0(:) = 0._wp
-                else if (nb > 1) then
-                    V0(:) = 0._wp
-                else
+                else if (nb < 1) then
                     stop 'Invalid value of nb'
                 end if
 
@@ -780,7 +796,11 @@ contains
         allocate (MPI_IO_DATA%view(1:sys_size))
         allocate (MPI_IO_DATA%var(1:sys_size))
         do i = 1, sys_size
-            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+            if (down_sample) then
+                allocate (MPI_IO_DATA%var(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
+            else
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+            end if
             MPI_IO_DATA%var(i)%sf => null()
         end do
 
@@ -817,7 +837,7 @@ contains
         buff_size = max(offset_x%beg, offset_x%end, offset_y%beg, &
                         offset_y%end, offset_z%beg, offset_z%end)
 
-        if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt) then
+        if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt .or. liutex_wrt) then
             fd_number = max(1, fd_order/2)
             buff_size = buff_size + fd_number
         end if
@@ -892,6 +912,10 @@ contains
 
     !> Subroutine to initialize parallel infrastructure
     impure subroutine s_initialize_parallel_io
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+#endif
 
         num_dims = 1 + min(1, n) + min(1, p)
 

@@ -30,6 +30,8 @@ module m_weno
 
     use m_mpi_proxy
 
+    use m_muscl !< For Interface Compression
+
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
     !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they
@@ -1094,6 +1096,11 @@ contains
             #:endfor
         end if
 
+        if (int_comp) then
+            call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, &
+                                         vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
+                                         weno_dir, is1_weno_d, is2_weno_d, is3_weno_d)
+        end if
     end subroutine s_weno
 
     !> The computation of parameters, the allocation of memory,
@@ -1142,69 +1149,32 @@ contains
         if (n == 0) return
 
         if (weno_dir == 2) then
-#if MFC_cuTENSOR
-            if (cu_tensor) then
-                if (p == 0) then
-                    block
-                        use CuTensorEx
-
-                        #:call GPU_HOST_DATA(use_device='[v_rs_ws_x, v_rs_ws_y]')
-                            v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1, sys_size], order=[2, 1, 3, 4])
-                        #:endcall GPU_HOST_DATA
-                    end block
-                else
-                    block
-                        use CuTensorEx
-
-                        #:call GPU_HOST_DATA(use_device='[v_rs_ws_x, v_rs_ws_y]')
-                            v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1 + 2*buff_size, sys_size], order=[2, 1, 3, 4])
-                        #:endcall GPU_HOST_DATA
-                    end block
-                end if
-            else
-#endif
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do j = 1, v_size
-                    do q = is3_weno%beg, is3_weno%end
-                        do l = is2_weno%beg, is2_weno%end
-                            do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
-                                v_rs_ws_y(k, l, q, j) = v_vf(j)%sf(l, k, q)
-                            end do
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do j = 1, v_size
+                do q = is3_weno%beg, is3_weno%end
+                    do l = is2_weno%beg, is2_weno%end
+                        do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
+                            v_rs_ws_y(k, l, q, j) = v_vf(j)%sf(l, k, q)
                         end do
                     end do
                 end do
-#if MFC_cuTENSOR
-            end if
-#endif
+            end do
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in z-direction
         if (p == 0) return
-        if (weno_dir == 3) then
-#if MFC_cuTENSOR
-            if (cu_tensor) then
-                block
-                    use CuTensorEx
 
-                    #:call GPU_HOST_DATA(use_device='[v_rs_ws_x, v_rs_ws_z]')
-                        v_rs_ws_z = reshape(v_rs_ws_x, shape=[p + 1 + 2*buff_size, n + 2*buff_size + 1, m + 2*buff_size + 1, sys_size], order=[3, 2, 1, 4])
-                    #:endcall
-                end block
-            else
-#endif
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do j = 1, v_size
-                    do q = is3_weno%beg, is3_weno%end
-                        do l = is2_weno%beg, is2_weno%end
-                            do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
-                                v_rs_ws_z(k, l, q, j) = v_vf(j)%sf(q, l, k)
-                            end do
+        if (weno_dir == 3) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do j = 1, v_size
+                do q = is3_weno%beg, is3_weno%end
+                    do l = is2_weno%beg, is2_weno%end
+                        do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
+                            v_rs_ws_z(k, l, q, j) = v_vf(j)%sf(q, l, k)
                         end do
                     end do
                 end do
-#if MFC_cuTENSOR
-            end if
-#endif
+            end do
         end if
 
     end subroutine s_initialize_weno
