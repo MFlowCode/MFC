@@ -124,7 +124,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-fprofile-arcs>
             $<$<COMPILE_LANGUAGE:Fortran>:-ftest-coverage>
-            $<$<COMPILE_LANGUAGE:Fortran>:-O0>
+            $<$<COMPILE_LANGUAGE:Fortran>:-O1>
 	    )
 
         add_link_options(
