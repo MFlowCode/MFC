@@ -26,7 +26,7 @@ module m_igr
 
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
     integer, dimension(3) :: nv_uvm_temp_on_gpu
-    real(wp), pointer, contiguous, dimension(:, :, :) :: jac,jac_rhs,jac_old
+    real(wp), pointer, contiguous, dimension(:, :, :) :: jac, jac_rhs, jac_old
     real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_host_pool
     real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_rhs_host_pool
     real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_old_host_pool
@@ -124,21 +124,21 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end))
             @:PREFER_GPU(jac)
         else
-            allocate(jac_host_pool(idwbuff(1)%beg:idwbuff(1)%end, &
-                idwbuff(2)%beg:idwbuff(2)%end, &
-                idwbuff(3)%beg:idwbuff(3)%end))
+            allocate (jac_host_pool(idwbuff(1)%beg:idwbuff(1)%end, &
+                                    idwbuff(2)%beg:idwbuff(2)%end, &
+                                    idwbuff(3)%beg:idwbuff(3)%end))
 
             jac(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
-                idwbuff(3)%beg:idwbuff(3)%end) => jac_host_pool(:,:,:)
+                idwbuff(3)%beg:idwbuff(3)%end) => jac_host_pool(:, :, :)
         end if
 
         if (nv_uvm_temp_on_gpu(2) == 1) then
             @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
             @:PREFER_GPU(jac_rhs)
         else
-            allocate(jac_rhs_host_pool(-1:m,-1:n,-1:p))
-            jac_rhs(-1:m,-1:n,-1:p) => jac_rhs_host_pool(:,:,:)
+            allocate (jac_rhs_host_pool(-1:m, -1:n, -1:p))
+            jac_rhs(-1:m, -1:n, -1:p) => jac_rhs_host_pool(:, :, :)
         end if
 
         if (igr_iter_solver == 1) then ! Jacobi iteration
@@ -148,13 +148,13 @@ contains
                     idwbuff(3)%beg:idwbuff(3)%end))
                 @:PREFER_GPU(jac_old)
             else
-                allocate(jac_old_host_pool(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end))
+                allocate (jac_old_host_pool(idwbuff(1)%beg:idwbuff(1)%end, &
+                                            idwbuff(2)%beg:idwbuff(2)%end, &
+                                            idwbuff(3)%beg:idwbuff(3)%end))
 
                 jac_old(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end) => jac_old_host_pool(:,:,:)
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end) => jac_old_host_pool(:, :, :)
             end if
         end if
 #endif
@@ -178,7 +178,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             if (igr_order == 3) then
-                vidxb = -1; vidxe = 2;
+                vidxb = -1; vidxe = 2; 
                 $:GPU_UPDATE(device='[vidxb, vidxe]')
 
                 @:ALLOCATE(coeff_L(0:2))
@@ -194,7 +194,7 @@ contains
                 $:GPU_UPDATE(device='[coeff_R]')
 
             elseif (igr_order == 5) then
-                vidxb = -2; vidxe = 3;
+                vidxb = -2; vidxe = 3; 
                 $:GPU_UPDATE(device='[vidxb, vidxe]')
 
                 @:ALLOCATE(coeff_L(-1:3))
@@ -2677,23 +2677,23 @@ contains
         if (nv_uvm_temp_on_gpu(1) == 1) then
             @:DEALLOCATE(jac)
         else
-            nullify(jac)
-            deallocate(jac_host_pool)
+            nullify (jac)
+            deallocate (jac_host_pool)
         end if
 
         if (nv_uvm_temp_on_gpu(2) == 1) then
             @:DEALLOCATE(jac_rhs)
         else
-            nullify(jac_rhs)
-            deallocate(jac_rhs_host_pool)
+            nullify (jac_rhs)
+            deallocate (jac_rhs_host_pool)
         end if
 
         if (igr_iter_solver == 1) then ! Jacobi iteration
             if (nv_uvm_temp_on_gpu(3) == 1) then
                 @:DEALLOCATE(jac_old)
             else
-                nullify(jac_old)
-                deallocate(jac_old_host_pool)
+                nullify (jac_old)
+                deallocate (jac_old_host_pool)
             end if
         end if
 #endif

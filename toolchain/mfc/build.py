@@ -64,7 +64,7 @@ class MFCTarget:
         # The install directory is located <root>/build/install/<slug>
         return os.sep.join([os.getcwd(), "build", "install", self.get_slug(case)])
 
-    def get_home_dirpath(self, case: Case) -> str:
+    def get_home_dirpath(self) -> str:
         return os.sep.join([os.getcwd()])
 
     def get_install_binpath(self, case: Case ) -> str:

@@ -234,7 +234,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
             message(STATUS "LTO/IPO is not supported in NVHPC Version < 23.11. Use a newer version of NVHPC for best performance.")
         else()
             message(STATUS "Performing IPO using -Mextract followed by -Minline")
-            set(NVHPC_USE_TWO_PASS_IPO FALSE)
+            set(NVHPC_USE_TWO_PASS_IPO TRUE)
         endif()
     else()
         CHECK_IPO_SUPPORTED(RESULT SUPPORTS_IPO OUTPUT IPO_ERROR)
@@ -492,7 +492,7 @@ function(MFC_SETUP_TARGET)
                 endforeach()
 
                 target_compile_options(${a_target}
-                    PRIVATE -gpu=keep,ptxinfo,lineinfo,fastmath
+                    PRIVATE -gpu=keep,ptxinfo,lineinfo
                 )
 
                 # GH-200 Unified Memory Support

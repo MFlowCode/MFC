@@ -4,8 +4,8 @@ import json
 
 N = 799
 Nx = N
-Ny = 2*(N+1)-1
-Nz = 2*(N+1)-1
+Ny = 2 * (N + 1) - 1
+Nz = 2 * (N + 1) - 1
 
 Re = 1600
 L = 1
@@ -47,8 +47,8 @@ print(
             "cyl_coord": "F",
             "dt": dt,
             "t_step_start": 0,
-            "t_step_stop": 10, #Nt,
-            "t_step_save": 10, #int(Nt / 100),
+            "t_step_stop": 10,  # Nt,
+            "t_step_save": 10,  # int(Nt / 100),
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
