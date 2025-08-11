@@ -17,7 +17,7 @@
 !!                           7) Supersonic Inflow
 !!                           8) Supersonic Outflow
 !!              Please refer to Thompson (1987, 1990) for detailed descriptions.
-
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 module m_cbc
@@ -1033,7 +1033,9 @@ contains
                             if (model_eqns == 1) then
                                 drho_dt = dalpha_rho_dt(1)
                                 dgamma_dt = dadv_dt(1)
-                                dpi_inf_dt = dadv_dt(2)
+                                #:if not MFC_CASE_OPTIMIZATION
+                                    dpi_inf_dt = dadv_dt(2)
+                                #:endif
                             else
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
