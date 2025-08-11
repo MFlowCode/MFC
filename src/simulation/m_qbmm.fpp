@@ -579,6 +579,7 @@ contains
         do i2 = 0, 2; do i1 = 0, 2
                 if ((i1 + i2) <= 2) then
                     if (bubble_model == 3) then
+                        #:if not MFC_CASE_OPTIMIZATION or nterms > 1
                         ! RPE
                         coeffs(1, i1, i2) = -1._wp*i2*pres/rho
                         coeffs(2, i1, i2) = -3._wp*i2/2._wp
@@ -587,7 +588,7 @@ contains
                         if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4._wp*i2*Re_inv/rho
                         if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
                         coeffs(7, i1, i2) = 0._wp
-
+                        #:endif
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
                         #:if not MFC_CASE_OPTIMIZATION or nterms > 7
@@ -654,6 +655,7 @@ contains
                 if ((i1 + i2) <= 2) then
                     if (bubble_model == 3) then
                         ! RPE
+                        #:if not MFC_CASE_OPTIMIZATION or nterms > 7
                         coeffs(1, i1, i2) = -1._wp*i2*pres/rho
                         coeffs(2, i1, i2) = -3._wp*i2/2._wp
                         coeffs(3, i1, i2) = i2/rho
@@ -661,6 +663,7 @@ contains
                         if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4._wp*i2*Re_inv/rho
                         if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
                         coeffs(7, i1, i2) = i2*pv/rho
+                        #:endif
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
                         #:if not MFC_CASE_OPTIMIZATION or nterms > 7
