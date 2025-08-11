@@ -532,7 +532,7 @@ contains
 
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
-        if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
+        if ((prim_vars_wrt .or. (n == 0 .and. p == 0)) .and. (.not. igr)) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
                 $:GPU_UPDATE(host='[q_prim_vf(i)%sf(:,:,:)]')
@@ -902,16 +902,16 @@ contains
                 do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            mpi_p, status, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                                            mpi_io_p, status, ierr)
                 end do
                 !Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                mpi_p, status, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                                                mpi_io_p, status, ierr)
                     end do
                 end if
             else
@@ -919,15 +919,15 @@ contains
                     do i = 1, sys_size !TODO: check if correct (sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_WRITE_ALL(ifile, q_cons_temp(i)%sf, data_size, &
-                                                mpi_p, status, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, q_cons_temp(i)%sf, data_size*mpi_io_tpe, &
+                                                mpi_io_p, status, ierr)
                     end do
                 else
                     do i = 1, sys_size !TODO: check if correct (sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                mpi_p, status, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                                                mpi_io_p, status, ierr)
                     end do
                 end if
             end if
@@ -975,8 +975,8 @@ contains
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            mpi_p, status, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                                            mpi_io_p, status, ierr)
                 end do
                 !Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
@@ -988,8 +988,8 @@ contains
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                mpi_p, status, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                                                mpi_io_p, status, ierr)
                     end do
                 end if
             else
@@ -1001,8 +1001,8 @@ contains
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            mpi_p, status, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                                            mpi_io_p, status, ierr)
                 end do
             end if
 
@@ -1015,8 +1015,8 @@ contains
 
                 call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(sys_size + 1), &
                                        'native', mpi_info_int, ierr)
-                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(sys_size + 1)%sf, data_size, &
-                                        mpi_p, status, ierr)
+                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(sys_size + 1)%sf, data_size*mpi_io_tpe, &
+                                        mpi_io_p, status, ierr)
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)

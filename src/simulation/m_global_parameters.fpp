@@ -1308,12 +1308,6 @@ contains
             $:GPU_UPDATE(device='[num_fluids,num_dims,viscous,num_vels,nb,muscl_lim]')
         #:endif
 
-        $:GPU_UPDATE(device='[Ca,Re_inv,Web,R0ref,bubbles_euler,qbmm,polytropic, &
-            & polydisperse,bubble_model,thermal,poly_sigma,ptil,weight,R0]')
-        $:GPU_UPDATE(device='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,pv, &
-            & M_n,M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T, &
-            & Re_trans_T,Re_trans_c,Im_trans_T,Im_trans_c,omegaN, &
-            & mul0,ss,gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
         $:GPU_UPDATE(device='[dir_idx,dir_flg,dir_idx_tau]')
 
         $:GPU_UPDATE(device='[relax,relax_model,palpha_eps,ptgalpha_eps]')
@@ -1323,12 +1317,12 @@ contains
         @:ALLOCATE(x_cc(-buff_size:m + buff_size))
         @:ALLOCATE(dx(-buff_size:m + buff_size))
 
-        if (n == 0) return; 
+        if (n == 0) return;
         @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE(dy(-buff_size:n + buff_size))
 
-        if (p == 0) return; 
+        if (p == 0) return;
         @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
@@ -1411,10 +1405,10 @@ contains
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x_cb, x_cc, dx)
 
-        if (n == 0) return; 
+        if (n == 0) return;
         @:DEALLOCATE(y_cb, y_cc, dy)
 
-        if (p == 0) return; 
+        if (p == 0) return;
         @:DEALLOCATE(z_cb, z_cc, dz)
 
     end subroutine s_finalize_global_parameters_module
