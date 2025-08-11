@@ -26,10 +26,23 @@
 % endif
 % endif
 
-# NVHPC and CUDA env vars
-export NV_ACC_USE_MALLOC=0                    # use cudaMallocManaged instead of malloc ( compiled using -gpu=mem:unified:managedalloc )
-export NVCOMPILER_ACC_NO_MEMHINTS=1           # disable implicit compiler hints
-#export CUDA_BUFFER_PAGE_IN_THRESHOLD_MS=0.001 # workaround for copying to/from unpopulated buffers on GH
+# We compiled the code using -gpu=unified:managedalloc, hence we use cudaMallocManaged for the dynamic allocations.
+# Using NV_ACC_USE_MALLOC we could change to malloc at runtime. We choose to not do that here and stick with cudaMallocManaged and 2MB page sizes.
+# https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html#memory-model
+# https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html#command-line-options-selecting-compiler-memory-modes
+export NV_ACC_USE_MALLOC=0
+
+# For NVIDIA CUDA devices, controls the use of automatic memory hints at data constructs in the managed and unified memory modes.
+# Below is a breakdown of the permitted values (case insensitive):
+# - DEFAULT: Use the default settings. On NVIDIA Grace Hopper systems, the default is currently ENABLE_ALL; on all other systems, the default is DISABLE.
+# - DISABLE: Memory hints are disabled for all data constructs.
+# - ENABLE_EXPLICIT: Memory hints are enabled for explicit data constructs only.
+# - ENABLE_ALL: Memory hints are enabled for explicit and implicit data constructs.
+# https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html#environment-variables-controlling-device-memory-management
+# Here we disable the implicit compiler hints.
+# Using NVCOMPILER_ACC_NO_MEMHINTS is the legacy way and is still supported, but users should prefer NVCOMPILER_ACC_MEMHINTS when using newer nvhpc compilers.
+export NVCOMPILER_ACC_NO_MEMHINTS=1           # disable implicit compiler hints - legacy way
+export NVCOMPILER_ACC_MEMHINTS=DISABLE        # disable implicit compiler hints - new way
 
 # Cray MPICH
 export MPICH_GPU_SUPPORT_ENABLED=1
