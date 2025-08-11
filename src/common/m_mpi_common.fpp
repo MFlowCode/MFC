@@ -84,7 +84,8 @@ contains
         @:ALLOCATE(buff_send(0:halo_size), buff_recv(0:halo_size))
 #else
         allocate (buff_send(0:halo_size), buff_recv(0:halo_size))
-        $:GPU_ENTER_DATA(create='[capture:buff_send, capture:buff_recv]')
+        $:GPU_ENTER_DATA(create='[capture:buff_send]')
+        $:GPU_ENTER_DATA(create='[capture:buff_recv]')
 #endif
 #endif
 
