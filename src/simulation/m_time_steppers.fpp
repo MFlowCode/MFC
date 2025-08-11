@@ -117,10 +117,10 @@ contains
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         if (num_ts == 2 .and. nv_uvm_out_of_core) then
             ! host allocation for q_cons_ts(2)%vf(j)%sf for all j
-            allocate(q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
-                                        idwbuff(2)%beg:idwbuff(2)%end, &
-                                        idwbuff(3)%beg:idwbuff(3)%end, &
-                                        1:sys_size))
+            allocate (q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
+                                          idwbuff(2)%beg:idwbuff(2)%end, &
+                                          idwbuff(3)%beg:idwbuff(3)%end, &
+                                          1:sys_size))
         end if
 
         do j = 1, sys_size
@@ -133,8 +133,8 @@ contains
                 if (nv_uvm_out_of_core) then
                     ! q_cons_ts(2) lives on the host
                     q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                        idwbuff(2)%beg:idwbuff(2)%end, &
-                        idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
+                                          idwbuff(2)%beg:idwbuff(2)%end, &
+                                          idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:, :, :, j)
                 else
                     @:ALLOCATE(q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, &
@@ -1385,14 +1385,14 @@ contains
             @:DEALLOCATE(q_cons_ts(1)%vf(j)%sf)
             if (num_ts == 2) then
                 if (nv_uvm_out_of_core) then
-                    nullify(q_cons_ts(2)%vf(j)%sf)
+                    nullify (q_cons_ts(2)%vf(j)%sf)
                 else
                     @:DEALLOCATE(q_cons_ts(2)%vf(j)%sf)
                 end if
             end if
         end do
         if (num_ts == 2 .and. nv_uvm_out_of_core) then
-            deallocate(q_cons_ts_pool_host)
+            deallocate (q_cons_ts_pool_host)
         end if
 #elif defined(FRONTIER_UNIFIED)
         do i = 1, num_ts
