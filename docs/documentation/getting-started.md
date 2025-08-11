@@ -14,7 +14,6 @@ cd MFC
 MFC can be built in multiple ways on various operating systems.
 Please select your desired configuration from the list bellow:
 
-<details>
   <summary><h2>*nix</h2></summary>
 
 - **On supported clusters:** Load environment modules
@@ -31,15 +30,14 @@ sudo apt upgrade
 sudo apt install tar wget make cmake gcc g++      \
                  python3 python3-dev python3-venv \
                  openmpi-bin libopenmpi-dev       \
-                 libhdf5-dev libfftw3-dev
+                 libhdf5-dev libfftw3-dev         \
+                 libblas-dev liblapack-dev
 ```
 
-If you wish to build MFC using [NVidia's NVHPC SDK](https://developer.nvidia.com/hpc-sdk),
+If you wish to build MFC using [NVIDIA's NVHPC SDK](https://developer.nvidia.com/hpc-sdk),
 first follow the instructions [here](https://developer.nvidia.com/nvidia-hpc-sdk-downloads).
 
-</details>
 
-<details>
   <summary><h2>Windows</h2></summary>
 
 On Windows, you can either use Intel Compilers with the standard Microsoft toolchain,
@@ -96,16 +94,13 @@ You will also have access to the `.sln` Microsoft Visual Studio solution files f
 
   </details>
 
-</details>
-
-<details>
   <summary><h3>MacOS</h3></summary>
 
 Using [Homebrew](https://brew.sh/) you can install the necessary dependencies
 before configuring your environment:
 
 ```shell
-brew install coreutils python cmake fftw hdf5 gcc boost open-mpi
+brew install coreutils python cmake fftw hdf5 gcc boost open-mpi lapack
 echo -e "export BOOST_INCLUDE='$(brew --prefix --installed boost)/include'" | tee -a ~/.bash_profile ~/.zshrc
 . ~/.bash_profile 2>/dev/null || . ~/.zshrc 2>/dev/null
 ! [ -z "${BOOST_INCLUDE+x}" ] && echo 'Environment is ready!' || echo 'Error: $BOOST_INCLUDE is unset. Please adjust the previous commands to fit with your environment.'
