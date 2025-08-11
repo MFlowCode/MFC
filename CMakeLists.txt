@@ -124,6 +124,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-fprofile-arcs>
             $<$<COMPILE_LANGUAGE:Fortran>:-ftest-coverage>
+            $<$<COMPILE_LANGUAGE:Fortran>:-O1>
 	    )
 
         add_link_options(
@@ -360,6 +361,8 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D chemistry=False
                                  --line-numbering
                                  --no-folding
+								 --line-length=999
+		 						 --line-numbering-mode=nocontlines
                                  "${fpp}" "${f90}"
             DEPENDS  "${fpp};${${target}_incs}"
             COMMENT  "Preprocessing (Fypp) ${fpp_filename}"
