@@ -20,7 +20,17 @@
 #ifdef MFC_SIMULATION
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
     block
+! Beginning in the 25.3 release, the structure of the cudafor module has been changed slightly.
+! The module now includes, or “uses” 3 submodules: cuda_runtime_api, gpu_reductions, and sort.
+! The cudafor functionality has not changed. But for new users, or users who have needed to
+! work-around name conflicts in the module, it may be better to use cuda_runtime_api to expose
+! interfaces to the CUDA runtime calls described in Chapter 4 of this guide.
+! https://docs.nvidia.com/hpc-sdk/compilers/cuda-fortran-prog-guide/index.html#fortran-host-modules
+#if __NVCOMPILER_MAJOR__ < 25 || (__NVCOMPILER_MAJOR__ == 25 && __NVCOMPILER_MINOR__ < 3)
     use cudafor, gpu_sum => sum, gpu_maxval => maxval, gpu_minval => minval
+#else
+    use cuda_runtime_api
+#endif
     integer :: istat
 
     if (nv_uvm_pref_gpu) then

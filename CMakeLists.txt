@@ -527,7 +527,12 @@ function(MFC_SETUP_TARGET)
 
         if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
             find_package(CUDAToolkit REQUIRED)
-            target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
+            if (TARGET CUDA::nvToolsExt) # CUDA <= 12.8
+                target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
+            else() # CUDA >= 12.9
+                target_link_libraries(${a_target} PRIVATE nvhpcwrapnvtx)
+                target_link_options(${a_target} PRIVATE "-cudalib=nvtx3")
+            endif()
         endif()
     endforeach()
 
