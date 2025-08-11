@@ -40,19 +40,19 @@
         istat = cudaMemAdvise( c_devloc(${arg}$), SIZEOF(${arg}$), cudaMemAdviseSetPreferredLocation, 0 )
         if (istat /= cudaSuccess) then
             write(*,"('Error code: ',I0, ': ')") istat
-            write(*,*) cudaGetErrorString(istat)
+            !write(*,*) cudaGetErrorString(istat)
         endif
         ! set accessed by CPU
         istat = cudaMemAdvise( c_devloc(${arg}$), SIZEOF(${arg}$), cudaMemAdviseSetAccessedBy, cudaCpuDeviceId )
         if (istat /= cudaSuccess) then
             write(*,"('Error code: ',I0, ': ')") istat
-            write(*,*) cudaGetErrorString(istat)
+            !write(*,*) cudaGetErrorString(istat)
         endif
         ! prefetch to GPU - physically populate memory pages
         istat = cudaMemPrefetchAsync( c_devloc(${arg}$), SIZEOF(${arg}$), 0, 0 )
         if (istat /= cudaSuccess) then
             write(*,"('Error code: ',I0, ': ')") istat
-            write(*,*) cudaGetErrorString(istat)
+            !write(*,*) cudaGetErrorString(istat)
         endif
     #:endfor
     end if
