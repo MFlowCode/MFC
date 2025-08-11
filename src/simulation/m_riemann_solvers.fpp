@@ -521,6 +521,7 @@ contains
                                 elseif (mhd .and. relativity) then
                                     Ga%L = 1._wp/sqrt(1._wp - vel_L_rms)
                                     Ga%R = 1._wp/sqrt(1._wp - vel_R_rms)
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                     vdotB%L = vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3)
                                     vdotB%R = vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3)
 
@@ -528,6 +529,7 @@ contains
                                     b4%R(1:3) = B%R(1:3)/Ga%R + Ga%R*vel_R(1:3)*vdotB%R
                                     B2%L = B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp
                                     B2%R = B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp
+                                    #:endif
 
                                     pres_mag%L = 0.5_wp*(B2%L/Ga%L**2._wp + vdotB%L**2._wp)
                                     pres_mag%R = 0.5_wp*(B2%R/Ga%R**2._wp + vdotB%R**2._wp)
@@ -535,15 +537,18 @@ contains
                                     ! Hard-coded EOS
                                     H_L = 1._wp + (gamma_L + 1)*pres_L/rho_L
                                     H_R = 1._wp + (gamma_R + 1)*pres_R/rho_R
-
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                     cm%L(1:3) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(1:3) - vdotB%L*B%L(1:3)
                                     cm%R(1:3) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(1:3) - vdotB%R*B%R(1:3)
+                                    #:endif
 
                                     E_L = rho_L*H_L*Ga%L**2 - pres_L + 0.5_wp*(B2%L + vel_L_rms*B2%L - vdotB%L**2._wp) - rho_L*Ga%L
                                     E_R = rho_R*H_R*Ga%R**2 - pres_R + 0.5_wp*(B2%R + vel_R_rms*B2%R - vdotB%R**2._wp) - rho_R*Ga%R
                                 elseif (mhd .and. .not. relativity) then
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                     pres_mag%L = 0.5_wp*(B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp)
                                     pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
+                                    #:endif
                                     E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag%L
                                     E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag%R ! includes magnetic energy
                                     H_L = (E_L + pres_L - pres_mag%L)/rho_L
@@ -822,11 +827,13 @@ contains
                                 ! Energy
                                 if (mhd .and. (.not. relativity)) then
                                     ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                         (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) - B%R(norm_dir)*(vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3))) &
                                          - s_P*(vel_L(norm_dir)*(E_L + pres_L + pres_mag%L) - B%L(norm_dir)*(vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3))) &
                                          + s_M*s_P*(E_L - E_R)) &
                                         /(s_M - s_P)
+                                    #:endif
                                 elseif (mhd .and. relativity) then
                                     ! energy flux = m_${XYZ}$ - mass flux
                                     ! Hard-coded for single-component for now
@@ -3885,7 +3892,9 @@ contains
                         ! Divergence in cylindrical coordinates (vx=vz_cyl, vy=vr_cyl, vz=vtheta_cyl)
                         divergence_cyl = avg_dvdx_int(1) + avg_dvdy_int(2) + avg_v_int(2)/r_eff
                         if (num_dims > 2) then
+                            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                             divergence_cyl = divergence_cyl + avg_dvdz_int(3)/r_eff
+                            #:endif
                         end if
 
                         stress_vector_shear = 0.0_wp
@@ -3901,23 +3910,29 @@ contains
                                     stress_vector_shear(2) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
                                 end if
                                 if (num_dims > 2) then
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                     stress_vector_shear(3) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
+                                    #:endif
                                 end if
                             case (2) ! Y-face (radial normal, r_cyl)
                                 if (num_dims > 1) then
                                     stress_vector_shear(1) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
                                     stress_vector_shear(2) = (2.0_wp*avg_dvdy_int(2))/Re_s + div_v_term_const
                                     if (num_dims > 2) then
+                                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                         stress_vector_shear(3) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
+                                        #:endif
                                     end if
                                 else
                                     stress_vector_shear(1) = (2.0_wp*avg_dvdx_int(1))/Re_s + div_v_term_const
                                 end if
                             case (3) ! Z-face (azimuthal normal, theta_cyl)
                                 if (num_dims > 2) then
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                     stress_vector_shear(1) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
                                     stress_vector_shear(2) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
                                     stress_vector_shear(3) = (2.0_wp*(avg_dvdz_int(3)/r_eff + avg_v_int(2)/r_eff))/Re_s + div_v_term_const
+                                    #:endif
                                 end if
                             end select
 
@@ -4011,8 +4026,10 @@ contains
                                                                         dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
                             end if
                             if (num_dims > 2) then
+                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                 vel_grad_avg(vel_comp_idx, 3) = 0.5_wp*(dvelL_dz_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
                                                                         dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
+                                #:endif
                             end if
                         end do
 

@@ -1,3 +1,4 @@
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 module m_sim_helpers
@@ -59,6 +60,7 @@ contains
 
         if (p > 0) then
             !3D
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             if (grid_geometry == 3) then
                 cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
                                 dy(k)/(abs(vel(2)) + c), &
@@ -68,6 +70,7 @@ contains
                                 dy(k)/(abs(vel(2)) + c), &
                                 dz(l)/(abs(vel(3)) + c))
             end if
+            #:endif
         else
             !2D
             cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
@@ -204,6 +207,7 @@ contains
         ! Viscous calculations
         if (viscous) then
             if (p > 0) then
+                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                 !3D
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
@@ -221,6 +225,7 @@ contains
                                          dz(l)*(abs(vel(3)) + c)) &
                                      /maxval(1._wp/Re_l)
                 end if
+                #:endif
             elseif (n > 0) then
                 !2D
                 vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp

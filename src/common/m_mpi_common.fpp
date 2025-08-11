@@ -1,4 +1,4 @@
-
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief The module serves as a proxy to the parameters and subroutines
@@ -186,7 +186,7 @@ contains
         if (n > 0) then
             sizes_glb(2) = n_glb + 1; sizes_loc(2) = n + 1
             if (p > 0) then
-                sizes_glb(3) = p_glb + 1; sizes_loc(3) = p + 1
+                sizes_glb(num_dims) = p_glb + 1; sizes_loc(num_dims) = p + 1
             end if
         end if
 
@@ -319,7 +319,7 @@ contains
         if (n > 0) then
             sizes_loc(2) = n_ds + 3
             if (p > 0) then
-                sizes_loc(3) = p_ds + 3
+                sizes_loc(num_dims) = p_ds + 3
             end if
         end if
 

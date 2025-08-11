@@ -1,3 +1,4 @@
+#:include 'case.fpp'
 #:include 'macros.fpp'
 #:include 'inline_capillary.fpp'
 
@@ -179,6 +180,7 @@ contains
             #:endcall GPU_PARALLEL_LOOP
 
         elseif (id == 3) then
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
 
             #:call GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
                 do l = isz%beg, isz%end
@@ -223,6 +225,7 @@ contains
                     end do
                 end do
             #:endcall GPU_PARALLEL_LOOP
+            #:endif
 
         end if
 

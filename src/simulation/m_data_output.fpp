@@ -1,6 +1,6 @@
 !! @file m_data_output.f90
 !! @brief Contains module m_data_output
-
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief The primary purpose of this module is to output the grid and the
@@ -1587,6 +1587,7 @@ contains
                         print *, 'time =', nondim_time, 'rho =', rho, 'pres =', pres
                     end if
                 else
+                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
                            'F24.8,F24.8,F24.8,F24.8,F24.8,'// &
                            'F24.8)') &
@@ -1601,6 +1602,7 @@ contains
                         qv, &
                         c, &
                         accel
+                    #:endif
                 end if
             end if
         end do

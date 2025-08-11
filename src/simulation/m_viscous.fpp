@@ -1,6 +1,7 @@
 !>
 !! @file m_viscous.f90
 !! @brief Contains module m_viscous
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief The module contains the subroutines used to compute viscous terms.
@@ -305,6 +306,7 @@ contains
         end if
 
         if (p == 0) return
+        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
 
         if (shear_stress) then    ! Shear stresses
             #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
@@ -515,6 +517,7 @@ contains
                 end do
             #:endcall GPU_PARALLEL_LOOP
         end if
+        #:endif
     end subroutine s_compute_viscous_stress_tensor
 
     !>  Computes viscous terms
@@ -748,7 +751,7 @@ contains
                 #:endcall GPU_PARALLEL_LOOP
 
                 if (p > 0) then
-
+                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     #:call GPU_PARALLEL_LOOP(collapse=3)
                         do j = is3_viscous%beg + 1, is3_viscous%end
                             do l = is2_viscous%beg, is2_viscous%end
@@ -962,6 +965,7 @@ contains
                                                    dq_prim_dy_qp(1)%vf(i), &
                                                    dq_prim_dz_qp(1)%vf(i))
                     end do
+                    #:endif
 
                 else
 
