@@ -1,3 +1,5 @@
+#:include 'parallel_macros.fpp'
+
 #:def LOG(expr)
 #ifdef MFC_DEBUG
     block
@@ -12,14 +14,16 @@
 
 #:def ALLOCATE(*args)
     @:LOG({'@:ALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
-    allocate (${', '.join(args)}$)
-    !$acc enter data create(${', '.join(args)}$)
+    #:set allocated_variables = ', '.join(args)
+    allocate (${allocated_variables}$)
+    $:GPU_ENTER_DATA(create=('[' + allocated_variables + ']'))
 #:enddef ALLOCATE
 
 #:def DEALLOCATE(*args)
     @:LOG({'@:DEALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
-    deallocate (${', '.join(args)}$)
-    !$acc exit data delete(${', '.join(args)}$)
+    #:set allocated_variables = ', '.join(args)
+    $:GPU_EXIT_DATA(delete=('[' + allocated_variables + ']'))
+    deallocate (${allocated_variables}$)
 #:enddef DEALLOCATE
 
 #:def ACC_SETUP_VFs(*args)
@@ -30,13 +34,13 @@
         @:LOG({'@:ACC_SETUP_VFs(${', '.join(args)}$)'})
 
         #:for arg in args
-            !$acc enter data copyin(${arg}$)
-            !$acc enter data copyin(${arg}$%vf)
+            $:GPU_ENTER_DATA(copyin=('[' + arg + ']'))
+            $:GPU_ENTER_DATA(copyin=('[' + arg + '%vf]'))
             if (allocated(${arg}$%vf)) then
                 do macros_setup_vfs_i = lbound(${arg}$%vf, 1), ubound(${arg}$%vf, 1)
                     if (associated(${arg}$%vf(macros_setup_vfs_i)%sf)) then
-                        !$acc enter data copyin(${arg}$%vf(macros_setup_vfs_i))
-                        !$acc enter data create(${arg}$%vf(macros_setup_vfs_i)%sf)
+                        $:GPU_ENTER_DATA(copyin=('[' + arg + '%vf(macros_setup_vfs_i)]'))
+                        $:GPU_ENTER_DATA(copyin=('[' + arg + '%vf(macros_setup_vfs_i)%sf]'))
                     end if
                 end do
             end if
@@ -52,9 +56,9 @@
         @:LOG({'@:ACC_SETUP_SFs(${', '.join(args)}$)'})
 
         #:for arg in args
-            !$acc enter data copyin(${arg}$)
+            $:GPU_ENTER_DATA(copyin=('[' + arg + ']'))
             if (associated(${arg}$%sf)) then
-                !$acc enter data create(${arg}$%sf)
+                $:GPU_ENTER_DATA(copyin=('[' + arg + '%sf]'))
             end if
         #:endfor
     end block
@@ -68,18 +72,18 @@
         @:LOG({'@:ACC_SETUP_source_spatials(${', '.join(args)}$)'})
 
         #:for arg in args
-            !$acc enter data copyin(${arg}$)
+            $:GPU_ENTER_DATA(copyin=('[' + arg + ']'))
             if (allocated(${arg}$%coord)) then
-                !$acc enter data create(${arg}$%coord)
+                $:GPU_ENTER_DATA(copyin=('[' + arg + '%coord]'))
             end if
             if (allocated(${arg}$%val)) then
-                !$acc enter data create(${arg}$%val)
+                $:GPU_ENTER_DATA(copyin=('[' + arg + '%val]'))
             end if
             if (allocated(${arg}$%angle)) then
-                !$acc enter data create(${arg}$%angle)
+                $:GPU_ENTER_DATA(copyin=('[' + arg + '%angle]'))
             end if
             if (allocated(${arg}$%xyz_to_r_ratios)) then
-                !$acc enter data create(${arg}$%xyz_to_r_ratios)
+                $:GPU_ENTER_DATA(copyin=('[' + arg + '%xyz_to_r_ratios]'))
             end if
         #:endfor
     end block
@@ -92,9 +96,6 @@
     end if
 #:enddef
 
-#define t_vec3   real(wp), dimension(1:3)
-#define t_mat4x4 real(wp), dimension(1:4,1:4)
-
 #:def ASSERT(predicate, message = None)
     if (.not. (${predicate}$)) then
         call s_mpi_abort("${_FILE_.split('/')[-1]}$:${_LINE_}$: "// &
@@ -102,3 +103,4 @@
                          //${message or '"No error description."'}$)
     end if
 #:enddef
+! New line at end of file is required for FYPP

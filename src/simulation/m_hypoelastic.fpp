@@ -20,26 +20,26 @@ module m_hypoelastic
  s_compute_damage_state
 
     real(wp), allocatable, dimension(:) :: Gs
-    !$acc declare create(Gs)
+    $:GPU_DECLARE(create='[Gs]')
 
     real(wp), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
     real(wp), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
     real(wp), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
-    !$acc declare create(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
+    $:GPU_DECLARE(create='[du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz]')
 
     real(wp), allocatable, dimension(:, :, :) :: rho_K_field, G_K_field
-    !$acc declare create(rho_K_field, G_K_field)
+    $:GPU_DECLARE(create='[rho_K_field,G_K_field]')
 
     real(wp), allocatable, dimension(:, :) :: fd_coeff_x_h
     real(wp), allocatable, dimension(:, :) :: fd_coeff_y_h
     real(wp), allocatable, dimension(:, :) :: fd_coeff_z_h
-    !$acc declare create(fd_coeff_x_h,fd_coeff_y_h,fd_coeff_z_h)
+    $:GPU_DECLARE(create='[fd_coeff_x_h,fd_coeff_y_h,fd_coeff_z_h]')
 
 contains
 
-    subroutine s_initialize_hypoelastic_module
+    impure subroutine s_initialize_hypoelastic_module
 
-        integer :: i, k, r
+        integer :: i
 
         @:ALLOCATE(Gs(1:num_fluids))
         @:ALLOCATE(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
@@ -55,7 +55,7 @@ contains
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
         end do
-        !$acc update device(Gs)
+        $:GPU_UPDATE(device='[Gs]')
 
         @:ALLOCATE(fd_coeff_x_h(-fd_number:fd_number, 0:m))
         if (n > 0) then
@@ -68,16 +68,16 @@ contains
         ! Computing centered finite difference coefficients
         call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_h, buff_size, &
                                                       fd_number, fd_order)
-        !$acc update device(fd_coeff_x_h)
+        $:GPU_UPDATE(device='[fd_coeff_x_h]')
         if (n > 0) then
             call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_h, buff_size, &
                                                           fd_number, fd_order)
-            !$acc update device(fd_coeff_y_h)
+            $:GPU_UPDATE(device='[fd_coeff_y_h]')
         end if
         if (p > 0) then
             call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_h, buff_size, &
                                                           fd_number, fd_order)
-            !$acc update device(fd_coeff_z_h)
+            $:GPU_UPDATE(device='[fd_coeff_z_h]')
         end if
 
     end subroutine s_initialize_hypoelastic_module
@@ -104,7 +104,7 @@ contains
             ! calculate velocity gradients + rho_K and G_K
             ! TODO: re-organize these loops one by one for GPU efficiency if possible?
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -112,13 +112,12 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do r = -fd_number, fd_number
                             du_dx(k, l, q) = du_dx(k, l, q) &
                                              + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
@@ -127,10 +126,9 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
 
             if (ndirs > 1) then
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:GPU_PARALLEL_LOOP(collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -138,13 +136,12 @@ contains
                         end do
                     end do
                 end do
-                !$acc end parallel loop
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:GPU_PARALLEL_LOOP(collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do r = -fd_number, fd_number
                                 du_dy(k, l, q) = du_dy(k, l, q) &
                                                  + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
@@ -156,27 +153,25 @@ contains
                         end do
                     end do
                 end do
-                !$acc end parallel loop
 
                 ! 3D
                 if (ndirs == 3) then
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:GPU_PARALLEL_LOOP(collapse=3)
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                                du_dz(k, l, q) = 0_wp; dv_dz(k, l, q) = 0_wp; dw_dx(k, l, q) = 0_wp; 
-                                dw_dy(k, l, q) = 0_wp; dw_dz(k, l, q) = 0_wp; 
+                                du_dz(k, l, q) = 0._wp; dv_dz(k, l, q) = 0._wp; dw_dx(k, l, q) = 0._wp; 
+                                dw_dy(k, l, q) = 0._wp; dw_dz(k, l, q) = 0._wp; 
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    $:GPU_PARALLEL_LOOP(collapse=3)
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do r = -fd_number, fd_number
                                     du_dz(k, l, q) = du_dz(k, l, q) &
                                                      + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
@@ -192,11 +187,10 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
                 end if
             end if
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -220,7 +214,7 @@ contains
             end do
 
             ! apply rhs source term to elastic stress equation
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -234,7 +228,7 @@ contains
             end do
 
         elseif (idir == 2) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -269,7 +263,7 @@ contains
             end do
 
         elseif (idir == 3) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -337,7 +331,7 @@ contains
 
         if (cyl_coord .and. idir == 2) then
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -370,7 +364,7 @@ contains
 
     end subroutine s_compute_hypoelastic_rhs
 
-    subroutine s_finalize_hypoelastic_module()
+    impure subroutine s_finalize_hypoelastic_module()
 
         @:DEALLOCATE(Gs)
         @:DEALLOCATE(rho_K_field, G_K_field)
@@ -387,7 +381,7 @@ contains
 
     end subroutine s_finalize_hypoelastic_module
 
-    subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
+    pure subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
@@ -399,13 +393,13 @@ contains
 
         if (n == 0) then
             l = 0; q = 0
-            !$acc parallel loop collapse(1) gang vector default(present)
+            $:GPU_PARALLEL_LOOP()
             do k = 0, m
                 rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_star, 0._wp))**cont_damage_s
             end do
         elseif (p == 0) then
             q = 0
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = 0, n
                 do k = 0, m
                     ! Maximum principal stress
@@ -419,7 +413,7 @@ contains
                 end do
             end do
         else
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m

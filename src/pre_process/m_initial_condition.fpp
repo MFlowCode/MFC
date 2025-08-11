@@ -68,7 +68,7 @@ contains
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_initial_condition_module
+    impure subroutine s_initialize_initial_condition_module
 
         integer :: i, j, k, l !< generic loop iterators
 
@@ -80,7 +80,9 @@ contains
             allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                       idwbuff(2)%beg:idwbuff(2)%end, &
                                       idwbuff(3)%beg:idwbuff(3)%end))
-            allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
+            allocate (q_cons_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                      idwbuff(2)%beg:idwbuff(2)%end, &
+                                      idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
         if (chemistry) then
@@ -90,10 +92,12 @@ contains
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
-        allocate (ib_markers%sf(0:m, 0:n, 0:p))
-
-        allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
-        allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+        if (ib) then
+            allocate (ib_markers%sf(0:m, 0:n, 0:p))
+            allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
+            allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+            ib_markers%sf = 0
+        end if
 
         if (qbmm .and. .not. polytropic) then
             !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
@@ -163,7 +167,6 @@ contains
         ! extent of application that the overwrite permissions give a patch
         ! when it is being applied in the domain.
         patch_id_fp = 0
-        ib_markers%sf = 0
 
     end subroutine s_initialize_initial_condition_module
 
@@ -173,12 +176,7 @@ contains
         !!              on the grid using the primitive variables included with
         !!              the patch parameters. The subroutine is complete once the
         !!              primitive variables are converted to conservative ones.
-    subroutine s_generate_initial_condition
-
-        integer :: i  !< Generic loop operator
-
-        ! First, compute the temperature field from the conservative variables.
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+    impure subroutine s_generate_initial_condition
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
@@ -189,18 +187,23 @@ contains
                                                                idwbuff)
         end if
 
-        call s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers%sf, levelset, levelset_norm)
+        if (ib) then
+            call s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers%sf, levelset, levelset_norm)
+        else
+            call s_apply_domain_patches(patch_id_fp, q_prim_vf)
+        end if
+
         if (num_bc_patches > 0) call s_apply_boundary_patches(q_prim_vf, bc_type)
 
         if (perturb_flow) call s_perturb_surrounding_flow(q_prim_vf)
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
-        if (mixlayer_perturb) call s_superposition_instability_wave(q_prim_vf)
+        if (mixlayer_perturb) call s_perturb_mixlayer(q_prim_vf)
         if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf, bc_type)
 
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+        if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
 
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
@@ -211,7 +214,7 @@ contains
     end subroutine s_generate_initial_condition
 
     !>  Deallocation procedures for the module
-    subroutine s_finalize_initial_condition_module
+    impure subroutine s_finalize_initial_condition_module
 
         integer :: i !< Generic loop iterator
 
@@ -230,7 +233,10 @@ contains
 
         ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
-        deallocate (ib_markers%sf)
+
+        if (ib) then
+            deallocate (ib_markers%sf, levelset%sf, levelset_norm%sf)
+        end if
 
     end subroutine s_finalize_initial_condition_module
 

@@ -1,12 +1,11 @@
 #:def Hardcoded2DVariables()
-
+    ! Place any declaration of intermediate variables here
     real(wp) :: eps
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: factor
 
-    eps = 1e-9_wp
-
+    eps = 1.e-9_wp
 #:enddef
 
 #:def Hardcoded2D()
@@ -35,7 +34,7 @@
         if (r < rmax) then
             q_prim_vf(momxb)%sf(i, j, 0) = -(y_cc(j) - 0.5_wp)*umax/rmax
             q_prim_vf(momxe)%sf(i, j, 0) = (x_cc(i) - 0.5_wp)*umax/rmax
-            q_prim_vf(E_idx)%sf(i, j, 0) = p0 + umax**2*((r/rmax)**2/2._wp)
+            q_prim_vf(E_idx)%sf(i, j, 0) = p0 + umax**2*((r/rmax)**2._wp/2._wp)
         else if (r < 2*rmax) then
             q_prim_vf(momxb)%sf(i, j, 0) = -((y_cc(j) - 0.5_wp)/r)*umax*(2._wp - r/rmax)
             q_prim_vf(momxe)%sf(i, j, 0) = ((x_cc(i) - 0.5_wp)/r)*umax*(2._wp - r/rmax)
@@ -144,7 +143,6 @@
         q_prim_vf(B_idx%beg + 1)%sf(i, j, 0) = sin(4._wp*pi*x_cc(i))/sqrt(4._wp*pi)
 
     case (251) ! RMHD Cylindrical Blast Wave [Mignone, 2006: Section 4.3.1]
-
         if (x_cc(i)**2 + y_cc(j)**2 < 0.08_wp**2) then
             q_prim_vf(contxb)%sf(i, j, 0) = 0.01
             q_prim_vf(E_idx)%sf(i, j, 0) = 1.0
@@ -156,6 +154,41 @@
         else
             q_prim_vf(contxb)%sf(i, j, 0) = 1.e-4_wp
             q_prim_vf(E_idx)%sf(i, j, 0) = 3.e-5_wp
+        end if
+
+    case (270)
+        ! This hardcoded case extrudes a 1D profile to initialize a 2D simulation domain
+        @: HardcodedReadValues()
+
+    case (280)
+        ! This is patch is hard-coded for test suite optimization used in the
+        ! 2D_isentropicvortex case:
+        ! This analytic patch uses geometry 2
+        if (patch_id == 1) then
+            q_prim_vf(E_idx)%sf(i, j, 0) = 1.0*(1.0 - (1.0/1.0)*(5.0/(2.0*pi))*(5.0/(8.0*1.0*(1.4 + 1.0)*pi))*exp(2.0*1.0*(1.0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0)))**(1.4 + 1.0)
+            q_prim_vf(contxb + 0)%sf(i, j, 0) = 1.0*(1.0 - (1.0/1.0)*(5.0/(2.0*pi))*(5.0/(8.0*1.0*(1.4 + 1.0)*pi))*exp(2.0*1.0*(1.0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0)))**1.4
+            q_prim_vf(momxb + 0)%sf(i, j, 0) = 0.0 + (y_cc(j) - patch_icpp(1)%y_centroid)*(5.0/(2.0*pi))*exp(1.0*(1.0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
+            q_prim_vf(momxb + 1)%sf(i, j, 0) = 0.0 - (x_cc(i) - patch_icpp(1)%x_centroid)*(5.0/(2.0*pi))*exp(1.0*(1.0 - (x_cc(i) - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
+        end if
+
+    case (281)
+        ! This is patch is hard-coded for test suite optimization used in the
+        ! 2D_acoustic_pulse case:
+        ! This analytic patch uses geometry 2
+        if (patch_id == 2) then
+            q_prim_vf(E_idx)%sf(i, j, 0) = 101325*(1 - 0.5*(1.4 - 1)*(0.4)**2*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2))))**(1.4/(1.4 - 1))
+            q_prim_vf(contxb + 0)%sf(i, j, 0) = 1*(1 - 0.5*(1.4 - 1)*(0.4)**2*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2))))**(1/(1.4 - 1))
+        end if
+
+    case (282)
+        ! This is patch is hard-coded for test suite optimization used in the
+        ! 2D_zero_circ_vortex case:
+        ! This analytic patch uses geometry 2
+        if (patch_id == 2) then
+            q_prim_vf(E_idx)%sf(i, j, 0) = 101325*(1 - 0.5*(1.4 - 1)*(0.1/0.3)**2*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2))))**(1.4/(1.4 - 1))
+            q_prim_vf(contxb + 0)%sf(i, j, 0) = 1*(1 - 0.5*(1.4 - 1)*(0.1/0.3)**2*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2))))**(1/(1.4 - 1))
+            q_prim_vf(momxb + 0)%sf(i, j, 0) = 112.99092883944267*(1 - (0.1/0.3))*y_cc(j)*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2)))
+            q_prim_vf(momxb + 1)%sf(i, j, 0) = 112.99092883944267*((0.1/0.3))*x_cc(i)*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2)))
         end if
 
     case default

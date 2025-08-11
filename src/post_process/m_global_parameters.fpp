@@ -38,7 +38,10 @@ module m_global_parameters
     integer :: p
     !> @}
 
-    integer(8) :: nGlobal ! Total number of cells in global domain
+    !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
+    type(cell_num_bounds) :: cells_bounds
+
+    integer(kind=8) :: nGlobal ! Total number of cells in global domain
 
     !> @name Cylindrical coordinates (either axisymmetric or full 3D)
     !> @{
@@ -102,7 +105,9 @@ module m_global_parameters
     integer :: relax_model     !< Phase change relaxation model
     logical :: mpp_lim         !< Maximum volume fraction limiter
     integer :: sys_size        !< Number of unknowns in the system of equations
+    integer :: recon_type      !< Which type of reconstruction to use
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
+    integer :: muscl_order     !< Order of accuracy for the MUSCL reconstruction
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: mhd             !< Magnetohydrodynamics
@@ -113,6 +118,8 @@ module m_global_parameters
     integer :: b_size          !< Number of components in the b tensor
     integer :: tensor_size     !< Number of components in the nonsymmetric tensor
     logical :: cont_damage     !< Continuum damage modeling
+    logical :: igr             !< enable IGR
+    integer :: igr_order       !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     !> @}
 
@@ -124,6 +131,7 @@ module m_global_parameters
     type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
     integer :: E_idx                               !< Index of energy equation
     integer :: n_idx                               !< Index of number density
+    integer :: beta_idx                            !< Index of lagrange bubbles beta
     type(int_bounds_info) :: adv_idx               !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx  !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
@@ -147,6 +155,8 @@ module m_global_parameters
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
 
+    integer :: num_bc_patches
+    logical :: bc_io
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
@@ -189,8 +199,6 @@ module m_global_parameters
     integer :: mpi_info_int
     !> @}
 
-    integer, private :: ierr
-
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
     !! Database of the physical parameters of each of the fluids that is present
     !! in the flow. These include the stiffened gas equation of state parameters,
@@ -203,6 +211,7 @@ module m_global_parameters
     integer :: format !< Format of the database file(s)
 
     integer :: precision !< Floating point precision of the database file(s)
+    logical :: down_sample !< down sampling of the database file(s)
 
     logical :: output_partial_domain !< Specify portion of domain to output for post-processing
 
@@ -243,6 +252,7 @@ module m_global_parameters
     logical :: c_wrt
     logical, dimension(3) :: omega_wrt
     logical :: qm_wrt
+    logical :: liutex_wrt
     logical :: schlieren_wrt
     logical :: cf_wrt
     logical :: ib
@@ -276,7 +286,7 @@ module m_global_parameters
     integer :: nb
     real(wp) :: R0ref
     real(wp) :: Ca, Web, Re_inv
-    real(wp), dimension(:), allocatable :: weight, R0, V0
+    real(wp), dimension(:), allocatable :: weight, R0
     logical :: bubbles_euler
     logical :: qbmm
     logical :: polytropic
@@ -324,7 +334,7 @@ contains
     !> Assigns default values to user inputs prior to reading
         !!      them in. This allows for an easier consistency check of
         !!      these parameters once they are read from the input file.
-    subroutine s_assign_default_values_to_user_inputs
+    impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i !< Generic loop iterator
 
@@ -333,6 +343,8 @@ contains
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
+        call s_update_cell_bounds(cells_bounds, m, n, p)
+
         m_root = dflt_int
         cyl_coord = .false.
 
@@ -351,7 +363,9 @@ contains
         ! Simulation algorithm parameters
         model_eqns = dflt_int
         num_fluids = dflt_int
+        recon_type = WENO_TYPE
         weno_order = dflt_int
+        muscl_order = dflt_int
         mixture_err = .false.
         alt_soundspeed = .false.
         relax = .false.
@@ -366,10 +380,13 @@ contains
         b_size = dflt_int
         tensor_size = dflt_int
         cont_damage = .false.
+        igr = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
+        bc_io = .false.
+        num_bc_patches = dflt_int
 
         #:for DIM in ['x', 'y', 'z']
             #:for DIR in [1, 2, 3]
@@ -392,6 +409,7 @@ contains
         format = dflt_int
 
         precision = dflt_int
+        down_sample = .false.
 
         alpha_rho_wrt = .false.
         rho_wrt = .false.
@@ -415,6 +433,7 @@ contains
         c_wrt = .false.
         omega_wrt = .false.
         qm_wrt = .false.
+        liutex_wrt = .false.
         schlieren_wrt = .false.
         sim_data = .false.
         cf_wrt = .false.
@@ -463,12 +482,12 @@ contains
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_global_parameters_module
+    impure subroutine s_initialize_global_parameters_module
 
         integer :: i, j, fac
 
         ! Setting m_root equal to m in the case of a 1D serial simulation
-        if (num_procs == 1 .and. n == 0) m_root = m
+        if (n == 0) m_root = m_glb
 
         ! Gamma/Pi_inf Model
         if (model_eqns == 1) then
@@ -501,8 +520,22 @@ contains
             mom_idx%beg = cont_idx%end + 1
             mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
-            adv_idx%beg = E_idx + 1
-            adv_idx%end = E_idx + num_fluids
+
+            if (igr) then
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. IGR tracks a total of (N-1) volume fractions
+                ! for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
+                ! then adv_idx%end < adv_idx%beg, which skips all loops over the
+                ! volume fractions since there is no volume fraction to track
+                adv_idx%beg = E_idx + 1 ! Alpha for fluid 1
+                adv_idx%end = E_idx + num_fluids - 1
+            else
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. WENO/MUSCL + Riemann tracks a total of (N)
+                ! volume fractions for N fluids, hence the lack of  "-1" in adv_idx%end
+                adv_idx%beg = E_idx + 1
+                adv_idx%end = E_idx + num_fluids
+            end if
 
             sys_size = adv_idx%end
 
@@ -537,7 +570,7 @@ contains
 
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
-                allocate (weight(nb), R0(nb), V0(nb))
+                allocate (weight(nb), R0(nb))
 
                 if (qbmm) then
                     allocate (bub_idx%moms(nb, nmom))
@@ -569,11 +602,7 @@ contains
                 if (nb == 1) then
                     weight(:) = 1._wp
                     R0(:) = 1._wp
-                    V0(:) = 0._wp
-                else if (nb > 1) then
-                    !call s_simpson
-                    V0(:) = 0._wp
-                else
+                else if (nb < 1) then
                     stop 'Invalid value of nb'
                 end if
 
@@ -584,6 +613,11 @@ contains
                     pref = 1._wp
                 end if
 
+            end if
+
+            if (bubbles_lagrange) then
+                beta_idx = sys_size + 1
+                sys_size = beta_idx
             end if
 
             if (mhd) then
@@ -635,7 +669,7 @@ contains
 
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
-                allocate (weight(nb), R0(nb), V0(nb))
+                allocate (weight(nb), R0(nb))
 
                 do i = 1, nb
                     if (polytropic .neqv. .true.) then
@@ -656,10 +690,7 @@ contains
                 if (nb == 1) then
                     weight(:) = 1._wp
                     R0(:) = 1._wp
-                    V0(:) = 0._wp
-                else if (nb > 1) then
-                    V0(:) = 0._wp
-                else
+                else if (nb < 1) then
                     stop 'Invalid value of nb'
                 end if
 
@@ -762,21 +793,16 @@ contains
         chemxe = species_idx%end
 
 #ifdef MFC_MPI
-        if (bubbles_lagrange) then
-            allocate (MPI_IO_DATA%view(1:sys_size + 1))
-            allocate (MPI_IO_DATA%var(1:sys_size + 1))
-            do i = 1, sys_size + 1
+        allocate (MPI_IO_DATA%view(1:sys_size))
+        allocate (MPI_IO_DATA%var(1:sys_size))
+        do i = 1, sys_size
+            if (down_sample) then
+                allocate (MPI_IO_DATA%var(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
+            else
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        else
-            allocate (MPI_IO_DATA%view(1:sys_size))
-            allocate (MPI_IO_DATA%var(1:sys_size))
-            do i = 1, sys_size
-                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        end if
+            end if
+            MPI_IO_DATA%var(i)%sf => null()
+        end do
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
 #endif
@@ -811,7 +837,7 @@ contains
         buff_size = max(offset_x%beg, offset_x%end, offset_y%beg, &
                         offset_y%end, offset_z%beg, offset_z%end)
 
-        if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt) then
+        if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt .or. liutex_wrt) then
             fd_number = max(1, fd_order/2)
             buff_size = buff_size + fd_number
         end if
@@ -885,7 +911,11 @@ contains
     end subroutine s_initialize_global_parameters_module
 
     !> Subroutine to initialize parallel infrastructure
-    subroutine s_initialize_parallel_io
+    impure subroutine s_initialize_parallel_io
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+#endif
 
         num_dims = 1 + min(1, n) + min(1, p)
 
@@ -919,26 +949,23 @@ contains
     end subroutine s_initialize_parallel_io
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_global_parameters_module
+    impure subroutine s_finalize_global_parameters_module
 
         integer :: i
 
         ! Deallocating the grid variables for the x-coordinate direction
-        deallocate (x_cb, x_cc, dx)
+        deallocate (x_cc, x_cb, dx)
 
         ! Deallocating grid variables for the y- and z-coordinate directions
         if (n > 0) then
-
-            deallocate (y_cb, y_cc, dy)
-
-            if (p > 0) deallocate (z_cb, z_cc, dz)
-
+            deallocate (y_cc, y_cb, dy)
+            if (p > 0) then
+                deallocate (z_cc, z_cb, dz)
+            end if
+        else
             ! Deallocating the grid variables, only used for the 1D simulations,
             ! and containing the defragmented computational domain grid data
-        else
-
             deallocate (x_root_cb, x_root_cc)
-
         end if
 
         deallocate (proc_coords)
@@ -952,8 +979,6 @@ contains
             do i = 1, sys_size
                 MPI_IO_DATA%var(i)%sf => null()
             end do
-
-            if (bubbles_lagrange) MPI_IO_DATA%var(sys_size + 1)%sf => null()
 
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)

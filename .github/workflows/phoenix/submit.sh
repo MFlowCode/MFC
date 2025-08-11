@@ -25,9 +25,9 @@ sbatch_gpu_opts="\
 #SBATCH -G2\
 "
 
-if [ "$2" == "cpu" ]; then
+if [ "$2" = "cpu" ]; then
     sbatch_device_opts="$sbatch_cpu_opts"
-elif [ "$2" == "gpu" ]; then
+elif [ "$2" = "gpu" ]; then
     sbatch_device_opts="$sbatch_gpu_opts"
 else
     usage
@@ -42,7 +42,7 @@ sbatch <<EOT
 #SBATCH --account=gts-sbryngelson3 # charge account
 #SBATCH -N1                        # Number of nodes required
 $sbatch_device_opts
-#SBATCH -t 02:00:00                # Duration of the job (Ex: 15 mins)
+#SBATCH -t 03:00:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -q embers                  # QOS Name
 #SBATCH -o$job_slug.out            # Combined output and error messages file
 #SBATCH -W                         # Do not exit until the submitted job terminates.

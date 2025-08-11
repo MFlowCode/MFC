@@ -22,7 +22,7 @@ contains
             !! @param lbk_s Computational coordinates of the bubbles
             !! @param lbk_pos Spatial coordinates of the bubbles
             !! @param updatedvar Eulerian variable to be updated
-    subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+    pure subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
@@ -40,7 +40,7 @@ contains
 
     !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the bubbles.
             !!      The effect of the bubbles only affects the cell where the bubble is located.
-    subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
+    pure subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
 
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s
@@ -55,7 +55,7 @@ contains
         real(wp), dimension(3) :: s_coord
         integer :: l
 
-        !$acc parallel loop gang vector default(present) private(l, s_coord, cell)
+        $:GPU_PARALLEL_LOOP(private='[l,s_coord,cell]')
         do l = 1, nBubs
 
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
@@ -74,19 +74,19 @@ contains
 
             !Update void fraction field
             addFun1 = strength_vol/Vol
-            !$acc atomic update
+            $:GPU_ATOMIC(atomic='update')
             updatedvar%vf(1)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(1)%sf(cell(1), cell(2), cell(3)) + addFun1
 
             !Update time derivative of void fraction
             addFun2 = strength_vel/Vol
-            !$acc atomic update
+            $:GPU_ATOMIC(atomic='update')
             updatedvar%vf(2)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(2)%sf(cell(1), cell(2), cell(3)) + addFun2
 
             !Product of two smeared functions
             !Update void fraction * time derivative of void fraction
             if (lag_params%cluster_type >= 4) then
                 addFun3 = (strength_vol*strength_vel)/Vol
-                !$acc atomic update
+                $:GPU_ATOMIC(atomic='update')
                 updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) + addFun3
             end if
         end do
@@ -95,7 +95,7 @@ contains
 
     !> The purpose of this procedure contains the algorithm to use the gaussian kernel function to map the effect of the bubbles.
             !!      The effect of the bubbles affects the 3X3x3 cells that surround the bubble.
-    subroutine s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+    pure subroutine s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
@@ -120,7 +120,7 @@ contains
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
-        !$acc parallel loop gang vector default(present) private(nodecoord, l, s_coord, cell, center) copyin(smearGrid, smearGridz)
+        $:GPU_PARALLEL_LOOP(private='[nodecoord,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
         do l = 1, nBubs
             nodecoord(1:3) = 0
             center(1:3) = 0._wp
@@ -134,7 +134,7 @@ contains
             strength_vol = volpart
             strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
 
-            !$acc loop collapse(3) private(cellaux, nodecoord)
+            $:GPU_LOOP(collapse=3,private='[cellaux,nodecoord]')
             do i = 1, smearGrid
                 do j = 1, smearGrid
                     do k = 1, smearGridz
@@ -170,14 +170,14 @@ contains
 
                         !Update void fraction field
                         addFun1 = func*strength_vol
-                        !$acc atomic update
+                        $:GPU_ATOMIC(atomic='update')
                         updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                             updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                             + addFun1
 
                         !Update time derivative of void fraction
                         addFun2 = func*strength_vel
-                        !$acc atomic update
+                        $:GPU_ATOMIC(atomic='update')
                         updatedvar%vf(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                             updatedvar%vf(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                             + addFun2
@@ -186,7 +186,7 @@ contains
                         !Update void fraction * time derivative of void fraction
                         if (lag_params%cluster_type >= 4) then
                             addFun3 = func2*strength_vol*strength_vel
-                            !$acc atomic update
+                            $:GPU_ATOMIC(atomic='update')
                             updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                                 updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                                 + addFun3
@@ -199,12 +199,10 @@ contains
     end subroutine s_gaussian
 
     !> The purpose of this subroutine is to apply the gaussian kernel function for each bubble (Maeda and Colonius, 2018)).
-    subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_applygaussian
-#else
-        !$acc routine seq
-#endif
+    pure subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
+        $:GPU_ROUTINE(function_name='s_applygaussian',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: center
         integer, dimension(3), intent(in) :: cellaux
         real(wp), dimension(3), intent(in) :: nodecoord
@@ -269,12 +267,10 @@ contains
     !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost cells).
             !! @param cellaux Tested cell to smear the bubble effect in.
             !! @param celloutside If true, then cellaux is outside the computational domain.
-    subroutine s_check_celloutside(cellaux, celloutside)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_check_celloutside
-#else
-        !$acc routine seq
-#endif
+    pure subroutine s_check_celloutside(cellaux, celloutside)
+        $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
+            & cray_inline=True)
+
         integer, dimension(3), intent(inout) :: cellaux
         logical, intent(out) :: celloutside
 
@@ -305,12 +301,10 @@ contains
     !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
             !! @param cell Cell of the current bubble
             !! @param cellaux Cell to map the bubble effect in.
-    subroutine s_shift_cell_symmetric_bc(cellaux, cell)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_shift_cell_symmetric_bc
-#else
-        !$acc routine seq
-#endif
+    pure subroutine s_shift_cell_symmetric_bc(cellaux, cell)
+        $:GPU_ROUTINE(function_name='s_shift_cell_symmetric_bc', &
+            & parallelism='[seq]', cray_inline=True)
+
         integer, dimension(3), intent(inout) :: cellaux
         integer, dimension(3), intent(in) :: cell
 
@@ -346,12 +340,10 @@ contains
             !! @param cell Cell where the bubble is located
             !! @param volpart Volume of the bubble
             !! @param stddsv Standard deviaton
-    subroutine s_compute_stddsv(cell, volpart, stddsv)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_stddsv
-#else
-        !$acc routine seq
-#endif
+    pure subroutine s_compute_stddsv(cell, volpart, stddsv)
+        $:GPU_ROUTINE(function_name='s_compute_stddsv',parallelism='[seq]', &
+            & cray_inline=True)
+
         integer, dimension(3), intent(in) :: cell
         real(wp), intent(in) :: volpart
         real(wp), intent(out) :: stddsv
@@ -387,12 +379,10 @@ contains
     !> The purpose of this procedure is to calculate the characteristic cell volume
             !! @param cell Computational coordinates (x, y, z)
             !! @param Charvol Characteristic volume
-    subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_get_char_vol
-#else
-        !$acc routine seq
-#endif
+    pure elemental subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
+        $:GPU_ROUTINE(function_name='s_get_char_vol',parallelism='[seq]', &
+            & cray_inline=True)
+
         integer, intent(in) :: cellx, celly, cellz
         real(wp), intent(out) :: Charvol
 
@@ -412,12 +402,10 @@ contains
             !!      real type into integer.
             !! @param s Computational coordinates of the bubble, real type
             !! @param get_cell Computational coordinates of the bubble, integer type
-    subroutine s_get_cell(s_cell, get_cell)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_get_cell
-#else
-        !$acc routine seq
-#endif
+    pure subroutine s_get_cell(s_cell, get_cell)
+        $:GPU_ROUTINE(function_name='s_get_cell',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: s_cell
         integer, dimension(3), intent(out) :: get_cell
         integer :: i

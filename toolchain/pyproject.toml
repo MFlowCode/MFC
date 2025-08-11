@@ -38,8 +38,20 @@ dependencies = [
     "matplotlib",
 
     # Chemistry
-    "cantera==3.0.1",
-    "pyrometheus==1.0.2"
+    "cantera==3.1.0",
+    "pyrometheus == 1.0.3",
+
+    # Frontier Profiling
+    "astunparse==1.6.2",
+    "colorlover",
+    "dash>=1.12.0",
+    "pymongo",
+    "tabulate",
+    "tqdm",
+    "dash-svg",
+    "dash-bootstrap-components",
+    "kaleido",
+    "plotille"
 ]
 
 [tool.hatch.metadata]

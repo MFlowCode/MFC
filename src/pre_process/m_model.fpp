@@ -29,12 +29,12 @@ contains
     !> This procedure reads a binary STL file.
     !! @param filepath Path to the STL file.
     !! @param model The binary of the STL file.
-    subroutine s_read_stl_binary(filepath, model)
+    impure subroutine s_read_stl_binary(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out) :: model
 
-        integer :: i, j, iunit, iostat
+        integer :: i, iunit, iostat
 
         character(kind=c_char, len=80) :: header
         integer(kind=c_int32_t) :: nTriangles
@@ -78,7 +78,7 @@ contains
     !> This procedure reads an ASCII STL file.
     !! @param filepath Path to the STL file.
     !! @param model the STL file.
-    subroutine s_read_stl_ascii(filepath, model)
+    impure subroutine s_read_stl_ascii(filepath, model)
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out) :: model
 
@@ -186,7 +186,7 @@ contains
     !> This procedure reads an STL file.
     !! @param filepath Path to the STL file.
     !! @param model the STL file.
-    subroutine s_read_stl(filepath, model)
+    impure subroutine s_read_stl(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out) :: model
@@ -220,14 +220,14 @@ contains
     !> This procedure reads an OBJ file.
     !! @param filepath Path to the odj file.
     !! @param model The obj file.
-    subroutine s_read_obj(filepath, model)
+    impure subroutine s_read_obj(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out) :: model
 
         integer :: i, j, k, l, iunit, iostat, nVertices
 
-        t_vec3, allocatable :: vertices(:, :)
+        real(wp), dimension(1:3), allocatable :: vertices(:, :)
 
         character(80) :: line
 
@@ -296,7 +296,7 @@ contains
     !> This procedure reads a mesh from a file.
     !! @param filepath Path to the file to read.
     !! @return The model read from the file.
-    function f_model_read(filepath) result(model)
+    impure function f_model_read(filepath) result(model)
 
         character(LEN=*), intent(in) :: filepath
 
@@ -318,7 +318,7 @@ contains
     !> This procedure writes a binary STL file.
     !! @param filepath Path to the STL file.
     !! @param model STL to write
-    subroutine s_write_stl(filepath, model)
+    impure subroutine s_write_stl(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(in) :: model
@@ -327,7 +327,7 @@ contains
 
         character(kind=c_char, len=80), parameter :: header = "Model file written by MFC."
         integer(kind=c_int32_t) :: nTriangles
-        real(kind=c_float) :: normal(3), v(3)
+        real(wp) :: normal(3), v(3)
         integer(kind=c_int16_t) :: attribute
 
         open (newunit=iunit, file=filepath, action='WRITE', &
@@ -368,7 +368,7 @@ contains
     !> This procedure writes an OBJ file.
     !! @param filepath Path to the obj file.
     !! @param model obj to write.
-    subroutine s_write_obj(filepath, model)
+    impure subroutine s_write_obj(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(in) :: model
@@ -405,7 +405,7 @@ contains
     !> This procedure writes a binary STL file.
     !! @param filepath  Path to the file to write.
     !! @param model Model to write.
-    subroutine s_model_write(filepath, model)
+    impure subroutine s_model_write(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(in) :: model
@@ -424,7 +424,7 @@ contains
     end subroutine s_model_write
 
     !> This procedure frees the memory allocated for an STL mesh.
-    subroutine s_model_free(model)
+    pure subroutine s_model_free(model)
 
         type(t_model), intent(inout) :: model
 
@@ -432,7 +432,7 @@ contains
 
     end subroutine s_model_free
 
-    function f_read_line(iunit, line) result(bIsLine)
+    impure function f_read_line(iunit, line) result(bIsLine)
 
         integer, intent(in) :: iunit
         character(80), intent(out) :: line
@@ -461,7 +461,7 @@ contains
 
     end function f_read_line
 
-    subroutine s_skip_ignored_lines(iunit, buffered_line, is_buffered)
+    impure subroutine s_skip_ignored_lines(iunit, buffered_line, is_buffered)
         integer, intent(in) :: iunit
         character(80), intent(inout) :: buffered_line
         logical, intent(inout) :: is_buffered
@@ -485,11 +485,11 @@ contains
     !! @param spacing  Space around the point to search in (grid spacing).
     !! @param spc      Number of samples per cell.
     !! @return True if the point is inside the octree, false otherwise.
-    function f_model_is_inside(model, point, spacing, spc) result(fraction)
+    impure function f_model_is_inside(model, point, spacing, spc) result(fraction)
 
         type(t_model), intent(in) :: model
-        t_vec3, intent(in) :: point
-        t_vec3, intent(in) :: spacing
+        real(wp), dimension(1:3), intent(in) :: point
+        real(wp), dimension(1:3), intent(in) :: spacing
         integer, intent(in) :: spc
 
         real(wp) :: fraction
@@ -532,14 +532,14 @@ contains
     !! @param ray      Ray.
     !! @param triangle Triangle.
     !! @return         True if the ray intersects the triangle, false otherwise.
-    function f_intersects_triangle(ray, triangle) result(intersects)
+    pure elemental function f_intersects_triangle(ray, triangle) result(intersects)
 
         type(t_ray), intent(in) :: ray
         type(t_triangle), intent(in) :: triangle
 
         logical :: intersects
 
-        real(wp) :: v0v1(3), v0v2(3), N(3), P(3), C(3), edge(3), vp(3)
+        real(wp) :: N(3), P(3), C(3), edge(3), vp(3)
         real(wp) :: area2, d, t, NdotRayDirection
 
         intersects = .false.
@@ -592,7 +592,7 @@ contains
     !! @param boundary_v                 Output boundary vertices/normals.
     !! @param boundary_vertex_count      Output total boundary vertex count
     !! @param boundary_edge_count        Output total boundary edge counts
-    subroutine f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+    pure subroutine f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
         type(t_model), intent(in) :: model
         real(wp), allocatable, intent(out), dimension(:, :, :) :: boundary_v !< Output boundary vertices/normals
         integer, intent(out) :: boundary_vertex_count, boundary_edge_count !< Output boundary vertex/edge count
@@ -705,7 +705,7 @@ contains
     !! @param edge                 Edges end points to be registered
     !! @param edge_index           Edge index iterator
     !! @param edge_count           Total number of edges
-    subroutine f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
+    pure subroutine f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
         integer, intent(inout) :: edge_index !< Edge index iterator
         integer, intent(inout) :: edge_count !< Total number of edges
         real(wp), intent(in), dimension(1:2, 1:2) :: edge !< Edges end points to be registered
@@ -723,11 +723,11 @@ contains
     !! @param boundary_edge_count       Output total number of boundary edges
     !! @param spacing                   Dimensions of the current levelset cell
     !! @param interpolate               Logical output
-    subroutine f_check_interpolation_2D(boundary_v, boundary_edge_count, spacing, interpolate)
+    pure subroutine f_check_interpolation_2D(boundary_v, boundary_edge_count, spacing, interpolate)
         logical, intent(inout) :: interpolate !< Logical indicator of interpolation
         integer, intent(in) :: boundary_edge_count !< Number of boundary edges
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
-        t_vec3, intent(in) :: spacing
+        real(wp), dimension(1:3), intent(in) :: spacing
 
         real(wp) :: l1, cell_width !< Length of each boundary edge and cell width
         integer :: j !< Boundary edge index iterator
@@ -753,11 +753,11 @@ contains
     !! @param model              Model to search in.
     !! @param spacing            Dimensions of the current levelset cell
     !! @param interpolate        Logical output
-    subroutine f_check_interpolation_3D(model, spacing, interpolate)
+    pure subroutine f_check_interpolation_3D(model, spacing, interpolate)
         logical, intent(inout) :: interpolate
         type(t_model), intent(in) :: model
-        t_vec3, intent(in) :: spacing
-        t_vec3 :: edge_l
+        real(wp), dimension(1:3), intent(in) :: spacing
+        real(wp), dimension(1:3) :: edge_l
         real(wp) :: cell_width
         real(wp), dimension(1:3, 1:3) :: tri_v
         integer :: i, j !< Loop iterator
@@ -799,9 +799,9 @@ contains
     !! @param spacing                      Dimensions of the current levelset cell
     !! @param interpolated_boundary_v      Output all the boundary vertices of the interpolated 2D model
     !! @param total_vertices               Total number of vertices after interpolation
-    subroutine f_interpolate_2D(boundary_v, boundary_edge_count, spacing, interpolated_boundary_v, total_vertices)
+    pure subroutine f_interpolate_2D(boundary_v, boundary_edge_count, spacing, interpolated_boundary_v, total_vertices)
         real(wp), intent(in), dimension(:, :, :) :: boundary_v
-        t_vec3, intent(in) :: spacing
+        real(wp), dimension(1:3), intent(in) :: spacing
         real(wp), allocatable, intent(inout), dimension(:, :) :: interpolated_boundary_v
 
         integer, intent(inout) :: total_vertices, boundary_edge_count
@@ -810,7 +810,6 @@ contains
 
         real(wp) :: edge_length, cell_width
         real(wp), dimension(1:2) :: edge_x, edge_y, edge_del
-        real(wp), allocatable :: temp_boundary_v(:, :)
 
         ! Get the number of boundary edges
         cell_width = minval(spacing(1:2))
@@ -893,18 +892,17 @@ contains
     !! @param spacing                      Dimensions of the current levelset cell
     !! @param interpolated_boundary_v      Output all the boundary vertices of the interpolated 3D model
     !! @param total_vertices               Total number of vertices after interpolation
-    subroutine f_interpolate_3D(model, spacing, interpolated_boundary_v, total_vertices)
-        t_vec3, intent(in) :: spacing
+    impure subroutine f_interpolate_3D(model, spacing, interpolated_boundary_v, total_vertices)
+        real(wp), dimension(1:3), intent(in) :: spacing
         type(t_model), intent(in) :: model
         real(wp), allocatable, intent(inout), dimension(:, :) :: interpolated_boundary_v
         integer, intent(out) :: total_vertices
 
         integer :: i, j, k, num_triangles, num_segments, num_inner_vertices
         real(wp), dimension(1:3, 1:3) :: tri
-        t_vec3 :: edge_del, cell_area
-        t_vec3 :: bary_coord !< Barycentric coordinates
+        real(wp), dimension(1:3) :: edge_del, cell_area
+        real(wp), dimension(1:3) :: bary_coord !< Barycentric coordinates
         real(wp) :: edge_length, cell_width, cell_area_min, tri_area
-        real(wp), allocatable :: temp_boundary_v(:, :)
 
         ! Number of triangles in the model
         num_triangles = model%ntrs
@@ -952,7 +950,7 @@ contains
                 tri(k, 2) = model%trs(i)%v(k, 2)
                 tri(k, 3) = model%trs(i)%v(k, 3)
             end do
-            tri_area = f_tri_area(tri)
+            call f_tri_area(tri, tri_area)
 
             if (tri_area > threshold_bary*cell_area_min) then
                 num_inner_vertices = Ifactor_bary_3D*ceiling(tri_area/cell_area_min)
@@ -1014,7 +1012,7 @@ contains
                 tri(k, 2) = model%trs(i)%v(k, 2)
                 tri(k, 3) = model%trs(i)%v(k, 3)
             end do
-            tri_area = f_tri_area(tri)
+            call f_tri_area(tri, tri_area)
 
             if (tri_area > threshold_bary*cell_area_min) then
                 num_inner_vertices = Ifactor_bary_3D*ceiling(tri_area/cell_area_min)
@@ -1044,22 +1042,21 @@ contains
     !! @param point        The cell centers of the current level cell
     !! @param normals      The output levelset normals
     !! @param distance     The output levelset distance
-    subroutine f_distance_normals_3D(model, point, normals, distance)
+    pure subroutine f_distance_normals_3D(model, point, normals, distance)
         type(t_model), intent(IN) :: model
-        t_vec3, intent(in) :: point
-        t_vec3, intent(out) :: normals
+        real(wp), dimension(1:3), intent(in) :: point
+        real(wp), dimension(1:3), intent(out) :: normals
         real(wp), intent(out) :: distance
 
-        real(wp), dimension(1:model%ntrs, 1:3) :: tri_normals
         real(wp), dimension(1:3, 1:3) :: tri
         real(wp) :: dist_min, dist_t_min
         real(wp) :: dist_min_normal, dist_buffer_normal
-        t_vec3 :: midp !< Centers of the triangle facets
-        t_vec3 :: dist_buffer !< Distance between the cell center and the vertices
+        real(wp), dimension(1:3) :: midp !< Centers of the triangle facets
+        real(wp), dimension(1:3) :: dist_buffer !< Distance between the cell center and the vertices
         integer :: i, j, tri_idx !< Iterator
 
-        dist_min = 1e12_wp
-        dist_min_normal = 1e12_wp
+        dist_min = 1.e12_wp
+        dist_min_normal = 1.e12_wp
         distance = 0._wp
 
         tri_idx = 0
@@ -1107,11 +1104,10 @@ contains
     !! @param point                        The cell centers of the current levelset cell
     !! @param spacing                      Dimensions of the current levelset cell
     !! @return                             Distance which the levelset distance without interpolation
-    function f_distance(boundary_v, boundary_vertex_count, boundary_edge_count, point, spacing) result(distance)
-        integer, intent(in) :: boundary_vertex_count, boundary_edge_count
+    pure function f_distance(boundary_v, boundary_edge_count, point) result(distance)
+        integer, intent(in) :: boundary_edge_count
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
-        t_vec3, intent(in) :: point
-        t_vec3, intent(in) :: spacing
+        real(wp), dimension(1:3), intent(in) :: point
 
         integer :: i
         real(wp) :: dist_buffer1, dist_buffer2
@@ -1135,17 +1131,14 @@ contains
 
     !> This procedure determines the levelset normals of 2D models without interpolation.
     !! @param boundary_v                   Group of all the boundary vertices of the 2D model without interpolation
-    !! @param boundary_vertex_count        Output the total number of boundary vertices
     !! @param boundary_edge_count          Output the total number of boundary edges
     !! @param point                        The cell centers of the current levelset cell
-    !! @param spacing                      Dimensions of the current levelset cell
     !! @param normals                      Output levelset normals without interpolation
-    subroutine f_normals(boundary_v, boundary_vertex_count, boundary_edge_count, point, spacing, normals)
-        integer, intent(in) :: boundary_vertex_count, boundary_edge_count
+    pure subroutine f_normals(boundary_v, boundary_edge_count, point, normals)
+        integer, intent(in) :: boundary_edge_count
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
-        t_vec3, intent(in) :: point
-        t_vec3, intent(in) :: spacing
-        t_vec3, intent(out) :: normals
+        real(wp), dimension(1:3), intent(in) :: point
+        real(wp), dimension(1:3), intent(out) :: normals
 
         integer :: i, idx_buffer
         real(wp) :: dist_min, dist_buffer
@@ -1175,17 +1168,34 @@ contains
 
     end subroutine f_normals
 
+    !> This procedure calculates the barycentric facet area
+    pure subroutine f_tri_area(tri, tri_area)
+        real(wp), dimension(1:3, 1:3), intent(in) :: tri
+        real(wp), intent(out) :: tri_area
+        real(wp), dimension(1:3) :: AB, AC, cross
+        integer :: i !< Loop iterator
+
+        do i = 1, 3
+            AB(i) = tri(2, i) - tri(1, i)
+            AC(i) = tri(3, i) - tri(1, i)
+        end do
+
+        cross(1) = AB(2)*AC(3) - AB(3)*AC(2)
+        cross(2) = AB(3)*AC(1) - AB(1)*AC(3)
+        cross(3) = AB(1)*AC(2) - AB(2)*AC(1)
+        tri_area = 0.5_wp*sqrt(cross(1)**2 + cross(2)**2 + cross(3)**2)
+
+    end subroutine f_tri_area
+
     !> This procedure determines the levelset of interpolated 2D models.
     !! @param interpolated_boundary_v      Group of all the boundary vertices of the interpolated 2D model
     !! @param total_vertices               Total number of vertices after interpolation
     !! @param point                        The cell centers of the current levelset cell
-    !! @param spacing                      Dimensions of the current levelset cell
     !! @return                             Distance which the levelset distance without interpolation
-    function f_interpolated_distance(interpolated_boundary_v, total_vertices, point, spacing) result(distance)
+    pure function f_interpolated_distance(interpolated_boundary_v, total_vertices, point) result(distance)
         integer, intent(in) :: total_vertices
         real(wp), intent(in), dimension(1:total_vertices, 1:3) :: interpolated_boundary_v
-        t_vec3, intent(in) :: point
-        t_vec3, intent(in) :: spacing
+        real(wp), dimension(1:3), intent(in) :: point
 
         integer :: i !< Loop iterator
         real(wp) :: dist_buffer, min_dist
@@ -1208,24 +1218,5 @@ contains
         distance = min_dist
 
     end function f_interpolated_distance
-
-    !> This procedure calculates the barycentric facet area
-    function f_tri_area(tri) result(tri_area)
-        real(wp), dimension(1:3, 1:3), intent(in) :: tri
-        t_vec3 :: AB, AC, cross
-        real(wp) :: tri_area
-        integer :: i !< Loop iterator
-
-        do i = 1, 3
-            AB(i) = tri(2, i) - tri(1, i)
-            AC(i) = tri(3, i) - tri(1, i)
-        end do
-
-        cross(1) = AB(2)*AC(3) - AB(3)*AC(2)
-        cross(2) = AB(3)*AC(1) - AB(1)*AC(3)
-        cross(3) = AB(1)*AC(2) - AB(2)*AC(1)
-        tri_area = 0.5_wp*sqrt(cross(1)**2 + cross(2)**2 + cross(3)**2)
-
-    end function f_tri_area
 
 end module m_model

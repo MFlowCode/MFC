@@ -30,6 +30,8 @@ module m_weno
 
     use m_mpi_proxy
 
+    use m_muscl !< For Interface Compression
+
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
     !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they
@@ -42,6 +44,7 @@ module m_weno
     !> @{
     real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
     !> @}
+    $:GPU_DECLARE(create='[v_rs_ws_x,v_rs_ws_y,v_rs_ws_z]')
 
     ! WENO Coefficients
 
@@ -58,6 +61,8 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
     !> @}
+    $:GPU_DECLARE(create='[poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z]')
+    $:GPU_DECLARE(create='[poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z]')
 
     !> @name The ideal weights at the left and the right cell-boundaries and at the
     !! left and the right quadrature points, in x-, y- and z-directions. Note
@@ -72,6 +77,7 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_y
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_z
     !> @}
+    $:GPU_DECLARE(create='[d_cbL_x,d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z]')
 
     !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
     !! that the first array dimension identifies the smoothness indicator, the
@@ -82,34 +88,26 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_y
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_z
     !> @}
+    $:GPU_DECLARE(create='[beta_coef_x,beta_coef_y,beta_coef_z]')
 
     ! END: WENO Coefficients
 
     integer :: v_size !< Number of WENO-reconstructed cell-average variables
-    !$acc declare create(v_size)
+    $:GPU_DECLARE(create='[v_size]')
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
     type(int_bounds_info) :: is1_weno, is2_weno, is3_weno
-    !$acc declare create(is1_weno, is2_weno, is3_weno)
+    $:GPU_DECLARE(create='[is1_weno,is2_weno,is3_weno]')
     !
     !> @}
-
-    real(wp) :: test
-    !$acc declare create(test)
-
-    !$acc declare create( &
-    !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
-    !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
-    !$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
-    !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z)
 
 contains
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_weno_module
+    impure subroutine s_initialize_weno_module
 
         if (weno_order == 1) return
 
@@ -272,12 +270,12 @@ contains
                     ! any contributions from outside of the physical domain during
                     ! the WENO reconstruction
                     if (null_weights) then
-                        if (bc_s%beg == BC_RIEMANN_EXTRAPOLATION) then
+                        if (bc_s%beg == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (1, 0) = 0._wp; d_cbR_${XYZ}$ (0, 0) = 1._wp
                             d_cbL_${XYZ}$ (1, 0) = 0._wp; d_cbL_${XYZ}$ (0, 0) = 1._wp
                         end if
 
-                        if (bc_s%end == BC_RIEMANN_EXTRAPOLATION) then
+                        if (bc_s%end == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (0, s) = 0._wp; d_cbR_${XYZ}$ (1, s) = 1._wp
                             d_cbL_${XYZ}$ (0, s) = 0._wp; d_cbL_${XYZ}$ (1, s) = 1._wp
                         end if
@@ -418,14 +416,14 @@ contains
                     ! any contributions from outside of the physical domain during
                     ! the WENO reconstruction
                     if (null_weights) then
-                        if (bc_s%beg == BC_RIEMANN_EXTRAPOLATION) then
+                        if (bc_s%beg == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (1:2, 0) = 0._wp; d_cbR_${XYZ}$ (0, 0) = 1._wp
                             d_cbL_${XYZ}$ (1:2, 0) = 0._wp; d_cbL_${XYZ}$ (0, 0) = 1._wp
                             d_cbR_${XYZ}$ (2, 1) = 0._wp; d_cbR_${XYZ}$ (:, 1) = d_cbR_${XYZ}$ (:, 1)/sum(d_cbR_${XYZ}$ (:, 1))
                             d_cbL_${XYZ}$ (2, 1) = 0._wp; d_cbL_${XYZ}$ (:, 1) = d_cbL_${XYZ}$ (:, 1)/sum(d_cbL_${XYZ}$ (:, 1))
                         end if
 
-                        if (bc_s%end == BC_RIEMANN_EXTRAPOLATION) then
+                        if (bc_s%end == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (0, s - 1) = 0._wp; d_cbR_${XYZ}$ (:, s - 1) = d_cbR_${XYZ}$ (:, s - 1)/sum(d_cbR_${XYZ}$ (:, s - 1))
                             d_cbL_${XYZ}$ (0, s - 1) = 0._wp; d_cbL_${XYZ}$ (:, s - 1) = d_cbL_${XYZ}$ (:, s - 1)/sum(d_cbL_${XYZ}$ (:, s - 1))
                             d_cbR_${XYZ}$ (0:1, s) = 0._wp; d_cbR_${XYZ}$ (2, s) = 1._wp
@@ -625,11 +623,11 @@ contains
         #:endfor
 
         if (weno_dir == 1) then
-            !$acc update device(poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x)
+            $:GPU_UPDATE(device='[poly_coef_cbL_x,poly_coef_cbR_x,d_cbL_x,d_cbR_x,beta_coef_x]')
         elseif (weno_dir == 2) then
-            !$acc update device(poly_coef_cbL_y, poly_coef_cbR_y, d_cbL_y, d_cbR_y, beta_coef_y)
+            $:GPU_UPDATE(device='[poly_coef_cbL_y,poly_coef_cbR_y,d_cbL_y,d_cbR_y,beta_coef_y]')
         else
-            !$acc update device(poly_coef_cbL_z, poly_coef_cbR_z, d_cbL_z, d_cbR_z, beta_coef_z)
+            $:GPU_UPDATE(device='[poly_coef_cbL_z,poly_coef_cbR_z,d_cbL_z,d_cbR_z,beta_coef_z]')
         end if
 
         ! Nullifying WENO coefficients and cell-boundary locations pointers
@@ -639,13 +637,12 @@ contains
     end subroutine s_compute_weno_coefficients
 
     subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
-                      norm_dir, weno_dir, &
+                      weno_dir, &
                       is1_weno_d, is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
-        integer, intent(in) :: norm_dir
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
 
@@ -664,16 +661,16 @@ contains
         is2_weno = is2_weno_d
         is3_weno = is3_weno_d
 
-        !$acc update device(is1_weno, is2_weno, is3_weno)
+        $:GPU_UPDATE(device='[is1_weno,is2_weno,is3_weno]')
 
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
-                                   norm_dir, weno_dir)
+                                   weno_dir)
         end if
 
         if (weno_order == 1) then
             if (weno_dir == 1) then
-                !$acc parallel loop collapse(4) default(present)
+                $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -684,9 +681,8 @@ contains
                         end do
                     end do
                 end do
-                !$acc end parallel loop
             else if (weno_dir == 2) then
-                !$acc parallel loop collapse(4) default(present)
+                $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -697,9 +693,8 @@ contains
                         end do
                     end do
                 end do
-                !$acc end parallel loop
             else if (weno_dir == 3) then
-                !$acc parallel loop collapse(4) default(present)
+                $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -710,12 +705,11 @@ contains
                         end do
                     end do
                 end do
-                !$acc end parallel loop
             end if
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha,tau)
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[beta,dvd,poly,omega,alpha,tau]')
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -788,17 +782,16 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
                 end if
             #:endfor
         elseif (weno_order == 5) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop vector gang collapse(3) default(present) private(dvd, poly, beta, alpha, omega, tau, delta)
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, v_size
                                     ! reconstruct from left side
 
@@ -903,7 +896,6 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
 
                     if (mp_weno) then
                         call s_preserve_monotonicity(v_rs_ws_${XYZ}$, vL_rs_vf_${XYZ}$, &
@@ -914,11 +906,11 @@ contains
         elseif (weno_order == 7) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop vector gang collapse(3) default(present) private(poly, beta, alpha, omega, tau, delta, dvd, v)
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[poly,beta,alpha,omega,tau,delta,dvd,v]')
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, v_size
 
                                     if (teno) v = v_rs_ws_${XYZ}$ (j - 3:j + 3, k, l, i) ! temporary field value array for clarity
@@ -1099,12 +1091,16 @@ contains
                             end do
                         end do
                     end do
-                    !$acc end parallel loop
 
                 end if
             #:endfor
         end if
 
+        if (int_comp) then
+            call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, &
+                                         vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
+                                         weno_dir, is1_weno_d, is2_weno_d, is3_weno_d)
+        end if
     end subroutine s_weno
 
     !> The computation of parameters, the allocation of memory,
@@ -1120,11 +1116,10 @@ contains
         !! @param is2_weno Index bounds in second coordinate direction
         !! @param is3_weno Index bounds in third coordinate direction
     subroutine s_initialize_weno(v_vf, &
-                                 norm_dir, weno_dir)
+                                 weno_dir)
 
         type(scalar_field), dimension(:), intent(IN) :: v_vf
 
-        integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
 
         integer :: j, k, l, q
@@ -1135,10 +1130,10 @@ contains
         ! as to reshape the inputted data in the coordinate direction of
         ! the WENO reconstruction
         v_size = ubound(v_vf, 1)
-        !$acc update device(v_size)
+        $:GPU_UPDATE(device='[v_size]')
 
         if (weno_dir == 1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do j = 1, v_size
                 do q = is3_weno%beg, is3_weno%end
                     do l = is2_weno%beg, is2_weno%end
@@ -1148,78 +1143,38 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in y-direction
         if (n == 0) return
 
         if (weno_dir == 2) then
-#if MFC_cuTENSOR
-            if (cu_tensor) then
-                if (p == 0) then
-                    block
-                        use CuTensorEx
-
-                        !$acc host_data use_device(v_rs_ws_x, v_rs_ws_y)
-                        v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1, sys_size], order=[2, 1, 3, 4])
-                        !$acc end host_data
-                    end block
-                else
-                    block
-                        use CuTensorEx
-
-                        !$acc host_data use_device(v_rs_ws_x, v_rs_ws_y)
-                        v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1 + 2*buff_size, sys_size], order=[2, 1, 3, 4])
-                        !$acc end host_data
-                    end block
-                end if
-            else
-#endif
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do j = 1, v_size
-                    do q = is3_weno%beg, is3_weno%end
-                        do l = is2_weno%beg, is2_weno%end
-                            do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
-                                v_rs_ws_y(k, l, q, j) = v_vf(j)%sf(l, k, q)
-                            end do
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do j = 1, v_size
+                do q = is3_weno%beg, is3_weno%end
+                    do l = is2_weno%beg, is2_weno%end
+                        do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
+                            v_rs_ws_y(k, l, q, j) = v_vf(j)%sf(l, k, q)
                         end do
                     end do
                 end do
-!$acc end parallel loop
-#if MFC_cuTENSOR
-            end if
-#endif
+            end do
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in z-direction
         if (p == 0) return
-        if (weno_dir == 3) then
-#if MFC_cuTENSOR
-            if (cu_tensor) then
-                block
-                    use CuTensorEx
 
-                    !$acc host_data use_device(v_rs_ws_x, v_rs_ws_z)
-                    v_rs_ws_z = reshape(v_rs_ws_x, shape=[p + 1 + 2*buff_size, n + 2*buff_size + 1, m + 2*buff_size + 1, sys_size], order=[3, 2, 1, 4])
-                    !$acc end host_data
-                end block
-            else
-#endif
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do j = 1, v_size
-                    do q = is3_weno%beg, is3_weno%end
-                        do l = is2_weno%beg, is2_weno%end
-                            do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
-                                v_rs_ws_z(k, l, q, j) = v_vf(j)%sf(q, l, k)
-                            end do
+        if (weno_dir == 3) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do j = 1, v_size
+                do q = is3_weno%beg, is3_weno%end
+                    do l = is2_weno%beg, is2_weno%end
+                        do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
+                            v_rs_ws_z(k, l, q, j) = v_vf(j)%sf(q, l, k)
                         end do
                     end do
                 end do
-!$acc end parallel loop
-#if MFC_cuTENSOR
-            end if
-#endif
+            end do
         end if
 
     end subroutine s_initialize_weno
@@ -1235,7 +1190,7 @@ contains
         !!  @param j First-coordinate cell index
         !!  @param k Secone-coordinate cell index
         !!  @param l Thire-coordinate cell index
-    subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
+    pure subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(IN) :: v_rs_ws
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
@@ -1269,7 +1224,7 @@ contains
         real(wp), parameter :: alpha_mp = 2._wp
         real(wp), parameter :: beta_mp = 4._wp/3._wp
 
-        !$acc parallel loop gang vector collapse (4)  default(present) private(d)
+        $:GPU_PARALLEL_LOOP(collapse=4,private='[d]')
         do l = is3_weno%beg, is3_weno%end
             do k = is2_weno%beg, is2_weno%end
                 do j = is1_weno%beg, is1_weno%end
@@ -1305,11 +1260,11 @@ contains
 
                         vL_MD = (v_rs_ws(j, k, l, i) &
                                  + v_rs_ws(j - 1, k, l, i) &
-                                 - d_MD)*5e-1_wp
+                                 - d_MD)*5.e-1_wp
 
                         vL_LC = v_rs_ws(j, k, l, i) &
                                 - (v_rs_ws(j + 1, k, l, i) &
-                                   - v_rs_ws(j, k, l, i))*5e-1_wp + beta_mp*d_LC
+                                   - v_rs_ws(j, k, l, i))*5.e-1_wp + beta_mp*d_LC
 
                         vL_min = max(min(v_rs_ws(j, k, l, i), &
                                          v_rs_ws(j - 1, k, l, i), &
@@ -1326,8 +1281,8 @@ contains
                                          vL_LC))
 
                         vL_rs_vf(j, k, l, i) = vL_rs_vf(j, k, l, i) &
-                                               + (sign(5e-1_wp, vL_min - vL_rs_vf(j, k, l, i)) &
-                                                  + sign(5e-1_wp, vL_max - vL_rs_vf(j, k, l, i))) &
+                                               + (sign(5.e-1_wp, vL_min - vL_rs_vf(j, k, l, i)) &
+                                                  + sign(5.e-1_wp, vL_max - vL_rs_vf(j, k, l, i))) &
                                                *min(abs(vL_min - vL_rs_vf(j, k, l, i)), &
                                                     abs(vL_max - vL_rs_vf(j, k, l, i)))
                         ! END: Left Monotonicity Preserving Bound
@@ -1364,11 +1319,11 @@ contains
 
                         vR_MD = (v_rs_ws(j, k, l, i) &
                                  + v_rs_ws(j + 1, k, l, i) &
-                                 - d_MD)*5e-1_wp
+                                 - d_MD)*5.e-1_wp
 
                         vR_LC = v_rs_ws(j, k, l, i) &
                                 + (v_rs_ws(j, k, l, i) &
-                                   - v_rs_ws(j - 1, k, l, i))*5e-1_wp + beta_mp*d_LC
+                                   - v_rs_ws(j - 1, k, l, i))*5.e-1_wp + beta_mp*d_LC
 
                         vR_min = max(min(v_rs_ws(j, k, l, i), &
                                          v_rs_ws(j + 1, k, l, i), &
@@ -1385,8 +1340,8 @@ contains
                                          vR_LC))
 
                         vR_rs_vf(j, k, l, i) = vR_rs_vf(j, k, l, i) &
-                                               + (sign(5e-1_wp, vR_min - vR_rs_vf(j, k, l, i)) &
-                                                  + sign(5e-1_wp, vR_max - vR_rs_vf(j, k, l, i))) &
+                                               + (sign(5.e-1_wp, vR_min - vR_rs_vf(j, k, l, i)) &
+                                                  + sign(5.e-1_wp, vR_max - vR_rs_vf(j, k, l, i))) &
                                                *min(abs(vR_min - vR_rs_vf(j, k, l, i)), &
                                                     abs(vR_max - vR_rs_vf(j, k, l, i)))
                         ! END: Right Monotonicity Preserving Bound
@@ -1394,12 +1349,11 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
 
     end subroutine s_preserve_monotonicity
 
     !>  Module deallocation and/or disassociation procedures
-    subroutine s_finalize_weno_module()
+    impure subroutine s_finalize_weno_module()
 
         if (weno_order == 1) return
 

@@ -34,6 +34,10 @@ jobs:
         find ./src -type f -not -name '*nvtx*' -exec sh -c 'fortitude check "$1" | grep -v E001' _ {} \;
         find ./src -type f -not -name '*nvtx*' -exec sh -c 'fortitude check "$1" | grep -v E001' _ {} \; | wc -l | xargs -I{} sh -c '[ {} -gt 0 ] && exit 1 || exit 0'
 
+    - name: Looking for raw directives
+      run: |
+        ! grep -iR '!\$acc\|!\$omp' --exclude="parallel_macros.fpp" --exclude="syscheck.fpp" ./src/*
+        
     - name: No double precision intrinsics
       run: |
         ! grep -iR 'double_precision\|dsqrt\|dexp\|dlog\|dble\|dabs\|double\ precision\|real(8)\|real(4)\|dprod\|dmin\|dmax\|dfloat\|dreal\|dcos\|dsin\|dtan\|dsign\|dtanh\|dsinh\|dcosh\|d0' --exclude-dir=syscheck --exclude="*nvtx*" --exclude="*precision_select*" ./src/*
@@ -41,6 +45,10 @@ jobs:
     - name: Looking for junk code
       run: |
         ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
+
+    - name: Looking for false integers
+      run: |
+        ! grep -onRP '(?<![0-9.eE\-])\b[0-9]*_wp\b' src/
 
     - name: Looking for junk comments in examples
       run: |

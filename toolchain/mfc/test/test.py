@@ -19,6 +19,8 @@ from ..packer import packer
 nFAIL = 0
 nPASS = 0
 nSKIP = 0
+current_test_number = 0
+total_test_count = 0
 errors = []
 
 # pylint: disable=too-many-branches, trailing-whitespace
@@ -37,6 +39,7 @@ def __filter(cases_) -> typing.List[TestCase]:
             # Do not "continue" because "--to" might be the same as "--from"
         if bFoundFrom and case.get_uuid() == ARG("to"):
             cases    = cases[from_i:i+1]
+            skipped_cases = [case for case in cases_ if case not in cases]
             bFoundTo = True
             break
 
@@ -51,22 +54,36 @@ def __filter(cases_) -> typing.List[TestCase]:
             checkCase.append(case.get_uuid())
             if not set(ARG("only")).issubset(set(checkCase)):
                 cases.remove(case)
+                skipped_cases.append(case)
 
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
             cases.remove(case)
             skipped_cases.append(case)
-    
+
+    for case in cases[:]:
+        if "RDMA MPI" in case.trace:
+            cases.remove(case)
+            skipped_cases.append(case)
+
     for case in cases[:]:
         if ARG("single"):
             skip = ['low_Mach', 'Hypoelasticity', 'teno', 'Chemistry', 'Phase Change model 6'
             ,'Axisymmetric', 'Transducer', 'Transducer Array', 'Cylindrical', 'HLLD', 'Example']
             if any(label in case.trace for label in skip):
                 cases.remove(case)
+                skipped_cases.append(case)
 
+    for case in cases[:]:
+        if ARG("gpu"):
+            skip = ['Gauss Seidel']
+            if any(label in case.trace for label in skip):
+                cases.remove(case)
 
     if ARG("no_examples"):
-        cases = [case for case in cases if not "Example" in case.trace]
+        example_cases = [case for case in cases if "Example" in case.trace]
+        skipped_cases += example_cases
+        cases = [case for case in cases if case not in example_cases]
 
     if ARG("percent") == 100:
         return cases, skipped_cases
@@ -74,13 +91,13 @@ def __filter(cases_) -> typing.List[TestCase]:
     seed(time.time())
 
     selected_cases = sample(cases, k=int(len(cases)*ARG("percent")/100.0))
-    skipped_cases = [item for item in cases if item not in selected_cases]
+    skipped_cases += [item for item in cases if item not in selected_cases]
 
     return selected_cases, skipped_cases
 
 def test():
     # pylint: disable=global-statement, global-variable-not-assigned
-    global nFAIL, nPASS, nSKIP
+    global nFAIL, nPASS, nSKIP, total_test_count
     global errors
 
     cases = list_cases()
@@ -98,6 +115,7 @@ def test():
 
     cases, skipped_cases = __filter(cases)
     cases = [ _.to_case() for _ in cases ]
+    total_test_count = len(cases)
 
     if ARG("list"):
         table = rich.table.Table(title="MFC Test Cases", box=rich.table.box.SIMPLE)
@@ -135,7 +153,7 @@ def test():
 
     # Run cases with multiple threads (if available)
     cons.print()
-    cons.print(" tests/[bold magenta]UUID[/bold magenta]     (s)      Summary")
+    cons.print("  Progress      [bold magenta]UUID[/bold magenta]          (s)      Summary")
     cons.print()
 
     # Select the correct number of threads to use to launch test cases
@@ -170,6 +188,7 @@ def test():
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements, trailing-whitespace
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     # pylint: disable=global-statement, global-variable-not-assigned
+    global current_test_number
     start_time = time.time()
 
     tol = case.compute_tolerance()
@@ -181,6 +200,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         return
 
     cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
     common.file_write(out_filepath, cmd.stdout)
@@ -253,7 +273,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
     end_time = time.time()
     duration = end_time - start_time
 
-    cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]    {duration:6.2f}    {case.trace}")
+    current_test_number += 1
+    progress_str = f"({current_test_number:3d}/{total_test_count:3d})"
+    cons.print(f"  {progress_str}    [bold magenta]{case.get_uuid()}[/bold magenta]    {duration:6.2f}    {case.trace}")
 
 
 def handle_case(case: TestCase, devices: typing.Set[int]):

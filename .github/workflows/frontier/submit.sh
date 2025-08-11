@@ -13,17 +13,29 @@ else
     exit 1
 fi
 
+if [ "$2" = "cpu" ]; then
+    sbatch_device_opts="\
+#SBATCH -n 32                       # Number of cores required"
+elif [ "$2" = "gpu" ]; then
+    sbatch_device_opts="\
+#SBATCH -n 8                       # Number of cores required"
+else
+    usage
+    exit 1
+fi
+
+
 job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2"
 
 sbatch <<EOT
 #!/bin/bash
-#SBATCH -JMFC-$job_slug            # Job name
+#SBATCH -J MFC-$job_slug            # Job name
 #SBATCH -A CFD154                  # charge account
 #SBATCH -N 1                       # Number of nodes required
-#SBATCH -n 8                       # Number of cores required
-#SBATCH -t 01:59:00                # Duration of the job (Ex: 15 mins)
+$sbatch_device_opts
+#SBATCH -t 04:59:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -o$job_slug.out            # Combined output and error messages file
-#SBATCH -q debug                   # Use debug QOS - only one job per user allowed in queue!
+#SBATCH -p extended                # Extended partition for shorter queues
 #SBATCH -W                         # Do not exit until the submitted job terminates.
 
 set -e

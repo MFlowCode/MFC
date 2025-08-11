@@ -23,7 +23,7 @@ Nx, Ny, Nz = 2 * s, s, s
 
 dx = 1.0 / (1.0 * (Nx + 1))
 
-Tend = 64e-06
+Tend = 1e-4
 Nt = 200
 mydt = Tend / (1.0 * Nt)
 
@@ -45,24 +45,24 @@ print(
             "p": Nz,
             "dt": mydt,
             "t_step_start": 0,
-            "t_step_stop": int(20 * (95 * size + 5)),
-            "t_step_save": int(20 * (95 * size + 5)),
+            "t_step_stop": int(20 * (5 * size + 5)),
+            "t_step_save": int(20 * (5 * size + 5)),
             # Simulation Algorithm Parameters
-            "num_patches": 2,
+            "num_patches": 1,
             "model_eqns": 2,
             "alt_soundspeed": "F",
-            "num_fluids": 1,
+            "num_fluids": 2,
             "mpp_lim": "F",
             "mixture_err": "F",
             "time_stepper": 3,
             "weno_order": 5,
             "weno_eps": 1.0e-16,
-            "weno_Re_flux": "F",
-            "weno_avg": "F",
-            "mapped_weno": "F",
+            "weno_Re_flux": "T",
+            "weno_avg": "T",
+            "mapped_weno": "T",
             "null_weights": "F",
             "mp_weno": "F",
-            "riemann_solver": 1,
+            "riemann_solver": 2,
             "wave_speeds": 1,
             "avg_state": 2,
             "bc_x%beg": -3,
@@ -71,9 +71,10 @@ print(
             "bc_y%end": -3,
             "bc_z%beg": -3,
             "bc_z%end": -3,
-            # Turning on Hypoelasticity
-            "hypoelasticity": "T",
-            "fd_order": 4,
+            # Turn on IBM
+            "ib": "T",
+            "num_ibs": 1,
+            "viscous": "T",
             # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
@@ -81,38 +82,34 @@ print(
             "parallel_io": "T",
             # Patch 1 L
             "patch_icpp(1)%geometry": 9,
-            "patch_icpp(1)%x_centroid": 0.25,
+            "patch_icpp(1)%x_centroid": 0.5,
             "patch_icpp(1)%y_centroid": 0.25,
             "patch_icpp(1)%z_centroid": 0.25,
-            "patch_icpp(1)%length_x": 0.5,
+            "patch_icpp(1)%length_x": 1.0,
             "patch_icpp(1)%length_y": 0.5,
             "patch_icpp(1)%length_z": 0.5,
-            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(1)%vel(1)": 0.1,
             "patch_icpp(1)%vel(2)": 0,
             "patch_icpp(1)%vel(3)": 0,
-            "patch_icpp(1)%pres": 1.0e8,
-            "patch_icpp(1)%alpha_rho(1)": 1000,
-            "patch_icpp(1)%alpha(1)": 1.0,
-            "patch_icpp(1)%tau_e(1)": 0.0,
-            # Patch 2 R
-            "patch_icpp(2)%geometry": 9,
-            "patch_icpp(2)%x_centroid": 0.75,
-            "patch_icpp(2)%y_centroid": 0.25,
-            "patch_icpp(2)%z_centroid": 0.25,
-            "patch_icpp(2)%length_x": 0.5,
-            "patch_icpp(2)%length_y": 0.5,
-            "patch_icpp(2)%length_z": 0.5,
-            "patch_icpp(2)%vel(1)": 0,
-            "patch_icpp(2)%vel(2)": 0,
-            "patch_icpp(2)%vel(3)": 0,
-            "patch_icpp(2)%pres": 1.0e05,
-            "patch_icpp(2)%alpha_rho(1)": 1000,
-            "patch_icpp(2)%alpha(1)": 1.0,
-            "patch_icpp(2)%tau_e(1)": 0.0,
+            "patch_icpp(1)%pres": 1.0,
+            "patch_icpp(1)%alpha_rho(1)": 0.8e00,
+            "patch_icpp(1)%alpha(1)": 0.8e00,
+            "patch_icpp(1)%alpha_rho(2)": 0.2e00,
+            "patch_icpp(1)%alpha(2)": 0.2e00,
+            # Patch: Sphere Immersed Boundary
+            "patch_ib(1)%geometry": 8,
+            "patch_ib(1)%x_centroid": 0.25,
+            "patch_ib(1)%y_centroid": 0.25,
+            "patch_ib(1)%z_centroid": 0.25,
+            "patch_ib(1)%radius": 0.1,
             # Fluids Physical Parameters
-            "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
-            "fluid_pp(1)%pi_inf": 4.4e00 * 6.0e08 / (4.4e00 - 1.0e00),
-            "fluid_pp(1)%G": 10e09,
+            # Specify 2 fluids
+            "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1.0e00),
+            "fluid_pp(1)%pi_inf": 0,
+            "fluid_pp(1)%Re(1)": 54000,
+            "fluid_pp(2)%gamma": 1.0e00 / (1.4 - 1.0e00),
+            "fluid_pp(2)%pi_inf": 0,
+            "fluid_pp(2)%Re(1)": 54000,
         }
     )
 )

@@ -24,7 +24,7 @@ contains
 
     !> Checks compatibility of parameters in the input file.
         !! Used by all three stages
-    subroutine s_check_inputs_common
+    impure subroutine s_check_inputs_common
 
 #ifndef MFC_PRE_PROCESS
         call s_check_inputs_time_stepping
@@ -35,24 +35,31 @@ contains
         call s_check_total_cells
 #endif
 
-#ifndef MFC_POST_PROCESS
-        call s_check_inputs_bubbles_euler
-        call s_check_inputs_qbmm_and_polydisperse
-        call s_check_inputs_adv_n
-        call s_check_inputs_hypoelasticity
-        call s_check_inputs_phase_change
-        call s_check_inputs_ibm
-#endif
-
         ! Run by all three stages
         call s_check_inputs_simulation_domain
         call s_check_inputs_model_eqns_and_num_fluids
-        call s_check_inputs_weno
+        if (igr) then
+            call s_check_inputs_igr
+        else
+#ifndef MFC_POST_PROCESS
+            call s_check_inputs_bubbles_euler
+            call s_check_inputs_qbmm_and_polydisperse
+            call s_check_inputs_adv_n
+            call s_check_inputs_hypoelasticity
+            call s_check_inputs_phase_change
+            call s_check_inputs_ibm
+#endif
+            if (recon_type == WENO_TYPE) then
+                call s_check_inputs_weno
+            elseif (recon_type == MUSCL_TYPE) then
+                call s_check_inputs_muscl
+            end if
+            call s_check_inputs_surface_tension
+            call s_check_inputs_mhd
+        end if
         call s_check_inputs_bc
         call s_check_inputs_stiffened_eos
-        call s_check_inputs_surface_tension
         call s_check_inputs_moving_bc
-        call s_check_inputs_mhd
 
     end subroutine s_check_inputs_common
 
@@ -60,7 +67,7 @@ contains
 
     !> Checks constraints on the time-stepping parameters.
         !! Called by s_check_inputs_common for simulation and post-processing
-    subroutine s_check_inputs_time_stepping
+    impure subroutine s_check_inputs_time_stepping
         if (cfl_dt) then
             @:PROHIBIT(cfl_target < 0 .or. cfl_target > 1._wp)
             @:PROHIBIT(t_stop <= 0)
@@ -76,7 +83,7 @@ contains
 
     !> Checks constraints on the finite difference parameters.
         !! Called by s_check_inputs_common for simulation and post-processing
-    subroutine s_check_inputs_finite_difference
+    impure subroutine s_check_inputs_finite_difference
         @:PROHIBIT(all(fd_order /= (/dflt_int, 1, 2, 4/)), "fd_order must be 1, 2, or 4")
     end subroutine s_check_inputs_finite_difference
 
@@ -85,11 +92,14 @@ contains
 #ifndef MFC_SIMULATION
 
     ! Checks constraints on the total number of cells
-    subroutine s_check_total_cells
-        character(len=5) :: numStr !< for int to string conversion
+    impure subroutine s_check_total_cells
+        character(len=18) :: numStr !< for int to string conversion
+        integer(kind=8) :: min_cells
 
+        min_cells = int(2, kind=8)**int(min(1, m) + min(1, n) + min(1, p), kind=8)*int(num_procs, kind=8)
         call s_int_to_str(2**(min(1, m) + min(1, n) + min(1, p))*num_procs, numStr)
-        @:PROHIBIT(nGlobal < 2**(min(1, m) + min(1, n) + min(1, p))*num_procs, &
+
+        @:PROHIBIT(nGlobal < min_cells, &
             "Total number of cells must be at least (2^[number of dimensions])*num_procs, " // &
             "which is currently "//trim(numStr))
     end subroutine s_check_total_cells
@@ -100,7 +110,7 @@ contains
 
     !> Checks constraints on the bubble parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
-    subroutine s_check_inputs_bubbles_euler
+    impure subroutine s_check_inputs_bubbles_euler
         @:PROHIBIT(bubbles_euler .and. nb < 1, "The Ensemble-Averaged Bubble Model requires nb >= 1")
         @:PROHIBIT(bubbles_euler .and. polydisperse .and. (nb == 1), "Polydisperse bubble dynamics requires nb > 1")
         @:PROHIBIT(bubbles_euler .and. polydisperse .and. (mod(nb, 2) == 0), "nb must be odd")
@@ -117,7 +127,7 @@ contains
 
     !> Checks constraints on the QBMM and polydisperse bubble parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
-    subroutine s_check_inputs_qbmm_and_polydisperse
+    impure subroutine s_check_inputs_qbmm_and_polydisperse
         @:PROHIBIT(polydisperse .and. (.not. bubbles_euler), "Polydisperse bubble modeling requires the bubbles_euler flag to be set")
         @:PROHIBIT(polydisperse .and. f_is_default(poly_sigma), "Polydisperse bubble modeling requires poly_sigma to be set")
         @:PROHIBIT(polydisperse .and. poly_sigma <= 0)
@@ -127,7 +137,7 @@ contains
 
     !> Checks constraints on the adv_n flag.
         !! Called by s_check_inputs_common for pre-processing and simulation
-    subroutine s_check_inputs_adv_n
+    impure subroutine s_check_inputs_adv_n
         @:PROHIBIT(adv_n .and. (.not. bubbles_euler))
         @:PROHIBIT(adv_n .and. num_fluids /= 1)
         @:PROHIBIT(adv_n .and. qbmm)
@@ -135,7 +145,7 @@ contains
 
     !> Checks constraints on the hypoelasticity parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
-    subroutine s_check_inputs_hypoelasticity
+    impure subroutine s_check_inputs_hypoelasticity
         @:PROHIBIT(hypoelasticity .and. model_eqns /= 2)
 #ifdef MFC_SIMULATION
         @:PROHIBIT(elasticity .and. fd_order /= 4)
@@ -144,7 +154,7 @@ contains
 
     !> Checks constraints on the hyperelasticity parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
-    subroutine s_check_inputs_hyperelasticity
+    impure subroutine s_check_inputs_hyperelasticity
         @:PROHIBIT(hyperelasticity .and. model_eqns == 1)
         @:PROHIBIT(hyperelasticity .and. model_eqns > 3)
 #ifdef MFC_SIMULATION
@@ -154,7 +164,7 @@ contains
 
     !> Checks constraints on the phase change parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
-    subroutine s_check_inputs_phase_change
+    impure subroutine s_check_inputs_phase_change
         @:PROHIBIT(relax .and. model_eqns /= 3, "phase change requires model_eqns = 3")
         @:PROHIBIT(relax .and. relax_model < 0, "relax_model must be in between 0 and 6")
         @:PROHIBIT(relax .and. relax_model > 6, "relax_model must be in between 0 and 6")
@@ -170,7 +180,7 @@ contains
 
     !> Checks constraints on the Immersed Boundaries parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
-    subroutine s_check_inputs_ibm
+    impure subroutine s_check_inputs_ibm
         @:PROHIBIT(ib .and. n <= 0, "Immersed Boundaries do not work in 1D")
         @:PROHIBIT(ib .and. (num_ibs <= 0 .or. num_ibs > num_patches_max), "num_ibs must be between 1 and num_patches_max")
         @:PROHIBIT((.not. ib) .and. num_ibs > 0, "num_ibs is set, but ib is not enabled")
@@ -180,7 +190,7 @@ contains
 
     !> Checks constraints on dimensionality and the number of cells for the grid.
         !! Called by s_check_inputs_common for all three stages
-    subroutine s_check_inputs_simulation_domain
+    impure subroutine s_check_inputs_simulation_domain
         @:PROHIBIT(m == dflt_int, "m must be set")
         @:PROHIBIT(n == dflt_int, "n must be set")
         @:PROHIBIT(p == dflt_int, "p must be set")
@@ -193,7 +203,7 @@ contains
 
     !> Checks constraints on model equations and number of fluids in the flow.
         !! Called by s_check_inputs_common for all three stages
-    subroutine s_check_inputs_model_eqns_and_num_fluids
+    impure subroutine s_check_inputs_model_eqns_and_num_fluids
         @:PROHIBIT(all(model_eqns /= (/1, 2, 3, 4/)), "model_eqns must be 1, 2, 3, or 4")
         @:PROHIBIT(num_fluids /= dflt_int .and. num_fluids < 1, "num_fluids must be positive")
         @:PROHIBIT(model_eqns == 1 .and. num_fluids /= dflt_int, "num_fluids is not supported for model_eqns = 1")
@@ -205,18 +215,36 @@ contains
             "6-equation model (model_eqns = 3) does not support cylindrical coordinates (cyl_coord = T and p != 0)")
     end subroutine s_check_inputs_model_eqns_and_num_fluids
 
+    !> Checks constraints regarding IGR order.
+        !! Called by s_check_inputs_common for all three stages
+    impure subroutine s_check_inputs_igr
+        @:PROHIBIT(all(igr_order /= (/3, 5/)), "igr_order must be 3 or 5")
+        @:PROHIBIT(m + 1 < igr_order, "m must be at least igr_order - 1")
+        @:PROHIBIT(n > 0 .and. n + 1 < igr_order, "n must be at least igr_order - 1")
+        @:PROHIBIT(p > 0 .and. p + 1 < igr_order, "p must be at least igr_order - 1")
+    end subroutine s_check_inputs_igr
+
     !> Checks constraints regarding WENO order.
         !! Called by s_check_inputs_common for all three stages
-    subroutine s_check_inputs_weno
+    impure subroutine s_check_inputs_weno
         @:PROHIBIT(all(weno_order /= (/1, 3, 5, 7/)), "weno_order must be 1, 3, 5, or 7")
         @:PROHIBIT(m + 1 < weno_order, "m must be at least weno_order - 1")
         @:PROHIBIT(n > 0 .and. n + 1 < weno_order, "n must be at least weno_order - 1")
         @:PROHIBIT(p > 0 .and. p + 1 < weno_order, "p must be at least weno_order - 1")
     end subroutine s_check_inputs_weno
 
+    !> Check constraints regarding MUSCL order
+        !! Called by s_check_inputs_common for all three stages
+    impure subroutine s_check_inputs_muscl
+        @:PROHIBIT(all(muscl_order /= (/1, 2/)), "muscl_order must be 1, or 2")
+        @:PROHIBIT(m + 1 < muscl_order, "m must be at least muscl_order - 1")
+        @:PROHIBIT(n > 0 .and. n + 1 < muscl_order, "n must be at least muscl_order - 1")
+        @:PROHIBIT(p > 0 .and. p + 1 < muscl_order, "p must be at least muscl_order - 1")
+    end subroutine s_check_inputs_muscl
+
     !> Checks constraints on the boundary conditions in the x-direction.
         !! Called by s_check_inputs_common for all three stages
-    subroutine s_check_inputs_bc
+    impure subroutine s_check_inputs_bc
         logical :: skip_check !< Flag to skip the check when iterating over
         !! x, y, and z directions, for special treatment of cylindrical coordinates
 
@@ -278,7 +306,7 @@ contains
 
     !> Checks constraints on the stiffened equation of state fluids parameters.
         !! Called by s_check_inputs_common for all three stages
-    subroutine s_check_inputs_stiffened_eos
+    impure subroutine s_check_inputs_stiffened_eos
         character(len=5) :: iStr !< for int to string conversion
         integer :: bub_fac !< For allowing an extra fluid_pp if there are subgrid bubbles_euler
         integer :: i
@@ -315,14 +343,14 @@ contains
 
     !> Checks constraints on the surface tension parameters.
         !! Called by s_check_inputs_common for all three stages
-    subroutine s_check_inputs_surface_tension
+    impure subroutine s_check_inputs_surface_tension
 
         integer :: i
 
         @:PROHIBIT(surface_tension .and. sigma < 0._wp, &
             "sigma must be greater than or equal to zero")
 
-        @:PROHIBIT(surface_tension .and. sigma == dflt_real, &
+        @:PROHIBIT(surface_tension .and. f_approx_equal(sigma, dflt_real), &
             "sigma must be set if surface_tension is enabled")
 
         @:PROHIBIT(.not. f_is_default(sigma) .and. .not. surface_tension, &
@@ -345,11 +373,14 @@ contains
 
     !> Checks constraints on the inputs for moving boundaries.
         !! Called by s_check_inputs_common for all three stages
-    subroutine s_check_inputs_moving_bc
+    impure subroutine s_check_inputs_moving_bc
         #:for X, VB2, VB3 in [('x', 'vb2', 'vb3'), ('y', 'vb3', 'vb1'), ('z', 'vb1', 'vb2')]
-            if (any((/bc_${X}$%vb1, bc_${X}$%vb2, bc_${X}$%vb3/) /= 0._wp)) then
+            if (.not. (f_approx_equal(bc_${X}$%vb1, 0._wp) .and. &
+                       f_approx_equal(bc_${X}$%vb2, 0._wp) .and. &
+                       f_approx_equal(bc_${X}$%vb3, 0._wp))) then
                 if (bc_${X}$%beg == BC_SLIP_WALL) then
-                    if (any((/bc_${X}$%${VB2}$, bc_${X}$%${VB3}$/) /= 0._wp)) then
+                    if (.not. (f_approx_equal(bc_${X}$%${VB2}$, 0._wp) .and. &
+                               f_approx_equal(bc_${X}$%${VB3}$, 0._wp))) then
                         call s_mpi_abort("bc_${X}$%beg must be -15 if "// &
                                          "bc_${X}$%${VB2}$ or bc_${X}$%${VB3}$ "// &
                                          "is set. Exiting.", CASE_FILE_ERROR_CODE)
@@ -362,9 +393,12 @@ contains
         #:endfor
 
         #:for X, VE2, VE3 in [('x', 've2', 've3'), ('y', 've3', 've1'), ('z', 've1', 've2')]
-            if (any((/bc_${X}$%ve1, bc_${X}$%ve2, bc_${X}$%ve3/) /= 0._wp)) then
+            if (.not. (f_approx_equal(bc_${X}$%ve1, 0._wp) .and. &
+                       f_approx_equal(bc_${X}$%ve2, 0._wp) .and. &
+                       f_approx_equal(bc_${X}$%ve3, 0._wp))) then
                 if (bc_${X}$%end == BC_SLIP_WALL) then
-                    if (any((/bc_${X}$%${VE2}$, bc_${X}$%${VE3}$/) /= 0._wp)) then
+                    if (.not. (f_approx_equal(bc_${X}$%${VE2}$, 0._wp) .and. &
+                               f_approx_equal(bc_${X}$%${VE3}$, 0._wp))) then
                         call s_mpi_abort("bc_${X}$%end must be -15 if "// &
                                          "bc_${X}$%${VE2}$ or bc_${X}$%${VE3}$ "// &
                                          "is set. Exiting.", CASE_FILE_ERROR_CODE)
@@ -377,7 +411,7 @@ contains
         #:endfor
     end subroutine s_check_inputs_moving_bc
 
-    subroutine s_check_inputs_mhd
+    impure subroutine s_check_inputs_mhd
         @:PROHIBIT(mhd .and. num_fluids /= 1, "MHD is only available for single-component flows")
         @:PROHIBIT(mhd .and. model_eqns /= 2, "MHD is only available for the 5-equation model")
 

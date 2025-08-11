@@ -15,12 +15,14 @@ module m_bubbles
 
     use m_variables_conversion !< State variables type conversion procedures
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     implicit none
 
     real(wp) :: chi_vw  !< Bubble wall properties (Ando 2010)
     real(wp) :: k_mw    !< Bubble wall properties (Ando 2010)
     real(wp) :: rho_mw  !< Bubble wall properties (Ando 2010)
-    !$acc declare create(chi_vw, k_mw, rho_mw)
+    $:GPU_DECLARE(create='[chi_vw,k_mw,rho_mw]')
 
 contains
 
@@ -38,8 +40,8 @@ contains
         !!  @param f_bub_adv_src Source for bubble volume fraction
         !!  @param f_divu Divergence of velocity
         !!  @param fCson Speed of sound from fP (EL)
-    function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson)
-        !$acc routine seq
+    pure elemental function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson)
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu
         real(wp), intent(in) :: fCson
@@ -69,7 +71,7 @@ contains
         else if (bubble_model == 3) then
             ! Rayleigh-Plesset bubbles
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
-            f_rddot = f_rddot_RP(fP, fRho, fR, fV, fR0, fCpbw)
+            f_rddot = f_rddot_RP(fP, fRho, fR, fV, fCpbw)
         end if
 
     end function f_rddot
@@ -79,8 +81,8 @@ contains
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
-    function f_cpbw(fR0, fR, fV, fpb)
-        !$acc routine seq
+    pure elemental function f_cpbw(fR0, fR, fV, fpb)
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fR0, fR, fV, fpb
 
         real(wp) :: f_cpbw
@@ -98,8 +100,8 @@ contains
         !!  @param fCpinf Driving bubble pressure
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
-    function f_H(fCpbw, fCpinf, fntait, fBtait)
-        !$acc routine seq
+    pure elemental function f_H(fCpbw, fCpinf, fntait, fBtait)
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fCpbw, fCpinf, fntait, fBtait
 
         real(wp) :: tmp1, tmp2, tmp3
@@ -118,8 +120,8 @@ contains
         !! @param fntait Tait EOS parameter
         !! @param fBtait Tait EOS parameter
         !! @param fH Bubble enthalpy
-    function f_cgas(fCpinf, fntait, fBtait, fH)
-        !$acc routine seq
+    pure elemental function f_cgas(fCpinf, fntait, fBtait, fH)
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fCpinf, fntait, fBtait, fH
 
         real(wp) :: tmp
@@ -141,8 +143,8 @@ contains
         !!  @param fBtait Tait EOS parameter
         !!  @param advsrc Advection equation source term
         !!  @param divu Divergence of velocity
-    function f_cpinfdot(fRho, fP, falf, fntait, fBtait, advsrc, divu)
-        !$acc routine seq
+    pure elemental function f_cpinfdot(fRho, fP, falf, fntait, fBtait, advsrc, divu)
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fRho, fP, falf, fntait, fBtait, advsrc, divu
 
         real(wp) :: c2_liquid
@@ -171,8 +173,8 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fpbdot Time derivative of the internal bubble pressure
-    function f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot)
-        !$acc routine seq
+    pure elemental function f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot)
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fCpbw, fCpinf, fCpinf_dot, fntait, fBtait
         real(wp), intent(in) :: fR, fV, fR0, fpbdot
 
@@ -207,9 +209,9 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fCpbw Boundary wall pressure
-    function f_rddot_RP(fCp, fRho, fR, fV, fR0, fCpbw)
-        !$acc routine seq
-        real(wp), intent(in) :: fCp, fRho, fR, fV, fR0, fCpbw
+    pure elemental function f_rddot_RP(fCp, fRho, fR, fV, fCpbw)
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: fCp, fRho, fR, fV, fCpbw
 
         real(wp) :: f_rddot_RP
 
@@ -230,8 +232,8 @@ contains
         !!  @param fcgas Current gas sound speed
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
-    function f_rddot_G(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait)
-        !$acc routine seq
+    pure elemental function f_rddot_G(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait)
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fCpbw, fR, fV, fH, fHdot
         real(wp), intent(in) :: fcgas, fntait, fBtait
 
@@ -253,10 +255,9 @@ contains
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
-    function f_cpbw_KM(fR0, fR, fV, fpb)
-        !$acc routine seq
+    pure elemental function f_cpbw_KM(fR0, fR, fV, fpb)
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fR0, fR, fV, fpb
-
         real(wp) :: f_cpbw_KM
 
         if (polytropic) then
@@ -281,14 +282,13 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fC Current sound speed
-    function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC)
-        !$acc routine seq
+    pure elemental function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC)
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fpbdot, fCp, fCpbw
         real(wp), intent(in) :: fRho, fR, fV, fR0, fC
 
         real(wp) :: tmp1, tmp2, cdot_star
         real(wp) :: f_rddot_KM
-
         if (polytropic) then
             cdot_star = -3._wp*gam*Ca*((fR0/fR)**(3._wp*gam))*fV/fR
             if (.not. f_is_default(Web)) cdot_star = cdot_star - &
@@ -316,40 +316,44 @@ contains
     !>  Subroutine that computes bubble wall properties for vapor bubbles
         !!  @param pb Internal bubble pressure
         !!  @param iR0 Current bubble size index
-    subroutine s_bwproperty(pb, iR0)
-        !$acc routine seq
-        real(wp), intent(in) :: pb
+    pure elemental subroutine s_bwproperty(pb_in, iR0, chi_vw_out, k_mw_out, rho_mw_out)
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: pb_in
         integer, intent(in) :: iR0
-
+        real(wp), intent(out) :: chi_vw_out  !< Bubble wall properties (Ando 2010)
+        real(wp), intent(out) :: k_mw_out    !< Bubble wall properties (Ando 2010)
+        real(wp), intent(out) :: rho_mw_out  !< Bubble wall properties (Ando 2010)
         real(wp) :: x_vw
 
         ! mass fraction of vapor
-        chi_vw = 1._wp/(1._wp + R_v/R_n*(pb/pv - 1._wp))
+        chi_vw_out = 1._wp/(1._wp + R_v/R_n*(pb_in/pv - 1._wp))
         ! mole fraction of vapor & thermal conductivity of gas mixture
-        x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
-        k_mw = x_vw*k_v(iR0)/(x_vw + (1._wp - x_vw)*phi_vn) &
-               + (1._wp - x_vw)*k_n(iR0)/(x_vw*phi_nv + 1._wp - x_vw)
+        x_vw = M_n*chi_vw_out/(M_v + (M_n - M_v)*chi_vw_out)
+        k_mw_out = x_vw*k_v(iR0)/(x_vw + (1._wp - x_vw)*phi_vn) &
+                   + (1._wp - x_vw)*k_n(iR0)/(x_vw*phi_nv + 1._wp - x_vw)
         ! gas mixture density
-        rho_mw = pv/(chi_vw*R_v*Tw)
+        rho_mw_out = pv/(chi_vw_out*R_v*Tw)
 
     end subroutine s_bwproperty
 
     !>  Function that computes the vapour flux
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
+        !!  @param fpb
         !!  @param fmass_v Current mass of vapour
         !!  @param iR0 Bubble size index (EE) or bubble identifier (EL)
         !!  @param fmass_n Current gas mass (EL)
         !!  @param fbeta_c Mass transfer coefficient (EL)
         !!  @param fR_m Mixture gas constant (EL)
         !!  @param fgamma_m Mixture gamma (EL)
-    function f_vflux(fR, fV, fpb, fmass_v, iR0, fmass_n, fbeta_c, fR_m, fgamma_m)
-        !$acc routine seq
+    pure elemental subroutine s_vflux(fR, fV, fpb, fmass_v, iR0, vflux, fmass_n, fbeta_c, fR_m, fgamma_m)
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fR
         real(wp), intent(in) :: fV
         real(wp), intent(in) :: fpb
         real(wp), intent(in) :: fmass_v
         integer, intent(in) :: iR0
+        real(wp), intent(out) :: vflux
         real(wp), intent(in), optional :: fmass_n, fbeta_c
         real(wp), intent(out), optional :: fR_m, fgamma_m
 
@@ -357,7 +361,6 @@ contains
         real(wp) :: rho_mw_lag
         real(wp) :: grad_chi
         real(wp) :: conc_v
-        real(wp) :: f_vflux
 
         if (thermal == 3) then !transfer
             ! constant transfer model
@@ -374,21 +377,21 @@ contains
                 chi_bar = fmass_v/(fmass_v + fmass_n)
                 grad_chi = (chi_bar - conc_v)
                 rho_mw_lag = (fmass_n + fmass_v)/(4._wp/3._wp*pi*fR**3._wp)
-                f_vflux = 0._wp
+                vflux = 0._wp
                 if (lag_params%massTransfer_model) then
-                    f_vflux = -fbeta_c*rho_mw_lag*grad_chi/(1._wp - conc_v)/fR
+                    vflux = -fbeta_c*rho_mw_lag*grad_chi/(1._wp - conc_v)/fR
                 end if
             else
                 chi_bar = fmass_v/(fmass_v + mass_n0(iR0))
                 grad_chi = -Re_trans_c(iR0)*(chi_bar - chi_vw)
-                f_vflux = rho_mw*grad_chi/Pe_c/(1._wp - chi_vw)/fR
+                vflux = rho_mw*grad_chi/Pe_c/(1._wp - chi_vw)/fR
             end if
         else
             ! polytropic
-            f_vflux = pv*fV/(R_v*Tw)
+            vflux = pv*fV/(R_v*Tw)
         end if
 
-    end function f_vflux
+    end subroutine s_vflux
 
     !>  Function that computes the time derivative of
         !!  the internal bubble pressure
@@ -401,8 +404,8 @@ contains
         !!  @param fbeta_t Mass transfer coefficient (EL)
         !!  @param fR_m Mixture gas constant (EL)
         !!  @param fgamma_m Mixture gamma (EL)
-    function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, fbeta_t, fR_m, fgamma_m)
-        !$acc routine seq
+    pure elemental function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, fbeta_t, fR_m, fgamma_m)
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fvflux
         real(wp), intent(in) :: fR
         real(wp), intent(in) :: fV
@@ -458,15 +461,13 @@ contains
         !!  @param fbeta_t Heat transfer coefficient (EL)
         !!  @param fCson Speed of sound (EL)
         !!  @param adap_dt_stop Fail-safe exit if max iteration count reached
-    subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                              fntait, fBtait, f_bub_adv_src, f_divu, &
-                              bub_id, fmass_v, fmass_n, fbeta_c, &
-                              fbeta_t, fCson, adap_dt_stop)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_advance_step
-#else
-        !$acc routine seq
-#endif
+    pure subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                                   fntait, fBtait, f_bub_adv_src, f_divu, &
+                                   bub_id, fmass_v, fmass_n, fbeta_c, &
+                                   fbeta_t, fCson, adap_dt_stop)
+        $:GPU_ROUTINE(function_name='s_advance_step',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), intent(inout) :: fR, fV, fpb, fmass_v
         real(wp), intent(in) :: fRho, fP, fR0, fpbdot, alf
         real(wp), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu
@@ -568,7 +569,7 @@ contains
             end do
 
             ! Exit the loop if the final time reached dt
-            if (t_new == 0.5_wp*dt .or. iter_count >= adap_dt_max_iters) exit
+            if (f_approx_equal(t_new, 0.5_wp*dt) .or. iter_count >= adap_dt_max_iters) exit
 
         end do
 
@@ -593,14 +594,12 @@ contains
         !!  @param f_divu Divergence of velocity
         !!  @param fCson Speed of sound (EL)
         !!  @param h Time step size
-    subroutine s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                   fntait, fBtait, f_bub_adv_src, f_divu, &
-                                   fCson, h)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_initial_substep_h
-#else
-        !$acc routine seq
-#endif
+    pure subroutine s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                                        fntait, fBtait, f_bub_adv_src, f_divu, &
+                                        fCson, h)
+        $:GPU_ROUTINE(function_name='s_initial_substep_h',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
         real(wp), intent(IN) :: fCson
@@ -640,7 +639,7 @@ contains
         d_norms(3) = sqrt(((myV_tmp(2) - myV_tmp(1))**2._wp + (myA_tmp(2) - myA_tmp(1))**2._wp)/2._wp)/h_size(1)
 
         ! Set h1 = (0.01/max(d_1,d_2))^{1/(p+1)}
-        !      if max(d_1,d_2) < 1e-15_wp, h_size(2) = max(1e-6_wp, h0*1e-3_wp)
+        !      if max(d_1,d_2) < 1.e-15_wp, h_size(2) = max(1.e-6_wp, h0*1.e-3_wp)
         if (max(d_norms(2), d_norms(3)) < threshold_second_guess) then
             h_size(2) = max(small_guess, h_size(1)*scale_first_guess)
         else
@@ -677,16 +676,14 @@ contains
         !!  @param myV_tmp Bubble radial velocity at each stage
         !!  @param myPb_tmp Internal bubble pressure at each stage (EL)
         !!  @param myMv_tmp Mass of vapor in the bubble at each stage (EL)
-    subroutine s_advance_substep(err, fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                 fntait, fBtait, f_bub_adv_src, f_divu, &
-                                 bub_id, fmass_v, fmass_n, fbeta_c, &
-                                 fbeta_t, fCson, h, &
-                                 myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_advance_substep
-#else
-        !$acc routine seq
-#endif
+    pure subroutine s_advance_substep(err, fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                                      fntait, fBtait, f_bub_adv_src, f_divu, &
+                                      bub_id, fmass_v, fmass_n, fbeta_c, &
+                                      fbeta_t, fCson, h, &
+                                      myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
+        $:GPU_ROUTINE(function_name='s_advance_substep',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), intent(OUT) :: err
         real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu, h
@@ -706,8 +703,8 @@ contains
         if (bubbles_lagrange) then
             myPb_tmp(1) = fpb
             myMv_tmp(1) = fmass_v
-            mydMvdt_tmp(1) = f_advance_EL(myR_tmp(1), myV_tmp(1), myPb_tmp(1), myMv_tmp(1), bub_id, &
-                                          fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(1))
+            call s_advance_EL(myR_tmp(1), myV_tmp(1), myPb_tmp(1), myMv_tmp(1), bub_id, &
+                              fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(1), mydMvdt_tmp(1))
         end if
         myA_tmp(1) = f_rddot(fRho, fP, myR_tmp(1), myV_tmp(1), fR0, &
                              myPb_tmp(1), mydPbdt_tmp(1), alf, fntait, fBtait, &
@@ -720,8 +717,8 @@ contains
         if (bubbles_lagrange) then
             myPb_tmp(2) = myPb_tmp(1) + h*mydPbdt_tmp(1)
             myMv_tmp(2) = myMv_tmp(1) + h*mydMvdt_tmp(1)
-            mydMvdt_tmp(2) = f_advance_EL(myR_tmp(2), myV_tmp(2), myPb_tmp(2), myMv_tmp(2), &
-                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(2))
+            call s_advance_EL(myR_tmp(2), myV_tmp(2), myPb_tmp(2), myMv_tmp(2), &
+                              bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(2), mydMvdt_tmp(2))
         end if
         myA_tmp(2) = f_rddot(fRho, fP, myR_tmp(2), myV_tmp(2), fR0, &
                              myPb_tmp(2), mydPbdt_tmp(2), alf, fntait, fBtait, &
@@ -734,8 +731,8 @@ contains
         if (bubbles_lagrange) then
             myPb_tmp(3) = myPb_tmp(1) + (h/4._wp)*(mydPbdt_tmp(1) + mydPbdt_tmp(2))
             myMv_tmp(3) = myMv_tmp(1) + (h/4._wp)*(mydMvdt_tmp(1) + mydMvdt_tmp(2))
-            mydMvdt_tmp(3) = f_advance_EL(myR_tmp(3), myV_tmp(3), myPb_tmp(3), myMv_tmp(3), &
-                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(3))
+            call s_advance_EL(myR_tmp(3), myV_tmp(3), myPb_tmp(3), myMv_tmp(3), &
+                              bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(3), mydMvdt_tmp(3))
         end if
         myA_tmp(3) = f_rddot(fRho, fP, myR_tmp(3), myV_tmp(3), fR0, &
                              myPb_tmp(3), mydPbdt_tmp(3), alf, fntait, fBtait, &
@@ -748,8 +745,8 @@ contains
         if (bubbles_lagrange) then
             myPb_tmp(4) = myPb_tmp(1) + (h/6._wp)*(mydPbdt_tmp(1) + mydPbdt_tmp(2) + 4._wp*mydPbdt_tmp(3))
             myMv_tmp(4) = myMv_tmp(1) + (h/6._wp)*(mydMvdt_tmp(1) + mydMvdt_tmp(2) + 4._wp*mydMvdt_tmp(3))
-            mydMvdt_tmp(4) = f_advance_EL(myR_tmp(4), myV_tmp(4), myPb_tmp(4), myMv_tmp(4), &
-                                          bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(4))
+            call s_advance_EL(myR_tmp(4), myV_tmp(4), myPb_tmp(4), myMv_tmp(4), &
+                              bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(4), mydMvdt_tmp(4))
         end if
         myA_tmp(4) = f_rddot(fRho, fP, myR_tmp(4), myV_tmp(4), fR0, &
                              myPb_tmp(4), mydPbdt_tmp(4), alf, fntait, fBtait, &
@@ -781,20 +778,20 @@ contains
         !!  @param fMv_tmp Mass of vapor in the bubble
         !!  @param fdPbdt_tmp Rate of change of the internal bubble pressure
         !!  @param fdMvdt_tmp Rate of change of the mass of vapor in the bubble
-    function f_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, &
-                          fmass_n, fbeta_c, fbeta_t, fdPbdt_tmp)
-        !$acc routine seq
+    pure elemental subroutine s_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, &
+                                           fmass_n, fbeta_c, fbeta_t, fdPbdt_tmp, advance_EL)
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(IN) :: fR_tmp, fV_tmp, fPb_tmp, fMv_tmp
         real(wp), intent(IN) :: fmass_n, fbeta_c, fbeta_t
         integer, intent(IN) :: bub_id
         real(wp), intent(INOUT) :: fdPbdt_tmp
+        real(wp), intent(out) :: advance_EL
+        real(wp) :: fVapFlux, myR_m, mygamma_m
 
-        real(wp) :: fVapFlux, f_advance_EL, myR_m, mygamma_m
-
-        fVapFlux = f_vflux(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fmass_n, fbeta_c, myR_m, mygamma_m)
+        call s_vflux(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fVapFlux, fmass_n, fbeta_c, myR_m, mygamma_m)
         fdPbdt_tmp = f_bpres_dot(fVapFlux, fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fbeta_t, myR_m, mygamma_m)
-        f_advance_EL = 4._wp*pi*fR_tmp**2._wp*fVapFlux
+        advance_EL = 4._wp*pi*fR_tmp**2._wp*fVapFlux
 
-    end function f_advance_EL
+    end subroutine s_advance_EL
 
 end module m_bubbles

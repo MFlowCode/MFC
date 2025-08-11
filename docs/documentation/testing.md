@@ -16,6 +16,7 @@ A test is considered passing when our error tolerances are met in order to maint
 - `--percent` (`%`) to specify a percentage of the test suite to select at random and test
 - `--max-attempts` (`-m`) the maximum number of attempts to make on a test before considering it failed
 - `--no-examples` skips the testing of cases in the examples folder
+- `--rdma-mpi` runs additional tests where RDMA MPI is enabled.
 
 To specify a computer, pass the `-c` flag to `./mfc.sh run` like so:
 ```shell

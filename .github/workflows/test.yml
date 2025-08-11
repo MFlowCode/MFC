@@ -53,8 +53,8 @@ jobs:
         run:  |
           brew update
           brew upgrade
-          brew install coreutils python cmake fftw hdf5 gcc@14 boost open-mpi
-          echo "FC=gfortran-14" >> $GITHUB_ENV
+          brew install coreutils python cmake fftw hdf5 gcc@15 boost open-mpi lapack
+          echo "FC=gfortran-15" >> $GITHUB_ENV
           echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
 
       - name: Setup Ubuntu
@@ -62,7 +62,8 @@ jobs:
         run: |
            sudo apt update -y
            sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
-                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev
+                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev \
+                    libblas-dev liblapack-dev
 
       - name: Setup Ubuntu (Intel)
         if:   matrix.os == 'ubuntu' && matrix.intel == true
@@ -97,13 +98,11 @@ jobs:
       matrix:
         device: ['cpu', 'gpu']
         lbl: ['gt', 'frontier']
-        exclude:
-          - device:   cpu
-            lbl: frontier
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
     env:
+      NODE_OPTIONS: ${{ matrix.lbl == 'gt' && '--max-old-space-size=2048' || '' }}
       ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
@@ -116,7 +115,7 @@ jobs:
 
       - name: Build
         if:   matrix.lbl == 'frontier'
-        run:  bash .github/workflows/frontier/build.sh
+        run:  bash .github/workflows/frontier/build.sh ${{ matrix.device }}
 
       - name: Test
         if:   matrix.lbl == 'frontier'
@@ -128,7 +127,7 @@ jobs:
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
-        if:   always()
+        if:   matrix.lbl == 'frontier'
         with:
           name: logs-${{ strategy.job-index }}-${{ matrix.device }}
           path: test-${{ matrix.device }}.out

@@ -3,6 +3,7 @@
 !! @brief Contains module m_assign_variables
 
 #:include 'case.fpp'
+#:include 'macros.fpp'
 
 module m_assign_variables
 
@@ -66,7 +67,7 @@ module m_assign_variables
 
 contains
 
-    subroutine s_initialize_assign_variables_module
+    impure subroutine s_initialize_assign_variables_module
 
         allocate (alf_sum%sf(0:m, 0:n, 0:p))
 
@@ -101,9 +102,9 @@ contains
         !! @param eta pseudo volume fraction
         !! @param q_prim_vf Primitive variables
         !! @param patch_id_fp Array to track patch ids
-    subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
-                                                          eta, q_prim_vf, patch_id_fp)
-        !$acc routine seq
+    pure subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
+                                                               eta, q_prim_vf, patch_id_fp)
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
@@ -111,14 +112,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
-        real(wp) :: rho    !< density
-        real(wp), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
-        real(wp) :: pres   !< pressure
-        real(wp) :: gamma  !< specific heat ratio function
-        real(wp) :: x_centroid, y_centroid
-        real(wp) :: epsilon, beta
         real(wp) :: Ys(1:num_species)
-        real(wp) :: mean_molecular_weight
 
         integer :: smooth_patch_id
         integer :: i !< generic loop operator
@@ -188,7 +182,7 @@ contains
         end if
 
         ! Updating the patch identities bookkeeping variable
-        if (1._wp - eta < 1e-16_wp) patch_id_fp(j, k, l) = patch_id
+        if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_mixture_primitive_variables
 
@@ -197,7 +191,7 @@ contains
     !! @param k the y-dir node index
     !! @param l the z-dir node index
     !! @param q_prim_vf Primitive variables
-    subroutine s_perturb_primitive(j, k, l, q_prim_vf)
+    pure subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
         integer, intent(in) :: j, k, l
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
@@ -206,8 +200,8 @@ contains
         real(wp) :: pres_mag, loc, n_tait, B_tait, p0
         real(wp) :: R3bar, n0, ratio, nH, vfH, velH, rhoH, deno
 
-        p0 = 101325
-        pres_mag = 1e-1_wp
+        p0 = 101325._wp
+        pres_mag = 1.e-1_wp
         loc = x_cc(177)
         n_tait = fluid_pp(1)%gamma
         B_tait = fluid_pp(1)%pi_inf
@@ -221,7 +215,7 @@ contains
 
         if (qbmm) then
             do i = 1, nb
-                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - fluid_pp(1)%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - fluid_pp(1)%pv))**(1/3._wp)
+                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - fluid_pp(1)%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - fluid_pp(1)%pv))**(1._wp/3._wp)
             end do
         end if
 
@@ -251,7 +245,7 @@ contains
         rhoH = (1._wp - vfH)/ratio
         deno = 1._wp - (1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/rhoH
 
-        if (deno == 0._wp) then
+        if (f_approx_equal(deno, 0._wp)) then
             velH = 0._wp
         else
             velH = (q_prim_vf(E_idx)%sf(j, k, l) - 1._wp)/(1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/deno
@@ -281,9 +275,9 @@ contains
         !! @param eta pseudo volume fraction
         !! @param q_prim_vf Primitive variables
         !! @param patch_id_fp Array to track patch ids
-    subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, &
-                                                          eta, q_prim_vf, patch_id_fp)
-        !$acc routine seq
+    impure subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, &
+                                                                 eta, q_prim_vf, patch_id_fp)
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
@@ -308,13 +302,7 @@ contains
         real(wp) :: rcoord, theta, phi, xi_sph
         real(wp), dimension(3) :: xi_cart
 
-        real(wp), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
-        real(wp) :: pres   !< pressure
-        real(wp) :: x_centroid, y_centroid
-        real(wp) :: epsilon, beta
-
         real(wp) :: Ys(1:num_species)
-        real(wp) :: mean_molecular_weight
 
         real(wp), dimension(sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes
@@ -353,10 +341,12 @@ contains
 
         ! Computing Mixture Variables of Current Patch
 
-        ! Volume fraction(s)
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha(i - E_idx)
-        end do
+        if (.not. igr .or. num_fluids > 1) then
+            ! Volume fraction(s)
+            do i = adv_idx%beg, adv_idx%end
+                q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha(i - E_idx)
+            end do
+        end if
 
         if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
@@ -396,10 +386,12 @@ contains
             end do
         end if
 
-        ! Volume fraction(s)
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha(i - E_idx)
-        end do
+        if (.not. igr .or. num_fluids > 1) then
+            ! Volume fraction(s)
+            do i = adv_idx%beg, adv_idx%end
+                q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha(i - E_idx)
+            end do
+        end if
 
         if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
@@ -417,8 +409,8 @@ contains
         ! Bubbles euler variables
         if (bubbles_euler) then
             do i = 1, nb
-                muR = R0(i)*patch_icpp(smooth_patch_id)%r0 ! = R0(i)
-                muV = V0(i)*patch_icpp(smooth_patch_id)%v0 ! = 0
+                muR = R0(i)*patch_icpp(smooth_patch_id)%r0
+                muV = patch_icpp(smooth_patch_id)%v0
                 if (qbmm) then
                     ! Initialize the moment set
                     if (dist_type == 1) then
@@ -470,12 +462,14 @@ contains
             (eta*patch_icpp(patch_id)%pres &
              + (1._wp - eta)*orig_prim_vf(E_idx))
 
-        ! Volume fractions \alpha
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf(j, k, l) = &
-                eta*patch_icpp(patch_id)%alpha(i - E_idx) &
-                + (1._wp - eta)*orig_prim_vf(i)
-        end do
+        if (.not. igr .or. num_fluids > 1) then
+            ! Volume fractions \alpha
+            do i = adv_idx%beg, adv_idx%end
+                q_prim_vf(i)%sf(j, k, l) = &
+                    eta*patch_icpp(patch_id)%alpha(i - E_idx) &
+                    + (1._wp - eta)*orig_prim_vf(i)
+            end do
+        end if
 
         if (mhd) then
             if (n == 0) then ! 1D: By, Bz
@@ -515,7 +509,7 @@ contains
                 theta = atan2(y_cc(k), x_cc(j))
                 phi = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
                 !spherical coord, assuming Rmax=1
-                xi_sph = (rcoord**3 - R0ref**3 + 1_wp)**(1_wp/3_wp)
+                xi_sph = (rcoord**3 - R0ref**3 + 1._wp)**(1._wp/3._wp)
                 xi_cart(1) = xi_sph*sin(phi)*cos(theta)
                 xi_cart(2) = xi_sph*sin(phi)*sin(theta)
                 xi_cart(3) = xi_sph*cos(phi)
@@ -528,7 +522,7 @@ contains
             ! assigning the reference map to the q_prim vector field
             do i = 1, num_dims
                 q_prim_vf(i + xibeg - 1)%sf(j, k, l) = eta*xi_cart(i) + &
-                                                       (1_wp - eta)*orig_prim_vf(i + xibeg - 1)
+                                                       (1._wp - eta)*orig_prim_vf(i + xibeg - 1)
             end do
         end if
 
@@ -622,8 +616,8 @@ contains
         ! Smoothed bubble variables
         if (bubbles_euler) then
             do i = 1, nb
-                muR = R0(i)*patch_icpp(patch_id)%r0 ! = 1*R0(i)
-                muV = V0(i)*patch_icpp(patch_id)%v0 ! = 1*V0(i)
+                muR = R0(i)*patch_icpp(patch_id)%r0
+                muV = patch_icpp(patch_id)%v0
                 if (qbmm) then
                     ! Initialize the moment set
                     if (dist_type == 1) then
@@ -642,12 +636,6 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
                 else
-                    ! q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = &
-                    !     (eta * R0(i)*patch_icpp(patch_id)%r0 &
-                    !     + (1._wp-eta)*orig_prim_vf(bub_idx%rs(i)))
-                    ! q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = &
-                    !     (eta * V0(i)*patch_icpp(patch_id)%v0 &
-                    !     + (1._wp-eta)*orig_prim_vf(bub_idx%vs(i)))
                     q_prim_vf(bub_idx%rs(i))%sf(j, k, l) = muR
                     q_prim_vf(bub_idx%vs(i))%sf(j, k, l) = muV
 
@@ -700,11 +688,11 @@ contains
         end if
 
         ! Updating the patch identities bookkeeping variable
-        if (1._wp - eta < 1e-16_wp) patch_id_fp(j, k, l) = patch_id
+        if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_species_primitive_variables
 
-    subroutine s_finalize_assign_variables_module
+    impure subroutine s_finalize_assign_variables_module
 
         ! Nullifying procedure pointer to the subroutine assigning either
         ! the patch mixture or species primitive variables to a cell in the

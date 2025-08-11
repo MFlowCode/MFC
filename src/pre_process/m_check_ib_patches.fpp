@@ -33,7 +33,7 @@ module m_check_ib_patches
 
 contains
 
-    subroutine s_check_ib_patches
+    impure subroutine s_check_ib_patches
 
         integer :: i
 
@@ -41,6 +41,8 @@ contains
             if (i <= num_ibs) then
                 ! call s_check_patch_geometry(i)
                 call s_int_to_str(i, iStr)
+                @:PROHIBIT(patch_ib(i)%geometry == dflt_int, "IB patch undefined. &
+                    patch_ib("//trim(iStr)//")%geometry must be set.")
 
                 ! Constraints on the geometric initial condition patch parameters
                 if (patch_ib(i)%geometry == 2) then
@@ -60,22 +62,15 @@ contains
                 else if (patch_ib(i)%geometry == 5 .or. &
                          patch_ib(i)%geometry == 12) then
                     call s_check_model_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == dflt_int) then
-                    call s_prohibit_abort("IB patch undefined", &
-                                          "patch_ib("//trim(iStr)//")%geometry must be set.")
                 else
                     call s_prohibit_abort("Invalid IB patch", &
                                           "patch_ib("//trim(iStr)//")%geometry must be "// &
                                           "2-4, 8-10, 11 or 12.")
                 end if
             else
-                if (patch_ib(i)%geometry == dflt_int) then
-                    call s_check_inactive_ib_patch_geometry(i)
-                else
-                    call s_prohibit_abort("Inactive IB patch defined", &
-                                          "patch_ib("//trim(iStr)//")%geometry "// &
-                                          "must not be set for inactive patches.")
-                end if
+                @:PROHIBIT(patch_ib(i)%geometry /= dflt_int, "Inactive IB patch defined. "// &
+                    "patch_ib("//trim(iStr)//")%geometry must not be set for inactive patches.")
+                call s_check_inactive_ib_patch_geometry(i)
             end if
         end do
 
@@ -85,7 +80,7 @@ contains
         !!      the circle patch have consistently been inputted by the
         !!      user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_circle_ib_patch_geometry(patch_id)
+    impure subroutine s_check_circle_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -103,7 +98,7 @@ contains
         !!      the airfoil patch have consistently been inputted by the
         !!      user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_airfoil_ib_patch_geometry(patch_id)
+    impure subroutine s_check_airfoil_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -124,7 +119,7 @@ contains
         !!      the 3d airfoil patch have consistently been inputted by the
         !!      user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_3d_airfoil_ib_patch_geometry(patch_id)
+    impure subroutine s_check_3d_airfoil_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -147,7 +142,7 @@ contains
         !!      the rectangle patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_rectangle_ib_patch_geometry(patch_id)
+    impure subroutine s_check_rectangle_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -170,7 +165,7 @@ contains
         !!      the sphere patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_sphere_ib_patch_geometry(patch_id)
+    impure subroutine s_check_sphere_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -193,7 +188,7 @@ contains
         !!      the cuboid patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_cuboid_ib_patch_geometry(patch_id)
+    impure subroutine s_check_cuboid_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -220,7 +215,7 @@ contains
         !!      the cylinder patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_cylinder_ib_patch_geometry(patch_id)
+    impure subroutine s_check_cylinder_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -261,7 +256,7 @@ contains
         !!      the model patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_model_ib_patch_geometry(patch_id)
+    impure subroutine s_check_model_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -282,7 +277,7 @@ contains
     !!>  This subroutine verifies that the geometric parameters of
         !!      the inactive patch remain unaltered by the user inputs.
         !!  @param patch_id Patch identifier
-    subroutine s_check_inactive_ib_patch_geometry(patch_id)
+    impure subroutine s_check_inactive_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 

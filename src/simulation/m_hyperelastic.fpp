@@ -26,14 +26,14 @@ module m_hyperelastic
     !! The btensor at the cell-interior Gaussian quadrature points.
     !! These tensor is needed to be calculated once and make the code DRY.
     type(vector_field) :: btensor !<
-    !$acc declare create(btensor)
+    $:GPU_DECLARE(create='[btensor]')
 
     real(wp), allocatable, dimension(:, :) :: fd_coeff_x
     real(wp), allocatable, dimension(:, :) :: fd_coeff_y
     real(wp), allocatable, dimension(:, :) :: fd_coeff_z
-    !$acc declare create(fd_coeff_x,fd_coeff_y,fd_coeff_z)
+    $:GPU_DECLARE(create='[fd_coeff_x,fd_coeff_y, fd_coeff_z]')
     real(wp), allocatable, dimension(:) :: Gs
-    !$acc declare create(Gs)
+    $:GPU_DECLARE(create='[Gs]')
 
 contains
 
@@ -45,7 +45,7 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-    subroutine s_initialize_hyperelastic_module
+    impure subroutine s_initialize_hyperelastic_module
         integer :: i !< generic iterator
 
         @:ALLOCATE(btensor%vf(1:b_size))
@@ -55,11 +55,11 @@ contains
         @:ACC_SETUP_VFs(btensor)
 
         @:ALLOCATE(Gs(1:num_fluids))
-        !$acc loop seq
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
         end do
-        !$acc update device(Gs)
+        $:GPU_UPDATE(device='[Gs]')
 
         @:ALLOCATE(fd_coeff_x(-fd_number:fd_number, 0:m))
         if (n > 0) then
@@ -72,16 +72,16 @@ contains
         ! Computing centered finite difference coefficients
         call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
                                                       fd_number, fd_order)
-        !$acc update device(fd_coeff_x)
+        $:GPU_UPDATE(device='[fd_coeff_x]')
         if (n > 0) then
             call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
                                                           fd_number, fd_order)
-            !$acc update device(fd_coeff_y)
+            $:GPU_UPDATE(device='[fd_coeff_y]')
         end if
         if (p > 0) then
             call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
                                                           fd_number, fd_order)
-            !$acc update device(fd_coeff_z)
+            $:GPU_UPDATE(device='[fd_coeff_z]')
         end if
 
     end subroutine s_initialize_hyperelastic_module
@@ -103,37 +103,37 @@ contains
         real(wp), dimension(num_fluids) :: alpha_k, alpha_rho_k
         real(wp), dimension(2) :: Re
         real(wp) :: rho, gamma, pi_inf, qv
-        real(wp) :: G
+        real(wp) :: G_local
         integer :: j, k, l, i, r
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, &
-        !$acc rho, gamma, pi_inf, qv, G, Re, tensora, tensorb)
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, rho, &
+            & gamma, pi_inf, qv, G_local, Re, tensora, tensorb]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    !$acc loop seq
+                    $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_fluids
                         alpha_rho_k(i) = q_cons_vf(i)%sf(j, k, l)
                         alpha_k(i) = q_cons_vf(advxb + i - 1)%sf(j, k, l)
                     end do
                     ! If in simulation, use acc mixture subroutines
                     call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha_k, &
-                                                                    alpha_rho_k, Re, j, k, l, G, Gs)
+                                                                    alpha_rho_k, Re, G_local, Gs)
                     rho = max(rho, sgm_eps)
-                    G = max(G, sgm_eps)
-                    !if ( G <= verysmall ) G_K = 0_wp
+                    G_local = max(G_local, sgm_eps)
+                    !if ( G_local <= verysmall ) G_K = 0._wp
 
-                    if (G > verysmall) then
-                        !$acc loop seq
+                    if (G_local > verysmall) then
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, tensor_size
-                            tensora(i) = 0_wp
+                            tensora(i) = 0._wp
                         end do
                         ! STEP 1: computing the grad_xi tensor using finite differences
                         ! grad_xi definition / organization
                         ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
                         ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
                         ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do r = -fd_number, fd_number
                             ! derivatives in the x-direction
                             tensora(1) = tensora(1) + q_prim_vf(xibeg)%sf(j + r, k, l)*fd_coeff_x(r, j)
@@ -167,13 +167,13 @@ contains
                         if (tensorb(tensor_size) > verysmall) then
                             ! STEP 2c: computing the inverse of grad_xi tensor = F
                             ! tensorb is the adjoint, tensora becomes F
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, tensor_size - 1
                                 tensora(i) = tensorb(i)/tensorb(tensor_size)
                             end do
 
                             ! STEP 2d: computing the J = det(F) = 1/det(\grad{\xi})
-                            tensorb(tensor_size) = 1_wp/tensorb(tensor_size)
+                            tensorb(tensor_size) = 1._wp/tensorb(tensor_size)
 
                             ! STEP 3: computing F transpose F
                             tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
@@ -190,15 +190,15 @@ contains
                             btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
                             ! STEP 5a: updating the Cauchy stress primitive scalar field
                             if (hyper_model == 1) then
-                                call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)
+                                call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G_local, j, k, l)
                             elseif (hyper_model == 2) then
-                                call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)
+                                call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G_local, j, k, l)
                             end if
                             ! STEP 5b: updating the pressure field
                             q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
-                                                           G*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma
+                                                           G_local*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma
                             ! STEP 5c: updating the Cauchy stress conservative scalar field
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, b_size - 1
                                 q_cons_vf(strxb + i - 1)%sf(j, k, l) = &
                                     rho*q_prim_vf(strxb + i - 1)%sf(j, k, l)
@@ -208,7 +208,6 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
     end subroutine s_hyperelastic_rmt_stress_update
 
     !>  The following subroutine handles the calculation of the btensor.
@@ -219,11 +218,11 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-    subroutine s_neoHookean_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
-        !$acc routine seq
+    pure subroutine s_neoHookean_cauchy_solver(btensor_in, q_prim_vf, G_param, j, k, l)
+        $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(inout) :: btensor
-        real(wp), intent(in) :: G
+        type(scalar_field), dimension(b_size), intent(inout) :: btensor_in
+        real(wp), intent(in) :: G_param
         integer, intent(in) :: j, k, l
 
         real(wp) :: trace
@@ -231,22 +230,22 @@ contains
         integer :: i !< Generic loop iterators
 
         ! tensor is the symmetric tensor & calculate the trace of the tensor
-        trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l) + btensor(6)%sf(j, k, l)
+        trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
 
         ! calculate the deviatoric of the tensor
         #:for IJ in [1,3,6]
-            btensor(${IJ}$)%sf(j, k, l) = btensor(${IJ}$)%sf(j, k, l) - f13*trace
+            btensor_in(${IJ}$)%sf(j, k, l) = btensor_in(${IJ}$)%sf(j, k, l) - f13*trace
         #:endfor
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
-        !$acc loop seq
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
-                G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
+                G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &
-            0.5_wp*(trace - 3.0_wp)/btensor(b_size)%sf(j, k, l)
+            0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
 
     end subroutine s_neoHookean_cauchy_solver
 
@@ -258,11 +257,11 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-    subroutine s_Mooney_Rivlin_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
-        !$acc routine seq
+    pure subroutine s_Mooney_Rivlin_cauchy_solver(btensor_in, q_prim_vf, G_param, j, k, l)
+        $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(inout) :: btensor
-        real(wp), intent(in) :: G
+        type(scalar_field), dimension(b_size), intent(inout) :: btensor_in
+        real(wp), intent(in) :: G_param
         integer, intent(in) :: j, k, l
 
         real(wp) :: trace
@@ -271,27 +270,27 @@ contains
 
         !TODO Make this 1D and 2D capable
         ! tensor is the symmetric tensor & calculate the trace of the tensor
-        trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l) + btensor(6)%sf(j, k, l)
+        trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
 
         ! calculate the deviatoric of the tensor
-        btensor(1)%sf(j, k, l) = btensor(1)%sf(j, k, l) - f13*trace
-        btensor(3)%sf(j, k, l) = btensor(3)%sf(j, k, l) - f13*trace
-        btensor(6)%sf(j, k, l) = btensor(6)%sf(j, k, l) - f13*trace
+        btensor_in(1)%sf(j, k, l) = btensor_in(1)%sf(j, k, l) - f13*trace
+        btensor_in(3)%sf(j, k, l) = btensor_in(3)%sf(j, k, l) - f13*trace
+        btensor_in(6)%sf(j, k, l) = btensor_in(6)%sf(j, k, l) - f13*trace
 
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
-        !$acc loop seq
+        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
-                G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
+                G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &
-            0.5_wp*(trace - 3.0_wp)/btensor(b_size)%sf(j, k, l)
+            0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
 
     end subroutine s_Mooney_Rivlin_cauchy_solver
 
-    subroutine s_finalize_hyperelastic_module()
+    impure subroutine s_finalize_hyperelastic_module()
 
         integer :: i !< iterator
 
