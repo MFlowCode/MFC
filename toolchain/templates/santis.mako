@@ -3,9 +3,8 @@
 <%namespace name="helpers" file="helpers.mako"/>
 
 % if engine == 'batch':
-#SBATCH --uenv=icon/25.2:v1
+#SBATCH --uenv=icon/25.2:v1@santis
 #SBATCH --nodes=${nodes}
-#SBATCH --reservation=g183
 #SBATCH --ntasks-per-node=${tasks_per_node}
 #SBATCH --job-name="${name}"
 #SBATCH --output="${name}.out"
@@ -78,9 +77,9 @@ echo
                 --gpus-per-task 1                                    \
             % endif
                 --wait 200 --bcast=/tmp/${target.name}               \
-                "${target.get_home_dirpath(case)}/misc/nvidia_uvm/bind.sh" \
+                "${target.get_home_dirpath()}/misc/nvidia_uvm/bind.sh" \
             % if target.name == 'simulation':
-                "${target.get_home_dirpath(case)}/misc/nvidia_uvm/nsys.sh" \
+                "${target.get_home_dirpath()}/misc/nvidia_uvm/nsys.sh" \
             % endif
                 "${target.get_install_binpath(case)}")
     % endif
