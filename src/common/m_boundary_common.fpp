@@ -1657,7 +1657,7 @@ contains
         integer :: ierr
 
         do dir = 1, num_dims
-            do loc = -1, 1, 2
+            do loc = 1, 2
                 sf_start_idx = (/0, 0, 0/)
                 sf_extents_loc = shape(bc_type(dir, loc)%sf)
 
