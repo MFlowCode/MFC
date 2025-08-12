@@ -14,7 +14,7 @@ export CUDA_VISIBLE_DEVICES="$local_rank"
 export MPICH_OFI_NIC_POLICY=USER
 export MPICH_OFI_NIC_MAPPING="0:0; 1:1; 2:2; 3:3"
 
-# Bind to cores ( first core per socket )
+# Bind to cores ( all cores per socket )
 physcores=(0-71 72-143 144-215 216-287)
 
 #echo hostname: $(hostname), rank: $local_rank, cores: ${physcores[$local_rank]}, GPU: $CUDA_VISIBLE_DEVICES, NIC mapping: $MPICH_OFI_NIC_POLICY
