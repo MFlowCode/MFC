@@ -21,6 +21,7 @@ option(MFC_OpenACC       "Build with OpenACC"                                OFF
 option(MFC_OpenMP        "Build with OpenMP"                                 OFF)
 option(MFC_GCov          "Build with GCov"                                   OFF)
 option(MFC_Unified       "Build with unified CPU & GPU memory (GH-200 only)" OFF)
+option(MFC_Fastmath      "Build with -gpu=fastmath on NV GPUs"               OFF)
 option(MFC_PRE_PROCESS   "Build pre_process"                                 OFF)
 option(MFC_SIMULATION    "Build simulation"                                  OFF)
 option(MFC_POST_PROCESS  "Build post_process"                                OFF)
@@ -130,6 +131,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-fprofile-arcs>
             $<$<COMPILE_LANGUAGE:Fortran>:-ftest-coverage>
+            $<$<COMPILE_LANGUAGE:Fortran>:-O1>
 	    )
 
         add_link_options(
@@ -366,6 +368,8 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D chemistry=False
                                  --line-numbering
                                  --no-folding
+								 --line-length=999
+		 						 --line-numbering-mode=nocontlines
                                  "${fpp}" "${f90}"
             DEPENDS  "${fpp};${${target}_incs}"
             COMMENT  "Preprocessing (Fypp) ${fpp_filename}"
@@ -517,6 +521,9 @@ function(MFC_SETUP_TARGET)
                     "-foffload=amdgcn-amdhsa='-march=gfx90a'"
                     "-foffload-options=-lgfortran\ -lm"
                     "-fno-exceptions")
+                if (MFC_Fastmath)
+                    message(WARNING "--fastmath has no effect with the GNU compiler")
+                endif()
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                 foreach (cc ${MFC_CUDA_CC})
                     target_compile_options(${a_target}
@@ -528,14 +535,20 @@ function(MFC_SETUP_TARGET)
                     PRIVATE -gpu=keep,ptxinfo,lineinfo
                 )
 
+                if (MFC_Fastmath)
+                    target_compile_options(${a_target}
+                        PRIVATE -gpu=fastmath
+                    )
+                endif()
+
                 # GH-200 Unified Memory Support
                 if (MFC_Unified)
                     target_compile_options(${ARGS_TARGET}
-                        PRIVATE -gpu=unified
+                        PRIVATE -gpu=mem:unified:managedalloc -cuda
                     )
                     # "This option must appear in both the compile and link lines" -- NVHPC Docs
                     target_link_options(${ARGS_TARGET}
-                        PRIVATE -gpu=unified
+                        PRIVATE -gpu=mem:unified:managedalloc -cuda
                     )
                 endif()
 
@@ -551,6 +564,10 @@ function(MFC_SETUP_TARGET)
                         PRIVATE -DFRONTIER_UNIFIED)
                 endif()
 
+                if (MFC_Fastmath)
+                    message(WARNING "--fastmath has no effect with the CCE")
+                endif()
+
                 find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
                 target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn)
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
@@ -559,11 +576,19 @@ function(MFC_SETUP_TARGET)
             endif()
         elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
             target_compile_options(${a_target} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")
+            if (MFC_Fastmath)
+                message(WARNING "--fastmath has no effect with the CCE")
+            endif()
         endif()
 
         if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
             find_package(CUDAToolkit REQUIRED)
-            target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
+            if (TARGET CUDA::nvToolsExt) # CUDA <= 12.8
+                target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
+            else() # CUDA >= 12.9
+                target_link_libraries(${a_target} PRIVATE nvhpcwrapnvtx)
+                target_link_options(${a_target} PRIVATE "-cudalib=nvtx3")
+            endif()
         endif()
     endforeach()
 

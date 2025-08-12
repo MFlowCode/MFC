@@ -1,19 +1,13 @@
 #!/bin/bash
 
-tmpbuild=/storage/scratch1/6/sbryngelson3/mytmp_build
-currentdir=$tmpbuild/run-$(( RANDOM % 900 ))
-mkdir -p $tmpbuild
-mkdir -p $currentdir
-export TMPDIR=$currentdir
-
-n_test_threads=8
-
 build_opts=""
 if [ "$job_device" = "gpu" ]; then
     build_opts="--gpu"
 fi
 
-./mfc.sh test --dry-run -j $n_test_threads $build_opts
+./mfc.sh test --dry-run -j 8 $build_opts
+
+n_test_threads=8
 
 if [ "$job_device" = "gpu" ]; then
     gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
@@ -24,7 +18,3 @@ fi
 
 ./mfc.sh test --max-attempts 3 -a -j $n_test_threads $device_opts -- -c phoenix
 
-sleep 10
-rm -rf "$currentdir" || true
-
-unset TMPDIR

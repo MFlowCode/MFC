@@ -87,4 +87,5 @@ n-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 san   CSCS Santis
 san-all cmake python
-san-gpu nvhpc/25.1 cuda cray-mpich
+san-gpu nvhpc cuda cray-mpich
+
