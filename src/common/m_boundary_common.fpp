@@ -28,7 +28,7 @@ module m_boundary_common
 
 #ifdef MFC_MPI
     integer, dimension(1:3, 1:2) :: MPI_BC_TYPE_TYPE
-    integer, dimension(1:3, -1:1) :: MPI_BC_BUFFER_TYPE
+    integer, dimension(1:3, 1:2) :: MPI_BC_BUFFER_TYPE
 #endif
 
     private; public :: s_initialize_boundary_common_module, &
@@ -54,21 +54,21 @@ contains
 
     impure subroutine s_initialize_boundary_common_module()
 
-        @:ALLOCATE(bc_buffers(1:num_dims, -1:1))
+        @:ALLOCATE(bc_buffers(1:num_dims, 1:2))
 
         if (bc_io) then
-            @:ALLOCATE(bc_buffers(1, -1)%sf(1:sys_size, 0:n, 0:p))
             @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size, 0:n, 0:p))
-            @:ACC_SETUP_SFs(bc_buffers(1,-1), bc_buffers(1,1))
+            @:ALLOCATE(bc_buffers(1, 2)%sf(1:sys_size, 0:n, 0:p))
+            @:ACC_SETUP_SFs(bc_buffers(1,1), bc_buffers(1,2))
             if (n > 0) then
-                @:ALLOCATE(bc_buffers(2,-1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
                 @:ALLOCATE(bc_buffers(2,1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-                @:ACC_SETUP_SFs(bc_buffers(2,-1), bc_buffers(2,1))
+                @:ALLOCATE(bc_buffers(2,2)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
+                @:ACC_SETUP_SFs(bc_buffers(2,1), bc_buffers(2,2))
                 if (p > 0) then
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                        @:ALLOCATE(bc_buffers(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
                         @:ALLOCATE(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-                        @:ACC_SETUP_SFs(bc_buffers(3,-1), bc_buffers(3,1))
+                        @:ALLOCATE(bc_buffers(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
+                        @:ACC_SETUP_SFs(bc_buffers(3,1), bc_buffers(3,2))
                     #:endif
                 end if
             end if
@@ -1038,14 +1038,14 @@ contains
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(-j, k, l) = &
-                            bc_buffers(1, -1)%sf(i, k, l)
+                            bc_buffers(1, 1)%sf(i, k, l)
                     end do
                 end do
             else !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = &
-                            bc_buffers(1, 1)%sf(i, k, l)
+                            bc_buffers(1, 2)%sf(i, k, l)
                     end do
                 end do
             end if
@@ -1054,14 +1054,14 @@ contains
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, -j, l) = &
-                            bc_buffers(2, -1)%sf(k, i, l)
+                            bc_buffers(2, 1)%sf(k, i, l)
                     end do
                 end do
             else !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, n + j, l) = &
-                            bc_buffers(2, 1)%sf(k, i, l)
+                            bc_buffers(2, 2)%sf(k, i, l)
                     end do
                 end do
             end if
@@ -1070,14 +1070,14 @@ contains
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, -j) = &
-                            bc_buffers(3, -1)%sf(k, l, i)
+                            bc_buffers(3, 1)%sf(k, l, i)
                     end do
                 end do
             else !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, p + j) = &
-                            bc_buffers(3, 1)%sf(k, l, i)
+                            bc_buffers(3, 2)%sf(k, l, i)
                     end do
                 end do
             end if
@@ -1668,7 +1668,7 @@ contains
         end do
 
         do dir = 1, num_dims
-            do loc = -1, 1, 2
+            do loc = 1, 2
                 sf_start_idx = (/0, 0, 0/)
                 sf_extents_loc = shape(bc_buffers(dir, loc)%sf)
 
@@ -1713,7 +1713,7 @@ contains
         file_path = trim(step_dirpath)//'/bc_buffers.dat'
         open (1, FILE=trim(file_path), FORM='unformatted', STATUS=status)
         do dir = 1, num_dims
-            do loc = -1, 1, 2
+            do loc = 1, 2
                 write (1) bc_buffers(dir, loc)%sf
             end do
         end do
@@ -1769,7 +1769,7 @@ contains
 
         ! Write bc_buffers
         do dir = 1, num_dims
-            do loc = -1, 1, 2
+            do loc = 1, 2
                 call MPI_File_write_all(file_id, bc_buffers(dir, loc)%sf, sizeof(bc_buffers(dir, loc)%sf)*mpi_io_tpe/stp, mpi_io_p, MPI_STATUS_IGNORE, ierr)
             end do
         end do
@@ -1816,7 +1816,7 @@ contains
 
         open (1, FILE=trim(file_path), FORM='unformatted', STATUS='unknown')
         do dir = 1, num_dims
-            do loc = -1, 1, 2
+            do loc = 1, 2
                 read (1) bc_buffers(dir, loc)%sf
                 $:GPU_UPDATE(device='[bc_buffers(dir, loc)%sf]')
             end do
@@ -1872,7 +1872,7 @@ contains
 
         ! Read bc_buffers
         do dir = 1, num_dims
-            do loc = -1, 1, 2
+            do loc = 1, 2
                 call MPI_File_read_all(file_id, bc_buffers(dir, loc)%sf, sizeof(bc_buffers(dir, loc)%sf)*mpi_io_tpe/stp, mpi_io_p, MPI_STATUS_IGNORE, ierr)
                 $:GPU_UPDATE(device='[bc_buffers(dir, loc)%sf]')
             end do
@@ -1891,8 +1891,8 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 1, sys_size
-                    bc_buffers(1, -1)%sf(i, j, k) = q_prim_vf(i)%sf(0, j, k)
-                    bc_buffers(1, 1)%sf(i, j, k) = q_prim_vf(i)%sf(m, j, k)
+                    bc_buffers(1, 1)%sf(i, j, k) = q_prim_vf(i)%sf(0, j, k)
+                    bc_buffers(1, 2)%sf(i, j, k) = q_prim_vf(i)%sf(m, j, k)
                 end do
             end do
         end do
@@ -1901,8 +1901,8 @@ contains
             do k = 0, p
                 do j = 1, sys_size
                     do i = 0, m
-                        bc_buffers(2, -1)%sf(i, j, k) = q_prim_vf(j)%sf(i, 0, k)
-                        bc_buffers(2, 1)%sf(i, j, k) = q_prim_vf(j)%sf(i, n, k)
+                        bc_buffers(2, 1)%sf(i, j, k) = q_prim_vf(j)%sf(i, 0, k)
+                        bc_buffers(2, 2)%sf(i, j, k) = q_prim_vf(j)%sf(i, n, k)
                     end do
                 end do
             end do
@@ -1911,8 +1911,8 @@ contains
                 do k = 1, sys_size
                     do j = 0, n
                         do i = 0, m
-                            bc_buffers(3, -1)%sf(i, j, k) = q_prim_vf(k)%sf(i, j, 0)
-                            bc_buffers(3, 1)%sf(i, j, k) = q_prim_vf(k)%sf(i, j, p)
+                            bc_buffers(3, 1)%sf(i, j, k) = q_prim_vf(k)%sf(i, j, 0)
+                            bc_buffers(3, 2)%sf(i, j, k) = q_prim_vf(k)%sf(i, j, p)
                         end do
                     end do
                 end do
@@ -2137,14 +2137,14 @@ contains
     subroutine s_finalize_boundary_common_module()
 
         if (bc_io) then
-            deallocate (bc_buffers(1, -1)%sf)
             deallocate (bc_buffers(1, 1)%sf)
+            deallocate (bc_buffers(1, 2)%sf)
             if (n > 0) then
-                deallocate (bc_buffers(2, -1)%sf)
                 deallocate (bc_buffers(2, 1)%sf)
+                deallocate (bc_buffers(2, 2)%sf)
                 if (p > 0) then
-                    deallocate (bc_buffers(3, -1)%sf)
                     deallocate (bc_buffers(3, 1)%sf)
+                    deallocate (bc_buffers(3, 2)%sf)
                 end if
             end if
         end if
