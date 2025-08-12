@@ -15,8 +15,6 @@ module m_igr
 
     use m_boundary_common
 
-    use cudadevice, only: atomicadd
-
     implicit none
 
     private; public :: s_initialize_igr_module, &
