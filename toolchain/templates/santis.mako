@@ -6,6 +6,7 @@
 #SBATCH --uenv=icon/25.2:v1@santis
 #SBATCH --nodes=${nodes}
 #SBATCH --ntasks-per-node=${tasks_per_node}
+#SBATCH --cpus-per-task=72
 #SBATCH --job-name="${name}"
 #SBATCH --output="${name}.out"
 #SBATCH --error="${name}.err"
