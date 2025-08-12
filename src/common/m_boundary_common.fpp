@@ -1760,8 +1760,6 @@ contains
 
         offset = 0
 
-        print *, sizeof(bc_type(1,1)%sf)
-
         ! Write bc_types
         do dir = 1, num_dims
             do loc = 1, 2
