@@ -292,8 +292,10 @@ contains
                                 c_divs(num_dims + 1)%sf(j, k, l) + &
                                 c_divs(i)%sf(j, k, l)**2._wp
                         end do
+                        !c_divs(num_dims + 1)%sf(j, k, l) = &
+                            !sqrt(c_divs(num_dims + 1)%sf(j, k, l))
                         c_divs(num_dims + 1)%sf(j, k, l) = &
-                            sqrt(c_divs(num_dims + 1)%sf(j, k, l))
+                            sqrt(real(c_divs(num_dims + 1)%sf(j, k, l), kind=wp))
                     end do
                 end do
             end do
@@ -379,7 +381,7 @@ contains
                                     do j = is1%beg, is1%end
                                         vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
                                         vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                                    end do
+                                        end do
                                 end do
                             end do
                         end do
