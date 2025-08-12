@@ -18,6 +18,7 @@ class MFCConfig:
     unified: bool = False
     single:  bool = False
     mixed:   bool = False
+    fastmath: bool = False
 
     @staticmethod
     def from_dict(d: dict):
