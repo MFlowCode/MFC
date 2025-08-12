@@ -72,7 +72,7 @@ class MFCTarget:
         # <root>/install/<slug>/bin/<target>
         return os.sep.join([self.get_install_dirpath(case), "bin", self.name])
 
-    def get_home_dirpath(self, case: Case) -> str:
+    def get_home_dirpath(self) -> str:
         return os.sep.join([os.getcwd()])
 
     def is_configured(self, case: Case ) -> bool:
