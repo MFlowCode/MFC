@@ -36,7 +36,7 @@ contains
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
         integer :: x, y, z, eqn
-        real(wp) :: energy
+        real(wp) :: energy, T_in
         real(wp), dimension(num_species) :: Ys
 
         do z = bounds(3)%beg, bounds(3)%end
@@ -57,7 +57,10 @@ contains
                                  0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z))**2._wp
                     end do
 
-                    call get_temperature(energy, dflt_T_guess, Ys, .true., q_T_sf%sf(x, y, z))
+                    T_in = real(q_T_sf%sf(x, y, z), kind=wp)
+                    call get_temperature(energy, dflt_T_guess, Ys, .true., T_in)
+                    q_T_sf%sf(x, y, z) = T_in
+
                 end do
             end do
         end do

@@ -663,7 +663,7 @@ contains
                                                 pb_in, mv_in)
 
         type(scalar_field), dimension(1:), intent(inout) :: q_comm
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
+        real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
         integer, intent(in) :: mpi_dir, pbc_loc, nVar
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
@@ -744,7 +744,7 @@ contains
                                 do j = 0, buff_size - 1
                                     do i = 1, nVar
                                         r = (i - 1) + v_size*(j + buff_size*(k + (n + 1)*l))
-                                        buff_send(r) = q_comm(i)%sf(j + pack_offset, k, l)
+                                        buff_send(r) = real(q_comm(i)%sf(j + pack_offset, k, l), kind=wp)
                                     end do
                                 end do
                             end do
@@ -760,7 +760,7 @@ contains
                                             do q = 1, nb
                                                 r = (i - 1) + (q - 1)*4 + v_size* &
                                                     (j + buff_size*(k + (n + 1)*l))
-                                                buff_send(r) = pb_in(j + pack_offset, k, l, i - nVar, q)
+                                                buff_send(r) = real(pb_in(j + pack_offset, k, l, i - nVar, q), kind=wp)
                                             end do
                                         end do
                                     end do
@@ -776,7 +776,7 @@ contains
                                             do q = 1, nb
                                                 r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                     (j + buff_size*(k + (n + 1)*l))
-                                                buff_send(r) = mv_in(j + pack_offset, k, l, i - nVar, q)
+                                                buff_send(r) = real(mv_in(j + pack_offset, k, l, i - nVar, q), kind=wp)
                                             end do
                                         end do
                                     end do
@@ -793,7 +793,7 @@ contains
                                         r = (i - 1) + v_size* &
                                             ((j + buff_size) + (m + 2*buff_size + 1)* &
                                              (k + buff_size*l))
-                                        buff_send(r) = q_comm(i)%sf(j, k + pack_offset, l)
+                                        buff_send(r) = real(q_comm(i)%sf(j, k + pack_offset, l), kind=wp)
                                     end do
                                 end do
                             end do
@@ -810,7 +810,7 @@ contains
                                                 r = (i - 1) + (q - 1)*4 + v_size* &
                                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                      (k + buff_size*l))
-                                                buff_send(r) = pb_in(j, k + pack_offset, l, i - nVar, q)
+                                                buff_send(r) = real(pb_in(j, k + pack_offset, l, i - nVar, q), kind=wp)
                                             end do
                                         end do
                                     end do
@@ -827,7 +827,7 @@ contains
                                                 r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                      (k + buff_size*l))
-                                                buff_send(r) = mv_in(j, k + pack_offset, l, i - nVar, q)
+                                                buff_send(r) = real(mv_in(j, k + pack_offset, l, i - nVar, q), kind=wp)
                                             end do
                                         end do
                                     end do
@@ -844,7 +844,7 @@ contains
                                         r = (i - 1) + v_size* &
                                             ((j + buff_size) + (m + 2*buff_size + 1)* &
                                              ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                        buff_send(r) = q_comm(i)%sf(j, k, l + pack_offset)
+                                        buff_send(r) = real(q_comm(i)%sf(j, k, l + pack_offset), kind=wp)
                                     end do
                                 end do
                             end do
@@ -861,7 +861,7 @@ contains
                                                 r = (i - 1) + (q - 1)*4 + v_size* &
                                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                      ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                                buff_send(r) = pb_in(j, k, l + pack_offset, i - nVar, q)
+                                                buff_send(r) = real(pb_in(j, k, l + pack_offset, i - nVar, q), kind=wp)
                                             end do
                                         end do
                                     end do
@@ -878,7 +878,7 @@ contains
                                                 r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                      ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                                buff_send(r) = mv_in(j, k, l + pack_offset, i - nVar, q)
+                                                buff_send(r) = real(mv_in(j, k, l + pack_offset, i - nVar, q), kind=wp)
                                             end do
                                         end do
                                     end do
@@ -946,7 +946,7 @@ contains
                                     do i = 1, nVar
                                         r = (i - 1) + v_size* &
                                             (j + buff_size*((k + 1) + (n + 1)*l))
-                                        q_comm(i)%sf(j + unpack_offset, k, l) = buff_recv(r)
+                                        q_comm(i)%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
                                         if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
                                             print *, "Error", j, k, l, i
@@ -968,7 +968,7 @@ contains
                                             do q = 1, nb
                                                 r = (i - 1) + (q - 1)*4 + v_size* &
                                                     (j + buff_size*((k + 1) + (n + 1)*l))
-                                                pb_in(j + unpack_offset, k, l, i - nVar, q) = buff_recv(r)
+                                                pb_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r), kind=stp)
                                             end do
                                         end do
                                     end do
@@ -984,7 +984,7 @@ contains
                                             do q = 1, nb
                                                 r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                     (j + buff_size*((k + 1) + (n + 1)*l))
-                                                mv_in(j + unpack_offset, k, l, i - nVar, q) = buff_recv(r)
+                                                mv_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r), kind=stp)
                                             end do
                                         end do
                                     end do
@@ -1001,7 +1001,7 @@ contains
                                         r = (i - 1) + v_size* &
                                             ((j + buff_size) + (m + 2*buff_size + 1)* &
                                              ((k + buff_size) + buff_size*l))
-                                        q_comm(i)%sf(j, k + unpack_offset, l) = buff_recv(r)
+                                        q_comm(i)%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
                                         if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
                                             print *, "Error", j, k, l, i
@@ -1024,7 +1024,7 @@ contains
                                                 r = (i - 1) + (q - 1)*4 + v_size* &
                                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                      ((k + buff_size) + buff_size*l))
-                                                pb_in(j, k + unpack_offset, l, i - nVar, q) = buff_recv(r)
+                                                pb_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
                                             end do
                                         end do
                                     end do
@@ -1041,7 +1041,7 @@ contains
                                                 r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                      ((k + buff_size) + buff_size*l))
-                                                mv_in(j, k + unpack_offset, l, i - nVar, q) = buff_recv(r)
+                                                mv_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
                                             end do
                                         end do
                                     end do
@@ -1060,7 +1060,7 @@ contains
                                             ((j + buff_size) + (m + 2*buff_size + 1)* &
                                              ((k + buff_size) + (n + 2*buff_size + 1)* &
                                               (l + buff_size)))
-                                        q_comm(i)%sf(j, k, l + unpack_offset) = buff_recv(r)
+                                        q_comm(i)%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
                                         if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
                                             print *, "Error", j, k, l, i
@@ -1084,7 +1084,7 @@ contains
                                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                      ((k + buff_size) + (n + 2*buff_size + 1)* &
                                                       (l + buff_size)))
-                                                pb_in(j, k, l + unpack_offset, i - nVar, q) = buff_recv(r)
+                                                pb_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
                                             end do
                                         end do
                                     end do
@@ -1102,7 +1102,7 @@ contains
                                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                                      ((k + buff_size) + (n + 2*buff_size + 1)* &
                                                       (l + buff_size)))
-                                                mv_in(j, k, l + unpack_offset, i - nVar, q) = buff_recv(r)
+                                                mv_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
                                             end do
                                         end do
                                     end do
