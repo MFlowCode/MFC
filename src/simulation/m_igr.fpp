@@ -27,9 +27,9 @@ module m_igr
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
     integer, dimension(3) :: nv_uvm_temp_on_gpu
     real(wp), pointer, contiguous, dimension(:, :, :) :: jac, jac_rhs, jac_old
-    real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_host_pool
-    real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_rhs_host_pool
-    real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_old_host_pool
+    real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_host
+    real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_rhs_host
+    real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_old_host
 #else
     real(wp), allocatable, dimension(:, :, :) :: jac, jac_rhs, jac_old
     $:GPU_DECLARE(create='[jac, jac_rhs, jac_old]')
@@ -124,21 +124,21 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end))
             @:PREFER_GPU(jac)
         else
-            allocate (jac_host_pool(idwbuff(1)%beg:idwbuff(1)%end, &
-                                    idwbuff(2)%beg:idwbuff(2)%end, &
-                                    idwbuff(3)%beg:idwbuff(3)%end))
+            allocate (jac_host(idwbuff(1)%beg:idwbuff(1)%end, &
+                               idwbuff(2)%beg:idwbuff(2)%end, &
+                               idwbuff(3)%beg:idwbuff(3)%end))
 
             jac(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
-                idwbuff(3)%beg:idwbuff(3)%end) => jac_host_pool(:, :, :)
+                idwbuff(3)%beg:idwbuff(3)%end) => jac_host(:, :, :)
         end if
 
         if (nv_uvm_temp_on_gpu(2) == 1) then
             @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
             @:PREFER_GPU(jac_rhs)
         else
-            allocate (jac_rhs_host_pool(-1:m, -1:n, -1:p))
-            jac_rhs(-1:m, -1:n, -1:p) => jac_rhs_host_pool(:, :, :)
+            allocate (jac_rhs_host(-1:m, -1:n, -1:p))
+            jac_rhs(-1:m, -1:n, -1:p) => jac_rhs_host(:, :, :)
         end if
 
         if (igr_iter_solver == 1) then ! Jacobi iteration
@@ -148,13 +148,13 @@ contains
                     idwbuff(3)%beg:idwbuff(3)%end))
                 @:PREFER_GPU(jac_old)
             else
-                allocate (jac_old_host_pool(idwbuff(1)%beg:idwbuff(1)%end, &
-                                            idwbuff(2)%beg:idwbuff(2)%end, &
-                                            idwbuff(3)%beg:idwbuff(3)%end))
+                allocate (jac_old_host(idwbuff(1)%beg:idwbuff(1)%end, &
+                                       idwbuff(2)%beg:idwbuff(2)%end, &
+                                       idwbuff(3)%beg:idwbuff(3)%end))
 
                 jac_old(idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, &
-                        idwbuff(3)%beg:idwbuff(3)%end) => jac_old_host_pool(:, :, :)
+                        idwbuff(3)%beg:idwbuff(3)%end) => jac_old_host(:, :, :)
             end if
         end if
 #endif
@@ -2678,14 +2678,14 @@ contains
             @:DEALLOCATE(jac)
         else
             nullify (jac)
-            deallocate (jac_host_pool)
+            deallocate (jac_host)
         end if
 
         if (nv_uvm_temp_on_gpu(2) == 1) then
             @:DEALLOCATE(jac_rhs)
         else
             nullify (jac_rhs)
-            deallocate (jac_rhs_host_pool)
+            deallocate (jac_rhs_host)
         end if
 
         if (igr_iter_solver == 1) then ! Jacobi iteration
@@ -2693,7 +2693,7 @@ contains
                 @:DEALLOCATE(jac_old)
             else
                 nullify (jac_old)
-                deallocate (jac_old_host_pool)
+                deallocate (jac_old_host)
             end if
         end if
 #endif
