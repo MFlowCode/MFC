@@ -81,7 +81,7 @@ print(
             "igr": "T",
             "igr_order": 5,
             "igr_pres_lim": "T",
-            "igr_iter_solver": 1,
+            "igr_iter_solver": 2,
             "num_igr_iters": igrIters,
             "num_igr_warm_start_iters": igrIters,
             "alf_factor": 10,
