@@ -14,7 +14,7 @@ z0 = -3 * D / 2  # y_beg coordinate
 z1 = 3 * D / 2  # y_end coordinate
 
 alfFactor = 10
-igrIters = 5
+igrIters = 3
 
 tS = 20  # dimensionless time
 
