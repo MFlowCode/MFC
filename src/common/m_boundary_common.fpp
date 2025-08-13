@@ -1483,7 +1483,7 @@ contains
     impure subroutine s_populate_F_igr_buffers(bc_type, jac_sf)
 
         type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
-        type(scalar_field), dimension(1:), intent(inout) :: jac_sf
+        type(scalar_field), dimension(1), intent(inout) :: jac_sf
 
         integer :: j, k, l
 
