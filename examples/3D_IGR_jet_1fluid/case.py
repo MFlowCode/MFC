@@ -95,8 +95,10 @@ print(
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
-            "c_wrt": "T",
+            "c_wrt": "F",
             "parallel_io": "T",
+            "file_per_process": "T",
+            "down_sample": "F",
             # Background
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": (x1 + x0) / 2,
