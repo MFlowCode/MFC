@@ -67,9 +67,10 @@ contains
     impure subroutine s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp, ib_markers_sf
-        type(levelset_field), intent(inout) :: levelset !< Levelset determined by models
-        type(levelset_norm_field), intent(inout) :: levelset_norm !< Levelset_norm determined by models
+        integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp
+        integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
+        type(levelset_field), intent(inout), optional :: levelset !< Levelset determined by models
+        type(levelset_norm_field), intent(inout), optional :: levelset_norm !< Levelset_norm determined by models
 
         integer :: i
 
@@ -99,9 +100,6 @@ contains
                     ! Ellipsoidal patch
                 elseif (patch_icpp(i)%geometry == 12) then
                     call s_ellipsoid(i, patch_id_fp, q_prim_vf)
-                    ! Analytical function patch for testing purposes
-                elseif (patch_icpp(i)%geometry == 13) then
-                    call s_3D_analytical(i, patch_id_fp, q_prim_vf)
                     ! Spherical harmonic patch
                 elseif (patch_icpp(i)%geometry == 14) then
                     call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
@@ -125,16 +123,16 @@ contains
 
                 if (patch_ib(i)%geometry == 8) then
                     call s_sphere(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_sphere_levelset(levelset, levelset_norm, i)
+                    call s_sphere_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 9) then
                     call s_cuboid(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_cuboid_levelset(levelset, levelset_norm, i)
+                    call s_cuboid_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 10) then
                     call s_cylinder(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_cylinder_levelset(levelset, levelset_norm, i)
+                    call s_cylinder_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 11) then
                     call s_3D_airfoil(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_3D_airfoil_levelset(levelset, levelset_norm, i)
+                    call s_3D_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 12) then
                     call s_model(i, ib_markers_sf, q_prim_vf, ib, levelset, levelset_norm)
@@ -169,9 +167,6 @@ contains
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, '// &
                                      'which no longer exists. See Examples. Exiting.')
-                    ! Analytical function patch for testing purposes
-                elseif (patch_icpp(i)%geometry == 7) then
-                    call s_2D_analytical(i, patch_id_fp, q_prim_vf)
                     ! Spherical Harmonic Patch
                 elseif (patch_icpp(i)%geometry == 14) then
                     call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
@@ -199,13 +194,13 @@ contains
                 end if
                 if (patch_ib(i)%geometry == 2) then
                     call s_circle(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_circle_levelset(levelset, levelset_norm, i)
+                    call s_circle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 3) then
                     call s_rectangle(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_rectangle_levelset(levelset, levelset_norm, i)
+                    call s_rectangle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 4) then
                     call s_airfoil(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_airfoil_levelset(levelset, levelset_norm, i)
+                    call s_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 5) then
                     call s_model(i, ib_markers_sf, q_prim_vf, ib, levelset, levelset_norm)
@@ -226,9 +221,6 @@ contains
                 if (patch_icpp(i)%geometry == 1) then
                     call s_line_segment(i, patch_id_fp, q_prim_vf)
                     ! 1d analytical
-                elseif (patch_icpp(i)%geometry == 15) then
-                    call s_1d_analytical(i, patch_id_fp, q_prim_vf)
-                    ! 1d bubble screen with sinusoidal pressure pulse
                 elseif (patch_icpp(i)%geometry == 16) then
                     call s_1d_bubble_pulse(i, patch_id_fp, q_prim_vf)
                 end if
@@ -253,13 +245,19 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        real(wp) :: pi_inf, gamma, lit_gamma
+        ! Generic loop iterators
+        integer :: i, j, k
 
-        integer :: i, j, k !< Generic loop operators
+        ! Placeholders for the cell boundary values
+        real(wp) :: pi_inf, gamma, lit_gamma
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded1DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1._wp + gamma)/gamma
+        j = 0
+        k = 0
 
         ! Transferring the line segment's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -290,11 +288,17 @@ contains
 
                 @:analytical()
 
+                ! check if this should load a hardcoded patch
+                if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                    @:Hardcoded1D()
+                end if
+
                 ! Updating the patch identities bookkeeping variable
-                if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, 0, 0) = patch_id
+                if (1._wp - eta < sgm_eps) patch_id_fp(i, 0, 0) = patch_id
 
             end if
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_line_segment
 
@@ -314,6 +318,8 @@ contains
         integer :: i, j, k !< Generic loop iterators
         real(wp) :: th, thickness, nturns, mya
         real(wp) :: spiral_x_min, spiral_x_max, spiral_y_min, spiral_y_max
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded2DVariables()
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
@@ -353,12 +359,16 @@ contains
                                                             eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
+                    if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                        @:Hardcoded2D()
+                    end if
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
                 end if
             end do
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_spiral
 
@@ -371,21 +381,23 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_circle(patch_id, patch_id_fp, q_prim_vf, ib)
+    subroutine s_circle(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        logical, optional, intent(in) :: ib
+        logical, optional, intent(in) :: ib_flag
 
         real(wp) :: radius
 
         integer :: i, j, k !< Generic loop iterators
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded2DVariables()
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
 
-        if (present(ib)) then
+        if (present(ib_flag)) then
             x_centroid = patch_ib(patch_id)%x_centroid
             y_centroid = patch_ib(patch_id)%y_centroid
             radius = patch_ib(patch_id)%radius
@@ -410,7 +422,7 @@ contains
         do j = 0, n
             do i = 0, m
 
-                if (.not. present(ib) .and. patch_icpp(patch_id)%smoothen) then
+                if (.not. present(ib_flag) .and. patch_icpp(patch_id)%smoothen) then
 
                     eta = tanh(smooth_coeff/min(dx, dy)* &
                                (sqrt((x_cc(i) - x_centroid)**2 &
@@ -419,8 +431,8 @@ contains
 
                 end if
 
-                if (present(ib) .and. ((x_cc(i) - x_centroid)**2 &
-                                       + (y_cc(j) - y_centroid)**2 <= radius**2)) &
+                if (present(ib_flag) .and. ((x_cc(i) - x_centroid)**2 &
+                                            + (y_cc(j) - y_centroid)**2 <= radius**2)) &
                     then
 
                     patch_id_fp(i, j, 0) = patch_id
@@ -430,17 +442,22 @@ contains
                          .and. &
                          patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                         .or. &
-                        (.not. present(ib) .and. patch_id_fp(i, j, 0) == smooth_patch_id)) &
+                        (.not. present(ib_flag) .and. patch_id_fp(i, j, 0) == smooth_patch_id)) &
                         then
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                                 eta, q_prim_vf, patch_id_fp)
 
                         @:analytical()
+                        if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                            @:Hardcoded2D()
+                        end if
+
                     end if
                 end if
             end do
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_circle
 
@@ -448,28 +465,29 @@ contains
     !! @param patch_id_fp Array to track patch ids
     !! @param q_prim_vf Array of primitive variables
     !! @param ib True if this patch is an immersed boundary
-    subroutine s_airfoil(patch_id, patch_id_fp, q_prim_vf, ib)
+    subroutine s_airfoil(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        logical, optional, intent(in) :: ib
+        logical, optional, intent(in) :: ib_flag
 
-        real(wp) :: x0, y0, f, x_act, y_act, ca, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
+        real(wp) :: x0, y0, f, x_act, y_act, ca_in, pa, ma, ta, theta
+        real(wp) :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k
         integer :: Np1, Np2
 
-        if (.not. present(ib)) return
+        if (.not. present(ib_flag)) return
         x0 = patch_ib(patch_id)%x_centroid
         y0 = patch_ib(patch_id)%y_centroid
-        ca = patch_ib(patch_id)%c
+        ca_in = patch_ib(patch_id)%c
         pa = patch_ib(patch_id)%p
         ma = patch_ib(patch_id)%m
         ta = patch_ib(patch_id)%t
         theta = pi*patch_ib(patch_id)%theta/180._wp
 
-        Np1 = int((pa*ca/dx)*20)
-        Np2 = int(((ca - pa*ca)/dx)*20)
+        Np1 = int((pa*ca_in/dx)*20)
+        Np2 = int(((ca_in - pa*ca_in)/dx)*20)
         Np = Np1 + Np2 + 1
 
         allocate (airfoil_grid_u(1:Np))
@@ -485,13 +503,13 @@ contains
 
         do i = 1, Np1 + Np2 - 1
             if (i <= Np1) then
-                xc = x0 + i*(pa*ca/Np1)
-                xa = (xc - x0)/ca
+                xc = x0 + i*(pa*ca_in/Np1)
+                xa = (xc - x0)/ca_in
                 yc = (ma/pa**2)*(2*pa*xa - xa**2)
                 dycdxc = (2*ma/pa**2)*(pa - xa)
             else
-                xc = x0 + pa*ca + (i - Np1)*((ca - pa*ca)/Np2)
-                xa = (xc - x0)/ca
+                xc = x0 + pa*ca_in + (i - Np1)*((ca_in - pa*ca_in)/Np2)
+                xa = (xc - x0)/ca_in
                 yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
                 dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
             end if
@@ -506,11 +524,11 @@ contains
             xl = xa + yt*sin_c
             yl = yc - yt*cos_c
 
-            xu = xu*ca + x0
-            yu = yu*ca + y0
+            xu = xu*ca_in + x0
+            yu = yu*ca_in + y0
 
-            xl = xl*ca + x0
-            yl = yl*ca + y0
+            xl = xl*ca_in + x0
+            yl = yl*ca_in + y0
 
             airfoil_grid_u(i + 1)%x = xu
             airfoil_grid_u(i + 1)%y = yu
@@ -520,10 +538,10 @@ contains
 
         end do
 
-        airfoil_grid_u(Np)%x = x0 + ca
+        airfoil_grid_u(Np)%x = x0 + ca_in
         airfoil_grid_u(Np)%y = y0
 
-        airfoil_grid_l(Np)%x = x0 + ca
+        airfoil_grid_l(Np)%x = x0 + ca_in
         airfoil_grid_l(Np)%y = y0
 
         do j = 0, n
@@ -537,8 +555,8 @@ contains
                     y_act = y_cc(j)
                 end if
 
-                if (x_act >= x0 .and. x_act <= x0 + ca) then
-                    xa = (x_act - x0)/ca
+                if (x_act >= x0 .and. x_act <= x0 + ca_in) then
+                    xa = (x_act - x0)/ca_in
                     if (xa <= pa) then
                         yc = (ma/pa**2)*(2*pa*xa - xa**2)
                         dycdxc = (2*ma/pa**2)*(pa - xa)
@@ -610,30 +628,30 @@ contains
     !! @param patch_id_fp Array to track patch ids
     !! @param q_prim_vf Array of primitive variables
     !! @param ib True if this patch is an immersed boundary
-    subroutine s_3D_airfoil(patch_id, patch_id_fp, q_prim_vf, ib)
+    subroutine s_3D_airfoil(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        logical, optional, intent(in) :: ib
+        logical, optional, intent(in) :: ib_flag
 
-        real(wp) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
+        real(wp) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca_in, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k, l
         integer :: Np1, Np2
 
-        if (.not. present(ib)) return
+        if (.not. present(ib_flag)) return
         x0 = patch_ib(patch_id)%x_centroid
         y0 = patch_ib(patch_id)%y_centroid
         z0 = patch_ib(patch_id)%z_centroid
         lz = patch_ib(patch_id)%length_z
-        ca = patch_ib(patch_id)%c
+        ca_in = patch_ib(patch_id)%c
         pa = patch_ib(patch_id)%p
         ma = patch_ib(patch_id)%m
         ta = patch_ib(patch_id)%t
         theta = pi*patch_ib(patch_id)%theta/180._wp
 
-        Np1 = int((pa*ca/dx)*20)
-        Np2 = int(((ca - pa*ca)/dx)*20)
+        Np1 = int((pa*ca_in/dx)*20)
+        Np2 = int(((ca_in - pa*ca_in)/dx)*20)
         Np = Np1 + Np2 + 1
 
         allocate (airfoil_grid_u(1:Np))
@@ -652,13 +670,13 @@ contains
 
         do i = 1, Np1 + Np2 - 1
             if (i <= Np1) then
-                xc = x0 + i*(pa*ca/Np1)
-                xa = (xc - x0)/ca
+                xc = x0 + i*(pa*ca_in/Np1)
+                xa = (xc - x0)/ca_in
                 yc = (ma/pa**2)*(2*pa*xa - xa**2)
                 dycdxc = (2*ma/pa**2)*(pa - xa)
             else
-                xc = x0 + pa*ca + (i - Np1)*((ca - pa*ca)/Np2)
-                xa = (xc - x0)/ca
+                xc = x0 + pa*ca_in + (i - Np1)*((ca_in - pa*ca_in)/Np2)
+                xa = (xc - x0)/ca_in
                 yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
                 dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
             end if
@@ -673,11 +691,11 @@ contains
             xl = xa + yt*sin_c
             yl = yc - yt*cos_c
 
-            xu = xu*ca + x0
-            yu = yu*ca + y0
+            xu = xu*ca_in + x0
+            yu = yu*ca_in + y0
 
-            xl = xl*ca + x0
-            yl = yl*ca + y0
+            xl = xl*ca_in + x0
+            yl = yl*ca_in + y0
 
             airfoil_grid_u(i + 1)%x = xu
             airfoil_grid_u(i + 1)%y = yu
@@ -687,10 +705,10 @@ contains
 
         end do
 
-        airfoil_grid_u(Np)%x = x0 + ca
+        airfoil_grid_u(Np)%x = x0 + ca_in
         airfoil_grid_u(Np)%y = y0
 
-        airfoil_grid_l(Np)%x = x0 + ca
+        airfoil_grid_l(Np)%x = x0 + ca_in
         airfoil_grid_l(Np)%y = y0
 
         do l = 0, p
@@ -706,8 +724,8 @@ contains
                             y_act = y_cc(j)
                         end if
 
-                        if (x_act >= x0 .and. x_act <= x0 + ca) then
-                            xa = (x_act - x0)/ca
+                        if (x_act >= x0 .and. x_act <= x0 + ca_in) then
+                            xa = (x_act - x0)/ca_in
                             if (xa <= pa) then
                                 yc = (ma/pa**2)*(2*pa*xa - xa**2)
                                 dycdxc = (2*ma/pa**2)*(pa - xa)
@@ -792,6 +810,8 @@ contains
         ! Generic loop iterators
         integer :: i, j, k
         real(wp) :: radius, myr, thickness
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded2DVariables()
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
@@ -824,9 +844,12 @@ contains
                                                             eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
+                    if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                        @:Hardcoded2D()
+                    end if
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
 
                     q_prim_vf(alf_idx)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
                                                      exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
@@ -834,6 +857,7 @@ contains
 
             end do
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_varcircle
 
@@ -850,6 +874,8 @@ contains
         ! Generic loop iterators
         integer :: i, j, k
         real(wp) :: radius, myr, thickness
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded3DVariables()
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
@@ -887,9 +913,12 @@ contains
                                                                 eta, q_prim_vf, patch_id_fp)
 
                         @:analytical()
+                        if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                            @:Hardcoded3D()
+                        end if
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
 
                         q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
                                                          exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
@@ -898,6 +927,7 @@ contains
                 end do
             end do
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_3dvarcircle
 
@@ -916,6 +946,8 @@ contains
 
         integer :: i, j, k !< Generic loop operators
         real(wp) :: a, b
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded2DVariables()
 
         ! Transferring the elliptical patch's radii, centroid, smearing
         ! patch identity, and smearing coefficient information
@@ -958,12 +990,16 @@ contains
                                                             eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
+                    if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                        @:Hardcoded2D()
+                    end if
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
                 end if
             end do
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_ellipse
 
@@ -984,6 +1020,8 @@ contains
         ! Generic loop iterators
         integer :: i, j, k
         real(wp) :: a, b, c
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded3DVariables()
 
         ! Transferring the ellipsoidal patch's radii, centroid, smearing
         ! patch identity, and smearing coefficient information
@@ -1038,13 +1076,17 @@ contains
                                                                 eta, q_prim_vf, patch_id_fp)
 
                         @:analytical()
+                        if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                            @:Hardcoded3D()
+                        end if
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
                     end if
                 end do
             end do
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_ellipsoid
 
@@ -1060,22 +1102,24 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_rectangle(patch_id, patch_id_fp, q_prim_vf, ib)
+    subroutine s_rectangle(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        logical, optional, intent(in) :: ib !< True if this patch is an immersed boundary
+        logical, optional, intent(in) :: ib_flag !< True if this patch is an immersed boundary
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded2DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1._wp + gamma)/gamma
 
         ! Transferring the rectangle's centroid and length information
-        if (present(ib)) then
+        if (present(ib_flag)) then
             x_centroid = patch_ib(patch_id)%x_centroid
             y_centroid = patch_ib(patch_id)%y_centroid
             length_x = patch_ib(patch_id)%length_x
@@ -1110,7 +1154,7 @@ contains
                     x_boundary%end >= x_cc(i) .and. &
                     y_boundary%beg <= y_cc(j) .and. &
                     y_boundary%end >= y_cc(j)) then
-                    if (present(ib)) then
+                    if (present(ib_flag)) then
                         ! Updating the patch identities bookkeeping variable
                         patch_id_fp(i, j, 0) = patch_id
                     else
@@ -1122,6 +1166,10 @@ contains
 
                             @:analytical()
 
+                            if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                                @:Hardcoded2D()
+                            end if
+
                             if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                                 !zero density, reassign according to Tait EOS
                                 q_prim_vf(1)%sf(i, j, 0) = &
@@ -1130,13 +1178,14 @@ contains
                             end if
 
                             ! Updating the patch identities bookkeeping variable
-                            if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                            if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
 
                         end if
                     end if
                 end if
             end do
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_rectangle
 
@@ -1158,6 +1207,8 @@ contains
 
         integer :: i, j, k !< Generic loop operators
         real(wp) :: a, b, c
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded3DVariables()
 
         ! Transferring the centroid information of the line to be swept
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1198,13 +1249,17 @@ contains
                                                             eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
+                    if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                        @:Hardcoded3D()
+                    end if
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
                 end if
 
             end do
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_sweep_line
 
@@ -1224,6 +1279,8 @@ contains
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
         real(wp) :: L0, U0 !< Taylor Green Vortex parameters
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded2DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -1268,9 +1325,12 @@ contains
                                                             eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
+                    if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                        @:Hardcoded2D()
+                    end if
 
                     ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
+                    if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
 
                     ! Assign Parameters
                     q_prim_vf(mom_idx%beg)%sf(i, j, 0) = U0*sin(x_cc(i)/L0)*cos(y_cc(j)/L0)
@@ -1281,73 +1341,9 @@ contains
                 end if
             end do
         end do
-
-    end subroutine s_2D_TaylorGreen_Vortex
-
-    !>  This patch assigns the primitive variables as analytical
-        !!  functions such that the code can be verified.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
-    subroutine s_1D_analytical(patch_id, patch_id_fp, q_prim_vf)
-
-        ! Patch identifier
-        integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-
-        ! Generic loop iterators
-        integer :: i, j, k
-
-        ! Placeholders for the cell boundary values
-        real(wp) :: pi_inf, gamma, lit_gamma
-        @:HardcodedDimensionsExtrusion()
-        @:Hardcoded1DVariables()
-
-        pi_inf = fluid_pp(1)%pi_inf
-        gamma = fluid_pp(1)%gamma
-        lit_gamma = (1._wp + gamma)/gamma
-        j = 0.0_wp
-        k = 0.0_wp
-
-        ! Transferring the patch's centroid and length information
-        x_centroid = patch_icpp(patch_id)%x_centroid
-        length_x = patch_icpp(patch_id)%length_x
-
-        ! Computing the beginning and the end x- and y-coordinates
-        ! of the patch based on its centroid and lengths
-        x_boundary%beg = x_centroid - 0.5_wp*length_x
-        x_boundary%end = x_centroid + 0.5_wp*length_x
-
-        ! Since the patch doesn't allow for its boundaries to be
-        ! smoothed out, the pseudo volume fraction is set to 1 to
-        ! ensure that only the current patch contributes to the fluid
-        ! state in the cells that this patch covers.
-        eta = 1._wp
-
-        ! Checking whether the line segment covers a particular cell in the
-        ! domain and verifying whether the current patch has the permission
-        ! to write to that cell. If both queries check out, the primitive
-        ! variables of the current patch are assigned to this cell.
-        do i = 0, m
-            if (x_boundary%beg <= x_cc(i) .and. &
-                x_boundary%end >= x_cc(i) .and. &
-                patch_icpp(patch_id)%alter_patch(patch_id_fp(i, 0, 0))) then
-
-                call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
-                                                        eta, q_prim_vf, patch_id_fp)
-
-                @:Hardcoded1D()
-
-                ! Updating the patch identities bookkeeping variable
-                if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, 0, 0) = patch_id
-
-            end if
-        end do
-
         @:HardcodedDellacation()
 
-    end subroutine s_1D_analytical
+    end subroutine s_2D_TaylorGreen_Vortex
 
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
@@ -1365,6 +1361,8 @@ contains
         integer :: i, j, k
         ! Placeholders for the cell boundary values
         real(wp) :: pi_inf, gamma, lit_gamma
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded1DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -1398,169 +1396,15 @@ contains
                                                         eta, q_prim_vf, patch_id_fp)
 
                 @:analytical()
+                if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                    @:Hardcoded1D()
+                end if
 
             end if
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_1D_bubble_pulse
-
-    !>  This patch assigns the primitive variables as analytical
-        !!  functions such that the code can be verified.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
-    subroutine s_2D_analytical(patch_id, patch_id_fp, q_prim_vf)
-
-        integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-
-        integer :: i, j, k !< generic loop iterators
-
-        real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
-        real(wp) :: l, U0 !< Taylor Green Vortex parameters
-        @:HardcodedDimensionsExtrusion()
-        @:Hardcoded2DVariables()
-
-        pi_inf = fluid_pp(1)%pi_inf
-        gamma = fluid_pp(1)%gamma
-        lit_gamma = (1._wp + gamma)/gamma
-
-        k = 0.0_wp
-
-        ! Transferring the patch's centroid and length information
-        x_centroid = patch_icpp(patch_id)%x_centroid
-        y_centroid = patch_icpp(patch_id)%y_centroid
-        length_x = patch_icpp(patch_id)%length_x
-        length_y = patch_icpp(patch_id)%length_y
-
-        ! Computing the beginning and the end x- and y-coordinates
-        ! of the patch based on its centroid and lengths
-        x_boundary%beg = x_centroid - 0.5_wp*length_x
-        x_boundary%end = x_centroid + 0.5_wp*length_x
-        y_boundary%beg = y_centroid - 0.5_wp*length_y
-        y_boundary%end = y_centroid + 0.5_wp*length_y
-
-        ! Since the patch doesn't allow for its boundaries to be
-        ! smoothed out, the pseudo volume fraction is set to 1 to
-        ! ensure that only the current patch contributes to the fluid
-        ! state in the cells that this patch covers.
-        eta = 1._wp
-        l = 1._wp
-        U0 = 0.1_wp
-        ! Checking whether the patch covers a particular cell in the
-        ! domain and verifying whether the current patch has the
-        ! permission to write to that cell. If both queries check out,
-        ! the primitive variables of the current patch are assigned
-        ! to this cell.
-
-        do j = 0, n
-            do i = 0, m
-                if (x_boundary%beg <= x_cc(i) .and. &
-                    x_boundary%end >= x_cc(i) .and. &
-                    y_boundary%beg <= y_cc(j) .and. &
-                    y_boundary%end >= y_cc(j) .and. &
-                    patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
-
-                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                            eta, q_prim_vf, patch_id_fp)
-
-                    @:Hardcoded2D()
-                    ! Updating the patch identities bookkeeping variable
-                    if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, 0) = patch_id
-
-                end if
-            end do
-        end do
-
-        @:HardcodedDellacation()
-
-    end subroutine s_2D_analytical
-
-    !> This patch assigns the primitive variables as analytical
-        !!      functions such that the code can be verified.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
-    subroutine s_3D_analytical(patch_id, patch_id_fp, q_prim_vf)
-
-        integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-
-        integer :: i, j, k !< generic loop iterators
-        real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
-        @:HardcodedDimensionsExtrusion()
-        @:Hardcoded3DVariables()
-
-        pi_inf = fluid_pp(1)%pi_inf
-        gamma = fluid_pp(1)%gamma
-        lit_gamma = (1._wp + gamma)/gamma
-
-        ! Transferring the patch's centroid and length information
-        x_centroid = patch_icpp(patch_id)%x_centroid
-        y_centroid = patch_icpp(patch_id)%y_centroid
-        z_centroid = patch_icpp(patch_id)%z_centroid
-        length_x = patch_icpp(patch_id)%length_x
-        length_y = patch_icpp(patch_id)%length_y
-        length_z = patch_icpp(patch_id)%length_z
-
-        ! Computing the beginning and the end x-, y- and z-coordinates of
-        ! the patch based on its centroid and lengths
-        x_boundary%beg = x_centroid - 0.5_wp*length_x
-        x_boundary%end = x_centroid + 0.5_wp*length_x
-        y_boundary%beg = y_centroid - 0.5_wp*length_y
-        y_boundary%end = y_centroid + 0.5_wp*length_y
-        z_boundary%beg = z_centroid - 0.5_wp*length_z
-        z_boundary%end = z_centroid + 0.5_wp*length_z
-
-        ! Since the analytical patch does not allow for its boundaries to get
-        ! smoothed out, the pseudo volume fraction is set to 1 to make sure
-        ! that only the current patch contributes to the fluid state in the
-        ! cells that this patch covers.
-        eta = 1._wp
-
-        ! Checking whether the patch covers a particular cell in the domain
-        ! and verifying whether the current patch has permission to write to
-        ! to that cell. If both queries check out, the primitive variables
-        ! of the current patch are assigned to this cell.
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
-
-                    if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
-                    else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
-                    end if
-
-                    if (x_boundary%beg <= x_cc(i) .and. &
-                        x_boundary%end >= x_cc(i) .and. &
-                        y_boundary%beg <= cart_y .and. &
-                        y_boundary%end >= cart_y .and. &
-                        z_boundary%beg <= cart_z .and. &
-                        z_boundary%end >= cart_z &
-                        .and. &
-                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
-                        then
-
-                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                                eta, q_prim_vf, patch_id_fp)
-
-                        @:Hardcoded3D()
-
-                        ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
-
-                    end if
-
-                end do
-            end do
-        end do
-
-        @:HardcodedDellacation()
-    end subroutine s_3D_analytical
 
     !> This patch generates the shape of the spherical harmonics
         !!      as a perturbation to a perfect sphere
@@ -1575,17 +1419,17 @@ contains
 
         real(wp) :: r, x_p, eps, phi
         real(wp), dimension(2:9) :: as, Ps
-        real(wp) :: radius, x_centroid, y_centroid, z_centroid, eta, smooth_coeff
-        logical :: non_axis_sym
+        real(wp) :: radius, x_centroid_local, y_centroid_local, z_centroid_local, eta_local, smooth_coeff_local
+        logical :: non_axis_sym_in
 
         integer :: i, j, k !< generic loop iterators
 
         ! Transferring the patch's centroid and radius information
-        x_centroid = patch_icpp(patch_id)%x_centroid
-        y_centroid = patch_icpp(patch_id)%y_centroid
-        z_centroid = patch_icpp(patch_id)%z_centroid
+        x_centroid_local = patch_icpp(patch_id)%x_centroid
+        y_centroid_local = patch_icpp(patch_id)%y_centroid
+        z_centroid_local = patch_icpp(patch_id)%z_centroid
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
-        smooth_coeff = patch_icpp(patch_id)%smooth_coeff
+        smooth_coeff_local = patch_icpp(patch_id)%smooth_coeff
         radius = patch_icpp(patch_id)%radius
         as(2) = patch_icpp(patch_id)%a(2)
         as(3) = patch_icpp(patch_id)%a(3)
@@ -1595,20 +1439,20 @@ contains
         as(7) = patch_icpp(patch_id)%a(7)
         as(8) = patch_icpp(patch_id)%a(8)
         as(9) = patch_icpp(patch_id)%a(9)
-        non_axis_sym = patch_icpp(patch_id)%non_axis_sym
+        non_axis_sym_in = patch_icpp(patch_id)%non_axis_sym
 
         ! Since the analytical patch does not allow for its boundaries to get
         ! smoothed out, the pseudo volume fraction is set to 1 to make sure
         ! that only the current patch contributes to the fluid state in the
         ! cells that this patch covers.
-        eta = 1._wp
+        eta_local = 1._wp
         eps = 1.e-32_wp
 
         ! Checking whether the patch covers a particular cell in the domain
         ! and verifying whether the current patch has permission to write to
         ! to that cell. If both queries check out, the primitive variables
         ! of the current patch are assigned to this cell.
-        if (p > 0 .and. .not. non_axis_sym) then
+        if (p > 0 .and. .not. non_axis_sym_in) then
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
@@ -1619,11 +1463,11 @@ contains
                             cart_z = z_cc(k)
                         end if
 
-                        r = sqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) + eps
-                        if (x_cc(i) - x_centroid <= 0) then
-                            x_p = -1._wp*abs(x_cc(i) - x_centroid + eps)/r
+                        r = sqrt((x_cc(i) - x_centroid_local)**2 + (cart_y - y_centroid_local)**2 + (cart_z - z_centroid_local)**2) + eps
+                        if (x_cc(i) - x_centroid_local <= 0) then
+                            x_p = -1._wp*abs(x_cc(i) - x_centroid_local + eps)/r
                         else
-                            x_p = abs(x_cc(i) - x_centroid + eps)/r
+                            x_p = abs(x_cc(i) - x_centroid_local + eps)/r
                         end if
 
                         Ps(2) = unassociated_legendre(x_p, 2)
@@ -1632,7 +1476,7 @@ contains
                         Ps(5) = unassociated_legendre(x_p, 5)
                         Ps(6) = unassociated_legendre(x_p, 6)
                         Ps(7) = unassociated_legendre(x_p, 7)
-                        if ((x_cc(i) - x_centroid >= 0 &
+                        if ((x_cc(i) - x_centroid_local >= 0 &
                              .and. &
                              r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) - as(7)*Ps(7) <= radius &
                              .and. &
@@ -1640,13 +1484,13 @@ contains
                             (patch_id_fp(i, j, k) == smooth_patch_id)) &
                             then
                             if (patch_icpp(patch_id)%smoothen) then
-                                eta = tanh(smooth_coeff/min(dx, dy, dz)* &
-                                           ((r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) - as(7)*Ps(7)) &
-                                            - radius))*(-0.5_wp) + 0.5_wp
+                                eta_local = tanh(smooth_coeff_local/min(dx, dy, dz)* &
+                                                 ((r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) - as(7)*Ps(7)) &
+                                                  - radius))*(-0.5_wp) + 0.5_wp
                             end if
 
                             call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                                    eta, q_prim_vf, patch_id_fp)
+                                                                    eta_local, q_prim_vf, patch_id_fp)
                         end if
 
                     end do
@@ -1657,9 +1501,9 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    if (non_axis_sym) then
-                        phi = atan(((y_cc(j) - y_centroid) + eps)/((x_cc(i) - x_centroid) + eps))
-                        r = sqrt((x_cc(i) - x_centroid)**2._wp + (y_cc(j) - y_centroid)**2._wp) + eps
+                    if (non_axis_sym_in) then
+                        phi = atan(((y_cc(j) - y_centroid_local) + eps)/((x_cc(i) - x_centroid_local) + eps))
+                        r = sqrt((x_cc(i) - x_centroid_local)**2._wp + (y_cc(j) - y_centroid_local)**2._wp) + eps
                         x_p = (eps)/r
                         Ps(2) = spherical_harmonic_func(x_p, phi, 2, 2)
                         Ps(3) = spherical_harmonic_func(x_p, phi, 3, 3)
@@ -1670,8 +1514,8 @@ contains
                         Ps(8) = spherical_harmonic_func(x_p, phi, 8, 8)
                         Ps(9) = spherical_harmonic_func(x_p, phi, 9, 9)
                     else
-                        r = sqrt((x_cc(i) - x_centroid)**2._wp + (y_cc(j) - y_centroid)**2._wp) + eps
-                        x_p = abs(x_cc(i) - x_centroid + eps)/r
+                        r = sqrt((x_cc(i) - x_centroid_local)**2._wp + (y_cc(j) - y_centroid_local)**2._wp) + eps
+                        x_p = abs(x_cc(i) - x_centroid_local + eps)/r
                         Ps(2) = unassociated_legendre(x_p, 2)
                         Ps(3) = unassociated_legendre(x_p, 3)
                         Ps(4) = unassociated_legendre(x_p, 4)
@@ -1682,22 +1526,22 @@ contains
                         Ps(9) = unassociated_legendre(x_p, 9)
                     end if
 
-                    if (x_cc(i) - x_centroid >= 0 &
+                    if (x_cc(i) - x_centroid_local >= 0 &
                         .and. &
                         r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) - as(7)*Ps(7) - as(8)*Ps(8) - as(9)*Ps(9) <= radius .and. &
                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                         then
                         call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                                eta, q_prim_vf, patch_id_fp)
+                                                                eta_local, q_prim_vf, patch_id_fp)
 
-                    elseif (x_cc(i) - x_centroid < 0 &
+                    elseif (x_cc(i) - x_centroid_local < 0 &
                             .and. &
                             r - as(2)*Ps(2) + as(3)*Ps(3) - as(4)*Ps(4) + as(5)*Ps(5) - as(6)*Ps(6) + as(7)*Ps(7) - as(8)*Ps(8) + as(9)*Ps(9) <= radius &
                             .and. &
                             patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                         then
                         call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                                eta, q_prim_vf, patch_id_fp)
+                                                                eta_local, q_prim_vf, patch_id_fp)
 
                     end if
                 end do
@@ -1715,23 +1559,25 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_sphere(patch_id, patch_id_fp, q_prim_vf, ib)
+    subroutine s_sphere(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        logical, optional, intent(in) :: ib   !< True if this patch is an immersed boundary
+        logical, optional, intent(in) :: ib_flag   !< True if this patch is an immersed boundary
 
         ! Generic loop iterators
-        integer :: i, j, k !< generic loop iterators
+        integer :: i, j, k
         real(wp) :: radius
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded3DVariables()
 
         !! Variables to initialize the pressure field that corresponds to the
             !! bubble-collapse test case found in Tiwari et al. (2013)
 
         ! Transferring spherical patch's radius, centroid, smoothing patch
         ! identity and smoothing coefficient information
-        if (present(ib)) then
+        if (present(ib_flag)) then
             x_centroid = patch_ib(patch_id)%x_centroid
             y_centroid = patch_ib(patch_id)%y_centroid
             z_centroid = patch_ib(patch_id)%z_centroid
@@ -1765,7 +1611,7 @@ contains
                         cart_z = z_cc(k)
                     end if
 
-                    if (.not. present(ib) .and. patch_icpp(patch_id)%smoothen) then
+                    if (.not. present(ib_flag) .and. patch_icpp(patch_id)%smoothen) then
                         eta = tanh(smooth_coeff/min(dx, dy, dz)* &
                                    (sqrt((x_cc(i) - x_centroid)**2 &
                                          + (cart_y - y_centroid)**2 &
@@ -1773,7 +1619,7 @@ contains
                                     - radius))*(-0.5_wp) + 0.5_wp
                     end if
 
-                    if (present(ib)) then
+                    if (present(ib_flag)) then
                         ! Updating the patch identities bookkeeping variable
                         if (((x_cc(i) - x_centroid)**2 &
                              + (cart_y - y_centroid)**2 &
@@ -1791,11 +1637,16 @@ contains
                                                                     eta, q_prim_vf, patch_id_fp)
 
                             @:analytical()
+                            if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                                @:Hardcoded3D()
+                            end if
+
                         end if
                     end if
                 end do
             end do
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_sphere
 
@@ -1810,17 +1661,19 @@ contains
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    subroutine s_cuboid(patch_id, patch_id_fp, q_prim_vf, ib)
+    subroutine s_cuboid(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
-        logical, optional, intent(in) :: ib
+        logical, optional, intent(in) :: ib_flag
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded3DVariables()
 
         ! Transferring the cuboid's centroid and length information
-        if (present(ib)) then
+        if (present(ib_flag)) then
             x_centroid = patch_ib(patch_id)%x_centroid
             y_centroid = patch_ib(patch_id)%y_centroid
             z_centroid = patch_ib(patch_id)%z_centroid
@@ -1873,7 +1726,7 @@ contains
                         z_boundary%beg <= cart_z .and. &
                         z_boundary%end >= cart_z) then
 
-                        if (present(ib)) then
+                        if (present(ib_flag)) then
                             ! Updating the patch identities bookkeeping variable
                             patch_id_fp(i, j, k) = patch_id
                         else
@@ -1883,9 +1736,12 @@ contains
                                                                         eta, q_prim_vf, patch_id_fp)
 
                                 @:analytical()
+                                if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                                    @:Hardcoded3D()
+                                end if
 
                                 ! Updating the patch identities bookkeeping variable
-                                if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
+                                if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
 
                             end if
                         end if
@@ -1893,6 +1749,7 @@ contains
                 end do
             end do
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_cuboid
 
@@ -1908,20 +1765,22 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_cylinder(patch_id, patch_id_fp, q_prim_vf, ib)
+    subroutine s_cylinder(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        logical, optional, intent(in) :: ib   !< True if this patch is an immersed boundary
+        logical, optional, intent(in) :: ib_flag   !< True if this patch is an immersed boundary
 
         integer :: i, j, k !< Generic loop iterators
         real(wp) :: radius
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded3DVariables()
 
         ! Transferring the cylindrical patch's centroid, length, radius,
         ! smoothing patch identity and smoothing coefficient information
 
-        if (present(ib)) then
+        if (present(ib_flag)) then
             x_centroid = patch_ib(patch_id)%x_centroid
             y_centroid = patch_ib(patch_id)%y_centroid
             z_centroid = patch_ib(patch_id)%z_centroid
@@ -1970,7 +1829,7 @@ contains
                         cart_z = z_cc(k)
                     end if
 
-                    if (.not. present(ib) .and. patch_icpp(patch_id)%smoothen) then
+                    if (.not. present(ib_flag) .and. patch_icpp(patch_id)%smoothen) then
                         if (.not. f_is_default(length_x)) then
                             eta = tanh(smooth_coeff/min(dy, dz)* &
                                        (sqrt((cart_y - y_centroid)**2 &
@@ -1989,7 +1848,7 @@ contains
                         end if
                     end if
 
-                    if (present(ib)) then
+                    if (present(ib_flag)) then
                         if (((.not. f_is_default(length_x) .and. &
                               (cart_y - y_centroid)**2 &
                               + (cart_z - z_centroid)**2 <= radius**2 .and. &
@@ -2037,14 +1896,18 @@ contains
                                                                     eta, q_prim_vf, patch_id_fp)
 
                             @:analytical()
+                            if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                                @:Hardcoded3D()
+                            end if
 
                             ! Updating the patch identities bookkeeping variable
-                            if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
+                            if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
                         end if
                     end if
                 end do
             end do
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_cylinder
 
@@ -2066,6 +1929,8 @@ contains
 
         integer :: i, j, k !< Generic loop iterators
         real(wp) :: a, b, c, d
+        @:HardcodedDimensionsExtrusion()
+        @:Hardcoded3DVariables()
 
         ! Transferring the centroid information of the plane to be swept
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -2119,14 +1984,18 @@ contains
                                                                 eta, q_prim_vf, patch_id_fp)
 
                         @:analytical()
+                        if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                            @:Hardcoded3D()
+                        end if
 
                         ! Updating the patch identities bookkeeping variable
-                        if (1._wp - eta < 1.e-16_wp) patch_id_fp(i, j, k) = patch_id
+                        if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
                     end if
 
                 end do
             end do
         end do
+        @:HardcodedDellacation()
 
     end subroutine s_sweep_plane
 
@@ -2137,7 +2006,7 @@ contains
     !! @param ib True if this patch is an immersed boundary
     !! @param STL_levelset STL levelset
     !! @param STL_levelset_norm STL levelset normals
-    subroutine s_model(patch_id, patch_id_fp, q_prim_vf, ib, STL_levelset, STL_levelset_norm)
+    subroutine s_model(patch_id, patch_id_fp, q_prim_vf, ib_flag, STL_levelset, STL_levelset_norm)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -2146,7 +2015,7 @@ contains
         ! Variables for IBM+STL
         type(levelset_field), optional, intent(inout) :: STL_levelset !< Levelset determined by models
         type(levelset_norm_field), optional, intent(inout) :: STL_levelset_norm !< Levelset_norm determined by models
-        logical, optional, intent(in) :: ib   !< True if this patch is an immersed boundary
+        logical, optional, intent(in) :: ib_flag   !< True if this patch is an immersed boundary
         real(wp) :: normals(1:3) !< Boundary normal buffer
         integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
         real(wp), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
@@ -2160,22 +2029,22 @@ contains
         type(t_model) :: model
         type(ic_model_parameters) :: params
 
-        t_vec3 :: point, model_center
+        real(wp), dimension(1:3) :: point, model_center
 
         real(wp) :: grid_mm(1:3, 1:2)
 
         integer :: cell_num
         integer :: ncells
 
-        t_mat4x4 :: transform, transform_n
+        real(wp), dimension(1:4, 1:4) :: transform, transform_n
 
-        if (present(ib) .and. proc_rank == 0) then
+        if (present(ib_flag) .and. proc_rank == 0) then
             print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
         else if (proc_rank == 0) then
             print *, " * Reading model: "//trim(patch_icpp(patch_id)%model_filepath)
         end if
 
-        if (present(ib)) then
+        if (present(ib_flag)) then
             model = f_model_read(patch_ib(patch_id)%model_filepath)
             params%scale(:) = patch_ib(patch_id)%model_scale(:)
             params%translate(:) = patch_ib(patch_id)%model_translate(:)
@@ -2285,13 +2154,13 @@ contains
                         point = f_convert_cyl_to_cart(point)
                     end if
 
-                    if (present(ib)) then
+                    if (present(ib_flag)) then
                         eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_ib(patch_id)%model_spc)
                     else
                         eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_icpp(patch_id)%model_spc)
                     end if
 
-                    if (present(ib)) then
+                    if (present(ib_flag)) then
                         ! Reading STL boundary vertices and compute the levelset and levelset_norm
                         if (eta > patch_ib(patch_id)%model_threshold) then
                             patch_id_fp(i, j, k) = patch_id
@@ -2389,7 +2258,7 @@ contains
     end subroutine s_model
 
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), intent(in) :: cyl_y, cyl_z
 
@@ -2400,10 +2269,10 @@ contains
 
     pure function f_convert_cyl_to_cart(cyl) result(cart)
 
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
 
-        t_vec3, intent(in) :: cyl
-        t_vec3 :: cart
+        real(wp), dimension(1:3), intent(in) :: cyl
+        real(wp), dimension(1:3) :: cart
 
         cart = (/cyl(1), &
                  cyl(2)*sin(cyl(3)), &
@@ -2412,7 +2281,7 @@ contains
     end function f_convert_cyl_to_cart
 
     subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), intent(IN) :: cyl_x, cyl_y
 
@@ -2425,7 +2294,7 @@ contains
     !! @param offset Thickness
     !! @param a Starting position
     pure elemental function f_r(myth, offset, a)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: myth, offset, a
         real(wp) :: b
         real(wp) :: f_r

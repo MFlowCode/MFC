@@ -3,6 +3,7 @@
 !! @brief Contains module m_assign_variables
 
 #:include 'case.fpp'
+#:include 'macros.fpp'
 
 module m_assign_variables
 
@@ -103,7 +104,7 @@ contains
         !! @param patch_id_fp Array to track patch ids
     pure subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
                                                                eta, q_prim_vf, patch_id_fp)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
@@ -276,7 +277,7 @@ contains
         !! @param patch_id_fp Array to track patch ids
     impure subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, &
                                                                  eta, q_prim_vf, patch_id_fp)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
@@ -340,10 +341,12 @@ contains
 
         ! Computing Mixture Variables of Current Patch
 
-        ! Volume fraction(s)
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha(i - E_idx)
-        end do
+        if (.not. igr .or. num_fluids > 1) then
+            ! Volume fraction(s)
+            do i = adv_idx%beg, adv_idx%end
+                q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha(i - E_idx)
+            end do
+        end if
 
         if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
@@ -383,10 +386,12 @@ contains
             end do
         end if
 
-        ! Volume fraction(s)
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha(i - E_idx)
-        end do
+        if (.not. igr .or. num_fluids > 1) then
+            ! Volume fraction(s)
+            do i = adv_idx%beg, adv_idx%end
+                q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha(i - E_idx)
+            end do
+        end if
 
         if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
@@ -404,8 +409,8 @@ contains
         ! Bubbles euler variables
         if (bubbles_euler) then
             do i = 1, nb
-                muR = R0(i)*patch_icpp(smooth_patch_id)%r0 ! = R0(i)
-                muV = V0(i)*patch_icpp(smooth_patch_id)%v0 ! = 0
+                muR = R0(i)*patch_icpp(smooth_patch_id)%r0
+                muV = patch_icpp(smooth_patch_id)%v0
                 if (qbmm) then
                     ! Initialize the moment set
                     if (dist_type == 1) then
@@ -457,12 +462,14 @@ contains
             (eta*patch_icpp(patch_id)%pres &
              + (1._wp - eta)*orig_prim_vf(E_idx))
 
-        ! Volume fractions \alpha
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf(j, k, l) = &
-                eta*patch_icpp(patch_id)%alpha(i - E_idx) &
-                + (1._wp - eta)*orig_prim_vf(i)
-        end do
+        if (.not. igr .or. num_fluids > 1) then
+            ! Volume fractions \alpha
+            do i = adv_idx%beg, adv_idx%end
+                q_prim_vf(i)%sf(j, k, l) = &
+                    eta*patch_icpp(patch_id)%alpha(i - E_idx) &
+                    + (1._wp - eta)*orig_prim_vf(i)
+            end do
+        end if
 
         if (mhd) then
             if (n == 0) then ! 1D: By, Bz
@@ -609,8 +616,8 @@ contains
         ! Smoothed bubble variables
         if (bubbles_euler) then
             do i = 1, nb
-                muR = R0(i)*patch_icpp(patch_id)%r0 ! = 1*R0(i)
-                muV = V0(i)*patch_icpp(patch_id)%v0 ! = 1*V0(i)
+                muR = R0(i)*patch_icpp(patch_id)%r0
+                muV = patch_icpp(patch_id)%v0
                 if (qbmm) then
                     ! Initialize the moment set
                     if (dist_type == 1) then
@@ -629,12 +636,6 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
                 else
-                    ! q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = &
-                    !     (eta * R0(i)*patch_icpp(patch_id)%r0 &
-                    !     + (1._wp-eta)*orig_prim_vf(bub_idx%rs(i)))
-                    ! q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = &
-                    !     (eta * V0(i)*patch_icpp(patch_id)%v0 &
-                    !     + (1._wp-eta)*orig_prim_vf(bub_idx%vs(i)))
                     q_prim_vf(bub_idx%rs(i))%sf(j, k, l) = muR
                     q_prim_vf(bub_idx%vs(i))%sf(j, k, l) = muV
 

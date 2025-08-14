@@ -1,4 +1,4 @@
-#:def compute_capilary_stress_tensor()
+#:def compute_capillary_stress_tensor()
 
     Omega(1, 1) = -sigma*(w2*w2 + w3*w3)/normW
 
@@ -19,4 +19,4 @@
 
     end if
 
-#:enddef compute_capilary_stress_tensor
+#:enddef compute_capillary_stress_tensor

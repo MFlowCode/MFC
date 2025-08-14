@@ -46,6 +46,17 @@ contains
             if (i <= num_patches) then
                 ! call s_check_patch_geometry(i)
                 call s_int_to_str(i, iStr)
+                @:PROHIBIT(patch_icpp(i)%geometry == 6, "Invalid patch geometry number. "// &
+                    "patch_icpp("//trim(iStr)//")%geometry is deprecated.")
+                @:PROHIBIT(patch_icpp(i)%geometry == 7, "Invalid patch geometry number. "// &
+                    "patch_icpp("//trim(iStr)//")%geometry is deprecated.")
+                @:PROHIBIT(patch_icpp(i)%geometry == 13, "Invalid patch geometry number. "// &
+                    "patch_icpp("//trim(iStr)//")%geometry is deprecated.")
+                @:PROHIBIT(patch_icpp(i)%geometry == 15, "Invalid patch geometry number. "// &
+                    "patch_icpp("//trim(iStr)//")%geometry is deprecated.")
+                @:PROHIBIT(patch_icpp(i)%geometry == dflt_int, "Invalid patch geometry number. "// &
+                    "patch_icpp("//trim(iStr)//")%geometry must be set.")
+
                 ! Constraints on the geometric initial condition patch parameters
                 if (patch_icpp(i)%geometry == 1) then
                     call s_check_line_segment_patch_geometry(i)
@@ -57,12 +68,6 @@ contains
                     call s_check_line_sweep_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 5) then
                     call s_check_ellipse_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 6) then
-                    call s_mpi_abort('geometry 6 (formerly "Vortex")'// &
-                                     'is no longer supported for patch '//trim(iStr)// &
-                                     '. Exiting.')
-                elseif (patch_icpp(i)%geometry == 7) then
-                    call s_check_2D_analytical_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 8) then
                     call s_check_sphere_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 9) then
@@ -73,37 +78,21 @@ contains
                     call s_check_plane_sweep_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 12) then
                     call s_check_ellipsoid_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 13) then
-                    call s_check_3D_analytical_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 14) then
                     call s_check_spherical_harmonic_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 15) then
-                    call s_check_1d_analytical_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 16) then
-                    print *, '1d pressure sinusoid'
-                elseif (patch_icpp(i)%geometry == 17) then
-                    print *, '2d spiral'
-                elseif (patch_icpp(i)%geometry == 18) then
-                    print *, '2d var circle'
-                elseif (patch_icpp(i)%geometry == 19) then
-                    print *, '3d var circle'
                 elseif (patch_icpp(i)%geometry == 20) then
                     call s_check_2D_TaylorGreen_vortex_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_check_model_geometry(i)
-                elseif (patch_icpp(i)%geometry == dflt_int) then
-                    call s_prohibit_abort("Active patch undefined", "patch_icpp("//trim(iStr)//")%geometry must be set")
                 else
                     call s_prohibit_abort("Invalid patch geometry number", "patch_icpp("//trim(iStr)//")%geometry "// &
                                           "must be between 1 and 21")
                 end if
             else
-                if (patch_icpp(i)%geometry == dflt_int) then
-                    call s_check_inactive_patch_geometry(i)
-                else
-                    call s_prohibit_abort("Inactive patch defined", "patch_icpp("//trim(iStr)//")%geometry must not be set. "// &
-                                          "Patch "//trim(iStr)//" is inactive as the number of patches is "//trim(num_patches_str))
-                end if
+                @:PROHIBIT(patch_icpp(i)%geometry /= dflt_int, "Inactive patch defined. "// &
+                    "patch_icpp("//trim(iStr)//")%geometry not be set for inactive patches. "// &
+                    "Patch "//trim(iStr)//" is inactive as the number of patches is "//trim(num_patches_str))
+                call s_check_inactive_patch_geometry(i)
             end if
         end do
 
@@ -242,54 +231,6 @@ contains
         @:PROHIBIT(patch_icpp(patch_id)%vel(2) <= 0._wp, "Taylor Green vortex patch "//trim(iStr)//": vel(2) must be greater than zero")
 
     end subroutine s_check_2D_TaylorGreen_vortex_patch_geometry
-
-    !>  This subroutine checks the model patch input
-        !!  @param patch_id Patch identifier
-    impure subroutine s_check_1D_analytical_patch_geometry(patch_id)
-
-        integer, intent(in) :: patch_id
-        call s_int_to_str(patch_id, iStr)
-
-        @:PROHIBIT(n > 0, "1D analytical patch "//trim(iStr)//": n must be zero")
-        @:PROHIBIT(p > 0, "1D analytical patch "//trim(iStr)//": p must be zero")
-        @:PROHIBIT(model_eqns /= 4 .and. model_eqns /= 2, "1D analytical patch "//trim(iStr)//": model_eqns must be either 4 or 2")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "1D analytical patch "//trim(iStr)//": x_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "1D analytical patch "//trim(iStr)//": length_x must be greater than zero")
-
-    end subroutine s_check_1D_analytical_patch_geometry
-
-    !>  This subroutine checks the model patch input
-        !!  @param patch_id Patch identifier
-    impure subroutine s_check_2D_analytical_patch_geometry(patch_id)
-
-        integer, intent(in) :: patch_id
-        call s_int_to_str(patch_id, iStr)
-
-        @:PROHIBIT(n == 0, "2D analytical patch "//trim(iStr)//": n must be greater than zero")
-        @:PROHIBIT(p > 0, "2D analytical patch "//trim(iStr)//": p must be zero")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "2D analytical patch "//trim(iStr)//": x_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "2D analytical patch "//trim(iStr)//": y_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "2D analytical patch "//trim(iStr)//": length_x must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0._wp, "2D analytical patch "//trim(iStr)//": length_y must be greater than zero")
-
-    end subroutine s_check_2D_analytical_patch_geometry
-
-    !>  This subroutine checks the model patch input
-        !!  @param patch_id Patch identifier
-    impure subroutine s_check_3D_analytical_patch_geometry(patch_id)
-
-        integer, intent(in) :: patch_id
-        call s_int_to_str(patch_id, iStr)
-
-        @:PROHIBIT(p == 0, "3D analytical patch "//trim(iStr)//": p must be greater than zero")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "3D analytical patch "//trim(iStr)//": x_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "3D analytical patch "//trim(iStr)//": y_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "3D analytical patch "//trim(iStr)//": z_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "3D analytical patch "//trim(iStr)//": length_x must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0._wp, "3D analytical patch "//trim(iStr)//": length_y must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_z <= 0._wp, "3D analytical patch "//trim(iStr)//": length_z must be greater than zero")
-
-    end subroutine s_check_3D_analytical_patch_geometry
 
     !> This subroutine checks the model patch input
         !!  @param patch_id Patch identifier

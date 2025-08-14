@@ -66,7 +66,8 @@ print(
             "patch_icpp(2)%length_x": 9.0,
             "patch_icpp(2)%vel(1)": 0.0,
             "patch_icpp(2)%pres": 1.0,
-            "patch_icpp(2)%alpha_rho(1)": "1 + 0.2*sin(5*x)",
+            "patch_icpp(2)%alpha_rho(1)": 0.0,
+            "patch_icpp(2)%hcid": 180,
             "patch_icpp(2)%alpha(1)": 1.0,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1.0e00),

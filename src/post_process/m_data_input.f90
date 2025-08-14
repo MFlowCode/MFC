@@ -50,6 +50,8 @@ module m_data_input
     type(scalar_field), allocatable, dimension(:), public :: q_cons_vf !<
     !! Conservative variables
 
+    type(scalar_field), allocatable, dimension(:), public :: q_cons_temp
+
     type(scalar_field), allocatable, dimension(:), public :: q_prim_vf !<
     !! Primitive variables
 
@@ -108,6 +110,7 @@ contains
 
     end subroutine s_read_grid_data_direction
 
+#ifdef MFC_MPI
     !> Helper subroutine to setup MPI data I/O parameters
     !!  @param data_size Local array size (output)
     !!  @param m_MOK, n_MOK, p_MOK MPI offset kinds for dimensions (output)
@@ -138,6 +141,7 @@ contains
         NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
     end subroutine s_setup_mpi_io_params
+#endif
 
     !> Helper subroutine to read IB data files
     !!  @param file_loc_base Base file location for IB data
@@ -148,9 +152,11 @@ contains
         character(LEN=len_trim(file_loc_base) + 20) :: file_loc
         logical :: file_exist
         integer :: ifile, ierr, data_size
+
+#ifdef MFC_MPI
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(KIND=MPI_OFFSET_KIND) :: disp
-
+#endif
         if (.not. ib) return
 
         if (parallel_io) then
@@ -192,22 +198,22 @@ contains
     !> Helper subroutine to allocate field arrays for given dimensionality
     !!  @param start_idx Starting index for allocation
     !!  @param end_x, end_y, end_z End indices for each dimension
-    impure subroutine s_allocate_field_arrays(start_idx, end_x, end_y, end_z)
+    impure subroutine s_allocate_field_arrays(local_start_idx, end_x, end_y, end_z)
 
-        integer, intent(in) :: start_idx, end_x, end_y, end_z
+        integer, intent(in) :: local_start_idx, end_x, end_y, end_z
         integer :: i
 
         do i = 1, sys_size
-            allocate (q_cons_vf(i)%sf(start_idx:end_x, start_idx:end_y, start_idx:end_z))
-            allocate (q_prim_vf(i)%sf(start_idx:end_x, start_idx:end_y, start_idx:end_z))
+            allocate (q_cons_vf(i)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+            allocate (q_prim_vf(i)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
         end do
 
         if (ib) then
-            allocate (ib_markers%sf(start_idx:end_x, start_idx:end_y, start_idx:end_z))
+            allocate (ib_markers%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
         end if
 
         if (chemistry) then
-            allocate (q_T_sf%sf(start_idx:end_x, start_idx:end_y, start_idx:end_z))
+            allocate (q_T_sf%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
         end if
 
     end subroutine s_allocate_field_arrays
@@ -328,7 +334,7 @@ contains
 
         real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
-        integer :: ifile, ierr, data_size
+        integer :: ifile, ierr, data_size, filetype, stride
         integer, dimension(MPI_STATUS_SIZE) :: status
 
         integer(KIND=MPI_OFFSET_KIND) :: disp
@@ -336,6 +342,8 @@ contains
         integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
         integer(KIND=MPI_OFFSET_KIND) :: NVARS_MOK
         integer(KIND=MPI_OFFSET_KIND) :: MOK
+        integer(kind=MPI_OFFSET_KIND) :: offset
+        real(wp) :: delx, dely, delz
 
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
@@ -348,6 +356,12 @@ contains
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))
 
+        if (down_sample) then
+            stride = 3
+        else
+            stride = 1
+        end if
+
         ! Read in cell boundary locations in x-direction
         file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'x_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -355,6 +369,13 @@ contains
         if (file_exist) then
             data_size = m_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+            call MPI_TYPE_VECTOR(data_size, 1, stride, mpi_p, filetype, ierr)
+            call MPI_TYPE_COMMIT(filetype, ierr)
+
+            offset = 0
+            call MPI_FILE_SET_VIEW(ifile, offset, mpi_p, filetype, 'native', mpi_info_int, ierr)
+
             call MPI_FILE_READ(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
@@ -376,6 +397,13 @@ contains
             if (file_exist) then
                 data_size = n_glb + 2
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                call MPI_TYPE_VECTOR(data_size, 1, stride, mpi_p, filetype, ierr)
+                call MPI_TYPE_COMMIT(filetype, ierr)
+
+                offset = 0
+                call MPI_FILE_SET_VIEW(ifile, offset, mpi_p, filetype, 'native', mpi_info_int, ierr)
+
                 call MPI_FILE_READ(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             else
@@ -397,6 +425,13 @@ contains
                 if (file_exist) then
                     data_size = p_glb + 2
                     call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                    call MPI_TYPE_VECTOR(data_size, 1, stride, mpi_p, filetype, ierr)
+                    call MPI_TYPE_COMMIT(filetype, ierr)
+
+                    offset = 0
+                    call MPI_FILE_SET_VIEW(ifile, offset, mpi_p, filetype, 'native', mpi_info_int, ierr)
+
                     call MPI_FILE_READ(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
@@ -426,6 +461,7 @@ contains
 
     end subroutine s_read_parallel_data_files
 
+#ifdef MFC_MPI
     !> Helper subroutine to read parallel conservative variable data
     !!  @param t_step Current time-step
     !!  @param m_MOK, n_MOK, p_MOK MPI offset kinds for dimensions
@@ -435,8 +471,6 @@ contains
         integer, intent(in) :: t_step
         integer(KIND=MPI_OFFSET_KIND), intent(inout) :: m_MOK, n_MOK, p_MOK
         integer(KIND=MPI_OFFSET_KIND), intent(inout) :: WP_MOK, MOK, str_MOK, NVARS_MOK
-
-#ifdef MFC_MPI
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
@@ -456,7 +490,33 @@ contains
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                call s_setup_mpi_io_params(data_size, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
+                if (down_sample) then
+                    call s_initialize_mpi_data_ds(q_cons_temp)
+                else
+                    ! Initialize MPI data I/O
+                    if (ib) then
+                        call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    else
+                        call s_initialize_mpi_data(q_cons_vf)
+                    end if
+                end if
+
+                if (down_sample) then
+                    ! Size of local arrays
+                    data_size = (m + 3)*(n + 3)*(p + 3)
+                else
+                    ! Size of local arrays
+                    data_size = (m + 1)*(n + 1)*(p + 1)
+                end if
+
+                ! Resize some integers so MPI can read even the biggest file
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity .or. mhd) then
@@ -466,7 +526,7 @@ contains
                                                mpi_p, status, ierr)
                     end do
                 else
-                    do i = 1, adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                                mpi_p, status, ierr)
@@ -475,6 +535,12 @@ contains
 
                 call s_mpi_barrier()
                 call MPI_FILE_CLOSE(ifile, ierr)
+
+                if (down_sample) then
+                    do i = 1, sys_size
+                        q_cons_vf(i)%sf(0:m, 0:n, 0:p) = q_cons_temp(i)%sf(0:m, 0:n, 0:p)
+                    end do
+                end if
 
                 call s_read_ib_data_files(trim(case_dir)//'/restart_data'//trim(mpiiofs))
             else
@@ -512,10 +578,8 @@ contains
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
         end if
-
-#endif
-
     end subroutine s_read_parallel_conservative_data
+#endif
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
@@ -528,6 +592,7 @@ contains
         ! the simulation
         allocate (q_cons_vf(1:sys_size))
         allocate (q_prim_vf(1:sys_size))
+        allocate (q_cons_temp(1:sys_size))
 
         ! Allocating the parts of the conservative and primitive variables
         ! that do require the direct knowledge of the dimensionality of
@@ -538,6 +603,11 @@ contains
             ! Simulation is 3D
             if (p > 0) then
                 call s_allocate_field_arrays(-buff_size, m + buff_size, n + buff_size, p + buff_size)
+                if (down_sample) then
+                    do i = 1, sys_size
+                        allocate (q_cons_temp(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
+                    end do
+                end if
             else
                 ! Simulation is 2D
                 call s_allocate_field_arrays(-buff_size, m + buff_size, n + buff_size, 0)
@@ -578,10 +648,14 @@ contains
         do i = 1, sys_size
             deallocate (q_cons_vf(i)%sf)
             deallocate (q_prim_vf(i)%sf)
+            if (down_sample) then
+                deallocate (q_cons_temp(i)%sf)
+            end if
         end do
 
         deallocate (q_cons_vf)
         deallocate (q_prim_vf)
+        deallocate (q_cons_temp)
 
         if (ib) then
             deallocate (ib_markers%sf)

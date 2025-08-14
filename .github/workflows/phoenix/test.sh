@@ -18,4 +18,3 @@ fi
 
 ./mfc.sh test --max-attempts 3 -a -j $n_test_threads $device_opts -- -c phoenix
 
-
