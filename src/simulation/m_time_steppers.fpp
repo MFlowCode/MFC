@@ -78,9 +78,9 @@ module m_time_steppers
     $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt,bc_type]')
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
-    real(wp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
+    real(stp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
 #elif defined(FRONTIER_UNIFIED)
-    real(wp), pointer, contiguous, dimension(:, :, :, :) :: q_cons_ts_pool_host, q_cons_ts_pool_device
+    real(stp), pointer, contiguous, dimension(:, :, :, :) :: q_cons_ts_pool_host, q_cons_ts_pool_device
     integer(kind=8) :: pool_dims(4), pool_starts(4)
 #endif
 
