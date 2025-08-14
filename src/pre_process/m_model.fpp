@@ -227,7 +227,7 @@ contains
 
         integer :: i, j, k, l, iunit, iostat, nVertices
 
-        t_vec3, allocatable :: vertices(:, :)
+        real(wp), dimension(1:3), allocatable :: vertices(:, :)
 
         character(80) :: line
 
@@ -488,8 +488,8 @@ contains
     impure function f_model_is_inside(model, point, spacing, spc) result(fraction)
 
         type(t_model), intent(in) :: model
-        t_vec3, intent(in) :: point
-        t_vec3, intent(in) :: spacing
+        real(wp), dimension(1:3), intent(in) :: point
+        real(wp), dimension(1:3), intent(in) :: spacing
         integer, intent(in) :: spc
 
         real(wp) :: fraction
@@ -727,7 +727,7 @@ contains
         logical, intent(inout) :: interpolate !< Logical indicator of interpolation
         integer, intent(in) :: boundary_edge_count !< Number of boundary edges
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
-        t_vec3, intent(in) :: spacing
+        real(wp), dimension(1:3), intent(in) :: spacing
 
         real(wp) :: l1, cell_width !< Length of each boundary edge and cell width
         integer :: j !< Boundary edge index iterator
@@ -756,8 +756,8 @@ contains
     pure subroutine f_check_interpolation_3D(model, spacing, interpolate)
         logical, intent(inout) :: interpolate
         type(t_model), intent(in) :: model
-        t_vec3, intent(in) :: spacing
-        t_vec3 :: edge_l
+        real(wp), dimension(1:3), intent(in) :: spacing
+        real(wp), dimension(1:3) :: edge_l
         real(wp) :: cell_width
         real(wp), dimension(1:3, 1:3) :: tri_v
         integer :: i, j !< Loop iterator
@@ -801,7 +801,7 @@ contains
     !! @param total_vertices               Total number of vertices after interpolation
     pure subroutine f_interpolate_2D(boundary_v, boundary_edge_count, spacing, interpolated_boundary_v, total_vertices)
         real(wp), intent(in), dimension(:, :, :) :: boundary_v
-        t_vec3, intent(in) :: spacing
+        real(wp), dimension(1:3), intent(in) :: spacing
         real(wp), allocatable, intent(inout), dimension(:, :) :: interpolated_boundary_v
 
         integer, intent(inout) :: total_vertices, boundary_edge_count
@@ -893,15 +893,15 @@ contains
     !! @param interpolated_boundary_v      Output all the boundary vertices of the interpolated 3D model
     !! @param total_vertices               Total number of vertices after interpolation
     impure subroutine f_interpolate_3D(model, spacing, interpolated_boundary_v, total_vertices)
-        t_vec3, intent(in) :: spacing
+        real(wp), dimension(1:3), intent(in) :: spacing
         type(t_model), intent(in) :: model
         real(wp), allocatable, intent(inout), dimension(:, :) :: interpolated_boundary_v
         integer, intent(out) :: total_vertices
 
         integer :: i, j, k, num_triangles, num_segments, num_inner_vertices
         real(wp), dimension(1:3, 1:3) :: tri
-        t_vec3 :: edge_del, cell_area
-        t_vec3 :: bary_coord !< Barycentric coordinates
+        real(wp), dimension(1:3) :: edge_del, cell_area
+        real(wp), dimension(1:3) :: bary_coord !< Barycentric coordinates
         real(wp) :: edge_length, cell_width, cell_area_min, tri_area
 
         ! Number of triangles in the model
@@ -1044,15 +1044,15 @@ contains
     !! @param distance     The output levelset distance
     pure subroutine f_distance_normals_3D(model, point, normals, distance)
         type(t_model), intent(IN) :: model
-        t_vec3, intent(in) :: point
-        t_vec3, intent(out) :: normals
+        real(wp), dimension(1:3), intent(in) :: point
+        real(wp), dimension(1:3), intent(out) :: normals
         real(wp), intent(out) :: distance
 
         real(wp), dimension(1:3, 1:3) :: tri
         real(wp) :: dist_min, dist_t_min
         real(wp) :: dist_min_normal, dist_buffer_normal
-        t_vec3 :: midp !< Centers of the triangle facets
-        t_vec3 :: dist_buffer !< Distance between the cell center and the vertices
+        real(wp), dimension(1:3) :: midp !< Centers of the triangle facets
+        real(wp), dimension(1:3) :: dist_buffer !< Distance between the cell center and the vertices
         integer :: i, j, tri_idx !< Iterator
 
         dist_min = 1.e12_wp
@@ -1107,7 +1107,7 @@ contains
     pure function f_distance(boundary_v, boundary_edge_count, point) result(distance)
         integer, intent(in) :: boundary_edge_count
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
-        t_vec3, intent(in) :: point
+        real(wp), dimension(1:3), intent(in) :: point
 
         integer :: i
         real(wp) :: dist_buffer1, dist_buffer2
@@ -1137,8 +1137,8 @@ contains
     pure subroutine f_normals(boundary_v, boundary_edge_count, point, normals)
         integer, intent(in) :: boundary_edge_count
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
-        t_vec3, intent(in) :: point
-        t_vec3, intent(out) :: normals
+        real(wp), dimension(1:3), intent(in) :: point
+        real(wp), dimension(1:3), intent(out) :: normals
 
         integer :: i, idx_buffer
         real(wp) :: dist_min, dist_buffer
@@ -1172,7 +1172,7 @@ contains
     pure subroutine f_tri_area(tri, tri_area)
         real(wp), dimension(1:3, 1:3), intent(in) :: tri
         real(wp), intent(out) :: tri_area
-        t_vec3 :: AB, AC, cross
+        real(wp), dimension(1:3) :: AB, AC, cross
         integer :: i !< Loop iterator
 
         do i = 1, 3
@@ -1195,7 +1195,7 @@ contains
     pure function f_interpolated_distance(interpolated_boundary_v, total_vertices, point) result(distance)
         integer, intent(in) :: total_vertices
         real(wp), intent(in), dimension(1:total_vertices, 1:3) :: interpolated_boundary_v
-        t_vec3, intent(in) :: point
+        real(wp), dimension(1:3), intent(in) :: point
 
         integer :: i !< Loop iterator
         real(wp) :: dist_buffer, min_dist

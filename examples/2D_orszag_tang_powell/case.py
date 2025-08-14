@@ -56,7 +56,7 @@ print(
             #     v = (-sin(2*pi*y), sin(2*pi*x), 0)
             #     B = (-sin(2*pi*y)/sqrt(4*pi), sin(4*pi*x)/sqrt(4*pi), 0)
             "patch_icpp(1)%hcid": 250,
-            "patch_icpp(1)%geometry": 7,
+            "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.5,
             "patch_icpp(1)%y_centroid": 0.5,
             "patch_icpp(1)%length_x": 1.0,

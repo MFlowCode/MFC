@@ -24,10 +24,7 @@ jobs:
 
   self:
     name: "${{ matrix.name }} (${{ matrix.device }})"
-    if: ${{ github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && (
-             (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
-             (github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbryngelson')
-           ) }}
+    if: ${{ github.repository=='MFlowCode/MFC' && needs.file-changes.outputs.checkall=='true' && ((github.event_name=='pull_request_review' && github.event.review.state=='approved') || (github.event_name=='pull_request' && (github.event.pull_request.user.login=='sbryngelson' || github.event.pull_request.user.login=='wilfonba'))) }}
     needs: file-changes
     strategy:
       fail-fast: false
@@ -97,10 +94,11 @@ jobs:
         run: |
           cat pr/bench-${{ matrix.device }}.* 2>/dev/null || true
           cat master/bench-${{ matrix.device }}.* 2>/dev/null || true
-      
-      - name: Archive Logs
+
+      # All other runners (non-Phoenix) just run without special env
+      - name: Archive Logs (Frontier)
+        if: always() && matrix.cluster != 'phoenix'
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: ${{ matrix.cluster }}-${{ matrix.device }}
           path: |

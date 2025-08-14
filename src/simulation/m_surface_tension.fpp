@@ -14,6 +14,9 @@ module m_surface_tension
 
     use m_weno
 
+    use m_muscl                !< Monotonic Upstream-centered (MUSCL)
+                               !! schemes for conservation laws
+
     use m_helper
 
     use m_boundary_common
@@ -21,24 +24,24 @@ module m_surface_tension
     implicit none
 
     private; public :: s_initialize_surface_tension_module, &
- s_compute_capilary_source_flux, &
- s_get_capilary, &
+ s_compute_capillary_source_flux, &
+ s_get_capillary, &
  s_finalize_surface_tension_module
 
     !> @name color function gradient components and magnitude
     !> @{
     type(scalar_field), allocatable, dimension(:) :: c_divs
     !> @)
-    !$acc declare create(c_divs)
+    $:GPU_DECLARE(create='[c_divs]')
 
     !> @name cell boundary reconstructed gradient components and magnitude
     !> @{
     real(wp), allocatable, dimension(:, :, :, :) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !> @}
-    !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
+    $:GPU_DECLARE(create='[gL_x,gR_x,gL_y,gR_y,gL_z,gR_z]')
 
     type(int_bounds_info) :: is1, is2, is3, iv
-    !$acc declare create(is1, is2, is3, iv)
+    $:GPU_DECLARE(create='[is1,is2,is3,iv]')
 
 contains
 
@@ -65,7 +68,7 @@ contains
         end if
     end subroutine s_initialize_surface_tension_module
 
-    pure subroutine s_compute_capilary_source_flux( &
+    pure subroutine s_compute_capillary_source_flux( &
         vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
         flux_src_vf, &
         id, isx, isy, isz)
@@ -85,8 +88,9 @@ contains
         integer :: j, k, l, i
 
         if (id == 1) then
-            !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, &
+                & w1R, w2R, w3R, w1, w2, w3, normWL, &
+                & normWR, normW]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -110,7 +114,7 @@ contains
                         normW = (normWL + normWR)/2._wp
 
                         if (normW > capillary_cutoff) then
-                            @:compute_capilary_stress_tensor()
+                            @:compute_capillary_stress_tensor()
 
                             do i = 1, num_dims
 
@@ -131,8 +135,9 @@ contains
 
         elseif (id == 2) then
 
-            !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, &
+                & w1R, w2R, w3R, w1, w2, w3, normWL, normWR, &
+                & normW]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -156,7 +161,7 @@ contains
                         normW = (normWL + normWR)/2._wp
 
                         if (normW > capillary_cutoff) then
-                            @:compute_capilary_stress_tensor()
+                            @:compute_capillary_stress_tensor()
 
                             do i = 1, num_dims
 
@@ -177,8 +182,9 @@ contains
 
         elseif (id == 3) then
 
-            !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, &
+                & w1R, w2R, w3R, w1, w2, w3, normWL, normWR, &
+                & normW]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -202,7 +208,7 @@ contains
                         normW = (normWL + normWR)/2._wp
 
                         if (normW > capillary_cutoff) then
-                            @:compute_capilary_stress_tensor()
+                            @:compute_capillary_stress_tensor()
 
                             do i = 1, num_dims
 
@@ -223,9 +229,9 @@ contains
 
         end if
 
-    end subroutine s_compute_capilary_source_flux
+    end subroutine s_compute_capillary_source_flux
 
-    impure subroutine s_get_capilary(q_prim_vf, bc_type)
+    impure subroutine s_get_capillary(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
@@ -240,7 +246,7 @@ contains
         isx%end = m; isy%end = n; isz%end = p
 
         ! compute gradient components
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -250,7 +256,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -261,7 +267,7 @@ contains
         end do
 
         if (p > 0) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -272,12 +278,12 @@ contains
             end do
         end if
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     c_divs(num_dims + 1)%sf(j, k, l) = 0._wp
-                    !s$acc loop seq
+                    $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_dims
                         c_divs(num_dims + 1)%sf(j, k, l) = &
                             c_divs(num_dims + 1)%sf(j, k, l) + &
@@ -298,82 +304,82 @@ contains
             call s_reconstruct_cell_boundary_values_capillary(c_divs, gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, i)
         end do
 
-    end subroutine s_get_capilary
+    end subroutine s_get_capillary
 
     subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                             norm_dir)
-
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, iv%beg:), intent(out) :: vL_x, vL_y, vL_z
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, iv%beg:), intent(out) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
 
-        integer :: recon_dir !< Coordinate direction of the WENO reconstruction
+        integer :: recon_dir !< Coordinate direction of the reconstruction
 
         integer :: i, j, k, l
 
-        ! Reconstruction in s1-direction
+        #:for SCHEME, TYPE in [('weno', 'WENO_TYPE'),('muscl', 'MUSCL_TYPE')]
+            if (recon_type == ${TYPE}$) then
+                ! Reconstruction in s1-direction
 
-        if (norm_dir == 1) then
-            is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)
-            recon_dir = 1; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
+                if (norm_dir == 1) then
+                    is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)
+                    recon_dir = 1; is1%beg = is1%beg + ${SCHEME}$_polyn
+                    is1%end = is1%end - ${SCHEME}$_polyn
 
-        elseif (norm_dir == 2) then
-            is1 = idwbuff(2); is2 = idwbuff(1); is3 = idwbuff(3)
-            recon_dir = 2; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
+                elseif (norm_dir == 2) then
+                    is1 = idwbuff(2); is2 = idwbuff(1); is3 = idwbuff(3)
+                    recon_dir = 2; is1%beg = is1%beg + ${SCHEME}$_polyn
+                    is1%end = is1%end - ${SCHEME}$_polyn
 
-        else
-            is1 = idwbuff(3); is2 = idwbuff(2); is3 = idwbuff(1)
-            recon_dir = 3; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
+                else
+                    is1 = idwbuff(3); is2 = idwbuff(2); is3 = idwbuff(1)
+                    recon_dir = 3; is1%beg = is1%beg + ${SCHEME}$_polyn
+                    is1%end = is1%end - ${SCHEME}$_polyn
 
-        end if
+                end if
 
-        !$acc update device(is1, is2, is3, iv)
+                $:GPU_UPDATE(device='[is1,is2,is3,iv]')
 
-        if (recon_dir == 1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = iv%beg, iv%end
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                            vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                if (recon_dir == 1) then
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do i = iv%beg, iv%end
+                        do l = is3%beg, is3%end
+                            do k = is2%beg, is2%end
+                                do j = is1%beg, is1%end
+                                    vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                                    vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                                end do
+                            end do
                         end do
                     end do
-                end do
-            end do
-            !$acc end parallel loop
-        else if (recon_dir == 2) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = iv%beg, iv%end
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                            vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                else if (recon_dir == 2) then
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do i = iv%beg, iv%end
+                        do l = is3%beg, is3%end
+                            do k = is2%beg, is2%end
+                                do j = is1%beg, is1%end
+                                    vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                                    vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                                end do
+                            end do
                         end do
                     end do
-                end do
-            end do
-            !$acc end parallel loop
-        else if (recon_dir == 3) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = iv%beg, iv%end
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                            vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                else if (recon_dir == 3) then
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do i = iv%beg, iv%end
+                        do l = is3%beg, is3%end
+                            do k = is2%beg, is2%end
+                                do j = is1%beg, is1%end
+                                    vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                                    vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                                end do
+                            end do
                         end do
                     end do
-                end do
-            end do
-            !$acc end parallel loop
-        end if
+                end if
+            end if
+        #:endfor
 
     end subroutine s_reconstruct_cell_boundary_values_capillary
 
