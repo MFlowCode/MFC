@@ -26,10 +26,10 @@ module m_igr
 
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
     integer, dimension(3) :: nv_uvm_temp_on_gpu
-    real(wp), pointer, contiguous, dimension(:, :, :) :: jac, jac_rhs, jac_old
-    real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_host
-    real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_rhs_host
-    real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_old_host
+    real(stp), pointer, contiguous, dimension(:, :, :) :: jac, jac_rhs, jac_old
+    real(stp), allocatable, dimension(:, :, :), pinned, target :: jac_host
+    real(stp), allocatable, dimension(:, :, :), pinned, target :: jac_rhs_host
+    real(stp), allocatable, dimension(:, :, :), pinned, target :: jac_old_host
 #else
     real(stp), allocatable, target, dimension(: ,:, :) :: jac
     real(stp), allocatable, dimension(:, :, :) :: jac_rhs, jac_old
