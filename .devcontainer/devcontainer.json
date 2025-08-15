@@ -1,0 +1,9 @@
+{
+  "name": "MFC Container",
+  "image": "sbryngelson/mfc:latest-cpu",
+  "workspaceFolder": "/opt/MFC",
+  "settings": {
+    "terminal.integrated.shell.linux": "/bin/bash",
+    "editor.formatOnSave": true
+  },
+}
