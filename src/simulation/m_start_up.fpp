@@ -1226,7 +1226,7 @@ contains
 
         integer :: save_count
 
-        #:call GPU_PARALLEL_LOOP(collapse=4)
+        #:call GPU_PARALLEL_LOOP(collapse=4, copyin='[idwbuff]')
             do i = 1, sys_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do k = idwbuff(2)%beg, idwbuff(2)%end
