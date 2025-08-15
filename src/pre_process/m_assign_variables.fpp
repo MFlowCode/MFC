@@ -52,7 +52,7 @@ module m_assign_variables
             integer, intent(in) :: j, k, l
             real(wp), intent(in) :: eta
             type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-            integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+            integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
         end subroutine s_assign_patch_xxxxx_primitive_variables
 
@@ -69,7 +69,9 @@ contains
 
     impure subroutine s_initialize_assign_variables_module
 
-        allocate (alf_sum%sf(0:m, 0:n, 0:p))
+        if(.not. igr) then 
+            allocate (alf_sum%sf(0:m, 0:n, 0:p))
+        end if
 
         ! Depending on multicomponent flow model, the appropriate procedure
         ! for assignment of the patch mixture or species primitive variables
@@ -110,7 +112,7 @@ contains
         integer, intent(in) :: j, k, l
         real(wp), intent(in) :: eta
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
         real(wp) :: Ys(1:num_species)
 
@@ -282,7 +284,7 @@ contains
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
         real(wp), intent(in) :: eta
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Density, the specific heat ratio function and the liquid stiffness

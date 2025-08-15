@@ -162,7 +162,6 @@ contains
         pool_starts(4) = 1
 #ifdef MFC_MIXED_PRECISION
         pool_size = 1_8*(idwbuff(1)%end - idwbuff(1)%beg + 1)*(idwbuff(2)%end - idwbuff(2)%beg + 1)*(idwbuff(3)%end - idwbuff(3)%beg + 1)*sys_size
-        print *, pool_size
         call hipCheck(hipMalloc_(cptr_device,pool_size*2_8))
         call c_f_pointer(cptr_device,q_cons_ts_pool_device,shape=pool_dims)
         q_cons_ts_pool_device(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:) => q_cons_ts_pool_device
