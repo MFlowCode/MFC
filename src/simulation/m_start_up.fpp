@@ -1360,6 +1360,12 @@ contains
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
 
+        do i = 1, sys_size
+            deallocate(q_cons_temp(i)%sf)
+        end do 
+
+        deallocate(q_cons_temp)
+
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
         if (bodyForces) call s_initialize_body_forces_module()
