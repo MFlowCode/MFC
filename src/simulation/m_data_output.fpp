@@ -74,7 +74,7 @@ module m_data_output
     real(wp) :: Rc_min !< Rc criterion maximum
     !> @}
 
-    type(scalar_field), allocatable, dimension(:) :: q_cons_temp
+    type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds
 
 contains
 
@@ -825,7 +825,7 @@ contains
 
         if (down_sample) then
             call s_populate_variables_buffers(bc_type, q_cons_vf)
-            call s_downsample_data(q_cons_vf, q_cons_temp, &
+            call s_downsample_data(q_cons_vf, q_cons_temp_ds, &
                                    m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
         end if
 
@@ -841,7 +841,7 @@ contains
 
             ! Initialize MPI data I/O
             if (down_sample) then
-                call s_initialize_mpi_data_ds(q_cons_temp)
+                call s_initialize_mpi_data_ds(q_cons_temp_ds)
             else
                 if (ib) then
                     call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
@@ -919,7 +919,7 @@ contains
                     do i = 1, sys_size !TODO: check if correct (sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_WRITE_ALL(ifile, q_cons_temp(i)%sf, data_size*mpi_io_tpe, &
+                        call MPI_FILE_WRITE_ALL(ifile, q_cons_temp_ds(i)%sf, data_size*mpi_io_tpe, &
                                                 mpi_io_p, status, ierr)
                     end do
                 else
@@ -1821,9 +1821,9 @@ contains
             n_ds = int((n + 1)/3) - 1
             p_ds = int((p + 1)/3) - 1
 
-            allocate (q_cons_temp(1:sys_size))
+            allocate (q_cons_temp_ds(1:sys_size))
             do i = 1, sys_size
-                allocate (q_cons_temp(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
+                allocate (q_cons_temp_ds(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
             end do
         end if
 
@@ -1848,9 +1848,9 @@ contains
 
         if (down_sample) then
             do i = 1, sys_size
-                deallocate (q_cons_temp(i)%sf)
+                deallocate (q_cons_temp_ds(i)%sf)
             end do
-            deallocate (q_cons_temp)
+            deallocate (q_cons_temp_ds)
         end if
 
     end subroutine s_finalize_data_output_module
