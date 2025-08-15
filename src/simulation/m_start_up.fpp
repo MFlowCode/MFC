@@ -1226,14 +1226,27 @@ contains
 
         integer :: save_count
 
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+        #:endcall GPU_PARALLEL_LOOP
+
         call cpu_time(start)
         call nvtxStartRange("SAVE-DATA")
         do i = 1, sys_size
-            $:GPU_UPDATE(host='[q_cons_ts(1)%vf(i)%sf]')
+            $:GPU_UPDATE(host='[q_cons_ts(2)%vf(i)%sf]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        if (ieee_is_nan(real(q_cons_ts(1)%vf(i)%sf(j, k, l), kind=wp))) then
+                        if (ieee_is_nan(real(q_cons_ts(2)%vf(i)%sf(j, k, l), kind=wp))) then
                             print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
                             error stop "NaN(s) in timestep output."
                         end if
@@ -1262,12 +1275,12 @@ contains
             end do
 
             $:GPU_UPDATE(host='[q_beta(1)%sf]')
-            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta(1))
+            call s_write_data_files(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta(1))
             $:GPU_UPDATE(host='[Rmax_stats,Rmin_stats,gas_p,gas_mv,intfc_vel]')
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
-            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
+            call s_write_data_files(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
 
         call nvtxEndRange
