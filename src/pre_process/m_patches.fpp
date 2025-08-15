@@ -67,7 +67,7 @@ contains
     impure subroutine s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
         type(levelset_field), intent(inout), optional :: levelset !< Levelset determined by models
         type(levelset_norm_field), intent(inout), optional :: levelset_norm !< Levelset_norm determined by models
@@ -245,7 +245,7 @@ contains
     subroutine s_line_segment(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
@@ -315,7 +315,7 @@ contains
     impure subroutine s_spiral(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
@@ -387,7 +387,7 @@ contains
     subroutine s_circle(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib_flag
 
@@ -471,7 +471,7 @@ contains
     subroutine s_airfoil(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib_flag
 
@@ -634,7 +634,7 @@ contains
     subroutine s_3D_airfoil(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib_flag
 
@@ -807,7 +807,7 @@ contains
 
         ! Patch identifier
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
@@ -871,7 +871,7 @@ contains
 
         ! Patch identifier
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
@@ -944,7 +944,7 @@ contains
     subroutine s_ellipse(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop operators
@@ -1017,7 +1017,7 @@ contains
 
         ! Patch identifier
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
@@ -1108,7 +1108,7 @@ contains
     subroutine s_rectangle(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib_flag !< True if this patch is an immersed boundary
 
@@ -1205,7 +1205,7 @@ contains
     subroutine s_sweep_line(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop operators
@@ -1276,7 +1276,7 @@ contains
     subroutine s_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< generic loop iterators
@@ -1357,7 +1357,7 @@ contains
 
         ! Patch identifier
         integer, intent(in) :: patch_id
-        integer(kind=2), intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        integer(kind=1), intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
@@ -1417,7 +1417,7 @@ contains
     subroutine s_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(IN) :: patch_id
-        integer(kind=2), intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        integer(kind=1), intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         real(wp) :: r, x_p, eps, phi
@@ -1565,7 +1565,7 @@ contains
     subroutine s_sphere(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib_flag   !< True if this patch is an immersed boundary
 
@@ -1668,7 +1668,7 @@ contains
 
         integer, intent(in) :: patch_id
         logical, optional, intent(in) :: ib_flag
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
@@ -1771,7 +1771,7 @@ contains
     subroutine s_cylinder(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib_flag   !< True if this patch is an immersed boundary
 
@@ -1927,7 +1927,7 @@ contains
     subroutine s_sweep_plane(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
@@ -2012,7 +2012,7 @@ contains
     subroutine s_model(patch_id, patch_id_fp, q_prim_vf, ib_flag, STL_levelset, STL_levelset_norm)
 
         integer, intent(in) :: patch_id
-        integer(kind=2), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Variables for IBM+STL
