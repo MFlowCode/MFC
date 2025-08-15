@@ -82,6 +82,8 @@ module m_time_steppers
 #elif defined(FRONTIER_UNIFIED)
     real(stp), pointer, contiguous, dimension(:, :, :, :) :: q_cons_ts_pool_host, q_cons_ts_pool_device
     integer(kind=8) :: pool_dims(4), pool_starts(4)
+    integer(kind=8) :: pool_size
+    type(c_ptr) :: cptr_host, cptr_device
 #endif
 
 contains
@@ -94,7 +96,9 @@ contains
         use hipfort
         use hipfort_hipmalloc
         use hipfort_check
+#if defined(MFC_OpenACC)
         use openacc
+#endif
 #endif
         integer :: i, j !< Generic loop iterators
 
@@ -156,18 +160,33 @@ contains
         end do
         pool_dims(4) = sys_size
         pool_starts(4) = 1
+#ifdef MFC_MIXED_PRECISION
+        pool_size = 1_8*(idwbuff(1)%end - idwbuff(1)%beg + 1)*(idwbuff(2)%end - idwbuff(2)%beg + 1)*(idwbuff(3)%end - idwbuff(3)%beg + 1)*sys_size
+        print *, pool_size
+        call hipCheck(hipMalloc_(cptr_device,pool_size*2_8))
+        call c_f_pointer(cptr_device,q_cons_ts_pool_device,shape=pool_dims)
+        q_cons_ts_pool_device(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:) => q_cons_ts_pool_device
 
+        call hipCheck(hipMallocManaged_(cptr_host,pool_size*2_8,hipMemAttachGlobal))
+        call c_f_pointer(cptr_host,q_cons_ts_pool_host,shape=pool_dims)
+        q_cons_ts_pool_host(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:) => q_cons_ts_pool_host
+#else
         ! Doing hipMalloc then mapping should be most performant
         call hipCheck(hipMalloc(q_cons_ts_pool_device, dims8=pool_dims, lbounds8=pool_starts))
         ! Without this map CCE will still create a device copy, because it's silly like that
+#if defined(MFC_OpenACC)
         call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
-
+#endif
         ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
         ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
         ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
         if (num_ts == 2) then
             call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
+#if defined(MFC_OpenMP)
+            call hipCheck(hipMemAdvise(c_loc(q_cons_ts_pool_host), c_sizeof(q_cons_ts_pool_host), hipMemAdviseSetPreferredLocation, -1))
+#endif
         end if
+#endif
 
         do j = 1, sys_size
             ! q_cons_ts(1) lives on the device
@@ -1430,9 +1449,15 @@ contains
                 nullify (q_cons_ts(i)%vf(j)%sf)
             end do
         end do
-
+#ifdef MFC_MIXED_PRECISION
+        call hipCheck(hipHostFree_(c_loc(q_cons_ts_pool_host)))
+        nullify(q_cons_ts_pool_host)
+        call hipCheck(hipFree_(c_loc(q_cons_ts_pool_device)))
+        nullify(q_cons_ts_pool_device)
+#else
         call hipCheck(hipHostFree(q_cons_ts_pool_host))
         call hipCheck(hipFree(q_cons_ts_pool_device))
+#endif
 #else
         do i = 1, num_ts
             do j = 1, sys_size
