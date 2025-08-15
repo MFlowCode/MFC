@@ -39,7 +39,7 @@ cd - > /dev/null
 echo
 
 % if gpu:
-    export MPICH_GPU_SUPPORT_ENABLED=1
+    export MPICH_GPU_SUPPORT_ENABLED=0
 % else:
     export MPICH_GPU_SUPPORT_ENABLED=0
 % endif
