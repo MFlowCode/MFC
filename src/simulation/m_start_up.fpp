@@ -107,7 +107,6 @@ module m_start_up
  s_save_performance_metrics
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
-    $:GPU_DECLARE(create='[q_cons_temp]')
 
     real(wp) :: dt_init
 
@@ -1369,15 +1368,13 @@ contains
             do i = 1, sys_size
                 $:GPU_UPDATE(device='[q_cons_ts(1)%vf(i)%sf]')
             end do
+            do i = 1, sys_size
+                deallocate(q_cons_temp(i)%sf)
+            end do
+            deallocate(q_cons_temp)
         else
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
-
-        do i = 1, sys_size
-            deallocate(q_cons_temp(i)%sf)
-        end do 
-
-        deallocate(q_cons_temp)
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
