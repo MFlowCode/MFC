@@ -824,7 +824,6 @@ contains
         integer :: m_glb_save, n_glb_save, p_glb_save ! Global save size
 
         if (down_sample) then
-            call s_populate_variables_buffers(bc_type, q_cons_vf)
             call s_downsample_data(q_cons_vf, q_cons_temp_ds, &
                                    m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
         end if

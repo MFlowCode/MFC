@@ -1225,6 +1225,10 @@ contains
 
         integer :: save_count
 
+        if(down_sample) then 
+            call s_populate_variables_buffers(bc_type, q_cons_ts(1)%vf)
+        end if
+
         #:call GPU_PARALLEL_LOOP(collapse=4, copyin='[idwbuff]')
             do i = 1, sys_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -1241,7 +1245,9 @@ contains
         call cpu_time(start)
         call nvtxStartRange("SAVE-DATA")
         do i = 1, sys_size
+#ifndef FRONTIER_UNIFIED
             $:GPU_UPDATE(host='[q_cons_ts(2)%vf(i)%sf]')
+#endif
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
