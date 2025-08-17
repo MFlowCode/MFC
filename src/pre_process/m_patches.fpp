@@ -72,7 +72,11 @@ contains
 #else
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #endif
+#ifdef MFC_MIXED_PRECISION
+        integer(kind=1), dimension(:, :, :), intent(inout), optional :: ib_markers_sf
+#else        
         integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
+#endif
         type(levelset_field), intent(inout), optional :: levelset !< Levelset determined by models
         type(levelset_norm_field), intent(inout), optional :: levelset_norm !< Levelset_norm determined by models
 
@@ -124,7 +128,6 @@ contains
                 if (proc_rank == 0) then
                     print *, 'Processing 3D ib patch ', i
                 end if
-#ifndef MFC_MIXED_PRECISION
                 if (patch_ib(i)%geometry == 8) then
                     call s_sphere(i, ib_markers_sf, q_prim_vf, ib)
                     call s_sphere_levelset(i, levelset, levelset_norm)
@@ -141,7 +144,6 @@ contains
                 elseif (patch_ib(i)%geometry == 12) then
                     call s_model(i, ib_markers_sf, q_prim_vf, ib, levelset, levelset_norm)
                 end if
-#endif
             end do
             !> @}
 
@@ -197,7 +199,6 @@ contains
                 if (proc_rank == 0) then
                     print *, 'Processing 2D ib patch ', i
                 end if
-#ifndef MFC_MIXED_PRECISION
                 if (patch_ib(i)%geometry == 2) then
                     call s_circle(i, ib_markers_sf, q_prim_vf, ib)
                     call s_circle_levelset(i, levelset, levelset_norm)
@@ -211,7 +212,6 @@ contains
                 elseif (patch_ib(i)%geometry == 5) then
                     call s_model(i, ib_markers_sf, q_prim_vf, ib, levelset, levelset_norm)
                 end if
-#endif
             end do
             !> @}
 
