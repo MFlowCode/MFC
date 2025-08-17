@@ -1763,7 +1763,11 @@ contains
         ! Write bc_types
         do dir = 1, num_dims
             do loc = 1, 2
+#ifdef MFC_MIXED_PRECISION
+                call MPI_File_write_all(file_id, bc_type(dir, loc)%sf, sizeof(bc_type(dir, loc)%sf), MPI_BYTE, MPI_STATUS_IGNORE, ierr)
+#else
                 call MPI_File_write_all(file_id, bc_type(dir, loc)%sf, sizeof(bc_type(dir, loc)%sf)/4, MPI_INTEGER, MPI_STATUS_IGNORE, ierr)
+#endif
             end do
         end do
 
@@ -1865,7 +1869,11 @@ contains
         ! Read bc_types
         do dir = 1, num_dims
             do loc = 1, 2
+#ifdef MFC_MIXED_PRECISION
+                call MPI_File_read_all(file_id, bc_type(dir, loc)%sf, sizeof(bc_type(dir, loc)%sf), MPI_BYTE, MPI_STATUS_IGNORE, ierr)
+#else
                 call MPI_File_read_all(file_id, bc_type(dir, loc)%sf, sizeof(bc_type(dir, loc)%sf)/4, MPI_INTEGER, MPI_STATUS_IGNORE, ierr)
+#endif
                 $:GPU_UPDATE(device='[bc_type(dir, loc)%sf]')
             end do
         end do
