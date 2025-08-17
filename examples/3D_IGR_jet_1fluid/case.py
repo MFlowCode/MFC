@@ -4,51 +4,30 @@ import json
 
 # Domain parameters
 
-D = 2  # Jet diameter
-Nd = 100 # Cells per jet diameter
-x0 = 0  # x_beg coordinate
-x1 = 3 * D  # x_end coordinate
-y0 = -3 * D / 2  # y_beg coordinate
-y1 = 3 * D / 2  # y_end coordinate
-z0 = -3 * D / 2  # y_beg coordinate
-z1 = 3 * D / 2  # y_end coordinate
 
 alfFactor = 10
 igrIters = 3
 
-tS = 20  # dimensionless time
+NPx = 2
+NPy = 2
+NPz = 2
 
-gam = 1.4  # Fluid gamma
-M = 10  # Mach number0
+x0 = 0
+x1 = 2*NPx
+y0 = -1.0 * NPy
+y1 = 1.0 * NPy
+z0 = -1.0 * NPz
+z1 = 1.0 * NPz
 
-# Reference parameters
-pR = 1.0
-rhoR = 1.0
-c = math.sqrt(1.4 * pR / rhoR)
+N = 1386
 
-# Ambient parameters
-pA = 1 * pR
-rhoA = 1 * rhoR
-velA = 0.01 * M * c
+Nx = N * NPx - 1
+Ny = N * NPy - 1
+Nz = N * NPz - 1
 
-# Jet parameters
-pJ = 10 * pR
-velJ = M * c
-rhoJ = 1 * rhoR
 
-Nx = int(Nd * (x1 - x0) / D) - 1
-Ny = int(Nd * (y1 - y0) / D) - 1
-Nz = int(Nd * (z1 - z0) / D) - 1
-
-# time_end = tS * D / (M*c)
-time_end = 1.0
-
-dx = D / Nd
-dt = dx / 18
-
-Nt = int(time_end / dt)
-
-eps = 1e-6
+dx = (x1 - x0) / Nx
+dt = dx / 20000
 
 # Configuring case dictionary
 print(
@@ -68,8 +47,8 @@ print(
             "p": int(Nz),
             "dt": dt,
             "t_step_start": 0,
-            "t_step_stop": 100,#Nt,
-            "t_step_save": 100,#int(Nt / 20),
+            "t_step_stop": 10,#Nt,
+            "t_step_save": 10,#int(Nt / 20),
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "num_bc_patches": 0,
@@ -98,7 +77,7 @@ print(
             "c_wrt": "F",
             "parallel_io": "T",
             "file_per_process": "T",
-            "down_sample": "F",
+            "down_sample": "T",
             # Background
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": (x1 + x0) / 2,
@@ -108,10 +87,10 @@ print(
             "patch_icpp(1)%length_y": (y1 - y0),
             "patch_icpp(1)%length_z": (z1 - z0),
             "patch_icpp(1)%hcid": 304,
-            "patch_icpp(1)%vel(1)": velA,
+            "patch_icpp(1)%vel(1)": 1.0,
             "patch_icpp(1)%vel(2)": 0.0e00,
             "patch_icpp(1)%vel(3)": 0.0e00,
-            "patch_icpp(1)%pres": pA,
+            "patch_icpp(1)%pres": 1.0,
             "patch_icpp(1)%alpha_rho(1)": 1.0e00,
             "patch_icpp(1)%alpha(1)": 1.0e00,
             # Fluids Physical Parameters
