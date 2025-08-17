@@ -945,7 +945,7 @@ contains
         call s_finalize_perturbation_module()
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
-
+        call s_finalize_initial_condition_module()
         ! Finalization of the MPI environment
         call s_mpi_finalize()
     end subroutine s_finalize_modules
