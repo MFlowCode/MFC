@@ -499,7 +499,7 @@ function(MFC_SETUP_TARGET)
                 endforeach()
 
                 target_compile_options(${a_target}
-                    PRIVATE -gpu=keep,ptxinfo,lineinfo
+                    PRIVATE -gpu=keep,ptxinfo,lineinfo -gpu=maxregcount:165
                 )
 
                 if (MFC_Fastmath)
