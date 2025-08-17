@@ -51,7 +51,11 @@ module m_initial_condition
 
     type(integer_field), dimension(:, :), allocatable :: bc_type !< bc_type fields
 
-    integer(kind=1), allocatable, dimension(:, :, :) :: patch_id_fp !<
+#ifdef MFC_MIXED_PRECISION
+    integer(kind=1), allocatable, dimension(:, :, :) :: patch_id_fp
+#else
+    integer, allocatable, dimension(:, :, :) :: patch_id_fp
+#endif
     !! Bookkepping variable used to track the patch identities (id) associated
     !! with each of the cells in the computational domain. Note that only one
     !! patch identity may be associated with any one cell.
