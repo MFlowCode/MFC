@@ -19,7 +19,7 @@ y1 = 1.0 * NPy
 z0 = -1.0 * NPz
 z1 = 1.0 * NPz
 
-N = 1386
+N = 1383
 
 Nx = N * NPx - 1
 Ny = N * NPy - 1
@@ -64,7 +64,7 @@ print(
             "num_igr_iters": igrIters,
             "num_igr_warm_start_iters": igrIters,
             "alf_factor": 10,
-            "bc_x%beg": -17,
+            "bc_x%beg": -3,
             "bc_x%end": -3,
             "bc_y%beg": -3,
             "bc_y%end": -3,
