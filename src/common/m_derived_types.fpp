@@ -453,5 +453,17 @@ module m_derived_types
         integer :: mn_min, np_min, mp_min, mnp_min
     end type cell_num_bounds
 
+    type simplex_noise_params
+        logical, dimension(3) :: perturb_vel
+        real(wp), dimension(3) :: perturb_vel_freq
+        real(wp), dimension(3) :: perturb_vel_scale
+        real(wp), dimension(3,3) :: perturb_vel_offset
+
+        logical, dimension(1:num_fluids_max) :: perturb_dens
+        real(wp), dimension(1:num_fluids_max) :: perturb_dens_freq
+        real(wp), dimension(1:num_fluids_max) :: perturb_dens_scale
+        real(wp), dimension(1:num_fluids_max, 3) :: perturb_dens_offset
+    end type
+
 end module m_derived_types
 

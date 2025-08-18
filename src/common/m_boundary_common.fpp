@@ -1737,6 +1737,7 @@ contains
         integer :: offset
         character(len=7) :: proc_rank_str
         logical :: dir_check
+        integer :: nelements
 
         call s_pack_boundary_condition_buffers(q_prim_vf)
 
@@ -1764,9 +1765,11 @@ contains
         do dir = 1, num_dims
             do loc = 1, 2
 #ifdef MFC_MIXED_PRECISION
-                call MPI_File_write_all(file_id, bc_type(dir, loc)%sf, sizeof(bc_type(dir, loc)%sf), MPI_BYTE, MPI_STATUS_IGNORE, ierr)
+                nelements = sizeof(bc_type(dir, loc)%sf)
+                call MPI_File_write_all(file_id, bc_type(dir, loc)%sf, nelements, MPI_BYTE, MPI_STATUS_IGNORE, ierr)
 #else
-                call MPI_File_write_all(file_id, bc_type(dir, loc)%sf, sizeof(bc_type(dir, loc)%sf)/4, MPI_INTEGER, MPI_STATUS_IGNORE, ierr)
+                nelements = sizeof(bc_type(dir, loc)%sf) / 4
+                call MPI_File_write_all(file_id, bc_type(dir, loc)%sf, nelements, MPI_INTEGER, MPI_STATUS_IGNORE, ierr)
 #endif
             end do
         end do
@@ -1774,7 +1777,8 @@ contains
         ! Write bc_buffers
         do dir = 1, num_dims
             do loc = 1, 2
-                call MPI_File_write_all(file_id, bc_buffers(dir, loc)%sf, sizeof(bc_buffers(dir, loc)%sf)*mpi_io_tpe/stp, mpi_io_p, MPI_STATUS_IGNORE, ierr)
+                nelements = sizeof(bc_buffers(dir, loc)%sf) * mpi_io_tpe / stp
+                call MPI_File_write_all(file_id, bc_buffers(dir, loc)%sf, nelements, mpi_io_p, MPI_STATUS_IGNORE, ierr)
             end do
         end do
 
@@ -1844,6 +1848,7 @@ contains
         integer :: offset
         character(len=7) :: proc_rank_str
         logical :: dir_check
+        integer :: nelements
 
         file_loc = trim(case_dir)//'/restart_data/boundary_conditions'
 
@@ -1870,9 +1875,11 @@ contains
         do dir = 1, num_dims
             do loc = 1, 2
 #ifdef MFC_MIXED_PRECISION
-                call MPI_File_read_all(file_id, bc_type(dir, loc)%sf, sizeof(bc_type(dir, loc)%sf), MPI_BYTE, MPI_STATUS_IGNORE, ierr)
+                nelements = sizeof(bc_type(dir, loc)%sf)
+                call MPI_File_read_all(file_id, bc_type(dir, loc)%sf, nelements, MPI_BYTE, MPI_STATUS_IGNORE, ierr)
 #else
-                call MPI_File_read_all(file_id, bc_type(dir, loc)%sf, sizeof(bc_type(dir, loc)%sf)/4, MPI_INTEGER, MPI_STATUS_IGNORE, ierr)
+                nelements = sizeof(bc_type(dir, loc)%sf) / 4
+                call MPI_File_read_all(file_id, bc_type(dir, loc)%sf, nelements, MPI_INTEGER, MPI_STATUS_IGNORE, ierr)
 #endif
                 $:GPU_UPDATE(device='[bc_type(dir, loc)%sf]')
             end do
@@ -1881,7 +1888,8 @@ contains
         ! Read bc_buffers
         do dir = 1, num_dims
             do loc = 1, 2
-                call MPI_File_read_all(file_id, bc_buffers(dir, loc)%sf, sizeof(bc_buffers(dir, loc)%sf)*mpi_io_tpe/stp, mpi_io_p, MPI_STATUS_IGNORE, ierr)
+                nelements = sizeof(bc_buffers(dir, loc)%sf) * mpi_io_tpe / stp
+                call MPI_File_read_all(file_id, bc_buffers(dir, loc)%sf, nelements, mpi_io_p, MPI_STATUS_IGNORE, ierr)
                 $:GPU_UPDATE(device='[bc_buffers(dir, loc)%sf]')
             end do
         end do

@@ -33,6 +33,7 @@ contains
         call s_check_inputs_chemistry
         call s_check_inputs_misc
         call s_check_bc
+        call s_check_simplex_noise
 
     end subroutine s_check_inputs
 
@@ -253,6 +254,28 @@ contains
                 (patch_bc(i)%type == BC_PERIODIC) .or. patch_bc(i)%type < BC_DIRICHLET), &
                 "Incompatible BC type for boundary condition patch "//trim(iStr))
         end do
+
+    end subroutine
+
+    impure subroutine s_check_simplex_noise
+
+        if (simplex_perturb) then
+            #:for DIR in [1, 2, 3]
+                if (simplex_params%perturb_vel(${DIR}$)) then
+                    @:PROHIBIT(simplex_params%perturb_vel_freq(${DIR}$) == dflt_real, &
+                        "simplex_params%perturb_vel_freq(${DIR}$) must be set if" // &
+                        "simplex_params%perturb_vel(${DIR}$) is true")
+                    @:PROHIBIT(simplex_params%perturb_vel_scale(${DIR}$) == dflt_real, &
+                        "simplex_params%perturb_vel_scale(${DIR}$) must be set if" // &
+                        "simplex_params%perturb_vel(${DIR}$) is true")
+                    #:for DIM in [1, 2, 3]
+                        @:PROHIBIT(simplex_params%perturb_vel_offset(${DIR}$,${DIM}$) == dflt_real, &
+                            "simplex_params%perturb_vel_scale(${DIR}$,${DIM}$) must be set if" // &
+                            "simplex_params%perturb_vel(${DIR}$) is true")
+                    #:endfor
+                end if
+            #:endfor
+        end if
 
     end subroutine
 
