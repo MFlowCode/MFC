@@ -113,9 +113,7 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
-        do i = 1, q_beta_idx
-            @:ACC_SETUP_SFs(q_beta(i))
-        end do
+        @:ACC_SETUP_SFs(q_beta)
 
         ! Allocating space for lagrangian variables
         nBubs_glb = lag_params%nBubs_glb
