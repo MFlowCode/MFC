@@ -73,7 +73,7 @@ def format_diagnostic_message(max_errors: typing.Tuple[typing.Optional[typing.Tu
     """Format the diagnostic message showing maximum errors."""
     max_abs_info, max_rel_info = max_errors
     diagnostic_msg = ""
-    
+
     if max_abs_info:
         filepath, var_idx, golden_val, candidate_val, abs_error, rel_error = max_abs_info
         rel_error_str = f"{rel_error:.2E}" if not math.isnan(rel_error) else "NaN"

@@ -1049,7 +1049,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'riemann_solver': riemann_solver,
                     'chem_params%gamma_method': gamma_method
                 },
-                override_tol=1
+                override_tol=10**(-12)
             ))
 
     foreach_dimension()
