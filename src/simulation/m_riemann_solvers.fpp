@@ -1139,7 +1139,7 @@ contains
                 if (model_eqns == 3) then
                     !ME3
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, &
-                        & vel_K_Star, Re_L, Re_R, rho_avg, h_avg, &
+                        & vel_K_Star, Re_L, Re_R, rho_avg, h_avg, c_fast, &
                         & gamma_avg, s_L, s_R, s_S, vel_avg_rms, &
                         & alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R, &
                         & Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, &
@@ -1752,8 +1752,8 @@ contains
 
                 elseif (model_eqns == 2 .and. bubbles_euler) then
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[R0_L, R0_R, V0_L, &
-                        & V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, &
-                        & vel_R, rho_avg, alpha_L, alpha_R, h_avg, &
+                        & V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, c_fast, &
+                        & vel_R, rho_avg, alpha_L, alpha_R, h_avg, tau_e_L, tau_e_R, &
                         & gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, &
                         & ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, &
                         & pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
@@ -2191,7 +2191,7 @@ contains
                 else
                     ! 5-EQUATION MODEL WITH HLLC
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, &
-                        & Re_L, Re_R, rho_avg, h_avg, gamma_avg, &
+                        & Re_L, Re_R, rho_avg, h_avg, gamma_avg, c_fast, &
                         & alpha_L, alpha_R, s_L, s_R, s_S, &
                         & vel_avg_rms, pcorr, zcoef, vel_L_tmp, &
                         & vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, &
