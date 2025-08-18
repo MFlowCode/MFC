@@ -1735,11 +1735,8 @@ contains
                                     s_L, s_R, s_S, s_M, s_P, idx, idx_tau)
 
         ! Computes the wave speeds for the Riemann solver
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_wave_speed
-#else
-        !$acc routine seq
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_speed_of_sound', &
+            & parallelism='[seq]', cray_inline=True)
 
         ! Input parameters
         integer, intent(in) :: wave_speeds
