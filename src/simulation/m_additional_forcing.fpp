@@ -57,9 +57,9 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    rhs_vf(1)%sf(i, j, k) = rhs_vf(1)%sf(i, j, k) + q_periodic_force(7)%sf(i, j, k) * fluid_indicator_function_I%sf(i, j, k) ! continuity
-                    rhs_vf(2)%sf(i, j, k) = rhs_vf(2)%sf(i, j, k) + q_periodic_force(1)%sf(i, j, k) * fluid_indicator_function_I%sf(i, j, k) * fluid_indicator_function_I%sf(i, j, k) ! x momentum
-                    rhs_vf(5)%sf(i, j, k) = rhs_vf(5)%sf(i, j, k) + (q_periodic_force(4)%sf(i, j, k) + q_periodic_force(8)%sf(i, j, k)) * fluid_indicator_function_I%sf(i, j, k) ! energy
+                    rhs_vf(1)%sf(i, j, k) = rhs_vf(1)%sf(i, j, k) + q_periodic_force(7)%sf(i, j, k) * fluid_indicator_function%sf(i, j, k) ! continuity
+                    rhs_vf(2)%sf(i, j, k) = rhs_vf(2)%sf(i, j, k) + q_periodic_force(1)%sf(i, j, k) * fluid_indicator_function%sf(i, j, k) * fluid_indicator_function%sf(i, j, k) ! x momentum
+                    rhs_vf(5)%sf(i, j, k) = rhs_vf(5)%sf(i, j, k) + (q_periodic_force(4)%sf(i, j, k) + q_periodic_force(8)%sf(i, j, k)) * fluid_indicator_function%sf(i, j, k) ! energy
                 end do
             end do
         end do
@@ -80,15 +80,15 @@ contains
         do i = 0, m 
             do j = 0, n 
                 do k = 0, p 
-                    q_spatial_avg(4) = q_spatial_avg(4) + q_cons_vf(1)%sf(i, j, k) * fluid_indicator_function_I%sf(i, j, k)
+                    q_spatial_avg(4) = q_spatial_avg(4) + q_cons_vf(1)%sf(i, j, k) * fluid_indicator_function%sf(i, j, k)
                     q_spatial_avg(5) = q_spatial_avg(5) + (0.4_wp/287._wp * (q_cons_vf(5)%sf(i, j, k)/q_cons_vf(1)%sf(i, j, k) & 
                                         - 0.5_wp * ((q_cons_vf(2)%sf(i, j, k)/q_cons_vf(1)%sf(i, j, k))**2 & 
                                         + (q_cons_vf(3)%sf(i, j, k)/q_cons_vf(1)%sf(i, j, k))**2 & 
-                                        + (q_cons_vf(4)%sf(i, j, k)/q_cons_vf(1)%sf(i, j, k))**2))) * fluid_indicator_function_I%sf(i, j, k)
+                                        + (q_cons_vf(4)%sf(i, j, k)/q_cons_vf(1)%sf(i, j, k))**2))) * fluid_indicator_function%sf(i, j, k)
                                         
-                    q_spatial_avg(1) = q_spatial_avg(1) + (q_cons_vf(2)%sf(i, j, k)) * fluid_indicator_function_I%sf(i, j, k)
-                    q_spatial_avg(2) = q_spatial_avg(2) + (q_cons_vf(3)%sf(i, j, k)) * fluid_indicator_function_I%sf(i, j, k)
-                    q_spatial_avg(3) = q_spatial_avg(3) + (q_cons_vf(4)%sf(i, j, k)) * fluid_indicator_function_I%sf(i, j, k)
+                    q_spatial_avg(1) = q_spatial_avg(1) + (q_cons_vf(2)%sf(i, j, k)) * fluid_indicator_function%sf(i, j, k)
+                    q_spatial_avg(2) = q_spatial_avg(2) + (q_cons_vf(3)%sf(i, j, k)) * fluid_indicator_function%sf(i, j, k)
+                    q_spatial_avg(3) = q_spatial_avg(3) + (q_cons_vf(4)%sf(i, j, k)) * fluid_indicator_function%sf(i, j, k)
                 end do
             end do
         end do

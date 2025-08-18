@@ -508,7 +508,7 @@ module m_global_parameters
     real(wp) :: rho_inf_ref !< reference freestream density 
     real(wp) :: T_inf_ref !< reference freestream temperature
     logical :: periodic_forcing
-    logical :: fourier_transform_filtering
+    logical :: volume_filtering_momentum_eqn
     logical :: store_levelset
     logical :: slab_domain_decomposition
     logical :: compute_autocorrelation
@@ -797,7 +797,7 @@ contains
         rho_inf_ref = dflt_real
         T_inf_ref = dflt_real
         periodic_forcing = .false.
-        fourier_transform_filtering = .false.
+        volume_filtering_momentum_eqn = .false.
         store_levelset = .true.
         slab_domain_decomposition = .false.
         compute_autocorrelation = .false.
@@ -1155,7 +1155,7 @@ contains
         elseif (bubbles_lagrange) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
-        else if (fourier_transform_filtering) then 
+        else if (volume_filtering_momentum_eqn) then 
             allocate (MPI_IO_DATA%view(1:sys_size+9))
             allocate (MPI_IO_DATA%var(1:sys_size+9))
         else
@@ -1177,7 +1177,7 @@ contains
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
-        else if (fourier_transform_filtering) then 
+        else if (volume_filtering_momentum_eqn) then 
             do i = sys_size+1, sys_size+9
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
@@ -1354,7 +1354,7 @@ contains
                 do i = 1, sys_size + 1
                     MPI_IO_DATA%var(i)%sf => null()
                 end do
-            else if (fourier_transform_filtering) then 
+            else if (volume_filtering_momentum_eqn) then 
                 do i = 1, sys_size+9
                     MPI_IO_DATA%var(i)%sf => null()
                 end do

@@ -27,8 +27,8 @@ contains
 
     end subroutine s_initialize_particle_forces_module
 
-    subroutine s_compute_drag_coefficient(div_pres_visc_stress)
-        type(scalar_field), dimension(momxb:momxe), intent(in) :: div_pres_visc_stress
+    subroutine s_compute_drag_coefficient(pres_visc_stress)
+        type(scalar_field), dimension(momxb:momxe), intent(in) :: pres_visc_stress
         real(wp), dimension(0:num_ibs) :: FD_global
         real(wp) :: drag_coeff 
         integer :: i, j, k
@@ -44,7 +44,7 @@ contains
                 do k = 0, p  
                     !$acc atomic
                     FD_calc(ib_markers%sf(i, j, k)) = FD_calc(ib_markers%sf(i, j, k)) & 
-                                                    + div_pres_visc_stress(momxb)%sf(i, j, k) * dx(i) * dy(j) * dz(k)
+                                                    + pres_visc_stress(momxb)%sf(i, j, k) * dx(i) * dy(j) * dz(k)
                 end do 
             end do 
         end do

@@ -76,7 +76,7 @@ contains
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
-    subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta, R_u_stat, R_mu_stat, F_IMET_stat)
+    subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta, stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -94,14 +94,14 @@ contains
         type(scalar_field), &
             intent(inout), optional :: beta
 
-        type(scalar_field), dimension(2:4), intent(inout), optional :: R_u_stat
-        type(scalar_field), dimension(2:4), intent(inout), optional :: R_mu_stat
-        type(scalar_field), dimension(2:4), intent(inout), optional :: F_IMET_stat
+        type(scalar_field), dimension(2:4), intent(inout), optional :: stat_reynolds_stress
+        type(scalar_field), dimension(2:4), intent(inout), optional :: stat_eff_visc
+        type(scalar_field), dimension(2:4), intent(inout), optional :: stat_int_mom_exch
 
         if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
         else
-            call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta, R_u_stat, R_mu_stat, F_IMET_stat)
+            call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta, stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
         end if
 
     end subroutine s_write_data_files
@@ -790,15 +790,15 @@ contains
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
         !!  @param beta Eulerian void fraction from lagrangian bubbles
-    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta, R_u_stat, R_mu_stat, F_IMET_stat)
+    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta, stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
-        type(scalar_field), dimension(2:4), intent(inout), optional :: R_u_stat
-        type(scalar_field), dimension(2:4), intent(inout), optional :: R_mu_stat
-        type(scalar_field), dimension(2:4), intent(inout), optional :: F_IMET_stat
+        type(scalar_field), dimension(2:4), intent(inout), optional :: stat_reynolds_stress
+        type(scalar_field), dimension(2:4), intent(inout), optional :: stat_eff_visc
+        type(scalar_field), dimension(2:4), intent(inout), optional :: stat_int_mom_exch
 
 #ifdef MFC_MPI
 
@@ -820,7 +820,7 @@ contains
 
         if (present(beta)) then
             alt_sys = sys_size + 1
-        else if (present(R_u_stat) .and. present(R_mu_stat) .and. present(F_IMET_stat)) then
+        else if (present(stat_reynolds_stress) .and. present(stat_eff_visc) .and. present(stat_int_mom_exch)) then
             alt_sys = sys_size + 9
         else
             alt_sys = sys_size
@@ -905,9 +905,9 @@ contains
             ! Initialize MPI data I/O
 
             if (ib) then
-                if (present(R_u_stat) .and. present(R_mu_stat) .and. present(F_IMET_stat)) then
+                if (present(stat_reynolds_stress) .and. present(stat_eff_visc) .and. present(stat_int_mom_exch)) then
                     call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, & 
-                                               R_u_stat=R_u_stat, R_mu_stat=R_mu_stat, F_IMET_stat=F_IMET_stat)
+                                               stat_reynolds_stress=stat_reynolds_stress, stat_eff_visc=stat_eff_visc, stat_int_mom_exch=stat_int_mom_exch)
                 else
                     call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
                 end if
@@ -965,7 +965,7 @@ contains
                                                 mpi_p, status, ierr)
                     end do
                 end if
-            else if (fourier_transform_filtering) then
+            else if (volume_filtering_momentum_eqn) then
                 do i = 1, alt_sys
                     var_MOK = int(i, MPI_OFFSET_KIND)
 

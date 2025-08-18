@@ -143,7 +143,7 @@ case_dict = {
     "periodic_forcing": "T",
     "periodic_ibs": "T",
     "compute_CD": "F",
-    "fourier_transform_filtering": "T",
+    "volume_filtering_momentum_eqn": "T",
 
     "u_inf_ref": v1,
     "rho_inf_ref": rho,

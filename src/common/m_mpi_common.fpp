@@ -101,7 +101,7 @@ contains
         allocate (buff_recv(0:ubound(buff_send, 1)))
 
 #ifdef MFC_SIMULATION
-        if (fourier_transform_filtering) then
+        if (volume_filtering_momentum_eqn) then
             @:ALLOCATE(buff_send_scalarfield(0:-1 + buff_size*1* &
                                      & (m + 2*buff_size + 1)* &
                                      & (n + 2*buff_size + 1)* &
@@ -153,7 +153,7 @@ contains
     !! @param levelset closest distance from every cell to the IB
     !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     !! @param beta Eulerian void fraction from lagrangian bubbles
-    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta, R_u_stat, R_mu_stat, F_IMET_stat)
+    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta, stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -174,9 +174,9 @@ contains
         type(scalar_field), &
             intent(in), optional :: beta
 
-        type(scalar_field), dimension(2:4), intent(in), optional :: R_u_stat
-        type(scalar_field), dimension(2:4), intent(in), optional :: R_mu_stat
-        type(scalar_field), dimension(2:4), intent(in), optional :: F_IMET_stat
+        type(scalar_field), dimension(2:4), intent(in), optional :: stat_reynolds_stress
+        type(scalar_field), dimension(2:4), intent(in), optional :: stat_eff_visc
+        type(scalar_field), dimension(2:4), intent(in), optional :: stat_int_mom_exch
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
@@ -191,7 +191,7 @@ contains
 
         if (present(beta)) then
             alt_sys = sys_size + 1
-        else if (present(R_u_stat) .and. present(R_mu_stat) .and. present(F_IMET_stat)) then
+        else if (present(stat_reynolds_stress) .and. present(stat_eff_visc) .and. present(stat_int_mom_exch)) then
             alt_sys = sys_size + 9
         else
             alt_sys = sys_size
@@ -201,15 +201,15 @@ contains
             MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m, 0:n, 0:p)
         end do
         
-        if (present(R_u_stat) .and. present(R_mu_stat) .and. present(F_IMET_stat)) then 
+        if (present(stat_reynolds_stress) .and. present(stat_eff_visc) .and. present(stat_int_mom_exch)) then 
             do i = sys_size+1, sys_size+3
-                MPI_IO_DATA%var(i)%sf => R_u_stat(i-sys_size+1)%sf(0:m, 0:n, 0:p)
+                MPI_IO_DATA%var(i)%sf => stat_reynolds_stress(i-sys_size+1)%sf(0:m, 0:n, 0:p)
             end do
             do i = sys_size+4, sys_size+6
-                MPI_IO_DATA%var(i)%sf => R_mu_stat(i-sys_size-2)%sf(0:m, 0:n, 0:p)
+                MPI_IO_DATA%var(i)%sf => stat_eff_visc(i-sys_size-2)%sf(0:m, 0:n, 0:p)
             end do
             do i = sys_size+7, sys_size+9 
-                MPI_IO_DATA%var(i)%sf => F_IMET_stat(i-sys_size-5)%sf(0:m, 0:n, 0:p)
+                MPI_IO_DATA%var(i)%sf => stat_int_mom_exch(i-sys_size-5)%sf(0:m, 0:n, 0:p)
             end do 
         end if
 

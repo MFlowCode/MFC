@@ -61,9 +61,9 @@ module m_data_input
     ! type(scalar_field), public :: ib_markers !<
     type(integer_field), public :: ib_markers
 
-    type(scalar_field), allocatable, dimension(:), public :: R_u_stat
-    type(scalar_field), allocatable, dimension(:), public :: R_mu_stat
-    type(scalar_field), allocatable, dimension(:), public :: F_IMET_stat
+    type(scalar_field), allocatable, dimension(:), public :: stat_reynolds_stress
+    type(scalar_field), allocatable, dimension(:), public :: stat_eff_visc
+    type(scalar_field), allocatable, dimension(:), public :: stat_int_mom_exch
 
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
@@ -463,9 +463,9 @@ contains
                 if (ib) then
                     if (q_filtered_wrt) then
                         call s_initialize_mpi_data(q_cons_vf, ib_markers, &
-                                                   R_u_stat=R_u_stat, & 
-                                                   R_mu_stat=R_mu_stat, & 
-                                                   F_IMET_stat=F_IMET_stat)
+                                                   stat_reynolds_stress=stat_reynolds_stress, & 
+                                                   stat_eff_visc=stat_eff_visc, & 
+                                                   stat_int_mom_exch=stat_int_mom_exch)
                     else 
                         call s_initialize_mpi_data(q_cons_vf, ib_markers)
                     end if
@@ -1345,12 +1345,12 @@ contains
                         q_particle%sf((m + 1) - j, 0:n, 0:p)
                 else
                     do i = 2, 4
-                        R_u_stat(i)%sf(-j, 0:n, 0:p) = &
-                            R_u_stat(i)%sf((m + 1) - j, 0:n, 0:p)
-                        R_mu_stat(i)%sf(-j, 0:n, 0:p) = &
-                            R_mu_stat(i)%sf((m + 1) - j, 0:n, 0:p)
-                        F_IMET_stat(i)%sf(-j, 0:n, 0:p) = &
-                            F_IMET_stat(i)%sf((m + 1) - j, 0:n, 0:p)
+                        stat_reynolds_stress(i)%sf(-j, 0:n, 0:p) = &
+                            stat_reynolds_stress(i)%sf((m + 1) - j, 0:n, 0:p)
+                        stat_eff_visc(i)%sf(-j, 0:n, 0:p) = &
+                            stat_eff_visc(i)%sf((m + 1) - j, 0:n, 0:p)
+                        stat_int_mom_exch(i)%sf(-j, 0:n, 0:p) = &
+                            stat_int_mom_exch(i)%sf((m + 1) - j, 0:n, 0:p)
                     end do
                 end if
             end do
@@ -1376,12 +1376,12 @@ contains
                         q_particle%sf(j - 1, 0:n, 0:p)
                 else
                     do i = 2, 4
-                        R_u_stat(i)%sf(m + j, 0:n, 0:p) = &
-                            R_u_stat(i)%sf(j - 1, 0:n, 0:p)
-                        R_mu_stat(i)%sf(m + j, 0:n, 0:p) = &
-                            R_mu_stat(i)%sf(j - 1, 0:n, 0:p)
-                        F_IMET_stat(i)%sf(m + j, 0:n, 0:p) = &
-                            F_IMET_stat(i)%sf(j - 1, 0:n, 0:p)
+                        stat_reynolds_stress(i)%sf(m + j, 0:n, 0:p) = &
+                            stat_reynolds_stress(i)%sf(j - 1, 0:n, 0:p)
+                        stat_eff_visc(i)%sf(m + j, 0:n, 0:p) = &
+                            stat_eff_visc(i)%sf(j - 1, 0:n, 0:p)
+                        stat_int_mom_exch(i)%sf(m + j, 0:n, 0:p) = &
+                            stat_int_mom_exch(i)%sf(j - 1, 0:n, 0:p)
                     end do
                 end if
             end do
@@ -1414,12 +1414,12 @@ contains
                             q_particle%sf(:, (n + 1) - j, 0:p)
                     else
                         do i = 2, 4
-                            R_u_stat(i)%sf(:, -j, 0:p) = &
-                                R_u_stat(i)%sf(:, (n + 1) - j, 0:p)
-                            R_mu_stat(i)%sf(:, -j, 0:p) = &
-                                R_mu_stat(i)%sf(:, (n + 1) - j, 0:p)
-                            F_IMET_stat(i)%sf(:, -j, 0:p) = &
-                                F_IMET_stat(i)%sf(:, (n + 1) - j, 0:p)
+                            stat_reynolds_stress(i)%sf(:, -j, 0:p) = &
+                                stat_reynolds_stress(i)%sf(:, (n + 1) - j, 0:p)
+                            stat_eff_visc(i)%sf(:, -j, 0:p) = &
+                                stat_eff_visc(i)%sf(:, (n + 1) - j, 0:p)
+                            stat_int_mom_exch(i)%sf(:, -j, 0:p) = &
+                                stat_int_mom_exch(i)%sf(:, (n + 1) - j, 0:p)
                         end do
                     end if
                 end do
@@ -1445,12 +1445,12 @@ contains
                             q_particle%sf(:, j - 1, 0:p)
                     else
                         do i = 2, 4
-                            R_u_stat(i)%sf(:, n + j, 0:p) = &
-                                R_u_stat(i)%sf(:, j - 1, 0:p)
-                            R_mu_stat(i)%sf(:, n + j, 0:p) = &
-                                R_mu_stat(i)%sf(:, j - 1, 0:p)
-                            F_IMET_stat(i)%sf(:, n + j, 0:p) = &
-                                F_IMET_stat(i)%sf(:, j - 1, 0:p)
+                            stat_reynolds_stress(i)%sf(:, n + j, 0:p) = &
+                                stat_reynolds_stress(i)%sf(:, j - 1, 0:p)
+                            stat_eff_visc(i)%sf(:, n + j, 0:p) = &
+                                stat_eff_visc(i)%sf(:, j - 1, 0:p)
+                            stat_int_mom_exch(i)%sf(:, n + j, 0:p) = &
+                                stat_int_mom_exch(i)%sf(:, j - 1, 0:p)
                         end do
                     end if
                 end do
@@ -1483,12 +1483,12 @@ contains
                                 q_particle%sf(:, :, (p + 1) - j)
                         else
                             do i = 2, 4
-                                R_u_stat(i)%sf(:, :, -j) = &
-                                    R_u_stat(i)%sf(:, :, (p + 1) - j)
-                                R_mu_stat(i)%sf(:, :, -j) = &
-                                    R_mu_stat(i)%sf(:, :, (p + 1) - j)
-                                F_IMET_stat(i)%sf(:, :, -j) = &
-                                    F_IMET_stat(i)%sf(:, :, (p + 1) - j)
+                                stat_reynolds_stress(i)%sf(:, :, -j) = &
+                                    stat_reynolds_stress(i)%sf(:, :, (p + 1) - j)
+                                stat_eff_visc(i)%sf(:, :, -j) = &
+                                    stat_eff_visc(i)%sf(:, :, (p + 1) - j)
+                                stat_int_mom_exch(i)%sf(:, :, -j) = &
+                                    stat_int_mom_exch(i)%sf(:, :, (p + 1) - j)
                             end do
                         end if
                     end do
@@ -1515,12 +1515,12 @@ contains
                                 q_particle%sf(:, :, j - 1)
                         else
                             do i = 2, 4
-                                R_u_stat(i)%sf(:, :, p + j) = &
-                                    R_u_stat(i)%sf(:, :, j - 1)
-                                R_mu_stat(i)%sf(:, :, p + j) = &
-                                    R_mu_stat(i)%sf(:, :, j - 1)
-                                F_IMET_stat(i)%sf(:, :, p + j) = &
-                                    F_IMET_stat(i)%sf(:, :, j - 1)
+                                stat_reynolds_stress(i)%sf(:, :, p + j) = &
+                                    stat_reynolds_stress(i)%sf(:, :, j - 1)
+                                stat_eff_visc(i)%sf(:, :, p + j) = &
+                                    stat_eff_visc(i)%sf(:, :, j - 1)
+                                stat_int_mom_exch(i)%sf(:, :, p + j) = &
+                                    stat_int_mom_exch(i)%sf(:, :, j - 1)
                             end do
                         end if
                     end do
@@ -1559,9 +1559,9 @@ contains
         allocate (q_prim_vf(1:sys_size))
         if (bubbles_lagrange) allocate (q_particle(1))
 
-        if (q_filtered_wrt) allocate (R_u_stat(2:4))
-        if (q_filtered_wrt) allocate (R_mu_stat(2:4))
-        if (q_filtered_wrt) allocate (F_IMET_stat(2:4))
+        if (q_filtered_wrt) allocate (stat_reynolds_stress(2:4))
+        if (q_filtered_wrt) allocate (stat_eff_visc(2:4))
+        if (q_filtered_wrt) allocate (stat_int_mom_exch(2:4))
 
         ! Allocating the parts of the conservative and primitive variables
         ! that do require the direct knowledge of the dimensionality of the
@@ -1602,13 +1602,13 @@ contains
 
                 if (q_filtered_wrt) then
                     do i = 2, 4
-                        allocate (R_u_stat(i)%sf(-buff_size:m + buff_size, &
+                        allocate (stat_reynolds_stress(i)%sf(-buff_size:m + buff_size, &
                                                      -buff_size:n + buff_size, &
                                                      -buff_size:p + buff_size))
-                        allocate (R_mu_stat(i)%sf(-buff_size:m + buff_size, &
+                        allocate (stat_eff_visc(i)%sf(-buff_size:m + buff_size, &
                                                      -buff_size:n + buff_size, &
                                                      -buff_size:p + buff_size))
-                        allocate (F_IMET_stat(i)%sf(-buff_size:m + buff_size, &
+                        allocate (stat_int_mom_exch(i)%sf(-buff_size:m + buff_size, &
                                                      -buff_size:n + buff_size, &
                                                      -buff_size:p + buff_size))
                     end do
@@ -1708,17 +1708,17 @@ contains
 
         if (q_filtered_wrt) then 
             do i = 2, 4 
-                deallocate (R_u_stat(i)%sf)
+                deallocate (stat_reynolds_stress(i)%sf)
             end do 
-            deallocate(R_u_stat)
+            deallocate(stat_reynolds_stress)
             do i = 2, 4 
-                deallocate (R_mu_stat(i)%sf)
+                deallocate (stat_eff_visc(i)%sf)
             end do 
-            deallocate(R_mu_stat)
+            deallocate(stat_eff_visc)
             do i = 2, 4 
-                deallocate (F_IMET_stat(i)%sf)
+                deallocate (stat_int_mom_exch(i)%sf)
             end do 
-            deallocate(F_IMET_stat)
+            deallocate(stat_int_mom_exch)
         end if
 
         s_read_data_files => null()

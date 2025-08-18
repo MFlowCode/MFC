@@ -138,7 +138,7 @@ case_dict = {
     "periodic_ibs": "T",
     #"compute_CD_vi": "F",
     #"compute_CD_si": "F",
-    #"fourier_transform_filtering": "T",
+    #"volume_filtering_momentum_eqn": "T",
 
     "u_inf_ref": v1,
     "rho_inf_ref": rho,

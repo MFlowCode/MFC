@@ -95,6 +95,8 @@ module m_start_up
 
     use m_volume_filtering
 
+    use m_compute_statistics
+
     implicit none
 
     private; public :: s_read_input_file, &
@@ -188,7 +190,7 @@ contains
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar, & 
             periodic_ibs, compute_CD, mu_visc, u_inf_ref, rho_inf_ref, T_inf_ref, & 
-            periodic_forcing, fourier_transform_filtering, store_levelset, & 
+            periodic_forcing, volume_filtering_momentum_eqn, store_levelset, & 
             slab_domain_decomposition, compute_autocorrelation
 
         ! Checking that an input file has been provided by the user. If it
@@ -1341,6 +1343,11 @@ contains
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
+        ! Volume filter flow variables, compute unclosed terms and their statistics
+        if (volume_filtering_momentum_eqn) then 
+            call s_volume_filter_momentum_eqn(q_cons_ts(1)%vf)
+        end if
+
         ! Time-stepping loop controls
 
         t_step = t_step + 1
@@ -1421,9 +1428,9 @@ contains
         call cpu_time(start)
         call nvtxStartRange("SAVE-DATA")
         do i = 2, 4 
-            !$acc update host(R_u_stat(i)%sf)
-            !$acc update host(R_mu_stat(i)%sf)
-            !$acc update host(F_IMET_stat(i)%sf)
+            !$acc update host(stat_reynolds_stress(i)%sf)
+            !$acc update host(stat_eff_visc(i)%sf)
+            !$acc update host(stat_int_mom_exch(i)%sf)
         end do  
         do i = 1, sys_size
             !$acc update host(q_cons_ts(1)%vf(i)%sf)
@@ -1457,9 +1464,9 @@ contains
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
-            if (fourier_transform_filtering) then
+            if (volume_filtering_momentum_eqn) then
                 call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, &
-                                        R_u_stat=R_u_stat, R_mu_stat=R_mu_stat, F_IMET_stat=F_IMET_stat)
+                                        stat_reynolds_stress=stat_reynolds_stress, stat_eff_visc=stat_eff_visc, stat_int_mom_exch=stat_int_mom_exch)
             else
                 call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count)
             end if
@@ -1579,7 +1586,7 @@ contains
 
         call s_initialize_particle_forces_module()
         call s_initialize_additional_forcing_module()
-        if (fourier_transform_filtering) call s_initialize_fftw_explicit_filter_module()
+        if (volume_filtering_momentum_eqn) call s_initialize_fftw_explicit_filter_module()
 
         call s_initialize_statistics_module()
 
@@ -1727,7 +1734,7 @@ contains
 
         call s_finalize_particle_forces_module()
         call s_finalize_additional_forcing_module()
-        if (fourier_transform_filtering) call s_finalize_fftw_explicit_filter_module
+        if (volume_filtering_momentum_eqn) call s_finalize_fftw_explicit_filter_module
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

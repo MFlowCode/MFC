@@ -92,7 +92,7 @@ contains
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
             & 'viscous', 'shear_stress', 'bulk_stress', 'bubbles_lagrange',     &
             & 'hyperelasticity', 'rkck_adap_dt', 'bc_io', 'powell', 'cont_damage', &
-            & 'periodic_ibs', 'compute_CD', 'periodic_forcing', 'fourier_transform_filtering', & 
+            & 'periodic_ibs', 'compute_CD', 'periodic_forcing', 'volume_filtering_momentum_eqn', & 
             & 'store_levelset', 'slab_domain_decomposition', 'compute_autocorrelation' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor

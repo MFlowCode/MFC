@@ -350,7 +350,7 @@ contains
             #:for BOUND in ['beg', 'end']
                 @:PROHIBIT(periodic_forcing .and. bc_${X}$%${BOUND}$ /= BC_PERIODIC, &
                     "Periodic forcing requires all BCs to be periodic")
-                @:PROHIBIT(fourier_transform_filtering .and. bc_${X}$%${BOUND}$ /= BC_PERIODIC, &
+                @:PROHIBIT(volume_filtering_momentum_eqn .and. bc_${X}$%${BOUND}$ /= BC_PERIODIC, &
                     "Explicit filtering of flow data requires all BCs to be periodic due to fourier transform")
             #:endfor
         #:endfor
