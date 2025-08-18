@@ -31,6 +31,7 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
     for gFilepath, gEntry in golden.entries.items():
         # Find the corresponding entry in the candidate's pack
         cEntry = candidate.find(gFilepath)
+        
         if cEntry is None:
             return None, f"No reference to {gFilepath} in the candidate's pack."
         
@@ -72,10 +73,10 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
                 
                 return None, f"""\
 Variable n°{valIndex+1} (1-indexed) in {gFilepath} {msg}:
- - Candidate: {cVal}
- - Golden: {gVal}
- - Error: {error}
- - Tolerance: {tol}{diagnostic_msg}
+  - Candidate:   {cVal}
+  - Golden:      {gVal}
+  - Error:       {error}
+  - Tolerance:   {tol}{diagnostic_msg}
 """
             
             if math.isnan(gVal):
