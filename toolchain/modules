@@ -85,3 +85,6 @@ n-cpu penguin/openmpi/4.1.5/gcc-8.5.0
 n-gpu penguin/openmpi/4.1.5/nvhpc-22.3 nvidia/nvhpc/22.3 cuda/cuda-11.6
 n-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
+san   CSCS Santis
+san-all cmake python
+san-gpu nvhpc cuda cray-mpich
