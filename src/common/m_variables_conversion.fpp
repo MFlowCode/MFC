@@ -1735,7 +1735,7 @@ contains
                                     s_L, s_R, s_S, s_M, s_P, idx, idx_tau)
 
         ! Computes the wave speeds for the Riemann solver
-        $:GPU_ROUTINE(function_name='s_compute_speed_of_sound', &
+        $:GPU_ROUTINE(function_name='s_compute_wave_speed', &
             & parallelism='[seq]', cray_inline=True)
 
         ! Input parameters
