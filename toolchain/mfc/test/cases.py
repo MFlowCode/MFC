@@ -170,6 +170,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
+    def alter_muscl():
+        for muscl_order in [1, 2]:
+            stack.push(f"muscl_order={muscl_order}", {'muscl_order': muscl_order, 'recon_type':2, 'weno_order':0})
+
+            if muscl_order == 1:
+                for int_comp in ["T", "F"]:
+                    cases.append(define_case_d(stack, f"int_comp={int_comp}", {'int_comp': int_comp}))
+            elif muscl_order == 2:
+                for int_comp in ["T", "F"]:
+                    stack.push(f"int_comp={int_comp}", {'int_comp': int_comp})
+                    cases.append(define_case_d(stack, f"muscl_lim=1", {'muscl_lim': 1}))
+                    stack.pop()
+                for muscl_lim in [2,3,4,5]:
+                    cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {'muscl_lim': muscl_lim}))
+            stack.pop()
+
     def alter_riemann_solvers(num_fluids):
         for riemann_solver in [1, 2]:
             stack.push(f"riemann_solver={riemann_solver}", {'riemann_solver': riemann_solver})
@@ -346,9 +362,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_ppn(dimInfo):
         if len(dimInfo[0]) == 3:
             cases.append(define_case_d(stack, '2 MPI Ranks', {'m': 29, 'n': 29, 'p': 49}, ppn=2))
+            cases.append(define_case_d(stack, '2 MPI Ranks -> RDMA MPI', {'m': 29, 'n': 29, 'p': 49, 'rdma_mpi': 'T'}, ppn=2))
         else:
             cases.append(define_case_d(stack, '2 MPI Ranks', {}, ppn=2))
-
+            cases.append(define_case_d(stack, '2 MPI Ranks -> RDMA MPI', {'rdma_mpi': 'T'}, ppn=2))
 
     def alter_ib(dimInfo, six_eqn_model=False):
         for slip in [True, False]:
@@ -676,17 +693,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 'patch_icpp(1)%vel(1)': 1.0, 'patch_icpp(1)%vel(2)': 0.0, 'patch_icpp(1)%vel(3)': 0.0,
                 'patch_icpp(1)%pres': 17.8571428571, 'patch_icpp(1)%alpha_rho(1)': 1.0, 'patch_icpp(1)%alpha(1)': 1.0,
                 'patch_icpp(1)%r0': -1e6, 'patch_icpp(1)%v0': -1e6,
-                'patch_icpp(2)%geometry': -100, 
+                'patch_icpp(2)%geometry': -100,
                 'patch_icpp(2)%x_centroid': -1e6, 'patch_icpp(2)%length_x': -1e6,
-                'patch_icpp(2)%y_centroid': -1e6, 'patch_icpp(2)%length_y': -1e6, 
-                'patch_icpp(2)%z_centroid': -1e6, 'patch_icpp(2)%length_z': -1e6, 
-                'patch_icpp(2)%vel(1)': -1e6, 'patch_icpp(2)%vel(2)': -1e6, 'patch_icpp(2)%vel(3)': -1e6, 
+                'patch_icpp(2)%y_centroid': -1e6, 'patch_icpp(2)%length_y': -1e6,
+                'patch_icpp(2)%z_centroid': -1e6, 'patch_icpp(2)%length_z': -1e6,
+                'patch_icpp(2)%vel(1)': -1e6, 'patch_icpp(2)%vel(2)': -1e6, 'patch_icpp(2)%vel(3)': -1e6,
                 'patch_icpp(2)%r0': -1e6, 'patch_icpp(2)%v0': -1e6,
-                'patch_icpp(3)%geometry': -100, 
+                'patch_icpp(3)%geometry': -100,
                 'patch_icpp(3)%x_centroid': -1e6, 'patch_icpp(3)%length_x': -1e6,
-                'patch_icpp(3)%y_centroid': -1e6, 'patch_icpp(3)%length_y': -1e6, 
-                'patch_icpp(3)%z_centroid': -1e6, 'patch_icpp(3)%length_z': -1e6, 
-                'patch_icpp(3)%vel(1)': -1e6, 'patch_icpp(3)%vel(2)': -1e6, 'patch_icpp(3)%vel(3)': -1e6, 
+                'patch_icpp(3)%y_centroid': -1e6, 'patch_icpp(3)%length_y': -1e6,
+                'patch_icpp(3)%z_centroid': -1e6, 'patch_icpp(3)%length_z': -1e6,
+                'patch_icpp(3)%vel(1)': -1e6, 'patch_icpp(3)%vel(2)': -1e6, 'patch_icpp(3)%vel(3)': -1e6,
                 'patch_icpp(3)%r0': -1e6, 'patch_icpp(3)%v0': -1e6
             }))
 
@@ -936,6 +953,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_bcs(dimInfo)
             alter_grcbc(dimInfo)
             alter_weno(dimInfo)
+            alter_muscl()
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
@@ -975,11 +993,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                            "2D_lagrange_bubblescreen",
                            "3D_lagrange_bubblescreen", "2D_triple_point",
                            "1D_shuosher_analytical",
-                           "1D_titarevtorro_analytical", 
+                           "1D_titarevtorro_analytical",
                            "2D_acoustic_pulse_analytical",
                            "2D_isentropicvortex_analytical",
                            "2D_zero_circ_vortex_analytical",
-                           "3D_TaylorGreenVortex_analytical"]
+                           "3D_TaylorGreenVortex_analytical",
+                           "3D_IGR_TaylorGreenVortex_nvidia",
+                           "2D_backward_facing_step",
+                           "2D_forward_facing_step"]
             if path in casesToSkip:
                 continue
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"
