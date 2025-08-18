@@ -235,7 +235,7 @@ contains
             end if
         end do
 
-        deallocate(ofs(nOffsets, num_dims))
+        deallocate(ofs)
 
     end subroutine s_perturb_simplex
 
