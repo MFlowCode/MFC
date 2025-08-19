@@ -45,10 +45,31 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
             error = compute_error(cVal, gVal)
             avg_err.push(error)
 
-            def raise_err_with_max_diagnostics(msg: str):
-                # Find maximum errors across ALL files for diagnostics
-                max_errors = find_maximum_errors(candidate, golden)
-                diagnostic_msg = format_diagnostic_message(max_errors)
+            def raise_err_with_failing_diagnostics(msg: str):
+                # Find maximum errors among FAILING variables only
+                max_abs_info, max_rel_info = find_maximum_errors_among_failing(candidate, golden, tol)
+
+                diagnostic_msg = ""
+                if max_abs_info:
+                    max_abs_filepath, max_abs_valIndex, max_abs_gVal, max_abs_cVal, max_abs_error, max_abs_rel_error = max_abs_info
+                    rel_error_str = f"{max_abs_rel_error:.2E}" if not math.isnan(max_abs_rel_error) else "NaN"
+                    diagnostic_msg += f"\n\nDiagnostics - Maximum absolute error among FAILING variables:\n" \
+                                     f" - File: {max_abs_filepath}\n" \
+                                     f" - Variable n°{max_abs_valIndex+1}\n" \
+                                     f" - Candidate: {max_abs_cVal}\n" \
+                                     f" - Golden: {max_abs_gVal}\n" \
+                                     f" - Absolute Error: {max_abs_error:.2E}\n" \
+                                     f" - Relative Error: {rel_error_str}"
+
+                if max_rel_info:
+                    max_rel_filepath, max_rel_valIndex, max_rel_gVal, max_rel_cVal, max_rel_error, max_rel_abs_error = max_rel_info
+                    diagnostic_msg += f"\n\nDiagnostics - Maximum relative error among FAILING variables:\n" \
+                                     f" - File: {max_rel_filepath}\n" \
+                                     f" - Variable n°{max_rel_valIndex+1}\n" \
+                                     f" - Candidate: {max_rel_cVal}\n" \
+                                     f" - Golden: {max_rel_gVal}\n" \
+                                     f" - Relative Error: {max_rel_error:.2E}\n" \
+                                     f" - Absolute Error: {max_rel_abs_error:.2E}"
 
                 return None, f"""\
 Variable n°{valIndex+1} (1-indexed) in {gFilepath} {msg}:
@@ -59,48 +80,21 @@ Variable n°{valIndex+1} (1-indexed) in {gFilepath} {msg}:
 """
 
             if math.isnan(gVal):
-                return raise_err_with_max_diagnostics("is NaN in the golden file")
+                return raise_err_with_failing_diagnostics("is NaN in the golden file")
             if math.isnan(cVal):
-                return raise_err_with_max_diagnostics("is NaN in the pack file")
+                return raise_err_with_failing_diagnostics("is NaN in the pack file")
             if not is_close(error, tol):
-                return raise_err_with_max_diagnostics("is not within tolerance")
+                return raise_err_with_failing_diagnostics("is not within tolerance")
 
     # Return the average relative error
     return avg_err.get(), None
 
 
-def format_diagnostic_message(max_errors: typing.Tuple[typing.Optional[typing.Tuple[str, int, float, float, float, float]], typing.Optional[typing.Tuple[str, int, float, float, float, float]]]) -> str:
-    """Format the diagnostic message showing maximum errors."""
-    max_abs_info, max_rel_info = max_errors
-    diagnostic_msg = ""
-
-    if max_abs_info:
-        filepath, var_idx, golden_val, candidate_val, abs_error, rel_error = max_abs_info
-        rel_error_str = f"{rel_error:.2E}" if not math.isnan(rel_error) else "NaN"
-        diagnostic_msg += f"\n\nDiagnostics - Maximum absolute error across ALL files:\n" \
-                         f" - File: {filepath}\n" \
-                         f" - Variable n°{var_idx+1}\n" \
-                         f" - Candidate: {candidate_val}\n" \
-                         f" - Golden: {golden_val}\n" \
-                         f" - Absolute Error: {abs_error:.2E}\n" \
-                         f" - Relative Error: {rel_error_str}"
-
-    if max_rel_info:
-        filepath, var_idx, golden_val, candidate_val, rel_error, abs_error = max_rel_info
-        diagnostic_msg += f"\n\nDiagnostics - Maximum relative error across ALL files:\n" \
-                         f" - File: {filepath}\n" \
-                         f" - Variable n°{var_idx+1}\n" \
-                         f" - Candidate: {candidate_val}\n" \
-                         f" - Golden: {golden_val}\n" \
-                         f" - Relative Error: {rel_error:.2E}\n" \
-                         f" - Absolute Error: {abs_error:.2E}"
-
-    return diagnostic_msg
-
-
-def find_maximum_errors(candidate: Pack, golden: Pack) -> typing.Tuple[typing.Optional[typing.Tuple[str, int, float, float, float, float]], typing.Optional[typing.Tuple[str, int, float, float, float, float]]]:
+def find_maximum_errors_among_failing(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[typing.Optional[typing.Tuple[str, int, float, float, float, float]], typing.Optional[typing.Tuple[str, int, float, float, float, float]]]:
     """
-    Scan all files to find the maximum absolute and relative errors.
+    Scan all files to find the maximum absolute and relative errors among FAILING variables only.
+    A variable fails if is_close(error, tol) returns False.
+
     Returns tuple of:
     - max_abs_info: (filepath, var_index, golden_val, candidate_val, absolute_error, relative_error)
     - max_rel_info: (filepath, var_index, golden_val, candidate_val, relative_error, absolute_error)
@@ -123,12 +117,16 @@ def find_maximum_errors(candidate: Pack, golden: Pack) -> typing.Tuple[typing.Op
 
             error = compute_error(cVal, gVal)
 
-            # Track maximum absolute error
+            # Only consider variables that FAIL tolerance
+            if is_close(error, tol):
+                continue  # Skip variables that pass tolerance
+
+            # Track maximum absolute error among failing variables
             if error.absolute > max_abs_error:
                 max_abs_error = error.absolute
                 max_abs_info = (gFilepath, valIndex, gVal, cVal, error.absolute, error.relative)
 
-            # Track maximum relative error (only if it's not NaN)
+            # Track maximum relative error among failing variables (only if it's not NaN)
             if not math.isnan(error.relative) and error.relative > max_rel_error:
                 max_rel_error = error.relative
                 max_rel_info = (gFilepath, valIndex, gVal, cVal, error.relative, error.absolute)
