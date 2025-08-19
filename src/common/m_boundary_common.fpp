@@ -1941,18 +1941,18 @@ contains
 
         type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
 
-        bc_type(1, 1)%sf(:, :, :) = bc_x%beg
-        bc_type(1, 2)%sf(:, :, :) = bc_x%end
+        bc_type(1, 1)%sf(:, :, :) = int(min(bc_x%beg,0),kind=1)
+        bc_type(1, 2)%sf(:, :, :) = int(min(bc_x%end,0),kind=1)
         $:GPU_UPDATE(device='[bc_type(1,1)%sf,bc_type(1,2)%sf]')
 
         if (n > 0) then
-            bc_type(2, 1)%sf(:, :, :) = bc_y%beg
-            bc_type(2, 2)%sf(:, :, :) = bc_y%end
+            bc_type(2, 1)%sf(:, :, :) = int(min(bc_y%beg,0),kind=1))
+            bc_type(2, 2)%sf(:, :, :) = int(min(bc_y%end,0),kind=1))
             $:GPU_UPDATE(device='[bc_type(2,1)%sf,bc_type(2,2)%sf]')
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                 if (p > 0) then
-                    bc_type(3, 1)%sf(:, :, :) = bc_z%beg
-                    bc_type(3, 2)%sf(:, :, :) = bc_z%end
+                    bc_type(3, 1)%sf(:, :, :) = int(min(bc_z%beg,0),kind=1))
+                    bc_type(3, 2)%sf(:, :, :) = int(min(bc_z%end,0),kind=1))
                     $:GPU_UPDATE(device='[bc_type(3,1)%sf,bc_type(3,2)%sf]')
                 end if
             #:endif

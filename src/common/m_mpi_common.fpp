@@ -42,7 +42,7 @@ module m_mpi_common
     $:GPU_DECLARE(create='[buff_send, buff_recv]')
 #endif
 
-    integer :: halo_size
+    integer(kind=8) :: halo_size
     $:GPU_DECLARE(create='[halo_size]')
 
 contains
@@ -65,11 +65,11 @@ contains
 
         if (n > 0) then
             if (p > 0) then
-                halo_size = nint(-1._wp + 1._wp*buff_size*(v_size)* &
+                halo_size = -1_8 + 1_8*buff_size*(v_size)* &
                                          & (m + 2*buff_size + 1)* &
                                          & (n + 2*buff_size + 1)* &
                                          & (p + 2*buff_size + 1)/ &
-                                         & (cells_bounds%mnp_min + 2*buff_size + 1))
+                                         & (cells_bounds%mnp_min + 2*buff_size + 1)
             else
                 halo_size = -1 + buff_size*(v_size)* &
                                          & (cells_bounds%mn_max + 2*buff_size + 1)
