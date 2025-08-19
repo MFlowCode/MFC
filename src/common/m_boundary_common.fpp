@@ -1946,13 +1946,13 @@ contains
         $:GPU_UPDATE(device='[bc_type(1,1)%sf,bc_type(1,2)%sf]')
 
         if (n > 0) then
-            bc_type(2, 1)%sf(:, :, :) = int(min(bc_y%beg,0),kind=1))
-            bc_type(2, 2)%sf(:, :, :) = int(min(bc_y%end,0),kind=1))
+            bc_type(2, 1)%sf(:, :, :) = int(min(bc_y%beg,0),kind=1)
+            bc_type(2, 2)%sf(:, :, :) = int(min(bc_y%end,0),kind=1)
             $:GPU_UPDATE(device='[bc_type(2,1)%sf,bc_type(2,2)%sf]')
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                 if (p > 0) then
-                    bc_type(3, 1)%sf(:, :, :) = int(min(bc_z%beg,0),kind=1))
-                    bc_type(3, 2)%sf(:, :, :) = int(min(bc_z%end,0),kind=1))
+                    bc_type(3, 1)%sf(:, :, :) = int(min(bc_z%beg,0),kind=1)
+                    bc_type(3, 2)%sf(:, :, :) = int(min(bc_z%end,0),kind=1)
                     $:GPU_UPDATE(device='[bc_type(3,1)%sf,bc_type(3,2)%sf]')
                 end if
             #:endif
