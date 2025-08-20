@@ -637,7 +637,8 @@ contains
         integer, intent(in) :: stage
 
         real(wp) :: t_start, t_finish
-        integer :: i, j, k, l, q, id !< Generic loop iterators
+	integer :: id
+        integer(kind=8) :: i, j, k, l, q !< Generic loop iterators
 
         call nvtxStartRange("COMPUTE-RHS")
 

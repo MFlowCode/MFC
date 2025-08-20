@@ -838,7 +838,7 @@ contains
         integer, intent(IN) :: t_step
         real(wp), intent(INOUT) :: time_avg
 
-        integer :: i, j, k, l, q !< Generic loop iterator
+        integer(kind=8) :: i, j, k, l, q !< Generic loop iterator
         real(wp) :: start, finish
         integer :: dest
 

@@ -130,7 +130,7 @@ module m_igr
 #endif
     #:endif
 
-    integer :: i, j, k, l, q, r
+    integer(kind=8) :: i, j, k, l, q, r
 
 contains
 
