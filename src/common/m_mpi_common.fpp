@@ -65,11 +65,11 @@ contains
 
         if (n > 0) then
             if (p > 0) then
-                halo_size = -1_8 + 1_8*buff_size*(v_size)* &
+                halo_size = nint(-1._wp + 1._wp*buff_size*(v_size)* &
                                          & (m + 2*buff_size + 1)* &
                                          & (n + 2*buff_size + 1)* &
                                          & (p + 2*buff_size + 1)/ &
-                                         & (cells_bounds%mnp_min + 2*buff_size + 1)
+                                         & (cells_bounds%mnp_min + 2*buff_size + 1))
             else
                 halo_size = -1 + buff_size*(v_size)* &
                                          & (cells_bounds%mn_max + 2*buff_size + 1)
