@@ -1221,7 +1221,7 @@ contains
         real(wp), intent(inout) :: start, finish, io_time_avg
         integer, intent(inout) :: nt
 
-        integer :: i, j, k, l
+        integer(kind=8) :: i, j, k, l
 
         integer :: save_count
 
