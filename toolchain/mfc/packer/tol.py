@@ -21,7 +21,7 @@ def is_close(error: Error, tolerance: Tolerance) -> bool:
 def _format_error_diagnostics(max_abs_info, max_rel_info) -> str:
     """Format diagnostic information for maximum errors among failing variables."""
     diagnostic_msg = ""
-    
+
     if max_abs_info:
         filepath, val_idx, g_val, c_val, abs_err, rel_err = max_abs_info
         rel_error_str = f"{rel_err:.2E}" if not math.isnan(rel_err) else "NaN"
@@ -139,4 +139,3 @@ def find_maximum_errors_among_failing(candidate: Pack, golden: Pack, tol: Tolera
                 max_rel_info = (gFilepath, valIndex, gVal, cVal, error.relative, error.absolute)
 
     return max_abs_info, max_rel_info
-
