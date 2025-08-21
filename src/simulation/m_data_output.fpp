@@ -1,4 +1,3 @@
-
 !! @file m_data_output.f90
 !! @brief Contains module m_data_output
 
@@ -32,6 +31,8 @@ module m_data_output
     use m_delay_file_access
 
     use m_ibm
+
+    use m_boundary_common
 
     implicit none
 
@@ -73,17 +74,19 @@ module m_data_output
     real(wp) :: Rc_min !< Rc criterion maximum
     !> @}
 
+    type(scalar_field), allocatable, dimension(:) :: q_cons_temp
+
 contains
 
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
-    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
+    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(in) :: q_cons_vf
+            intent(inout) :: q_cons_vf
 
         type(scalar_field), &
             intent(inout) :: q_T_sf
@@ -97,10 +100,14 @@ contains
         type(scalar_field), &
             intent(inout), optional :: beta
 
+        type(integer_field), &
+            dimension(1:num_dims, -1:1), &
+            intent(in) :: bc_type
+
         if (.not. parallel_io) then
-            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
+            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
         else
-            call s_write_parallel_data_files(q_cons_vf, t_step, beta)
+            call s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
         end if
 
     end subroutine s_write_data_files
@@ -387,13 +394,14 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
+    impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the current time-step directory
@@ -537,7 +545,7 @@ contains
         !1D
         if (n == 0 .and. p == 0) then
 
-            if (model_eqns == 2) then
+            if (model_eqns == 2 .and. (.not. igr)) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
@@ -651,7 +659,7 @@ contains
                 end do
             end if
 
-            if (prim_vars_wrt) then
+            if (prim_vars_wrt .and. (.not. igr)) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
@@ -746,7 +754,7 @@ contains
                 end do
             end if
 
-            if (prim_vars_wrt) then
+            if (prim_vars_wrt .and. (.not. igr)) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
@@ -782,11 +790,14 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
         !!  @param beta Eulerian void fraction from lagrangian bubbles
-    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, beta)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
+        type(integer_field), &
+            dimension(1:num_dims, -1:1), &
+            intent(in) :: bc_type
 
 #ifdef MFC_MPI
 
@@ -806,6 +817,17 @@ contains
 
         integer :: alt_sys !< Altered system size for the lagrangian subgrid bubble model
 
+        ! Down sampling variables
+        integer :: m_ds, n_ds, p_ds
+        integer :: m_glb_ds, n_glb_ds, p_glb_ds
+        integer :: m_glb_save, n_glb_save, p_glb_save ! Global save size
+
+        if (down_sample) then
+            call s_populate_variables_buffers(bc_type, q_cons_vf)
+            call s_downsample_data(q_cons_vf, q_cons_temp, &
+                                   m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
+        end if
+
         if (present(beta)) then
             alt_sys = sys_size + 1
         else
@@ -817,11 +839,14 @@ contains
             call s_int_to_str(t_step, t_step_string)
 
             ! Initialize MPI data I/O
-
-            if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+            if (down_sample) then
+                call s_initialize_mpi_data_ds(q_cons_temp)
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
             end if
 
             if (proc_rank == 0) then
@@ -848,13 +873,24 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
 
-            ! Size of local arrays
-            data_size = (m + 1)*(n + 1)*(p + 1)
+            if (down_sample) then
+                ! Size of local arrays
+                data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
+                m_glb_save = m_glb_ds + 1
+                n_glb_save = n_glb_ds + 1
+                p_glb_save = p_glb_ds + 1
+            else
+                ! Size of local arrays
+                data_size = (m + 1)*(n + 1)*(p + 1)
+                m_glb_save = m_glb + 1
+                n_glb_save = n_glb + 1
+                p_glb_save = p_glb + 1
+            end if
 
             ! Resize some integers so MPI can write even the biggest files
-            m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-            n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-            p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+            m_MOK = int(m_glb_save + 1, MPI_OFFSET_KIND)
+            n_MOK = int(n_glb_save + 1, MPI_OFFSET_KIND)
+            p_MOK = int(p_glb_save + 1, MPI_OFFSET_KIND)
             WP_MOK = int(8._wp, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
@@ -878,12 +914,21 @@ contains
                     end do
                 end if
             else
-                do i = 1, sys_size !TODO: check if correct (sys_size
-                    var_MOK = int(i, MPI_OFFSET_KIND)
+                if (down_sample) then
+                    do i = 1, sys_size !TODO: check if correct (sys_size
+                        var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            mpi_p, status, ierr)
-                end do
+                        call MPI_FILE_WRITE_ALL(ifile, q_cons_temp(i)%sf, data_size, &
+                                                mpi_p, status, ierr)
+                    end do
+                else
+                    do i = 1, sys_size !TODO: check if correct (sys_size
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                                mpi_p, status, ierr)
+                    end do
+                end if
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
@@ -975,7 +1020,6 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
-
 #endif
 
     end subroutine s_write_parallel_data_files
@@ -985,10 +1029,10 @@ contains
     !!  @param t_step Current time-step
     !!  @param q_com Center of mass information
     !!  @param moments Higher moment information
-    impure subroutine s_write_com_files(t_step, c_mass)
+    impure subroutine s_write_com_files(t_step, c_mass_in)
 
         integer, intent(in) :: t_step
-        real(wp), dimension(num_fluids, 5), intent(in) :: c_mass
+        real(wp), dimension(num_fluids, 5), intent(in) :: c_mass_in
         integer :: i !< Generic loop iterator
         real(wp) :: nondim_time !< Non-dimensional time
 
@@ -1004,28 +1048,28 @@ contains
                 do i = 1, num_fluids ! Loop through fluids
                     write (i + 120, '(6X,4F24.12)') &
                         nondim_time, &
-                        c_mass(i, 1), &
-                        c_mass(i, 2), &
-                        c_mass(i, 5)
+                        c_mass_in(i, 1), &
+                        c_mass_in(i, 2), &
+                        c_mass_in(i, 5)
                 end do
             elseif (p == 0) then ! 2D simulation
                 do i = 1, num_fluids ! Loop through fluids
                     write (i + 120, '(6X,5F24.12)') &
                         nondim_time, &
-                        c_mass(i, 1), &
-                        c_mass(i, 2), &
-                        c_mass(i, 3), &
-                        c_mass(i, 5)
+                        c_mass_in(i, 1), &
+                        c_mass_in(i, 2), &
+                        c_mass_in(i, 3), &
+                        c_mass_in(i, 5)
                 end do
             else ! 3D simulation
                 do i = 1, num_fluids ! Loop through fluids
                     write (i + 120, '(6X,6F24.12)') &
                         nondim_time, &
-                        c_mass(i, 1), &
-                        c_mass(i, 2), &
-                        c_mass(i, 3), &
-                        c_mass(i, 4), &
-                        c_mass(i, 5)
+                        c_mass_in(i, 1), &
+                        c_mass_in(i, 2), &
+                        c_mass_in(i, 3), &
+                        c_mass_in(i, 4), &
+                        c_mass_in(i, 5)
                 end do
             end if
         end if
@@ -1071,7 +1115,7 @@ contains
         real(wp) :: max_pres
         real(wp), dimension(2) :: Re
         real(wp), dimension(6) :: tau_e
-        real(wp) :: G
+        real(wp) :: G_local
         real(wp) :: dyn_p, T
         real(wp) :: damage_state
 
@@ -1152,7 +1196,7 @@ contains
                     if (elasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
                                                             rho, gamma, pi_inf, qv, &
-                                                            Re, G, fluid_pp(:)%G)
+                                                            Re, G_local, fluid_pp(:)%G)
                     else
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
                                                             rho, gamma, pi_inf, qv)
@@ -1166,7 +1210,7 @@ contains
                     if (elasticity) then
                         if (cont_damage) then
                             damage_state = q_cons_vf(damage_idx)%sf(j - 2, k, l)
-                            G = G*max((1._wp - damage_state), 0._wp)
+                            G_local = G_local*max((1._wp - damage_state), 0._wp)
                         end if
 
                         call s_compute_pressure( &
@@ -1174,7 +1218,7 @@ contains
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
                             dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
-                            q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
+                            q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G_local)
                     else
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
@@ -1267,7 +1311,7 @@ contains
                         ! Computing/Sharing necessary state variables
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, &
                                                             rho, gamma, pi_inf, qv, &
-                                                            Re, G, fluid_pp(:)%G)
+                                                            Re, G_local, fluid_pp(:)%G)
                         do s = 1, num_vels
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
@@ -1277,7 +1321,7 @@ contains
                         if (elasticity) then
                             if (cont_damage) then
                                 damage_state = q_cons_vf(damage_idx)%sf(j - 2, k - 2, l)
-                                G = G*max((1._wp - damage_state), 0._wp)
+                                G_local = G_local*max((1._wp - damage_state), 0._wp)
                             end if
 
                             call s_compute_pressure( &
@@ -1288,7 +1332,7 @@ contains
                                 pres, &
                                 T, &
                                 q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
-                                q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
+                                q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G_local)
                         else
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
                                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
@@ -1357,7 +1401,7 @@ contains
                             ! Computing/Sharing necessary state variables
                             call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l - 2, &
                                                                 rho, gamma, pi_inf, qv, &
-                                                                Re, G, fluid_pp(:)%G)
+                                                                Re, G_local, fluid_pp(:)%G)
                             do s = 1, num_vels
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l - 2)/rho
                             end do
@@ -1373,7 +1417,7 @@ contains
                             if (elasticity) then
                                 if (cont_damage) then
                                     damage_state = q_cons_vf(damage_idx)%sf(j - 2, k - 2, l - 2)
-                                    G = G*max((1._wp - damage_state), 0._wp)
+                                    G_local = G_local*max((1._wp - damage_state), 0._wp)
                                 end if
 
                                 call s_compute_pressure( &
@@ -1382,7 +1426,7 @@ contains
                                     dyn_p, pi_inf, gamma, rho, qv, &
                                     rhoYks, pres, T, &
                                     q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
-                                    q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G)
+                                    q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G_local)
                             else
                                 call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
                                                         q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
@@ -1749,20 +1793,35 @@ contains
         !!      other procedures that are necessary to setup the module.
     impure subroutine s_initialize_data_output_module
 
+        integer :: i, m_ds, n_ds, p_ds
+
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
-        @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
-        icfl_max = 0._wp
+        if (run_time_info) then
+            @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
+            icfl_max = 0._wp
+
+            if (viscous) then
+                @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
+                @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
+
+                vcfl_max = 0._wp
+                Rc_min = 1.e3_wp
+            end if
+        end if
 
         if (probe_wrt) then
             @:ALLOCATE(c_mass(num_fluids,5))
         end if
 
-        if (viscous) then
-            @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
-            @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
+        if (down_sample) then
+            m_ds = int((m + 1)/3) - 1
+            n_ds = int((n + 1)/3) - 1
+            p_ds = int((p + 1)/3) - 1
 
-            vcfl_max = 0._wp
-            Rc_min = 1.e3_wp
+            allocate (q_cons_temp(1:sys_size))
+            do i = 1, sys_size
+                allocate (q_cons_temp(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
+            end do
         end if
 
     end subroutine s_initialize_data_output_module
@@ -1770,14 +1829,25 @@ contains
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_data_output_module
 
+        integer :: i
+
         if (probe_wrt) then
             @:DEALLOCATE(c_mass)
         end if
 
-        ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
-        @:DEALLOCATE(icfl_sf)
-        if (viscous) then
-            @:DEALLOCATE(vcfl_sf, Rc_sf)
+        if (run_time_info) then
+            ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
+            @:DEALLOCATE(icfl_sf)
+            if (viscous) then
+                @:DEALLOCATE(vcfl_sf, Rc_sf)
+            end if
+        end if
+
+        if (down_sample) then
+            do i = 1, sys_size
+                deallocate (q_cons_temp(i)%sf)
+            end do
+            deallocate (q_cons_temp)
         end if
 
     end subroutine s_finalize_data_output_module

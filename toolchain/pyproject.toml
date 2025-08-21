@@ -26,7 +26,6 @@ dependencies = [
     "pylint",
     "fprettify",
     "black",
-    "fortitude-lint",
     "ansi2txt",
 
     # Profiling

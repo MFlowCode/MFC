@@ -37,7 +37,7 @@ module m_riemann_solvers
 
     use m_bubbles_EE
 
-    use m_surface_tension      !< To get the capilary fluxes
+    use m_surface_tension      !< To get the capillary fluxes
 
     use m_helper_basic         !< Functions to compare floating point numbers
 
@@ -2893,7 +2893,7 @@ contains
         end if
 
         if (surface_tension) then
-            call s_compute_capilary_source_flux( &
+            call s_compute_capillary_source_flux( &
                 vel_src_rsx_vf, &
                 vel_src_rsy_vf, &
                 vel_src_rsz_vf, &

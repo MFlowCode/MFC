@@ -61,6 +61,11 @@ COMMON = {
     'relativity': ParamType.LOG,
     'cont_damage': ParamType.LOG,
     'num_bc_patches': ParamType.INT,
+    'igr': ParamType.LOG,
+    'igr_order': ParamType.INT,
+    'down_sample': ParamType.LOG,
+    'recon_type': ParamType.INT,
+    'muscl_order': ParamType.INT,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -84,7 +89,6 @@ PRE_PROCESS.update({
     'num_patches': ParamType.INT,
     'qbmm': ParamType.LOG,
     'dist_type': ParamType.INT,
-    'R0_type': ParamType.INT,
     'sigR': ParamType.REAL,
     'sigV': ParamType.REAL,
     'rhoRV': ParamType.REAL,
@@ -274,7 +278,6 @@ SIMULATION.update({
     'acoustic_source': ParamType.LOG,
     'num_source': ParamType.INT,
     'qbmm': ParamType.LOG,
-    'R0_type': ParamType.INT,
     'integral_wrt': ParamType.LOG,
     'num_integrals': ParamType.INT,
     'rdma_mpi': ParamType.LOG,
@@ -283,6 +286,7 @@ SIMULATION.update({
     'pi_fac': ParamType.REAL,
     'adap_dt': ParamType.LOG,
     'adap_dt_tol': ParamType.REAL,
+    'adap_dt_max_iters': ParamType.INT,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
     'n_start': ParamType.INT,
@@ -298,6 +302,20 @@ SIMULATION.update({
     'tau_star': ParamType.REAL,
     'cont_damage_s': ParamType.REAL,
     'alpha_bar': ParamType.REAL,
+    'num_igr_iters': ParamType.INT,
+    'num_igr_warm_start_iters': ParamType.INT,
+    'alf_factor': ParamType.REAL,
+    'igr_iter_solver': ParamType.INT,
+    'igr_pres_lim': ParamType.LOG,
+    'recon_type': ParamType.INT,
+    'muscl_order': ParamType.INT,
+    'muscl_lim': ParamType.INT,
+    'int_comp': ParamType.LOG,
+    'ic_eps': ParamType.REAL,
+    'ic_beta': ParamType.REAL,
+    'nv_uvm_out_of_core': ParamType.LOG,
+    'nv_uvm_igr_temps_on_gpu': ParamType.INT,
+    'nv_uvm_pref_gpu': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
@@ -426,6 +444,7 @@ POST_PROCESS.update({
     'omega_wrt': ParamType.LOG,
     'qbmm': ParamType.LOG,
     'qm_wrt': ParamType.LOG,
+    'liutex_wrt': ParamType.LOG,
     'cf_wrt': ParamType.LOG,
     'sim_data': ParamType.LOG,
     'ib': ParamType.LOG,
@@ -438,6 +457,10 @@ POST_PROCESS.update({
     'output_partial_domain': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
 })
+
+for cmp in ["x", "y", "z"]:
+    for prepend in ["domain%beg", "domain%end", "a", "b"]:
+        PRE_PROCESS[f"{cmp}_{prepend}"] = ParamType.REAL
 
 for cmp_id in range(1,3+1):
     cmp = ["x", "y", "z"][cmp_id-1]
@@ -472,7 +495,9 @@ ALL.update(PRE_PROCESS)
 ALL.update(SIMULATION)
 ALL.update(POST_PROCESS)
 
-CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order", "num_fluids", "mhd", "relativity" ]
+CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order",
+                     "num_fluids", "mhd", "relativity", "igr_order", "viscous",
+                     "igr_iter_solver", "igr", "igr_pres_lim", "recon_type", "muscl_order", "muscl_lim" ]
 
 _properties = { k: v.value for k, v in ALL.items() }
 
