@@ -2488,8 +2488,8 @@ contains
 
                                     call get_species_specific_heats_r(T_L, Cp_iL)
                                     call get_species_specific_heats_r(T_R, Cp_iR)
-
-                                    if (chem_params%gamma_method == 1) then
+                                    !print *, chem_params%gamma_method
+				    if (chem_params%gamma_method == 1) then
                                         !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
                                         Gamma_iL = Cp_iL/(Cp_iL - 1.0_wp)
                                         Gamma_iR = Cp_iR/(Cp_iR - 1.0_wp)
@@ -2596,7 +2596,8 @@ contains
                                 ! variables are placeholders to call the subroutine.
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
                                                               vel_avg_rms, c_sum_Yi_Phi, c_avg)
-
+			       ! print *, pres_R
+			!	print *, Ys_L(9)
                                 if (viscous) then
                                     if (chemistry) then
                                         call compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L(1), Re_R(1))
