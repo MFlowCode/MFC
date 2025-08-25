@@ -1569,8 +1569,10 @@ contains
 #ifdef MFC_MPI
         deallocate (buff_send, buff_recv)
 #ifdef MFC_SIMULATION
-        @:DEALLOCATE(buff_send_scalarfield)
-        @:DEALLOCATE(buff_recv_scalarfield)
+        if (volume_filtering_momentum_eqn) then
+            @:DEALLOCATE(buff_send_scalarfield)
+            @:DEALLOCATE(buff_recv_scalarfield)
+        end if 
 #endif
 #endif
 

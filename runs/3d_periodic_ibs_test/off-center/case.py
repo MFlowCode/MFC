@@ -25,28 +25,23 @@ mu = rho*v1*D/Re # dynamic viscosity for current case
 #print('Kn = ' + str( np.sqrt(np.pi*gam_a/2)*(M/Re) )) # Kn < 0.01 = continuum flow
 
 dt = 4.0E-06
-Nt = 10
-t_save = 1
+Nt = 100
+t_save = 10
 
-Nx = 99
-Ny = 99
-Nz = 99
-
-# load initial sphere locations
-sphere_loc = np.loadtxt('sphere_array_locations.txt')
-N_sphere = len(sphere_loc)
+Nx = 63
+Ny = 63
+Nz = 63
 
 # immersed boundary dictionary
 ib_dict = {}
-for i in range(N_sphere):
-    ib_dict.update({
-        f"patch_ib({i+1})%geometry": 8,
-        f"patch_ib({i+1})%x_centroid": sphere_loc[i, 0],
-        f"patch_ib({i+1})%y_centroid": sphere_loc[i, 1],
-        f"patch_ib({i+1})%z_centroid": sphere_loc[i, 2],
-        f"patch_ib({i+1})%radius": D / 2,
-        f"patch_ib({i+1})%slip": "F",
-        })
+ib_dict.update({
+    f"patch_ib({1})%geometry": 8,
+    f"patch_ib({1})%x_centroid": 15.0 * D,
+    f"patch_ib({1})%y_centroid": 15.0 * D,
+    f"patch_ib({1})%z_centroid": 15.0 * D,
+    f"patch_ib({1})%radius": D / 2,
+    f"patch_ib({1})%slip": "F",
+    })
 
 # Configuring case dictionary
 case_dict = {
@@ -54,14 +49,14 @@ case_dict = {
     "run_time_info": "T",
     # Computational Domain Parameters
     # x direction
-    "x_domain%beg": -5.0 * D,
-    "x_domain%end": 5.0 * D,
+    "x_domain%beg": 5.0 * D,
+    "x_domain%end": 15.0 * D,
     # y direction
-    "y_domain%beg": -5.0 * D,
-    "y_domain%end": 5.0 * D,
+    "y_domain%beg": 5.0 * D,
+    "y_domain%end": 15.0 * D,
     # z direction
-    "z_domain%beg": -5.0 * D,
-    "z_domain%end": 5.0 * D,
+    "z_domain%beg": 5.0 * D,
+    "z_domain%end": 15.0 * D,
     "cyl_coord": "F",
     "m": Nx,
     "n": Ny,
@@ -107,22 +102,20 @@ case_dict = {
     "bc_z%end": -1,
     # Set IB to True and add 1 patch
     "ib": "T",
-    "num_ibs": N_sphere,
+    "num_ibs": 1,
     "viscous": "T",
     # Formatted Database Files Structure Parameters
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "T",
     "E_wrt": "T",
-    "q_filtered_wrt": "T",
     "parallel_io": "T",
-    # Patch: Constant Tube filled with air
-    # Specify the cylindrical air tube grid geometry
+    
     "patch_icpp(1)%geometry": 9,
-    "patch_icpp(1)%x_centroid": 0.0,
+    "patch_icpp(1)%x_centroid": 10.0*D,
     # Uniform medium density, centroid is at the center of the domain
-    "patch_icpp(1)%y_centroid": 0.0,
-    "patch_icpp(1)%z_centroid": 0.0,
+    "patch_icpp(1)%y_centroid": 10.0*D,
+    "patch_icpp(1)%z_centroid": 10.0*D,
     "patch_icpp(1)%length_x": 10 * D,
     "patch_icpp(1)%length_y": 10 * D,
     "patch_icpp(1)%length_z": 10 * D,
@@ -137,21 +130,15 @@ case_dict = {
     # Fluids Physical Parameters
     "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
     "fluid_pp(1)%pi_inf": 0,
-    "fluid_pp(1)%Re(1)": Re,
+    "fluid_pp(1)%Re(1)": 1.0 / mu,
 
     # new case additions
     "periodic_forcing": "T",
     "periodic_ibs": "T",
-    "compute_CD": "F",
-    "volume_filtering_momentum_eqn": "T",
 
     "u_inf_ref": v1,
     "rho_inf_ref": rho,
     "T_inf_ref": T,
-
-    "store_levelset": "F",
-    "slab_domain_decomposition": "T", 
-    "compute_autocorrelation": "T",
     }
 
 case_dict.update(ib_dict)

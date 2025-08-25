@@ -503,7 +503,6 @@ module m_global_parameters
 
     logical :: periodic_ibs
     logical :: compute_CD
-    real(wp) :: mu_visc !< reference viscosity
     real(wp) :: u_inf_ref !< reference freestream velocity
     real(wp) :: rho_inf_ref !< reference freestream density 
     real(wp) :: T_inf_ref !< reference freestream temperature
@@ -512,8 +511,9 @@ module m_global_parameters
     logical :: store_levelset
     logical :: slab_domain_decomposition
     logical :: compute_autocorrelation
+    integer :: t_step_stat_start
 
-    !$acc declare create(mu_visc, u_inf_ref, rho_inf_ref, T_inf_ref)
+    !$acc declare create(u_inf_ref, rho_inf_ref, T_inf_ref)
 
 contains
 
@@ -792,7 +792,6 @@ contains
 
         periodic_ibs = .false.
         compute_CD = .false.
-        mu_visc = dflt_real
         u_inf_ref = dflt_real
         rho_inf_ref = dflt_real
         T_inf_ref = dflt_real
@@ -801,6 +800,7 @@ contains
         store_levelset = .true.
         slab_domain_decomposition = .false.
         compute_autocorrelation = .false.
+        t_step_stat_start = dflt_int
 
     end subroutine s_assign_default_values_to_user_inputs
 

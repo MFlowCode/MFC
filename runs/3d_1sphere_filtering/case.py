@@ -25,8 +25,8 @@ mu = rho*v1*D/Re # dynamic viscosity for current case
 #print('Kn = ' + str( np.sqrt(np.pi*gam_a/2)*(M/Re) )) # Kn < 0.01 = continuum flow
 
 dt = 4.0E-06
-Nt = 31
-t_save = 1
+Nt = 1000
+t_save = 10
 
 Nx = 63
 Ny = 63
@@ -65,6 +65,7 @@ case_dict = {
     "t_step_start": 0,
     "t_step_stop": Nt,  # 3000
     "t_step_save": t_save,  # 10
+    "t_step_stat_start": 100,
     # Simulation Algorithm Parameters
     # Only one patches are necessary, the air tube
     "num_patches": 1,
@@ -132,18 +133,16 @@ case_dict = {
     # Fluids Physical Parameters
     "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
     "fluid_pp(1)%pi_inf": 0,
-    "fluid_pp(1)%Re(1)": Re,
+    "fluid_pp(1)%Re(1)": 1.0 / mu,
 
     # new case additions
     "periodic_forcing": "T",
     "periodic_ibs": "T",
-    "compute_CD": "F",
     "volume_filtering_momentum_eqn": "T",
 
     "u_inf_ref": v1,
     "rho_inf_ref": rho,
     "T_inf_ref": T,
-    "mu_visc": mu,
 
     "store_levelset": "F",
     "slab_domain_decomposition": "T", 

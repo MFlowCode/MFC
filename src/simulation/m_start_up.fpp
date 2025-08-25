@@ -189,9 +189,9 @@ contains
             rkck_adap_dt, rkck_tolerance, &
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar, & 
-            periodic_ibs, compute_CD, mu_visc, u_inf_ref, rho_inf_ref, T_inf_ref, & 
+            periodic_ibs, compute_CD, u_inf_ref, rho_inf_ref, T_inf_ref, & 
             periodic_forcing, volume_filtering_momentum_eqn, store_levelset, & 
-            slab_domain_decomposition, compute_autocorrelation
+            slab_domain_decomposition, compute_autocorrelation, t_step_stat_start
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1346,6 +1346,29 @@ contains
         ! Volume filter flow variables, compute unclosed terms and their statistics
         if (volume_filtering_momentum_eqn) then 
             call s_volume_filter_momentum_eqn(q_cons_ts(1)%vf)
+
+            if (t_step > t_step_stat_start) then    
+                call s_compute_statistics_momentum_unclosed_terms(t_step - t_step_stat_start, mag_reynolds_stress, mag_eff_visc, mag_int_mom_exch)
+
+                ! write(100, *) mag_reynolds_stress%sf(10, 10, 10)
+                ! write(101, *) stat_reynolds_stress(2)%sf(10, 10, 10), stat_reynolds_stress(3)%sf(10, 10, 10), stat_reynolds_stress(4)%sf(10, 10, 10)
+            end if
+
+            ! TEMPORARY, for v+v
+            ! if (t_step == 1) then 
+            !     open(unit=100, file='dat_reynolds_stress.txt', status='replace', action='write')
+            !     open(unit=101, file='stat_reynolds_stress.txt', status='replace', action='write')
+            ! end if
+            ! if (t_step == 999) then 
+            !     close(100)
+            !     close(101)
+            ! end if
+
+        end if
+
+        if (periodic_forcing) then 
+            call s_compute_phase_average(q_cons_ts(1)%vf, t_step+1)
+            call s_compute_periodic_forcing(q_cons_ts(1)%vf)
         end if
 
         ! Time-stepping loop controls
@@ -1585,10 +1608,11 @@ contains
         if (mhd .and. powell) call s_initialize_mhd_powell_module
 
         call s_initialize_particle_forces_module()
-        call s_initialize_additional_forcing_module()
-        if (volume_filtering_momentum_eqn) call s_initialize_fftw_explicit_filter_module()
-
-        call s_initialize_statistics_module()
+        if (periodic_forcing) call s_initialize_additional_forcing_module()
+        if (volume_filtering_momentum_eqn) then 
+            call s_initialize_fftw_explicit_filter_module()
+            call s_initialize_statistics_module()
+        end if
 
     end subroutine s_initialize_modules
 
@@ -1702,7 +1726,7 @@ contains
             !$acc update device(ib_markers%sf)
         end if
 
-        !$acc update device(mu_visc, u_inf_ref, rho_inf_ref, T_inf_ref)
+        !$acc update device(u_inf_ref, rho_inf_ref, T_inf_ref)
 
     end subroutine s_initialize_gpu_vars
 

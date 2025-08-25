@@ -15,7 +15,7 @@ T = P/(rho*R)
 
 M = 1.2
 Re = 1500.0
-v1 = M*(gam_a*P/rho)**(1.0/2.0)
+v1 = M*np.sqrt((gam_a*P/rho))
 
 mu = rho*v1*D/Re # dynamic viscosity for current case
 
@@ -25,8 +25,8 @@ mu = rho*v1*D/Re # dynamic viscosity for current case
 #print('Kn = ' + str( np.sqrt(np.pi*gam_a/2)*(M/Re) )) # Kn < 0.01 = continuum flow
 
 dt = 4.0E-06
-Nt = 5
-t_save = 1
+Nt = 100
+t_save = 10
 
 Nx = 63
 Ny = 63
@@ -36,25 +36,11 @@ Nz = 63
 ib_dict = {}
 ib_dict.update({
     f"patch_ib({1})%geometry": 8,
-    f"patch_ib({1})%x_centroid": 0.5,
-    f"patch_ib({1})%y_centroid": 0.5,
-    f"patch_ib({1})%z_centroid": 0.5,
+    f"patch_ib({1})%x_centroid": 0.0,
+    f"patch_ib({1})%y_centroid": 0.0,
+    f"patch_ib({1})%z_centroid": 0.0,
     f"patch_ib({1})%radius": D / 2,
     f"patch_ib({1})%slip": "F",
-
-    f"patch_ib({2})%geometry": 8,
-    f"patch_ib({2})%x_centroid": 0.0,
-    f"patch_ib({2})%y_centroid": 0.0,
-    f"patch_ib({2})%z_centroid": 0.0,
-    f"patch_ib({2})%radius": D / 2,
-    f"patch_ib({2})%slip": "F",
-
-    f"patch_ib({3})%geometry": 8,
-    f"patch_ib({3})%x_centroid": 0.0,
-    f"patch_ib({3})%y_centroid": 0.5,
-    f"patch_ib({3})%z_centroid": 0.25,
-    f"patch_ib({3})%radius": D / 2,
-    f"patch_ib({3})%slip": "F",
     })
 
 # Configuring case dictionary
@@ -116,7 +102,7 @@ case_dict = {
     "bc_z%end": -1,
     # Set IB to True and add 1 patch
     "ib": "T",
-    "num_ibs": 3,
+    "num_ibs": 1,
     "viscous": "T",
     # Formatted Database Files Structure Parameters
     "format": 1,
@@ -144,10 +130,15 @@ case_dict = {
     # Fluids Physical Parameters
     "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
     "fluid_pp(1)%pi_inf": 0,
-    "fluid_pp(1)%Re(1)": Re,
+    "fluid_pp(1)%Re(1)": 1.0 / mu,
 
     # new case additions
+    "periodic_forcing": "T",
     "periodic_ibs": "T",
+
+    "u_inf_ref": v1,
+    "rho_inf_ref": rho,
+    "T_inf_ref": T,
     }
 
 case_dict.update(ib_dict)

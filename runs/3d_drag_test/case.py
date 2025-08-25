@@ -134,7 +134,6 @@ case_dict = {
 
     # new case additions
     "compute_CD": "T",
-    "mu_visc": mu,
     "u_inf_ref": v1,
     "rho_inf_ref": rho,
     "T_inf_ref": T,

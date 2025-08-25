@@ -87,13 +87,7 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    type(scalar_field), allocatable, dimension(:) :: stat_reynolds_stress
-    type(scalar_field), allocatable, dimension(:) :: stat_eff_visc
-    type(scalar_field), allocatable, dimension(:) :: stat_int_mom_exch
-
     !$acc declare create(q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, rhs_ts_rkck, q_prim_ts, rhs_mv, rhs_pb, max_dt)
-
-    !$acc declare create(stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
 
 contains
 
@@ -367,32 +361,6 @@ contains
             do j = -1, 1, 2
                 @:ACC_SETUP_SFs(bc_type(i,j))
             end do
-        end do
-
-        if (compute_CD .or. volume_filtering_momentum_eqn) then
-            @:ALLOCATE(pres_visc_stress(momxb:momxe))
-            do i = momxb, momxe
-                @:ALLOCATE(pres_visc_stress(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(pres_visc_stress(i))
-            end do
-        end if
-
-        @:ALLOCATE(stat_reynolds_stress(2:4))
-        do i = 2, 4
-            @:ALLOCATE(stat_reynolds_stress(i)%sf(0:m, 0:n, 0:p))
-            @:ACC_SETUP_SFs(stat_reynolds_stress(i))
-        end do
-        @:ALLOCATE(stat_eff_visc(2:4))
-        do i = 2, 4
-            @:ALLOCATE(stat_eff_visc(i)%sf(0:m, 0:n, 0:p))
-            @:ACC_SETUP_SFs(stat_eff_visc(i))
-        end do
-        @:ALLOCATE(stat_int_mom_exch(2:4))
-        do i = 2, 4
-            @:ALLOCATE(stat_int_mom_exch(i)%sf(0:m, 0:n, 0:p))
-            @:ACC_SETUP_SFs(stat_int_mom_exch(i))
         end do
 
     end subroutine s_initialize_time_steppers_module
@@ -712,45 +680,7 @@ contains
             call nvtxStartRange("TIMESTEP")
         end if
 
-        if (periodic_forcing) then 
-            call s_compute_phase_average(q_cons_ts(1)%vf, t_step+1)
-            call s_compute_periodic_forcing(q_cons_ts(1)%vf)
-        end if
-
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, pres_visc_stress)
-
-        ! if (volume_filtering_momentum_eqn) then 
-        !     call s_apply_fftw_filter_cons(q_cons_ts(1)%vf, q_cons_filtered)
-        !     call s_setup_terms_filtering(q_cons_ts(1)%vf, reynolds_stress, eff_visc)
-        !     call s_apply_fftw_filter_tensor(reynolds_stress, eff_visc, q_cons_filtered, pres_visc_stress, int_mom_exch)
-        !     call s_compute_pseudo_turbulent_reynolds_stress(q_cons_filtered, reynolds_stress, mag_reynolds_stress)
-        !     call s_compute_eff_visc(q_cons_filtered, eff_visc, mag_eff_visc)
-        !     call s_compute_interphase_momentum_exchange_term(int_mom_exch, mag_int_mom_exch)
-        ! end if
-        
-
-        ! call s_autocorrelation_function(t_step+1, q_cons_ts(1)%vf)
-        ! if (t_step > 10) then
-        !     n_step = t_step - 10
-        !     call s_compute_s_order_statistics(mag_reynolds_stress, n_step, stat_reynolds_stress, 1)
-        !     call s_compute_s_order_statistics(mag_eff_visc, n_step, stat_eff_visc, 2)
-        !     call s_compute_s_order_statistics(mag_int_mom_exch, n_step, stat_int_mom_exch, 3)
-        ! end if
-
-
-        ! stat_reynolds_stress(2)%sf(0:m, 0:n, 0:p) = q_cons_filtered(6)%sf(0:m, 0:n, 0:p)
-        ! stat_reynolds_stress(3)%sf(0:m, 0:n, 0:p) = mag_reynolds_stress%sf(0:m, 0:n, 0:p)
-        ! stat_reynolds_stress(4)%sf(0:m, 0:n, 0:p) = mag_eff_visc%sf(0:m, 0:n, 0:p)
-        ! stat_eff_visc(2)%sf(0:m, 0:n, 0:p) = mag_int_mom_exch%sf(0:m, 0:n, 0:p)
-
-
-        if (compute_CD) then
-            call s_compute_drag_coefficient(pres_visc_stress)
-        end if
-
-        if (periodic_forcing) then 
-            call s_add_periodic_forcing(rhs_vf)
-        end if
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -841,10 +771,6 @@ contains
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
-        if (periodic_forcing) then 
-            call s_add_periodic_forcing(rhs_vf)
-        end if
-
         if (bubbles_lagrange) then
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
             call s_update_lagrange_tdv_rk(stage=2)
@@ -920,10 +846,6 @@ contains
 
         ! Stage 3 of 3
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
-
-        if (periodic_forcing) then 
-            call s_add_periodic_forcing(rhs_vf)
-        end if
 
         if (bubbles_lagrange) then
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=3)
@@ -1415,26 +1337,6 @@ contains
 
             @:DEALLOCATE(rhs_vf)
         end if
-
-        if (compute_CD .or. volume_filtering_momentum_eqn) then
-            do i = momxb, momxe
-                @:DEALLOCATE(pres_visc_stress(i)%sf)
-            end do
-            @:DEALLOCATE(pres_visc_stress)
-        end if
-
-        do i = 2, 4
-            @:DEALLOCATE(stat_reynolds_stress(i)%sf)
-        end do
-        @:DEALLOCATE(stat_reynolds_stress)
-        do i = 2, 4
-            @:DEALLOCATE(stat_eff_visc(i)%sf)
-        end do
-        @:DEALLOCATE(stat_eff_visc)
-        do i = 2, 4
-            @:DEALLOCATE(stat_int_mom_exch(i)%sf)
-        end do
-        @:DEALLOCATE(stat_int_mom_exch)
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then

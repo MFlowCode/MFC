@@ -61,6 +61,8 @@ module m_rhs
 
     use m_mhd
 
+    use m_additional_forcing
+
     implicit none
 
     private; public :: s_initialize_rhs_module, &
@@ -609,7 +611,7 @@ contains
 
     end subroutine s_initialize_rhs_module
 
-    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, pres_visc_stress)
+    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
@@ -620,7 +622,6 @@ contains
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
-        type(scalar_field), dimension(momxb:momxe), optional, intent(inout) :: pres_visc_stress
 
         real(wp), dimension(0:m, 0:n, 0:p) :: nbub
         real(wp) :: t_start, t_finish
@@ -810,8 +811,7 @@ contains
                                                  rhs_vf, &
                                                  q_cons_qp, &
                                                  q_prim_qp, &
-                                                 flux_src_n(id), & 
-                                                 pres_visc_stress)
+                                                 flux_src_n(id))
             call nvtxEndRange
 
             ! RHS additions for hypoelasticity
@@ -830,8 +830,7 @@ contains
                                                       flux_src_n(id)%vf, &
                                                       dq_prim_dx_qp(1)%vf, &
                                                       dq_prim_dy_qp(1)%vf, &
-                                                      dq_prim_dz_qp(1)%vf, & 
-                                                      pres_visc_stress)
+                                                      dq_prim_dz_qp(1)%vf)
                 call nvtxEndRange
             end if
 
@@ -911,6 +910,8 @@ contains
 
         if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, rhs_vf)
 
+        if (periodic_forcing) call s_add_periodic_forcing(rhs_vf)
+
         ! END: Additional physics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
@@ -938,14 +939,13 @@ contains
 
     end subroutine s_compute_rhs
 
-    subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, pres_visc_stress)
+    subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(vector_field), intent(inout) :: q_cons_vf
         type(vector_field), intent(inout) :: q_prim_vf
         type(vector_field), intent(inout) :: flux_src_n_vf
-        type(scalar_field), dimension(momxb:momxe), optional, intent(inout) :: pres_visc_stress  
 
         integer :: i, j, k, l, q
 
@@ -997,25 +997,6 @@ contains
                     end do
                 end do
             end do
-
-            ! particle forces loop, x-dir
-            if ((compute_CD .or. volume_filtering_momentum_eqn) .and. present(pres_visc_stress)) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do k = 0, p
-                    do j = 0, n 
-                        do i = 0, m 
-                            !$acc loop seq
-                            do l = momxb, momxe
-                                pres_visc_stress(l)%sf(i, j, k) = 1._wp/dx(i) * & 
-                                                          (flux_n(1)%vf(l)%sf(i-1, j, k) - & 
-                                                           flux_n(1)%vf(l)%sf(i, j, k)) - 0.5_wp/dx(i) * & 
-                                                          (q_cons_vf%vf(2)%sf(i+1, j, k)*q_cons_vf%vf(l)%sf(i+1, j, k)/q_cons_vf%vf(1)%sf(i+1, j, k) - & 
-                                                           q_cons_vf%vf(2)%sf(i-1, j, k)*q_cons_vf%vf(l)%sf(i-1, j, k)/q_cons_vf%vf(1)%sf(i-1, j, k))
-                            end do 
-                        end do 
-                    end do 
-                end do 
-            end if
 
             if (model_eqns == 3) then
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -1126,25 +1107,6 @@ contains
                     end do
                 end do
             end do
-
-            ! particle forces loop, y-dir
-            if ((compute_CD .or. volume_filtering_momentum_eqn) .and. present(pres_visc_stress)) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do k = 0, p 
-                    do j = 0, n 
-                        do i = 0, m 
-                            !$acc loop seq
-                            do l = momxb, momxe 
-                                pres_visc_stress(l)%sf(i, j, k) = pres_visc_stress(l)%sf(i, j, k) + 1._wp/dy(j) * & 
-                                                          (flux_n(2)%vf(l)%sf(i, j-1, k) - & 
-                                                           flux_n(2)%vf(l)%sf(i, j, k)) - 0.5_wp/dy(j) * & 
-                                                          (q_cons_vf%vf(3)%sf(i, j+1, k)*q_cons_vf%vf(l)%sf(i, j+1, k)/q_cons_vf%vf(1)%sf(i, j+1, k) - & 
-                                                           q_cons_vf%vf(3)%sf(i, j-1, k)*q_cons_vf%vf(l)%sf(i, j-1, k)/q_cons_vf%vf(1)%sf(i, j-1, k))
-                            end do  
-                        end do 
-                    end do
-                end do
-            end if
 
             if (model_eqns == 3) then
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -1352,25 +1314,6 @@ contains
                 end do
             end if
 
-            ! particle forces loop, z-dir
-            if ((compute_CD .or. volume_filtering_momentum_eqn) .and. present(pres_visc_stress)) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do k = 0, p 
-                    do j = 0, n 
-                        do i = 0, m 
-                            !$acc loop seq
-                            do l = momxb, momxe 
-                                pres_visc_stress(l)%sf(i, j, k) = pres_visc_stress(l)%sf(i, j, k) + 1._wp/dz(k) * & 
-                                                          (flux_n(3)%vf(l)%sf(i, j, k-1) - & 
-                                                           flux_n(3)%vf(l)%sf(i, j, k)) - 0.5_wp/dz(k) * & 
-                                                          (q_cons_vf%vf(4)%sf(i, j, k+1)*q_cons_vf%vf(l)%sf(i, j, k+1)/q_cons_vf%vf(1)%sf(i, j, k+1) - & 
-                                                           q_cons_vf%vf(4)%sf(i, j, k-1)*q_cons_vf%vf(l)%sf(i, j, k-1)/q_cons_vf%vf(1)%sf(i, j, k-1))
-                            end do  
-                        end do 
-                    end do 
-                end do 
-            end if
-
             if (model_eqns == 3) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do l = 0, p
@@ -1552,14 +1495,13 @@ contains
     end subroutine s_compute_advection_source_term
 
     subroutine s_compute_additional_physics_rhs(idir, q_prim_vf, rhs_vf, flux_src_n, &
-                                                dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf, pres_visc_stress)
+                                                dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(in) :: flux_src_n
         type(scalar_field), dimension(sys_size), intent(in) :: dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf
-        type(scalar_field), dimension(momxb:momxe), optional, intent(inout) :: pres_visc_stress
 
         integer :: i, j, k, l
 
@@ -1594,23 +1536,6 @@ contains
                     end do
                 end do
             end do
-
-            ! particle momentum exchange, viscous stress tensor, x-dir
-            if ((compute_CD .or. volume_filtering_momentum_eqn) .and. present(pres_visc_stress)) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do k = 0, p 
-                    do j = 0, n 
-                        do i = 0, m 
-                            !$acc loop seq
-                            do l = momxb, momxe
-                                pres_visc_stress(l)%sf(i, j, k) = pres_visc_stress(l)%sf(i, j, k) + 1._wp/dx(i) * & 
-                                                       (flux_src_n(l)%sf(i-1, j, k) - & 
-                                                        flux_src_n(l)%sf(i, j, k))
-                            end do 
-                        end do 
-                    end do 
-                end do
-            end if
 
         elseif (idir == 2) then ! y-direction
 
@@ -1690,23 +1615,6 @@ contains
                                      - flux_src_n(i)%sf(j, k, l))
                             end do
                         end do
-                    end do
-                end do
-            end if
-
-            ! particle momentum exchange, viscous stress tensor, y-dir
-            if ((compute_CD .or. volume_filtering_momentum_eqn) .and. present(pres_visc_stress)) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do k = 0, p 
-                    do j = 0, n 
-                        do i = 0, m 
-                            !$acc loop seq
-                            do l = momxb, momxe
-                                pres_visc_stress(l)%sf(i, j, k) = pres_visc_stress(l)%sf(i, j, k) + 1._wp/dy(j) * & 
-                                                       (flux_src_n(l)%sf(i, j-1, k) - & 
-                                                        flux_src_n(l)%sf(i, j, k))
-                            end do 
-                        end do 
                     end do
                 end do
             end if
@@ -1795,23 +1703,6 @@ contains
                     end do
                 end do
             end do
-
-            ! particle momentum exchange, viscous stress tensor, z-dir
-            if ((compute_CD .or. volume_filtering_momentum_eqn) .and. present(pres_visc_stress)) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do k = 0, p 
-                    do j = 0, n 
-                        do i = 0, m 
-                            !$acc loop seq
-                            do l = momxb, momxe 
-                                pres_visc_stress(l)%sf(i, j, k) = pres_visc_stress(l)%sf(i, j, k) + 1._wp/dz(k) * & 
-                                                       (flux_src_n(l)%sf(i, j, k-1) - & 
-                                                        flux_src_n(l)%sf(i, j, k))
-                            end do 
-                        end do 
-                    end do 
-                end do 
-            end if 
 
             if (grid_geometry == 3) then
                 !$acc parallel loop collapse(3) gang vector default(present)
