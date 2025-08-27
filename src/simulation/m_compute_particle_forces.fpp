@@ -9,6 +9,8 @@ module m_compute_particle_forces
 
     use m_mpi_proxy 
 
+    use m_volume_filtering
+
     implicit none
 
     private; public :: s_initialize_particle_forces_module, & 
@@ -21,9 +23,7 @@ module m_compute_particle_forces
 contains
     
     subroutine s_initialize_particle_forces_module
-        if (compute_CD) then
-            @:ALLOCATE(FD_calc(0:num_ibs))
-        end if
+        @:ALLOCATE(FD_calc(0:num_ibs))
 
     end subroutine s_initialize_particle_forces_module
 
@@ -63,9 +63,7 @@ contains
     end subroutine s_compute_drag_coefficient
 
     subroutine s_finalize_particle_forces_module
-        if (compute_CD) then 
-            @:DEALLOCATE(FD_calc)
-        end if
+        @:DEALLOCATE(FD_calc)
 
     end subroutine s_finalize_particle_forces_module
     

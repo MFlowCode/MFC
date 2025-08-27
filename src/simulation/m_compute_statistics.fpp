@@ -9,6 +9,8 @@ module m_compute_statistics
 
     use m_additional_forcing
 
+    use m_nvtx
+
     implicit none
 
     private; public :: s_initialize_statistics_module, s_finalize_statistics_module, &
@@ -52,20 +54,20 @@ contains
             @:ACC_SETUP_SFs(Msn_int_mom_exch(i))
         end do
 
-        @:ALLOCATE(stat_reynolds_stress(2:4))
-        do i = 2, 4
+        @:ALLOCATE(stat_reynolds_stress(1:4))
+        do i = 1, 4
             @:ALLOCATE(stat_reynolds_stress(i)%sf(0:m, 0:n, 0:p))
             @:ACC_SETUP_SFs(stat_reynolds_stress(i))
         end do
 
-        @:ALLOCATE(stat_eff_visc(2:4))
-        do i = 2, 4
+        @:ALLOCATE(stat_eff_visc(1:4))
+        do i = 1, 4
             @:ALLOCATE(stat_eff_visc(i)%sf(0:m, 0:n, 0:p))
             @:ACC_SETUP_SFs(stat_eff_visc(i))
         end do
 
-        @:ALLOCATE(stat_int_mom_exch(2:4))
-        do i = 2, 4
+        @:ALLOCATE(stat_int_mom_exch(1:4))
+        do i = 1, 4
             @:ALLOCATE(stat_int_mom_exch(i)%sf(0:m, 0:n, 0:p))
             @:ACC_SETUP_SFs(stat_int_mom_exch(i))
         end do
@@ -125,7 +127,7 @@ contains
 
     subroutine s_compute_234_order_statistics(ns, Msn, q_stat)
         type(scalar_field), dimension(1:4), intent(in) :: Msn
-        type(scalar_field), dimension(2:4), intent(inout) :: q_stat
+        type(scalar_field), dimension(1:4), intent(inout) :: q_stat
 
         real(wp), intent(in) :: ns
         integer :: i, j, k
@@ -134,6 +136,7 @@ contains
         do i = 0, m 
             do j = 0, n 
                 do k = 0, p 
+                    q_stat(1)%sf(i, j, k) = Msn(1)%sf(i, j, k)
                     q_stat(2)%sf(i, j, k) = Msn(2)%sf(i, j, k) / (ns - 1._wp)
                     q_stat(3)%sf(i, j, k) = sqrt(ns - 1._wp) / (ns - 2._wp) * ns * Msn(3)%sf(i, j, k) / (Msn(2)%sf(i, j, k)**1.5)
                     q_stat(4)%sf(i, j, k) = (ns - 1._wp) / ((ns - 2._wp) * (ns - 3._wp)) * ((ns + 1._wp) * (ns * Msn(4)%sf(i, j, k) / (Msn(2)%sf(i, j, k)**2) - 3._wp) + 6._wp)
@@ -160,17 +163,17 @@ contains
         end do
         @:DEALLOCATE(Msn_int_mom_exch)
 
-        do i = 2, 4
+        do i = 1, 4
             @:DEALLOCATE(stat_reynolds_stress(i)%sf)
         end do
         @:DEALLOCATE(stat_reynolds_stress)
 
-        do i = 2, 4
+        do i = 1, 4
             @:DEALLOCATE(stat_eff_visc(i)%sf)
         end do
         @:DEALLOCATE(stat_eff_visc)
 
-        do i = 2, 4
+        do i = 1, 4
             @:DEALLOCATE(stat_int_mom_exch(i)%sf)
         end do
         @:DEALLOCATE(stat_int_mom_exch)

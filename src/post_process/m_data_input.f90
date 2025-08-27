@@ -1344,7 +1344,7 @@ contains
                     q_particle%sf(-j, 0:n, 0:p) = &
                         q_particle%sf((m + 1) - j, 0:n, 0:p)
                 else
-                    do i = 2, 4
+                    do i = 1, 4
                         stat_reynolds_stress(i)%sf(-j, 0:n, 0:p) = &
                             stat_reynolds_stress(i)%sf((m + 1) - j, 0:n, 0:p)
                         stat_eff_visc(i)%sf(-j, 0:n, 0:p) = &
@@ -1375,7 +1375,7 @@ contains
                     q_particle%sf(m + j, 0:n, 0:p) = &
                         q_particle%sf(j - 1, 0:n, 0:p)
                 else
-                    do i = 2, 4
+                    do i = 1, 4
                         stat_reynolds_stress(i)%sf(m + j, 0:n, 0:p) = &
                             stat_reynolds_stress(i)%sf(j - 1, 0:n, 0:p)
                         stat_eff_visc(i)%sf(m + j, 0:n, 0:p) = &
@@ -1413,7 +1413,7 @@ contains
                         q_particle%sf(:, -j, 0:p) = &
                             q_particle%sf(:, (n + 1) - j, 0:p)
                     else
-                        do i = 2, 4
+                        do i = 1, 4
                             stat_reynolds_stress(i)%sf(:, -j, 0:p) = &
                                 stat_reynolds_stress(i)%sf(:, (n + 1) - j, 0:p)
                             stat_eff_visc(i)%sf(:, -j, 0:p) = &
@@ -1444,7 +1444,7 @@ contains
                         q_particle%sf(:, n + j, 0:p) = &
                             q_particle%sf(:, j - 1, 0:p)
                     else
-                        do i = 2, 4
+                        do i = 1, 4
                             stat_reynolds_stress(i)%sf(:, n + j, 0:p) = &
                                 stat_reynolds_stress(i)%sf(:, j - 1, 0:p)
                             stat_eff_visc(i)%sf(:, n + j, 0:p) = &
@@ -1482,7 +1482,7 @@ contains
                             q_particle%sf(:, :, -j) = &
                                 q_particle%sf(:, :, (p + 1) - j)
                         else
-                            do i = 2, 4
+                            do i = 1, 4
                                 stat_reynolds_stress(i)%sf(:, :, -j) = &
                                     stat_reynolds_stress(i)%sf(:, :, (p + 1) - j)
                                 stat_eff_visc(i)%sf(:, :, -j) = &
@@ -1514,7 +1514,7 @@ contains
                             q_particle%sf(:, :, p + j) = &
                                 q_particle%sf(:, :, j - 1)
                         else
-                            do i = 2, 4
+                            do i = 1, 4
                                 stat_reynolds_stress(i)%sf(:, :, p + j) = &
                                     stat_reynolds_stress(i)%sf(:, :, j - 1)
                                 stat_eff_visc(i)%sf(:, :, p + j) = &
@@ -1559,9 +1559,9 @@ contains
         allocate (q_prim_vf(1:sys_size))
         if (bubbles_lagrange) allocate (q_particle(1))
 
-        if (q_filtered_wrt) allocate (stat_reynolds_stress(2:4))
-        if (q_filtered_wrt) allocate (stat_eff_visc(2:4))
-        if (q_filtered_wrt) allocate (stat_int_mom_exch(2:4))
+        if (q_filtered_wrt) allocate (stat_reynolds_stress(1:4))
+        if (q_filtered_wrt) allocate (stat_eff_visc(1:4))
+        if (q_filtered_wrt) allocate (stat_int_mom_exch(1:4))
 
         ! Allocating the parts of the conservative and primitive variables
         ! that do require the direct knowledge of the dimensionality of the
@@ -1601,7 +1601,7 @@ contains
                 end if
 
                 if (q_filtered_wrt) then
-                    do i = 2, 4
+                    do i = 1, 4
                         allocate (stat_reynolds_stress(i)%sf(-buff_size:m + buff_size, &
                                                      -buff_size:n + buff_size, &
                                                      -buff_size:p + buff_size))
@@ -1707,15 +1707,15 @@ contains
         end if
 
         if (q_filtered_wrt) then 
-            do i = 2, 4 
+            do i = 1, 4 
                 deallocate (stat_reynolds_stress(i)%sf)
             end do 
             deallocate(stat_reynolds_stress)
-            do i = 2, 4 
+            do i = 1, 4 
                 deallocate (stat_eff_visc(i)%sf)
             end do 
             deallocate(stat_eff_visc)
-            do i = 2, 4 
+            do i = 1, 4 
                 deallocate (stat_int_mom_exch(i)%sf)
             end do 
             deallocate(stat_int_mom_exch)

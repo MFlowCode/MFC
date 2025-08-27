@@ -502,7 +502,7 @@ module m_global_parameters
     !> @}
 
     logical :: periodic_ibs
-    logical :: compute_CD
+    logical :: compute_particle_drag
     real(wp) :: u_inf_ref !< reference freestream velocity
     real(wp) :: rho_inf_ref !< reference freestream density 
     real(wp) :: T_inf_ref !< reference freestream temperature
@@ -512,8 +512,9 @@ module m_global_parameters
     logical :: slab_domain_decomposition
     logical :: compute_autocorrelation
     integer :: t_step_stat_start
+    real(wp) :: filter_width
 
-    !$acc declare create(u_inf_ref, rho_inf_ref, T_inf_ref)
+    !$acc declare create(u_inf_ref, rho_inf_ref, T_inf_ref, filter_width)
 
 contains
 
@@ -791,7 +792,7 @@ contains
         #:endif
 
         periodic_ibs = .false.
-        compute_CD = .false.
+        compute_particle_drag = .false.
         u_inf_ref = dflt_real
         rho_inf_ref = dflt_real
         T_inf_ref = dflt_real
@@ -801,6 +802,7 @@ contains
         slab_domain_decomposition = .false.
         compute_autocorrelation = .false.
         t_step_stat_start = dflt_int
+        filter_width = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs
 

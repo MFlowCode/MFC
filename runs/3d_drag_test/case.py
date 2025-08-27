@@ -133,7 +133,7 @@ case_dict = {
     "fluid_pp(1)%Re(1)": Re,
 
     # new case additions
-    "compute_CD": "T",
+    "compute_particle_drag": "T",
     "u_inf_ref": v1,
     "rho_inf_ref": rho,
     "T_inf_ref": T,

@@ -94,9 +94,9 @@ contains
         type(scalar_field), &
             intent(inout), optional :: beta
 
-        type(scalar_field), dimension(2:4), intent(inout), optional :: stat_reynolds_stress
-        type(scalar_field), dimension(2:4), intent(inout), optional :: stat_eff_visc
-        type(scalar_field), dimension(2:4), intent(inout), optional :: stat_int_mom_exch
+        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_reynolds_stress
+        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_eff_visc
+        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_int_mom_exch
 
         if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
@@ -796,9 +796,9 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
-        type(scalar_field), dimension(2:4), intent(inout), optional :: stat_reynolds_stress
-        type(scalar_field), dimension(2:4), intent(inout), optional :: stat_eff_visc
-        type(scalar_field), dimension(2:4), intent(inout), optional :: stat_int_mom_exch
+        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_reynolds_stress
+        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_eff_visc
+        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_int_mom_exch
 
 #ifdef MFC_MPI
 
@@ -821,7 +821,7 @@ contains
         if (present(beta)) then
             alt_sys = sys_size + 1
         else if (present(stat_reynolds_stress) .and. present(stat_eff_visc) .and. present(stat_int_mom_exch)) then
-            alt_sys = sys_size + 9
+            alt_sys = sys_size + 12
         else
             alt_sys = sys_size
         end if

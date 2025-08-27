@@ -16,7 +16,7 @@
 % endif
 % if gpu:
 #SBATCH --gpus-per-node=${tasks_per_node}
-#SBATCH --mem=208G
+#SBATCH --mem=240G
 #SBATCH --gpu-bind=closest
 % endif
 #SBATCH --output="${name}.out"

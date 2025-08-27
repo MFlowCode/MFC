@@ -174,9 +174,9 @@ contains
         type(scalar_field), &
             intent(in), optional :: beta
 
-        type(scalar_field), dimension(2:4), intent(in), optional :: stat_reynolds_stress
-        type(scalar_field), dimension(2:4), intent(in), optional :: stat_eff_visc
-        type(scalar_field), dimension(2:4), intent(in), optional :: stat_int_mom_exch
+        type(scalar_field), dimension(1:4), intent(in), optional :: stat_reynolds_stress
+        type(scalar_field), dimension(1:4), intent(in), optional :: stat_eff_visc
+        type(scalar_field), dimension(1:4), intent(in), optional :: stat_int_mom_exch
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
@@ -192,7 +192,7 @@ contains
         if (present(beta)) then
             alt_sys = sys_size + 1
         else if (present(stat_reynolds_stress) .and. present(stat_eff_visc) .and. present(stat_int_mom_exch)) then
-            alt_sys = sys_size + 9
+            alt_sys = sys_size + 12
         else
             alt_sys = sys_size
         end if
@@ -202,14 +202,14 @@ contains
         end do
         
         if (present(stat_reynolds_stress) .and. present(stat_eff_visc) .and. present(stat_int_mom_exch)) then 
-            do i = sys_size+1, sys_size+3
-                MPI_IO_DATA%var(i)%sf => stat_reynolds_stress(i-sys_size+1)%sf(0:m, 0:n, 0:p)
+            do i = sys_size+1, sys_size+4
+                MPI_IO_DATA%var(i)%sf => stat_reynolds_stress(i-sys_size)%sf(0:m, 0:n, 0:p)
             end do
-            do i = sys_size+4, sys_size+6
-                MPI_IO_DATA%var(i)%sf => stat_eff_visc(i-sys_size-2)%sf(0:m, 0:n, 0:p)
+            do i = sys_size+5, sys_size+8
+                MPI_IO_DATA%var(i)%sf => stat_eff_visc(i-sys_size-4)%sf(0:m, 0:n, 0:p)
             end do
-            do i = sys_size+7, sys_size+9 
-                MPI_IO_DATA%var(i)%sf => stat_int_mom_exch(i-sys_size-5)%sf(0:m, 0:n, 0:p)
+            do i = sys_size+9, sys_size+12 
+                MPI_IO_DATA%var(i)%sf => stat_int_mom_exch(i-sys_size-8)%sf(0:m, 0:n, 0:p)
             end do 
         end if
 

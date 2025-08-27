@@ -30,7 +30,7 @@ module m_volume_filtering
  s_initialize_filtering_kernel, s_initialize_fluid_indicator_function, & 
  s_initialize_filtered_fluid_indicator_function, s_finalize_fftw_explicit_filter_module, & 
  s_apply_fftw_filter_cons, s_volume_filter_momentum_eqn, s_apply_fftw_filter_tensor, s_apply_fftw_filter_scalarfield, &
- s_compute_viscous_stress_tensor, s_compute_stress_tensor, s_compute_divergence_stress_tensor, &
+ s_compute_viscous_stress_tensor, s_compute_stress_tensor, s_compute_divergence_stress_tensor, s_compute_particle_forces, &
  s_mpi_transpose_slabZ2Y, s_mpi_transpose_slabY2Z, s_mpi_FFT_fwd, s_mpi_FFT_bwd, &
  s_setup_terms_filtering, s_compute_pseudo_turbulent_reynolds_stress, s_compute_effective_viscosity, s_compute_interphase_momentum_exchange
 
@@ -55,21 +55,25 @@ module m_volume_filtering
     type(scalar_field), allocatable, dimension(:) :: div_pres_visc_stress
     
     ! unclosed terms in volume filtered momentum equation
-    type(vector_field), allocatable, dimension(:) :: reynolds_stress
-    type(vector_field), allocatable, dimension(:) :: eff_visc
-    type(scalar_field), allocatable, dimension(:) :: int_mom_exch
+    type(vector_field), allocatable, dimension(:), public :: reynolds_stress
+    type(vector_field), allocatable, dimension(:), public :: eff_visc
+    type(scalar_field), allocatable, dimension(:), public :: int_mom_exch
 
     ! magnitude of unclosed terms in momentum equation
     type(scalar_field), public :: mag_reynolds_stress
     type(scalar_field), public :: mag_eff_visc
     type(scalar_field), public :: mag_int_mom_exch
 
+    ! 1/mu
     real(wp), allocatable, dimension(:, :) :: Res
+
+    ! x-,y-,z-direction forces on particles
+    real(wp), allocatable, dimension(:, :) :: particle_forces
 
     !$acc declare create(fluid_indicator_function, filtered_fluid_indicator_function, q_cons_filtered)
     !$acc declare create(visc_stress, pres_visc_stress, div_pres_visc_stress)
     !$acc declare create(reynolds_stress, eff_visc, int_mom_exch, mag_reynolds_stress, mag_eff_visc, mag_int_mom_exch)
-    !$acc declare create(Res)
+    !$acc declare create(Res, particle_forces)
 
 #if defined(MFC_OpenACC)
     ! GPU plans
@@ -213,8 +217,10 @@ contains
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-            !$acc update device(Res, Re_idx, Re_size)
+            !$acc update device(Res)
         end if
+
+        @:ALLOCATE(particle_forces(0:num_ibs, 3))
 
         !< global sizes 
         Nx = m_glb + 1
@@ -339,7 +345,7 @@ contains
         integer :: i, j, k, idx
 
         ! gaussian filter
-        sigma_stddev = 3.0_dp * 0.05_dp
+        sigma_stddev = filter_width
 
         Lx = x_domain_end_glb - x_domain_beg_glb
         Ly = y_domain_end_glb - y_domain_beg_glb  
@@ -522,17 +528,13 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer :: i, j, k
 
-        call nvtxStartRange("FILTER-CONSERVATIVE-VARIABLES")
         call s_apply_fftw_filter_cons(q_cons_vf, q_cons_filtered)
-        call nvtxEndRange
 
-        call nvtxStartRange("COMPUTE-MOMENTUM-UNCLOSED-TERMS")
         call s_setup_terms_filtering(q_cons_vf, reynolds_stress, visc_stress, pres_visc_stress, div_pres_visc_stress)
         call s_apply_fftw_filter_tensor(reynolds_stress, visc_stress, eff_visc, div_pres_visc_stress, int_mom_exch)
         call s_compute_pseudo_turbulent_reynolds_stress(q_cons_filtered, reynolds_stress, mag_reynolds_stress)
         call s_compute_effective_viscosity(q_cons_filtered, eff_visc, visc_stress, mag_eff_visc)
         call s_compute_interphase_momentum_exchange(int_mom_exch, mag_int_mom_exch)
-        call nvtxEndRange
 
     end subroutine s_volume_filter_momentum_eqn
 
@@ -993,7 +995,7 @@ contains
         type(scalar_field), dimension(1:num_dims), intent(in) :: int_mom_exch
         type(scalar_field), intent(inout) :: mag_int_mom_exch
 
-        integer :: i, j, k, l, q, ii
+        integer :: i, j, k
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do i = 0, m
@@ -1007,6 +1009,28 @@ contains
         end do 
 
     end subroutine s_compute_interphase_momentum_exchange
+
+    ! computes x-,y-,z-direction forces on particles
+    subroutine s_compute_particle_forces
+        real(wp) :: dvol
+        integer :: i, j, k, l
+
+        !$acc parallel loop collapse(3) gang vector default(present) private(dvol)
+        do i = 0, m 
+            do j = 0, n 
+                do k = 0, p
+                    dvol = dx(i) * dy(j) * dz(k)
+                    !$acc atomic
+                    particle_forces(ib_markers%sf(i, j, k), 1) = particle_forces(ib_markers%sf(i, j, k), 1) + div_pres_visc_stress(1)%sf(i, j, k) * dvol
+                    !$acc atomic
+                    particle_forces(ib_markers%sf(i, j, k), 2) = particle_forces(ib_markers%sf(i, j, k), 2) + div_pres_visc_stress(2)%sf(i, j, k) * dvol
+                    !$acc atomic
+                    particle_forces(ib_markers%sf(i, j, k), 3) = particle_forces(ib_markers%sf(i, j, k), 3) + div_pres_visc_stress(3)%sf(i, j, k) * dvol
+                end do 
+            end do 
+        end do
+
+    end subroutine s_compute_particle_forces
 
 
     !< transpose domain from z-slabs to y-slabs on each processor
@@ -1280,6 +1304,9 @@ contains
         @:DEALLOCATE(mag_reynolds_stress%sf)
         @:DEALLOCATE(mag_eff_visc%sf)
         @:DEALLOCATE(mag_int_mom_exch%sf)
+
+        @:DEALLOCATE(Res)
+        @:DEALLOCATE(particle_forces)
 
         @:DEALLOCATE(data_real_in1d, data_cmplx_out1d, data_cmplx_out1dy)
         @:DEALLOCATE(cmplx_kernelG1d, real_kernelG_in)

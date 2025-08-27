@@ -328,21 +328,21 @@ contains
         ! Adding filtered quantities
         if (q_filtered_wrt) then
             ! filtered cons vars
-            do i = 2, 4
+            do i = 1, 4
                 q_sf = stat_reynolds_stress(i)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
                 write (varname, '(A,I0)') 'stat_reynolds_stresss', i
                 call s_write_variable_to_formatted_database_file(varname, t_step)
 
                 varname(:) = ' '
             end do
-            do i = 2, 4
+            do i = 1, 4
                 q_sf = stat_eff_visc(i)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
                 write (varname, '(A,I0)') 'stat_eff_viscs', i
                 call s_write_variable_to_formatted_database_file(varname, t_step)
 
                 varname(:) = ' '
             end do
-            do i = 2, 4
+            do i = 1, 4
                 q_sf = stat_int_mom_exch(i)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
                 write (varname, '(A,I0)') 'stat_int_mom_exchs', i
                 call s_write_variable_to_formatted_database_file(varname, t_step)

@@ -136,8 +136,8 @@ case_dict = {
     # new case additions
     "periodic_forcing": "T",
     "periodic_ibs": "T",
-    #"compute_CD_vi": "F",
-    #"compute_CD_si": "F",
+    #"compute_particle_drag_vi": "F",
+    #"compute_particle_drag_si": "F",
     #"volume_filtering_momentum_eqn": "T",
 
     "u_inf_ref": v1,

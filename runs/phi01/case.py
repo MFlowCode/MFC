@@ -2,6 +2,15 @@ import json
 import math
 import numpy as np
 
+'''
+need to store
+full stats of unclosed term tensors (1, 2, 3, 4) - only at end time
+stats of flow quantities - only at end time
+flow quantities
+filtered fluid indicator function
+drag force on each particle
+'''
+
 Mu = 1.84e-05
 gam_a = 1.4
 R = 287.0
@@ -25,8 +34,8 @@ mu = rho*v1*D/Re # dynamic viscosity for current case
 #print('Kn = ' + str( np.sqrt(np.pi*gam_a/2)*(M/Re) )) # Kn < 0.01 = continuum flow
 
 dt = 4.0E-06
-Nt = 10
-t_save = 1
+Nt = 200
+t_save = 10
 
 Nx = 99
 Ny = 99
@@ -70,6 +79,7 @@ case_dict = {
     "t_step_start": 0,
     "t_step_stop": Nt,  # 3000
     "t_step_save": t_save,  # 10
+    "t_step_stat_start": 50,
     # Simulation Algorithm Parameters
     # Only one patches are necessary, the air tube
     "num_patches": 1,
@@ -137,13 +147,13 @@ case_dict = {
     # Fluids Physical Parameters
     "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
     "fluid_pp(1)%pi_inf": 0,
-    "fluid_pp(1)%Re(1)": Re,
+    "fluid_pp(1)%Re(1)": 1.0 / mu,
 
     # new case additions
     "periodic_forcing": "T",
     "periodic_ibs": "T",
-    "compute_CD": "F",
     "volume_filtering_momentum_eqn": "T",
+    "filter_width": 3.0*D/2,
 
     "u_inf_ref": v1,
     "rho_inf_ref": rho,
@@ -151,7 +161,6 @@ case_dict = {
 
     "store_levelset": "F",
     "slab_domain_decomposition": "T", 
-    "compute_autocorrelation": "T",
     }
 
 case_dict.update(ib_dict)

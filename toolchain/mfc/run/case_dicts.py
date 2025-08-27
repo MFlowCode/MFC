@@ -300,7 +300,7 @@ SIMULATION.update({
     'tau_star': ParamType.REAL,
     'cont_damage_s': ParamType.REAL,
     'alpha_bar': ParamType.REAL,
-    'compute_CD': ParamType.LOG,
+    'compute_particle_drag': ParamType.LOG,
     'u_inf_ref': ParamType.REAL,
     'rho_inf_ref': ParamType.REAL,
     'T_inf_ref': ParamType.REAL,
@@ -308,6 +308,7 @@ SIMULATION.update({
     'volume_filtering_momentum_eqn': ParamType.LOG,
     'compute_autocorrelation': ParamType.LOG,
     't_step_stat_start': ParamType.INT,
+    'filter_width': ParamType.REAL,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
