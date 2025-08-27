@@ -781,9 +781,9 @@ contains
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         else if (q_filtered_wrt) then
-            allocate (MPI_IO_DATA%view(1:sys_size+9))
-            allocate (MPI_IO_DATA%var(1:sys_size+9))
-            do i = 1, sys_size+9
+            allocate (MPI_IO_DATA%view(1:sys_size+12))
+            allocate (MPI_IO_DATA%var(1:sys_size+12))
+            do i = 1, sys_size+12
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
@@ -974,7 +974,7 @@ contains
             if (bubbles_lagrange) MPI_IO_DATA%var(sys_size + 1)%sf => null()
 
             if (q_filtered_wrt) then 
-                do i = sys_size+1, sys_size+9
+                do i = sys_size+1, sys_size+12
                     MPI_IO_DATA%var(i)%sf => null()
                 end do
             end if
