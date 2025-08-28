@@ -157,6 +157,16 @@ module m_global_parameters
         logical :: viscous        !< Viscous effects
     #:endif
 
+    !> @name Variables for our of core IGR computation on NVIDIA
+    !> @{
+    logical :: nv_uvm_out_of_core ! Enable out-of-core storage of q_cons_ts(2) in timestepping (default FALSE)
+    integer :: nv_uvm_igr_temps_on_gpu ! 0 => jac, jac_rhs, and jac_old on CPU
+    ! 1 => jac on GPU, jac_rhs and jac_old on CPU
+    ! 2 => jac and jac_rhs on GPU, jac_old on CPU
+    ! 3 => jac, jac_rhs, and jac_old on GPU (default)
+    logical :: nv_uvm_pref_gpu ! Enable explicit gpu memory hints (default FALSE)
+    !> @}
+
     real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
     real(wp) :: teno_CT        !< Smoothness threshold for TENO
     logical :: mp_weno        !< Monotonicity preserving (MP) WENO
@@ -572,6 +582,11 @@ contains
         n_start = dflt_int
         t_stop = dflt_real
         t_save = dflt_real
+
+        ! NVIDIA UVM options
+        nv_uvm_out_of_core = .false.
+        nv_uvm_igr_temps_on_gpu = 3 ! => jac, jac_rhs, and jac_old on GPU (default)
+        nv_uvm_pref_gpu = .false.
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
@@ -1321,16 +1336,25 @@ contains
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
         @:ALLOCATE(x_cc(-buff_size:m + buff_size))
         @:ALLOCATE(dx(-buff_size:m + buff_size))
+        @:PREFER_GPU(x_cb)
+        @:PREFER_GPU(x_cc)
+        @:PREFER_GPU(dx)
 
         if (n == 0) return; 
         @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE(dy(-buff_size:n + buff_size))
+        @:PREFER_GPU(y_cb)
+        @:PREFER_GPU(y_cc)
+        @:PREFER_GPU(dy)
 
         if (p == 0) return; 
         @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
+        @:PREFER_GPU(z_cb)
+        @:PREFER_GPU(z_cc)
+        @:PREFER_GPU(dz)
 
     end subroutine s_initialize_global_parameters_module
 

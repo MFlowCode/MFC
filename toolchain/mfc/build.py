@@ -64,6 +64,9 @@ class MFCTarget:
         # The install directory is located <root>/build/install/<slug>
         return os.sep.join([os.getcwd(), "build", "install", self.get_slug(case)])
 
+    def get_home_dirpath(self) -> str:
+        return os.sep.join([os.getcwd()])
+
     def get_install_binpath(self, case: Case ) -> str:
         # <root>/install/<slug>/bin/<target>
         return os.sep.join([self.get_install_dirpath(case), "bin", self.name])
@@ -144,6 +147,7 @@ class MFCTarget:
             flags.append(f"-DMFC_OpenACC={'ON' if ARG('gpu') else 'OFF'}")
             flags.append(f"-DMFC_GCov={   'ON' if ARG('gcov') else 'OFF'}")
             flags.append(f"-DMFC_Unified={'ON' if ARG('unified') else 'OFF'}")
+            flags.append(f"-DMFC_Fastmath={'ON' if ARG('fastmath') else 'OFF'}")
 
         command = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]
 
