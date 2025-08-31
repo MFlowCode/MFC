@@ -345,18 +345,18 @@ contains
         #:endfor
         call nvtxEndRange ! Packbuf
 
+
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
                 #:if rdma_mpi
                     #:call GPU_HOST_DATA(use_device='[ib_buff_send, ib_buff_recv]')
-                        call nvtxStartRange("IB-MARKER-SENDRECV-RDMA")
-
-                        call MPI_SENDRECV( &
-                            ib_buff_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
-                            ib_buff_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
-                            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                        call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
+                    
+                    call nvtxStartRange("IB-MARKER-SENDRECV-RDMA")
+                    call MPI_SENDRECV( &
+                        ib_buff_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
+                        ib_buff_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call nvtxEndRange 
 
                     #:endcall GPU_HOST_DATA
                     $:GPU_WAIT()
@@ -364,14 +364,13 @@ contains
                     call nvtxStartRange("IB-MARKER-DEV2HOST")
                     $:GPU_UPDATE(host='[ib_buff_send]')
                     call nvtxEndRange
+
                     call nvtxStartRange("IB-MARKER-SENDRECV-NO-RMDA")
-
                     call MPI_SENDRECV( &
-                        ib_buff_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
-                        ib_buff_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
+                            ib_buff_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
+                            ib_buff_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
+                            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call nvtxEndRange 
 
                     call nvtxStartRange("IB-MARKER-HOST2DEV")
                     $:GPU_UPDATE(device='[ib_buff_recv]')
