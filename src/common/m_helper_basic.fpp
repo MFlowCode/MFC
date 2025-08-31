@@ -143,7 +143,7 @@ contains
             buff_size = max(buff_size, 6)
         end if
 
-        if(ib) then 
+        if (ib) then
             buff_size = max(buff_size, 6)
         end if
 

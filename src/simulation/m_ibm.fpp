@@ -404,8 +404,8 @@ contains
                     do while ((temp_loc < s_cc(index) &
                                .or. temp_loc > s_cc(index + 1)))
                         index = index + dir
-                        if(index < -buff_size .or. index > bound) then
-                            EXIT
+                        if (index < -buff_size .or. index > bound) then
+                            exit
                         end if
                     end do
                     ghost_points_in(q)%ip_grid(dim) = index
