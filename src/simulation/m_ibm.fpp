@@ -405,7 +405,8 @@ contains
                                .or. temp_loc > s_cc(index + 1)))
                         index = index + dir
                         if (index < -buff_size .or. index > bound) then
-                            exit
+                            print *, "Increase buff_size further in m_helper_basic (currently set to a minimum of 10)"
+                            error stop "Increase buff_size"
                         end if
                     end do
                     ghost_points_in(q)%ip_grid(dim) = index
