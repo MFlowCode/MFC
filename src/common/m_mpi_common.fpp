@@ -38,7 +38,9 @@ module m_mpi_common
     !! average primitive variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
     $:GPU_DECLARE(create='[buff_send, buff_recv]')
+#endif
 
     integer :: halo_size
     $:GPU_DECLARE(create='[halo_size]')
@@ -78,7 +80,13 @@ contains
 
         $:GPU_UPDATE(device='[halo_size, v_size]')
 
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         @:ALLOCATE(buff_send(0:halo_size), buff_recv(0:halo_size))
+#else
+        allocate (buff_send(0:halo_size), buff_recv(0:halo_size))
+        $:GPU_ENTER_DATA(create='[capture:buff_send]')
+        $:GPU_ENTER_DATA(create='[capture:buff_recv]')
+#endif
 #endif
 
     end subroutine s_initialize_mpi_common_module
@@ -281,6 +289,57 @@ contains
 #endif
 
     end subroutine s_initialize_mpi_data
+
+    !! @param q_cons_vf Conservative variables
+    subroutine s_initialize_mpi_data_ds(q_cons_vf)
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(in) :: q_cons_vf
+
+        integer, dimension(num_dims) :: sizes_glb, sizes_loc
+        integer, dimension(3) :: sf_start_idx
+
+#ifdef MFC_MPI
+
+        ! Generic loop iterator
+        integer :: i, j, q, k, l, m_ds, n_ds, p_ds, ierr
+
+        sf_start_idx = (/0, 0, 0/)
+
+#ifndef MFC_POST_PROCESS
+        m_ds = int((m + 1)/3) - 1
+        n_ds = int((n + 1)/3) - 1
+        p_ds = int((p + 1)/3) - 1
+#else
+        m_ds = m
+        n_ds = n
+        p_ds = p
+#endif
+
+#ifdef MFC_POST_PROCESS
+        do i = 1, sys_size
+            MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1)
+        end do
+#endif
+        ! Define global(g) and local(l) sizes for flow variables
+        sizes_loc(1) = m_ds + 3
+        if (n > 0) then
+            sizes_loc(2) = n_ds + 3
+            if (p > 0) then
+                sizes_loc(3) = p_ds + 3
+            end if
+        end if
+
+        ! Define the view for each variable
+        do i = 1, sys_size
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_loc, sizes_loc, sf_start_idx, &
+                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
+            call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
+        end do
+#endif
+
+    end subroutine s_initialize_mpi_data_ds
 
     impure subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
 
@@ -1100,7 +1159,8 @@ contains
             !! Remaining number of cells, in a particular coordinate direction,
             !! after the majority is divided up among the available processors
 
-        integer :: recon_order !< reconstruction order
+        integer :: recon_order !<
+            !! WENO or MUSCL reconstruction order
 
         integer :: i, j, k !< Generic loop iterators
         integer :: ierr !< Generic flag used to identify and report MPI errors
@@ -1112,6 +1172,12 @@ contains
         nidx(1)%beg = 0; nidx(1)%end = 0
         nidx(2)%beg = 0; nidx(2)%end = 0
         nidx(3)%beg = 0; nidx(3)%end = 0
+
+        if (recon_type == WENO_TYPE) then
+            recon_order = weno_order
+        else
+            recon_order = muscl_order
+        end if
 
         if (num_procs == 1 .and. parallel_io) then
             do i = 1, num_dims
@@ -1248,7 +1314,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     call s_mpi_abort('Unsupported combination of values '// &
                                      'of num_procs, m, n, p and '// &
-                                     'weno/igr_order. Exiting.')
+                                     'weno/muscl/igr_order. Exiting.')
                 end if
 
                 ! Creating new communicator using the Cartesian topology
@@ -1387,7 +1453,7 @@ contains
                 if (proc_rank == 0 .and. ierr == -1) then
                     call s_mpi_abort('Unsupported combination of values '// &
                                      'of num_procs, m, n and '// &
-                                     'weno/igr_order. Exiting.')
+                                     'weno/muscl/igr_order. Exiting.')
                 end if
 
                 ! Creating new communicator using the Cartesian topology

@@ -608,8 +608,8 @@ contains
                             coeffs(19, i1, i2) = -i2*2._wp*Re_inv/(rho*c*c)
                             coeffs(20, i1, i2) = i2*4._wp*pres*Re_inv/(rho*rho*c)
                             coeffs(21, i1, i2) = i2*4._wp*pres*Re_inv/(rho*rho*c*c)
-                            coeffs(22, i1, i2) = -i2*4._wp/(rho*rho*c)
-                            coeffs(23, i1, i2) = -i2*4._wp/(rho*rho*c*c)
+                            coeffs(22, i1, i2) = -i2*4._wp*Re_inv/(rho*rho*c)
+                            coeffs(23, i1, i2) = -i2*4._wp*Re_inv/(rho*rho*c*c)
                             coeffs(24, i1, i2) = i2*16._wp*Re_inv*Re_inv/(rho*rho*c)
                             if (.not. f_is_default(Web)) then
                                 coeffs(25, i1, i2) = i2*8._wp*Re_inv/Web/(rho*rho*c)
@@ -679,8 +679,8 @@ contains
                             coeffs(19, i1, i2) = -i2*2._wp*Re_inv/(rho*c*c)
                             coeffs(20, i1, i2) = i2*4._wp*pres*Re_inv/(rho*rho*c)
                             coeffs(21, i1, i2) = i2*4._wp*pres*Re_inv/(rho*rho*c*c)
-                            coeffs(22, i1, i2) = -i2*4._wp/(rho*rho*c)
-                            coeffs(23, i1, i2) = -i2*4._wp/(rho*rho*c*c)
+                            coeffs(22, i1, i2) = -i2*4._wp*Re_inv/(rho*rho*c)
+                            coeffs(23, i1, i2) = -i2*4._wp*Re_inv/(rho*rho*c*c)
                             coeffs(24, i1, i2) = i2*16._wp*Re_inv*Re_inv/(rho*rho*c)
                             if (.not. f_is_default(Web)) then
                                 coeffs(25, i1, i2) = i2*8._wp*Re_inv/Web/(rho*rho*c)

@@ -41,7 +41,7 @@ module m_global_parameters
     !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
     type(cell_num_bounds) :: cells_bounds
 
-    integer(8) :: nGlobal ! Total number of cells in global domain
+    integer(kind=8) :: nGlobal ! Total number of cells in global domain
 
     !> @name Cylindrical coordinates (either axisymmetric or full 3D)
     !> @{
@@ -105,7 +105,9 @@ module m_global_parameters
     integer :: relax_model     !< Phase change relaxation model
     logical :: mpp_lim         !< Maximum volume fraction limiter
     integer :: sys_size        !< Number of unknowns in the system of equations
+    integer :: recon_type      !< Which type of reconstruction to use
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
+    integer :: muscl_order     !< Order of accuracy for the MUSCL reconstruction
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: mhd             !< Magnetohydrodynamics
@@ -214,6 +216,7 @@ module m_global_parameters
     integer :: format !< Format of the database file(s)
 
     integer :: precision !< Floating point precision of the database file(s)
+    logical :: down_sample !< down sampling of the database file(s)
 
     logical :: output_partial_domain !< Specify portion of domain to output for post-processing
 
@@ -254,6 +257,7 @@ module m_global_parameters
     logical :: c_wrt
     logical, dimension(3) :: omega_wrt
     logical :: qm_wrt
+    logical :: liutex_wrt
     logical :: schlieren_wrt
     logical :: cf_wrt
     logical :: ib
@@ -382,7 +386,9 @@ contains
         ! Simulation algorithm parameters
         model_eqns = dflt_int
         num_fluids = dflt_int
+        recon_type = WENO_TYPE
         weno_order = dflt_int
+        muscl_order = dflt_int
         mixture_err = .false.
         alt_soundspeed = .false.
         relax = .false.
@@ -426,6 +432,7 @@ contains
         format = dflt_int
 
         precision = dflt_int
+        down_sample = .false.
 
         alpha_rho_wrt = .false.
         rho_wrt = .false.
@@ -449,6 +456,7 @@ contains
         c_wrt = .false.
         omega_wrt = .false.
         qm_wrt = .false.
+        liutex_wrt = .false.
         schlieren_wrt = .false.
         sim_data = .false.
         cf_wrt = .false.
@@ -553,14 +561,20 @@ contains
             mom_idx%beg = cont_idx%end + 1
             mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
-            adv_idx%beg = E_idx + 1
+
             if (igr) then
-                if (num_fluids == 1) then
-                    adv_idx%end = adv_idx%beg
-                else
-                    adv_idx%end = E_idx + num_fluids - 1
-                end if
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. IGR tracks a total of (N-1) volume fractions
+                ! for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
+                ! then adv_idx%end < adv_idx%beg, which skips all loops over the
+                ! volume fractions since there is no volume fraction to track
+                adv_idx%beg = E_idx + 1 ! Alpha for fluid 1
+                adv_idx%end = E_idx + num_fluids - 1
             else
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. WENO/MUSCL + Riemann tracks a total of (N)
+                ! volume fractions for N fluids, hence the lack of  "-1" in adv_idx%end
+                adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
             end if
 
@@ -823,7 +837,11 @@ contains
         allocate (MPI_IO_DATA%view(1:sys_size))
         allocate (MPI_IO_DATA%var(1:sys_size))
         do i = 1, sys_size
-            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+            if (down_sample) then
+                allocate (MPI_IO_DATA%var(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
+            else
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+            end if
             MPI_IO_DATA%var(i)%sf => null()
         end do
 
@@ -860,7 +878,7 @@ contains
         buff_size = max(offset_x%beg, offset_x%end, offset_y%beg, &
                         offset_y%end, offset_z%beg, offset_z%end)
 
-        if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt) then
+        if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt .or. liutex_wrt) then
             fd_number = max(1, fd_order/2)
             buff_size = buff_size + fd_number
         end if
