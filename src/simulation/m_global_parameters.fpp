@@ -252,9 +252,9 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
 
-    type(int_bounds_info), dimension(3) :: nidx !< Indicies for neighboring processors
+    type(int_bounds_info), dimension(3) :: nidx !< Indices for neighboring processors
 
-    integer, allocatable, dimension(:,:,:) :: neighbor_ranks
+    integer, allocatable, dimension(:, :, :) :: neighbor_ranks
     !! Neighbor ranks for lagrangian particle communication
 
     integer, allocatable, dimension(:) :: start_idx !<
@@ -1352,7 +1352,7 @@ contains
         @:PREFER_GPU(x_cc)
         @:PREFER_GPU(dx)
 
-        if (n == 0) return;
+        if (n == 0) return; 
         @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE(dy(-buff_size:n + buff_size))
@@ -1360,7 +1360,7 @@ contains
         @:PREFER_GPU(y_cc)
         @:PREFER_GPU(dy)
 
-        if (p == 0) return;
+        if (p == 0) return; 
         @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
@@ -1446,10 +1446,10 @@ contains
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x_cb, x_cc, dx)
 
-        if (n == 0) return;
+        if (n == 0) return; 
         @:DEALLOCATE(y_cb, y_cc, dy)
 
-        if (p == 0) return;
+        if (p == 0) return; 
         @:DEALLOCATE(z_cb, z_cc, dz)
 
     end subroutine s_finalize_global_parameters_module

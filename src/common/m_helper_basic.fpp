@@ -10,7 +10,7 @@ module m_helper_basic
 
     implicit none
 
-    private;
+    private; 
     public :: f_approx_equal, &
               f_approx_in_array, &
               f_is_default, &

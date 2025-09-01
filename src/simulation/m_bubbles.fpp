@@ -566,15 +566,15 @@ contains
                         if (lag_params%vel_model == 1) then
                             do l = 1, num_dims
                                 vTemp = f_interpolate_velocity(fR, cell, l, q_prim_vf)
-                                fPos(l) = fPos(l) + h * vTemp
+                                fPos(l) = fPos(l) + h*vTemp
                                 fVel(l) = vTemp
                             end do
                         elseif (lag_params%vel_model == 2) then
                             do l = 1, num_dims
                                 aTemp = f_get_acceleration(fPos(l), fR, fVel(l), fmass_n, fmass_v, &
                                                            fRe, fRho, cell, l, q_prim_vf)
-                                fPos(l) = fPos(l) + h * fVel(l)
-                                fVel(l) = fVel(l) + h * aTemp
+                                fPos(l) = fPos(l) + h*fVel(l)
+                                fVel(l) = fVel(l) + h*aTemp
                             end do
                         end if
                     end if

@@ -1641,8 +1641,8 @@ contains
         end if
 
         @:ALLOCATE(neighbor_ranks(nidx(1)%beg:nidx(1)%end, &
-                                  nidx(2)%beg:nidx(2)%end, &
-                                  nidx(3)%beg:nidx(3)%end))
+            nidx(2)%beg:nidx(2)%end, &
+            nidx(3)%beg:nidx(3)%end))
 
         do k = nidx(3)%beg, nidx(3)%end
             do j = nidx(2)%beg, nidx(2)%end
@@ -1652,7 +1652,7 @@ contains
                         if (num_dims > 1) neighbor_coords(2) = proc_coords(2) + j
                         if (num_dims > 2) neighbor_coords(3) = proc_coords(3) + k
                         call MPI_CART_RANK(MPI_COMM_CART, neighbor_coords, &
-                                   neighbor_ranks(i, j, k), ierr)
+                                           neighbor_ranks(i, j, k), ierr)
                     end if
                 end do
             end do

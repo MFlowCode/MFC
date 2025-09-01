@@ -48,7 +48,7 @@ module m_mpi_proxy
     $:GPU_DECLARE(create='[i_halo_size]')
 
     integer, dimension(-1:1, -1:1, -1:1) :: p_send_counts, p_recv_counts
-    integer, dimension(:,:,:,:), allocatable :: p_send_ids
+    integer, dimension(:, :, :, :), allocatable :: p_send_ids
     character(len=1), dimension(:), allocatable :: p_send_buff, p_recv_buff
     type(bounds_info), dimension(3) :: comm_coords
     integer :: p_buff_size, p_var_size
@@ -96,8 +96,8 @@ contains
         call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
 
         nReal = 7 + 16*2 + 10*lag_num_ts
-        p_var_size = (nReal * real_size + int_size)
-        p_buff_size = lag_params%nBubs_glb * p_var_size
+        p_var_size = (nReal*real_size + int_size)
+        p_buff_size = lag_params%nBubs_glb*p_var_size
 
         @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
 
@@ -449,15 +449,15 @@ contains
         !!                for communication of initial condition)
     impure subroutine s_add_particles_to_transfer_list(nBub, pos, posPrev)
 
-        real(wp), dimension(:,:) :: pos
-        real(wp), dimension(:,:), optional :: posPrev
+        real(wp), dimension(:, :) :: pos
+        real(wp), dimension(:, :), optional :: posPrev
         integer :: bubID, nbub
         integer :: i, j, k
 
         do k = nidx(3)%beg, nidx(3)%end
             do j = nidx(2)%beg, nidx(2)%end
                 do i = nidx(1)%beg, nidx(1)%end
-                    p_send_counts(i,j,k) = 0
+                    p_send_counts(i, j, k) = 0
                 end do
             end do
         end do
@@ -593,8 +593,8 @@ contains
         logical function f_crosses_boundary(particle_id, dir, loc, pos, posPrev)
 
             integer, intent(in) :: particle_id, dir, loc
-            real(wp), dimension(:,:), intent(in) :: pos
-            real(wp), dimension(:,:), optional, intent(in) :: posPrev
+            real(wp), dimension(:, :), intent(in) :: pos
+            real(wp), dimension(:, :), optional, intent(in) :: posPrev
 
             if (loc == -1) then ! Beginning of the domain
                 if (nidx(dir)%beg == 0) then
@@ -603,10 +603,10 @@ contains
                 end if
 
                 if (present(posPrev)) then
-                    f_crosses_boundary = (posPrev(particle_id,dir) > comm_coords(dir)%beg .and. &
-                                          pos(particle_id,dir) < comm_coords(dir)%beg)
+                    f_crosses_boundary = (posPrev(particle_id, dir) > comm_coords(dir)%beg .and. &
+                                          pos(particle_id, dir) < comm_coords(dir)%beg)
                 else
-                    f_crosses_boundary = (pos(particle_id,dir) < comm_coords(dir)%beg)
+                    f_crosses_boundary = (pos(particle_id, dir) < comm_coords(dir)%beg)
                 end if
             elseif (loc == 1) then ! End of the domain
                 if (nidx(dir)%end == 0) then
@@ -615,10 +615,10 @@ contains
                 end if
 
                 if (present(posPrev)) then
-                    f_crosses_boundary = (posPrev(particle_id,dir) < comm_coords(dir)%end .and. &
-                                          pos(particle_id,dir) > comm_coords(dir)%end)
+                    f_crosses_boundary = (posPrev(particle_id, dir) < comm_coords(dir)%end .and. &
+                                          pos(particle_id, dir) > comm_coords(dir)%end)
                 else
-                    f_crosses_boundary = (pos(particle_id,dir) > comm_coords(dir)%end)
+                    f_crosses_boundary = (pos(particle_id, dir) > comm_coords(dir)%end)
                 end if
             end if
 
@@ -662,12 +662,12 @@ contains
         !! @param lag_num_ts Number of stages in time-stepping scheme
         !! @param nBubs Local number of bubbles
     impure subroutine s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-                                    gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, rad, &
-                                    rvel, pos, posPrev, vel, scoord, drad, drvel, dgasp, &
-                                    dgasmv, dpos, dvel, lag_num_ts, nbubs)
+                                               gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, rad, &
+                                               rvel, pos, posPrev, vel, scoord, drad, drvel, dgasp, &
+                                               dgasmv, dpos, dvel, lag_num_ts, nbubs)
 
         real(wp), dimension(:) :: bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt
-        integer, dimension(:,:) :: lag_id
+        integer, dimension(:, :) :: lag_id
         real(wp), dimension(:, :) :: gas_p, gas_mv, rad, rvel, drad, drvel, dgasp, dgasmv
         real(wp), dimension(:, :, :) :: pos, posPrev, vel, scoord, dpos, dvel
         integer :: position, bub_id, lag_num_ts, tag, partner, send_tag, recv_tag, nbubs, p_recv_size
@@ -680,20 +680,20 @@ contains
                 do i = nidx(1)%beg, nidx(1)%end
                     if (abs(i) + abs(j) + abs(k) > 0) then
 
-                        partner = neighbor_ranks(i,j,k)
+                        partner = neighbor_ranks(i, j, k)
 
                         send_tag = neighbor_tag(i, j, k)
                         recv_tag = neighbor_tag(-i, -j, -k)
 
-                        call MPI_Sendrecv(p_send_counts(i,j,k), 1, MPI_INTEGER, partner, send_tag,  &
-                                          p_recv_counts(i,j,k), 1, MPI_INTEGER, partner, recv_tag, &
+                        call MPI_Sendrecv(p_send_counts(i, j, k), 1, MPI_INTEGER, partner, send_tag, &
+                                          p_recv_counts(i, j, k), 1, MPI_INTEGER, partner, recv_tag, &
                                           MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                        p_recv_size = p_recv_counts(i,j,k) * p_var_size
+                        p_recv_size = p_recv_counts(i, j, k)*p_var_size
 
                         position = 0
-                        do l = 0, p_send_counts(i,j,k) - 1
-                            bub_id = p_send_ids(i,j,k,l)
+                        do l = 0, p_send_counts(i, j, k) - 1
+                            bub_id = p_send_ids(i, j, k, l)
                             call MPI_Pack(lag_id(bub_id, 1), 1, MPI_INTEGER, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
                             call MPI_Pack(bub_R0(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
                             call MPI_Pack(Rmax_stats(bub_id), 1, mpi_p, p_send_buff, p_buff_size, position, MPI_COMM_WORLD, ierr)
@@ -725,12 +725,12 @@ contains
                         send_tag = send_tag + max(num_procs, n_neighbor)
                         recv_tag = recv_tag + max(num_procs, n_neighbor)
 
-                        call MPI_Sendrecv(p_send_buff, position, MPI_PACKED, partner, send_tag,  &
+                        call MPI_Sendrecv(p_send_buff, position, MPI_PACKED, partner, send_tag, &
                                           p_recv_buff, p_recv_size, MPI_PACKED, partner, recv_tag, &
                                           MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                         position = 0
-                        do l = 0, p_recv_counts(i,j,k) - 1
+                        do l = 0, p_recv_counts(i, j, k) - 1
                             nbubs = nbubs + 1
                             bub_id = nbubs
                             call MPI_Unpack(p_recv_buff, p_recv_size, position, lag_id(bub_id, 1), 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)

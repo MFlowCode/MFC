@@ -78,7 +78,6 @@ module m_bubbles_EL
 
     $:GPU_DECLARE(create='[nBubs,Rmax_glb,Rmin_glb,q_beta,q_beta_idx]')
 
-
     integer, allocatable, dimension(:) :: keep_bubble, prefix_sum
     integer :: active_bubs
     $:GPU_DECLARE(create='[keep_bubble, prefix_sum, active_bubs]')
@@ -272,10 +271,10 @@ contains
         if (num_procs > 1) then
             call s_add_particles_to_transfer_list(nBubs, mtn_pos(:, :, 1))
             call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-                                      gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
-                                      intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
-                                      mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                                      gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
+                                          gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
+                                          intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
+                                          mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
+                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
         end if
 
         $:GPU_UPDATE(device='[bubbles_lagrange, lag_params]')
@@ -450,11 +449,11 @@ contains
         dummy = 0._wp
 
         ! Construct file path
-        write(file_loc, '(A,I0,A)') 'lag_bubbles_', save_count, '.dat'
+        write (file_loc, '(A,I0,A)') 'lag_bubbles_', save_count, '.dat'
         file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
 
         ! Check if file exists
-        inquire(FILE=trim(file_loc), EXIST=file_exist)
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
         if (.not. file_exist) then
             call s_mpi_abort('Restart file '//trim(file_loc)//' does not exist!')
         end if
@@ -463,7 +462,7 @@ contains
 
         if (proc_rank == 0) then
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, &
-                              mpi_info_int, ifile, ierr)
+                               mpi_info_int, ifile, ierr)
 
             call MPI_FILE_READ(ifile, file_tot_part, 1, MPI_INTEGER, status, ierr)
             call MPI_FILE_READ(ifile, file_time, 1, mpi_p, status, ierr)
@@ -478,15 +477,15 @@ contains
         call MPI_BCAST(file_dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(file_num_procs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
-        allocate(proc_bubble_counts(file_num_procs))
+        allocate (proc_bubble_counts(file_num_procs))
 
         if (proc_rank == 0) then
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, &
-                              mpi_info_int, ifile, ierr)
+                               mpi_info_int, ifile, ierr)
 
             ! Skip to processor counts position
             disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs), &
-                      MPI_OFFSET_KIND)
+                       MPI_OFFSET_KIND)
             call MPI_FILE_SEEK(ifile, disp, MPI_SEEK_SET, ierr)
             call MPI_FILE_READ(ifile, proc_bubble_counts, file_num_procs, MPI_INTEGER, status, ierr)
 
@@ -518,7 +517,7 @@ contains
             allocate (MPI_IO_DATA_lag_bubbles(bub_id, 1:lag_io_vars))
 
             call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, &
-                                           MPI_ORDER_FORTRAN, mpi_p, view, ierr)
+                                          MPI_ORDER_FORTRAN, mpi_p, view, ierr)
             call MPI_TYPE_COMMIT(view, ierr)
 
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, &
@@ -526,11 +525,11 @@ contains
 
             ! Skip extended header
             disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) + &
-                      file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+                       file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
             call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
 
             call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lag_bubbles, &
-                                  lag_io_vars * bub_id, mpi_p, status, ierr)
+                                   lag_io_vars*bub_id, mpi_p, status, ierr)
 
             call MPI_FILE_CLOSE(ifile, ierr)
             call MPI_TYPE_FREE(view, ierr)
@@ -568,7 +567,7 @@ contains
 
             ! Skip extended header
             disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) + &
-                      file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+                       file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
             call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
 
             call MPI_FILE_READ_ALL(ifile, dummy, 0, mpi_p, status, ierr)
@@ -577,14 +576,14 @@ contains
             call MPI_TYPE_FREE(view, ierr)
         end if
 
-        print*, proc_rank, lag_id
+        print *, proc_rank, lag_id
 
         if (proc_rank == 0) then
-            write(*,'(A,I0,A,I0)') 'Read ', file_tot_part, ' particles from restart file at t_step = ', save_count
-            write(*,'(A,E15.7,A,E15.7)') 'Restart time = ', mytime, ', dt = ', dt
+            write (*, '(A,I0,A,I0)') 'Read ', file_tot_part, ' particles from restart file at t_step = ', save_count
+            write (*, '(A,E15.7,A,E15.7)') 'Restart time = ', mytime, ', dt = ', dt
         end if
 
-        deallocate(proc_bubble_counts)
+        deallocate (proc_bubble_counts)
 #endif
 
     end subroutine s_restart_bubbles
@@ -655,8 +654,8 @@ contains
             myBeta_c = gas_betaC(k)
             myBeta_t = gas_betaT(k)
             myR0 = bub_R0(k)
-            myPos = mtn_pos(k,:,2)
-            myVel = mtn_vel(k,:,2)
+            myPos = mtn_pos(k, :, 2)
+            myVel = mtn_vel(k, :, 2)
 
             ! Vapor and heat fluxes
             call s_vflux(myR, myV, myPb, myMass_v, k, myVapFlux, myMass_n, myBeta_c, myR_m, mygamma_m)
@@ -693,13 +692,13 @@ contains
                 gas_mv(k, 1) = myMass_v
 
                 if (lag_params%vel_model == 1) then
-                    mtn_posPrev(k,:,1) = mtn_pos(k,:,2)
-                    mtn_pos(k,:,1) = myPos
-                    mtn_vel(k,:,1) = myVel
+                    mtn_posPrev(k, :, 1) = mtn_pos(k, :, 2)
+                    mtn_pos(k, :, 1) = myPos
+                    mtn_vel(k, :, 1) = myVel
                 elseif (lag_params%vel_model == 2) then
-                    mtn_posPrev(k,:,1) = mtn_pos(k,:,2)
-                    mtn_pos(k,:,1) = myPos
-                    mtn_vel(k,:,1) = myVel
+                    mtn_posPrev(k, :, 1) = mtn_pos(k, :, 2)
+                    mtn_pos(k, :, 1) = myPos
+                    mtn_vel(k, :, 1) = myVel
                 end if
 
             else
@@ -715,14 +714,14 @@ contains
                 do l = 1, num_dims
                     if (lag_params%vel_model == 1) then
                         mtn_dposdt(k, l, stage) = f_interpolate_velocity(myPos(l), &
-                                                    cell, l, q_prim_vf)
+                                                                         cell, l, q_prim_vf)
                         mtn_dveldt(k, l, stage) = 0._wp
                     elseif (lag_params%vel_model == 2) then
                         mtn_dposdt(k, l, stage) = myVel(l)
                         mtn_dveldt(k, l, stage) = f_get_acceleration(myPos(l), &
-                                                    myR, myVel(l), &
-                                                    myMass_n, myMass_v, &
-                                                    Re(1), myRho, cell, l, q_prim_vf)
+                                                                     myR, myVel(l), &
+                                                                     myMass_n, myMass_v, &
+                                                                     Re(1), myRho, cell, l, q_prim_vf)
                     else
                         mtn_dposdt(k, l, stage) = 0._wp
                         mtn_dveldt(k, l, stage) = 0._wp
@@ -1010,16 +1009,16 @@ contains
                 if (p == 0) then  !2D - 4 point interpolation (2x2)
                     do j = 1, 2
                         do i = 1, 2
-                            f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 1, cell(2) + j - 1, cell(3)) * &
-                                               psi_x(i) * psi_y(j)
+                            f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 1, cell(2) + j - 1, cell(3))* &
+                                      psi_x(i)*psi_y(j)
                         end do
                     end do
                 else              !3D - 8 point interpolation (2x2x2)
                     do k = 1, 2
                         do j = 1, 2
                             do i = 1, 2
-                                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 1, cell(2) + j - 1, cell(3) + k - 1) * &
-                                                   psi_x(i) * psi_y(j) * psi_z(k)
+                                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 1, cell(2) + j - 1, cell(3) + k - 1)* &
+                                          psi_x(i)*psi_y(j)*psi_z(k)
                             end do
                         end do
                     end do
@@ -1086,16 +1085,16 @@ contains
                 if (p == 0) then  !2D - 9 point interpolation (3x3)
                     do j = 1, 3
                         do i = 1, 3
-                            f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 2, cell(2) + j - 2, cell(3)) * &
-                                               psi_x(i) * psi_y(j)
+                            f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 2, cell(2) + j - 2, cell(3))* &
+                                      psi_x(i)*psi_y(j)
                         end do
                     end do
                 else              !3D - 27 point interpolation (3x3x3)
                     do k = 1, 3
                         do j = 1, 3
                             do i = 1, 3
-                                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 2, cell(2) + j - 2, cell(3) + k - 2) * &
-                                                   psi_x(i) * psi_y(j) * psi_z(k)
+                                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 2, cell(2) + j - 2, cell(3) + k - 2)* &
+                                          psi_x(i)*psi_y(j)*psi_z(k)
                             end do
                         end do
                     end do
@@ -1369,11 +1368,11 @@ contains
             ! Relocate bubbles at solid boundaries and delete bubbles that leave
             ! buffer regions
             if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                .and. mtn_pos(k,1,dest) < x_cb(-1) + intfc_rad(k,dest)) then
-                mtn_pos(k, 1, dest) = x_cb(-1) + intfc_rad(k,dest)
+                .and. mtn_pos(k, 1, dest) < x_cb(-1) + intfc_rad(k, dest)) then
+                mtn_pos(k, 1, dest) = x_cb(-1) + intfc_rad(k, dest)
             elseif (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                .and. mtn_pos(k,1,dest) > x_cb(m) - intfc_rad(k,dest)) then
-                mtn_pos(k, 1, dest) = x_cb(m) - intfc_rad(k,dest)
+                    .and. mtn_pos(k, 1, dest) > x_cb(m) - intfc_rad(k, dest)) then
+                mtn_pos(k, 1, dest) = x_cb(m) - intfc_rad(k, dest)
             elseif (mtn_pos(k, 1, dest) >= x_cb(m + buff_size - fd_number)) then
                 keep_bubble(k) = 0
             elseif (mtn_pos(k, 1, dest) < x_cb(fd_number - buff_size - 1)) then
@@ -1381,11 +1380,11 @@ contains
             end if
 
             if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                .and. mtn_pos(k,2,dest) < y_cb(-1) + intfc_rad(k,dest)) then
-                mtn_pos(k, 2, dest) = y_cb(-1) + intfc_rad(k,dest)
+                .and. mtn_pos(k, 2, dest) < y_cb(-1) + intfc_rad(k, dest)) then
+                mtn_pos(k, 2, dest) = y_cb(-1) + intfc_rad(k, dest)
             else if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                .and. mtn_pos(k,2,dest) > y_cb(n) - intfc_rad(k,dest)) then
-                mtn_pos(k, 2, dest) = y_cb(n) - intfc_rad(k,dest)
+                     .and. mtn_pos(k, 2, dest) > y_cb(n) - intfc_rad(k, dest)) then
+                mtn_pos(k, 2, dest) = y_cb(n) - intfc_rad(k, dest)
             elseif (mtn_pos(k, 2, dest) >= y_cb(n + buff_size - fd_number)) then
                 keep_bubble(k) = 0
             elseif (mtn_pos(k, 2, dest) < y_cb(fd_number - buff_size - 1)) then
@@ -1394,11 +1393,11 @@ contains
 
             if (p > 0) then
                 if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                    .and. mtn_pos(k,3,dest) < z_cb(-1) + intfc_rad(k,dest)) then
-                    mtn_pos(k, 3, dest) = z_cb(-1) + intfc_rad(k,dest)
+                    .and. mtn_pos(k, 3, dest) < z_cb(-1) + intfc_rad(k, dest)) then
+                    mtn_pos(k, 3, dest) = z_cb(-1) + intfc_rad(k, dest)
                 else if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                    .and. mtn_pos(k,3,dest) > z_cb(p) - intfc_rad(k,dest)) then
-                    mtn_pos(k, 3, dest) = z_cb(p) - intfc_rad(k,dest)
+                         .and. mtn_pos(k, 3, dest) > z_cb(p) - intfc_rad(k, dest)) then
+                    mtn_pos(k, 3, dest) = z_cb(p) - intfc_rad(k, dest)
                 elseif (mtn_pos(k, 3, dest) >= z_cb(p + buff_size - fd_number)) then
                     keep_bubble(k) = 0
                 elseif (mtn_pos(k, 3, dest) < z_cb(fd_number - buff_size - 1)) then
@@ -1427,7 +1426,7 @@ contains
                         do i = 1, num_dims
                             mtn_pos(k, i, dest) = mtn_pos(k, i, dest) - &
                                                   levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
-                                                  * levelset%sf(cell(1), cell(2), cell(3), patch_id)
+                                                  *levelset%sf(cell(1), cell(2), cell(3), patch_id)
                         end do
 
                         cell = fd_number - buff_size
@@ -1449,7 +1448,7 @@ contains
             if (k == 1) then
                 prefix_sum(k) = keep_bubble(k)
             else
-                prefix_sum(k) =  prefix_sum(k - 1) + keep_bubble(k)
+                prefix_sum(k) = prefix_sum(k - 1) + keep_bubble(k)
             end if
             if (k == nBubs) active_bubs = prefix_sum(k)
         end do
@@ -1491,10 +1490,10 @@ contains
 
             call nvtxStartRange("LAG-BC-SENDRECV")
             call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-                                      gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
-                                      intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
-                                      mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                                      gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
+                                          gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
+                                          intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
+                                          mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
+                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
             call nvtxEndRange
         end if
 
@@ -1881,7 +1880,7 @@ contains
                            MPI_SUM, MPI_COMM_WORLD, ierr)
 
         call MPI_ALLGATHER(bub_id, 1, MPI_INTEGER, proc_bubble_counts, 1, MPI_INTEGER, &
-                          MPI_COMM_WORLD, ierr)
+                           MPI_COMM_WORLD, ierr)
 
         ! Calculate starting index for this processor's particles
         call MPI_EXSCAN(lsizes(1), start_idx_part(1), 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
@@ -1891,12 +1890,12 @@ contains
         gsizes(1) = tot_part
         gsizes(2) = lag_io_vars
 
-        write(file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
+        write (file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
         file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
 
         ! Clean up existing file
         if (proc_rank == 0) then
-            inquire(FILE=trim(file_loc), EXIST=file_exist)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist) then
                 call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             end if
@@ -1906,8 +1905,8 @@ contains
 
         if (proc_rank == 0) then
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, &
-                              ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                              mpi_info_int, ifile, ierr)
+                               ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                               mpi_info_int, ifile, ierr)
 
             ! Write header using MPI I/O for consistency
             call MPI_FILE_WRITE(ifile, tot_part, 1, MPI_INTEGER, status, ierr)
@@ -1947,7 +1946,7 @@ contains
             end do
 
             call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, &
-                                           MPI_ORDER_FORTRAN, mpi_p, view, ierr)
+                                          MPI_ORDER_FORTRAN, mpi_p, view, ierr)
             call MPI_TYPE_COMMIT(view, ierr)
 
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, &
@@ -1956,11 +1955,11 @@ contains
 
             ! Skip header (written by rank 0)
             disp = int(sizeof(tot_part) + 2*sizeof(mytime) + sizeof(num_procs) + &
-                      num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+                       num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
             call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
 
             call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA_lag_bubbles, &
-                                   lag_io_vars * bub_id, mpi_p, status, ierr)
+                                    lag_io_vars*bub_id, mpi_p, status, ierr)
 
             call MPI_FILE_CLOSE(ifile, ierr)
 
@@ -1976,7 +1975,7 @@ contains
 
             ! Skip header (written by rank 0)
             disp = int(sizeof(tot_part) + 2*sizeof(mytime) + sizeof(num_procs) + &
-                      num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+                       num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
             call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
 
             call MPI_FILE_WRITE_ALL(ifile, dummy, 0, mpi_p, status, ierr)
@@ -2063,8 +2062,8 @@ contains
             intfc_dveldt(i, 1:lag_num_ts) = intfc_dveldt(i + 1, 1:lag_num_ts)
             gas_dpdt(i, 1:lag_num_ts) = gas_dpdt(i + 1, 1:lag_num_ts)
             gas_dmvdt(i, 1:lag_num_ts) = gas_dmvdt(i + 1, 1:lag_num_ts)
-            mtn_dposdt(i,1:3, 1:lag_num_ts) = mtn_dposdt(i + 1, 1:3, 1:lag_num_ts)
-            mtn_dveldt(i,1:3, 1:lag_num_ts) = mtn_dveldt(i + 1, 1:3, 1:lag_num_ts)
+            mtn_dposdt(i, 1:3, 1:lag_num_ts) = mtn_dposdt(i + 1, 1:3, 1:lag_num_ts)
+            mtn_dveldt(i, 1:3, 1:lag_num_ts) = mtn_dveldt(i + 1, 1:3, 1:lag_num_ts)
         end do
 
         nBubs = nBubs - 1

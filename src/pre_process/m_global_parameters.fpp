@@ -195,7 +195,7 @@ module m_global_parameters
 
     type(int_bounds_info), dimension(3) :: nidx
 
-    integer, allocatable, dimension(:,:,:) :: neighbor_ranks
+    integer, allocatable, dimension(:, :, :) :: neighbor_ranks
     !! Neighbor ranks for lagrangian particle communication
 
     integer, allocatable, dimension(:) :: start_idx !<
