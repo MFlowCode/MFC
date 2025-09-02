@@ -113,7 +113,7 @@ contains
     pure subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
                                                   igr_order, buff_size, idwint, idwbuff, &
                                                   viscous, bubbles_lagrange, m, n, p, num_dims, &
-                                                  igr, fd_number)
+                                                  igr, ib, fd_number)
 
         integer, intent(in) :: recon_type, weno_polyn, muscl_polyn
         integer, intent(in) :: m, n, p, num_dims, igr_order, fd_number
@@ -121,6 +121,7 @@ contains
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
         logical, intent(in) :: viscous, bubbles_lagrange
         logical, intent(in) :: igr
+        logical, intent(in) :: ib
 
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
@@ -141,6 +142,10 @@ contains
         ! Correction for smearing function in the lagrangian subgrid bubble model
         if (bubbles_lagrange) then
             buff_size = max(buff_size + fd_number, 6 + fd_number)
+        end if
+
+        if (ib) then
+            buff_size = max(buff_size, 10)
         end if
 
         ! Configuring Coordinate Direction Indexes
