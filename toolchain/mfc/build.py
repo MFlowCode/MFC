@@ -1,4 +1,8 @@
-import os, typing, hashlib, dataclasses
+import os, typing, dataclasses
+import re
+import pathlib
+import subprocess
+import tempfile
 
 from .case    import Case
 from .printer import cons
@@ -32,19 +36,82 @@ class MFCTarget:
     def __hash__(self) -> int:
         return hash(self.name)
 
+    def get_compiler_info(self) -> str:
+        compiler = "unknown"
+        with tempfile.TemporaryDirectory() as build_dir:
+            try:
+                subprocess.run(
+                    ["cmake", "-B", build_dir, "-S", ".", "-DCMAKE_VERBOSE_MAKEFILE=ON"],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                return "unknown"
+
+            cache = pathlib.Path(build_dir) / "CMakeCache.txt"
+            if not cache.exists():
+                return "unknown"
+
+            pat = re.compile(r"CMAKE_.*_COMPILER:FILEPATH=(.+)", re.IGNORECASE)
+            compiler_name = ""
+
+            for line in cache.read_text(errors="ignore").splitlines():
+                if "fortran" in line.lower():
+                    m = pat.search(line)
+                    if m:
+                        compiler_name = pathlib.Path(m.group(1).strip()).name
+                        break
+
+        name = compiler_name.lower()
+        if "gfortran" in name:
+            compiler = "gnu"
+        elif "ifort" in name or "ifx" in name:
+            compiler = "intel"
+        elif "nvfortran" in name:
+            compiler = "nvhpc"
+        elif name == "ftn" or "cray" in name:
+            compiler = "cray"
+        elif "pgfortran" in name:
+            compiler = "pgi"
+        elif "clang" in name:
+            compiler = "clang"
+        elif "flang" in name:
+            compiler = "flang"
+        return compiler
+
     def get_slug(self, case: Case ) -> str:
         if self.isDependency:
             return self.name
 
-        m = hashlib.sha256()
-        m.update(self.name.encode())
-        m.update(CFG().make_slug().encode())
-        m.update(case.get_fpp(self, False).encode())
+        # Start with target name
+        parts = [self.name]
 
+        # Add active configuration options
+        cfg = CFG()
+        cfg_parts = []
+        for key, value in sorted(cfg.items()):
+            if value:  # Only include enabled options
+                cfg_parts.append(key)
+
+        if cfg_parts:
+            parts.append('-'.join(cfg_parts))
+
+        # Add chemistry info if enabled
         if case.params.get('chemistry', 'F') == 'T':
-            m.update(case.get_cantera_solution().name.encode())
+            parts.append(f"chem-{case.get_cantera_solution().name}")
 
-        return m.hexdigest()[:10]
+        # Add case optimization if enabled
+        if case.params.get('case_optimization', False):
+            parts.append('opt')
+
+        # Add compiler identifier
+        compiler_id = self.get_compiler_info()
+        if compiler_id:
+            parts.append(f"fc-{compiler_id}")
+
+        # Join all parts with underscores
+        return '_'.join(parts)
 
     # Get path to directory that will store the build files
     def get_staging_dirpath(self, case: Case ) -> str:
