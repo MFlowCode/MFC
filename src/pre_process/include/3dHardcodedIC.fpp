@@ -8,7 +8,7 @@
     real(wp) :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth
 
     real(wp), allocatable, dimension(:, :) :: ih
-    integer :: i, j, pos, start, end
+    integer :: pos, start, end
     logical :: file_exist
     character(len=10000) :: line
     character(len=25) :: value
@@ -35,8 +35,8 @@
                             start = start + end  ! Move to next value
                         end if
                         read(value, *) ih(i, j)  ! Convert string to numeric value
-                        if (.not. f_is_default(normMag)) ih(i,j )= ih(i,j) * normMag
-                        if (.not. f_is_default(normFac)) ih(i,j) = ih(i,j) + normFac
+                        if (.not. f_is_default(normMag)) ih(i, j) = ih(i, j) * normMag
+                        if (.not. f_is_default(normFac)) ih(i, j) = ih(i, j) + normFac
                     end do
                 end do
                 close(10)
