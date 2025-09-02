@@ -1321,42 +1321,42 @@ contains
 
         call s_compute_derived_variables(t_step)
 
-        ! ! Volume filter flow variables, compute unclosed terms and their statistics
-        ! if (volume_filtering_momentum_eqn) then 
-        !     if (t_step > t_step_stat_start) then  
-        !         call nvtxStartRange('VOLUME-FILTER-MOMENTUM-EQUATION')  
-        !         call s_volume_filter_momentum_eqn(q_cons_ts(1)%vf)
-        !         call nvtxEndRange
+        ! Volume filter flow variables, compute unclosed terms and their statistics
+        if (volume_filtering_momentum_eqn) then 
+            if (t_step > t_step_stat_start) then  
+                call nvtxStartRange("VOLUME-FILTER-MOMENTUM-EQUATION")  
+                call s_volume_filter_momentum_eqn(q_cons_ts(1)%vf)
+                call nvtxEndRange
 
-        !         call nvtxStartRange('COMPUTE-STATISTICS')
-        !         call s_compute_statistics_momentum_unclosed_terms(t_step - t_step_stat_start, mag_reynolds_stress, mag_eff_visc, mag_int_mom_exch)
-        !         call nvtxEndRange
+                call nvtxStartRange("COMPUTE-STATISTICS")
+                call s_compute_statistics_momentum_unclosed_terms(t_step - t_step_stat_start, mag_reynolds_stress, mag_eff_visc, mag_int_mom_exch)
+                call nvtxEndRange
 
-        !         ! write(100, *) mag_reynolds_stress%sf(10, 10, 10)
-        !         ! write(101, *) stat_reynolds_stress(2)%sf(10, 10, 10), stat_reynolds_stress(3)%sf(10, 10, 10), stat_reynolds_stress(4)%sf(10, 10, 10)
-        !     end if
+                ! write(100, *) mag_reynolds_stress%sf(10, 10, 10)
+                ! write(101, *) stat_reynolds_stress(2)%sf(10, 10, 10), stat_reynolds_stress(3)%sf(10, 10, 10), stat_reynolds_stress(4)%sf(10, 10, 10)
+            end if
 
-        !     ! TEMPORARY, for v+v
-        !     ! if (t_step == 1) then 
-        !     !     open(unit=100, file='dat_reynolds_stress.txt', status='replace', action='write')
-        !     !     open(unit=101, file='stat_reynolds_stress.txt', status='replace', action='write')
-        !     ! end if
-        !     ! if (t_step == 999) then 
-        !     !     close(100)
-        !     !     close(101)
-        !     ! end if
+            ! TEMPORARY, for v+v
+            ! if (t_step == 1) then 
+            !     open(unit=100, file='dat_reynolds_stress.txt', status='replace', action='write')
+            !     open(unit=101, file='stat_reynolds_stress.txt', status='replace', action='write')
+            ! end if
+            ! if (t_step == 999) then 
+            !     close(100)
+            !     close(101)
+            ! end if
 
-        !     call nvtxStartRange("COMPUTE-PARTICLE-FORCES")
-        !     call s_compute_particle_forces()
-        !     call nvtxEndRange
-        ! end if
+            call nvtxStartRange("COMPUTE-PARTICLE-FORCES")
+            call s_compute_particle_forces()
+            call nvtxEndRange
+        end if
 
-        ! if (periodic_forcing) then 
-        !     call nvtxStartRange("COMPUTE-PERIODIC-FORCING")
-        !     call s_compute_phase_average(q_cons_ts(1)%vf, t_step+1)
-        !     call s_compute_periodic_forcing(q_cons_ts(1)%vf)
-        !     call nvtxEndRange
-        ! end if
+        if (periodic_forcing) then 
+            call nvtxStartRange("COMPUTE-PERIODIC-FORCING")
+            call s_compute_phase_average(q_cons_ts(1)%vf, t_step+1)
+            call s_compute_periodic_forcing(q_cons_ts(1)%vf)
+            call nvtxEndRange
+        end if
 
 #ifdef DEBUG
         print *, 'Computed derived vars'

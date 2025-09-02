@@ -95,9 +95,9 @@ contains
         phase_u = phase_u + (spatial_u_glb / real(N_x_total_glb, wp) - phase_u) / real(t_step, wp)
         !$acc update device(phase_rho, phase_u)
 
-        if (proc_rank == 0) then 
-            print *, t_step, 'rho', phase_rho, 'rho*u', phase_u
-        end if
+        ! if (proc_rank == 0) then 
+        !     print *, t_step, 'rho', phase_rho, 'rho*u', phase_u
+        ! end if
 
     end subroutine s_compute_phase_average
 

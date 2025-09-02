@@ -333,6 +333,10 @@ contains
                                                 cmplx_kernelG1d, onembed, 1, Nz, & 
                                                 FFTW_FORWARD, FFTW_MEASURE)
 #endif
+
+        ! file for particle forces
+        open(unit=100, file='particle_force.bin', status='replace', form='unformatted', access='stream')
+
     end subroutine s_initialize_fftw_explicit_filter_module
 
     !< initialize the gaussian filtering kernel in real space and then compute its DFT
@@ -528,13 +532,23 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer :: i, j, k
 
+        call nvtxStartRange("FILTER-CONS-VARS")
         call s_apply_fftw_filter_cons(q_cons_vf, q_cons_filtered)
+        call nvtxEndRange
 
+        call nvtxStartRange("UNCLOSED-TERM-SETUP")
         call s_setup_terms_filtering(q_cons_vf, reynolds_stress, visc_stress, pres_visc_stress, div_pres_visc_stress)
+        call nvtxEndRange
+
+        call nvtxStartRange("FILTER-UNCLOSED-TERM-VARS")
         call s_apply_fftw_filter_tensor(reynolds_stress, visc_stress, eff_visc, div_pres_visc_stress, int_mom_exch)
+        call nvtxEndRange
+
+        call nvtxStartRange("COMPUTE-UNCLOSED-TERMS")
         call s_compute_pseudo_turbulent_reynolds_stress(q_cons_filtered, reynolds_stress, mag_reynolds_stress)
         call s_compute_effective_viscosity(q_cons_filtered, eff_visc, visc_stress, mag_eff_visc)
         call s_compute_interphase_momentum_exchange(int_mom_exch, mag_int_mom_exch)
+        call nvtxEndRange
 
     end subroutine s_volume_filter_momentum_eqn
 
@@ -1012,6 +1026,7 @@ contains
 
     ! computes x-,y-,z-direction forces on particles
     subroutine s_compute_particle_forces
+        real(wp), dimension(num_ibs, 3) :: force_glb
         real(wp) :: dvol
         integer :: i, j, k, l
 
@@ -1030,6 +1045,18 @@ contains
             end do 
         end do
 
+        ! reduce particle forces across processors
+        do i = 1, num_ibs
+            call s_mpi_allreduce_sum(particle_forces(i, 1), force_glb(i, 1))
+            call s_mpi_allreduce_sum(particle_forces(i, 2), force_glb(i, 2))
+            call s_mpi_allreduce_sum(particle_forces(i, 3), force_glb(i, 3))
+        end do
+
+        ! write particle forces to file
+        if (proc_rank == 0) then
+            write(100) force_glb
+        end if
+            
     end subroutine s_compute_particle_forces
 
 
@@ -1328,6 +1355,8 @@ contains
         call fftw_destroy_plan(plan_y_c2c_kernelG)
         call fftw_destroy_plan(plan_z_c2c_kernelG)
 #endif
+
+        close(100)
 
     end subroutine s_finalize_fftw_explicit_filter_module
 
