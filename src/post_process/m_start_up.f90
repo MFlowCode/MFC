@@ -180,7 +180,6 @@ contains
         ! Populating the buffer regions of the conservative variables
         if (buff_size > 0) then
             call s_populate_conservative_variables_buffer_regions()
-            if (q_filtered_wrt) call s_populate_filtered_variables_buffer_regions()
             if (bubbles_lagrange) call s_populate_conservative_variables_buffer_regions(q_particle(1))
         end if
 
@@ -326,28 +325,50 @@ contains
         end do
 
         ! Adding filtered quantities
-        if (q_filtered_wrt) then
-            ! filtered cons vars
-            do i = 1, 4
-                q_sf = stat_reynolds_stress(i)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
-                write (varname, '(A,I0)') 'stat_reynolds_stresss', i
-                call s_write_variable_to_formatted_database_file(varname, t_step)
+        if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
+            ! filtered fluid indicator
+            q_sf = filtered_fluid_indicator_function%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+            write (varname, '(A)') 'filtered_fluid_indicator_function'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
 
-                varname(:) = ' '
+            varname(:) = ' '
+
+            ! filtered vars stats
+            do i = 1, 9
+                do j = 1, 4 
+                    q_sf = stat_reynolds_stress(i)%vf(j)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                    write (varname, '(A,I0,A,I0)') 'stat_reynolds_stress', i, '_m', j
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
+
+                    varname(:) = ' '
+                end do 
             end do
-            do i = 1, 4
-                q_sf = stat_eff_visc(i)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
-                write (varname, '(A,I0)') 'stat_eff_viscs', i
-                call s_write_variable_to_formatted_database_file(varname, t_step)
+            do i = 1, 9
+                do j = 1, 4 
+                    q_sf = stat_eff_visc(i)%vf(j)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                    write (varname, '(A,I0,A,I0)') 'stat_eff_visc', i, '_m', j
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
 
-                varname(:) = ' '
+                    varname(:) = ' '
+                end do
             end do
-            do i = 1, 4
-                q_sf = stat_int_mom_exch(i)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
-                write (varname, '(A,I0)') 'stat_int_mom_exchs', i
-                call s_write_variable_to_formatted_database_file(varname, t_step)
+            do i = 1, 3 
+                do j = 1, 4 
+                    q_sf = stat_int_mom_exch(i)%vf(j)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                    write (varname, '(A,I0,A,I0)') 'stat_int_mom_exch', i, '_m', j
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
 
-                varname(:) = ' '
+                    varname(:) = ' '
+                end do
+            end do
+            do i = 1, sys_size
+                do j = 1, 4 
+                    q_sf = stat_q_cons_filtered(i)%vf(j)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                    write (varname, '(A,I0,A,I0)') 'stat_q_cons_filtered', i, '_m', j
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
+
+                    varname(:) = ' '
+                end do 
             end do
         end if
 

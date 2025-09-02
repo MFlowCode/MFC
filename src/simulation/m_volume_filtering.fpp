@@ -545,9 +545,9 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("COMPUTE-UNCLOSED-TERMS")
-        call s_compute_pseudo_turbulent_reynolds_stress(q_cons_filtered, reynolds_stress, mag_reynolds_stress)
-        call s_compute_effective_viscosity(q_cons_filtered, eff_visc, visc_stress, mag_eff_visc)
-        call s_compute_interphase_momentum_exchange(int_mom_exch, mag_int_mom_exch)
+        call s_compute_pseudo_turbulent_reynolds_stress(q_cons_filtered, reynolds_stress)
+        call s_compute_effective_viscosity(q_cons_filtered, eff_visc, visc_stress)
+        call s_compute_interphase_momentum_exchange(int_mom_exch)
         call nvtxEndRange
 
     end subroutine s_volume_filter_momentum_eqn
@@ -624,7 +624,7 @@ contains
 
         integer :: i
 
-        do i = contxb, momxe
+        do i = 1, sys_size
             call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., q_cons_vf(i), q_cons_filtered(i))
         end do 
 
@@ -810,11 +810,9 @@ contains
 
     end subroutine s_setup_terms_filtering
 
-    subroutine s_compute_pseudo_turbulent_reynolds_stress(q_cons_filtered, reynolds_stress, mag_reynolds_stress)
+    subroutine s_compute_pseudo_turbulent_reynolds_stress(q_cons_filtered, reynolds_stress)
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_filtered
         type(vector_field), dimension(1:num_dims), intent(inout) :: reynolds_stress
-        type(scalar_field), intent(inout) :: mag_reynolds_stress
-        real(wp), dimension(1:num_dims, 0:m, 0:n, 0:p) :: div_Ru
         integer :: i, j, k, l, q    
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -833,81 +831,18 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present)
-        do i = 0, m
-            do j = 0, n
-                do k = 0, p  
-                    !$acc loop seq
-                    do l = 1, num_dims
-                        !$acc loop seq
-                        do q = 1, num_dims
-                            reynolds_stress(l)%vf(q)%sf(i, j, k) = reynolds_stress(l)%vf(q)%sf(i, j, k) * filtered_fluid_indicator_function%sf(i, j, k)
-                        end do 
-                    end do 
-                end do
-            end do 
-        end do
-
-        ! set boundary buffer zone values
-#ifdef MFC_MPI
-        do l = 1, num_dims 
-            do q = 1, num_dims
-                call s_populate_scalarfield_buffers(reynolds_stress(l)%vf(q))
-            end do 
-        end do
-#else
-        do l = 1, num_dims
-            do q = 1, num_dims
-                reynolds_stress(l)%vf(q)%sf(-buff_size:-1, :, :) = reynolds_stress(l)%vf(q)%sf(m-buff_size+1:m, :, :)
-                reynolds_stress(l)%vf(q)%sf(m+1:m+buff_size, :, :) = reynolds_stress(l)%vf(q)%sf(0:buff_size-1, :, :)
-
-                reynolds_stress(l)%vf(q)%sf(:, -buff_size:-1, :) = reynolds_stress(l)%vf(q)%sf(:, n-buff_size+1:n, :)
-                reynolds_stress(l)%vf(q)%sf(:, n+1:n+buff_size, :) = reynolds_stress(l)%vf(q)%sf(:, 0:buff_size-1, :)
-
-                reynolds_stress(l)%vf(q)%sf(:, :, -buff_size:-1) = reynolds_stress(l)%vf(q)%sf(:, :, p-buff_size+1:p)
-                reynolds_stress(l)%vf(q)%sf(:, :, p+1:p+buff_size) = reynolds_stress(l)%vf(q)%sf(:, :, 0:buff_size-1)
-            end do
-        end do
-#endif
-
-        ! div(Ru), using CD2 FD scheme 
-        !$acc parallel loop collapse(3) gang vector default(present) copy(div_Ru)
-        do i = 0, m
-            do j = 0, n 
-                do k = 0, p
-                    !$acc loop seq
-                    do l = 1, num_dims
-                        div_Ru(l, i, j, k) = (reynolds_stress(l)%vf(1)%sf(i+1, j, k) - reynolds_stress(l)%vf(1)%sf(i-1, j, k))/(2._wp*dx(i)) &
-                                           + (reynolds_stress(l)%vf(2)%sf(i, j+1, k) - reynolds_stress(l)%vf(2)%sf(i, j-1, k))/(2._wp*dy(j)) & 
-                                           + (reynolds_stress(l)%vf(3)%sf(i, j, k+1) - reynolds_stress(l)%vf(3)%sf(i, j, k-1))/(2._wp*dz(k))
-                    end do
-                end do
-            end do
-        end do
-
-        !$acc parallel loop collapse(3) gang vector default(present) copyin(div_Ru)
-        do i = 0, m
-            do j = 0, n
-                do k = 0, p 
-                    mag_reynolds_stress%sf(i, j, k) = sqrt(div_Ru(1, i, j, k)**2 + div_Ru(2, i, j, k)**2 + div_Ru(3, i, j, k)**2)
-                end do
-            end do
-        end do
-
     end subroutine s_compute_pseudo_turbulent_reynolds_stress
 
-    subroutine s_compute_effective_viscosity(q_cons_filtered, eff_visc, visc_stress, mag_eff_visc)
+    subroutine s_compute_effective_viscosity(q_cons_filtered, eff_visc, visc_stress)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_filtered
         type(vector_field), dimension(1:num_dims), intent(inout) :: eff_visc
         type(vector_field), dimension(1:num_dims), intent(inout) :: visc_stress
-        type(scalar_field), intent(inout) :: mag_eff_visc
-        real(wp), dimension(1:num_dims, 0:m, 0:n, 0:p) :: div_eff_visc
 
         integer :: i, j, k, l, q
 
         ! set buffers for filtered momentum quantities and density
 #ifdef MFC_MPI
-        do i = 1, momxe 
+        do i = contxb, momxe 
             call s_populate_scalarfield_buffers(q_cons_filtered(i))
         end do
 #else
@@ -942,85 +877,12 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present)
-        do i = 0, m
-            do j = 0, n
-                do k = 0, p 
-                    !$acc loop seq
-                    do l = 1, num_dims
-                        !$acc loop seq
-                        do q = 1, num_dims
-                            eff_visc(l)%vf(q)%sf(i, j, k) = eff_visc(l)%vf(q)%sf(i, j, k) * filtered_fluid_indicator_function%sf(i, j, k)
-                        end do 
-                    end do 
-                end do
-            end do 
-        end do
-
-        ! set boundary buffer zone values
-#ifdef MFC_MPI
-        do l = 1, num_dims
-            do q = 1, num_dims
-                call s_populate_scalarfield_buffers(eff_visc(l)%vf(q))
-            end do
-        end do
-#else
-        do l = 1, num_dims
-            do q = 1, num_dims
-                eff_visc(l)%vf(q)%sf(-buff_size:-1, :, :) = eff_visc(l)%vf(q)%sf(m-buff_size+1:m, :, :)
-                eff_visc(l)%vf(q)%sf(m+1:m+buff_size, :, :) = eff_visc(l)%vf(q)%sf(0:buff_size-1, :, :)
-
-                eff_visc(l)%vf(q)%sf(:, -buff_size:-1, :) = eff_visc(l)%vf(q)%sf(:, n-buff_size+1:n, :)
-                eff_visc(l)%vf(q)%sf(:, n+1:n+buff_size, :) = eff_visc(l)%vf(q)%sf(:, 0:buff_size-1, :)
-
-                eff_visc(l)%vf(q)%sf(:, :, -buff_size:-1) = eff_visc(l)%vf(q)%sf(:, :, p-buff_size+1:p)
-                eff_visc(l)%vf(q)%sf(:, :, p+1:p+buff_size) = eff_visc(l)%vf(q)%sf(:, :, 0:buff_size-1)
-            end do
-        end do
-#endif
-
-        ! div(eff_visc), using CD2 FD scheme 
-        !$acc parallel loop collapse(3) gang vector default(present) copy(div_eff_visc)
-        do i = 0, m
-            do j = 0, n 
-                do k = 0, p
-                    !$acc loop seq
-                    do l = 1, num_dims
-                        div_eff_visc(l, i, j, k) = (eff_visc(l)%vf(1)%sf(i+1, j, k) - eff_visc(l)%vf(1)%sf(i-1, j, k))/(2._wp*dx(i)) &
-                                                 + (eff_visc(l)%vf(2)%sf(i, j+1, k) - eff_visc(l)%vf(2)%sf(i, j-1, k))/(2._wp*dy(j)) & 
-                                                 + (eff_visc(l)%vf(3)%sf(i, j, k+1) - eff_visc(l)%vf(3)%sf(i, j, k-1))/(2._wp*dz(k))
-                    end do 
-                end do
-            end do
-        end do
-
-        !$acc parallel loop collapse(3) gang vector default(present) copyin(div_eff_visc)
-        do i = 0, m
-            do j = 0, n
-                do k = 0, p 
-                    mag_eff_visc%sf(i, j, k) = sqrt(div_eff_visc(1, i, j, k)**2 + div_eff_visc(2, i, j, k)**2 + div_eff_visc(3, i, j, k)**2)
-                end do
-            end do
-        end do
-
     end subroutine s_compute_effective_viscosity
 
-    subroutine s_compute_interphase_momentum_exchange(int_mom_exch, mag_int_mom_exch)
+    subroutine s_compute_interphase_momentum_exchange(int_mom_exch)
         type(scalar_field), dimension(1:num_dims), intent(in) :: int_mom_exch
-        type(scalar_field), intent(inout) :: mag_int_mom_exch
 
         integer :: i, j, k
-
-        !$acc parallel loop collapse(3) gang vector default(present)
-        do i = 0, m
-            do j = 0, n
-                do k = 0, p 
-                    mag_int_mom_exch%sf(i, j, k) = sqrt(int_mom_exch(1)%sf(i, j, k)**2 & 
-                                                      + int_mom_exch(2)%sf(i, j, k)**2 & 
-                                                      + int_mom_exch(3)%sf(i, j, k)**2)
-                end do
-            end do
-        end do 
 
     end subroutine s_compute_interphase_momentum_exchange
 

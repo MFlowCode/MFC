@@ -34,8 +34,9 @@ mu = rho*v1*D/Re # dynamic viscosity for current case
 #print('Kn = ' + str( np.sqrt(np.pi*gam_a/2)*(M/Re) )) # Kn < 0.01 = continuum flow
 
 dt = 4.0E-06
-Nt = 200
-t_save = 10
+Nt = 20
+t_save = 1
+t_step_start_stats = 10
 
 Nx = 99
 Ny = 99
@@ -79,7 +80,7 @@ case_dict = {
     "t_step_start": 0,
     "t_step_stop": Nt,  # 3000
     "t_step_save": t_save,  # 10
-    "t_step_stat_start": 50,
+    "t_step_stat_start": t_step_start_stats,
     # Simulation Algorithm Parameters
     # Only one patches are necessary, the air tube
     "num_patches": 1,

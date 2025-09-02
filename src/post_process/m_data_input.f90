@@ -29,7 +29,6 @@ module m_data_input
  s_read_parallel_data_files, &
  s_populate_grid_variables_buffer_regions, &
  s_populate_conservative_variables_buffer_regions, &
- s_populate_filtered_variables_buffer_regions, &
  s_finalize_data_input_module
 
     abstract interface
@@ -61,9 +60,11 @@ module m_data_input
     ! type(scalar_field), public :: ib_markers !<
     type(integer_field), public :: ib_markers
 
-    type(scalar_field), allocatable, dimension(:), public :: stat_reynolds_stress
-    type(scalar_field), allocatable, dimension(:), public :: stat_eff_visc
-    type(scalar_field), allocatable, dimension(:), public :: stat_int_mom_exch
+    type(scalar_field), public :: filtered_fluid_indicator_function
+    type(vector_field), allocatable, dimension(:), public :: stat_reynolds_stress
+    type(vector_field), allocatable, dimension(:), public :: stat_eff_visc
+    type(vector_field), allocatable, dimension(:), public :: stat_int_mom_exch
+    type(vector_field), allocatable, dimension(:), public :: stat_q_cons_filtered
 
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
@@ -301,8 +302,8 @@ contains
 
         if (bubbles_lagrange) then
             alt_sys = sys_size + 1
-        else if (q_filtered_wrt) then
-            alt_sys = sys_size + 9
+        else if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
+            alt_sys = sys_size + 1 + 9*4 + 9*4 + 3*4 + 6*4 ! 109, filtered indicator, stats of: R_u, R_mu, F_imet, q_cons_filtered
         else
             alt_sys = sys_size
         end if
@@ -461,11 +462,13 @@ contains
 
                 ! Initialize MPI data I/O
                 if (ib) then
-                    if (q_filtered_wrt) then
+                    if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
                         call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                                                   filtered_fluid_indicator_function=filtered_fluid_indicator_function, &
                                                    stat_reynolds_stress=stat_reynolds_stress, & 
                                                    stat_eff_visc=stat_eff_visc, & 
-                                                   stat_int_mom_exch=stat_int_mom_exch)
+                                                   stat_int_mom_exch=stat_int_mom_exch, & 
+                                                   stat_q_cons_filtered=stat_q_cons_filtered)
                     else 
                         call s_initialize_mpi_data(q_cons_vf, ib_markers)
                     end if
@@ -500,7 +503,7 @@ contains
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                                mpi_p, status, ierr)
                     end do
-                else if (q_filtered_wrt) then
+                else if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
                     do i = 1, alt_sys
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -1328,229 +1331,11 @@ contains
 
     end subroutine s_populate_conservative_variables_buffer_regions
 
-    subroutine s_populate_filtered_variables_buffer_regions(q_particle)
-
-        type(scalar_field), intent(inout), optional :: q_particle
-
-        integer :: i, j, k !< Generic loop iterators
-
-        ! Populating Buffer Regions in the x-direction
-
-        ! Periodic BC at the beginning
-        if (bc_x%beg == BC_PERIODIC) then
-
-            do j = 1, buff_size
-                if (present(q_particle)) then
-                    q_particle%sf(-j, 0:n, 0:p) = &
-                        q_particle%sf((m + 1) - j, 0:n, 0:p)
-                else
-                    do i = 1, 4
-                        stat_reynolds_stress(i)%sf(-j, 0:n, 0:p) = &
-                            stat_reynolds_stress(i)%sf((m + 1) - j, 0:n, 0:p)
-                        stat_eff_visc(i)%sf(-j, 0:n, 0:p) = &
-                            stat_eff_visc(i)%sf((m + 1) - j, 0:n, 0:p)
-                        stat_int_mom_exch(i)%sf(-j, 0:n, 0:p) = &
-                            stat_int_mom_exch(i)%sf((m + 1) - j, 0:n, 0:p)
-                    end do
-                end if
-            end do
-
-            ! Processor BC at the beginning
-        else
-            if (present(q_particle)) then
-                call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                             'beg', 'x', q_particle)
-            else
-                call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                             'beg', 'x')
-            end if
-
-        end if
-
-        ! Perodic BC at the end
-        if (bc_x%end == BC_PERIODIC) then
-
-            do j = 1, buff_size
-                if (present(q_particle)) then
-                    q_particle%sf(m + j, 0:n, 0:p) = &
-                        q_particle%sf(j - 1, 0:n, 0:p)
-                else
-                    do i = 1, 4
-                        stat_reynolds_stress(i)%sf(m + j, 0:n, 0:p) = &
-                            stat_reynolds_stress(i)%sf(j - 1, 0:n, 0:p)
-                        stat_eff_visc(i)%sf(m + j, 0:n, 0:p) = &
-                            stat_eff_visc(i)%sf(j - 1, 0:n, 0:p)
-                        stat_int_mom_exch(i)%sf(m + j, 0:n, 0:p) = &
-                            stat_int_mom_exch(i)%sf(j - 1, 0:n, 0:p)
-                    end do
-                end if
-            end do
-
-            ! Processor BC at the end
-        else
-
-            if (present(q_particle)) then
-                call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                             'end', 'x', q_particle)
-            else
-                call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                             'end', 'x')
-            end if
-
-        end if
-
-        ! END: Populating Buffer Regions in the x-direction
-
-        ! Populating Buffer Regions in the y-direction
-
-        if (n > 0) then
-
-            ! Periodic BC at the beginning
-            if (bc_y%beg == BC_PERIODIC) then
-
-                do j = 1, buff_size
-                    if (present(q_particle)) then
-                        q_particle%sf(:, -j, 0:p) = &
-                            q_particle%sf(:, (n + 1) - j, 0:p)
-                    else
-                        do i = 1, 4
-                            stat_reynolds_stress(i)%sf(:, -j, 0:p) = &
-                                stat_reynolds_stress(i)%sf(:, (n + 1) - j, 0:p)
-                            stat_eff_visc(i)%sf(:, -j, 0:p) = &
-                                stat_eff_visc(i)%sf(:, (n + 1) - j, 0:p)
-                            stat_int_mom_exch(i)%sf(:, -j, 0:p) = &
-                                stat_int_mom_exch(i)%sf(:, (n + 1) - j, 0:p)
-                        end do
-                    end if
-                end do
-
-                ! Processor BC at the beginning
-            else
-                if (present(q_particle)) then
-                    call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                 'beg', 'y', q_particle)
-                else
-                    call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                 'beg', 'y')
-                end if
-
-            end if
-
-            ! Perodic BC at the end
-            if (bc_y%end == BC_PERIODIC) then
-
-                do j = 1, buff_size
-                    if (present(q_particle)) then
-                        q_particle%sf(:, n + j, 0:p) = &
-                            q_particle%sf(:, j - 1, 0:p)
-                    else
-                        do i = 1, 4
-                            stat_reynolds_stress(i)%sf(:, n + j, 0:p) = &
-                                stat_reynolds_stress(i)%sf(:, j - 1, 0:p)
-                            stat_eff_visc(i)%sf(:, n + j, 0:p) = &
-                                stat_eff_visc(i)%sf(:, j - 1, 0:p)
-                            stat_int_mom_exch(i)%sf(:, n + j, 0:p) = &
-                                stat_int_mom_exch(i)%sf(:, j - 1, 0:p)
-                        end do
-                    end if
-                end do
-
-                ! Processor BC at the end
-            else
-
-                if (present(q_particle)) then
-                    call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                 'end', 'y', q_particle)
-                else
-                    call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                 'end', 'y')
-                end if
-
-            end if
-
-            ! END: Populating Buffer Regions in the y-direction
-
-            ! Populating Buffer Regions in the z-direction
-
-            if (p > 0) then
-
-                ! Periodic BC at the beginning
-                if (bc_z%beg == BC_PERIODIC) then
-
-                    do j = 1, buff_size
-                        if (present(q_particle)) then
-                            q_particle%sf(:, :, -j) = &
-                                q_particle%sf(:, :, (p + 1) - j)
-                        else
-                            do i = 1, 4
-                                stat_reynolds_stress(i)%sf(:, :, -j) = &
-                                    stat_reynolds_stress(i)%sf(:, :, (p + 1) - j)
-                                stat_eff_visc(i)%sf(:, :, -j) = &
-                                    stat_eff_visc(i)%sf(:, :, (p + 1) - j)
-                                stat_int_mom_exch(i)%sf(:, :, -j) = &
-                                    stat_int_mom_exch(i)%sf(:, :, (p + 1) - j)
-                            end do
-                        end if
-                    end do
-
-                    ! Processor BC at the beginning
-                else
-
-                    if (present(q_particle)) then
-                        call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                     'beg', 'z', q_particle)
-                    else
-                        call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                     'beg', 'z')
-                    end if
-
-                end if
-
-                ! Perodic BC at the end
-                if (bc_z%end == BC_PERIODIC) then
-
-                    do j = 1, buff_size
-                        if (present(q_particle)) then
-                            q_particle%sf(:, :, p + j) = &
-                                q_particle%sf(:, :, j - 1)
-                        else
-                            do i = 1, 4
-                                stat_reynolds_stress(i)%sf(:, :, p + j) = &
-                                    stat_reynolds_stress(i)%sf(:, :, j - 1)
-                                stat_eff_visc(i)%sf(:, :, p + j) = &
-                                    stat_eff_visc(i)%sf(:, :, j - 1)
-                                stat_int_mom_exch(i)%sf(:, :, p + j) = &
-                                    stat_int_mom_exch(i)%sf(:, :, j - 1)
-                            end do
-                        end if
-                    end do
-
-                    ! Processor BC at the end
-                else
-
-                    if (present(q_particle)) then
-                        call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                     'end', 'z', q_particle)
-                    else
-                        call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                     'end', 'z')
-                    end if
-
-                end if
-
-            end if
-
-        end if
-
-        ! END: Populating Buffer Regions in the z-direction
-
-    end subroutine s_populate_filtered_variables_buffer_regions
-
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
     subroutine s_initialize_data_input_module
 
-        integer :: i !< Generic loop iterator
+        integer :: i, j !< Generic loop iterator
 
         ! Allocating the parts of the conservative and primitive variables
         ! that do not require the direct knowledge of the dimensionality of
@@ -1559,9 +1344,10 @@ contains
         allocate (q_prim_vf(1:sys_size))
         if (bubbles_lagrange) allocate (q_particle(1))
 
-        if (q_filtered_wrt) allocate (stat_reynolds_stress(1:4))
-        if (q_filtered_wrt) allocate (stat_eff_visc(1:4))
-        if (q_filtered_wrt) allocate (stat_int_mom_exch(1:4))
+        if (q_filtered_wrt) allocate (stat_reynolds_stress(1:9))
+        if (q_filtered_wrt) allocate (stat_eff_visc(1:9))
+        if (q_filtered_wrt) allocate (stat_int_mom_exch(1:3))
+        if (q_filtered_wrt) allocate (stat_q_cons_filtered(1:sys_size))
 
         ! Allocating the parts of the conservative and primitive variables
         ! that do require the direct knowledge of the dimensionality of the
@@ -1601,16 +1387,42 @@ contains
                 end if
 
                 if (q_filtered_wrt) then
-                    do i = 1, 4
-                        allocate (stat_reynolds_stress(i)%sf(-buff_size:m + buff_size, &
-                                                     -buff_size:n + buff_size, &
-                                                     -buff_size:p + buff_size))
-                        allocate (stat_eff_visc(i)%sf(-buff_size:m + buff_size, &
-                                                     -buff_size:n + buff_size, &
-                                                     -buff_size:p + buff_size))
-                        allocate (stat_int_mom_exch(i)%sf(-buff_size:m + buff_size, &
-                                                     -buff_size:n + buff_size, &
-                                                     -buff_size:p + buff_size))
+                    allocate (filtered_fluid_indicator_function%sf(-buff_size:m + buff_size, &
+                                                                   -buff_size:n + buff_size, &
+                                                                   -buff_size:p + buff_size))
+                    do i = 1, 9
+                        allocate (stat_reynolds_stress(i)%vf(1:4))
+                        allocate (stat_eff_visc(i)%vf(1:4))
+                    end do
+                    do i = 1, 9 
+                        do j = 1, 4 
+                            allocate (stat_reynolds_stress(i)%vf(j)%sf(-buff_size:m + buff_size, &
+                                                                       -buff_size:n + buff_size, &
+                                                                       -buff_size:p + buff_size))
+                            allocate (stat_eff_visc(i)%vf(j)%sf(-buff_size:m + buff_size, &
+                                                                -buff_size:n + buff_size, &
+                                                                -buff_size:p + buff_size))
+                        end do 
+                    end do
+                    do i = 1, 3 
+                        allocate (stat_int_mom_exch(i)%vf(1:4))
+                    end do
+                    do i = 1, 3 
+                        do j = 1, 4 
+                            allocate (stat_int_mom_exch(i)%vf(j)%sf(-buff_size:m + buff_size, &
+                                                                    -buff_size:n + buff_size, &
+                                                                    -buff_size:p + buff_size))
+                        end do 
+                    end do
+                    do i = 1, sys_size
+                        allocate (stat_q_cons_filtered(i)%vf(1:4))
+                    end do 
+                    do i = 1, sys_size
+                        do j = 1, 4 
+                            allocate (stat_q_cons_filtered(i)%vf(j)%sf(-buff_size:m + buff_size, &
+                                                                       -buff_size:n + buff_size, &
+                                                                       -buff_size:p + buff_size))
+                        end do 
                     end do
                 end if
                 
@@ -1682,7 +1494,7 @@ contains
     !> Deallocation procedures for the module
     subroutine s_finalize_data_input_module
 
-        integer :: i !< Generic loop iterator
+        integer :: i, j !< Generic loop iterator
 
         ! Deallocating the conservative and primitive variables
         do i = 1, sys_size
@@ -1707,18 +1519,35 @@ contains
         end if
 
         if (q_filtered_wrt) then 
-            do i = 1, 4 
-                deallocate (stat_reynolds_stress(i)%sf)
-            end do 
+            deallocate (filtered_fluid_indicator_function%sf)
+            do i = 1, 9 
+                do j = 1, 4 
+                    deallocate (stat_reynolds_stress(i)%vf(j)%sf)
+                end do 
+                deallocate(stat_reynolds_stress(i)%vf)
+            end do
             deallocate(stat_reynolds_stress)
-            do i = 1, 4 
-                deallocate (stat_eff_visc(i)%sf)
-            end do 
+            do i = 1, 9 
+                do j = 1, 4 
+                    deallocate (stat_eff_visc(i)%vf(j)%sf)
+                end do 
+                deallocate(stat_eff_visc(i)%vf)
+            end do
             deallocate(stat_eff_visc)
-            do i = 1, 4 
-                deallocate (stat_int_mom_exch(i)%sf)
-            end do 
+            do i = 1, 3
+                do j = 1, 4 
+                    deallocate (stat_int_mom_exch(i)%vf(j)%sf)
+                end do 
+                deallocate(stat_int_mom_exch(i)%vf)
+            end do
             deallocate(stat_int_mom_exch)
+            do i = 1, sys_size
+                do j = 1, 4 
+                    deallocate (stat_q_cons_filtered(i)%vf(j)%sf)
+                end do 
+                deallocate(stat_q_cons_filtered(i)%vf)
+            end do
+            deallocate(stat_q_cons_filtered)
         end if
 
         s_read_data_files => null()

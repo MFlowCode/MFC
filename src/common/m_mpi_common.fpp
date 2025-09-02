@@ -153,7 +153,8 @@ contains
     !! @param levelset closest distance from every cell to the IB
     !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     !! @param beta Eulerian void fraction from lagrangian bubbles
-    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta, stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
+    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta, filtered_fluid_indicator_function, &
+                                     stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch, stat_q_cons_filtered)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -174,9 +175,11 @@ contains
         type(scalar_field), &
             intent(in), optional :: beta
 
-        type(scalar_field), dimension(1:4), intent(in), optional :: stat_reynolds_stress
-        type(scalar_field), dimension(1:4), intent(in), optional :: stat_eff_visc
-        type(scalar_field), dimension(1:4), intent(in), optional :: stat_int_mom_exch
+        type(scalar_field), intent(in), optional :: filtered_fluid_indicator_function
+        type(vector_field), dimension(1:9), intent(in), optional :: stat_reynolds_stress
+        type(vector_field), dimension(1:9), intent(in), optional :: stat_eff_visc
+        type(vector_field), dimension(1:3), intent(in), optional :: stat_int_mom_exch
+        type(vector_field), dimension(1:sys_size), intent(in), optional :: stat_q_cons_filtered
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
@@ -192,7 +195,7 @@ contains
         if (present(beta)) then
             alt_sys = sys_size + 1
         else if (present(stat_reynolds_stress) .and. present(stat_eff_visc) .and. present(stat_int_mom_exch)) then
-            alt_sys = sys_size + 12
+            alt_sys = sys_size + 1 + 9*4 + 9*4 + 3*4 + 6*4 ! 109
         else
             alt_sys = sys_size
         end if
@@ -202,15 +205,27 @@ contains
         end do
         
         if (present(stat_reynolds_stress) .and. present(stat_eff_visc) .and. present(stat_int_mom_exch)) then 
-            do i = sys_size+1, sys_size+4
-                MPI_IO_DATA%var(i)%sf => stat_reynolds_stress(i-sys_size)%sf(0:m, 0:n, 0:p)
+            MPI_IO_DATA%var(sys_size+1)%sf => filtered_fluid_indicator_function%sf(0:m, 0:n, 0:p)
+            do i = 1, 9
+                do j = 1, 4
+                    MPI_IO_DATA%var(sys_size+1+(i-1)*4+j)%sf => stat_reynolds_stress(i)%vf(j)%sf(0:m, 0:n, 0:p)
+                end do
             end do
-            do i = sys_size+5, sys_size+8
-                MPI_IO_DATA%var(i)%sf => stat_eff_visc(i-sys_size-4)%sf(0:m, 0:n, 0:p)
+            do i = 1, 9
+                do j = 1, 4
+                    MPI_IO_DATA%var(sys_size+37+(i-1)*4+j)%sf => stat_eff_visc(i)%vf(j)%sf(0:m, 0:n, 0:p)
+                end do
             end do
-            do i = sys_size+9, sys_size+12 
-                MPI_IO_DATA%var(i)%sf => stat_int_mom_exch(i-sys_size-8)%sf(0:m, 0:n, 0:p)
-            end do 
+            do i = 1, 3
+                do j = 1, 4
+                    MPI_IO_DATA%var(sys_size+73+(i-1)*4+j)%sf => stat_int_mom_exch(i)%vf(j)%sf(0:m, 0:n, 0:p)
+                end do
+            end do
+            do i = 1, sys_size
+                do j = 1, 4
+                    MPI_IO_DATA%var(sys_size+85+(i-1)*4+j)%sf => stat_q_cons_filtered(i)%vf(j)%sf(0:m, 0:n, 0:p)
+                end do
+            end do
         end if
 
         if (present(beta)) then

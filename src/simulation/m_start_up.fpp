@@ -192,7 +192,7 @@ contains
             periodic_ibs, compute_particle_drag, u_inf_ref, rho_inf_ref, T_inf_ref, & 
             periodic_forcing, volume_filtering_momentum_eqn, store_levelset, & 
             slab_domain_decomposition, compute_autocorrelation, t_step_stat_start, & 
-            filter_width
+            filter_width, q_filtered_wrt
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1329,7 +1329,7 @@ contains
                 call nvtxEndRange
 
                 call nvtxStartRange("COMPUTE-STATISTICS")
-                call s_compute_statistics_momentum_unclosed_terms(t_step - t_step_stat_start, mag_reynolds_stress, mag_eff_visc, mag_int_mom_exch)
+                call s_compute_statistics_momentum_unclosed_terms(t_step - t_step_stat_start, reynolds_stress, eff_visc, int_mom_exch)
                 call nvtxEndRange
 
                 ! write(100, *) mag_reynolds_stress%sf(10, 10, 10)
@@ -1459,11 +1459,25 @@ contains
 
         call cpu_time(start)
         call nvtxStartRange("SAVE-DATA")
-        do i = 1, 4 
-            !$acc update host(stat_reynolds_stress(i)%sf)
-            !$acc update host(stat_eff_visc(i)%sf)
-            !$acc update host(stat_int_mom_exch(i)%sf)
-        end do  
+        if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
+            !$acc update host(filtered_fluid_indicator_function%sf)
+            do i = 1, 9 
+                do j = 1, 4 
+                    !$acc update host(stat_reynolds_stress(i)%vf(j)%sf)
+                    !$acc update host(stat_eff_visc(i)%vf(j)%sf)
+                end do 
+            end do 
+            do i = 1, 3 
+                do j = 1, 4 
+                    !$acc update host(stat_int_mom_exch(i)%vf(j)%sf)
+                end do 
+            end do
+            do i = 1, sys_size
+                do j = 1, 4 
+                    !$acc update host(stat_q_cons_filtered(i)%vf(j)%sf)
+                end do 
+            end do
+        end if
         do i = 1, sys_size
             !$acc update host(q_cons_ts(1)%vf(i)%sf)
             do l = 0, p
@@ -1496,9 +1510,11 @@ contains
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
-            if (volume_filtering_momentum_eqn) then
+            if (volume_filtering_momentum_eqn .and. (t_step == 0 .or. t_step == t_step_stop)) then
                 call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, &
-                                        stat_reynolds_stress=stat_reynolds_stress, stat_eff_visc=stat_eff_visc, stat_int_mom_exch=stat_int_mom_exch)
+                                        filtered_fluid_indicator_function=filtered_fluid_indicator_function, &
+                                        stat_reynolds_stress=stat_reynolds_stress, stat_eff_visc=stat_eff_visc, &
+                                        stat_int_mom_exch=stat_int_mom_exch, stat_q_cons_filtered=stat_q_cons_filtered)
             else
                 call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count)
             end if

@@ -76,7 +76,8 @@ contains
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
-    subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta, stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
+    subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta, filtered_fluid_indicator_function, &
+                                  stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch, stat_q_cons_filtered)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -94,14 +95,17 @@ contains
         type(scalar_field), &
             intent(inout), optional :: beta
 
-        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_reynolds_stress
-        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_eff_visc
-        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_int_mom_exch
+        type(scalar_field), intent(inout), optional :: filtered_fluid_indicator_function
+        type(vector_field), dimension(1:9), intent(inout), optional :: stat_reynolds_stress
+        type(vector_field), dimension(1:9), intent(inout), optional :: stat_eff_visc
+        type(vector_field), dimension(1:3), intent(inout), optional :: stat_int_mom_exch
+        type(vector_field), dimension(1:sys_size), intent(inout), optional :: stat_q_cons_filtered
 
         if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
         else
-            call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta, stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
+            call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta, &
+                                             filtered_fluid_indicator_function, stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch, stat_q_cons_filtered)
         end if
 
     end subroutine s_write_data_files
@@ -790,15 +794,18 @@ contains
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
         !!  @param beta Eulerian void fraction from lagrangian bubbles
-    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta, stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
+    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta, filtered_fluid_indicator_function, &
+                                           stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch, stat_q_cons_filtered)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
-        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_reynolds_stress
-        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_eff_visc
-        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_int_mom_exch
+        type(scalar_field), intent(inout), optional :: filtered_fluid_indicator_function
+        type(vector_field), dimension(1:9), intent(inout), optional :: stat_reynolds_stress
+        type(vector_field), dimension(1:9), intent(inout), optional :: stat_eff_visc
+        type(vector_field), dimension(1:3), intent(inout), optional :: stat_int_mom_exch
+        type(vector_field), dimension(1:sys_size), intent(inout), optional :: stat_q_cons_filtered
 
 #ifdef MFC_MPI
 
@@ -821,7 +828,7 @@ contains
         if (present(beta)) then
             alt_sys = sys_size + 1
         else if (present(stat_reynolds_stress) .and. present(stat_eff_visc) .and. present(stat_int_mom_exch)) then
-            alt_sys = sys_size + 12
+            alt_sys = sys_size + 1 + 9*4 + 9*4 + 3*4 + 6*4
         else
             alt_sys = sys_size
         end if
@@ -906,8 +913,10 @@ contains
 
             if (ib) then
                 if (present(stat_reynolds_stress) .and. present(stat_eff_visc) .and. present(stat_int_mom_exch)) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, & 
-                                               stat_reynolds_stress=stat_reynolds_stress, stat_eff_visc=stat_eff_visc, stat_int_mom_exch=stat_int_mom_exch)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, &
+                                               filtered_fluid_indicator_function=filtered_fluid_indicator_function, & 
+                                               stat_reynolds_stress=stat_reynolds_stress, stat_eff_visc=stat_eff_visc, &
+                                               stat_int_mom_exch=stat_int_mom_exch, stat_q_cons_filtered=stat_q_cons_filtered)
                 else
                     call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
                 end if

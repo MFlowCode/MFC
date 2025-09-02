@@ -309,6 +309,7 @@ SIMULATION.update({
     'compute_autocorrelation': ParamType.LOG,
     't_step_stat_start': ParamType.INT,
     'filter_width': ParamType.REAL,
+    'q_filtered_wrt': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
