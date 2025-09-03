@@ -15,7 +15,7 @@ module m_additional_forcing
 
     private; public :: s_initialize_additional_forcing_module, & 
  s_add_periodic_forcing, s_finalize_additional_forcing_module, & 
- s_compute_phase_average, s_compute_periodic_forcing;
+ s_compute_periodic_forcing
 
     type(scalar_field), allocatable, dimension(:) :: q_periodic_force
     real(wp) :: volfrac_phi
@@ -61,8 +61,8 @@ contains
         end do
     end subroutine s_add_periodic_forcing
 
-    !< compute the space and time average of quantities
-    subroutine s_compute_phase_average(q_cons_vf, t_step)
+    !< compute the space and time average of quantities, compute the periodic forcing terms described in Khalloufi and Capecelatro
+    subroutine s_compute_periodic_forcing(q_cons_vf, t_step)
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer, intent(in) :: t_step
         real(wp) :: spatial_rho_glb, spatial_u_glb
@@ -95,18 +95,7 @@ contains
         phase_u = phase_u + (spatial_u_glb / real(N_x_total_glb, wp) - phase_u) / real(t_step, wp)
         !$acc update device(phase_rho, phase_u)
 
-        ! if (proc_rank == 0) then 
-        !     print *, t_step, 'rho', phase_rho, 'rho*u', phase_u
-        ! end if
-
-    end subroutine s_compute_phase_average
-
-    !< computes the periodic forcing terms described in Khalloufi and Capecelatro
-    subroutine s_compute_periodic_forcing(q_cons_vf)
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-
-        integer :: i, j, k
-
+        ! compute periodic forcing terms for mass, momentum, energy
         !$acc parallel loop collapse(3) gang vector default(present)
         do i = 0, m
             do j = 0, n
@@ -122,6 +111,7 @@ contains
                 end do 
             end do
         end do
+
     end subroutine s_compute_periodic_forcing
 
     subroutine s_finalize_additional_forcing_module

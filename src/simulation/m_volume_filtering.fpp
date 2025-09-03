@@ -29,10 +29,10 @@ module m_volume_filtering
     private; public :: s_initialize_fftw_explicit_filter_module, &
  s_initialize_filtering_kernel, s_initialize_fluid_indicator_function, & 
  s_initialize_filtered_fluid_indicator_function, s_finalize_fftw_explicit_filter_module, & 
- s_apply_fftw_filter_cons, s_volume_filter_momentum_eqn, s_apply_fftw_filter_tensor, s_apply_fftw_filter_scalarfield, &
+ s_volume_filter_momentum_eqn, s_apply_fftw_filter_scalarfield, &
  s_compute_viscous_stress_tensor, s_compute_stress_tensor, s_compute_divergence_stress_tensor, s_compute_particle_forces, &
  s_mpi_transpose_slabZ2Y, s_mpi_transpose_slabY2Z, s_mpi_FFT_fwd, s_mpi_FFT_bwd, &
- s_setup_terms_filtering, s_compute_pseudo_turbulent_reynolds_stress, s_compute_effective_viscosity, s_compute_interphase_momentum_exchange
+ s_setup_terms_filtering, s_compute_pseudo_turbulent_reynolds_stress, s_compute_effective_viscosity
 
 #if !defined(MFC_OpenACC)
     include 'fftw3.f03'
@@ -514,27 +514,40 @@ contains
     end subroutine s_initialize_filtered_fluid_indicator_function
 
     !< calculate the unclosed terms present in the volume filtered momentum equation
-    subroutine s_volume_filter_momentum_eqn(q_cons_vf)
+    subroutine s_volume_filter_momentum_eqn(q_cons_vf, q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k
 
         call nvtxStartRange("FILTER-CONS-VARS")
-        call s_apply_fftw_filter_cons(q_cons_vf, q_cons_filtered)
-        call nvtxEndRange
-
-        call nvtxStartRange("UNCLOSED-TERM-SETUP")
-        call s_setup_terms_filtering(q_cons_vf, reynolds_stress, visc_stress, pres_visc_stress, div_pres_visc_stress, filtered_pressure)
-        call nvtxEndRange
-
-        call nvtxStartRange("FILTER-UNCLOSED-TERM-VARS")
-        call s_apply_fftw_filter_tensor(reynolds_stress, visc_stress, eff_visc, div_pres_visc_stress, int_mom_exch)
-        call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., filtered_pressure)
+        do i = 1, sys_size-1
+            call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., q_cons_vf(i), q_cons_filtered(i))
+        end do 
+        call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., q_prim_vf(E_idx), filtered_pressure)
         call nvtxEndRange
 
         call nvtxStartRange("COMPUTE-UNCLOSED-TERMS")
+        call s_setup_terms_filtering(q_cons_vf, q_prim_vf, reynolds_stress, visc_stress, pres_visc_stress, div_pres_visc_stress)
+
+        ! pseudo turbulent reynolds stress
+        do i = 1, num_dims 
+            do j = 1, num_dims
+                call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., reynolds_stress(i)%vf(j))
+            end do
+        end do 
+        ! effective viscosity
+        do i = 1, num_dims 
+            do j = 1, num_dims
+                call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., visc_stress(i)%vf(j), eff_visc(i)%vf(j))
+            end do
+        end do 
+        ! interphase momentum exchange
+        do i = 1, num_dims
+            call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .false., div_pres_visc_stress(i), int_mom_exch(i))
+        end do 
+
         call s_compute_pseudo_turbulent_reynolds_stress(q_cons_filtered, reynolds_stress)
         call s_compute_effective_viscosity(q_cons_filtered, eff_visc, visc_stress)
-        call s_compute_interphase_momentum_exchange(int_mom_exch)
         call nvtxEndRange
 
     end subroutine s_volume_filter_momentum_eqn
@@ -569,7 +582,9 @@ contains
             end do
         end if
 
+        call nvtxStartRange("FORWARD-3D-FFT")
         call s_mpi_FFT_fwd 
+        call nvtxEndRange
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do i = 1, NxC 
@@ -580,7 +595,9 @@ contains
             end do 
         end do
 
+        call nvtxStartRange("BACKWARD-3D-FFT")
         call s_mpi_FFT_bwd
+        call nvtxEndRange
 
         if (present(q_temp_out)) then 
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -603,50 +620,6 @@ contains
         end if
 
     end subroutine s_apply_fftw_filter_scalarfield
-
-    !< apply the gaussian filter to the conservative variables and compute their filtered components
-    subroutine s_apply_fftw_filter_cons(q_cons_vf, q_cons_filtered)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(sys_size-1), intent(inout) :: q_cons_filtered
-
-        integer :: i
-
-        do i = 1, sys_size-1
-            call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., q_cons_vf(i), q_cons_filtered(i))
-        end do 
-
-    end subroutine s_apply_fftw_filter_cons
-
-    !< apply the gaussian filter to the requisite tensors to compute unclosed terms of interest
-    subroutine s_apply_fftw_filter_tensor(reynolds_stress, visc_stress, eff_visc, div_pres_visc_stress, int_mom_exch)
-        type(vector_field), dimension(1:num_dims), intent(inout) :: reynolds_stress
-        type(vector_field), dimension(1:num_dims), intent(inout) :: visc_stress
-        type(vector_field), dimension(1:num_dims), intent(inout) :: eff_visc
-        type(scalar_field), dimension(1:num_dims), intent(inout) :: div_pres_visc_stress
-        type(scalar_field), dimension(1:num_dims), intent(inout) :: int_mom_exch
-
-        integer :: i, j
-
-        ! pseudo turbulent reynolds stress
-        do i = 1, num_dims 
-            do j = 1, num_dims
-                call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., reynolds_stress(i)%vf(j))
-            end do
-        end do 
-
-        ! effective viscosity
-        do i = 1, num_dims 
-            do j = 1, num_dims
-                call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., visc_stress(i)%vf(j), eff_visc(i)%vf(j))
-            end do
-        end do 
-
-        ! interphase momentum exchange
-        do i = 1, num_dims
-            call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .false., div_pres_visc_stress(i), int_mom_exch(i))
-        end do 
-
-    end subroutine s_apply_fftw_filter_tensor
 
     ! compute viscous stress tensor
     subroutine s_compute_viscous_stress_tensor(visc_stress, q_cons_vf)
@@ -688,11 +661,11 @@ contains
 
     end subroutine s_compute_viscous_stress_tensor
     
-    subroutine s_compute_stress_tensor(pres_visc_stress, visc_stress, q_cons_vf, filtered_pressure)
+    subroutine s_compute_stress_tensor(pres_visc_stress, visc_stress, q_cons_vf, q_prim_vf)
         type(vector_field), dimension(num_dims), intent(inout) :: pres_visc_stress
         type(vector_field), dimension(num_dims), intent(in) :: visc_stress
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        type(scalar_field), intent(inout) :: filtered_pressure
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp) :: pressure
         integer :: i, j, k
 
@@ -700,20 +673,15 @@ contains
         do i = 0, m 
             do j = 0, n 
                 do k = 0, p
-                    pressure = (q_cons_vf(E_idx)%sf(i, j, k) - 0.5_wp * (q_cons_vf(momxb)%sf(i, j, k)**2 + q_cons_vf(momxb+1)%sf(i, j, k)**2 + q_cons_vf(momxb+2)%sf(i, j, k)**2) &
-                             / q_cons_vf(contxb)%sf(i, j, k) - pi_infs(1) - qvs(1)) / (gammas(1))
-
-                    pres_visc_stress(1)%vf(1)%sf(i, j, k) = pressure - visc_stress(1)%vf(1)%sf(i, j, k)
+                    pres_visc_stress(1)%vf(1)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) - visc_stress(1)%vf(1)%sf(i, j, k)
                     pres_visc_stress(1)%vf(2)%sf(i, j, k) = - visc_stress(1)%vf(2)%sf(i, j, k) 
                     pres_visc_stress(1)%vf(3)%sf(i, j, k) = - visc_stress(1)%vf(3)%sf(i, j, k)
                     pres_visc_stress(2)%vf(1)%sf(i, j, k) = - visc_stress(2)%vf(1)%sf(i, j, k)
-                    pres_visc_stress(2)%vf(2)%sf(i, j, k) = pressure - visc_stress(2)%vf(2)%sf(i, j, k) 
+                    pres_visc_stress(2)%vf(2)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) - visc_stress(2)%vf(2)%sf(i, j, k) 
                     pres_visc_stress(2)%vf(3)%sf(i, j, k) = - visc_stress(2)%vf(3)%sf(i, j, k)
                     pres_visc_stress(3)%vf(1)%sf(i, j, k) = - visc_stress(3)%vf(1)%sf(i, j, k)
                     pres_visc_stress(3)%vf(2)%sf(i, j, k) = - visc_stress(3)%vf(2)%sf(i, j, k)
-                    pres_visc_stress(3)%vf(3)%sf(i, j, k) = pressure - visc_stress(3)%vf(3)%sf(i, j, k)
-
-                    filtered_pressure%sf(i, j, k) = pressure
+                    pres_visc_stress(3)%vf(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) - visc_stress(3)%vf(3)%sf(i, j, k)
                 end do 
             end do 
         end do 
@@ -748,13 +716,13 @@ contains
     end subroutine s_compute_divergence_stress_tensor
 
     !< setup for calculation of unclosed terms in volume filtered momentum eqn
-    subroutine s_setup_terms_filtering(q_cons_vf, reynolds_stress, visc_stress, pres_visc_stress, div_pres_visc_stress, filtered_pressure)
+    subroutine s_setup_terms_filtering(q_cons_vf, q_prim_vf, reynolds_stress, visc_stress, pres_visc_stress, div_pres_visc_stress)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(vector_field), dimension(1:num_dims), intent(inout) :: reynolds_stress
         type(vector_field), dimension(1:num_dims), intent(inout) :: visc_stress
         type(vector_field), dimension(1:num_dims), intent(inout) :: pres_visc_stress
         type(scalar_field), dimension(1:num_dims), intent(inout) :: div_pres_visc_stress
-        type(scalar_field), intent(inout) :: filtered_pressure
 
         integer :: i, j, k, l, q
 
@@ -767,7 +735,7 @@ contains
                     do l = 1, num_dims
                         !$acc loop seq
                         do q = 1, num_dims
-                            reynolds_stress(l)%vf(q)%sf(i, j, k) = (q_cons_vf(momxb-1+l)%sf(i, j, k) * q_cons_vf(momxb-1+q)%sf(i, j, k)) / q_cons_vf(1)%sf(i, j, k) ! (rho*u x rho*u)/rho = rho*(u x u) 
+                            reynolds_stress(l)%vf(q)%sf(i, j, k) = q_cons_vf(1)%sf(i, j, k) * (q_prim_vf(momxb-1+l)%sf(i, j, k) * q_prim_vf(momxb-1+q)%sf(i, j, k)) ! rho*(u x u) 
                         end do
                     end do
                 end do
@@ -776,11 +744,11 @@ contains
 
         ! set density and momentum buffers
 #ifdef MFC_MPI
-        do i = 1, momxe 
+        do i = contxb, momxe 
             call s_populate_scalarfield_buffers(q_cons_vf(i))
         end do
 #else
-        do i = 1, momxe
+        do i = contxb, momxe
             q_cons_vf(i)%sf(-buff_size:-1, :, :) = q_cons_vf(i)%sf(m-buff_size+1:m, :, :)
             q_cons_vf(i)%sf(m+1:m+buff_size, :, :) = q_cons_vf(i)%sf(0:buff_size-1, :, :)
 
@@ -795,8 +763,9 @@ contains
         ! effective viscosity setup, return viscous stress tensor
         call s_compute_viscous_stress_tensor(visc_stress, q_cons_vf)
 
-        call s_compute_stress_tensor(pres_visc_stress, visc_stress, q_cons_vf, filtered_pressure)
+        call s_compute_stress_tensor(pres_visc_stress, visc_stress, q_cons_vf, q_prim_vf)
 
+        ! interphase momentum exchange term setup
         call s_compute_divergence_stress_tensor(div_pres_visc_stress, pres_visc_stress)
 
     end subroutine s_setup_terms_filtering
@@ -837,7 +806,7 @@ contains
             call s_populate_scalarfield_buffers(q_cons_filtered(i))
         end do
 #else
-        do i = 1, momxe
+        do i = contxb, momxe
             q_cons_filtered(i)%sf(-buff_size:-1, :, :) = q_cons_filtered(i)%sf(m-buff_size+1:m, :, :)
             q_cons_filtered(i)%sf(m+1:m+buff_size, :, :) = q_cons_filtered(i)%sf(0:buff_size-1, :, :)
 
@@ -869,13 +838,6 @@ contains
         end do
 
     end subroutine s_compute_effective_viscosity
-
-    subroutine s_compute_interphase_momentum_exchange(int_mom_exch)
-        type(scalar_field), dimension(1:num_dims), intent(in) :: int_mom_exch
-
-        integer :: i, j, k
-
-    end subroutine s_compute_interphase_momentum_exchange
 
     ! computes x-,y-,z-direction forces on particles
     subroutine s_compute_particle_forces
@@ -1036,7 +998,9 @@ contains
         end do 
 
         ! transpose z-slab to y-slab
+        call nvtxStartRange("SLAB-MPI-TRANSPOSE-Z2Y")
         call s_mpi_transpose_slabZ2Y 
+        call nvtxEndRange
 
         ! 3D y-slab -> 1D z, x, y
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -1080,7 +1044,9 @@ contains
         end do
 
         ! transpose y-slab to z-slab
+        call nvtxStartRange("SLAB-MPI-TRANSPOSE-Y2Z")
         call s_mpi_transpose_slabY2Z
+        call nvtxEndRange
 
         ! 3D z-slab -> 1D y, x, z
         !$acc parallel loop collapse(3) gang vector default(present)

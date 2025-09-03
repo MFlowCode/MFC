@@ -1324,8 +1324,8 @@ contains
         ! Volume filter flow variables, compute unclosed terms and their statistics
         if (volume_filtering_momentum_eqn) then 
             if (t_step > t_step_stat_start) then  
-                call nvtxStartRange("VOLUME-FILTER-MOMENTUM-EQUATION")  
-                call s_volume_filter_momentum_eqn(q_cons_ts(1)%vf)
+                call nvtxStartRange("VOLUME-FILTERED-MOMENTUM-EQUATION")  
+                call s_volume_filter_momentum_eqn(q_cons_ts(1)%vf, q_prim_vf)
                 call nvtxEndRange
 
                 call nvtxStartRange("COMPUTE-STATISTICS")
@@ -1346,15 +1346,16 @@ contains
             !     close(101)
             ! end if
 
+            ! Compute explicit x-, y-, z- forces on each particle
             call nvtxStartRange("COMPUTE-PARTICLE-FORCES")
             call s_compute_particle_forces()
             call nvtxEndRange
         end if
 
+        ! Compute terms to force a constant mass flow rate in fully periodic domain
         if (periodic_forcing) then 
             call nvtxStartRange("COMPUTE-PERIODIC-FORCING")
-            call s_compute_phase_average(q_cons_ts(1)%vf, t_step+1)
-            call s_compute_periodic_forcing(q_cons_ts(1)%vf)
+            call s_compute_periodic_forcing(q_cons_ts(1)%vf, t_step+1)
             call nvtxEndRange
         end if
 
