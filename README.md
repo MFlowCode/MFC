@@ -28,7 +28,7 @@
 **Welcome!**
 MFC simulates compressible multi-phase flows, [among other things](#what-else-can-this-thing-do). 
 It uses metaprogramming to stay short and portable (~20K lines).
-MFC conducted the largest known, open CFD simulation at <a href="https://arxiv.org/abs/2505.07392" target="_blank">101 trillion grid points</a> (as of July 2025).
+MFC conducted the largest known, open CFD simulation at <a href="https://arxiv.org/abs/2505.07392" target="_blank">200 trillion grid points</a>, and 1 quadrillion degrees of freedom (as of September 2025), and is a 2025 Gordon Bell Prize finalist.
 
 <p align="center">
 <a href="https://doi.org/10.48550/arXiv.2503.07953" target="_blank">
