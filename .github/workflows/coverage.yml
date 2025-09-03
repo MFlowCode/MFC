@@ -5,8 +5,8 @@ on: [push, pull_request, workflow_dispatch]
 jobs:
   file-changes:
     name: Detect File Changes
-    runs-on: 'ubuntu-latest'
-    outputs: 
+    runs-on: ubuntu-latest
+    outputs:
       checkall: ${{ steps.changes.outputs.checkall }}
     steps:
       - name: Clone
@@ -15,34 +15,66 @@ jobs:
       - name: Detect Changes
         uses: dorny/paths-filter@v3
         id: changes
-        with: 
+        with:
           filters: ".github/file-filter.yml"
 
   run:
     name: Coverage Test on CodeCov
     if: needs.file-changes.outputs.checkall == 'true'
     needs: file-changes
-    runs-on: "ubuntu-latest"
+    runs-on: ubuntu-latest
     steps:
       - name: Checkouts
         uses: actions/checkout@v4
 
       - name: Setup Ubuntu
         run: |
-            sudo apt update -y
-            sudo apt install -y tar wget make cmake gcc g++ python3 \
-                python3-dev "openmpi-*" libopenmpi-dev hdf5-tools \
-                libfftw3-dev libhdf5-dev libblas-dev liblapack-dev
+          sudo apt update -y
+          sudo apt install -y tar wget make cmake gcc g++ python3 python3-pip \
+            "openmpi-*" libopenmpi-dev hdf5-tools libfftw3-dev libhdf5-dev \
+            libblas-dev liblapack-dev
+          python3 -m pip install --upgrade pip gcovr
 
-      - name: Build
+      - name: Build (with coverage)
         run: /bin/bash mfc.sh build -j $(nproc) --gcov
 
       - name: Test
         run: /bin/bash mfc.sh test -a -j $(nproc)
 
-      - name: Upload coverage reports to Codecov
+      - name: Generate coverage (gcovr XML)
+        run: |
+          # Create a stable, filtered XML that points to build-side files first
+          gcovr \
+            --root "${{ github.workspace }}" \
+            --object-directory "${{ github.workspace }}/build" \
+            --filter '.*/fypp/.+\.f90$' \
+            --exclude '.*(tests|examples|toolchain|docs|benchmarks)/.*' \
+            --gcov-ignore-parse-errors \
+            --xml-pretty -o coverage.xml
+
+      - name: Rewrite paths from generated .fpp.f90 -> repo .fpp
+        run: |
+          python3 - <<'PY'
+          import os, xml.etree.ElementTree as ET
+          fn = "coverage.xml"
+          t = ET.parse(fn)
+          r = t.getroot()
+          for c in r.iter('class'):
+              p = c.get('filename') or ''
+              if p.endswith('.fpp.f90'):
+                  base = os.path.basename(p).rsplit('.fpp.f90', 1)[0] + '.fpp'
+                  for sub in ('pre_process','simulation','post_process','common'):
+                      cand = os.path.join('src', sub, base)
+                      if os.path.exists(cand):
+                          c.set('filename', cand)
+                          break
+          t.write(fn, encoding='utf-8', xml_declaration=True)
+          PY
+
+      - name: Upload coverage to Codecov (XML only)
         uses: codecov/codecov-action@v4
         with:
+          files: coverage.xml
           fail_ci_if_error: false
           verbose: true
         env:
