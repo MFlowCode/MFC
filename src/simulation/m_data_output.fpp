@@ -77,7 +77,8 @@ contains
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
     subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta, filtered_fluid_indicator_function, &
-                                  stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch, stat_q_cons_filtered)
+                                  stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch, &
+                                  stat_q_cons_filtered, stat_filtered_pressure)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -99,13 +100,15 @@ contains
         type(vector_field), dimension(1:9), intent(inout), optional :: stat_reynolds_stress
         type(vector_field), dimension(1:9), intent(inout), optional :: stat_eff_visc
         type(vector_field), dimension(1:3), intent(inout), optional :: stat_int_mom_exch
-        type(vector_field), dimension(1:sys_size), intent(inout), optional :: stat_q_cons_filtered
+        type(vector_field), dimension(1:sys_size-1), intent(inout), optional :: stat_q_cons_filtered
+        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_filtered_pressure
 
         if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
         else
             call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta, &
-                                             filtered_fluid_indicator_function, stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch, stat_q_cons_filtered)
+                                             filtered_fluid_indicator_function, stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch, &
+                                             stat_q_cons_filtered, stat_filtered_pressure)
         end if
 
     end subroutine s_write_data_files
@@ -795,7 +798,8 @@ contains
         !!  @param t_step Current time-step
         !!  @param beta Eulerian void fraction from lagrangian bubbles
     subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta, filtered_fluid_indicator_function, &
-                                           stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch, stat_q_cons_filtered)
+                                           stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch, & 
+                                           stat_q_cons_filtered, stat_filtered_pressure)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -805,7 +809,8 @@ contains
         type(vector_field), dimension(1:9), intent(inout), optional :: stat_reynolds_stress
         type(vector_field), dimension(1:9), intent(inout), optional :: stat_eff_visc
         type(vector_field), dimension(1:3), intent(inout), optional :: stat_int_mom_exch
-        type(vector_field), dimension(1:sys_size), intent(inout), optional :: stat_q_cons_filtered
+        type(vector_field), dimension(1:sys_size-1), intent(inout), optional :: stat_q_cons_filtered
+        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_filtered_pressure
 
 #ifdef MFC_MPI
 
@@ -916,7 +921,8 @@ contains
                     call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, &
                                                filtered_fluid_indicator_function=filtered_fluid_indicator_function, & 
                                                stat_reynolds_stress=stat_reynolds_stress, stat_eff_visc=stat_eff_visc, &
-                                               stat_int_mom_exch=stat_int_mom_exch, stat_q_cons_filtered=stat_q_cons_filtered)
+                                               stat_int_mom_exch=stat_int_mom_exch, stat_q_cons_filtered=stat_q_cons_filtered, &
+                                               stat_filtered_pressure=stat_filtered_pressure)
                 else
                     call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
                 end if

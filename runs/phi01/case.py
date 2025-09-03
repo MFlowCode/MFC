@@ -34,9 +34,9 @@ mu = rho*v1*D/Re # dynamic viscosity for current case
 #print('Kn = ' + str( np.sqrt(np.pi*gam_a/2)*(M/Re) )) # Kn < 0.01 = continuum flow
 
 dt = 4.0E-06
-Nt = 20
-t_save = 1
-t_step_start_stats = 10
+Nt = 100
+t_save = 10
+t_step_start_stats = 50
 
 Nx = 99
 Ny = 99

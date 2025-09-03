@@ -45,7 +45,8 @@ module m_volume_filtering
     type(scalar_field), public :: filtered_fluid_indicator_function
 
     ! volume filtered conservative variables
-    type(scalar_field), allocatable, dimension(:) :: q_cons_filtered
+    type(scalar_field), allocatable, dimension(:), public :: q_cons_filtered
+    type(scalar_field), public :: filtered_pressure
 
     ! viscous and pressure+viscous stress tensors
     type(vector_field), allocatable, dimension(:) :: visc_stress
@@ -59,20 +60,15 @@ module m_volume_filtering
     type(vector_field), allocatable, dimension(:), public :: eff_visc
     type(scalar_field), allocatable, dimension(:), public :: int_mom_exch
 
-    ! magnitude of unclosed terms in momentum equation
-    type(scalar_field), public :: mag_reynolds_stress
-    type(scalar_field), public :: mag_eff_visc
-    type(scalar_field), public :: mag_int_mom_exch
-
     ! 1/mu
     real(wp), allocatable, dimension(:, :) :: Res
 
     ! x-,y-,z-direction forces on particles
     real(wp), allocatable, dimension(:, :) :: particle_forces
 
-    !$acc declare create(fluid_indicator_function, filtered_fluid_indicator_function, q_cons_filtered)
+    !$acc declare create(fluid_indicator_function, filtered_fluid_indicator_function, q_cons_filtered, filtered_pressure)
     !$acc declare create(visc_stress, pres_visc_stress, div_pres_visc_stress)
-    !$acc declare create(reynolds_stress, eff_visc, int_mom_exch, mag_reynolds_stress, mag_eff_visc, mag_int_mom_exch)
+    !$acc declare create(reynolds_stress, eff_visc, int_mom_exch)
     !$acc declare create(Res, particle_forces)
 
 #if defined(MFC_OpenACC)
@@ -116,13 +112,18 @@ contains
         integer :: i, j, k
         integer :: size_n(1), inembed(1), onembed(1)
         
-        @:ALLOCATE(q_cons_filtered(1:sys_size))
-        do i = 1, sys_size
+        @:ALLOCATE(q_cons_filtered(1:sys_size-1))
+        do i = 1, sys_size-1
             @:ALLOCATE(q_cons_filtered(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(q_cons_filtered(i))
         end do
+
+        @:ALLOCATE(filtered_pressure%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+            idwbuff(2)%beg:idwbuff(2)%end, &
+            idwbuff(3)%beg:idwbuff(3)%end))
+        @:ACC_SETUP_SFs(filtered_pressure)
 
         @:ALLOCATE(visc_stress(1:num_dims))
         do i = 1, num_dims
@@ -191,21 +192,6 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(int_mom_exch(i))
         end do
-
-        @:ALLOCATE(mag_reynolds_stress%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-            idwbuff(2)%beg:idwbuff(2)%end, &
-            idwbuff(3)%beg:idwbuff(3)%end))
-        @:ACC_SETUP_SFs(mag_reynolds_stress)
-
-        @:ALLOCATE(mag_eff_visc%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-            idwbuff(2)%beg:idwbuff(2)%end, &
-            idwbuff(3)%beg:idwbuff(3)%end))
-        @:ACC_SETUP_SFs(mag_eff_visc)
-
-        @:ALLOCATE(mag_int_mom_exch%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-            idwbuff(2)%beg:idwbuff(2)%end, &
-            idwbuff(3)%beg:idwbuff(3)%end))
-        @:ACC_SETUP_SFs(mag_int_mom_exch)
 
         if (viscous) then
             @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
@@ -537,11 +523,12 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("UNCLOSED-TERM-SETUP")
-        call s_setup_terms_filtering(q_cons_vf, reynolds_stress, visc_stress, pres_visc_stress, div_pres_visc_stress)
+        call s_setup_terms_filtering(q_cons_vf, reynolds_stress, visc_stress, pres_visc_stress, div_pres_visc_stress, filtered_pressure)
         call nvtxEndRange
 
         call nvtxStartRange("FILTER-UNCLOSED-TERM-VARS")
         call s_apply_fftw_filter_tensor(reynolds_stress, visc_stress, eff_visc, div_pres_visc_stress, int_mom_exch)
+        call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., filtered_pressure)
         call nvtxEndRange
 
         call nvtxStartRange("COMPUTE-UNCLOSED-TERMS")
@@ -620,11 +607,11 @@ contains
     !< apply the gaussian filter to the conservative variables and compute their filtered components
     subroutine s_apply_fftw_filter_cons(q_cons_vf, q_cons_filtered)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_filtered
+        type(scalar_field), dimension(sys_size-1), intent(inout) :: q_cons_filtered
 
         integer :: i
 
-        do i = 1, sys_size
+        do i = 1, sys_size-1
             call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., q_cons_vf(i), q_cons_filtered(i))
         end do 
 
@@ -701,10 +688,11 @@ contains
 
     end subroutine s_compute_viscous_stress_tensor
     
-    subroutine s_compute_stress_tensor(pres_visc_stress, visc_stress, q_cons_vf)
+    subroutine s_compute_stress_tensor(pres_visc_stress, visc_stress, q_cons_vf, filtered_pressure)
         type(vector_field), dimension(num_dims), intent(inout) :: pres_visc_stress
         type(vector_field), dimension(num_dims), intent(in) :: visc_stress
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), intent(inout) :: filtered_pressure
         real(wp) :: pressure
         integer :: i, j, k
 
@@ -724,6 +712,8 @@ contains
                     pres_visc_stress(3)%vf(1)%sf(i, j, k) = - visc_stress(3)%vf(1)%sf(i, j, k)
                     pres_visc_stress(3)%vf(2)%sf(i, j, k) = - visc_stress(3)%vf(2)%sf(i, j, k)
                     pres_visc_stress(3)%vf(3)%sf(i, j, k) = pressure - visc_stress(3)%vf(3)%sf(i, j, k)
+
+                    filtered_pressure%sf(i, j, k) = pressure
                 end do 
             end do 
         end do 
@@ -758,12 +748,13 @@ contains
     end subroutine s_compute_divergence_stress_tensor
 
     !< setup for calculation of unclosed terms in volume filtered momentum eqn
-    subroutine s_setup_terms_filtering(q_cons_vf, reynolds_stress, visc_stress, pres_visc_stress, div_pres_visc_stress)
+    subroutine s_setup_terms_filtering(q_cons_vf, reynolds_stress, visc_stress, pres_visc_stress, div_pres_visc_stress, filtered_pressure)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(vector_field), dimension(1:num_dims), intent(inout) :: reynolds_stress
         type(vector_field), dimension(1:num_dims), intent(inout) :: visc_stress
         type(vector_field), dimension(1:num_dims), intent(inout) :: pres_visc_stress
         type(scalar_field), dimension(1:num_dims), intent(inout) :: div_pres_visc_stress
+        type(scalar_field), intent(inout) :: filtered_pressure
 
         integer :: i, j, k, l, q
 
@@ -804,14 +795,14 @@ contains
         ! effective viscosity setup, return viscous stress tensor
         call s_compute_viscous_stress_tensor(visc_stress, q_cons_vf)
 
-        call s_compute_stress_tensor(pres_visc_stress, visc_stress, q_cons_vf)
+        call s_compute_stress_tensor(pres_visc_stress, visc_stress, q_cons_vf, filtered_pressure)
 
         call s_compute_divergence_stress_tensor(div_pres_visc_stress, pres_visc_stress)
 
     end subroutine s_setup_terms_filtering
 
     subroutine s_compute_pseudo_turbulent_reynolds_stress(q_cons_filtered, reynolds_stress)
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_filtered
+        type(scalar_field), dimension(sys_size-1), intent(in) :: q_cons_filtered
         type(vector_field), dimension(1:num_dims), intent(inout) :: reynolds_stress
         integer :: i, j, k, l, q    
 
@@ -834,7 +825,7 @@ contains
     end subroutine s_compute_pseudo_turbulent_reynolds_stress
 
     subroutine s_compute_effective_viscosity(q_cons_filtered, eff_visc, visc_stress)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_filtered
+        type(scalar_field), dimension(1:sys_size-1), intent(inout) :: q_cons_filtered
         type(vector_field), dimension(1:num_dims), intent(inout) :: eff_visc
         type(vector_field), dimension(1:num_dims), intent(inout) :: visc_stress
 
@@ -1143,10 +1134,12 @@ contains
         @:DEALLOCATE(fluid_indicator_function%sf)
         @:DEALLOCATE(filtered_fluid_indicator_function%sf)
 
-        do i = 1, sys_size
+        do i = 1, sys_size-1
             @:DEALLOCATE(q_cons_filtered(i)%sf)
         end do
         @:DEALLOCATE(q_cons_filtered)
+
+        @:DEALLOCATE(filtered_pressure%sf)
 
         do i = 1, num_dims
             do j = 1, num_dims
@@ -1189,10 +1182,6 @@ contains
             @:DEALLOCATE(int_mom_exch(i)%sf)
         end do
         @:DEALLOCATE(int_mom_exch)
-
-        @:DEALLOCATE(mag_reynolds_stress%sf)
-        @:DEALLOCATE(mag_eff_visc%sf)
-        @:DEALLOCATE(mag_int_mom_exch%sf)
 
         @:DEALLOCATE(Res)
         @:DEALLOCATE(particle_forces)

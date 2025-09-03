@@ -154,7 +154,7 @@ contains
     !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     !! @param beta Eulerian void fraction from lagrangian bubbles
     subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta, filtered_fluid_indicator_function, &
-                                     stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch, stat_q_cons_filtered)
+                                     stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch, stat_q_cons_filtered, stat_filtered_pressure)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -179,7 +179,8 @@ contains
         type(vector_field), dimension(1:9), intent(in), optional :: stat_reynolds_stress
         type(vector_field), dimension(1:9), intent(in), optional :: stat_eff_visc
         type(vector_field), dimension(1:3), intent(in), optional :: stat_int_mom_exch
-        type(vector_field), dimension(1:sys_size), intent(in), optional :: stat_q_cons_filtered
+        type(vector_field), dimension(1:sys_size-1), intent(in), optional :: stat_q_cons_filtered
+        type(scalar_field), dimension(1:4), intent(in), optional :: stat_filtered_pressure
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
@@ -221,10 +222,13 @@ contains
                     MPI_IO_DATA%var(sys_size+73+(i-1)*4+j)%sf => stat_int_mom_exch(i)%vf(j)%sf(0:m, 0:n, 0:p)
                 end do
             end do
-            do i = 1, sys_size
+            do i = 1, sys_size-1
                 do j = 1, 4
                     MPI_IO_DATA%var(sys_size+85+(i-1)*4+j)%sf => stat_q_cons_filtered(i)%vf(j)%sf(0:m, 0:n, 0:p)
                 end do
+            end do
+            do i = 1, 4 
+                MPI_IO_DATA%var(sys_size+105+i)%sf => stat_filtered_pressure(i)%sf(0:m, 0:n, 0:p)
             end do
         end if
 

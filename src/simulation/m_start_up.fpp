@@ -1329,7 +1329,7 @@ contains
                 call nvtxEndRange
 
                 call nvtxStartRange("COMPUTE-STATISTICS")
-                call s_compute_statistics_momentum_unclosed_terms(t_step - t_step_stat_start, reynolds_stress, eff_visc, int_mom_exch)
+                call s_compute_statistics_momentum_unclosed_terms(t_step, t_step_stat_start, reynolds_stress, eff_visc, int_mom_exch, q_cons_filtered, filtered_pressure)
                 call nvtxEndRange
 
                 ! write(100, *) mag_reynolds_stress%sf(10, 10, 10)
@@ -1472,10 +1472,13 @@ contains
                     !$acc update host(stat_int_mom_exch(i)%vf(j)%sf)
                 end do 
             end do
-            do i = 1, sys_size
+            do i = 1, sys_size-1
                 do j = 1, 4 
                     !$acc update host(stat_q_cons_filtered(i)%vf(j)%sf)
                 end do 
+            end do
+            do i = 1, 4
+                !$acc update host(stat_filtered_pressure(i)%sf)
             end do
         end if
         do i = 1, sys_size
@@ -1514,7 +1517,8 @@ contains
                 call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, &
                                         filtered_fluid_indicator_function=filtered_fluid_indicator_function, &
                                         stat_reynolds_stress=stat_reynolds_stress, stat_eff_visc=stat_eff_visc, &
-                                        stat_int_mom_exch=stat_int_mom_exch, stat_q_cons_filtered=stat_q_cons_filtered)
+                                        stat_int_mom_exch=stat_int_mom_exch, stat_q_cons_filtered=stat_q_cons_filtered, &
+                                        stat_filtered_pressure=stat_filtered_pressure)
             else
                 call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count)
             end if

@@ -361,7 +361,7 @@ contains
                     varname(:) = ' '
                 end do
             end do
-            do i = 1, sys_size
+            do i = 1, sys_size-1
                 do j = 1, 4 
                     q_sf = stat_q_cons_filtered(i)%vf(j)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
                     write (varname, '(A,I0,A,I0)') 'stat_q_cons_filtered', i, '_m', j
@@ -369,6 +369,13 @@ contains
 
                     varname(:) = ' '
                 end do 
+            end do
+            do i = 1, 4 
+                q_sf = stat_filtered_pressure(i)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                write (varname, '(A,I0)') 'stat_filtered_pressure_m', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+
+                varname(:) = ' '
             end do
         end if
 

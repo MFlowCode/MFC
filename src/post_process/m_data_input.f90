@@ -65,6 +65,7 @@ module m_data_input
     type(vector_field), allocatable, dimension(:), public :: stat_eff_visc
     type(vector_field), allocatable, dimension(:), public :: stat_int_mom_exch
     type(vector_field), allocatable, dimension(:), public :: stat_q_cons_filtered
+    type(scalar_field), allocatable, dimension(:), public :: stat_filtered_pressure
 
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
@@ -468,7 +469,8 @@ contains
                                                    stat_reynolds_stress=stat_reynolds_stress, & 
                                                    stat_eff_visc=stat_eff_visc, & 
                                                    stat_int_mom_exch=stat_int_mom_exch, & 
-                                                   stat_q_cons_filtered=stat_q_cons_filtered)
+                                                   stat_q_cons_filtered=stat_q_cons_filtered, & 
+                                                   stat_filtered_pressure=stat_filtered_pressure)
                     else 
                         call s_initialize_mpi_data(q_cons_vf, ib_markers)
                     end if
@@ -1347,7 +1349,8 @@ contains
         if (q_filtered_wrt) allocate (stat_reynolds_stress(1:9))
         if (q_filtered_wrt) allocate (stat_eff_visc(1:9))
         if (q_filtered_wrt) allocate (stat_int_mom_exch(1:3))
-        if (q_filtered_wrt) allocate (stat_q_cons_filtered(1:sys_size))
+        if (q_filtered_wrt) allocate (stat_q_cons_filtered(1:sys_size-1))
+        if (q_filtered_wrt) allocate (stat_filtered_pressure(1:4))
 
         ! Allocating the parts of the conservative and primitive variables
         ! that do require the direct knowledge of the dimensionality of the
@@ -1414,15 +1417,20 @@ contains
                                                                     -buff_size:p + buff_size))
                         end do 
                     end do
-                    do i = 1, sys_size
+                    do i = 1, sys_size-1
                         allocate (stat_q_cons_filtered(i)%vf(1:4))
                     end do 
-                    do i = 1, sys_size
+                    do i = 1, sys_size-1
                         do j = 1, 4 
                             allocate (stat_q_cons_filtered(i)%vf(j)%sf(-buff_size:m + buff_size, &
                                                                        -buff_size:n + buff_size, &
                                                                        -buff_size:p + buff_size))
                         end do 
+                    end do
+                    do i = 1, 4 
+                        allocate (stat_filtered_pressure(i)%sf(-buff_size:m + buff_size, &
+                                                               -buff_size:n + buff_size, &
+                                                               -buff_size:p + buff_size))
                     end do
                 end if
                 
@@ -1541,13 +1549,17 @@ contains
                 deallocate(stat_int_mom_exch(i)%vf)
             end do
             deallocate(stat_int_mom_exch)
-            do i = 1, sys_size
+            do i = 1, sys_size-1
                 do j = 1, 4 
                     deallocate (stat_q_cons_filtered(i)%vf(j)%sf)
                 end do 
                 deallocate(stat_q_cons_filtered(i)%vf)
             end do
             deallocate(stat_q_cons_filtered)
+            do i = 1, 4 
+                deallocate(stat_filtered_pressure(i)%sf)
+            end do
+            deallocate(stat_filtered_pressure)
         end if
 
         s_read_data_files => null()
