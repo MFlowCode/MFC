@@ -43,15 +43,13 @@ jobs:
 
       - name: Generate coverage (gcovr XML)
         run: |
-          # Create a stable, filtered XML that points to build-side files first
           gcovr \
             --root "${{ github.workspace }}" \
             --object-directory "${{ github.workspace }}/build" \
-            --filter '.*/fypp/.+\.f90$' \
             --exclude '.*(tests|examples|toolchain|docs|benchmarks)/.*' \
             --gcov-ignore-parse-errors \
             --xml-pretty -o coverage.xml
-
+            
       - name: Rewrite paths from generated .fpp.f90 -> repo .fpp
         run: |
           python3 - <<'PY'
@@ -77,6 +75,8 @@ jobs:
           files: coverage.xml
           fail_ci_if_error: false
           verbose: true
+          disable_search: true
+          disable_file_fixes: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
