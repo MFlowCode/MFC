@@ -622,42 +622,76 @@ contains
     end subroutine s_apply_fftw_filter_scalarfield
 
     ! compute viscous stress tensor
-    subroutine s_compute_viscous_stress_tensor(visc_stress, q_cons_vf)
+    subroutine s_compute_viscous_stress_tensor(visc_stress, q_prim_vf, q_cons_filtered)
         type(vector_field), dimension(num_dims), intent(inout) :: visc_stress 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in), optional :: q_prim_vf
+        type(scalar_field), dimension(sys_size-1), intent(in), optional :: q_cons_filtered
         real(wp) :: dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz ! spatial velocity derivatives
         integer :: i, j, k 
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz)
-        do i = 0, m 
-            do j = 0, n 
-                do k = 0, p
-                    ! velocity gradients, local to each process
-                    dudx = ( q_cons_vf(2)%sf(i+1, j, k)/q_cons_vf(1)%sf(i+1, j, k) - q_cons_vf(2)%sf(i-1, j, k)/q_cons_vf(1)%sf(i-1, j, k) ) / (dx(i-1) + dx(i+1))
-                    dudy = ( q_cons_vf(2)%sf(i, j+1, k)/q_cons_vf(1)%sf(i, j+1, k) - q_cons_vf(2)%sf(i, j-1, k)/q_cons_vf(1)%sf(i, j-1, k) ) / (dy(j-1) + dy(j+1))
-                    dudz = ( q_cons_vf(2)%sf(i, j, k+1)/q_cons_vf(1)%sf(i, j, k+1) - q_cons_vf(2)%sf(i, j, k-1)/q_cons_vf(1)%sf(i, j, k-1) ) / (dz(k-1) + dz(k+1))
+        if (present(q_prim_vf)) then
+            !$acc parallel loop collapse(3) gang vector default(present) private(dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz)
+            do i = 0, m 
+                do j = 0, n 
+                    do k = 0, p
+                        ! velocity gradients, local to each process
+                        dudx = ( q_prim_vf(2)%sf(i+1, j, k) - q_prim_vf(2)%sf(i-1, j, k) ) / (dx(i-1) + dx(i+1))
+                        dudy = ( q_prim_vf(2)%sf(i, j+1, k) - q_prim_vf(2)%sf(i, j-1, k) ) / (dy(j-1) + dy(j+1))
+                        dudz = ( q_prim_vf(2)%sf(i, j, k+1) - q_prim_vf(2)%sf(i, j, k-1) ) / (dz(k-1) + dz(k+1))
 
-                    dvdx = ( q_cons_vf(3)%sf(i+1, j, k)/q_cons_vf(1)%sf(i+1, j, k) - q_cons_vf(3)%sf(i-1, j, k)/q_cons_vf(1)%sf(i-1, j, k) ) / (dx(i-1) + dx(i+1))
-                    dvdy = ( q_cons_vf(3)%sf(i, j+1, k)/q_cons_vf(1)%sf(i, j+1, k) - q_cons_vf(3)%sf(i, j-1, k)/q_cons_vf(1)%sf(i, j-1, k) ) / (dy(j-1) + dy(j+1))
-                    dvdz = ( q_cons_vf(3)%sf(i, j, k+1)/q_cons_vf(1)%sf(i, j, k+1) - q_cons_vf(3)%sf(i, j, k-1)/q_cons_vf(1)%sf(i, j, k-1) ) / (dz(k-1) + dz(k+1))
+                        dvdx = ( q_prim_vf(3)%sf(i+1, j, k) - q_prim_vf(3)%sf(i-1, j, k) ) / (dx(i-1) + dx(i+1))
+                        dvdy = ( q_prim_vf(3)%sf(i, j+1, k) - q_prim_vf(3)%sf(i, j-1, k) ) / (dy(j-1) + dy(j+1))
+                        dvdz = ( q_prim_vf(3)%sf(i, j, k+1) - q_prim_vf(3)%sf(i, j, k-1) ) / (dz(k-1) + dz(k+1))
 
-                    dwdx = ( q_cons_vf(4)%sf(i+1, j, k)/q_cons_vf(1)%sf(i+1, j, k) - q_cons_vf(4)%sf(i-1, j, k)/q_cons_vf(1)%sf(i-1, j, k) ) / (dx(i-1) + dx(i+1))
-                    dwdy = ( q_cons_vf(4)%sf(i, j+1, k)/q_cons_vf(1)%sf(i, j+1, k) - q_cons_vf(4)%sf(i, j-1, k)/q_cons_vf(1)%sf(i, j-1, k) ) / (dy(j-1) + dy(j+1))
-                    dwdz = ( q_cons_vf(4)%sf(i, j, k+1)/q_cons_vf(1)%sf(i, j, k+1) - q_cons_vf(4)%sf(i, j, k-1)/q_cons_vf(1)%sf(i, j, k-1) ) / (dz(k-1) + dz(k+1))
+                        dwdx = ( q_prim_vf(4)%sf(i+1, j, k) - q_prim_vf(4)%sf(i-1, j, k) ) / (dx(i-1) + dx(i+1))
+                        dwdy = ( q_prim_vf(4)%sf(i, j+1, k) - q_prim_vf(4)%sf(i, j-1, k) ) / (dy(j-1) + dy(j+1))
+                        dwdz = ( q_prim_vf(4)%sf(i, j, k+1) - q_prim_vf(4)%sf(i, j, k-1) ) / (dz(k-1) + dz(k+1))
 
-                    ! viscous stress tensor, visc_stress(row, column)
-                    visc_stress(1)%vf(1)%sf(i, j, k) = (4._wp/3._wp * dudx - 2._wp/3._wp * (dvdy + dwdz)) / Res(1, 1)
-                    visc_stress(1)%vf(2)%sf(i, j, k) = (dudy + dvdx) / Res(1, 1)
-                    visc_stress(1)%vf(3)%sf(i, j, k) = (dudz + dwdx) / Res(1, 1)
-                    visc_stress(2)%vf(1)%sf(i, j, k) = (dvdx + dudy) / Res(1, 1)
-                    visc_stress(2)%vf(2)%sf(i, j, k) = (4._wp/3._wp * dvdy - 2._wp/3._wp * (dudx + dwdz)) / Res(1, 1)
-                    visc_stress(2)%vf(3)%sf(i, j, k) = (dvdz + dwdy) / Res(1, 1)
-                    visc_stress(3)%vf(1)%sf(i, j, k) = (dwdx + dudz) / Res(1, 1)
-                    visc_stress(3)%vf(2)%sf(i, j, k) = (dwdy + dvdz) / Res(1, 1)
-                    visc_stress(3)%vf(3)%sf(i, j, k) = (4._wp/3._wp * dwdz - 2._wp/3._wp * (dudx + dvdy)) / Res(1, 1)
+                        ! viscous stress tensor, visc_stress(row, column)
+                        visc_stress(1)%vf(1)%sf(i, j, k) = (4._wp/3._wp * dudx - 2._wp/3._wp * (dvdy + dwdz)) / Res(1, 1)
+                        visc_stress(1)%vf(2)%sf(i, j, k) = (dudy + dvdx) / Res(1, 1)
+                        visc_stress(1)%vf(3)%sf(i, j, k) = (dudz + dwdx) / Res(1, 1)
+                        visc_stress(2)%vf(1)%sf(i, j, k) = (dvdx + dudy) / Res(1, 1)
+                        visc_stress(2)%vf(2)%sf(i, j, k) = (4._wp/3._wp * dvdy - 2._wp/3._wp * (dudx + dwdz)) / Res(1, 1)
+                        visc_stress(2)%vf(3)%sf(i, j, k) = (dvdz + dwdy) / Res(1, 1)
+                        visc_stress(3)%vf(1)%sf(i, j, k) = (dwdx + dudz) / Res(1, 1)
+                        visc_stress(3)%vf(2)%sf(i, j, k) = (dwdy + dvdz) / Res(1, 1)
+                        visc_stress(3)%vf(3)%sf(i, j, k) = (4._wp/3._wp * dwdz - 2._wp/3._wp * (dudx + dvdy)) / Res(1, 1)
+                    end do 
                 end do 
-            end do 
-        end do
+            end do
+        else if (present(q_cons_filtered)) then
+            !$acc parallel loop collapse(3) gang vector default(present) private(dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz)
+            do i = 0, m 
+                do j = 0, n 
+                    do k = 0, p
+                        ! velocity gradients, local to each process
+                        dudx = ( q_cons_filtered(2)%sf(i+1, j, k)/q_cons_filtered(1)%sf(i+1, j, k) - q_cons_filtered(2)%sf(i-1, j, k)/q_cons_filtered(1)%sf(i-1, j, k) ) / (dx(i-1) + dx(i+1))
+                        dudy = ( q_cons_filtered(2)%sf(i, j+1, k)/q_cons_filtered(1)%sf(i, j+1, k) - q_cons_filtered(2)%sf(i, j-1, k)/q_cons_filtered(1)%sf(i, j-1, k) ) / (dy(j-1) + dy(j+1))
+                        dudz = ( q_cons_filtered(2)%sf(i, j, k+1)/q_cons_filtered(1)%sf(i, j, k+1) - q_cons_filtered(2)%sf(i, j, k-1)/q_cons_filtered(1)%sf(i, j, k-1) ) / (dz(k-1) + dz(k+1))
+
+                        dvdx = ( q_cons_filtered(3)%sf(i+1, j, k)/q_cons_filtered(1)%sf(i+1, j, k) - q_cons_filtered(3)%sf(i-1, j, k)/q_cons_filtered(1)%sf(i-1, j, k) ) / (dx(i-1) + dx(i+1))
+                        dvdy = ( q_cons_filtered(3)%sf(i, j+1, k)/q_cons_filtered(1)%sf(i, j+1, k) - q_cons_filtered(3)%sf(i, j-1, k)/q_cons_filtered(1)%sf(i, j-1, k) ) / (dy(j-1) + dy(j+1))
+                        dvdz = ( q_cons_filtered(3)%sf(i, j, k+1)/q_cons_filtered(1)%sf(i, j, k+1) - q_cons_filtered(3)%sf(i, j, k-1)/q_cons_filtered(1)%sf(i, j, k-1) ) / (dz(k-1) + dz(k+1))
+
+                        dwdx = ( q_cons_filtered(4)%sf(i+1, j, k)/q_cons_filtered(1)%sf(i+1, j, k) - q_cons_filtered(4)%sf(i-1, j, k)/q_cons_filtered(1)%sf(i-1, j, k) ) / (dx(i-1) + dx(i+1))
+                        dwdy = ( q_cons_filtered(4)%sf(i, j+1, k)/q_cons_filtered(1)%sf(i, j+1, k) - q_cons_filtered(4)%sf(i, j-1, k)/q_cons_filtered(1)%sf(i, j-1, k) ) / (dy(j-1) + dy(j+1))
+                        dwdz = ( q_cons_filtered(4)%sf(i, j, k+1)/q_cons_filtered(1)%sf(i, j, k+1) - q_cons_filtered(4)%sf(i, j, k-1)/q_cons_filtered(1)%sf(i, j, k-1) ) / (dz(k-1) + dz(k+1))
+
+                        ! viscous stress tensor, visc_stress(row, column)
+                        visc_stress(1)%vf(1)%sf(i, j, k) = (4._wp/3._wp * dudx - 2._wp/3._wp * (dvdy + dwdz)) / Res(1, 1)
+                        visc_stress(1)%vf(2)%sf(i, j, k) = (dudy + dvdx) / Res(1, 1)
+                        visc_stress(1)%vf(3)%sf(i, j, k) = (dudz + dwdx) / Res(1, 1)
+                        visc_stress(2)%vf(1)%sf(i, j, k) = (dvdx + dudy) / Res(1, 1)
+                        visc_stress(2)%vf(2)%sf(i, j, k) = (4._wp/3._wp * dvdy - 2._wp/3._wp * (dudx + dwdz)) / Res(1, 1)
+                        visc_stress(2)%vf(3)%sf(i, j, k) = (dvdz + dwdy) / Res(1, 1)
+                        visc_stress(3)%vf(1)%sf(i, j, k) = (dwdx + dudz) / Res(1, 1)
+                        visc_stress(3)%vf(2)%sf(i, j, k) = (dwdy + dvdz) / Res(1, 1)
+                        visc_stress(3)%vf(3)%sf(i, j, k) = (4._wp/3._wp * dwdz - 2._wp/3._wp * (dudx + dvdy)) / Res(1, 1)
+                    end do 
+                end do 
+            end do
+        end if
 
     end subroutine s_compute_viscous_stress_tensor
     
@@ -761,7 +795,7 @@ contains
 #endif
         
         ! effective viscosity setup, return viscous stress tensor
-        call s_compute_viscous_stress_tensor(visc_stress, q_cons_vf)
+        call s_compute_viscous_stress_tensor(visc_stress, q_prim_vf=q_prim_vf)
 
         call s_compute_stress_tensor(pres_visc_stress, visc_stress, q_cons_vf, q_prim_vf)
 
@@ -819,7 +853,7 @@ contains
 #endif
 
         ! calculate stress tensor with filtered quantities 
-        call s_compute_viscous_stress_tensor(visc_stress, q_cons_filtered)
+        call s_compute_viscous_stress_tensor(visc_stress, q_cons_filtered=q_cons_filtered)
 
         ! calculate eff_visc
         !$acc parallel loop collapse(3) gang vector default(present)
