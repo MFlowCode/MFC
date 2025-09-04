@@ -884,7 +884,7 @@ contains
                                            igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
-                                           num_dims, igr)
+                                           num_dims, igr, ib)
 
 #ifdef MFC_MPI
 
