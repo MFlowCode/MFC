@@ -671,8 +671,6 @@ contains
 
         real(wp) :: start, finish
 
-        integer :: n_step
-
         ! Stage 1 of 3
 
         if (.not. adap_dt) then

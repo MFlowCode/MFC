@@ -56,7 +56,7 @@ program p_main
     call s_initialize_gpu_vars()
     call nvtxEndRange
 
-    call s_initialize_fluid_indicator_function()
+    if (volume_filtering_momentum_eqn .or. periodic_forcing) call s_initialize_fluid_indicator_function()
     if (volume_filtering_momentum_eqn) then 
         call s_initialize_filtering_kernel()
         call s_initialize_filtered_fluid_indicator_function()

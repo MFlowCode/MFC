@@ -89,8 +89,6 @@ module m_start_up
 
     use m_mhd
 
-    use m_compute_particle_forces
-
     use m_additional_forcing 
 
     use m_volume_filtering
@@ -1347,9 +1345,11 @@ contains
             ! end if
 
             ! Compute explicit x-, y-, z- forces on each particle
-            call nvtxStartRange("COMPUTE-PARTICLE-FORCES")
-            call s_compute_particle_forces()
-            call nvtxEndRange
+            if (compute_particle_drag) then
+                call nvtxStartRange("COMPUTE-PARTICLE-FORCES")
+                call s_compute_particle_forces()
+                call nvtxEndRange
+            end if
         end if
 
         ! Compute terms to force a constant mass flow rate in fully periodic domain
@@ -1637,7 +1637,6 @@ contains
 
         if (mhd .and. powell) call s_initialize_mhd_powell_module
 
-        if (compute_particle_drag) call s_initialize_particle_forces_module()
         if (periodic_forcing) call s_initialize_additional_forcing_module()
         if (volume_filtering_momentum_eqn) then 
             call s_initialize_fftw_explicit_filter_module()
@@ -1786,7 +1785,6 @@ contains
         if (bodyForces) call s_finalize_body_forces_module()
         if (mhd .and. powell) call s_finalize_mhd_powell_module
 
-        if (compute_particle_drag) call s_finalize_particle_forces_module()
         if (periodic_forcing) call s_finalize_additional_forcing_module()
         if (volume_filtering_momentum_eqn) call s_finalize_fftw_explicit_filter_module
 
