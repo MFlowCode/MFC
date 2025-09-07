@@ -62,9 +62,10 @@ def __filter(cases_) -> typing.List[TestCase]:
             skipped_cases.append(case)
 
     for case in cases[:]:
-        if "RDMA MPI" in case.trace:
-            cases.remove(case)
-            skipped_cases.append(case)
+        if not ARG("rdma_mpi"):
+            if "RDMA MPI" in case.trace:
+                cases.remove(case)
+                skipped_cases.append(case)
 
     for case in cases[:]:
         if ARG("single"):
