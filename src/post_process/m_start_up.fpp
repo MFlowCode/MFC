@@ -242,14 +242,11 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end, &
                             -offset_y%beg:n + offset_y%end, &
                             -offset_z%beg:p + offset_z%end, 3) :: liutex_axis
-        integer :: i, j, k, l,  kx, ky, kz, kf, Nf, j_glb, k_glb, l_glb
+        integer :: i, j, k, l,  kx, ky, kz, kf, j_glb, k_glb, l_glb
         real(wp) :: En_tot
         character(20) :: filename
         logical :: file_exists
         integer :: x_beg, x_end, y_beg, y_end, z_beg, z_end
-
-
-        print *, proc_rank, proc_coords(1), proc_coords(2), proc_coords(3)
 
         if (output_partial_domain) then
             call s_define_output_region
@@ -904,6 +901,8 @@ contains
             Nyloc2 = (n_glb + 1) / num_procs_z
             Nzloc = p + 1 
 
+            Nf = max(Nx, Ny, Nz)
+
             @:ALLOCATE(data_in(Nx*Nyloc*Nzloc))
             @:ALLOCATE(data_out(Nx*Nyloc*Nzloc))
 
@@ -912,7 +911,6 @@ contains
             @:ALLOCATE(data_cmplx_z(Nxloc, Nyloc2, Nz))
 
             @:ALLOCATE(En_real(Nxloc, Nyloc2, Nz))
-            Nf = max(Nx, Ny, Nz)
             @:ALLOCATE(En(Nf)) 
 
             size_n(1) = Nx
