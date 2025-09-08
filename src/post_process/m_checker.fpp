@@ -114,7 +114,7 @@ contains
 
      !> Checks constraints on fft_wrt
     impure subroutine s_check_inputs_fft
-        @:PROHIBIT(fft_wrt .and. (.not. file_per_process), "Turn off file_per_process with fft_wrt")
+        @:PROHIBIT(fft_wrt .and. file_per_process, "Turn off file_per_process with fft_wrt")
         @:PROHIBIT(fft_wrt .and. (n == 0 .or. p == 0), "FFT WRT only in 3D")
         @:PROHIBIT(fft_wrt .and. (MOD(m+1,2) == 1 .or. MOD(n+1,2) == 1 .or. MOD(p+1,2) == 1), "FFT WRT requires local dimensions divisible by 2")
     end subroutine s_check_inputs_fft
