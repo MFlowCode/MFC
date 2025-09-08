@@ -431,6 +431,7 @@ POST_PROCESS.update({
     'flux_lim': ParamType.INT,
     'flux_wrt': ParamType.LOG,
     'E_wrt': ParamType.LOG,
+    'fft_wrt': ParamType.LOG,
     'pres_wrt': ParamType.LOG,
     'alpha_wrt': ParamType.LOG,
     'kappa_wrt': ParamType.LOG,

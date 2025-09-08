@@ -32,6 +32,7 @@ contains
         call s_check_inputs_flux_limiter
         call s_check_inputs_volume_fraction
         call s_check_inputs_vorticity
+        call s_check_inputs_fft
         call s_check_inputs_qm
         call s_check_inputs_liutex
         call s_check_inputs_schlieren
@@ -110,6 +111,13 @@ contains
         @:PROHIBIT(p == 0 .and. (omega_wrt(1) .or. omega_wrt(2)))
         @:PROHIBIT(any(omega_wrt) .and. fd_order == dflt_int, "fd_order must be set for omega_wrt")
     end subroutine s_check_inputs_vorticity
+
+     !> Checks constraints on fft_wrt
+    impure subroutine s_check_inputs_fft
+        @:PROHIBIT(fft_wrt .and. (.not. file_per_process), "Turn off file_per_process with fft_wrt")
+        @:PROHIBIT(fft_wrt .and. (n == 0 .or. p == 0), "FFT WRT only in 3D")
+        @:PROHIBIT(fft_wrt .and. (MOD(m+1,2) == 1 .or. MOD(n+1,2) == 1 .or. MOD(p+1,2) == 1), "FFT WRT requires local dimensions divisible by 2")
+    end subroutine s_check_inputs_fft
 
     !> Checks constraints on Q-criterion parameters
     impure subroutine s_check_inputs_qm
