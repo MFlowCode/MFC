@@ -9,7 +9,6 @@
 !!              deallocates the relevant variables and sets up the time stepping,
 !!              MPI decomposition and I/O procedures
 
-
 module m_start_up
 
     ! Dependencies
@@ -61,13 +60,13 @@ module m_start_up
 
     type(c_ptr) :: fwd_plan_x, fwd_plan_y, fwd_plan_z
     complex(c_double_complex), allocatable :: data_in(:), data_out(:)
-    complex(c_double_complex), allocatable :: data_cmplx(:, :, :), data_cmplx_y(:,:,:), data_cmplx_z(:, :, :)
+    complex(c_double_complex), allocatable :: data_cmplx(:, :, :), data_cmplx_y(:, :, :), data_cmplx_z(:, :, :)
     real(wp), allocatable, dimension(:, :, :) :: En_real
-    real(wp), allocatable, dimension(:) :: En 
+    real(wp), allocatable, dimension(:) :: En
     integer :: num_procs_x, num_procs_y, num_procs_z
     integer :: Nx, Ny, Nz, Nxloc, Nyloc, Nyloc2, Nzloc, Nf
     integer :: ierr
-    integer :: MPI_COMM_CART, MPI_COMM_CART12, MPI_COMM_CART13 
+    integer :: MPI_COMM_CART, MPI_COMM_CART12, MPI_COMM_CART13
     integer, dimension(3) :: cart3d_coords
     integer, dimension(2) :: cart2d12_coords, cart2d13_coords
     integer :: proc_rank12, proc_rank13
@@ -242,7 +241,7 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end, &
                             -offset_y%beg:n + offset_y%end, &
                             -offset_z%beg:p + offset_z%end, 3) :: liutex_axis
-        integer :: i, j, k, l,  kx, ky, kz, kf, j_glb, k_glb, l_glb
+        integer :: i, j, k, l, kx, ky, kz, kf, j_glb, k_glb, l_glb
         real(wp) :: En_tot
         character(20) :: filename
         logical :: file_exists
@@ -417,43 +416,43 @@ contains
         end if
 
         !Adding Energy cascade FFT
-        if(fft_wrt) then
+        if (fft_wrt) then
 
-            do l = 0, p 
-                do k = 0, n 
-                    do j = 0, m 
-                        data_cmplx(j+1,k+1,l+1) = CMPLX(q_cons_vf(mom_idx%beg)%sf(j,k,l) / q_cons_vf(1)%sf(j,k,l), 0._wp)
-                    end do 
-                end do 
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        data_cmplx(j + 1, k + 1, l + 1) = cmplx(q_cons_vf(mom_idx%beg)%sf(j, k, l)/q_cons_vf(1)%sf(j, k, l), 0._wp)
+                    end do
+                end do
             end do
 
             call s_mpi_FFT_fwd()
 
-            En_real = 0.5_wp*abs(data_cmplx_z)**2._wp / ((m+1)*(n+1)*(p+1))
+            En_real = 0.5_wp*abs(data_cmplx_z)**2._wp/((m + 1)*(n + 1)*(p + 1))
 
-            do l = 0, p 
-                do k = 0, n 
-                    do j = 0, m 
-                        data_cmplx(j+1,k+1,l+1) = CMPLX(q_cons_vf(mom_idx%beg+1)%sf(j,k,l) / q_cons_vf(1)%sf(j,k,l), 0._wp)
-                    end do 
-                end do 
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        data_cmplx(j + 1, k + 1, l + 1) = cmplx(q_cons_vf(mom_idx%beg + 1)%sf(j, k, l)/q_cons_vf(1)%sf(j, k, l), 0._wp)
+                    end do
+                end do
             end do
 
             call s_mpi_FFT_fwd()
 
-            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp / ((m+1)*(n+1)*(p+1))
+            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp/((m + 1)*(n + 1)*(p + 1))
 
-            do l = 0, p 
-                do k = 0, n 
-                    do j = 0, m 
-                        data_cmplx(j+1,k+1,l+1) = CMPLX(q_cons_vf(mom_idx%beg+2)%sf(j,k,l) / q_cons_vf(1)%sf(j,k,l), 0._wp)
-                    end do 
-                end do 
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        data_cmplx(j + 1, k + 1, l + 1) = cmplx(q_cons_vf(mom_idx%beg + 2)%sf(j, k, l)/q_cons_vf(1)%sf(j, k, l), 0._wp)
+                    end do
+                end do
             end do
 
             call s_mpi_FFT_fwd()
 
-            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp / ((m+1)*(n+1)*(p+1))
+            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp/((m + 1)*(n + 1)*(p + 1))
 
             do kf = 1, Nf
                 En(kf) = 0._wp
@@ -465,38 +464,38 @@ contains
 
                         j_glb = j + proc_coords(2)*Nxloc
                         k_glb = k + proc_coords(3)*Nyloc2
-                        l_glb = l 
+                        l_glb = l
 
-                        if(j_glb >= (m_glb+1)/ 2) then 
-                            kx = (j_glb-1) - (m_glb+1)
-                        else 
-                            kx = j_glb -1
+                        if (j_glb >= (m_glb + 1)/2) then
+                            kx = (j_glb - 1) - (m_glb + 1)
+                        else
+                            kx = j_glb - 1
                         end if
 
-                        if(k_glb >= (n_glb+1)/2) then 
-                            ky = (k_glb-1) - (n_glb+1)
-                        else 
-                            ky = k_glb - 1 
+                        if (k_glb >= (n_glb + 1)/2) then
+                            ky = (k_glb - 1) - (n_glb + 1)
+                        else
+                            ky = k_glb - 1
                         end if
 
-                        if(l_glb >= (p_glb+1)/2) then 
-                            kz = (l_glb-1) - (p_glb+1)
-                        else 
-                            kz = l_glb - 1 
+                        if (l_glb >= (p_glb + 1)/2) then
+                            kz = (l_glb - 1) - (p_glb + 1)
+                        else
+                            kz = l_glb - 1
                         end if
 
-                        kf = NINT(SQRT(kx**2._wp + ky**2._wp + kz**2._wp)) + 1
+                        kf = nint(sqrt(kx**2._wp + ky**2._wp + kz**2._wp)) + 1
 
                         En(kf) = En(kf) + En_real(j, k, l)
 
-                    end do 
-                end do 
+                    end do
+                end do
             end do
 
-            call MPI_ALLREDUCE(MPI_IN_PLACE, En, Nf, mpi_p, MPI_SUM, MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, En, Nf, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
 
             ! do kf = 1, m +1
-            !     if(proc_rank == 0) then 
+            !     if(proc_rank == 0) then
             !         !print *, "En_tot", En(kf) , proc_rank
             !     end if
             !     write(filename,'(a,i0,a)') 'En_tot',proc_rank,'.dat'
@@ -886,20 +885,20 @@ contains
             s_read_data_files => s_read_parallel_data_files
         end if
 
-        if(fft_wrt) then 
+        if (fft_wrt) then
 
-            num_procs_x = (m_glb + 1) / (m + 1)
-            num_procs_y = (n_glb + 1) / (n + 1)
-            num_procs_z = (p_glb + 1) / (p + 1)
+            num_procs_x = (m_glb + 1)/(m + 1)
+            num_procs_y = (n_glb + 1)/(n + 1)
+            num_procs_z = (p_glb + 1)/(p + 1)
 
             Nx = m_glb + 1
             Ny = n_glb + 1
             Nz = p_glb + 1
 
-            Nxloc = (m_glb + 1) / num_procs_y
+            Nxloc = (m_glb + 1)/num_procs_y
             Nyloc = n + 1
-            Nyloc2 = (n_glb + 1) / num_procs_z
-            Nzloc = p + 1 
+            Nyloc2 = (n_glb + 1)/num_procs_z
+            Nzloc = p + 1
 
             Nf = max(Nx, Ny, Nz)
 
@@ -911,42 +910,41 @@ contains
             @:ALLOCATE(data_cmplx_z(Nxloc, Nyloc2, Nz))
 
             @:ALLOCATE(En_real(Nxloc, Nyloc2, Nz))
-            @:ALLOCATE(En(Nf)) 
+            @:ALLOCATE(En(Nf))
 
             size_n(1) = Nx
-            inembed(1) = Nx 
-            onembed(1) = Nx 
+            inembed(1) = Nx
+            onembed(1) = Nx
 
-            fwd_plan_x =  fftw_plan_many_dft(1, size_n, Nyloc*Nzloc, & 
-                                           data_in, inembed, 1, Nx, & 
-                                           data_out, onembed, 1, Nx, & 
-                                           FFTW_FORWARD, FFTW_MEASURE)
+            fwd_plan_x = fftw_plan_many_dft(1, size_n, Nyloc*Nzloc, &
+                                            data_in, inembed, 1, Nx, &
+                                            data_out, onembed, 1, Nx, &
+                                            FFTW_FORWARD, FFTW_MEASURE)
 
-            size_n(1) = Ny 
-            inembed(1) = Ny 
-            onembed(1) = Ny 
+            size_n(1) = Ny
+            inembed(1) = Ny
+            onembed(1) = Ny
 
-            fwd_plan_y = fftw_plan_many_dft(1, size_n, Nxloc*Nzloc, & 
-                                           data_out, inembed, 1, Ny, & 
-                                           data_in, onembed, 1, Ny, & 
-                                           FFTW_FORWARD, FFTW_MEASURE)
+            fwd_plan_y = fftw_plan_many_dft(1, size_n, Nxloc*Nzloc, &
+                                            data_out, inembed, 1, Ny, &
+                                            data_in, onembed, 1, Ny, &
+                                            FFTW_FORWARD, FFTW_MEASURE)
 
-            size_n(1) = Nz 
-            inembed(1) = Nz 
-            onembed(1) = Nz   
+            size_n(1) = Nz
+            inembed(1) = Nz
+            onembed(1) = Nz
 
-            fwd_plan_z =  fftw_plan_many_dft(1, size_n, Nxloc*Nyloc2, & 
-                                           data_in, inembed, 1, Nz, & 
-                                           data_out, onembed, 1, Nz, & 
-                                           FFTW_FORWARD, FFTW_MEASURE)   
-
+            fwd_plan_z = fftw_plan_many_dft(1, size_n, Nxloc*Nyloc2, &
+                                            data_in, inembed, 1, Nz, &
+                                            data_out, onembed, 1, Nz, &
+                                            FFTW_FORWARD, FFTW_MEASURE)
 
             call MPI_CART_CREATE(MPI_COMM_WORLD, 3, (/num_procs_x, &
-                                                          num_procs_y, num_procs_z/), &
-                                     (/.true., .true., .true./), &
-                                     .false., MPI_COMM_CART, ierr)   
+                                                      num_procs_y, num_procs_z/), &
+                                 (/.true., .true., .true./), &
+                                 .false., MPI_COMM_CART, ierr)
             call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, &
-                                     cart3d_coords, ierr)  
+                                 cart3d_coords, ierr)
 
             call MPI_Cart_SUB(MPI_COMM_CART, (/.true., .true., .false./), MPI_COMM_CART12, ierr)
             call MPI_COMM_RANK(MPI_COMM_CART12, proc_rank12, ierr)
@@ -961,140 +959,139 @@ contains
 
     subroutine s_mpi_FFT_fwd
 
-    integer :: j, k, l 
+        integer :: j, k, l
 
-    do l = 1, Nzloc 
-        do k = 1, Nyloc 
-            do j = 1, Nx
-                data_in(j + (k-1)*Nx + (l-1)*Nx*Nyloc) = data_cmplx(j, k, l)
-            end do 
-        end do 
-    end do
+        do l = 1, Nzloc
+            do k = 1, Nyloc
+                do j = 1, Nx
+                    data_in(j + (k - 1)*Nx + (l - 1)*Nx*Nyloc) = data_cmplx(j, k, l)
+                end do
+            end do
+        end do
 
-    call fftw_execute_dft(fwd_plan_x, data_in, data_out)
+        call fftw_execute_dft(fwd_plan_x, data_in, data_out)
 
-    do l = 1, Nzloc 
-        do k = 1, Nyloc 
-            do j = 1, Nx
-                data_cmplx(j, k, l) = data_out(j + (k-1)*Nx + (l-1)*Nx*Nyloc)
-            end do 
-        end do 
-    end do
+        do l = 1, Nzloc
+            do k = 1, Nyloc
+                do j = 1, Nx
+                    data_cmplx(j, k, l) = data_out(j + (k - 1)*Nx + (l - 1)*Nx*Nyloc)
+                end do
+            end do
+        end do
 
-    call s_mpi_transpose_x2y !!Change Pencil from data_cmplx to data_cmpx_y 
+        call s_mpi_transpose_x2y !!Change Pencil from data_cmplx to data_cmpx_y
 
-    do l = 1, Nzloc 
-        do k = 1, Nxloc 
-            do j = 1, Ny
-                data_out(j + (k-1)*Ny + (l-1)*Ny*Nxloc) = data_cmplx_y(k, j, l)
-            end do 
-        end do 
-    end do
-    
-    call fftw_execute_dft(fwd_plan_y, data_out, data_in)
+        do l = 1, Nzloc
+            do k = 1, Nxloc
+                do j = 1, Ny
+                    data_out(j + (k - 1)*Ny + (l - 1)*Ny*Nxloc) = data_cmplx_y(k, j, l)
+                end do
+            end do
+        end do
 
-    do l = 1, Nzloc 
-        do k = 1, Nxloc 
-            do j = 1, Ny 
-                data_cmplx_y(k, j, l) = data_in(j + (k-1)*Ny + (l-1)*Ny*Nxloc)
-            end do 
-        end do 
-    end do
+        call fftw_execute_dft(fwd_plan_y, data_out, data_in)
 
-    call s_mpi_transpose_y2z !!Change Pencil from data_cmplx_y to data_cmpx_z
+        do l = 1, Nzloc
+            do k = 1, Nxloc
+                do j = 1, Ny
+                    data_cmplx_y(k, j, l) = data_in(j + (k - 1)*Ny + (l - 1)*Ny*Nxloc)
+                end do
+            end do
+        end do
 
-    do l = 1, Nyloc2 
-        do k = 1, Nxloc 
-            do j = 1, Nz
-                data_in(j + (k-1)*Nz + (l-1)*Nz*Nxloc) = data_cmplx_z(k, l, j)
-            end do 
-        end do 
-    end do
+        call s_mpi_transpose_y2z !!Change Pencil from data_cmplx_y to data_cmpx_z
 
-    call fftw_execute_dft(fwd_plan_z, data_in, data_out)
+        do l = 1, Nyloc2
+            do k = 1, Nxloc
+                do j = 1, Nz
+                    data_in(j + (k - 1)*Nz + (l - 1)*Nz*Nxloc) = data_cmplx_z(k, l, j)
+                end do
+            end do
+        end do
 
-    do l = 1, Nyloc2 
-        do k = 1, Nxloc 
-            do j = 1, Nz
-                data_cmplx_z(k, l, j) = data_out(j + (k-1)*Nz + (l-1)*Nz*Nxloc)
-            end do 
-        end do 
-    end do
+        call fftw_execute_dft(fwd_plan_z, data_in, data_out)
+
+        do l = 1, Nyloc2
+            do k = 1, Nxloc
+                do j = 1, Nz
+                    data_cmplx_z(k, l, j) = data_out(j + (k - 1)*Nz + (l - 1)*Nz*Nxloc)
+                end do
+            end do
+        end do
 
     end subroutine s_mpi_FFT_fwd
 
     subroutine s_mpi_transpose_x2y
-    complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
-    integer :: dest_rank, src_rank
-    integer :: i, j, k, l
+        complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
+        integer :: dest_rank, src_rank
+        integer :: i, j, k, l
 
-    allocate(sendbuf(Nx*Nyloc*Nzloc))
-    allocate(recvbuf(Nx*Nyloc*Nzloc))
+        allocate (sendbuf(Nx*Nyloc*Nzloc))
+        allocate (recvbuf(Nx*Nyloc*Nzloc))
 
-    do dest_rank = 0, num_procs_y - 1
-        do l = 1, Nzloc 
-            do k = 1, Nyloc 
-                do j = 1, Nxloc
-                    sendbuf(j + (k-1)*Nxloc + (l-1)*Nxloc*Nyloc + dest_rank*Nxloc*Nyloc*Nzloc) = data_cmplx(j + dest_rank*Nxloc, k, l)
-                end do 
-            end do 
+        do dest_rank = 0, num_procs_y - 1
+            do l = 1, Nzloc
+                do k = 1, Nyloc
+                    do j = 1, Nxloc
+                        sendbuf(j + (k - 1)*Nxloc + (l - 1)*Nxloc*Nyloc + dest_rank*Nxloc*Nyloc*Nzloc) = data_cmplx(j + dest_rank*Nxloc, k, l)
+                    end do
+                end do
+            end do
         end do
-    end do
 
-    call MPI_Alltoall(sendbuf, Nxloc*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
+        call MPI_Alltoall(sendbuf, Nxloc*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, &
                           recvbuf, Nxloc*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_CART12, ierr)
 
-    do src_rank = 0, num_procs_y - 1
-        do l = 1, Nzloc 
-            do k = 1, Nyloc 
-                do j = 1, Nxloc
-                    data_cmplx_y(j, k + src_rank*Nyloc, l) = recvbuf(j + (k-1)*Nxloc + (l-1)*Nxloc*Nyloc + src_rank*Nxloc*Nyloc*Nzloc) 
-                end do 
-            end do 
+        do src_rank = 0, num_procs_y - 1
+            do l = 1, Nzloc
+                do k = 1, Nyloc
+                    do j = 1, Nxloc
+                        data_cmplx_y(j, k + src_rank*Nyloc, l) = recvbuf(j + (k - 1)*Nxloc + (l - 1)*Nxloc*Nyloc + src_rank*Nxloc*Nyloc*Nzloc)
+                    end do
+                end do
+            end do
         end do
-    end do
 
-    deallocate(sendbuf)
-    deallocate(recvbuf)
+        deallocate (sendbuf)
+        deallocate (recvbuf)
 
     end subroutine s_mpi_transpose_x2y
 
     subroutine s_mpi_transpose_y2z
-    complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
-    integer :: dest_rank, src_rank
-    integer :: j, k, l
+        complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
+        integer :: dest_rank, src_rank
+        integer :: j, k, l
 
-    allocate(sendbuf(Ny*Nxloc*Nzloc))
-    allocate(recvbuf(Ny*Nxloc*Nzloc))
+        allocate (sendbuf(Ny*Nxloc*Nzloc))
+        allocate (recvbuf(Ny*Nxloc*Nzloc))
 
-    do dest_rank = 0, num_procs_z - 1
-        do l = 1, Nzloc 
-            do j = 1, Nxloc
-                do k = 1, Nyloc2 
-                    sendbuf(k + (j-1)*Nyloc2 + (l-1)*(Nyloc2*Nxloc) + dest_rank*Nyloc2*Nxloc*Nzloc) = data_cmplx_y(j, k + dest_rank*Nyloc2, l)
-                end do 
-            end do 
+        do dest_rank = 0, num_procs_z - 1
+            do l = 1, Nzloc
+                do j = 1, Nxloc
+                    do k = 1, Nyloc2
+                        sendbuf(k + (j - 1)*Nyloc2 + (l - 1)*(Nyloc2*Nxloc) + dest_rank*Nyloc2*Nxloc*Nzloc) = data_cmplx_y(j, k + dest_rank*Nyloc2, l)
+                    end do
+                end do
+            end do
         end do
-    end do
 
-    call MPI_Alltoall(sendbuf, Nyloc2*Nxloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
+        call MPI_Alltoall(sendbuf, Nyloc2*Nxloc*Nzloc, MPI_DOUBLE_COMPLEX, &
                           recvbuf, Nyloc2*Nxloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_CART13, ierr)
 
-    do src_rank = 0, num_procs_z - 1
-        do l = 1, Nzloc 
-            do j = 1, Nxloc
-                do k = 1, Nyloc2 
-                    data_cmplx_z(j, k, l + src_rank*Nzloc) = recvbuf(k + (j-1)*Nyloc2 + (l-1)*(Nyloc2*Nxloc) + src_rank*Nyloc2*Nxloc*Nzloc) 
-                end do 
-            end do 
+        do src_rank = 0, num_procs_z - 1
+            do l = 1, Nzloc
+                do j = 1, Nxloc
+                    do k = 1, Nyloc2
+                        data_cmplx_z(j, k, l + src_rank*Nzloc) = recvbuf(k + (j - 1)*Nyloc2 + (l - 1)*(Nyloc2*Nxloc) + src_rank*Nyloc2*Nxloc*Nzloc)
+                    end do
+                end do
+            end do
         end do
-    end do
 
-    deallocate(sendbuf)
-    deallocate(recvbuf)
+        deallocate (sendbuf)
+        deallocate (recvbuf)
 
     end subroutine s_mpi_transpose_y2z
-
 
     impure subroutine s_initialize_mpi_domain
         ! Initialization of the MPI environment
@@ -1118,6 +1115,7 @@ contains
         call s_mpi_bcast_user_inputs()
         call s_initialize_parallel_io()
         call s_mpi_decompose_computational_domain()
+        call s_check_inputs_fft()
 
     end subroutine s_initialize_mpi_domain
 

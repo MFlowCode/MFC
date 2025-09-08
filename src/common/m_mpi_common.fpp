@@ -1165,7 +1165,7 @@ contains
             if (p > 0) then
 
 #ifdef MFC_POST_PROCESS
-                if(fft_wrt .and. (.not. file_per_process)) then 
+                if (fft_wrt .and. (.not. file_per_process)) then
 
                     ! Initial estimate of optimal processor topology
                     num_procs_x = 1
@@ -1269,7 +1269,7 @@ contains
                         end if
 
                     end do
-                end if    
+                end if
 #else
                 if (cyl_coord .and. p > 0) then
                     ! Implement pencil processor blocking if using cylindrical coordinates so
