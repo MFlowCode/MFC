@@ -321,7 +321,9 @@ contains
 #endif
 
         ! file for particle forces
-        open(unit=100, file='particle_force.bin', status='replace', form='unformatted', access='stream')
+        if (proc_rank == 0) then
+            open(unit=100, file='particle_force.bin', status='replace', form='unformatted', access='stream', action='write')
+        end if
 
     end subroutine s_initialize_fftw_explicit_filter_module
 
@@ -879,20 +881,26 @@ contains
         real(wp) :: dvol
         integer :: i, j, k, l
 
+        ! zero particle forces
+        particle_forces = 0.0_wp
+        !$acc update device(particle_forces)
+
         !$acc parallel loop collapse(3) gang vector default(present) private(dvol)
         do i = 0, m 
             do j = 0, n 
                 do k = 0, p
                     dvol = dx(i) * dy(j) * dz(k)
                     !$acc atomic
-                    particle_forces(ib_markers%sf(i, j, k), 1) = particle_forces(ib_markers%sf(i, j, k), 1) + div_pres_visc_stress(1)%sf(i, j, k) * dvol
+                    particle_forces(ib_markers%sf(i, j, k), 1) = particle_forces(ib_markers%sf(i, j, k), 1) - div_pres_visc_stress(1)%sf(i, j, k) * dvol
                     !$acc atomic
-                    particle_forces(ib_markers%sf(i, j, k), 2) = particle_forces(ib_markers%sf(i, j, k), 2) + div_pres_visc_stress(2)%sf(i, j, k) * dvol
+                    particle_forces(ib_markers%sf(i, j, k), 2) = particle_forces(ib_markers%sf(i, j, k), 2) - div_pres_visc_stress(2)%sf(i, j, k) * dvol
                     !$acc atomic
-                    particle_forces(ib_markers%sf(i, j, k), 3) = particle_forces(ib_markers%sf(i, j, k), 3) + div_pres_visc_stress(3)%sf(i, j, k) * dvol
+                    particle_forces(ib_markers%sf(i, j, k), 3) = particle_forces(ib_markers%sf(i, j, k), 3) - div_pres_visc_stress(3)%sf(i, j, k) * dvol
                 end do 
             end do 
         end do
+
+        !$acc update host(particle_forces)
 
         ! reduce particle forces across processors
         do i = 1, num_ibs
@@ -901,6 +909,11 @@ contains
             call s_mpi_allreduce_sum(particle_forces(i, 3), force_glb(i, 3))
         end do
 
+        if (proc_rank == 0) then
+            print *, 'force', force_glb(1, 1)
+            print *, 'C_D', 2._wp * force_glb(1, 1) / (rho_inf_ref * u_inf_ref**2 * pi * patch_ib(1)%radius**2)
+        end if
+        
         ! write particle forces to file
         if (proc_rank == 0) then
             write(100) force_glb
@@ -1207,7 +1220,9 @@ contains
         call fftw_destroy_plan(plan_z_c2c_kernelG)
 #endif
 
-        close(100)
+        if (proc_rank == 0) then
+            close(100)
+        end if
 
     end subroutine s_finalize_fftw_explicit_filter_module
 
