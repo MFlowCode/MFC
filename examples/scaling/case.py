@@ -84,7 +84,7 @@ def closest_three_factors(n):
 def nxyz_from_ncells_weak(ncells: float) -> typing.Tuple[int, int, int]:
     s = math.floor(ncells ** (1 / 3))
     ND = closest_three_factors(nranks)
-    if any(N < 4 for N in ND):
+    if any(N < 4 for N in ND) and nranks > 64:
         raise RuntimeError(f"Cannot represent {nranks} ranks with at least 4 partitions in each direction.")
     N1 = ND[0] * s - 1
     N2 = ND[1] * s - 1
@@ -96,11 +96,9 @@ def nxyz_from_ncells_weak(ncells: float) -> typing.Tuple[int, int, int]:
 
 def nxyz_from_ncells_strong(ncells: float) -> typing.Tuple[int, int, int]:
     s = round(ncells ** (1 / 3))
-    if s * s * s != ncells:
-        raise RuntimeError(f"Cannot represent {ncells} cells exactly.")
-    Lx = 1
-    Ly = 1
-    Lz = 1
+    Lx = 4
+    Ly = 4
+    Lz = 4
     return s, s, s, Lx, Ly, Lz
 
 if args.scaling == "weak":
@@ -149,10 +147,10 @@ vel = c_a / gama * (psOp0a - 1.0) * p0a / (p0a + pia) / Min # velocity at the po
 # Domain extents
 xb = -Lx * D0 / 2
 xe = Lx * D0 / 2
-yb = 0 * D0
-ye = Ly * D0
-zb = 0 * D0
-ze = Lz * D0
+yb = -Ly * D0 / 2
+ye = Ly * D0 / 2
+zb = -Lz * D0 / 2
+ze = Lz * D0 / 2
 
 # Calculating time step
 dx = (xe - xb) / Nx
@@ -189,19 +187,19 @@ print(
             "mpp_lim": "T",
             "mixture_err": "T",
             "time_stepper": 3,
-            "weno_order": 3,
+            "weno_order": 5,
             "weno_eps": 1.0e-16,
             "weno_Re_flux": "F",
             "weno_avg": "F",
-            "mapped_weno": "T",
+            "mapped_weno": "F",
             "riemann_solver": 2,
             "wave_speeds": 1,
             "avg_state": 2,
-            "bc_x%beg": -6,
-            "bc_x%end": -6,
-            "bc_y%beg": -2,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -3,
             "bc_y%end": -3,
-            "bc_z%beg": -2,
+            "bc_z%beg": -3,
             "bc_z%end": -3,
             # Formatted Database Files Structure Parameters
             "format": 1,
@@ -213,7 +211,7 @@ print(
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": (xb + xe) / 2,
             "patch_icpp(1)%y_centroid": (yb + ye) / 2,
-            "patch_icpp(1)%z_centroid": (yb + ye) / 2,
+            "patch_icpp(1)%z_centroid": (zb + ze) / 2,
             "patch_icpp(1)%length_x": (xe - xb),
             "patch_icpp(1)%length_y": (ye - yb),
             "patch_icpp(1)%length_z": (ze - zb),
@@ -228,7 +226,7 @@ print(
             # Patch 2: Shocked state (AIR - 2)
             "patch_icpp(2)%geometry": 9,
             "patch_icpp(2)%alter_patch(1)": "T",
-            "patch_icpp(2)%x_centroid": -ISD - (xe - xb),
+            "patch_icpp(2)%x_centroid": -ISD - (xe - xb) / 2,
             "patch_icpp(2)%y_centroid": (yb + ye) / 2,
             "patch_icpp(2)%z_centroid": (zb + ze) / 2,
             "patch_icpp(2)%length_x": (xe - xb),
