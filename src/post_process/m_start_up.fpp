@@ -496,10 +496,10 @@ contains
 
             if (proc_rank == 0) then
                 call s_create_directory('En_FFT_DATA')
-                write (filename, '(a,i0,a)') '/En_FFT_DATA/En_tot', t_step, '.dat'
+                write (filename, '(a,i0,a)') 'En_FFT_DATA/En_tot', t_step, '.dat'
                 inquire (FILE=filename, EXIST=file_exists)
                 if (file_exists) then
-                    call s_delete_file(trim(case_dir)//trim(filename))
+                    call s_delete_file(trim(filename))
                 end if
             end if
 
