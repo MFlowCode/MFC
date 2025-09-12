@@ -538,6 +538,11 @@ contains
             patch_ib(i)%model_filepath(:) = dflt_char
             patch_ib(i)%model_spc = num_ray
             patch_ib(i)%model_threshold = ray_tracing_threshold
+
+            patch_ib%moving_ibm = 0._wp
+            patch_ib%x_vel = 0._wp
+            patch_ib%y_vel = 0._wp
+            patch_ib%z_vel = 0._wp
         end do
 
         ! Fluids physical parameters
