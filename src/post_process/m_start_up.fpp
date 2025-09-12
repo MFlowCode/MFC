@@ -243,8 +243,8 @@ contains
                             -offset_z%beg:p + offset_z%end, 3) :: liutex_axis
         integer :: i, j, k, l, kx, ky, kz, kf, j_glb, k_glb, l_glb
         real(wp) :: En_tot
-        character(20) :: filename
-        logical :: file_exists
+        character(50) :: filename, dirname
+        logical :: file_exists, dir_exists
         integer :: x_beg, x_end, y_beg, y_end, z_beg, z_end
 
         if (output_partial_domain) then
@@ -494,17 +494,18 @@ contains
 
             call MPI_ALLREDUCE(MPI_IN_PLACE, En, Nf, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
 
-            if(proc_rank == 0) then
-                write(filename,'(a,i0,a)') 'En_tot',t_step,'.dat'
+            if (proc_rank == 0) then
+                call s_create_directory('En_FFT_DATA')
+                write (filename, '(a,i0,a)') 'En_FFT_DATA/En_tot', t_step, '.dat'
                 inquire (FILE=filename, EXIST=file_exists)
-                if(file_exists) then 
-                    call s_delete_file(trim(case_dir)//'/'//trim(filename))
+                if (file_exists) then
+                    call s_delete_file(trim(case_dir)//'/En_FFT_DATA/'//trim(filename))
                 end if
             end if
 
             do kf = 1, Nf
-                if(proc_rank == 0) then 
-                    write(filename,'(a,i0,a)') 'En_tot',t_step,'.dat'
+                if (proc_rank == 0) then
+                    write (filename, '(a,i0,a)') 'En_FFT_DATA/En_tot', t_step, '.dat'
                     inquire (FILE=filename, EXIST=file_exists)
                     if (file_exists) then
                         open (1, file=filename, position='append', status='old')
