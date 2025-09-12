@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Initialize default values for optional arguments
-NODES=(1 2 4)
-MEM=(256 512)
+NODES=(8 64 512 4096)
+MEM=(4096) # Approximate total problem size in GB
 
 # Mandatory argument
 ACCOUNT=""

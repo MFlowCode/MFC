@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Initialize default values for optional arguments
-NODES=(1 2 4 8 16)
-MEM=(64)
+NODES=(16 128 1024 8192)
+MEM=(64) # Approximate problem size per GCD in GB
 
 # Mandatory argument
 ACCOUNT=""
@@ -52,12 +52,12 @@ for N in "${NODES[@]}"; do
         echo -n "N=$N: M=$M"
         sbatch <<EOT
 #!/bin/bash
-#SBATCH --job-name MFC-S-$N-$M
+#SBATCH --job-name MFC-W-$N-$M
 #SBATCH --account=$ACCOUNT
 #SBATCH --nodes=$N
 #SBATCH --ntasks-per-node=8
 #SBATCH --time=00:20:00
-#SBATCH --output=MFC-S-$N-$M.out
+#SBATCH --output=MFC-W-$N-$M.out
 #SBATCH --cpus-per-task=7
 #SBATCH --gpus-per-task=1
 #SBATCH --gpu-bind=closest

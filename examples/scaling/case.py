@@ -2,8 +2,8 @@
 import sys, json, math, typing, argparse
 
 parser = argparse.ArgumentParser(
-    prog="scaling",
-    description="Weak- and strong-scaling benchmark case.",
+    prog="scaling_and_perf",
+    description="Weak- and strong-scaling and performance benchmark case.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 parser.add_argument(
@@ -206,6 +206,7 @@ print(
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
+            "file_per_process": "T",
             # I will use 1 for WATER properties, and 2 for AIR properties
             # Patch 1: Background (AIR - 2)
             "patch_icpp(1)%geometry": 9,

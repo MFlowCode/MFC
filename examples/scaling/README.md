@@ -1,4 +1,4 @@
-# Strong- & Weak-scaling
+# Scaling and Performance test
 
 The scaling case can exercise both weak- and strong-scaling. It
 adjusts itself depending on the number of requested ranks.
