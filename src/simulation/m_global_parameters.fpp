@@ -27,7 +27,8 @@ module m_global_parameters
 
     implicit none
 
-    real(wp) :: time = 0
+    real(wp) :: wall_time = 0
+    real(wp) :: wall_time_avg = 0
 
     ! Logistics
     integer :: num_procs             !< Number of processors
@@ -156,6 +157,16 @@ module m_global_parameters
         logical :: viscous        !< Viscous effects
     #:endif
 
+    !> @name Variables for our of core IGR computation on NVIDIA
+    !> @{
+    logical :: nv_uvm_out_of_core ! Enable out-of-core storage of q_cons_ts(2) in timestepping (default FALSE)
+    integer :: nv_uvm_igr_temps_on_gpu ! 0 => jac, jac_rhs, and jac_old on CPU
+    ! 1 => jac on GPU, jac_rhs and jac_old on CPU
+    ! 2 => jac and jac_rhs on GPU, jac_old on CPU
+    ! 3 => jac, jac_rhs, and jac_old on GPU (default)
+    logical :: nv_uvm_pref_gpu ! Enable explicit gpu memory hints (default FALSE)
+    !> @}
+
     real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
     real(wp) :: teno_CT        !< Smoothness threshold for TENO
     logical :: mp_weno        !< Monotonicity preserving (MP) WENO
@@ -235,6 +246,8 @@ module m_global_parameters
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< shared file or not when using parallel io
     integer :: precision !< Precision of output files
+    logical :: down_sample !< down sample the output files
+    $:GPU_DECLARE(create='[down_sample]')
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
@@ -570,6 +583,11 @@ contains
         t_stop = dflt_real
         t_save = dflt_real
 
+        ! NVIDIA UVM options
+        nv_uvm_out_of_core = .false.
+        nv_uvm_igr_temps_on_gpu = 3 ! => jac, jac_rhs, and jac_old on GPU (default)
+        nv_uvm_pref_gpu = .false.
+
         ! Simulation algorithm parameters
         model_eqns = dflt_int
         mpp_lim = .false.
@@ -589,6 +607,7 @@ contains
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
+        down_sample = .false.
         relax = .false.
         relax_model = dflt_int
         palpha_eps = dflt_real
@@ -878,14 +897,20 @@ contains
                 mom_idx%beg = cont_idx%end + 1
                 mom_idx%end = cont_idx%end + num_vels
                 E_idx = mom_idx%end + 1
-                adv_idx%beg = E_idx + 1
+
                 if (igr) then
-                    if (num_fluids == 1) then
-                        adv_idx%end = adv_idx%beg
-                    else
-                        adv_idx%end = E_idx + num_fluids - 1
-                    end if
+                    ! Volume fractions are stored in the indices immediately following
+                    ! the energy equation. IGR tracks a total of (N-1) volume fractions
+                    ! for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
+                    ! then adv_idx%end < adv_idx%beg, which skips all loops over the
+                    ! volume fractions since there is no volume fraction to track
+                    adv_idx%beg = E_idx + 1 ! Alpha for fluid 1
+                    adv_idx%end = E_idx + num_fluids - 1
                 else
+                    ! Volume fractions are stored in the indices immediately following
+                    ! the energy equation. WENO/MUSCL + Riemann tracks a total of (N)
+                    ! volume fractions for N fluids, hence the lack of  "-1" in adv_idx%end
+                    adv_idx%beg = E_idx + 1
                     adv_idx%end = E_idx + num_fluids
                 end if
 
@@ -1179,10 +1204,12 @@ contains
             allocate (MPI_IO_DATA%var(1:sys_size))
         end if
 
-        do i = 1, sys_size
-            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-            MPI_IO_DATA%var(i)%sf => null()
-        end do
+        if (.not. down_sample) then
+            do i = 1, sys_size
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        end if
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
@@ -1223,10 +1250,11 @@ contains
             fd_number = max(1, fd_order/2)
         end if
 
-        call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, buff_size, &
+        call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
+                                           igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
-                                           num_dims, igr)
+                                           num_dims, igr, ib)
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Configuring Coordinate Direction Indexes
@@ -1308,16 +1336,25 @@ contains
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
         @:ALLOCATE(x_cc(-buff_size:m + buff_size))
         @:ALLOCATE(dx(-buff_size:m + buff_size))
+        @:PREFER_GPU(x_cb)
+        @:PREFER_GPU(x_cc)
+        @:PREFER_GPU(dx)
 
         if (n == 0) return; 
         @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE(dy(-buff_size:n + buff_size))
+        @:PREFER_GPU(y_cb)
+        @:PREFER_GPU(y_cc)
+        @:PREFER_GPU(dy)
 
         if (p == 0) return; 
         @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
+        @:PREFER_GPU(z_cb)
+        @:PREFER_GPU(z_cc)
+        @:PREFER_GPU(dz)
 
     end subroutine s_initialize_global_parameters_module
 

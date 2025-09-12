@@ -5,7 +5,7 @@ from .state   import MFCConfig
 from .printer import cons
 
 
-MFC_LOCK_CURRENT_VERSION: int = 5
+MFC_LOCK_CURRENT_VERSION: int = 6
 
 
 @dataclasses.dataclass

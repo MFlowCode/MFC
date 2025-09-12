@@ -3,12 +3,13 @@ import typing, dataclasses
 
 @dataclasses.dataclass
 class MFCConfig:
-    mpi:     bool = True
-    gpu:     bool = False
-    debug:   bool = False
-    gcov:    bool = False
-    unified: bool = False
-    single: bool = False
+    mpi:       bool = True
+    gpu:       bool = False
+    debug:     bool = False
+    gcov:      bool = False
+    unified:   bool = False
+    single:    bool = False
+    fastmath : bool = False
 
     @staticmethod
     def from_dict(d: dict):

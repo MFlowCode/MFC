@@ -29,6 +29,7 @@ module m_derived_variables
  s_derive_flux_limiter, &
  s_derive_vorticity_component, &
  s_derive_qm, &
+ s_derive_liutex, &
  s_derive_numerical_schlieren_function, &
  s_compute_speed_of_sound, &
  s_finalize_derived_variables_module
@@ -80,13 +81,13 @@ contains
         ! s_compute_finite_difference_coefficients.
 
         ! Allocating centered finite-difference coefficients in x-direction
-        if (omega_wrt(2) .or. omega_wrt(3) .or. schlieren_wrt) then
+        if (omega_wrt(2) .or. omega_wrt(3) .or. schlieren_wrt .or. liutex_wrt) then
             allocate (fd_coeff_x(-fd_number:fd_number, &
                                  -offset_x%beg:m + offset_x%end))
         end if
 
         ! Allocating centered finite-difference coefficients in y-direction
-        if (omega_wrt(1) .or. omega_wrt(3) &
+        if (omega_wrt(1) .or. omega_wrt(3) .or. liutex_wrt &
             .or. &
             (n > 0 .and. schlieren_wrt)) then
             allocate (fd_coeff_y(-fd_number:fd_number, &
@@ -94,7 +95,7 @@ contains
         end if
 
         ! Allocating centered finite-difference coefficients in z-direction
-        if (omega_wrt(1) .or. omega_wrt(2) &
+        if (omega_wrt(1) .or. omega_wrt(2) .or. liutex_wrt &
             .or. &
             (p > 0 .and. schlieren_wrt)) then
             allocate (fd_coeff_z(-fd_number:fd_number, &
@@ -555,6 +556,135 @@ contains
         end do
 
     end subroutine s_derive_qm
+
+    !> This subroutine gets as inputs the primitive variables. From those
+        !!      inputs, it proceeds to calculate the Liutex vector and its
+        !!      magnitude based on Xu et al. (2019).
+        !!  @param q_prim_vf Primitive variables
+        !!  @param liutex_mag Liutex magnitude
+        !!  @param liutex_axis Liutex axis
+    impure subroutine s_derive_liutex(q_prim_vf, liutex_mag, liutex_axis)
+        integer, parameter :: nm = 3
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(in) :: q_prim_vf
+
+        real(wp), &
+            dimension(-offset_x%beg:m + offset_x%end, &
+                      -offset_y%beg:n + offset_y%end, &
+                      -offset_z%beg:p + offset_z%end), &
+            intent(out) :: liutex_mag !< Liutex magnitude
+
+        real(wp), &
+            dimension(-offset_x%beg:m + offset_x%end, &
+                      -offset_y%beg:n + offset_y%end, &
+                      -offset_z%beg:p + offset_z%end, nm), &
+            intent(out) :: liutex_axis !< Liutex rigid rotation axis
+
+        character, parameter :: ivl = 'N' !< compute left eigenvectors
+        character, parameter :: ivr = 'V' !< compute right eigenvectors
+        real(wp), dimension(nm, nm) :: vgt !< velocity gradient tensor
+        real(wp), dimension(nm) :: lr, li !< real and imaginary parts of eigenvalues
+        real(wp), dimension(nm, nm) :: vl, vr !< left and right eigenvectors
+        integer, parameter :: lwork = 4*nm !< size of work array (4*nm recommended)
+        real(wp), dimension(lwork) :: work !< work array
+        integer :: info
+
+        real(wp), dimension(nm) :: eigvec !< real eigenvector
+        real(wp) :: eigvec_mag !< magnitude of real eigenvector
+        real(wp) :: omega_proj !< projection of vorticity on real eigenvector
+        real(wp) :: lci !< imaginary part of complex eigenvalue
+        real(wp) :: alpha
+
+        integer :: j, k, l, r, i !< Generic loop iterators
+        integer :: idx
+
+        do l = -offset_z%beg, p + offset_z%end
+            do k = -offset_y%beg, n + offset_y%end
+                do j = -offset_x%beg, m + offset_x%end
+
+                    ! Get velocity gradient tensor (VGT)
+                    vgt(:, :) = 0._wp
+
+                    do r = -fd_number, fd_number
+                        do i = 1, 3
+                            ! d()/dx
+                            vgt(i, 1) = &
+                                vgt(i, 1) + &
+                                fd_coeff_x(r, j)* &
+                                q_prim_vf(mom_idx%beg + i - 1)%sf(r + j, k, l)
+                            ! d()/dy
+                            vgt(i, 2) = &
+                                vgt(i, 2) + &
+                                fd_coeff_y(r, k)* &
+                                q_prim_vf(mom_idx%beg + i - 1)%sf(j, r + k, l)
+                            ! d()/dz
+                            vgt(i, 3) = &
+                                vgt(i, 3) + &
+                                fd_coeff_z(r, l)* &
+                                q_prim_vf(mom_idx%beg + i - 1)%sf(j, k, r + l)
+                        end do
+                    end do
+
+                    ! Call appropriate LAPACK routine based on precision
+#ifdef MFC_SINGLE_PRECISION
+                    call sgeev(ivl, ivr, nm, vgt, nm, lr, li, vl, nm, vr, nm, work, lwork, info)
+#else
+                    call dgeev(ivl, ivr, nm, vgt, nm, lr, li, vl, nm, vr, nm, work, lwork, info)
+#endif
+
+                    ! Find real eigenvector
+                    idx = 1
+                    do r = 2, 3
+                        if (abs(li(r)) < abs(li(idx))) then
+                            idx = r
+                        end if
+                    end do
+                    eigvec = vr(:, idx)
+
+                    ! Normalize real eigenvector if it is effectively non-zero
+                    eigvec_mag = sqrt(eigvec(1)**2._wp &
+                                      + eigvec(2)**2._wp &
+                                      + eigvec(3)**2._wp)
+                    if (eigvec_mag > sgm_eps) then
+                        eigvec = eigvec/eigvec_mag
+                    else
+                        eigvec = 0._wp
+                    end if
+
+                    ! Compute vorticity projected on the eigenvector
+                    omega_proj = (vgt(3, 2) - vgt(2, 3))*eigvec(1) &
+                                 + (vgt(1, 3) - vgt(3, 1))*eigvec(2) &
+                                 + (vgt(2, 1) - vgt(1, 2))*eigvec(3)
+
+                    ! As eigenvector can have +/- signs, we can choose the sign
+                    ! so that omega_proj is positive
+                    if (omega_proj < 0._wp) then
+                        eigvec = -eigvec
+                        omega_proj = -omega_proj
+                    end if
+
+                    ! Find imaginary part of complex eigenvalue
+                    lci = li(mod(idx, 3) + 1)
+
+                    ! Compute Liutex magnitude
+                    alpha = omega_proj**2._wp - 4._wp*lci**2._wp ! (2*alpha)^2
+                    if (alpha > 0._wp) then
+                        liutex_mag(j, k, l) = omega_proj - sqrt(alpha)
+                    else
+                        liutex_mag(j, k, l) = omega_proj
+                    end if
+
+                    ! Compute Liutex axis
+                    liutex_axis(j, k, l, 1) = eigvec(1)
+                    liutex_axis(j, k, l, 2) = eigvec(2)
+                    liutex_axis(j, k, l, 3) = eigvec(3)
+
+                end do
+            end do
+        end do
+
+    end subroutine s_derive_liutex
 
     !>  This subroutine gets as inputs the conservative variables
         !!      and density. From those inputs, it proceeds to calculate

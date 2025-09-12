@@ -98,7 +98,9 @@ module m_weno
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
     type(int_bounds_info) :: is1_weno, is2_weno, is3_weno
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
     $:GPU_DECLARE(create='[is1_weno,is2_weno,is3_weno]')
+#endif
     !
     !> @}
 

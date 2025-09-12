@@ -119,24 +119,24 @@ contains
         res = f_approx_equal(var, real(nint(var), wp))
     end function f_is_integer
 
-    pure subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, buff_size, idwint, idwbuff, &
-                                                  viscous, bubbles_lagrange, m, n, p, num_dims, igr)
-        integer, intent(in) :: recon_type, weno_polyn, muscl_polyn, m, n, p, num_dims
+    pure subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
+                                                  igr_order, buff_size, idwint, idwbuff, &
+                                                  viscous, bubbles_lagrange, m, n, p, num_dims, igr, ib)
+
+        integer, intent(in) :: recon_type, weno_polyn, muscl_polyn
+        integer, intent(in) :: m, n, p, num_dims, igr_order
         integer, intent(inout) :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
         logical, intent(in) :: viscous, bubbles_lagrange
         logical, intent(in) :: igr
+        logical, intent(in) :: ib
 
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
         ! the next one
         if (igr) then
-            if (viscous) then
-                buff_size = 6
-            else
-                buff_size = 4
-            end if
+            buff_size = (igr_order - 1)/2 + 2
         elseif (recon_type == WENO_TYPE) then
             if (viscous) then
                 buff_size = 2*weno_polyn + 2
@@ -150,6 +150,10 @@ contains
         ! Correction for smearing function in the lagrangian subgrid bubble model
         if (bubbles_lagrange) then
             buff_size = max(buff_size, 6)
+        end if
+
+        if (ib) then
+            buff_size = max(buff_size, 10)
         end if
 
         ! Configuring Coordinate Direction Indexes

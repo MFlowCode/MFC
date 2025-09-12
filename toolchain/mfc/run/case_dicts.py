@@ -63,6 +63,7 @@ COMMON = {
     'num_bc_patches': ParamType.INT,
     'igr': ParamType.LOG,
     'igr_order': ParamType.INT,
+    'down_sample': ParamType.LOG,
     'recon_type': ParamType.INT,
     'muscl_order': ParamType.INT,
 }
@@ -312,6 +313,9 @@ SIMULATION.update({
     'int_comp': ParamType.LOG,
     'ic_eps': ParamType.REAL,
     'ic_beta': ParamType.REAL,
+    'nv_uvm_out_of_core': ParamType.LOG,
+    'nv_uvm_igr_temps_on_gpu': ParamType.INT,
+    'nv_uvm_pref_gpu': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
@@ -440,6 +444,7 @@ POST_PROCESS.update({
     'omega_wrt': ParamType.LOG,
     'qbmm': ParamType.LOG,
     'qm_wrt': ParamType.LOG,
+    'liutex_wrt': ParamType.LOG,
     'cf_wrt': ParamType.LOG,
     'sim_data': ParamType.LOG,
     'ib': ParamType.LOG,
@@ -452,6 +457,10 @@ POST_PROCESS.update({
     'output_partial_domain': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
 })
+
+for cmp in ["x", "y", "z"]:
+    for prepend in ["domain%beg", "domain%end", "a", "b"]:
+        PRE_PROCESS[f"{cmp}_{prepend}"] = ParamType.REAL
 
 for cmp_id in range(1,3+1):
     cmp = ["x", "y", "z"][cmp_id-1]

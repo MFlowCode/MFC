@@ -53,19 +53,19 @@ contains
     impure subroutine s_initialize_ibm_module()
 
         if (p > 0) then
-            @:ALLOCATE(ib_markers%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, -gp_layers:p+gp_layers))
-            @:ALLOCATE(levelset%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, -gp_layers:p+gp_layers, 1:num_ibs))
-            @:ALLOCATE(levelset_norm%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, -gp_layers:p+gp_layers, 1:num_ibs, 1:3))
+            @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, &
+                -buff_size:n+buff_size, -buff_size:p+buff_size))
+            @:ALLOCATE(levelset%sf(-buff_size:m+buff_size, &
+                -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs))
+            @:ALLOCATE(levelset_norm%sf(-buff_size:m+buff_size, &
+                -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs, 1:3))
         else
-            @:ALLOCATE(ib_markers%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, 0:0))
-            @:ALLOCATE(levelset%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, 0:0, 1:num_ibs))
-            @:ALLOCATE(levelset_norm%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, 0:0, 1:num_ibs, 1:3))
+            @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, &
+                -buff_size:n+buff_size, 0:0))
+            @:ALLOCATE(levelset%sf(-buff_size:m+buff_size, &
+                -buff_size:n+buff_size, 0:0, 1:num_ibs))
+            @:ALLOCATE(levelset_norm%sf(-buff_size:m+buff_size, &
+                -buff_size:n+buff_size, 0:0, 1:num_ibs, 1:3))
         end if
 
         @:ACC_SETUP_SFs(ib_markers)
@@ -381,13 +381,13 @@ contains
                 ! s_cc points to the dim array we need
                 if (dim == 1) then
                     s_cc => x_cc
-                    bound = m
+                    bound = m + buff_size - 1
                 elseif (dim == 2) then
                     s_cc => y_cc
-                    bound = n
+                    bound = n + buff_size - 1
                 else
                     s_cc => z_cc
-                    bound = p
+                    bound = p + buff_size - 1
                 end if
 
                 if (f_approx_equal(norm(dim), 0._wp)) then
@@ -402,9 +402,12 @@ contains
                     index = ghost_points_in(q)%loc(dim)
                     temp_loc = ghost_points_in(q)%ip_loc(dim)
                     do while ((temp_loc < s_cc(index) &
-                               .or. temp_loc > s_cc(index + 1)) &
-                              .and. (index >= 0 .and. index <= bound))
+                               .or. temp_loc > s_cc(index + 1)))
                         index = index + dir
+                        if (index < -buff_size .or. index > bound) then
+                            print *, "Increase buff_size further in m_helper_basic (currently set to a minimum of 10)"
+                            error stop "Increase buff_size"
+                        end if
                     end do
                     ghost_points_in(q)%ip_grid(dim) = index
                     if (ghost_points_in(q)%DB(dim) == -1) then

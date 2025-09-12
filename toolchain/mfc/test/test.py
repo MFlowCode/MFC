@@ -19,6 +19,8 @@ from ..packer import packer
 nFAIL = 0
 nPASS = 0
 nSKIP = 0
+current_test_number = 0
+total_test_count = 0
 errors = []
 
 # pylint: disable=too-many-branches, trailing-whitespace
@@ -95,7 +97,7 @@ def __filter(cases_) -> typing.List[TestCase]:
 
 def test():
     # pylint: disable=global-statement, global-variable-not-assigned
-    global nFAIL, nPASS, nSKIP
+    global nFAIL, nPASS, nSKIP, total_test_count
     global errors
 
     cases = list_cases()
@@ -113,6 +115,7 @@ def test():
 
     cases, skipped_cases = __filter(cases)
     cases = [ _.to_case() for _ in cases ]
+    total_test_count = len(cases)
 
     if ARG("list"):
         table = rich.table.Table(title="MFC Test Cases", box=rich.table.box.SIMPLE)
@@ -150,7 +153,7 @@ def test():
 
     # Run cases with multiple threads (if available)
     cons.print()
-    cons.print(" tests/[bold magenta]UUID[/bold magenta]     (s)      Summary")
+    cons.print("  Progress      [bold magenta]UUID[/bold magenta]          (s)      Summary")
     cons.print()
 
     # Select the correct number of threads to use to launch test cases
@@ -185,6 +188,7 @@ def test():
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements, trailing-whitespace
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     # pylint: disable=global-statement, global-variable-not-assigned
+    global current_test_number
     start_time = time.time()
 
     tol = case.compute_tolerance()
@@ -269,7 +273,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
     end_time = time.time()
     duration = end_time - start_time
 
-    cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]    {duration:6.2f}    {case.trace}")
+    current_test_number += 1
+    progress_str = f"({current_test_number:3d}/{total_test_count:3d})"
+    cons.print(f"  {progress_str}    [bold magenta]{case.get_uuid()}[/bold magenta]    {duration:6.2f}    {case.trace}")
 
 
 def handle_case(case: TestCase, devices: typing.Set[int]):

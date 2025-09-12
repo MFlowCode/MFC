@@ -33,7 +33,7 @@ module m_start_up
                                !! schemes for spatial reconstruction of variables
 
     use m_muscl                !< Monotonic Upstream-centered (MUSCL)
-                               !! schemes for convservation laws 
+                               !! schemes for convservation laws
 
     use m_riemann_solvers      !< Exact and approximate Riemann problem solvers
 
@@ -108,6 +108,8 @@ module m_start_up
  s_perform_time_step, s_save_data, &
  s_save_performance_metrics
 
+    type(scalar_field), allocatable, dimension(:) :: q_cons_temp
+    $:GPU_DECLARE(create='[q_cons_temp]')
 
     real(wp) :: dt_init
 
@@ -185,9 +187,10 @@ contains
             surface_tension, bubbles_lagrange, lag_params, &
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar, &
-            alf_factor, num_igr_iters, &
-            num_igr_warm_start_iters, &
-            int_comp, ic_eps, ic_beta 
+            alf_factor, num_igr_iters, num_igr_warm_start_iters, &
+            int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, &
+            nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample
+
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
         inquire (FILE=trim(file_path), EXIST=file_exist)
@@ -534,6 +537,11 @@ contains
 
         integer :: i, j
 
+        ! Downsampled data variables
+        integer :: m_ds, n_ds, p_ds
+        integer :: m_glb_ds, n_glb_ds, p_glb_ds
+        integer :: m_glb_read, n_glb_read, p_glb_read ! data size of read
+
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))
@@ -541,6 +549,16 @@ contains
         ! Read in cell boundary locations in x-direction
         file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'x_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+        if(down_sample) then
+            m_ds = INT((m+1)/3) - 1
+            n_ds = INT((n+1)/3) - 1
+            p_ds = INT((p+1)/3) - 1
+
+            m_glb_ds = INT((m_glb+1)/3) - 1
+            n_glb_ds = INT((n_glb+1)/3) - 1
+            p_glb_ds = INT((p_glb+1)/3) - 1
+        end if
 
         if (file_exist) then
             data_size = m_glb + 2
@@ -628,21 +646,35 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 ! Initialize MPI data I/O
-
-                if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers, &
-                        levelset, levelset_norm)
+                if(down_sample) then
+                    call s_initialize_mpi_data_ds(q_cons_vf)
                 else
-                    call s_initialize_mpi_data(q_cons_vf)
+                    if (ib) then
+                        call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                            levelset, levelset_norm)
+                    else
+                        call s_initialize_mpi_data(q_cons_vf)
+                    end if
                 end if
 
-                ! Size of local arrays
-                data_size = (m + 1)*(n + 1)*(p + 1)
+                if(down_sample) then
+                    ! Size of local arrays
+                    data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
+                    m_glb_read = m_glb_ds + 1
+                    n_glb_read = n_glb_ds + 1
+                    p_glb_read = p_glb_ds + 1
+                else
+                    ! Size of local arrays
+                    data_size = (m + 1)*(n + 1)*(p + 1)
+                    m_glb_read = m_glb + 1
+                    n_glb_read = n_glb + 1
+                    p_glb_read = p_glb + 1
+                end if
 
                 ! Resize some integers so MPI can read even the biggest file
-                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                m_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
+                n_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
+                p_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 WP_MOK = int(8._wp, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
@@ -667,14 +699,22 @@ contains
                         end do
                     end if
                 else
-                    do i = 1, adv_idx%end
-                        var_MOK = int(i, MPI_OFFSET_KIND)
+                    if(down_sample) then
+                        do i = 1, sys_size
+                            var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           mpi_p, status, ierr)
-                    end do
+                            call MPI_FILE_READ(ifile, q_cons_temp(i)%sf, data_size, &
+                                               mpi_p, status, ierr)
+                        end do
+                    else
+                        do i = 1, sys_size
+                            var_MOK = int(i, MPI_OFFSET_KIND)
+
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                               mpi_p, status, ierr)
+                        end do
+                    end if
                 end if
-
 
                 call s_mpi_barrier()
 
@@ -1069,19 +1109,23 @@ contains
 
         if (cfl_dt) then
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8, "")', &
+                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8,  " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', &
                     int(ceiling(100._wp*(mytime/t_stop))), &
                     mytime, &
                     dt, &
-                    t_step
+                    t_step, &
+                    wall_time_avg, &
+                    wall_time
             end if
         else
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I0, "")', &
+                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I8,  " Time Avg = ", ES12.6,  " Time/step= ", ES12.6, "")', &
                    int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                     t_step - t_step_start + 1, &
                     t_step_stop - t_step_start + 1, &
-                t_step
+                    t_step, &
+                    wall_time_avg, &
+                    wall_time
             end if
         end if
 
@@ -1225,12 +1269,12 @@ contains
             end do
 
             $:GPU_UPDATE(host='[q_beta%vf(1)%sf]')
-            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, q_beta%vf(1))
+            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta%vf(1))
             $:GPU_UPDATE(host='[Rmax_stats,Rmin_stats,gas_p,gas_mv,intfc_vel]')
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
-            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count)
+            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
 
         call nvtxEndRange
@@ -1250,6 +1294,10 @@ contains
     end subroutine s_save_data
 
     impure subroutine s_initialize_modules
+
+        integer :: m_ds, n_ds, p_ds
+        integer :: i, j, k, l, x_id, y_id, z_id, ix, iy, iz
+        real(wp) :: temp1, temp2, temp3, temp4
 
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
@@ -1296,16 +1344,35 @@ contains
 
         call s_initialize_boundary_common_module()
 
+        if(down_sample) then
+            m_ds = INT((m+1)/3) - 1
+            n_ds = INT((n+1)/3) - 1
+            p_ds = INT((p+1)/3) - 1
+
+            allocate(q_cons_temp(1:sys_size))
+            do i = 1, sys_size
+                allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
+            end do
+        end if
+
         ! Reading in the user provided initial condition and grid data
-        call s_read_data_files(q_cons_ts(1)%vf)
+        if(down_sample) then
+            call s_read_data_files(q_cons_temp)
+            call s_upsample_data(q_cons_ts(1)%vf, q_cons_temp)
+            do i = 1, sys_size
+                $:GPU_UPDATE(device='[q_cons_ts(1)%vf(i)%sf]')
+            end do
+        else
+            call s_read_data_files(q_cons_ts(1)%vf)
+        end if
+
+        ! Populating the buffers of the grid variables using the boundary conditions
+        call s_populate_grid_variables_buffers()
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
         if (bodyForces) call s_initialize_body_forces_module()
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
-
-        ! Populating the buffers of the grid variables using the boundary conditions
-        call s_populate_grid_variables_buffers()
 
         ! Initialize the Temperature cache.
         if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_ts(1)%vf, idwint)
@@ -1411,9 +1478,11 @@ contains
     subroutine s_initialize_gpu_vars
         integer :: i
         !Update GPU DATA
-        do i = 1, sys_size
-            $:GPU_UPDATE(device='[q_cons_ts(1)%vf(i)%sf]')
-        end do
+        if (.not. down_sample) then
+            do i = 1, sys_size
+                $:GPU_UPDATE(device='[q_cons_ts(1)%vf(i)%sf]')
+            end do
+        end if
 
         if (qbmm .and. .not. polytropic) then
             $:GPU_UPDATE(device='[pb_ts(1)%sf,mv_ts(1)%sf]')
