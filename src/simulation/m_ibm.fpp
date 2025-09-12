@@ -22,6 +22,8 @@ module m_ibm
 
     use m_constants
 
+    use m_compute_levelset
+
     implicit none
 
     private :: s_compute_image_points, &

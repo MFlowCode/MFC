@@ -254,6 +254,12 @@ contains
                 "Incompatible BC type for boundary condition patch "//trim(iStr))
         end do
 
-    end subroutine
+    end subroutine s_check_bc
+
+    impure subroutine s_check_moving_IBM
+
+      
+
+    end subroutine s__check_moving_IBM
 
 end module m_checker
