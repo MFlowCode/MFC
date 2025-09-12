@@ -428,7 +428,7 @@ contains
 
             call s_mpi_FFT_fwd()
 
-            En_real = 0.5_wp*abs(data_cmplx_z)**2._wp/((m + 1)*(n + 1)*(p + 1))
+            En_real = 0.5_wp*abs(data_cmplx_z)**2._wp/(Nx*Ny*Nz)**2._wp
 
             do l = 0, p
                 do k = 0, n
@@ -440,7 +440,7 @@ contains
 
             call s_mpi_FFT_fwd()
 
-            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp/((m + 1)*(n + 1)*(p + 1))
+            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp/(Nx*Ny*Nz)**2._wp
 
             do l = 0, p
                 do k = 0, n
@@ -452,7 +452,7 @@ contains
 
             call s_mpi_FFT_fwd()
 
-            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp/((m + 1)*(n + 1)*(p + 1))
+            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp/(Nx*Ny*Nz)**2._wp
 
             do kf = 1, Nf
                 En(kf) = 0._wp
@@ -494,22 +494,29 @@ contains
 
             call MPI_ALLREDUCE(MPI_IN_PLACE, En, Nf, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
 
-            ! do kf = 1, m +1
-            !     if(proc_rank == 0) then
-            !         !print *, "En_tot", En(kf) , proc_rank
-            !     end if
-            !     write(filename,'(a,i0,a)') 'En_tot',proc_rank,'.dat'
-            !     inquire (FILE=filename, EXIST=file_exists)
-            !     if (file_exists) then
-            !         open (1, file=filename, position='append', status='old')
-            !         write (1, *) En(kf), proc_rank, t_step
-            !         close (1)
-            !     else
-            !         open (1, file=filename, status='new')
-            !         write (1, *) En(kf), proc_rank, t_step
-            !         close (1)
-            !     end if
-            ! end do
+            if(proc_rank == 0) then
+                write(filename,'(a,i0,a)') 'En_tot',t_step,'.dat'
+                inquire (FILE=filename, EXIST=file_exists)
+                if(file_exists) then 
+                    call s_delete_file(trim(case_dir)//'/'//trim(filename))
+                end if
+            end if
+
+            do kf = 1, Nf
+                if(proc_rank == 0) then 
+                    write(filename,'(a,i0,a)') 'En_tot',t_step,'.dat'
+                    inquire (FILE=filename, EXIST=file_exists)
+                    if (file_exists) then
+                        open (1, file=filename, position='append', status='old')
+                        write (1, *) En(kf), t_step
+                        close (1)
+                    else
+                        open (1, file=filename, status='new')
+                        write (1, *) En(kf), t_step
+                        close (1)
+                    end if
+                end if
+            end do
 
         end if
 
