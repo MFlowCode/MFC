@@ -117,7 +117,7 @@ contains
 
         @:PROHIBIT(fft_wrt .and. file_per_process, "Turn off file_per_process with fft_wrt")
         @:PROHIBIT(fft_wrt .and. (n == 0 .or. p == 0), "FFT WRT only in 3D")
-        @:PROHIBIT(fft_wrt .and. (MOD(m+1,2) == 1 .or. MOD(n+1,2) == 1 .or. MOD(p+1,2) == 1), "FFT WRT requires local dimensions divisible by 2")
+        @:PROHIBIT(fft_wrt .and. (MOD(m_glb+1,2) == 1 .or. MOD(n_glb+1,2) == 1 .or. MOD(p_glb+1,2) == 1), "FFT WRT requires global dimensions divisible by 2")
         num_procs_x = (m_glb + 1)/(m + 1)
         num_procs_y = (n_glb + 1)/(n + 1)
         num_procs_z = (p_glb + 1)/(p + 1)
