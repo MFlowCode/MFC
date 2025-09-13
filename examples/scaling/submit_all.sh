@@ -21,7 +21,7 @@ if [[ -z "$ACCOUNT" ]]; then
     exit 1
 fi
 
-#./examples/scaling/submit_weak.sh --account $ACCOUNT
-#./examples/scaling/submit_strong.sh --account $ACCOUNT
-./examples/scaling/submit_grind.sh --account $ACCOUNT --mem "8"
+./examples/scaling/submit_weak.sh --account $ACCOUNT
+./examples/scaling/submit_strong.sh --account $ACCOUNT
+./examples/scaling/submit_grind.sh --account $ACCOUNT
 

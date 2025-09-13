@@ -76,8 +76,8 @@ if [ ! -d \$case_dir/restart_data ]; then
 
     # Note: `time` is not used for performance measurement, only for monitoring
     #       the job's progress.
-    time ./mfc.sh run \$case_dir/case.py -c frontier -n 1 -N 1 --clean   \
-            -t pre_process -# grind-\$slug-pre -- --scaling weak\
+    time ./mfc.sh run \$case_dir/case.py -c frontier -n 1 -N 1 --clean \
+            -t pre_process -# grind-\$slug-pre -- --scaling weak \
             --memory $M \
             > examples/scaling/logs/grind-\$slug-pre.out 2>&1
 fi
@@ -88,7 +88,7 @@ echo "Running \$slug"
 # Note: `time` is not used for performance measurement, only for monitoring
 #       the job's progress.
 time ./mfc.sh run \$case_dir/case.py -c frontier -n 1 -N 1 -t simulation \
-    --case-optimization -# grind-\$slug-sim -- --scaling weak\
+    --case-optimization -# grind-\$slug-sim -- --scaling weak \
     --memory $M --n-steps 100 --n-save 20 \
     > examples/scaling/logs/grind-\$slug-sim.out 2>&1
 

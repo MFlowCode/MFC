@@ -4,14 +4,17 @@ from dataclasses import dataclass, fields
 CDIR = os.path.abspath(os.path.join("examples", "scaling"))
 LDIR = os.path.join(CDIR, "logs")
 
+
 def get_num(s: str) -> float:
     try:
         return float(re.findall(r"[0-9]+\.[0-9]+(?:E[-+][0-9]+)?", s, re.MULTILINE)[0])
     except:
         return None
 
+
 def get_nums(arr):
     return {get_num(_) for _ in arr if get_num(_)}
+
 
 @dataclass(frozen=True, order=True)
 class Configuration:
@@ -19,12 +22,14 @@ class Configuration:
     mem: int
     rdma_mpi: bool
 
+
 @dataclass
 class Result:
     ts_avg: float
     mpi_avg: float
     init_t: float
     sim_t: float
+
 
 runs = {}
 

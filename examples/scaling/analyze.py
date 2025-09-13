@@ -2,6 +2,7 @@ import os, re
 import pandas as pd
 from io import StringIO
 
+
 def parse_time_avg(path):
     last_val = None
     pattern = re.compile(r"Time Avg =\s*([0-9.E+-]+)")
@@ -12,6 +13,7 @@ def parse_time_avg(path):
                 last_val = float(match.group(1))
     return last_val
 
+
 def parse_grind_time(path):
     last_val = None
     pattern = re.compile(r"Performance: \s*([0-9.E+-]+)")
@@ -21,6 +23,7 @@ def parse_grind_time(path):
             if match:
                 last_val = float(match.group(1))
     return last_val
+
 
 def parse_reference_file(filename):
     with open(filename) as f:
@@ -44,15 +47,7 @@ def parse_reference_file(filename):
             rdma = rdma_match.group(1) if rdma_match else None
 
             for _, row in df.iterrows():
-                records.append({
-                    "scaling": "weak",
-                    "nodes": int(row["nodes"]),
-                    "memory": memory,
-                    "rdma": rdma,
-                    "phase": "sim",
-                    "time_avg": row["time_avg"],
-                    "efficiency": row["efficiency"]
-                })
+                records.append({"scaling": "weak", "nodes": int(row["nodes"]), "memory": memory, "rdma": rdma, "phase": "sim", "time_avg": row["time_avg"], "efficiency": row["efficiency"]})
 
         elif header.startswith("Strong Scaling"):
             mem_match = re.search(r"Memory: ~(\d+)GB", header)
@@ -61,26 +56,25 @@ def parse_reference_file(filename):
             rdma = rdma_match.group(1) if rdma_match else None
 
             for _, row in df.iterrows():
-                records.append({
-                    "scaling": "strong",
-                    "nodes": int(row["nodes"]),
-                    "memory": memory,
-                    "rdma": rdma,
-                    "phase": "sim",
-                    "time_avg": row["time_avg"],
-                    "speedup": row["speedup"],
-                    "efficiency": row["efficiency"]
-                })
+                records.append(
+                    {
+                        "scaling": "strong",
+                        "nodes": int(row["nodes"]),
+                        "memory": memory,
+                        "rdma": rdma,
+                        "phase": "sim",
+                        "time_avg": row["time_avg"],
+                        "speedup": row["speedup"],
+                        "efficiency": row["efficiency"],
+                    }
+                )
 
         elif header.startswith("Grind Time"):
             for _, row in df.iterrows():
-                records.append({
-                    "scaling": "grind",
-                    "memory": int(row["memory"]),
-                    "grind_time": row["grind_time"]
-                })
+                records.append({"scaling": "grind", "memory": int(row["memory"]), "grind_time": row["grind_time"]})
 
     return pd.DataFrame(records)
+
 
 # Get log files and filter for simulation logs
 files = os.listdir("examples/scaling/logs/")
@@ -91,14 +85,7 @@ for fname in files:
     # Remove extension
     parts = fname.replace(".out", "").split("-")
     scaling, nodes, memory, rdma, phase = parts
-    records.append({
-        "scaling": scaling,
-        "nodes": int(nodes),
-        "memory": int(memory),
-        "rdma": rdma,
-        "phase": phase,
-        "file": fname
-    })
+    records.append({"scaling": scaling, "nodes": int(nodes), "memory": int(memory), "rdma": rdma, "phase": phase, "file": fname})
 
 df = pd.DataFrame(records)
 
@@ -119,12 +106,9 @@ weak_scaling_rdma = weak_df["rdma"].unique()
 
 for mem in weak_scaling_mem:
     for rdma in weak_scaling_rdma:
-        subset = weak_df[(weak_df["memory"] == mem) &
-                         (weak_df["rdma"] == rdma)]
+        subset = weak_df[(weak_df["memory"] == mem) & (weak_df["rdma"] == rdma)]
         subset = subset.sort_values(by="nodes")
-        ref = weak_ref_df[(weak_ref_df["memory"] == mem) &
-                          (weak_ref_df["rdma"] == rdma) &
-                          (weak_ref_df["nodes"].isin(subset["nodes"]))]
+        ref = weak_ref_df[(weak_ref_df["memory"] == mem) & (weak_ref_df["rdma"] == rdma) & (weak_ref_df["nodes"].isin(subset["nodes"]))]
         ref = ref.sort_values(by="nodes")
 
         times = []
@@ -148,13 +132,10 @@ strong_scaling_rdma = strong_df["rdma"].unique()
 
 for mem in strong_scaling_mem:
     for rdma in strong_scaling_rdma:
-        subset = strong_df[(strong_df["memory"] == mem) &
-                           (strong_df["rdma"] == rdma)]
+        subset = strong_df[(strong_df["memory"] == mem) & (strong_df["rdma"] == rdma)]
         subset = subset.sort_values(by="nodes")
 
-        ref = strong_ref_df[(strong_ref_df["memory"] == mem) &
-                            (strong_ref_df["rdma"] == rdma) &
-                            (strong_ref_df["nodes"].isin(subset["nodes"]))]
+        ref = strong_ref_df[(strong_ref_df["memory"] == mem) & (strong_ref_df["rdma"] == rdma) & (strong_ref_df["nodes"].isin(subset["nodes"]))]
         ref = ref.sort_values(by="nodes")
 
         times = []
@@ -194,4 +175,3 @@ if not grind_df.empty:
     print(subset[["memory", "grind_time", "rel_perf"]].to_string(index=False))
 
 print()
-

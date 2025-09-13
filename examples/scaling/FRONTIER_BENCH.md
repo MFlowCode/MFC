@@ -33,7 +33,7 @@ The code for the benchmarks is built with the following command
 
 The benchmarks can be run in their default configuration with the following
 ```
-./examples/scaling/submit_all.sh --account <acount_name>
+./examples/scaling/submit_all.sh --account <account_name>
 ```
 By default this will submit the following jobs for benchmarking
 

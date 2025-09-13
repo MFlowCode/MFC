@@ -85,8 +85,8 @@ if [ ! -d \$case_dir/restart_data ]; then
 
     # Note: `time` is not used for performance measurement, only for monitoring
     #       the job's progress.
-    time ./mfc.sh run \$case_dir/case.py -c frontier -n 8 -N $N --clean   \
-            -t pre_process -# weak-\$slug-pre -- --scaling weak\
+    time ./mfc.sh run \$case_dir/case.py -c frontier -n 8 -N $N --clean \
+            -t pre_process -# weak-\$slug-pre -- --scaling weak \
             --memory $M \
             > examples/scaling/logs/weak-\$slug-pre.out 2>&1
 fi
@@ -99,7 +99,7 @@ for rdma_mpi in F T; do
     # Note: `time` is not used for performance measurement, only for monitoring
     #       the job's progress.
     time ./mfc.sh run \$case_dir/case.py -c frontier -n 8 -N $N -t simulation \
-        --case-optimization -# weak-\$slug-sim -- --scaling weak\
+        --case-optimization -# weak-\$slug-sim -- --scaling weak \
         --memory $M --rdma_mpi \$rdma_mpi --n-steps 20 \
         > examples/scaling/logs/weak-\$slug-sim.out 2>&1
 

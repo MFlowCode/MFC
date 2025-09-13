@@ -28,25 +28,9 @@ parser.add_argument(
     metavar="MEMORY",
     help="Weak scaling: memory per rank in GB. Strong scaling: global memory in GB. Used to determine cell count.",
 )
-parser.add_argument(
-    "--rdma_mpi",
-    metavar="RDMA",
-    type=str,
-    choices=["T", "F"],
-    default="F",
-    help="Enable RDMA-aware MPI optimizations.")
-parser.add_argument(
-    "--n-steps",
-    metavar="N",
-    type=int,
-    default=20,
-    help="Number of time steps to simulate.")
-parser.add_argument(
-    "--n-save",
-    metavar="NS",
-    type=int,
-    default=20,
-    help="Number of time steps between saves.")
+parser.add_argument("--rdma_mpi", metavar="RDMA", type=str, choices=["T", "F"], default="F", help="Enable RDMA-aware MPI optimizations.")
+parser.add_argument("--n-steps", metavar="N", type=int, default=20, help="Number of time steps to simulate.")
+parser.add_argument("--n-save", metavar="NS", type=int, default=20, help="Number of time steps between saves.")
 args = parser.parse_args()
 
 if args.scaling is None:
@@ -59,27 +43,29 @@ cpg = 8000000 / 16.0
 # Number of ranks.
 nranks = args.mfc["nodes"] * args.mfc["tasks_per_node"]
 
+
 # This subroutine finds three factors of n that are as close to each other as possible.
 def closest_three_factors(n):
     best_triplet = None
-    min_range = float('inf')
+    min_range = float("inf")
 
     # Iterate over possible first factor a
-    for a in range(1, int(n ** (1/3)) + 2):  # a should be around the cube root of n
-        if n % a == 0:
-            n1 = n // a  # Remaining part
+    for factor_one in range(1, int(n ** (1 / 3)) + 2):  # factor_one should be around the cube root of n
+        if n % factor_one == 0:
+            n1 = n // factor_one  # Remaining part
 
             # Iterate over possible second factor b
-            for b in range(a, int(math.sqrt(n1)) + 2):  # b should be around sqrt of n1
-                if n1 % b == 0:
-                    c = n1 // b  # Third factor
+            for factor_two in range(factor_one, int(math.sqrt(n1)) + 2):  # factor_two should be around sqrt of n1
+                if n1 % factor_two == 0:
+                    factor_three = n1 // factor_two  # Third factor
 
-                    triplet_range = c - a  # Spread of the numbers
+                    triplet_range = factor_three - factor_one  # Spread of the numbers
                     if triplet_range < min_range:
                         min_range = triplet_range
-                        best_triplet = (a, b, c)
+                        best_triplet = (factor_one, factor_two, factor_three)
 
     return best_triplet
+
 
 def nxyz_from_ncells_weak(ncells: float) -> typing.Tuple[int, int, int]:
     s = math.floor(ncells ** (1 / 3))
@@ -89,17 +75,19 @@ def nxyz_from_ncells_weak(ncells: float) -> typing.Tuple[int, int, int]:
     N1 = ND[0] * s - 1
     N2 = ND[1] * s - 1
     N3 = ND[2] * s - 1
-    Lx = ND[0]
-    Ly = ND[1]
-    Lz = ND[2]
-    return N1, N2, N3, Lx, Ly, Lz
+    L1 = ND[0]
+    L2 = ND[1]
+    L3 = ND[2]
+    return N1, N2, N3, L1, L2, L3
+
 
 def nxyz_from_ncells_strong(ncells: float) -> typing.Tuple[int, int, int]:
     s = round(ncells ** (1 / 3))
-    Lx = 4
-    Ly = 4
-    Lz = 4
-    return s, s, s, Lx, Ly, Lz
+    L1 = 4
+    L2 = 4
+    L3 = 4
+    return s, s, s, L1, L2, L3
+
 
 if args.scaling == "weak":
     Nx, Ny, Nz, Lx, Ly, Lz = nxyz_from_ncells_weak(cpg * args.memory)
@@ -117,32 +105,32 @@ D0 = 1.0e-3
 ISD = 5.0 / 8 * D0
 
 ## pre-shock properties - AIR
-p0a = patm    # pressure - Pa
-rho0a = 1.204 # density - kg/m3
-gama = 1.40   # gamma
-pia = 0       # pi infinity - Pa
-c_a = math.sqrt(gama * (p0a + pia) / rho0a) # speed of sound - M/s
+p0a = patm  # pressure - Pa
+rho0a = 1.204  # density - kg/m3
+gama = 1.40  # gamma
+pia = 0  # pi infinity - Pa
+c_a = math.sqrt(gama * (p0a + pia) / rho0a)  # speed of sound - M/s
 
 ## Droplet - WATER
 rho0w = 1000  # density - kg/m3
-p0w = patm    # pressure - Pa
-gamw = 6.12   # gamma
-piw = 3.43e08 # pi infty - Pa
-c_w = math.sqrt(gamw * (p0w + piw) / rho0w) # speed of sound - m/s
+p0w = patm  # pressure - Pa
+gamw = 6.12  # gamma
+piw = 3.43e08  # pi infty - Pa
+c_w = math.sqrt(gamw * (p0w + piw) / rho0w)  # speed of sound - m/s
 
 # Shock Mach number of interest
 Min = 2.4
 
 # Pos to pre shock ratios - AIR
-psOp0a = (Min**2 - 1) * 2 * gama / (gama + 1) + 1 # pressure
-rhosOrho0a = (1 + (gama + 1) / (gama - 1) * psOp0a) / ((gama + 1) / (gama - 1) + psOp0a) # density
-ss = Min * c_a # shock speed of sound - m/s
+psOp0a = (Min**2 - 1) * 2 * gama / (gama + 1) + 1  # pressure
+rhosOrho0a = (1 + (gama + 1) / (gama - 1) * psOp0a) / ((gama + 1) / (gama - 1) + psOp0a)  # density
+ss = Min * c_a  # shock speed of sound - m/s
 
 # post-shock conditions - AIR
-ps = psOp0a * p0a # pressure - Pa
-rhos = rhosOrho0a * rho0a # density - kg / m3
-c_s = math.sqrt(gama * (ps + pia) / rhos) # post shock speed of sound - m/s
-vel = c_a / gama * (psOp0a - 1.0) * p0a / (p0a + pia) / Min # velocity at the post shock - m/s
+ps = psOp0a * p0a  # pressure - Pa
+rhos = rhosOrho0a * rho0a  # density - kg / m3
+c_s = math.sqrt(gama * (ps + pia) / rhos)  # post shock speed of sound - m/s
+vel = c_a / gama * (psOp0a - 1.0) * p0a / (p0a + pia) / Min  # velocity at the post shock - m/s
 
 # Domain extents
 xb = -Lx * D0 / 2

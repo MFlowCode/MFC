@@ -85,7 +85,7 @@ if [ ! -d \$case_dir/restart_data ]; then
 
     # Note: `time` is not used for performance measurement, only for monitoring
     #       the job's progress.
-    time ./mfc.sh run \$case_dir/case.py -c frontier -n 8 -N $N --clean   \
+    time ./mfc.sh run \$case_dir/case.py -c frontier -n 8 -N $N --clean \
             -t pre_process -# strong-\$slug-pre -- --scaling strong \
             --memory $M \
             > examples/scaling/logs/strong-\$slug-pre.out 2>&1
