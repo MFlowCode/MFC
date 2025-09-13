@@ -28,8 +28,8 @@ module m_volume_filtering
 
     private; public :: s_initialize_fftw_explicit_filter_module, &
  s_initialize_filtering_kernel, s_initialize_fluid_indicator_function, & 
- s_initialize_filtered_fluid_indicator_function, s_finalize_fftw_explicit_filter_module, & 
- s_volume_filter_momentum_eqn, s_apply_fftw_filter_scalarfield, &
+ s_initialize_filtered_fluid_indicator_function, s_initialize_fluid_indicator_gradient, &
+ s_finalize_fftw_explicit_filter_module, s_volume_filter_momentum_eqn, s_apply_fftw_filter_scalarfield, &
  s_compute_viscous_stress_tensor, s_compute_stress_tensor, s_compute_divergence_stress_tensor, s_compute_particle_forces, &
  s_mpi_transpose_slabZ2Y, s_mpi_transpose_slabY2Z, s_mpi_FFT_fwd, s_mpi_FFT_bwd, &
  s_setup_terms_filtering, s_compute_pseudo_turbulent_reynolds_stress, s_compute_effective_viscosity
@@ -43,6 +43,7 @@ module m_volume_filtering
     ! fluid indicator function (1 = fluid, 0 = otherwise)
     type(scalar_field), public :: fluid_indicator_function
     type(scalar_field), public :: filtered_fluid_indicator_function
+    type(scalar_field), allocatable, dimension(:) :: grad_fluid_indicator
 
     ! volume filtered conservative variables
     type(scalar_field), allocatable, dimension(:), public :: q_cons_filtered
@@ -66,7 +67,8 @@ module m_volume_filtering
     ! x-,y-,z-direction forces on particles
     real(wp), allocatable, dimension(:, :) :: particle_forces
 
-    !$acc declare create(fluid_indicator_function, filtered_fluid_indicator_function, q_cons_filtered, filtered_pressure)
+    !$acc declare create(fluid_indicator_function, filtered_fluid_indicator_function, grad_fluid_indicator)
+    !$acc declare create(q_cons_filtered, filtered_pressure)
     !$acc declare create(visc_stress, pres_visc_stress, div_pres_visc_stress)
     !$acc declare create(reynolds_stress, eff_visc, int_mom_exch)
     !$acc declare create(Res, particle_forces)
@@ -456,14 +458,14 @@ contains
     subroutine s_initialize_fluid_indicator_function 
         integer :: i, j, k 
 
-        @:ALLOCATE(fluid_indicator_function%sf(0:m, 0:n, 0:p))
+        @:ALLOCATE(fluid_indicator_function%sf(-1:m+1, -1:n+1, -1:p+1))
         @:ACC_SETUP_SFs(fluid_indicator_function)
 
         ! define fluid indicator function
         !$acc parallel loop collapse(3) gang vector default(present)
-        do i = 0, m
-            do j = 0, n 
-                do k = 0, p
+        do i = -1, m+1
+            do j = -1, n+1 
+                do k = -1, p+1
                     if (ib_markers%sf(i, j, k) == 0) then 
                         fluid_indicator_function%sf(i, j, k) = 1.0_dp
                     else 
@@ -515,6 +517,36 @@ contains
 
     end subroutine s_initialize_filtered_fluid_indicator_function
 
+
+    subroutine s_initialize_fluid_indicator_gradient
+        integer :: i, j, k
+
+        @:ALLOCATE(grad_fluid_indicator(1:3))
+        do i = 1, 3
+            @:ALLOCATE(grad_fluid_indicator(i)%sf(0:m, 0:n, 0:p))
+            @:ACC_SETUP_SFs(grad_fluid_indicator(i))
+        end do
+
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do i = 0, m
+            do j = 0, n
+                do k = 0, p 
+                    grad_fluid_indicator(1)%sf(i, j, k) = (fluid_indicator_function%sf(i+1, j, k) - &
+                                                           fluid_indicator_function%sf(i-1, j, k)) / & 
+                                                           (x_cc(i+1) - x_cc(i-1))
+                    grad_fluid_indicator(2)%sf(i, j, k) = (fluid_indicator_function%sf(i, j+1, k) - &
+                                                           fluid_indicator_function%sf(i, j-1, k)) / & 
+                                                           (y_cc(j+1) - y_cc(j-1))
+                    grad_fluid_indicator(3)%sf(i, j, k) = (fluid_indicator_function%sf(i, j, k+1) - &
+                                                           fluid_indicator_function%sf(i, j, k-1)) / & 
+                                                           (z_cc(k+1) - z_cc(k-1))
+                end do 
+            end do 
+        end do
+
+    end subroutine s_initialize_fluid_indicator_gradient
+
+
     !< calculate the unclosed terms present in the volume filtered momentum equation
     subroutine s_volume_filter_momentum_eqn(q_cons_vf, q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -544,9 +576,7 @@ contains
             end do
         end do 
         ! interphase momentum exchange
-        do i = 1, num_dims
-            call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .false., div_pres_visc_stress(i), int_mom_exch(i))
-        end do 
+        call s_compute_interphase_momentum_exchange(filtered_fluid_indicator_function, grad_fluid_indicator, pres_visc_stress, int_mom_exch)
 
         call s_compute_pseudo_turbulent_reynolds_stress(q_cons_filtered, reynolds_stress)
         call s_compute_effective_viscosity(q_cons_filtered, eff_visc, visc_stress)
@@ -875,6 +905,58 @@ contains
 
     end subroutine s_compute_effective_viscosity
 
+    subroutine s_compute_interphase_momentum_exchange(filtered_fluid_indicator_function, grad_fluid_indicator, pres_visc_stress, int_mom_exch)
+        type(scalar_field), intent(in) :: filtered_fluid_indicator_function
+        type(scalar_field), dimension(1:3), intent(in) :: grad_fluid_indicator
+        type(vector_field), dimension(1:3), intent(in) :: pres_visc_stress
+        type(scalar_field), dimension(1:3), intent(inout) :: int_mom_exch
+
+        integer :: i, j, k, l
+
+        ! x-, y-, z- component loop
+        do l = 1, 3
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do i = 0, m 
+                do j = 0, n 
+                    do k = 0, p
+                        data_real_3D_slabz(i+1, j+1, k+1) = pres_visc_stress(1)%vf(l)%sf(i, j, k) * grad_fluid_indicator(1)%sf(i, j, k) & 
+                                                          + pres_visc_stress(2)%vf(l)%sf(i, j, k) * grad_fluid_indicator(2)%sf(i, j, k) & 
+                                                          + pres_visc_stress(3)%vf(l)%sf(i, j, k) * grad_fluid_indicator(3)%sf(i, j, k)
+                    end do 
+                end do
+            end do
+
+            call nvtxStartRange("FORWARD-3D-FFT")
+            call s_mpi_FFT_fwd 
+            call nvtxEndRange
+
+            ! convolution with filtering kernel
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do i = 1, NxC 
+                do j = 1, Nyloc 
+                    do k = 1, Nz 
+                        data_cmplx_out1d(k + (i-1)*Nz + (j-1)*Nz*NxC) = data_cmplx_out1d(k + (i-1)*Nz + (j-1)*Nz*NxC) * cmplx_kernelG1d(k + (i-1)*Nz + (j-1)*Nz*NxC)
+                    end do 
+                end do 
+            end do
+
+            call nvtxStartRange("BACKWARD-3D-FFT")
+            call s_mpi_FFT_bwd
+            call nvtxEndRange
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do i = 0, m
+                do j = 0, n
+                    do k = 0, p
+                        int_mom_exch(l)%sf(i, j, k) = data_real_3D_slabz(i+1, j+1, k+1) / (real(Nx*Ny*Nz, dp))
+                    end do 
+                end do 
+            end do
+        end do ! end component loop
+
+    end subroutine s_compute_interphase_momentum_exchange
+
     ! computes x-,y-,z-direction forces on particles
     subroutine s_compute_particle_forces
         real(wp), dimension(num_ibs, 3) :: force_glb
@@ -1146,6 +1228,10 @@ contains
 
         @:DEALLOCATE(fluid_indicator_function%sf)
         @:DEALLOCATE(filtered_fluid_indicator_function%sf)
+        do i = 1, 3 
+            @:DEALLOCATE(grad_fluid_indicator(i)%sf)
+        end do
+        @:DEALLOCATE(grad_fluid_indicator)
 
         do i = 1, sys_size-1
             @:DEALLOCATE(q_cons_filtered(i)%sf)

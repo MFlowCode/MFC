@@ -60,6 +60,7 @@ program p_main
     if (volume_filtering_momentum_eqn) then 
         call s_initialize_filtering_kernel()
         call s_initialize_filtered_fluid_indicator_function()
+        call s_initialize_fluid_indicator_gradient()
     end if
 
     ! Setting the time-step iterator to the first time-step
