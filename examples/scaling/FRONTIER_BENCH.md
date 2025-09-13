@@ -14,7 +14,7 @@ can be run with the following steps:
 The code is hosted on GitHub and can be cloned with the following command:
 
 ```bash
-git clone git@github.com:wilfonba/MFC-Wilfong.git; cd MFC-Wilfong; git checkout OLCFBenchmark; chmod u+x examples/scaling/*.sh;
+git clone git@github.com:MFlowCode/MFC.git; cd MFC; chmod u+x examples/scaling/*.sh;
 ```
 
 The above command clones the repository, changes directories in the repository

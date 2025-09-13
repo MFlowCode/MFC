@@ -170,7 +170,6 @@ for mem in strong_scaling_mem:
         subset["speedup"] = base_time / subset["time_avg"]
         subset["efficiency"] = base_time / ((subset["nodes"] / subset.iloc[0]["nodes"]) * subset["time_avg"])
         subset["rel_perf"] = subset["time_avg"] / ref["time_avg"].values
-        print(ref["time_avg"].values)
         print(f"Strong Scaling - Memory: ~{mem}GB, RDMA: {rdma}")
         print(subset[["nodes", "time_avg", "speedup", "efficiency", "rel_perf"]].to_string(index=False))
         print()
