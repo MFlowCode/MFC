@@ -540,10 +540,10 @@ contains
             patch_ib(i)%model_threshold = ray_tracing_threshold
 
             ! Variabes to handle moving imersed boundaries, defaulting to no movement
-            patch_ib%moving_ibm = 0._wp
-            patch_ib%x_vel = 0._wp
-            patch_ib%y_vel = 0._wp
-            patch_ib%z_vel = 0._wp
+            patch_ib(i)%moving_ibm = 0
+            patch_ib(i)%vel(1) = 0._wp
+            patch_ib(i)%vel(2) = 0._wp
+            patch_ib(i)%vel(3) = 0._wp
         end do
 
         ! Fluids physical parameters

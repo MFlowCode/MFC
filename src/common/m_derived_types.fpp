@@ -321,7 +321,7 @@ module m_derived_types
         
         !! Patch conditions for moving imersed boundaries
         integer :: moving_ibm ! 0 for no moving, 1 for moving, 2 for moving on forced path
-        real(wp) :: x_vel, y_vel, z_vel
+        real(wp), dimension(1:3) :: vel
 
     end type ib_patch_parameters
 
