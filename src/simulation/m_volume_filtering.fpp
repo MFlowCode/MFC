@@ -991,10 +991,10 @@ contains
             call s_mpi_allreduce_sum(particle_forces(i, 3), force_glb(i, 3))
         end do
 
-        if (proc_rank == 0) then
-            print *, 'force', force_glb(1, 1)
-            print *, 'C_D', 2._wp * force_glb(1, 1) / (rho_inf_ref * u_inf_ref**2 * pi * patch_ib(1)%radius**2)
-        end if
+        ! if (proc_rank == 0) then
+        !     print *, 'force', force_glb(1, 1)
+        !     print *, 'C_D', 2._wp * force_glb(1, 1) / (rho_inf_ref * u_inf_ref**2 * pi * patch_ib(1)%radius**2)
+        ! end if
         
         ! write particle forces to file
         if (proc_rank == 0) then
