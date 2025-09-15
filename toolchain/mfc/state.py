@@ -38,7 +38,7 @@ class MFCConfig:
             Example: --no-debug --mpi --no-gpu --no-gcov --no-unified"""
         options = []
         for k, v in self.items():
-            if (k == 'gpu'):
+            if k == 'gpu':
                 options.append(f"--{v}-{k}")
             else:
                 options.append(f"--{'no-' if not v else ''}{k}")
@@ -49,7 +49,7 @@ class MFCConfig:
             identifies the configuration. Example: no-debug_no-gpu_no_mpi_no-gcov """
         options = []
         for k, v in sorted(self.items(), key=lambda x: x[0]):
-            if (k == 'gpu'):
+            if k == 'gpu':
                 options.append(f"--{v}-{k}")
             else:
                 options.append(f"--{'no-' if not v else ''}{k}")

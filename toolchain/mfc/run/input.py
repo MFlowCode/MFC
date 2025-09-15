@@ -73,9 +73,9 @@ class MFCInputFile(Case):
         # Determine the real type based on the single precision flag
         real_type = 'real(sp)' if ARG('single') else 'real(dp)'
 
-        if (ARG("gpu") == gpuConfigOptions.MP.value):
+        if ARG("gpu") == gpuConfigOptions.MP.value:
             directive_str = 'mp'
-        elif (ARG("gpu") == gpuConfigOptions.ACC.value):
+        elif ARG("gpu") == gpuConfigOptions.ACC.value:
             directive_str = 'acc'
         else:
             directive_str = None
