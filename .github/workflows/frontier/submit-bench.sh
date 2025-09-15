@@ -24,7 +24,7 @@ else
 fi
 
 
-job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2"
+job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2-$3"
 
 sbatch <<EOT
 #!/bin/bash
