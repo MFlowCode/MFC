@@ -13,6 +13,6 @@ if [ "$2" == "bench" ]; then
         ./mfc.sh run "$dir/case.py" --case-optimization -j 8 --dry-run $build_opts
     done
 else
-    ./mfc.sh test -a --dry-run --rdma-mpi --generate -j 8 $build_opts
+    ./mfc.sh test -a --dry-run --rdma-mpi -j 8 $build_opts
 fi
 
