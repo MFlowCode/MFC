@@ -155,8 +155,6 @@ contains
             rdma_mpi, teno_CT, mp_weno, weno_avg, &
             riemann_solver, low_Mach, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
-            x_a, y_a, z_a, x_b, y_b, z_b, &
-            x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
             fluid_pp, probe_wrt, prim_vars_wrt, &
@@ -225,10 +223,14 @@ contains
 
             if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
-            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. &
+            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_DIRICHLET) .or. &
                 num_bc_patches > 0) then
                 bc_io = .true.
             endif
+
+            if (bc_x%beg == BC_PERIODIC .and. bc_x%end == BC_PERIODIC) periodic_bc(1) = .true.
+            if (bc_y%beg == BC_PERIODIC .and. bc_y%end == BC_PERIODIC) periodic_bc(2) = .true.
+            if (bc_z%beg == BC_PERIODIC .and. bc_z%end == BC_PERIODIC) periodic_bc(3) = .true.
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')

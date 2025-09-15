@@ -50,10 +50,9 @@ module m_mpi_proxy
     integer, dimension(-1:1, -1:1, -1:1) :: p_send_counts, p_recv_counts
     integer, dimension(:, :, :, :), allocatable :: p_send_ids
     character(len=1), dimension(:), allocatable :: p_send_buff, p_recv_buff
-    type(bounds_info), dimension(3) :: comm_coords
     integer :: p_buff_size, p_var_size
 
-    $:GPU_DECLARE(create='[p_send_counts, comm_coords]')
+    $:GPU_DECLARE(create='[p_send_counts]')
 
 contains
 
@@ -92,6 +91,7 @@ contains
         integer :: real_size, int_size, nReal, lag_num_ts
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
+#ifdef MFC_MPI
         call MPI_Pack_size(1, mpi_p, MPI_COMM_WORLD, real_size, ierr)
         call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
 
@@ -100,19 +100,8 @@ contains
         p_buff_size = lag_params%nBubs_glb*p_var_size
 
         @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
-
-        comm_coords(1)%beg = x_cb(buff_size - fd_number - 1)
-        comm_coords(1)%end = x_cb(m - buff_size + fd_number)
-        if (n > 0) then
-            comm_coords(2)%beg = y_cb(buff_size - fd_number - 1)
-            comm_coords(2)%end = y_cb(n - buff_size + fd_number)
-            if (p > 0) then
-                comm_coords(3)%beg = z_cb(buff_size - fd_number - 1)
-                comm_coords(3)%end = z_cb(p - buff_size + fd_number)
-            end if
-        end if
-
         @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, 0:lag_params%nBubs_glb))
+#endif
 
     end subroutine s_initialize_particles_mpi
 
@@ -195,11 +184,8 @@ contains
             & 'bc_y%vb1','bc_y%vb2','bc_y%vb3','bc_y%ve1','bc_y%ve2','bc_y%ve3', &
             & 'bc_z%vb1','bc_z%vb2','bc_z%vb3','bc_z%ve1','bc_z%ve2','bc_z%ve3', &
             & 'bc_x%pres_in','bc_x%pres_out','bc_y%pres_in','bc_y%pres_out', 'bc_z%pres_in','bc_z%pres_out', &
-            & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',    &
-            & 'z_domain%beg', 'z_domain%end', 'x_a', 'x_b', 'y_a', 'y_b', 'z_a', &
-            & 'z_b', 't_stop', 't_save', 'cfl_target', 'Bx0', 'alf_factor',  &
-            & 'tau_star', 'cont_damage_s', 'alpha_bar', 'adap_dt_tol', &
-            & 'ic_eps', 'ic_beta' ]
+            & 't_stop', 't_save', 'cfl_target', 'Bx0', 'alf_factor', 'tau_star', &
+            & 'cont_damage_s', 'alpha_bar', 'adap_dt_tol', 'ic_eps', 'ic_beta' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -284,6 +270,9 @@ contains
         call MPI_BCAST(nv_uvm_out_of_core, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(nv_uvm_igr_temps_on_gpu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(nv_uvm_pref_gpu, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
+        ! Extra BC Variable
+        call MPI_BCAST(periodic_bc, 3, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
 #endif
 
@@ -612,6 +601,7 @@ contains
                     call s_add_particle_to_direction(k, 0, 0, 1)
                 end if
             end if
+
         end do
 
     contains
@@ -629,10 +619,10 @@ contains
                 end if
 
                 if (present(posPrev)) then
-                    f_crosses_boundary = (posPrev(particle_id, dir) > comm_coords(dir)%beg .and. &
-                                          pos(particle_id, dir) < comm_coords(dir)%beg)
+                    f_crosses_boundary = (posPrev(particle_id, dir) > pcomm_coords(dir)%beg .and. &
+                                          pos(particle_id, dir) < pcomm_coords(dir)%beg)
                 else
-                    f_crosses_boundary = (pos(particle_id, dir) < comm_coords(dir)%beg)
+                    f_crosses_boundary = (pos(particle_id, dir) < pcomm_coords(dir)%beg)
                 end if
             elseif (loc == 1) then ! End of the domain
                 if (nidx(dir)%end == 0) then
@@ -641,10 +631,10 @@ contains
                 end if
 
                 if (present(posPrev)) then
-                    f_crosses_boundary = (posPrev(particle_id, dir) < comm_coords(dir)%end .and. &
-                                          pos(particle_id, dir) > comm_coords(dir)%end)
+                    f_crosses_boundary = (posPrev(particle_id, dir) < pcomm_coords(dir)%end .and. &
+                                          pos(particle_id, dir) > pcomm_coords(dir)%end)
                 else
-                    f_crosses_boundary = (pos(particle_id, dir) > comm_coords(dir)%end)
+                    f_crosses_boundary = (pos(particle_id, dir) > pcomm_coords(dir)%end)
                 end if
             end if
 
@@ -690,30 +680,34 @@ contains
     impure subroutine s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
                                                gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, rad, &
                                                rvel, pos, posPrev, vel, scoord, drad, drvel, dgasp, &
-                                               dgasmv, dpos, dvel, lag_num_ts, nbubs)
+                                               dgasmv, dpos, dvel, lag_num_ts, nbubs, dest)
 
         real(wp), dimension(:) :: bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt
         integer, dimension(:, :) :: lag_id
         real(wp), dimension(:, :) :: gas_p, gas_mv, rad, rvel, drad, drvel, dgasp, dgasmv
         real(wp), dimension(:, :, :) :: pos, posPrev, vel, scoord, dpos, dvel
-        integer :: position, bub_id, lag_num_ts, tag, partner, send_tag, recv_tag, nbubs, p_recv_size
+        integer :: position, bub_id, lag_num_ts, tag, partner, send_tag, recv_tag, nbubs, p_recv_size, dest
 
         integer :: i, j, k, l, q
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
+#ifdef MFC_MPI
         do k = nidx(3)%beg, nidx(3)%end
             do j = nidx(2)%beg, nidx(2)%end
                 do i = nidx(1)%beg, nidx(1)%end
-                    if (abs(i) + abs(j) + abs(k) > 0) then
-
+                    if (abs(i) + abs(j) + abs(k) /= 0) then
                         partner = neighbor_ranks(i, j, k)
-
                         send_tag = neighbor_tag(i, j, k)
-                        recv_tag = neighbor_tag(-i, -j, -k)
+                        recv_tag = send_tag !neighbor_tag(-i,-j,-k)
 
-                        call MPI_Sendrecv(p_send_counts(i, j, k), 1, MPI_INTEGER, partner, send_tag, &
+                        call MPI_sendrecv(p_send_counts(i, j, k), 1, MPI_INTEGER, partner, send_tag, &
                                           p_recv_counts(i, j, k), 1, MPI_INTEGER, partner, recv_tag, &
                                           MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                        ! Skip if no particles to exchange
+                        if (p_send_counts(i, j, k) == 0 .and. p_recv_counts(i, j, k) == 0) then
+                            cycle
+                        end if
 
                         p_recv_size = p_recv_counts(i, j, k)*p_var_size
 
@@ -751,7 +745,7 @@ contains
                         send_tag = send_tag + max(num_procs, n_neighbor)
                         recv_tag = recv_tag + max(num_procs, n_neighbor)
 
-                        call MPI_Sendrecv(p_send_buff, position, MPI_PACKED, partner, send_tag, &
+                        call MPI_sendrecv(p_send_buff, position, MPI_PACKED, partner, send_tag, &
                                           p_recv_buff, p_recv_size, MPI_PACKED, partner, recv_tag, &
                                           MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -786,12 +780,16 @@ contains
                                 call MPI_Unpack(p_recv_buff, p_recv_size, position, dvel(bub_id, :, q), 3, mpi_p, MPI_COMM_WORLD, ierr)
                             end do
                             lag_id(bub_id, 2) = bub_id
-
                         end do
                     end if
                 end do
             end do
         end do
+#endif
+
+        if (any(periodic_bc)) then
+            call s_wrap_particle_positions(pos, posPrev, nbubs, dest)
+        end if
 
     end subroutine s_mpi_sendrecv_particles
 
@@ -806,6 +804,65 @@ contains
         tag = (k + 1)*9 + (j + 1)*3 + (i + 1)
 
     end function neighbor_tag
+
+    subroutine s_wrap_particle_positions(pos, posPrev, nbubs, dest)
+
+        real(wp), dimension(:, :, :) :: pos, posPrev
+        integer :: nbubs, dest
+        integer :: i, q
+        real :: offset
+
+        do i = 1, nbubs
+            if (periodic_bc(1)) then
+                offset = glb_bounds(1)%end - glb_bounds(1)%beg
+                if (pos(i, 1, dest) > x_cb(m + buff_size)) then
+                    do q = 1, 2
+                        pos(i, 1, q) = pos(i, 1, q) - offset
+                        posPrev(i, 1, q) = posPrev(i, 1, q) - offset
+                    end do
+                endif
+                if (pos(i, 1, dest) < x_cb(-1 - buff_size)) then
+                    do q = 1, 2
+                        pos(i, 1, q) = pos(i, 1, q) + offset
+                        posPrev(i, 1, q) = posPrev(i, 1, q) + offset
+                    end do
+                endif
+            end if
+
+            if (periodic_bc(2)) then
+                offset = glb_bounds(2)%end - glb_bounds(2)%beg
+                if (pos(i, 2, dest) > y_cb(n + buff_size)) then
+                    do q = 1, 2
+                        pos(i, 2, q) = pos(i, 2, q) - offset
+                        posPrev(i, 2, q) = posPrev(i, 2, q) - offset
+                    end do
+                endif
+                if (pos(i, 2, dest) < y_cb(-buff_size - 1)) then
+                    do q = 1, 2
+                        pos(i, 2, q) = pos(i, 2, q) + offset
+                        posPrev(i, 2, q) = posPrev(i, 2, q) + offset
+                    end do
+                endif
+            end if
+
+            if (periodic_bc(3)) then
+                offset = glb_bounds(3)%end - glb_bounds(3)%beg
+                if (pos(i, 3, dest) > z_cb(p + buff_size)) then
+                    do q = 1, 2
+                        pos(i, 3, q) = pos(i, 3, q) - offset
+                        posPrev(i, 2, q) = posPrev(i, 2, q) - offset
+                    end do
+                endif
+                if (pos(i, 3, dest) < z_cb(-1 - buff_size)) then
+                    do q = 1, 2
+                        pos(i, 3, q) = pos(i, 3, q) + offset
+                        posPrev(i, 2, q) = posPrev(i, 2, q) + offset
+                    end do
+                endif
+            end if
+        end do
+
+    end subroutine s_wrap_particle_positions
 
     impure subroutine s_mpi_send_random_number(phi_rn, num_freq)
         integer, intent(in) :: num_freq

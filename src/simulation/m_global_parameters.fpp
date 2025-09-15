@@ -63,6 +63,7 @@ module m_global_parameters
     !> @{
 
     real(wp), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
+    type(bounds_info), dimension(3) :: glb_bounds !<
     !> @}
 
     !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
@@ -70,7 +71,6 @@ module m_global_parameters
 
     real(wp), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
-    !type(bounds_info) :: x_domain, y_domain, z_domain !<
     !! Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
@@ -231,6 +231,7 @@ module m_global_parameters
 
     integer :: num_bc_patches
     logical :: bc_io
+    logical, dimension(3) :: periodic_bc
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
@@ -238,10 +239,6 @@ module m_global_parameters
     $:GPU_DECLARE(create='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
     $:GPU_DECLARE(create='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
     $:GPU_DECLARE(create='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
-
-    type(bounds_info) :: x_domain, y_domain, z_domain
-    real(wp) :: x_a, y_a, z_a
-    real(wp) :: x_b, y_b, z_b
 
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< shared file or not when using parallel io
@@ -251,6 +248,9 @@ module m_global_parameters
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
+
+    type(bounds_info), allocatable, dimension(:) :: pcomm_coords
+    !! Coordinates for EL particle transfer
 
     type(int_bounds_info), dimension(3) :: nidx !< Indices for neighboring processors
 
@@ -652,6 +652,7 @@ contains
 
         num_bc_patches = 0
         bc_io = .false.
+        periodic_bc = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -664,9 +665,9 @@ contains
             #:endfor
         #:endfor
 
-        x_domain%beg = dflt_int; x_domain%end = dflt_int
-        y_domain%beg = dflt_int; y_domain%end = dflt_int
-        z_domain%beg = dflt_int; z_domain%end = dflt_int
+        glb_bounds(1)%beg = dflt_int; glb_bounds(1)%end = dflt_int
+        glb_bounds(2)%beg = dflt_int; glb_bounds(2)%end = dflt_int
+        glb_bounds(3)%beg = dflt_int; glb_bounds(3)%end = dflt_int
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -1388,6 +1389,7 @@ contains
         #:endif
 
         allocate (proc_coords(1:num_dims))
+        allocate (pcomm_coords(1:num_dims))
 
         if (parallel_io .neqv. .true.) return
 
@@ -1424,6 +1426,7 @@ contains
         end if
 
         deallocate (proc_coords)
+        deallocate (pcomm_coords)
         if (parallel_io) then
             deallocate (start_idx)
 

@@ -501,17 +501,17 @@ contains
                             ghost_points_in(count)%slip = patch_ib(patch_id)%slip
                             ! ghost_points(count)%rank = proc_rank
 
-                            if ((x_cc(i) - dx(i)) < x_domain%beg) then
+                            if ((x_cc(i) - dx(i)) < glb_bounds(1)%beg) then
                                 ghost_points_in(count)%DB(1) = -1
-                            else if ((x_cc(i) + dx(i)) > x_domain%end) then
+                            else if ((x_cc(i) + dx(i)) > glb_bounds(1)%end) then
                                 ghost_points_in(count)%DB(1) = 1
                             else
                                 ghost_points_in(count)%DB(1) = 0
                             end if
 
-                            if ((y_cc(j) - dy(j)) < y_domain%beg) then
+                            if ((y_cc(j) - dy(j)) < glb_bounds(2)%beg) then
                                 ghost_points_in(count)%DB(2) = -1
-                            else if ((y_cc(j) + dy(j)) > y_domain%end) then
+                            else if ((y_cc(j) + dy(j)) > glb_bounds(2)%end) then
                                 ghost_points_in(count)%DB(2) = 1
                             else
                                 ghost_points_in(count)%DB(2) = 0
@@ -543,25 +543,25 @@ contains
                                     ib_markers%sf(i, j, k)
                                 ghost_points_in(count)%slip = patch_ib(patch_id)%slip
 
-                                if ((x_cc(i) - dx(i)) < x_domain%beg) then
+                                if ((x_cc(i) - dx(i)) < glb_bounds(1)%beg) then
                                     ghost_points_in(count)%DB(1) = -1
-                                else if ((x_cc(i) + dx(i)) > x_domain%end) then
+                                else if ((x_cc(i) + dx(i)) > glb_bounds(1)%end) then
                                     ghost_points_in(count)%DB(1) = 1
                                 else
                                     ghost_points_in(count)%DB(1) = 0
                                 end if
 
-                                if ((y_cc(j) - dy(j)) < y_domain%beg) then
+                                if ((y_cc(j) - dy(j)) < glb_bounds(2)%beg) then
                                     ghost_points_in(count)%DB(2) = -1
-                                else if ((y_cc(j) + dy(j)) > y_domain%end) then
+                                else if ((y_cc(j) + dy(j)) > glb_bounds(2)%end) then
                                     ghost_points_in(count)%DB(2) = 1
                                 else
                                     ghost_points_in(count)%DB(2) = 0
                                 end if
 
-                                if ((z_cc(k) - dz(k)) < z_domain%beg) then
+                                if ((z_cc(k) - dz(k)) < glb_bounds(3)%beg) then
                                     ghost_points_in(count)%DB(3) = -1
-                                else if ((z_cc(k) + dz(k)) > z_domain%end) then
+                                else if ((z_cc(k) + dz(k)) > glb_bounds(3)%end) then
                                     ghost_points_in(count)%DB(3) = 1
                                 else
                                     ghost_points_in(count)%DB(3) = 0

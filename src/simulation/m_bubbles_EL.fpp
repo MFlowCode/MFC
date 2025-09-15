@@ -79,8 +79,11 @@ module m_bubbles_EL
     $:GPU_DECLARE(create='[nBubs,Rmax_glb,Rmin_glb,q_beta,q_beta_idx]')
 
     integer, allocatable, dimension(:) :: keep_bubble, prefix_sum
+    integer, allocatable, dimension(:) :: wrap_bubble_loc
+    integer, allocatable, dimension(:,:) :: wrap_bubble_dir
     integer :: active_bubs
     $:GPU_DECLARE(create='[keep_bubble, prefix_sum, active_bubs]')
+    $:GPU_DECLARE(create='[wrap_bubble_loc, wrap_bubble_dir]')
 
 contains
 
@@ -108,6 +111,17 @@ contains
             end if
         else
             call s_mpi_abort('Please check the lag_params%solver_approach input')
+        end if
+
+        pcomm_coords(1)%beg = x_cb(buff_size - fd_number - 1)
+        pcomm_coords(1)%end = x_cb(m - buff_size + fd_number)
+        if (n > 0) then
+            pcomm_coords(2)%beg = y_cb(buff_size - fd_number - 1)
+            pcomm_coords(2)%end = y_cb(n - buff_size + fd_number)
+            if (p > 0) then
+                pcomm_coords(3)%beg = z_cb(buff_size - fd_number - 1)
+                pcomm_coords(3)%end = z_cb(p - buff_size + fd_number)
+            end if
         end if
 
         $:GPU_UPDATE(device='[lag_num_ts, q_beta_idx]')
@@ -149,6 +163,7 @@ contains
         @:ALLOCATE(mtn_dveldt(1:nBubs_glb, 1:3, 1:lag_num_ts))
 
         @:ALLOCATE(keep_bubble(1:nBubs_glb), prefix_sum(1:nBubs_glb))
+        @:ALLOCATE(wrap_bubble_loc(1:nBubs_glb), wrap_bubble_dir(1:nBubs_glb, 1:num_dims))
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
@@ -274,7 +289,8 @@ contains
                                           gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
                                           intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
                                           mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
+                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs, &
+                                          dest=1)
         end if
 
         $:GPU_UPDATE(device='[bubbles_lagrange, lag_params]')
@@ -575,8 +591,6 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
             call MPI_TYPE_FREE(view, ierr)
         end if
-
-        print *, proc_rank, lag_id
 
         if (proc_rank == 0) then
             write (*, '(A,I0,A,I0)') 'Read ', file_tot_part, ' particles from restart file at t_step = ', save_count
@@ -1358,12 +1372,16 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: dest
-        integer :: k, i, patch_id, offset
+        integer :: k, i, q
+        integer ::  patch_id, newBubs, new_idx
+        real(wp) :: offset
         integer, dimension(3) :: cell
 
         $:GPU_PARALLEL_LOOP(private='[cell]')
         do k = 1, nBubs
             keep_bubble(k) = 1
+            wrap_bubble_loc(k) = 0
+            wrap_bubble_dir(k,:) = 0
 
             ! Relocate bubbles at solid boundaries and delete bubbles that leave
             ! buffer regions
@@ -1373,6 +1391,16 @@ contains
             elseif (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                     .and. mtn_pos(k, 1, dest) > x_cb(m) - intfc_rad(k, dest)) then
                 mtn_pos(k, 1, dest) = x_cb(m) - intfc_rad(k, dest)
+            elseif (bc_x%beg == BC_PERIODIC .and. mtn_pos(k, 1, dest) < pcomm_coords(1)%beg .and. &
+                    mtn_posPrev(k, 1, dest) > pcomm_coords(1)%beg) then
+                !print*, "1, -1", mtn_pos(k, 1, dest), mtn_posPrev(k, 1, dest), pcomm_coords(1)%beg
+                wrap_bubble_dir(k,1) = 1
+                wrap_bubble_loc(k) = -1
+            elseif (bc_x%end == BC_PERIODIC .and. mtn_pos(k, 1, dest) > pcomm_coords(1)%end .and. &
+                    mtn_posPrev(k, 1, dest) < pcomm_coords(1)%end) then
+                !print*, "1, 1", mtn_pos(k, 1, dest), mtn_posPrev(k, 1, dest), pcomm_coords(1)%end
+                wrap_bubble_dir(k,1) = 1
+                wrap_bubble_loc(k) = 1
             elseif (mtn_pos(k, 1, dest) >= x_cb(m + buff_size - fd_number)) then
                 keep_bubble(k) = 0
             elseif (mtn_pos(k, 1, dest) < x_cb(fd_number - buff_size - 1)) then
@@ -1385,6 +1413,16 @@ contains
             else if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                      .and. mtn_pos(k, 2, dest) > y_cb(n) - intfc_rad(k, dest)) then
                 mtn_pos(k, 2, dest) = y_cb(n) - intfc_rad(k, dest)
+            elseif (bc_y%beg == BC_PERIODIC .and. mtn_pos(k, 2, dest) < pcomm_coords(2)%beg .and. &
+                    mtn_posPrev(k, 2, dest) > pcomm_coords(2)%beg) then
+                !print*, "2, -1", mtn_pos(k, 2, dest), mtn_posPrev(k, 2, dest), pcomm_coords(2)%beg
+                wrap_bubble_dir(k,2) = 1
+                wrap_bubble_loc(k) = -1
+            elseif (bc_y%end == BC_PERIODIC .and. mtn_pos(k, 2, dest) > pcomm_coords(2)%end .and. &
+                    mtn_posPrev(k, 2, dest) < pcomm_coords(2)%end) then
+                !print*, "2, 1", mtn_pos(k, 2, dest), mtn_posPrev(k, 2, dest), pcomm_coords(2)%end
+                wrap_bubble_dir(k,2) = 1
+                wrap_bubble_loc(k) = 1
             elseif (mtn_pos(k, 2, dest) >= y_cb(n + buff_size - fd_number)) then
                 keep_bubble(k) = 0
             elseif (mtn_pos(k, 2, dest) < y_cb(fd_number - buff_size - 1)) then
@@ -1398,6 +1436,14 @@ contains
                 else if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                          .and. mtn_pos(k, 3, dest) > z_cb(p) - intfc_rad(k, dest)) then
                     mtn_pos(k, 3, dest) = z_cb(p) - intfc_rad(k, dest)
+                elseif (bc_z%beg == BC_PERIODIC .and. mtn_pos(k, 3, dest) < pcomm_coords(3)%beg .and. &
+                        mtn_posPrev(k, 3, dest) > pcomm_coords(3)%beg) then
+                    wrap_bubble_dir(k,3) = 1
+                    wrap_bubble_loc(k) = -1
+                elseif (bc_z%end == BC_PERIODIC .and. mtn_pos(k, 3, dest) > pcomm_coords(3)%end .and. &
+                        mtn_posPrev(k, 3, dest) < pcomm_coords(3)%end) then
+                    wrap_bubble_dir(k,3) = 1
+                    wrap_bubble_loc(k) = 1
                 elseif (mtn_pos(k, 3, dest) >= z_cb(p + buff_size - fd_number)) then
                     keep_bubble(k) = 0
                 elseif (mtn_pos(k, 3, dest) < z_cb(fd_number - buff_size - 1)) then
@@ -1436,6 +1482,7 @@ contains
             end if
         end do
 
+        call nvtxStartRange("LAG-BC")
         call nvtxStartRange("LAG-BC-DEV2HOST")
         $:GPU_UPDATE(host='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
             & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
@@ -1444,6 +1491,7 @@ contains
             & nBubs]')
         call nvtxEndRange
 
+        ! Handle deletion of bubbles leaving local domain
         do k = 1, nBubs
             if (k == 1) then
                 prefix_sum(k) = keep_bubble(k)
@@ -1456,33 +1504,41 @@ contains
         do k = 1, nBubs
             if (keep_bubble(k) == 1) then
                 if (prefix_sum(k) /= k) then
-                    bub_R0(prefix_sum(k)) = bub_R0(k)
-                    Rmax_stats(prefix_sum(k)) = Rmax_stats(k)
-                    Rmin_stats(prefix_sum(k)) = Rmin_stats(k)
-                    gas_mg(prefix_sum(k)) = gas_mg(k)
-                    gas_betaT(prefix_sum(k)) = gas_betaT(k)
-                    gas_betaC(prefix_sum(k)) = gas_betaC(k)
-                    bub_dphidt(prefix_sum(k)) = bub_dphidt(k)
-                    lag_id(prefix_sum(k), 1) = lag_id(k, 1)
-                    gas_p(prefix_sum(k), 1:2) = gas_p(k, 1:2)
-                    gas_mv(prefix_sum(k), 1:2) = gas_mv(k, 1:2)
-                    intfc_rad(prefix_sum(k), 1:2) = intfc_rad(k, 1:2)
-                    intfc_vel(prefix_sum(k), 1:2) = intfc_vel(k, 1:2)
-                    mtn_pos(prefix_sum(k), 1:3, 1:2) = mtn_pos(k, 1:3, 1:2)
-                    mtn_posPrev(prefix_sum(k), 1:3, 1:2) = mtn_posPrev(k, 1:3, 1:2)
-                    mtn_vel(prefix_sum(k), 1:3, 1:2) = mtn_vel(k, 1:3, 1:2)
-                    mtn_s(prefix_sum(k), 1:3, 1:2) = mtn_s(k, 1:3, 1:2)
-                    intfc_draddt(prefix_sum(k), 1:lag_num_ts) = intfc_draddt(k, 1:lag_num_ts)
-                    intfc_dveldt(prefix_sum(k), 1:lag_num_ts) = intfc_dveldt(k, 1:lag_num_ts)
-                    gas_dpdt(prefix_sum(k), 1:lag_num_ts) = gas_dpdt(k, 1:lag_num_ts)
-                    gas_dmvdt(prefix_sum(k), 1:lag_num_ts) = gas_dmvdt(k, 1:lag_num_ts)
-                    mtn_dposdt(prefix_sum(k), 1:3, 1:lag_num_ts) = mtn_dposdt(k, 1:3, 1:lag_num_ts)
-                    mtn_dveldt(prefix_sum(k), 1:3, 1:lag_num_ts) = mtn_dveldt(k, 1:3, 1:lag_num_ts)
+                    call s_copy_lag_bubble(k, prefix_sum(k))
                 end if
             end if
             if (k == nBubs) nBubs = active_bubs
         end do
 
+        ! Handle periodic wrapping of bubbles on same processor
+        newBubs = 0
+        do k = 1, nBubs
+            if (any(wrap_bubble_dir(k, :) == 1)) then
+                newBubs = newBubs + 1
+                new_idx = nBubs + newBubs
+                call s_copy_lag_bubble(k, new_idx)
+                do i = 1, num_dims
+                    if (wrap_bubble_dir(k, i) == 1) then
+                        offset = glb_bounds(i)%end - glb_bounds(i)%beg
+                        if (wrap_bubble_loc(k) == 1) then
+                            do q = 1, 2
+                                mtn_pos(new_idx, i, q) = mtn_pos(new_idx, i, q) - offset
+                                mtn_posPrev(new_idx, i, q) = mtn_posPrev(new_idx, i, q) - offset
+                            end do
+                        else if (wrap_bubble_loc(k) == -1) then
+                            do q = 1, 2
+                                mtn_pos(new_idx, i, q) = mtn_pos(new_idx, i, q) + offset
+                                mtn_posPrev(new_idx, i, q) = mtn_posPrev(new_idx, i, q) + offset
+                            end do
+                        end if
+                    end if
+                end do
+            end if
+        end do
+        print*, nBubs, newBubs
+        nBubs = nBubs + newBubs
+
+        ! Handle MPI transfer of bubbles going to another processor's local domain
         if (num_procs > 1) then
             call nvtxStartRange("LAG-BC-TRANSFER-LIST")
             call s_add_particles_to_transfer_list(nBubs, mtn_pos(:, :, dest), mtn_posPrev(:, :, dest))
@@ -1493,7 +1549,8 @@ contains
                                           gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
                                           intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
                                           mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs)
+                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs, &
+                                          dest)
             call nvtxEndRange
         end if
 
@@ -1502,6 +1559,7 @@ contains
             & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
             & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
             & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, nBubs]')
+        call nvtxEndRange
         call nvtxEndRange
 
     end subroutine s_enforce_EL_bubbles_boundary_conditions
@@ -2034,42 +2092,34 @@ contains
 
     !> The purpose of this subroutine is to remove one specific particle if dt is too small.
           !! @param bub_id Particle id
-    impure subroutine s_remove_lag_bubble(bub_id)
+    impure subroutine s_copy_lag_bubble(src, dest)
 
-        integer, intent(in) :: bub_id
+        integer, intent(in) :: src, dest
 
-        integer :: i
+        bub_R0(dest) = bub_R0(src)
+        Rmax_stats(dest) = Rmax_stats(src)
+        Rmin_stats(dest) = Rmin_stats(src)
+        gas_mg(dest) = gas_mg(src)
+        gas_betaT(dest) = gas_betaT(src)
+        gas_betaC(dest) = gas_betaC(src)
+        bub_dphidt(dest) = bub_dphidt(src)
+        lag_id(dest, 1) = lag_id(src, 1)
+        gas_p(dest, 1:2) = gas_p(src, 1:2)
+        gas_mv(dest, 1:2) = gas_mv(src, 1:2)
+        intfc_rad(dest, 1:2) = intfc_rad(src, 1:2)
+        intfc_vel(dest, 1:2) = intfc_vel(src, 1:2)
+        mtn_vel(dest, 1:3, 1:2) = mtn_vel(src, 1:3, 1:2)
+        mtn_s(dest, 1:3, 1:2) = mtn_s(src, 1:3, 1:2)
+        intfc_draddt(dest, 1:lag_num_ts) = intfc_draddt(src, 1:lag_num_ts)
+        intfc_dveldt(dest, 1:lag_num_ts) = intfc_dveldt(src, 1:lag_num_ts)
+        gas_dpdt(dest, 1:lag_num_ts) = gas_dpdt(src, 1:lag_num_ts)
+        gas_dmvdt(dest, 1:lag_num_ts) = gas_dmvdt(src, 1:lag_num_ts)
+        mtn_dposdt(dest, 1:3, 1:lag_num_ts) = mtn_dposdt(src, 1:3, 1:lag_num_ts)
+        mtn_dveldt(dest, 1:3, 1:lag_num_ts) = mtn_dveldt(src, 1:3, 1:lag_num_ts)
+        mtn_pos(dest, 1:3, 1:2) = mtn_pos(src, 1:3, 1:2)
+        mtn_posPrev(dest, 1:3, 1:2) = mtn_posPrev(src, 1:3, 1:2)
 
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = bub_id, nBubs - 1
-            bub_R0(i) = bub_R0(i + 1)
-            Rmax_stats(i) = Rmax_stats(i + 1)
-            Rmin_stats(i) = Rmin_stats(i + 1)
-            gas_mg(i) = gas_mg(i + 1)
-            gas_betaT(i) = gas_betaT(i + 1)
-            gas_betaC(i) = gas_betaC(i + 1)
-            bub_dphidt(i) = bub_dphidt(i + 1)
-            lag_id(i, 1) = lag_id(i + 1, 1)
-            gas_p(i, 1:2) = gas_p(i + 1, 1:2)
-            gas_mv(i, 1:2) = gas_mv(i + 1, 1:2)
-            intfc_rad(i, 1:2) = intfc_rad(i + 1, 1:2)
-            intfc_vel(i, 1:2) = intfc_vel(i + 1, 1:2)
-            mtn_pos(i, 1:3, 1:2) = mtn_pos(i + 1, 1:3, 1:2)
-            mtn_posPrev(i, 1:3, 1:2) = mtn_posPrev(i + 1, 1:3, 1:2)
-            mtn_vel(i, 1:3, 1:2) = mtn_vel(i + 1, 1:3, 1:2)
-            mtn_s(i, 1:3, 1:2) = mtn_s(i + 1, 1:3, 1:2)
-            intfc_draddt(i, 1:lag_num_ts) = intfc_draddt(i + 1, 1:lag_num_ts)
-            intfc_dveldt(i, 1:lag_num_ts) = intfc_dveldt(i + 1, 1:lag_num_ts)
-            gas_dpdt(i, 1:lag_num_ts) = gas_dpdt(i + 1, 1:lag_num_ts)
-            gas_dmvdt(i, 1:lag_num_ts) = gas_dmvdt(i + 1, 1:lag_num_ts)
-            mtn_dposdt(i, 1:3, 1:lag_num_ts) = mtn_dposdt(i + 1, 1:3, 1:lag_num_ts)
-            mtn_dveldt(i, 1:3, 1:lag_num_ts) = mtn_dveldt(i + 1, 1:3, 1:lag_num_ts)
-        end do
-
-        nBubs = nBubs - 1
-        $:GPU_UPDATE(device='[nBubs]')
-
-    end subroutine s_remove_lag_bubble
+    end subroutine s_copy_lag_bubble
 
     !> The purpose of this subroutine is to deallocate variables
     impure subroutine s_finalize_lagrangian_solver()
