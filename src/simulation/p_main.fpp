@@ -53,6 +53,7 @@ program p_main
     call nvtxStartRange("INIT-GPU-VARS")
     call s_initialize_gpu_vars()
     call nvtxEndRange
+    print *, patch_ib(1)%moving_ibm, patch_ib(1)%vel(1), patch_ib(1)%vel(2), patch_ib(1)%vel(3)
 
     ! Setting the time-step iterator to the first time-step
     if (cfl_dt) then
