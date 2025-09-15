@@ -160,20 +160,20 @@ contains
                                 flux_gsrc_vf, &
                                 norm_dir, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
 
-        type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
+        type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
-            intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+            intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
         integer, intent(IN) :: norm_dir
 
@@ -224,7 +224,7 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_src_vf
+            intent(inout) :: flux_src_vf
 
         integer, intent(IN) :: norm_dir
 
@@ -329,7 +329,7 @@ contains
         real(wp) :: alpha_L_sum, alpha_R_sum
         real(wp) :: zcoef, pcorr !< low Mach number correction
 
-        type(riemann_states) :: c_fast, pres_mag
+        type(riemann_states) :: c_fast, pres_mag, vel
         type(riemann_states_vec3) :: B
 
         type(riemann_states) :: Ga ! Gamma (Lorentz factor)
@@ -1108,6 +1108,8 @@ contains
 
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
+        type(riemann_states) :: c_fast, vel
+        integer :: loop_end
 
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
@@ -1137,7 +1139,7 @@ contains
                 if (model_eqns == 3) then
                     !ME3
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, &
-                        & vel_K_Star, Re_L, Re_R, rho_avg, h_avg, &
+                        & vel_K_Star, Re_L, Re_R, rho_avg, h_avg, c_fast, &
                         & gamma_avg, s_L, s_R, s_S, vel_avg_rms, &
                         & alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R, &
                         & Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, &
@@ -1708,8 +1710,10 @@ contains
 
                 elseif (model_eqns == 2 .and. bubbles_euler) then
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[R0_L, R0_R, V0_L, &
-                        & V0_R, P0_L, P0_R, pbw_L, pbw_R, &
-                        & Re_L, Re_R, &
+                        & V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, c_fast, &
+                        & vel_R, rho_avg, alpha_L, alpha_R, h_avg, tau_e_L, tau_e_R, &
+                        & gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, &
+                        & ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, &
                         & pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2117,7 +2121,7 @@ contains
                 else
                     ! 5-EQUATION MODEL WITH HLLC
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, &
-                        & Re_L, Re_R, rho_avg, h_avg, gamma_avg, &
+                        & Re_L, Re_R, rho_avg, h_avg, gamma_avg, c_fast, &
                         & alpha_L, alpha_R, s_L, s_R, s_S, &
                         & vel_avg_rms, pcorr, zcoef, vel_L_tmp, &
                         & vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, &
