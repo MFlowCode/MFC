@@ -14,7 +14,7 @@ module m_helper
 
     implicit none
 
-    private;
+    private; 
     public :: s_comp_n_from_prim, &
               s_comp_n_from_cons, &
               s_initialize_nonpoly, &
@@ -37,7 +37,9 @@ module m_helper
               double_factorial, &
               factorial, &
               f_cut_on, &
-              f_cut_off
+              f_cut_off, &
+              s_downsample_data, &
+              s_upsample_data
 
 contains
 
@@ -513,11 +515,11 @@ contains
         real(wp) :: Y, prefactor, local_pi
 
         local_pi = acos(-1._wp)
-        prefactor = sqrt((2*l + 1)/(4*local_pi)*factorial(l - m_order)/factorial(l + m_order));
+        prefactor = sqrt((2*l + 1)/(4*local_pi)*factorial(l - m_order)/factorial(l + m_order)); 
         if (m_order == 0) then
-            Y = prefactor*associated_legendre(x, l, m_order);
+            Y = prefactor*associated_legendre(x, l, m_order); 
         elseif (m_order > 0) then
-            Y = (-1._wp)**m_order*sqrt(2._wp)*prefactor*associated_legendre(x, l, m_order)*cos(m_order*phi);
+            Y = (-1._wp)**m_order*sqrt(2._wp)*prefactor*associated_legendre(x, l, m_order)*cos(m_order*phi); 
         end if
 
     end function spherical_harmonic_func
@@ -535,17 +537,17 @@ contains
         real(wp) :: result_P
 
         if (m_order <= 0 .and. l <= 0) then
-            result_P = 1;
+            result_P = 1; 
         elseif (l == 1 .and. m_order <= 0) then
-            result_P = x;
+            result_P = x; 
         elseif (l == 1 .and. m_order == 1) then
-            result_P = -(1 - x**2)**(1._wp/2._wp);
+            result_P = -(1 - x**2)**(1._wp/2._wp); 
         elseif (m_order == l) then
-            result_P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2);
+            result_P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2); 
         elseif (m_order == l - 1) then
-            result_P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1);
+            result_P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1); 
         else
-            result_P = ((2*l - 1)*x*associated_legendre(x, l - 1, m_order) - (l + m_order - 1)*associated_legendre(x, l - 2, m_order))/(l - m_order);
+            result_P = ((2*l - 1)*x*associated_legendre(x, l - 1, m_order) - (l + m_order - 1)*associated_legendre(x, l - 2, m_order))/(l - m_order); 
         end if
 
     end function associated_legendre
@@ -624,5 +626,88 @@ contains
         end if
 
     end function f_gx
+
+    subroutine s_downsample_data(q_cons_vf, q_cons_temp, m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf, q_cons_temp
+
+        ! Down sampling variables
+        integer :: i, j, k, l
+        integer :: ix, iy, iz, x_id, y_id, z_id
+        integer, intent(inout) :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
+
+        m_ds = int((m + 1)/3) - 1
+        n_ds = int((n + 1)/3) - 1
+        p_ds = int((p + 1)/3) - 1
+
+        m_glb_ds = int((m_glb + 1)/3) - 1
+        n_glb_ds = int((n_glb + 1)/3) - 1
+        p_glb_ds = int((p_glb + 1)/3) - 1
+
+        do i = 1, sys_size
+            $:GPU_UPDATE(host='[q_cons_vf(i)%sf]')
+        end do
+
+        do l = -1, p_ds + 1
+            do k = -1, n_ds + 1
+                do j = -1, m_ds + 1
+                    x_id = 3*j + 1
+                    y_id = 3*k + 1
+                    z_id = 3*l + 1
+                    do i = 1, sys_size
+                        q_cons_temp(i)%sf(j, k, l) = 0
+
+                        do iz = -1, 1
+                            do iy = -1, 1
+                                do ix = -1, 1
+                                    q_cons_temp(i)%sf(j, k, l) = q_cons_temp(i)%sf(j, k, l) &
+                                                                 + (1._wp/27._wp)*q_cons_vf(i)%sf(x_id + ix, y_id + iy, z_id + iz)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_downsample_data
+
+    subroutine s_upsample_data(q_cons_vf, q_cons_temp)
+
+        type(scalar_field), intent(inout), dimension(sys_size) :: q_cons_vf, q_cons_temp
+        integer :: i, j, k, l
+        integer :: ix, iy, iz
+        integer :: x_id, y_id, z_id
+        real(wp), dimension(4) :: temp
+
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
+
+                        ix = int(j/3._wp)
+                        iy = int(k/3._wp)
+                        iz = int(l/3._wp)
+
+                        x_id = j - int(3*ix) - 1
+                        y_id = k - int(3*iy) - 1
+                        z_id = l - int(3*iz) - 1
+
+                        temp(1) = (2._wp/3._wp)*q_cons_temp(i)%sf(ix, iy, iz) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix + x_id, iy, iz)
+                        temp(2) = (2._wp/3._wp)*q_cons_temp(i)%sf(ix, iy + y_id, iz) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix + x_id, iy + y_id, iz)
+                        temp(3) = (2._wp/3._wp)*temp(1) + (1._wp/3._wp)*temp(2)
+
+                        temp(1) = (2._wp/3._wp)*q_cons_temp(i)%sf(ix, iy, iz + z_id) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix + x_id, iy, iz + z_id)
+                        temp(2) = (2._wp/3._wp)*q_cons_temp(i)%sf(ix, iy + y_id, iz + z_id) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix + x_id, iy + y_id, iz + z_id)
+                        temp(4) = (2._wp/3._wp)*temp(1) + (1._wp/3._wp)*temp(2)
+
+                        q_cons_vf(i)%sf(j, k, l) = (2._wp/3._wp)*temp(3) + (1._wp/3._wp)*temp(4)
+
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_upsample_data
 
 end module m_helper

@@ -53,17 +53,17 @@ contains
         if (ib) then
             if (n > 0) then
                 if (p > 0) then
-                    i_halo_size = -1 + gp_layers* &
-                                            & (m + 2*gp_layers + 1)* &
-                                            & (n + 2*gp_layers + 1)* &
-                                            & (p + 2*gp_layers + 1)/ &
-                                            & (cells_bounds%mnp_min + 2*gp_layers + 1)
+                    i_halo_size = -1 + buff_size* &
+                                            & (m + 2*buff_size + 1)* &
+                                            & (n + 2*buff_size + 1)* &
+                                            & (p + 2*buff_size + 1)/ &
+                                            & (cells_bounds%mnp_min + 2*buff_size + 1)
                 else
-                    i_halo_size = -1 + gp_layers* &
-                                            & (cells_bounds%mn_max + 2*gp_layers + 1)
+                    i_halo_size = -1 + buff_size* &
+                                            & (cells_bounds%mn_max + 2*buff_size + 1)
                 end if
             else
-                i_halo_size = -1 + gp_layers
+                i_halo_size = -1 + buff_size
             end if
 
             $:GPU_UPDATE(device='[i_halo_size]')
@@ -98,8 +98,9 @@ contains
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', &
             & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',  'fd_order',     &
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
-            & 'R0_type', 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
-            & 'num_bc_patches', 'num_igr_iters', 'num_igr_warm_start_iters']
+            & 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
+            & 'num_bc_patches', 'num_igr_iters', 'num_igr_warm_start_iters', &
+            & 'adap_dt_max_iters' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -113,9 +114,9 @@ contains
             & 'bc_x%grcbc_in', 'bc_x%grcbc_out', 'bc_x%grcbc_vel_out',          &
             & 'bc_y%grcbc_in', 'bc_y%grcbc_out', 'bc_y%grcbc_vel_out',          &
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
-            & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
-            & 'shear_stress', 'bulk_stress', 'bubbles_lagrange',     &
-            & 'hyperelasticity']
+            & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',       &
+            & 'shear_stress', 'bulk_stress', 'bubbles_lagrange',                &
+            & 'hyperelasticity', 'down_sample', 'int_comp' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -153,8 +154,9 @@ contains
             & 'bc_x%pres_in','bc_x%pres_out','bc_y%pres_in','bc_y%pres_out', 'bc_z%pres_in','bc_z%pres_out', &
             & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',    &
             & 'z_domain%beg', 'z_domain%end', 'x_a', 'x_b', 'y_a', 'y_b', 'z_a', &
-            & 'z_b', 't_stop', 't_save', 'cfl_target', 'Bx0', 'alf_factor', &
-            & 'tau_star', 'cont_damage_s', 'alpha_bar', 'adap_dt_tol' ]
+            & 'z_b', 't_stop', 't_save', 'cfl_target', 'Bx0', 'alf_factor',  &
+            & 'tau_star', 'cont_damage_s', 'alpha_bar', 'adap_dt_tol', &
+            & 'ic_eps', 'ic_beta' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -180,6 +182,9 @@ contains
             call MPI_BCAST(igr_pres_lim, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(igr_iter_solver, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(viscous, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(recon_type, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(muscl_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(muscl_lim, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endif
 
         do i = 1, num_fluids_max
@@ -232,6 +237,11 @@ contains
             #:endfor
         end do
 
+        ! NVIDIA UVM variables
+        call MPI_BCAST(nv_uvm_out_of_core, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(nv_uvm_igr_temps_on_gpu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(nv_uvm_pref_gpu, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
 #endif
 
     end subroutine s_mpi_bcast_user_inputs
@@ -260,9 +270,9 @@ contains
         call nvtxStartRange("IB-MARKER-COMM-PACKBUF")
 
         buffer_counts = (/ &
-                        gp_layers*(n + 1)*(p + 1), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1) &
+                        buff_size*(n + 1)*(p + 1), &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        buff_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
                         /)
 
         buffer_count = buffer_counts(mpi_dir)
@@ -287,12 +297,12 @@ contains
 
         pack_offset = 0
         if (f_xor(pbc_loc == 1, beg_end_geq_0)) then
-            pack_offset = grid_dims(mpi_dir) - gp_layers + 1
+            pack_offset = grid_dims(mpi_dir) - buff_size + 1
         end if
 
         unpack_offset = 0
         if (pbc_loc == 1) then
-            unpack_offset = grid_dims(mpi_dir) + gp_layers + 1
+            unpack_offset = grid_dims(mpi_dir) + buff_size + 1
         end if
 
         ! Pack Buffer to Send
@@ -302,8 +312,8 @@ contains
                     #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = 0, n
-                                do j = 0, gp_layers - 1
-                                    r = (j + gp_layers*(k + (n + 1)*l))
+                                do j = 0, buff_size - 1
+                                    r = (j + buff_size*(k + (n + 1)*l))
                                     ib_buff_send(r) = ib_markers%sf(j + pack_offset, k, l)
                                 end do
                             end do
@@ -312,10 +322,10 @@ contains
                 #:elif mpi_dir == 2
                     #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
-                            do k = 0, gp_layers - 1
-                                do j = -gp_layers, m + gp_layers
-                                    r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                         (k + gp_layers*l))
+                            do k = 0, buff_size - 1
+                                do j = -buff_size, m + buff_size
+                                    r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                         (k + buff_size*l))
                                     ib_buff_send(r) = ib_markers%sf(j, k + pack_offset, l)
                                 end do
                             end do
@@ -323,11 +333,11 @@ contains
                     #:endcall GPU_PARALLEL_LOOP
                 #:else
                     #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                        do l = 0, gp_layers - 1
-                            do k = -gp_layers, n + gp_layers
-                                do j = -gp_layers, m + gp_layers
-                                    r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                         ((k + gp_layers) + (n + 2*gp_layers + 1)*l))
+                        do l = 0, buff_size - 1
+                            do k = -buff_size, n + buff_size
+                                do j = -buff_size, m + buff_size
+                                    r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                         ((k + buff_size) + (n + 2*buff_size + 1)*l))
                                     ib_buff_send(r) = ib_markers%sf(j, k, l + pack_offset)
                                 end do
                             end do
@@ -338,12 +348,38 @@ contains
         #:endfor
         call nvtxEndRange ! Packbuf
 
-        call nvtxStartRange("IB-MARKER-SENDRECV")
-        call MPI_SENDRECV( &
-            ib_buff_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
-            ib_buff_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
-            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-        call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
+        #:for rdma_mpi in [False, True]
+            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+                #:if rdma_mpi
+                    #:call GPU_HOST_DATA(use_device_addr='[ib_buff_send, ib_buff_recv]')
+
+                        call nvtxStartRange("IB-MARKER-SENDRECV-RDMA")
+                        call MPI_SENDRECV( &
+                            ib_buff_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
+                            ib_buff_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
+                            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        call nvtxEndRange
+
+                    #:endcall GPU_HOST_DATA
+                    $:GPU_WAIT()
+                #:else
+                    call nvtxStartRange("IB-MARKER-DEV2HOST")
+                    $:GPU_UPDATE(host='[ib_buff_send]')
+                    call nvtxEndRange
+
+                    call nvtxStartRange("IB-MARKER-SENDRECV-NO-RMDA")
+                    call MPI_SENDRECV( &
+                        ib_buff_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
+                        ib_buff_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call nvtxEndRange
+
+                    call nvtxStartRange("IB-MARKER-HOST2DEV")
+                    $:GPU_UPDATE(device='[ib_buff_recv]')
+                    call nvtxEndRange
+                #:endif
+            end if
+        #:endfor
 
         ! Unpack Received Buffer
         call nvtxStartRange("IB-MARKER-COMM-UNPACKBUF")
@@ -353,8 +389,8 @@ contains
                     #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = 0, n
-                                do j = -gp_layers, -1
-                                    r = (j + gp_layers*((k + 1) + (n + 1)*l))
+                                do j = -buff_size, -1
+                                    r = (j + buff_size*((k + 1) + (n + 1)*l))
                                     ib_markers%sf(j + unpack_offset, k, l) = ib_buff_recv(r)
                                 end do
                             end do
@@ -363,10 +399,10 @@ contains
                 #:elif mpi_dir == 2
                     #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
-                            do k = -gp_layers, -1
-                                do j = -gp_layers, m + gp_layers
-                                    r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                         ((k + gp_layers) + gp_layers*l))
+                            do k = -buff_size, -1
+                                do j = -buff_size, m + buff_size
+                                    r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                         ((k + buff_size) + buff_size*l))
                                     ib_markers%sf(j, k + unpack_offset, l) = ib_buff_recv(r)
                                 end do
                             end do
@@ -375,12 +411,12 @@ contains
                 #:else
                     ! Unpacking buffer from bc_z%beg
                     #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                        do l = -gp_layers, -1
-                            do k = -gp_layers, n + gp_layers
-                                do j = -gp_layers, m + gp_layers
-                                    r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                         ((k + gp_layers) + (n + 2*gp_layers + 1)* &
-                                          (l + gp_layers)))
+                        do l = -buff_size, -1
+                            do k = -buff_size, n + buff_size
+                                do j = -buff_size, m + buff_size
+                                    r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                         ((k + buff_size) + (n + 2*buff_size + 1)* &
+                                          (l + buff_size)))
                                     ib_markers%sf(j, k, l + unpack_offset) = ib_buff_recv(r)
                                 end do
                             end do

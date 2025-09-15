@@ -35,6 +35,8 @@ module m_data_output
 
     use m_thermochem, only: species_names
 
+    use m_helper
+
     implicit none
 
     private; 
@@ -44,6 +46,8 @@ module m_data_output
               s_initialize_data_output_module, &
               s_finalize_data_output_module
 
+    type(scalar_field), allocatable, dimension(:) :: q_cons_temp
+
     abstract interface
 
         !>  Interface for the conservative data
@@ -51,7 +55,7 @@ module m_data_output
         !! @param ib_markers track if a cell is within the immersed boundary
         !! @param levelset closest distance from every cell to the IB
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-        impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
+        impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, bc_type, ib_markers, levelset, levelset_norm)
 
             import :: scalar_field, integer_field, sys_size, m, n, p, &
                 pres_field, levelset_field, levelset_norm_field, num_dims
@@ -59,7 +63,7 @@ module m_data_output
             ! Conservative variables
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(in) :: q_cons_vf, q_prim_vf
+                intent(inout) :: q_cons_vf, q_prim_vf
 
             type(integer_field), &
                 dimension(1:num_dims, -1:1), &
@@ -67,15 +71,15 @@ module m_data_output
 
             ! IB markers
             type(integer_field), &
-                intent(in) :: ib_markers
+                intent(in), optional :: ib_markers
 
             ! Levelset
             type(levelset_field), &
-                intent(IN) :: levelset
+                intent(IN), optional :: levelset
 
             ! Levelset Norm
             type(levelset_norm_field), &
-                intent(IN) :: levelset_norm
+                intent(IN), optional :: levelset_norm
 
         end subroutine s_write_abstract_data_files
     end interface
@@ -96,10 +100,10 @@ contains
         !! @param ib_markers track if a cell is within the immersed boundary
         !! @param levelset closest distance from every cell to the IB
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-    impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
+    impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, bc_type, ib_markers, levelset, levelset_norm)
         type(scalar_field), &
             dimension(sys_size), &
-            intent(in) :: q_cons_vf, q_prim_vf
+            intent(inout) :: q_cons_vf, q_prim_vf
 
         ! BC types
         type(integer_field), &
@@ -108,15 +112,15 @@ contains
 
         ! IB markers
         type(integer_field), &
-            intent(in) :: ib_markers
+            intent(in), optional :: ib_markers
 
         ! Levelset
         type(levelset_field), &
-            intent(IN) :: levelset
+            intent(IN), optional :: levelset
 
         ! Levelset Norm
         type(levelset_norm_field), &
-            intent(IN) :: levelset_norm
+            intent(IN), optional :: levelset_norm
 
         logical :: file_exist !< checks if file exists
 
@@ -191,14 +195,15 @@ contains
             end if
         end if
 
-        ! Outputting IB Markers
-        file_loc = trim(t_step_dir)//'/ib.dat'
-
-        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
-        write (1) ib_markers%sf
-        close (1)
-
         if (ib) then
+
+            ! Outputting IB Markers
+            file_loc = trim(t_step_dir)//'/ib.dat'
+
+            open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+            write (1) ib_markers%sf
+            close (1)
+
             do i = 1, num_ibs
                 if (patch_ib(i)%geometry == 4) then
 
@@ -215,20 +220,20 @@ contains
                     close (1)
                 end if
             end do
+
+            ! Outtputting Levelset Info
+            file_loc = trim(t_step_dir)//'/levelset.dat'
+
+            open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+            write (1) levelset%sf
+            close (1)
+
+            file_loc = trim(t_step_dir)//'/levelset_norm.dat'
+
+            open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+            write (1) levelset_norm%sf
+            close (1)
         end if
-
-        ! Outtputting Levelset Info
-        file_loc = trim(t_step_dir)//'/levelset.dat'
-
-        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
-        write (1) levelset%sf
-        close (1)
-
-        file_loc = trim(t_step_dir)//'/levelset_norm.dat'
-
-        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
-        write (1) levelset_norm%sf
-        close (1)
 
         ! Outputting Conservative Variables
         do i = 1, sys_size
@@ -422,6 +427,7 @@ contains
                 end do
                 close (2)
             end do
+
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
@@ -474,6 +480,7 @@ contains
                 end do
                 close (2)
             end do
+
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
@@ -557,12 +564,12 @@ contains
         !! @param ib_markers track if a cell is within the immersed boundary
         !! @param levelset closest distance from every cell to the IB
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-    impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, bc_type, ib_markers, levelset, levelset_norm)
 
         ! Conservative variables
         type(scalar_field), &
             dimension(sys_size), &
-            intent(in) :: q_cons_vf, q_prim_vf
+            intent(inout) :: q_cons_vf, q_prim_vf
 
         type(integer_field), &
             dimension(1:num_dims, -1:1), &
@@ -570,15 +577,15 @@ contains
 
         ! IB markers
         type(integer_field), &
-            intent(in) :: ib_markers
+            intent(in), optional :: ib_markers
 
         ! Levelset
         type(levelset_field), &
-            intent(IN) :: levelset
+            intent(IN), optional :: levelset
 
         ! Levelset Norm
         type(levelset_norm_field), &
-            intent(IN) :: levelset_norm
+            intent(IN), optional :: levelset_norm
 
 #ifdef MFC_MPI
 
@@ -593,8 +600,28 @@ contains
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist, dir_check
 
-        ! Generic loop iterator
-        integer :: i
+        ! Generic loop iterators
+        integer :: i, j, k, l
+        real(wp) :: loc_violations, glb_violations
+
+        ! Downsample variables
+        integer :: m_ds, n_ds, p_ds
+        integer :: m_glb_ds, n_glb_ds, p_glb_ds
+        integer :: m_glb_save, n_glb_save, p_glb_save ! Size of array being saved
+
+        if (down_sample) then
+            if ((mod(m + 1, 3) > 0) .or. (mod(n + 1, 3) > 0) .or. (mod(p + 1, 3) > 0)) then
+                loc_violations = 1._wp
+            end if
+            call s_mpi_allreduce_sum(loc_violations, glb_violations)
+            if (proc_rank == 0 .and. nint(glb_violations) > 0) then
+                print *, "WARNING: Attempting to downsample data but there are"// &
+                    "processors with local problem sizes that are not divisible by 3."
+            end if
+            call s_populate_variables_buffers(bc_type, q_cons_vf)
+            call s_downsample_data(q_cons_vf, q_cons_temp, &
+                                   m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
+        end if
 
         if (file_per_process) then
             if (proc_rank == 0) then
@@ -609,11 +636,15 @@ contains
             call DelayFileAccess(proc_rank)
 
             ! Initialize MPI data I/O
-            if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers, &
-                                           levelset, levelset_norm)
+            if (down_sample) then
+                call s_initialize_mpi_data_ds(q_cons_temp)
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                                               levelset, levelset_norm)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
             end if
 
             ! Open the file to write all flow variables
@@ -631,13 +662,24 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
 
-            ! Size of local arrays
-            data_size = (m + 1)*(n + 1)*(p + 1)
+            if (down_sample) then
+                ! Size of local arrays
+                data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
+                m_glb_save = m_glb_ds + 3
+                n_glb_save = n_glb_ds + 3
+                p_glb_save = p_glb_ds + 3
+            else
+                ! Size of local arrays
+                data_size = (m + 1)*(n + 1)*(p + 1)
+                m_glb_save = m_glb + 1
+                n_glb_save = n_glb + 1
+                p_glb_save = p_glb + 1
+            end if
 
             ! Resize some integers so MPI can write even the biggest files
-            m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-            n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-            p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+            m_MOK = int(m_glb_save, MPI_OFFSET_KIND)
+            n_MOK = int(n_glb_save, MPI_OFFSET_KIND)
+            p_MOK = int(p_glb_save, MPI_OFFSET_KIND)
             WP_MOK = int(8._wp, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
@@ -661,13 +703,23 @@ contains
                     end do
                 end if
             else
-                do i = 1, sys_size !TODO: check if this is right
-                    !            do i = 1, adv_idx%end
-                    var_MOK = int(i, MPI_OFFSET_KIND)
+                if (down_sample) then
+                    do i = 1, sys_size !TODO: check if this is right
+                        !            do i = 1, adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            mpi_p, status, ierr)
-                end do
+                        call MPI_FILE_WRITE_ALL(ifile, q_cons_temp(i)%sf, data_size, &
+                                                mpi_p, status, ierr)
+                    end do
+                else
+                    do i = 1, sys_size !TODO: check if this is right
+                        !            do i = 1, adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                                mpi_p, status, ierr)
+                    end do
+                end if
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
@@ -887,6 +939,8 @@ contains
         logical :: dir_check
         integer :: i
 
+        integer :: m_ds, n_ds, p_ds !< down sample dimensions
+
         if (parallel_io .neqv. .true.) then
             ! Setting the address of the time-step directory
             write (t_step_dir, '(A,I0,A)') '/p_all/p', proc_rank, '/0'
@@ -968,12 +1022,32 @@ contains
 
         close (1)
 
+        if (down_sample) then
+            m_ds = int((m + 1)/3) - 1
+            n_ds = int((n + 1)/3) - 1
+            p_ds = int((p + 1)/3) - 1
+
+            allocate (q_cons_temp(1:sys_size))
+            do i = 1, sys_size
+                allocate (q_cons_temp(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
+            end do
+        end if
+
     end subroutine s_initialize_data_output_module
 
     !> Resets s_write_data_files pointer
     impure subroutine s_finalize_data_output_module
 
+        integer :: i
+
         s_write_data_files => null()
+
+        if (down_sample) then
+            do i = 1, sys_size
+                deallocate (q_cons_temp(i)%sf)
+            end do
+            deallocate (q_cons_temp)
+        end if
 
     end subroutine s_finalize_data_output_module
 

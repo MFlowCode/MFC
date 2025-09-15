@@ -15,12 +15,12 @@ module m_chemistry
     use m_global_parameters
 
     implicit none
-    
+
     #:block DEF_AMD
-    real(dp) :: molecular_weights_nonparameter(10) = &
-    (/ 2.016d0, 1.008d0, 15.999d0, 31.998d0, 17.007d0, 18.015d0, 33.006d0, &
-        34.014d0, 39.95d0, 28.014d0 /)
-    $:GPU_DECLARE(create='[molecular_weights_nonparameter]')
+        real(dp) :: molecular_weights_nonparameter(10) = &
+                    (/2.016d0, 1.008d0, 15.999d0, 31.998d0, 17.007d0, 18.015d0, 33.006d0, &
+                      34.014d0, 39.95d0, 28.014d0/)
+        $:GPU_DECLARE(create='[molecular_weights_nonparameter]')
     #:endblock DEF_AMD
 
 contains
@@ -124,10 +124,10 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do eqn = chemxb, chemxe
                             #:block UNDEF_AMD
-                            omega_m = molecular_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+                                omega_m = molecular_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
                             #:endblock UNDEF_AMD
                             #:block DEF_AMD
-                            omega_m = molecular_weights_nonparameter(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+                                omega_m = molecular_weights_nonparameter(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
                             #:endblock DEF_AMD
                             rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
 

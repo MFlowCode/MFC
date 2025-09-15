@@ -121,7 +121,7 @@ contains
                             $:GPU_LOOP(parallelism='[seq]')
                             do r = -fd_number, fd_number
                                 du_dx_hypo(k, l, q) = du_dx_hypo(k, l, q) &
-                                                 + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
+                                                      + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
                             end do
 
                         end do
@@ -147,11 +147,11 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do r = -fd_number, fd_number
                                     du_dy_hypo(k, l, q) = du_dy_hypo(k, l, q) &
-                                                     + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
+                                                          + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
                                     dv_dx_hypo(k, l, q) = dv_dx_hypo(k, l, q) &
-                                                     + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
+                                                          + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
                                     dv_dy_hypo(k, l, q) = dv_dy_hypo(k, l, q) &
-                                                     + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
+                                                          + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
                                 end do
                             end do
                         end do
@@ -179,15 +179,15 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do r = -fd_number, fd_number
                                         du_dz_hypo(k, l, q) = du_dz_hypo(k, l, q) &
-                                                         + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
+                                                              + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
                                         dv_dz_hypo(k, l, q) = dv_dz_hypo(k, l, q) &
-                                                         + q_prim_vf(momxb + 1)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
+                                                              + q_prim_vf(momxb + 1)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
                                         dw_dx_hypo(k, l, q) = dw_dx_hypo(k, l, q) &
-                                                         + q_prim_vf(momxe)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
+                                                              + q_prim_vf(momxe)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
                                         dw_dy_hypo(k, l, q) = dw_dy_hypo(k, l, q) &
-                                                         + q_prim_vf(momxe)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
+                                                              + q_prim_vf(momxe)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
                                         dw_dz_hypo(k, l, q) = dw_dz_hypo(k, l, q) &
-                                                         + q_prim_vf(momxe)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
+                                                              + q_prim_vf(momxe)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
                                     end do
                                 end do
                             end do
