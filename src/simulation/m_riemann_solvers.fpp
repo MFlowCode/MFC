@@ -160,20 +160,20 @@ contains
                                 flux_gsrc_vf, &
                                 norm_dir, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
 
-        type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
+        type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
-            intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+            intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
+            intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
         integer, intent(IN) :: norm_dir
 
@@ -224,7 +224,7 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(inout) :: flux_src_vf
+            intent(INOUT) :: flux_src_vf
 
         integer, intent(IN) :: norm_dir
 
@@ -329,7 +329,7 @@ contains
         real(wp) :: alpha_L_sum, alpha_R_sum
         real(wp) :: zcoef, pcorr !< low Mach number correction
 
-        type(riemann_states) :: c_fast, pres_mag, vel
+        type(riemann_states) :: c_fast, pres_mag
         type(riemann_states_vec3) :: B
 
         type(riemann_states) :: Ga ! Gamma (Lorentz factor)
@@ -1108,8 +1108,6 @@ contains
 
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
-        type(riemann_states) :: c_fast, vel
-        integer :: loop_end
 
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
@@ -1139,7 +1137,7 @@ contains
                 if (model_eqns == 3) then
                     !ME3
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, &
-                        & vel_K_Star, Re_L, Re_R, rho_avg, h_avg, c_fast, &
+                        & vel_K_Star, Re_L, Re_R, rho_avg, h_avg, &
                         & gamma_avg, s_L, s_R, s_S, vel_avg_rms, &
                         & alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R, &
                         & Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, &
@@ -1710,10 +1708,8 @@ contains
 
                 elseif (model_eqns == 2 .and. bubbles_euler) then
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[R0_L, R0_R, V0_L, &
-                        & V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, c_fast, &
-                        & vel_R, rho_avg, alpha_L, alpha_R, h_avg, tau_e_L, tau_e_R, &
-                        & gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, &
-                        & ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, &
+                        & V0_R, P0_L, P0_R, pbw_L, pbw_R, &
+                        & Re_L, Re_R, &
                         & pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2121,7 +2117,7 @@ contains
                 else
                     ! 5-EQUATION MODEL WITH HLLC
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, &
-                        & Re_L, Re_R, rho_avg, h_avg, gamma_avg, c_fast, &
+                        & Re_L, Re_R, rho_avg, h_avg, gamma_avg, &
                         & alpha_L, alpha_R, s_L, s_R, s_S, &
                         & vel_avg_rms, pcorr, zcoef, vel_L_tmp, &
                         & vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, &
@@ -3006,18 +3002,13 @@ contains
         dqR_prim_dz_vf, &
         norm_dir, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), target, intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
-        real(wp), dimension(:, :, :, :), pointer :: qL_prim_rs_vf, qR_prim_rs_vf
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
-            target, intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
-                                     dqL_prim_dy_vf, dqR_prim_dy_vf, &
-                                     dqL_prim_dz_vf, dqR_prim_dz_vf
-
-        type(scalar_field), dimension(:), pointer :: dqL_prim_d_vf, dqR_prim_d_vf
-
-        integer :: end_val, bc_beg, bc_end
+            intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+                             dqL_prim_dy_vf, dqR_prim_dy_vf, &
+                             dqL_prim_dz_vf, dqR_prim_dz_vf
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
@@ -3027,30 +3018,12 @@ contains
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
             dir_idx = (/1, 2, 3/); dir_flg = (/1._wp, 0._wp, 0._wp/)
-            bc_beg = bc_x%beg; bc_end = bc_x%end
-            end_val = m
-            qL_prim_rs_vf => qL_prim_rsx_vf
-            qR_prim_rs_vf => qR_prim_rsx_vf
-            dqL_prim_d_vf => dqL_prim_dx_vf
-            dqR_prim_d_vf => dqR_prim_dx_vf
-        else if (norm_dir == 2) then
+        elseif (norm_dir == 2) then
             is1 = iy; is2 = ix; is3 = iz
             dir_idx = (/2, 1, 3/); dir_flg = (/0._wp, 1._wp, 0._wp/)
-            bc_beg = bc_y%beg; bc_end = bc_y%end
-            end_val = n
-            qL_prim_rs_vf => qL_prim_rsy_vf
-            qR_prim_rs_vf => qR_prim_rsy_vf
-            dqL_prim_d_vf => dqL_prim_dy_vf
-            dqR_prim_d_vf => dqR_prim_dy_vf
         else
             is1 = iz; is2 = iy; is3 = ix
             dir_idx = (/3, 1, 2/); dir_flg = (/0._wp, 0._wp, 1._wp/)
-            bc_beg = bc_z%beg; bc_end = bc_z%end
-            end_val = p
-            qL_prim_rs_vf => qL_prim_rsz_vf
-            qR_prim_rs_vf => qR_prim_rsz_vf
-            dqL_prim_d_vf => dqL_prim_dz_vf
-            dqR_prim_d_vf => dqR_prim_dz_vf
         end if
 
         $:GPU_UPDATE(device='[is1,is2,is3]')
@@ -3071,83 +3044,315 @@ contains
         ! for stuff in different modules
         $:GPU_UPDATE(device='[dir_idx,dir_flg,dir_idx_tau]')
 
-        ! Population of Buffers in x/y/z-direction
-        if (bc_beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do i = 1, sys_size
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        qL_prim_rs_vf(-1, k, l, i) = qR_prim_rs_vf(0, k, l, i)
-                    end do
-                end do
-            end do
-            if (viscous) then
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do i = momxb, momxe
-                    do l = isz%beg, isz%end
-                        do k = isy%beg, isy%end
-                            if (norm_dir == 1) then
-                                dqL_prim_dx_vf(i)%sf(-1, k, l) = dqR_prim_dx_vf(i)%sf(0, k, l)
-                                if (n > 0) then
-                                    dqL_prim_dy_vf(i)%sf(-1, k, l) = dqR_prim_dy_vf(i)%sf(0, k, l)
-                                    if (p > 0) then
-                                        dqL_prim_dz_vf(i)%sf(-1, k, l) = dqR_prim_dz_vf(i)%sf(0, k, l)
-                                    end if
-                                end if
-                            else if (norm_dir == 2) then
-                                dqL_prim_dx_vf(i)%sf(j, -1, l) = dqR_prim_dx_vf(i)%sf(j, 0, l)
-                                dqL_prim_dy_vf(i)%sf(j, -1, l) = dqR_prim_dy_vf(i)%sf(j, 0, l)
-                                if (p > 0) then
-                                    dqL_prim_dz_vf(i)%sf(j, -1, l) = dqR_prim_dz_vf(i)%sf(j, 0, l)
-                                end if
-                            else
-                                dqL_prim_dx_vf(i)%sf(j, k, -1) = dqR_prim_dx_vf(i)%sf(j, k, 0)
-                                dqL_prim_dy_vf(i)%sf(j, k, -1) = dqR_prim_dy_vf(i)%sf(j, k, 0)
-                                dqL_prim_dz_vf(i)%sf(j, k, -1) = dqR_prim_dz_vf(i)%sf(j, k, 0)
-                            end if
-                        end do
-                    end do
-                end do
-            end if
-        end if
+        ! Population of Buffers in x-direction
+        if (norm_dir == 1) then
 
-        if (bc_end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do i = 1, sys_size
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        qR_prim_rs_vf(end_val + 1, k, l, i) = qL_prim_rs_vf(end_val, k, l, i)
-                    end do
-                end do
-            end do
-            if (viscous) then
+            if (bc_x%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
                 $:GPU_PARALLEL_LOOP(collapse=3)
-                do i = momxb, momxe
-                    do l = isz%beg, isz%end
-                        do k = isy%beg, isy%end
-                            if (norm_dir == 1) then
-                                dqR_prim_dx_vf(i)%sf(end_val + 1, k, l) = dqL_prim_dx_vf(i)%sf(end_val, k, l)
-                                if (n > 0) then
-                                    dqR_prim_dy_vf(i)%sf(end_val + 1, k, l) = dqL_prim_dy_vf(i)%sf(end_val, k, l)
-                                    if (p > 0) then
-                                        dqR_prim_dz_vf(i)%sf(end_val + 1, k, l) = dqL_prim_dz_vf(i)%sf(end_val, k, l)
-                                    end if
-                                end if
-                            else if (norm_dir == 2) then
-                                dqR_prim_dx_vf(i)%sf(j, end_val + 1, l) = dqL_prim_dx_vf(i)%sf(j, end_val, l)
-                                dqR_prim_dy_vf(i)%sf(j, end_val + 1, l) = dqL_prim_dy_vf(i)%sf(j, end_val, l)
-                                if (p > 0) then
-                                    dqR_prim_dz_vf(i)%sf(j, end_val + 1, l) = dqL_prim_dz_vf(i)%sf(j, end_val, l)
-                                end if
-                            else
-                                dqR_prim_dx_vf(i)%sf(j, k, end_val + 1) = dqL_prim_dx_vf(i)%sf(j, k, end_val)
-                                dqR_prim_dy_vf(i)%sf(j, k, end_val + 1) = dqL_prim_dy_vf(i)%sf(j, k, end_val)
-                                dqR_prim_dz_vf(i)%sf(j, k, end_val + 1) = dqL_prim_dz_vf(i)%sf(j, k, end_val)
-                            end if
+                do i = 1, sys_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            qL_prim_rsx_vf(-1, k, l, i) = &
+                                qR_prim_rsx_vf(0, k, l, i)
                         end do
                     end do
                 end do
+
+                if (viscous) then
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = momxb, momxe
+                        do l = isz%beg, isz%end
+                            do k = isy%beg, isy%end
+
+                                dqL_prim_dx_vf(i)%sf(-1, k, l) = &
+                                    dqR_prim_dx_vf(i)%sf(0, k, l)
+                            end do
+                        end do
+                    end do
+
+                    if (n > 0) then
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do i = momxb, momxe
+                            do l = isz%beg, isz%end
+                                do k = isy%beg, isy%end
+
+                                    dqL_prim_dy_vf(i)%sf(-1, k, l) = &
+                                        dqR_prim_dy_vf(i)%sf(0, k, l)
+                                end do
+                            end do
+                        end do
+
+                        if (p > 0) then
+                            $:GPU_PARALLEL_LOOP(collapse=3)
+                            do i = momxb, momxe
+                                do l = isz%beg, isz%end
+                                    do k = isy%beg, isy%end
+
+                                        dqL_prim_dz_vf(i)%sf(-1, k, l) = &
+                                            dqR_prim_dz_vf(i)%sf(0, k, l)
+                                    end do
+                                end do
+                            end do
+                        end if
+
+                    end if
+
+                end if
+
             end if
+
+            if (bc_x%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
+
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do i = 1, sys_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            qR_prim_rsx_vf(m + 1, k, l, i) = &
+                                qL_prim_rsx_vf(m, k, l, i)
+                        end do
+                    end do
+                end do
+
+                if (viscous) then
+
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = momxb, momxe
+                        do l = isz%beg, isz%end
+                            do k = isy%beg, isy%end
+
+                                dqR_prim_dx_vf(i)%sf(m + 1, k, l) = &
+                                    dqL_prim_dx_vf(i)%sf(m, k, l)
+                            end do
+                        end do
+                    end do
+
+                    if (n > 0) then
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do i = momxb, momxe
+                            do l = isz%beg, isz%end
+                                do k = isy%beg, isy%end
+
+                                    dqR_prim_dy_vf(i)%sf(m + 1, k, l) = &
+                                        dqL_prim_dy_vf(i)%sf(m, k, l)
+                                end do
+                            end do
+                        end do
+
+                        if (p > 0) then
+                            $:GPU_PARALLEL_LOOP(collapse=3)
+                            do i = momxb, momxe
+                                do l = isz%beg, isz%end
+                                    do k = isy%beg, isy%end
+
+                                        dqR_prim_dz_vf(i)%sf(m + 1, k, l) = &
+                                            dqL_prim_dz_vf(i)%sf(m, k, l)
+                                    end do
+                                end do
+                            end do
+                        end if
+
+                    end if
+
+                end if
+
+            end if
+            ! END: Population of Buffers in x-direction
+
+            ! Population of Buffers in y-direction
+        elseif (norm_dir == 2) then
+
+            if (bc_y%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do i = 1, sys_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            qL_prim_rsy_vf(-1, k, l, i) = &
+                                qR_prim_rsy_vf(0, k, l, i)
+                        end do
+                    end do
+                end do
+
+                if (viscous) then
+
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = momxb, momxe
+                        do l = isz%beg, isz%end
+                            do j = isx%beg, isx%end
+                                dqL_prim_dx_vf(i)%sf(j, -1, l) = &
+                                    dqR_prim_dx_vf(i)%sf(j, 0, l)
+                            end do
+                        end do
+                    end do
+
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = momxb, momxe
+                        do l = isz%beg, isz%end
+                            do j = isx%beg, isx%end
+                                dqL_prim_dy_vf(i)%sf(j, -1, l) = &
+                                    dqR_prim_dy_vf(i)%sf(j, 0, l)
+                            end do
+                        end do
+                    end do
+
+                    if (p > 0) then
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do i = momxb, momxe
+                            do l = isz%beg, isz%end
+                                do j = isx%beg, isx%end
+                                    dqL_prim_dz_vf(i)%sf(j, -1, l) = &
+                                        dqR_prim_dz_vf(i)%sf(j, 0, l)
+                                end do
+                            end do
+                        end do
+                    end if
+
+                end if
+
+            end if
+
+            if (bc_y%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
+
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do i = 1, sys_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            qR_prim_rsy_vf(n + 1, k, l, i) = &
+                                qL_prim_rsy_vf(n, k, l, i)
+                        end do
+                    end do
+                end do
+
+                if (viscous) then
+
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = momxb, momxe
+                        do l = isz%beg, isz%end
+                            do j = isx%beg, isx%end
+                                dqR_prim_dx_vf(i)%sf(j, n + 1, l) = &
+                                    dqL_prim_dx_vf(i)%sf(j, n, l)
+                            end do
+                        end do
+                    end do
+
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = momxb, momxe
+                        do l = isz%beg, isz%end
+                            do j = isx%beg, isx%end
+                                dqR_prim_dy_vf(i)%sf(j, n + 1, l) = &
+                                    dqL_prim_dy_vf(i)%sf(j, n, l)
+                            end do
+                        end do
+                    end do
+
+                    if (p > 0) then
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do i = momxb, momxe
+                            do l = isz%beg, isz%end
+                                do j = isx%beg, isx%end
+                                    dqR_prim_dz_vf(i)%sf(j, n + 1, l) = &
+                                        dqL_prim_dz_vf(i)%sf(j, n, l)
+                                end do
+                            end do
+                        end do
+                    end if
+
+                end if
+
+            end if
+            ! END: Population of Buffers in y-direction
+
+            ! Population of Buffers in z-direction
+        else
+
+            if (bc_z%beg == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at beginning
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do i = 1, sys_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            qL_prim_rsz_vf(-1, k, l, i) = &
+                                qR_prim_rsz_vf(0, k, l, i)
+                        end do
+                    end do
+                end do
+
+                if (viscous) then
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = momxb, momxe
+                        do k = isy%beg, isy%end
+                            do j = isx%beg, isx%end
+                                dqL_prim_dx_vf(i)%sf(j, k, -1) = &
+                                    dqR_prim_dx_vf(i)%sf(j, k, 0)
+                            end do
+                        end do
+                    end do
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = momxb, momxe
+                        do k = isy%beg, isy%end
+                            do j = isx%beg, isx%end
+                                dqL_prim_dy_vf(i)%sf(j, k, -1) = &
+                                    dqR_prim_dy_vf(i)%sf(j, k, 0)
+                            end do
+                        end do
+                    end do
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = momxb, momxe
+                        do k = isy%beg, isy%end
+                            do j = isx%beg, isx%end
+                                dqL_prim_dz_vf(i)%sf(j, k, -1) = &
+                                    dqR_prim_dz_vf(i)%sf(j, k, 0)
+                            end do
+                        end do
+                    end do
+                end if
+
+            end if
+
+            if (bc_z%end == BC_RIEMANN_EXTRAP) then    ! Riemann state extrap. BC at end
+
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do i = 1, sys_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            qR_prim_rsz_vf(p + 1, k, l, i) = &
+                                qL_prim_rsz_vf(p, k, l, i)
+                        end do
+                    end do
+                end do
+
+                if (viscous) then
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = momxb, momxe
+                        do k = isy%beg, isy%end
+                            do j = isx%beg, isx%end
+                                dqR_prim_dx_vf(i)%sf(j, k, p + 1) = &
+                                    dqL_prim_dx_vf(i)%sf(j, k, p)
+                            end do
+                        end do
+                    end do
+
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = momxb, momxe
+                        do k = isy%beg, isy%end
+                            do j = isx%beg, isx%end
+                                dqR_prim_dy_vf(i)%sf(j, k, p + 1) = &
+                                    dqL_prim_dy_vf(i)%sf(j, k, p)
+                            end do
+                        end do
+                    end do
+
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = momxb, momxe
+                        do k = isy%beg, isy%end
+                            do j = isx%beg, isx%end
+                                dqR_prim_dz_vf(i)%sf(j, k, p + 1) = &
+                                    dqL_prim_dz_vf(i)%sf(j, k, p)
+                            end do
+                        end do
+                    end do
+                end if
+
+            end if
+
         end if
         ! END: Population of Buffers in z-direction
 
@@ -3183,42 +3388,94 @@ contains
 
         ! Reshaping Inputted Data in x-direction
 
-        if (viscous .or. (surface_tension)) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = momxb, E_idx
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            if (norm_dir == 1) then
-                                flux_src_vf(i)%sf(j, k, l) = 0._wp
-                            else if (norm_dir == 2) then
-                                flux_src_vf(i)%sf(k, j, l) = 0._wp
-                            else if (norm_dir == 3) then
-                                flux_src_vf(i)%sf(l, k, j) = 0._wp
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-        end if
+        if (norm_dir == 1) then
 
-        if (qbmm) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, 4
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end + 1
-                            if (norm_dir == 1) then
-                                mom_sp_rsx_vf(j, k, l, i) = mom_sp(i)%sf(j, k, l)
-                            else if (norm_dir == 2) then
-                                mom_sp_rsy_vf(j, k, l, i) = mom_sp(i)%sf(k, j, l)
-                            else if (norm_dir == 3) then
-                                mom_sp_rsz_vf(j, k, l, i) = mom_sp(i)%sf(l, k, j)
-                            end if
+            if (viscous .or. (surface_tension)) then
+
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = momxb, E_idx
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                flux_src_vf(i)%sf(j, k, l) = 0._wp
+                            end do
                         end do
                     end do
                 end do
-            end do
+            end if
+
+            if (qbmm) then
+
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, 4
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end + 1
+                                mom_sp_rsx_vf(j, k, l, i) = mom_sp(i)%sf(j, k, l)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            ! Reshaping Inputted Data in y-direction
+        elseif (norm_dir == 2) then
+
+            if (viscous .or. (surface_tension)) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = momxb, E_idx
+                    do l = is3%beg, is3%end
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                flux_src_vf(i)%sf(k, j, l) = 0._wp
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if (qbmm) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, 4
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end + 1
+                                mom_sp_rsy_vf(j, k, l, i) = mom_sp(i)%sf(k, j, l)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            ! Reshaping Inputted Data in z-direction
+        else
+
+            if (viscous .or. (surface_tension)) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = momxb, E_idx
+                    do j = is1%beg, is1%end
+                        do k = is2%beg, is2%end
+                            do l = is3%beg, is3%end
+                                flux_src_vf(i)%sf(l, k, j) = 0._wp
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if (qbmm) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, 4
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end + 1
+                                mom_sp_rsz_vf(j, k, l, i) = mom_sp(i)%sf(l, k, j)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
         end if
 
     end subroutine s_initialize_riemann_solver
@@ -3602,80 +3859,145 @@ contains
 
         ! Reshaping Outputted Data in y-direction
         if (norm_dir == 2) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = is3%beg, is3%end
+                    do j = is1%beg, is1%end
+                        do k = is2%beg, is2%end
+                            flux_vf(i)%sf(k, j, l) = &
+                                flux_rsy_vf(j, k, l, i)
+                        end do
+                    end do
+                end do
+            end do
+
+            if (cyl_coord) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = is3%beg, is3%end
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                flux_gsrc_vf(i)%sf(k, j, l) = &
+                                    flux_gsrc_rsy_vf(j, k, l, i)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3%beg, is3%end
                 do j = is1%beg, is1%end
                     do k = is2%beg, is2%end
                         flux_src_vf(advxb)%sf(k, j, l) = &
                             flux_src_rsy_vf(j, k, l, advxb)
-                        do i = 1, sys_size
-                            flux_vf(i)%sf(k, j, l) = &
-                                flux_rsy_vf(j, k, l, i)
-                            if (cyl_coord) then
-                                flux_gsrc_vf(i)%sf(k, j, l) = &
-                                    flux_gsrc_rsy_vf(j, k, l, i)
-                            end if
-                        end do
                     end do
                 end do
             end do
 
+            if (riemann_solver == 1 .or. riemann_solver == 4) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = advxb + 1, advxe
+                    do l = is3%beg, is3%end
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                flux_src_vf(i)%sf(k, j, l) = &
+                                    flux_src_rsy_vf(j, k, l, i)
+                            end do
+                        end do
+                    end do
+                end do
+
+            end if
             ! Reshaping Outputted Data in z-direction
         elseif (norm_dir == 3) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do j = is1%beg, is1%end
+                    do k = is2%beg, is2%end
+                        do l = is3%beg, is3%end
+
+                            flux_vf(i)%sf(l, k, j) = &
+                                flux_rsz_vf(j, k, l, i)
+                        end do
+                    end do
+                end do
+            end do
+            if (grid_geometry == 3) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do j = is1%beg, is1%end
+                        do k = is2%beg, is2%end
+                            do l = is3%beg, is3%end
+
+                                flux_gsrc_vf(i)%sf(l, k, j) = &
+                                    flux_gsrc_rsz_vf(j, k, l, i)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
             $:GPU_PARALLEL_LOOP(collapse=3)
             do j = is1%beg, is1%end
                 do k = is2%beg, is2%end
                     do l = is3%beg, is3%end
                         flux_src_vf(advxb)%sf(l, k, j) = &
                             flux_src_rsz_vf(j, k, l, advxb)
-                        do i = 1, sys_size
-                            flux_vf(i)%sf(l, k, j) = &
-                                flux_rsz_vf(j, k, l, i)
-                            if (grid_geometry == 3) then
-                                flux_gsrc_vf(i)%sf(l, k, j) = &
-                                    flux_gsrc_rsz_vf(j, k, l, i)
-                            end if
-                        end do
                     end do
                 end do
             end do
 
-        elseif (norm_dir == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = is3%beg, is3%end
-                do k = is2%beg, is2%end
+            if (riemann_solver == 1 .or. riemann_solver == 4) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = advxb + 1, advxe
                     do j = is1%beg, is1%end
-                        flux_src_vf(advxb)%sf(j, k, l) = &
-                            flux_src_rsx_vf(j, k, l, advxb)
-                        do i = 1, sys_size
+                        do k = is2%beg, is2%end
+                            do l = is3%beg, is3%end
+                                flux_src_vf(i)%sf(l, k, j) = &
+                                    flux_src_rsz_vf(j, k, l, i)
+                            end do
+                        end do
+                    end do
+                end do
+
+            end if
+        elseif (norm_dir == 1) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
                             flux_vf(i)%sf(j, k, l) = &
                                 flux_rsx_vf(j, k, l, i)
                         end do
                     end do
                 end do
             end do
-        end if
 
-        if (riemann_solver == 1 .or. riemann_solver == 4) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = advxb + 1, advxe
-                do l = is3%beg, is3%end
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do l = is3%beg, is3%end
+                do k = is2%beg, is2%end
                     do j = is1%beg, is1%end
-                        do k = is2%beg, is2%end
-                            if (norm_dir == 2) then
-                                flux_src_vf(i)%sf(k, j, l) = &
-                                    flux_src_rsy_vf(j, k, l, i)
-                            else if (norm_dir == 3) then
-                                flux_src_vf(i)%sf(l, k, j) = &
-                                    flux_src_rsz_vf(j, k, l, i)
-                            else if (norm_dir == 1) then
-                                flux_src_vf(i)%sf(j, k, l) = &
-                                    flux_src_rsx_vf(j, k, l, i)
-                            end if
-                        end do
+                        flux_src_vf(advxb)%sf(j, k, l) = &
+                            flux_src_rsx_vf(j, k, l, advxb)
                     end do
                 end do
             end do
+
+            if (riemann_solver == 1 .or. riemann_solver == 4) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = advxb + 1, advxe
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                flux_src_vf(i)%sf(j, k, l) = &
+                                    flux_src_rsx_vf(j, k, l, i)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
         end if
 
     end subroutine s_finalize_riemann_solver
