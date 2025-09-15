@@ -46,6 +46,7 @@ echo "Running in $(pwd):"
 
 job_slug="$job_slug"
 job_device="$2"
+job_interface="$3"
 
 . ./mfc.sh load -c f -m g
 

@@ -3,7 +3,7 @@
 set -e
 
 usage() {
-    echo "Usage: $0 [script.sh] [cpu|gpu]"
+    echo "Usage: $0 [script.sh] [cpu|gpu] [none|acc|omp]"
 }
 
 if [ ! -z "$1" ]; then
@@ -55,6 +55,7 @@ echo "Running in $(pwd):"
 
 job_slug="$job_slug"
 job_device="$2"
+job_interface="$3"
 
 . ./mfc.sh load -c p -m $2
 
