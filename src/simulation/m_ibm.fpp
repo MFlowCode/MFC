@@ -863,7 +863,7 @@ contains
     end subroutine s_interpolate_image_point
 
     !> Subroutine the updates the moving imersed boundary positions
-    impure subroutine propagate_mibs()
+    impure subroutine s_propagate_mibs()
 
     integer :: i, j
 
@@ -882,17 +882,21 @@ contains
 
     end do
 
-    end subroutine propagate_mibs
+    end subroutine s_propagate_mibs
 
-    impure subroutine recompute_levelset_norms()
+    impure subroutine s_update_mib()
 
-    end subroutine recompute_levelset_norms()
+      integer :: i
+      
+      do i = 1, num_ibs
+        if (patch_ib(i)%moving_ibm .ne. 0) then
+          call s_propagate_mibs()  ! TODO :: THIS IS DONE TERRIBLY WITH EULER METHOD
+          call s_apply_domain_patches()  ! TODO :: VERIFY THAT I AM ALLOWED TO JUST APPLY THEM LIKE THIS
+          exit
+        end if
+      end do
 
-    impure subroutine update_mib()
-
-
-
-    end subroutine update_mib
+    end subroutine s_update_mib
 
     !> Subroutine to deallocate memory reserved for the IBM module
     impure subroutine s_finalize_ibm_module()
