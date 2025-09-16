@@ -876,9 +876,10 @@ contains
         end do
 
         patch_ib(i)%x_centroid = patch_ib(i)%x_centroid + patch_ib(i)%vel(1) * dt
-        patch_ib(i)%x_centroid = patch_ib(i)%y_centroid + patch_ib(i)%vel(2) * dt
-        patch_ib(i)%x_centroid = patch_ib(i)%z_centroid + patch_ib(i)%vel(3) * dt
+        patch_ib(i)%y_centroid = patch_ib(i)%y_centroid + patch_ib(i)%vel(2) * dt
+        patch_ib(i)%z_centroid = patch_ib(i)%z_centroid + patch_ib(i)%vel(3) * dt
       end if
+
     end do
 
     end subroutine propagate_mibs
