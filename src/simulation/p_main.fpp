@@ -75,6 +75,8 @@ program p_main
     ! Time-stepping Loop
     do
 
+        call s_update_mib()
+
         if (cfl_dt) then
             if (mytime >= t_stop) then
                 call s_save_performance_metrics(time_avg, time_final, io_time_avg, &
