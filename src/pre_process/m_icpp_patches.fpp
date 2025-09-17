@@ -87,28 +87,28 @@ contains
                 !> @{
                 ! Spherical patch
                 if (patch_icpp(i)%geometry == 8) then
-                    call s_sphere(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_sphere(i, patch_id_fp, q_prim_vf)
                     ! Cuboidal patch
                 elseif (patch_icpp(i)%geometry == 9) then
-                    call s_cuboid(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_cuboid(i, patch_id_fp, q_prim_vf)
                     ! Cylindrical patch
                 elseif (patch_icpp(i)%geometry == 10) then
-                    call s_cylinder(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_cylinder(i, patch_id_fp, q_prim_vf)
                     ! Swept plane patch
                 elseif (patch_icpp(i)%geometry == 11) then
-                    call s_sweep_plane(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_sweep_plane(i, patch_id_fp, q_prim_vf)
                     ! Ellipsoidal patch
                 elseif (patch_icpp(i)%geometry == 12) then
-                    call s_ellipsoid(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_ellipsoid(i, patch_id_fp, q_prim_vf)
                     ! Spherical harmonic patch
                 elseif (patch_icpp(i)%geometry == 14) then
-                    call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_spherical_harmonic(i, patch_id_fp, q_prim_vf)
                     ! 3D Modified circular patch
                 elseif (patch_icpp(i)%geometry == 19) then
-                    call s_3dvarcircle(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_3dvarcircle(i, patch_id_fp, q_prim_vf)
                     ! 3D STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_model(i, patch_id_fp, q_prim_vf)
                 end if
             end do
             !> @}
@@ -126,35 +126,35 @@ contains
                 !> @{
                 ! Circular patch
                 if (patch_icpp(i)%geometry == 2) then
-                    call s_circle(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_circle(i, patch_id_fp, q_prim_vf)
                     ! Rectangular patch
                 elseif (patch_icpp(i)%geometry == 3) then
-                    call s_rectangle(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_rectangle(i, patch_id_fp, q_prim_vf)
                     ! Swept line patch
                 elseif (patch_icpp(i)%geometry == 4) then
-                    call s_sweep_line(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_sweep_line(i, patch_id_fp, q_prim_vf)
                     ! Elliptical patch
                 elseif (patch_icpp(i)%geometry == 5) then
-                    call s_ellipse(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_ellipse(i, patch_id_fp, q_prim_vf)
                     ! Unimplemented patch (formerly isentropic vortex)
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, '// &
                                      'which no longer exists. See Examples. Exiting.')
                     ! Spherical Harmonic Patch
                 elseif (patch_icpp(i)%geometry == 14) then
-                    call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_spherical_harmonic(i, patch_id_fp, q_prim_vf)
                     ! Spiral patch
                 elseif (patch_icpp(i)%geometry == 17) then
-                    call s_spiral(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_spiral(i, patch_id_fp, q_prim_vf)
                     ! Modified circular patch
                 elseif (patch_icpp(i)%geometry == 18) then
-                    call s_varcircle(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_varcircle(i, patch_id_fp, q_prim_vf)
                     ! TaylorGreen vortex patch
                 elseif (patch_icpp(i)%geometry == 20) then
-                    call s_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)
                     ! STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_model(i, patch_id_fp, q_prim_vf)
                 end if
                 !> @}
             end do
@@ -173,7 +173,7 @@ contains
                     call s_icpp_line_segment(i, patch_id_fp, q_prim_vf)
                     ! 1d analytical
                 elseif (patch_icpp(i)%geometry == 16) then
-                    call s_1d_bubble_pulse(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_1d_bubble_pulse(i, patch_id_fp, q_prim_vf)
                 end if
             end do
 
