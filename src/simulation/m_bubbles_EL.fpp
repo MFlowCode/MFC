@@ -79,8 +79,7 @@ module m_bubbles_EL
     $:GPU_DECLARE(create='[nBubs,Rmax_glb,Rmin_glb,q_beta,q_beta_idx]')
 
     integer, allocatable, dimension(:) :: keep_bubble, prefix_sum
-    integer, allocatable, dimension(:) :: wrap_bubble_loc
-    integer, allocatable, dimension(:,:) :: wrap_bubble_dir
+    integer, allocatable, dimension(:,:) :: wrap_bubble_loc, wrap_bubble_dir
     integer :: active_bubs
     $:GPU_DECLARE(create='[keep_bubble, prefix_sum, active_bubs]')
     $:GPU_DECLARE(create='[wrap_bubble_loc, wrap_bubble_dir]')
@@ -163,7 +162,7 @@ contains
         @:ALLOCATE(mtn_dveldt(1:nBubs_glb, 1:3, 1:lag_num_ts))
 
         @:ALLOCATE(keep_bubble(1:nBubs_glb), prefix_sum(1:nBubs_glb))
-        @:ALLOCATE(wrap_bubble_loc(1:nBubs_glb), wrap_bubble_dir(1:nBubs_glb, 1:num_dims))
+        @:ALLOCATE(wrap_bubble_loc(1:nBubs_glb, 1:num_dims), wrap_bubble_dir(1:nBubs_glb, 1:num_dims))
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
@@ -1380,7 +1379,7 @@ contains
         $:GPU_PARALLEL_LOOP(private='[cell]')
         do k = 1, nBubs
             keep_bubble(k) = 1
-            wrap_bubble_loc(k) = 0
+            wrap_bubble_loc(k,:) = 0
             wrap_bubble_dir(k,:) = 0
 
             ! Relocate bubbles at solid boundaries and delete bubbles that leave
@@ -1393,14 +1392,12 @@ contains
                 mtn_pos(k, 1, dest) = x_cb(m) - intfc_rad(k, dest)
             elseif (bc_x%beg == BC_PERIODIC .and. mtn_pos(k, 1, dest) < pcomm_coords(1)%beg .and. &
                     mtn_posPrev(k, 1, dest) > pcomm_coords(1)%beg) then
-                !print*, "1, -1", mtn_pos(k, 1, dest), mtn_posPrev(k, 1, dest), pcomm_coords(1)%beg
                 wrap_bubble_dir(k,1) = 1
-                wrap_bubble_loc(k) = -1
+                wrap_bubble_loc(k,1) = -1
             elseif (bc_x%end == BC_PERIODIC .and. mtn_pos(k, 1, dest) > pcomm_coords(1)%end .and. &
                     mtn_posPrev(k, 1, dest) < pcomm_coords(1)%end) then
-                !print*, "1, 1", mtn_pos(k, 1, dest), mtn_posPrev(k, 1, dest), pcomm_coords(1)%end
                 wrap_bubble_dir(k,1) = 1
-                wrap_bubble_loc(k) = 1
+                wrap_bubble_loc(k,1) = 1
             elseif (mtn_pos(k, 1, dest) >= x_cb(m + buff_size - fd_number)) then
                 keep_bubble(k) = 0
             elseif (mtn_pos(k, 1, dest) < x_cb(fd_number - buff_size - 1)) then
@@ -1415,14 +1412,12 @@ contains
                 mtn_pos(k, 2, dest) = y_cb(n) - intfc_rad(k, dest)
             elseif (bc_y%beg == BC_PERIODIC .and. mtn_pos(k, 2, dest) < pcomm_coords(2)%beg .and. &
                     mtn_posPrev(k, 2, dest) > pcomm_coords(2)%beg) then
-                !print*, "2, -1", mtn_pos(k, 2, dest), mtn_posPrev(k, 2, dest), pcomm_coords(2)%beg
                 wrap_bubble_dir(k,2) = 1
-                wrap_bubble_loc(k) = -1
+                wrap_bubble_loc(k,2) = -1
             elseif (bc_y%end == BC_PERIODIC .and. mtn_pos(k, 2, dest) > pcomm_coords(2)%end .and. &
                     mtn_posPrev(k, 2, dest) < pcomm_coords(2)%end) then
-                !print*, "2, 1", mtn_pos(k, 2, dest), mtn_posPrev(k, 2, dest), pcomm_coords(2)%end
                 wrap_bubble_dir(k,2) = 1
-                wrap_bubble_loc(k) = 1
+                wrap_bubble_loc(k,2) = 1
             elseif (mtn_pos(k, 2, dest) >= y_cb(n + buff_size - fd_number)) then
                 keep_bubble(k) = 0
             elseif (mtn_pos(k, 2, dest) < y_cb(fd_number - buff_size - 1)) then
@@ -1439,11 +1434,11 @@ contains
                 elseif (bc_z%beg == BC_PERIODIC .and. mtn_pos(k, 3, dest) < pcomm_coords(3)%beg .and. &
                         mtn_posPrev(k, 3, dest) > pcomm_coords(3)%beg) then
                     wrap_bubble_dir(k,3) = 1
-                    wrap_bubble_loc(k) = -1
+                    wrap_bubble_loc(k,3) = -1
                 elseif (bc_z%end == BC_PERIODIC .and. mtn_pos(k, 3, dest) > pcomm_coords(3)%end .and. &
                         mtn_posPrev(k, 3, dest) < pcomm_coords(3)%end) then
                     wrap_bubble_dir(k,3) = 1
-                    wrap_bubble_loc(k) = 1
+                    wrap_bubble_loc(k,3) = 1
                 elseif (mtn_pos(k, 3, dest) >= z_cb(p + buff_size - fd_number)) then
                     keep_bubble(k) = 0
                 elseif (mtn_pos(k, 3, dest) < z_cb(fd_number - buff_size - 1)) then
@@ -1491,52 +1486,57 @@ contains
             & nBubs]')
         call nvtxEndRange
 
-        ! Handle deletion of bubbles leaving local domain
-        do k = 1, nBubs
-            if (k == 1) then
-                prefix_sum(k) = keep_bubble(k)
-            else
-                prefix_sum(k) = prefix_sum(k - 1) + keep_bubble(k)
-            end if
-            if (k == nBubs) active_bubs = prefix_sum(k)
-        end do
-
-        do k = 1, nBubs
-            if (keep_bubble(k) == 1) then
-                if (prefix_sum(k) /= k) then
-                    call s_copy_lag_bubble(k, prefix_sum(k))
+        if (nBubs > 0) then
+            ! Handle deletion of bubbles leaving local domain
+            do k = 1, nBubs
+                if (k == 1) then
+                    prefix_sum(k) = keep_bubble(k)
+                else
+                    prefix_sum(k) = prefix_sum(k - 1) + keep_bubble(k)
                 end if
-            end if
-            if (k == nBubs) nBubs = active_bubs
-        end do
+            end do
 
-        ! Handle periodic wrapping of bubbles on same processor
-        newBubs = 0
-        do k = 1, nBubs
-            if (any(wrap_bubble_dir(k, :) == 1)) then
-                newBubs = newBubs + 1
-                new_idx = nBubs + newBubs
-                call s_copy_lag_bubble(k, new_idx)
-                do i = 1, num_dims
-                    if (wrap_bubble_dir(k, i) == 1) then
-                        offset = glb_bounds(i)%end - glb_bounds(i)%beg
-                        if (wrap_bubble_loc(k) == 1) then
-                            do q = 1, 2
-                                mtn_pos(new_idx, i, q) = mtn_pos(new_idx, i, q) - offset
-                                mtn_posPrev(new_idx, i, q) = mtn_posPrev(new_idx, i, q) - offset
-                            end do
-                        else if (wrap_bubble_loc(k) == -1) then
-                            do q = 1, 2
-                                mtn_pos(new_idx, i, q) = mtn_pos(new_idx, i, q) + offset
-                                mtn_posPrev(new_idx, i, q) = mtn_posPrev(new_idx, i, q) + offset
-                            end do
-                        end if
+            active_bubs = prefix_sum(nBubs)
+
+            do k = 1, nBubs
+                if (keep_bubble(k) == 1) then
+                    if (prefix_sum(k) /= k) then
+                        call s_copy_lag_bubble(prefix_sum(k), k)
+                        wrap_bubble_dir(prefix_sum(k), :) = wrap_bubble_dir(k, :)
+                        wrap_bubble_loc(prefix_sum(k), :) = wrap_bubble_loc(k, :)
                     end if
-                end do
-            end if
-        end do
-        print*, nBubs, newBubs
-        nBubs = nBubs + newBubs
+                end if
+            end do
+
+            nBubs = active_bubs
+
+            ! Handle periodic wrapping of bubbles on same processor
+            newBubs = 0
+            do k = 1, nBubs
+                if (any(wrap_bubble_dir(k, :) == 1)) then
+                    newBubs = newBubs + 1
+                    new_idx = nBubs + newBubs
+                    call s_copy_lag_bubble(new_idx, k)
+                    do i = 1, num_dims
+                        if (wrap_bubble_dir(k, i) == 1) then
+                            offset = glb_bounds(i)%end - glb_bounds(i)%beg
+                            if (wrap_bubble_loc(k,i) == 1) then
+                                do q = 1, 2
+                                    mtn_pos(new_idx, i, q) = mtn_pos(new_idx, i, q) - offset
+                                    mtn_posPrev(new_idx, i, q) = mtn_posPrev(new_idx, i, q) - offset
+                                end do
+                            else if (wrap_bubble_loc(k,i) == -1) then
+                                do q = 1, 2
+                                    mtn_pos(new_idx, i, q) = mtn_pos(new_idx, i, q) + offset
+                                    mtn_posPrev(new_idx, i, q) = mtn_posPrev(new_idx, i, q) + offset
+                                end do
+                            end if
+                        end if
+                    end do
+                end if
+            end do
+            nBubs = nBubs + newBubs
+        end if
 
         ! Handle MPI transfer of bubbles going to another processor's local domain
         if (num_procs > 1) then
@@ -1664,7 +1664,7 @@ contains
         end if
 
         ! 3D
-        if (p > 0) then
+        if (p > 1) then
             particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. &
                                   (pos_part(1) >= x_cb(fd_number - buff_size - 1)) .and. &
                                   (pos_part(2) < y_cb(n + buff_size - fd_number)) .and. &
@@ -2092,7 +2092,7 @@ contains
 
     !> The purpose of this subroutine is to remove one specific particle if dt is too small.
           !! @param bub_id Particle id
-    impure subroutine s_copy_lag_bubble(src, dest)
+    impure subroutine s_copy_lag_bubble(dest, src)
 
         integer, intent(in) :: src, dest
 
@@ -2110,14 +2110,14 @@ contains
         intfc_vel(dest, 1:2) = intfc_vel(src, 1:2)
         mtn_vel(dest, 1:3, 1:2) = mtn_vel(src, 1:3, 1:2)
         mtn_s(dest, 1:3, 1:2) = mtn_s(src, 1:3, 1:2)
+        mtn_pos(dest, 1:3, 1:2) = mtn_pos(src, 1:3, 1:2)
+        mtn_posPrev(dest, 1:3, 1:2) = mtn_posPrev(src, 1:3, 1:2)
         intfc_draddt(dest, 1:lag_num_ts) = intfc_draddt(src, 1:lag_num_ts)
         intfc_dveldt(dest, 1:lag_num_ts) = intfc_dveldt(src, 1:lag_num_ts)
         gas_dpdt(dest, 1:lag_num_ts) = gas_dpdt(src, 1:lag_num_ts)
         gas_dmvdt(dest, 1:lag_num_ts) = gas_dmvdt(src, 1:lag_num_ts)
         mtn_dposdt(dest, 1:3, 1:lag_num_ts) = mtn_dposdt(src, 1:3, 1:lag_num_ts)
         mtn_dveldt(dest, 1:3, 1:lag_num_ts) = mtn_dveldt(src, 1:3, 1:lag_num_ts)
-        mtn_pos(dest, 1:3, 1:2) = mtn_pos(src, 1:3, 1:2)
-        mtn_posPrev(dest, 1:3, 1:2) = mtn_posPrev(src, 1:3, 1:2)
 
     end subroutine s_copy_lag_bubble
 
