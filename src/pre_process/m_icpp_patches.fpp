@@ -64,7 +64,7 @@ module m_patches
 
 contains
 
-    impure subroutine s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
+    impure subroutine s_apply_icpp_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp
@@ -109,33 +109,6 @@ contains
                     ! 3D STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_model(i, patch_id_fp, q_prim_vf)
-                end if
-            end do
-            !> @}
-
-            !> IB Patches
-            !> @{
-            ! Spherical patch
-            do i = 1, num_ibs
-                if (proc_rank == 0) then
-                    print *, 'Processing 3D ib patch ', i
-                end if
-
-                if (patch_ib(i)%geometry == 8) then
-                    call s_sphere(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_sphere_levelset(i, levelset, levelset_norm)
-                elseif (patch_ib(i)%geometry == 9) then
-                    call s_cuboid(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_cuboid_levelset(i, levelset, levelset_norm)
-                elseif (patch_ib(i)%geometry == 10) then
-                    call s_cylinder(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_cylinder_levelset(i, levelset, levelset_norm)
-                elseif (patch_ib(i)%geometry == 11) then
-                    call s_3D_airfoil(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_3D_airfoil_levelset(i, levelset, levelset_norm)
-                    ! STL+IBM patch
-                elseif (patch_ib(i)%geometry == 12) then
-                    call s_model(i, ib_markers_sf, q_prim_vf, ib, levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -186,28 +159,6 @@ contains
                 !> @}
             end do
 
-            !> IB Patches
-            !> @{
-            do i = 1, num_ibs
-                if (proc_rank == 0) then
-                    print *, 'Processing 2D ib patch ', i
-                end if
-                if (patch_ib(i)%geometry == 2) then
-                    call s_circle(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_circle_levelset(i, levelset, levelset_norm)
-                elseif (patch_ib(i)%geometry == 3) then
-                    call s_rectangle(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_rectangle_levelset(i, levelset, levelset_norm)
-                elseif (patch_ib(i)%geometry == 4) then
-                    call s_airfoil(i, ib_markers_sf, q_prim_vf, ib)
-                    call s_airfoil_levelset(i, levelset, levelset_norm)
-                    ! STL+IBM patch
-                elseif (patch_ib(i)%geometry == 5) then
-                    call s_model(i, ib_markers_sf, q_prim_vf, ib, levelset, levelset_norm)
-                end if
-            end do
-            !> @}
-
             ! 1D Patch Geometries
         else
 
@@ -219,7 +170,7 @@ contains
 
                 ! Line segment patch
                 if (patch_icpp(i)%geometry == 1) then
-                    call s_line_segment(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_line_segment(i, patch_id_fp, q_prim_vf)
                     ! 1d analytical
                 elseif (patch_icpp(i)%geometry == 16) then
                     call s_1d_bubble_pulse(i, patch_id_fp, q_prim_vf)
@@ -228,7 +179,7 @@ contains
 
         end if
 
-    end subroutine s_apply_domain_patches
+    end subroutine s_apply_icpp_patches
 
     !>          The line segment patch is a 1D geometry that may be used,
     !!              for example, in creating a Riemann problem. The geometry
@@ -239,7 +190,7 @@ contains
     !! @param patch_id patch identifier
     !! @param patch_id_fp Array to track patch ids
     !! @param q_prim_vf Array of primitive variables
-    subroutine s_line_segment(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_line_segment(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -300,7 +251,7 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_line_segment
+    end subroutine s_icpp_line_segment
 
     !>  The spiral patch is a 2D geometry that may be used, The geometry
         !!              of the patch is well-defined when its centroid and radius
@@ -309,7 +260,7 @@ contains
         !! @param patch_id patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    impure subroutine s_spiral(patch_id, patch_id_fp, q_prim_vf)
+    impure subroutine s_icpp_spiral(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -370,7 +321,7 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_spiral
+    end subroutine s_icpp_spiral
 
     !> The circular patch is a 2D geometry that may be used, for
         !!              example, in creating a bubble or a droplet. The geometry
@@ -381,7 +332,7 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_circle(patch_id, patch_id_fp, q_prim_vf, ib_flag)
+    subroutine s_icpp_circle(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -459,13 +410,13 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_circle
+    end subroutine s_icpp_circle
 
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
     !! @param q_prim_vf Array of primitive variables
     !! @param ib True if this patch is an immersed boundary
-    subroutine s_airfoil(patch_id, patch_id_fp, q_prim_vf, ib_flag)
+    subroutine s_icpp_airfoil(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -622,13 +573,13 @@ contains
             end do
         end if
 
-    end subroutine s_airfoil
+    end subroutine s_icpp_airfoil
 
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
     !! @param q_prim_vf Array of primitive variables
     !! @param ib True if this patch is an immersed boundary
-    subroutine s_3D_airfoil(patch_id, patch_id_fp, q_prim_vf, ib_flag)
+    subroutine s_icpp_3D_airfoil(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -793,14 +744,14 @@ contains
             end do
         end if
 
-    end subroutine s_3D_airfoil
+    end subroutine s_icpp_3D_airfoil
 
     !>  The varcircle patch is a 2D geometry that may be used
         !!             . It  generatres an annulus
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    subroutine s_varcircle(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_varcircle(patch_id, patch_id_fp, q_prim_vf)
 
         ! Patch identifier
         integer, intent(in) :: patch_id
@@ -859,12 +810,12 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_varcircle
+    end subroutine s_icpp_varcircle
 
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
     !! @param q_prim_vf Array of primitive variables
-    subroutine s_3dvarcircle(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_3dvarcircle(patch_id, patch_id_fp, q_prim_vf)
 
         ! Patch identifier
         integer, intent(in) :: patch_id
@@ -929,7 +880,7 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_3dvarcircle
+    end subroutine s_icpp_3dvarcircle
 
     !> The elliptical patch is a 2D geometry. The geometry of
         !!      the patch is well-defined when its centroid and radii
@@ -938,7 +889,7 @@ contains
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    subroutine s_ellipse(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_ellipse(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -1001,7 +952,7 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_ellipse
+    end subroutine s_icpp_ellipse
 
     !> The ellipsoidal patch is a 3D geometry. The geometry of
         !!       the patch is well-defined when its centroid and radii
@@ -1010,7 +961,7 @@ contains
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    subroutine s_ellipsoid(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_ellipsoid(patch_id, patch_id_fp, q_prim_vf)
 
         ! Patch identifier
         integer, intent(in) :: patch_id
@@ -1088,7 +1039,7 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_ellipsoid
+    end subroutine s_icpp_ellipsoid
 
     !> The rectangular patch is a 2D geometry that may be used,
         !!              for example, in creating a solid boundary, or pre-/post-
@@ -1102,7 +1053,7 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_rectangle(patch_id, patch_id_fp, q_prim_vf, ib_flag)
+    subroutine s_icpp_rectangle(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -1187,7 +1138,7 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_rectangle
+    end subroutine s_icpp_rectangle
 
     !> The swept line patch is a 2D geometry that may be used,
         !!      for example, in creating a solid boundary, or pre-/post-
@@ -1199,7 +1150,7 @@ contains
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    subroutine s_sweep_line(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_sweep_line(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -1261,7 +1212,7 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_sweep_line
+    end subroutine s_icpp_sweep_line
 
     !> The Taylor Green vortex is 2D decaying vortex that may be used,
         !!              for example, to verify the effects of viscous attenuation.
@@ -1270,7 +1221,7 @@ contains
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    subroutine s_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -1343,12 +1294,12 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_2D_TaylorGreen_Vortex
+    end subroutine s_icpp_2D_TaylorGreen_Vortex
 
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    subroutine s_1d_bubble_pulse(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_1d_bubble_pulse(patch_id, patch_id_fp, q_prim_vf)
         ! Description: This patch assigns the primitive variables as analytical
         !       functions such that the code can be verified.
 
@@ -1404,14 +1355,14 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_1D_bubble_pulse
+    end subroutine s_icpp_1D_bubble_pulse
 
     !> This patch generates the shape of the spherical harmonics
         !!      as a perturbation to a perfect sphere
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    subroutine s_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
@@ -1548,7 +1499,7 @@ contains
             end do
         end if
 
-    end subroutine s_spherical_harmonic
+    end subroutine s_icpp_spherical_harmonic
 
     !>          The spherical patch is a 3D geometry that may be used,
         !!              for example, in creating a bubble or a droplet. The patch
@@ -1559,7 +1510,7 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_sphere(patch_id, patch_id_fp, q_prim_vf, ib_flag)
+    subroutine s_icpp_sphere(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -1648,7 +1599,7 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_sphere
+    end subroutine s_icpp_sphere
 
     !> The cuboidal patch is a 3D geometry that may be used, for
         !!              example, in creating a solid boundary, or pre-/post-shock
@@ -1661,7 +1612,7 @@ contains
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    subroutine s_cuboid(patch_id, patch_id_fp, q_prim_vf, ib_flag)
+    subroutine s_icpp_cuboid(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         logical, optional, intent(in) :: ib_flag
@@ -1751,7 +1702,7 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_cuboid
+    end subroutine s_icpp_cuboid
 
     !> The cylindrical patch is a 3D geometry that may be used,
         !!              for example, in setting up a cylindrical solid boundary
@@ -1765,7 +1716,7 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_cylinder(patch_id, patch_id_fp, q_prim_vf, ib_flag)
+    subroutine s_icpp_cylinder(patch_id, patch_id_fp, q_prim_vf, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -1909,7 +1860,7 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_cylinder
+    end subroutine s_icpp_cylinder
 
     !>      The swept plane patch is a 3D geometry that may be used,
         !!              for example, in creating a solid boundary, or pre-/post-
@@ -1921,7 +1872,7 @@ contains
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Primitive variables
-    subroutine s_sweep_plane(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_sweep_plane(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -1997,7 +1948,7 @@ contains
         end do
         @:HardcodedDellacation()
 
-    end subroutine s_sweep_plane
+    end subroutine s_icpp_sweep_plane
 
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
@@ -2006,7 +1957,7 @@ contains
     !! @param ib True if this patch is an immersed boundary
     !! @param STL_levelset STL levelset
     !! @param STL_levelset_norm STL levelset normals
-    subroutine s_model(patch_id, patch_id_fp, q_prim_vf, ib_flag, STL_levelset, STL_levelset_norm)
+    subroutine s_icpp_model(patch_id, patch_id_fp, q_prim_vf, ib_flag, STL_levelset, STL_levelset_norm)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -2255,7 +2206,7 @@ contains
 
         call s_model_free(model)
 
-    end subroutine s_model
+    end subroutine s_icpp_model
 
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
         $:GPU_ROUTINE(parallelism='[seq]')
