@@ -7,6 +7,8 @@ from .printer import cons
 from .state import ARG
 from .run   import case_dicts
 
+import pprint
+
 QPVF_IDX_VARS = {
     'alpha_rho': 'contxb', 'vel'  : 'momxb',         'pres': 'E_idx', 
     'alpha':     'advxb',  'tau_e': 'stress_idx%beg', 'Y':   'chemxb',
@@ -234,7 +236,7 @@ class Case:
             igr_pres_lim = 1 if self.params.get("igr_pres_lim", 'F') == 'T' else 0
 
             # Throw error if wenoz_q is required but not set
-            return f"""\
+            out = f"""\
 #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
 #:set recon_type            = {recon_type}
 #:set weno_order            = {weno_order}
@@ -262,10 +264,13 @@ class Case:
 #:set viscous               = {viscous}
 """
 
-        return """\
+        else:
+            out = """\
 ! This file is purposefully empty. It is only important for builds that make use
 ! of --case-optimization.
 """
+
+        return out + f"\n{self.__get_pre_fpp(print)}"
 
     def get_fpp(self, target, print = True) -> str:
         def _prepend() -> str:
@@ -277,9 +282,13 @@ class Case:
             return "! This file is purposefully empty."
 
         result = {
-            "pre_process" : self.__get_pre_fpp,
+            "pre_process"      : self.__get_pre_fpp,
             "simulation"  : self.__get_sim_fpp,
         }.get(build.get_target(target).name, _default)(print)
+
+        pprint.pprint(build.get_target(target).name)
+        if build.get_target(target).name == 'common':
+          raise 0
 
         return _prepend() + result
 

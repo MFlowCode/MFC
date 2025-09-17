@@ -75,7 +75,7 @@ program p_main
     ! Time-stepping Loop
     do
 
-        call s_update_mib()
+        call s_update_mib(num_ibs, ib_markers%sf, q_prim_vf, levelset, levelset_norm)
 
         if (cfl_dt) then
             if (mytime >= t_stop) then
