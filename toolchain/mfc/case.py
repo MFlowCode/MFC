@@ -265,11 +265,9 @@ class Case:
 """
 
         else:
-            out = """\
-! This file is purposefully empty. It is only important for builds that make use
-! of --case-optimization.
-"""
+            out = ""
 
+        # We need to also include the pre_processing includes so that common subroutines have access to the @:analytical function
         return out + f"\n{self.__get_pre_fpp(print)}"
 
     def get_fpp(self, target, print = True) -> str:
