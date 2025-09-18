@@ -60,9 +60,8 @@ module m_ib_patches
 
 contains
 
-    impure subroutine s_apply_ib_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
+    impure subroutine s_apply_ib_patches(patch_id_fp, ib_markers_sf, levelset, levelset_norm)
 
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp
         integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
         type(levelset_field), intent(inout), optional :: levelset !< Levelset determined by models
@@ -82,20 +81,20 @@ contains
                 end if
 
                 if (patch_ib(i)%geometry == 8) then
-                    call s_ib_sphere(i, ib_markers_sf, q_prim_vf)
+                    call s_ib_sphere(i, ib_markers_sf)
                     call s_ib_sphere_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 9) then
-                    call s_ib_cuboid(i, ib_markers_sf, q_prim_vf)
+                    call s_ib_cuboid(i, ib_markers_sf)
                     call s_ib_cuboid_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 10) then
-                    call s_ib_cylinder(i, ib_markers_sf, q_prim_vf)
+                    call s_ib_cylinder(i, ib_markers_sf)
                     call s_ib_cylinder_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 11) then
-                    call s_ib_3D_airfoil(i, ib_markers_sf, q_prim_vf)
+                    call s_ib_3D_airfoil(i, ib_markers_sf)
                     call s_ib_3D_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 12) then
-                    call s_ib_model(i, ib_markers_sf, q_prim_vf, levelset, levelset_norm)
+                    call s_ib_model(i, ib_markers_sf, levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -110,17 +109,17 @@ contains
                     print *, 'Processing 2D ib patch ', i
                 end if
                 if (patch_ib(i)%geometry == 2) then
-                    call s_ib_circle(i, ib_markers_sf, q_prim_vf)
+                    call s_ib_circle(i, ib_markers_sf)
                     call s_circle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 3) then
-                    call s_ib_rectangle(i, ib_markers_sf, q_prim_vf)
+                    call s_ib_rectangle(i, ib_markers_sf)
                     call s_rectangle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 4) then
-                    call s_ib_airfoil(i, ib_markers_sf, q_prim_vf)
+                    call s_ib_airfoil(i, ib_markers_sf)
                     call s_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 5) then
-                    call s_ib_model(i, ib_markers_sf, q_prim_vf, levelset, levelset_norm)
+                    call s_ib_model(i, ib_markers_sf, levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -136,13 +135,11 @@ contains
         !!              the smoothing of its boundary.
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_circle(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_ib_circle(patch_id, patch_id_fp)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         real(wp) :: radius
 
@@ -183,13 +180,11 @@ contains
 
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_airfoil(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_ib_airfoil(patch_id, patch_id_fp)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         real(wp) :: x0, y0, f, x_act, y_act, ca_in, pa, ma, ta, theta
         real(wp) :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
@@ -290,16 +285,12 @@ contains
                         if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
                             if (y_act <= airfoil_grid_u(k)%y) then
                                 !!IB
-                                !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                !eta, q_prim_vf, patch_id_fp)
                                 patch_id_fp(i, j, 0) = patch_id
                             end if
                         else
                             f = (airfoil_grid_u(k)%x - x_act)/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
                             if (y_act <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
                                 !!IB
-                                !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                !eta, q_prim_vf, patch_id_fp)
                                 patch_id_fp(i, j, 0) = patch_id
                             end if
                         end if
@@ -311,17 +302,13 @@ contains
                         if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
                             if (y_act >= airfoil_grid_l(k)%y) then
                                 !!IB
-                                !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                !eta, q_prim_vf, patch_id_fp)
                                 patch_id_fp(i, j, 0) = patch_id
                             end if
                         else
                             f = (airfoil_grid_l(k)%x - x_act)/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
                             if (y_act >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
-                                   !!IB
-                                !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                !eta, q_prim_vf, patch_id_fp)
+                                !!IB
                                 patch_id_fp(i, j, 0) = patch_id
                             end if
                         end if
@@ -344,13 +331,11 @@ contains
 
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_3D_airfoil(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_ib_3D_airfoil(patch_id, patch_id_fp)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         real(wp) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca_in, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k, l
@@ -457,16 +442,12 @@ contains
                                 if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
                                     if (y_act <= airfoil_grid_u(k)%y) then
                                         !!IB
-                                        !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                        !eta, q_prim_vf, patch_id_fp)
                                         patch_id_fp(i, j, l) = patch_id
                                     end if
                                 else
                                     f = (airfoil_grid_u(k)%x - x_act)/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
                                     if (y_act <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
                                         !!IB
-                                        !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                        !eta, q_prim_vf, patch_id_fp)
                                         patch_id_fp(i, j, l) = patch_id
                                     end if
                                 end if
@@ -478,17 +459,13 @@ contains
                                 if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
                                     if (y_act >= airfoil_grid_l(k)%y) then
                                         !!IB
-                                        !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                        !eta, q_prim_vf, patch_id_fp)
                                         patch_id_fp(i, j, l) = patch_id
                                     end if
                                 else
                                     f = (airfoil_grid_l(k)%x - x_act)/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
                                     if (y_act >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
-                                           !!IB
-                                        !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                        !eta, q_prim_vf, patch_id_fp)
+                                        !!IB
                                         patch_id_fp(i, j, l) = patch_id
                                     end if
                                 end if
@@ -521,13 +498,11 @@ contains
         !!              boundaries.
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_rectangle(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_ib_rectangle(patch_id, patch_id_fp)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
@@ -589,13 +564,11 @@ contains
         !!              for the smoothing of its boundary.
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_sphere(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_ib_sphere(patch_id, patch_id_fp)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -652,12 +625,10 @@ contains
         !!              boundaries.
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
-    subroutine s_ib_cuboid(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_ib_cuboid(patch_id, patch_id_fp)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -712,7 +683,6 @@ contains
                 end do
             end do
         end do
-        @:HardcodedDellacation()
 
     end subroutine s_ib_cuboid
 
@@ -726,13 +696,11 @@ contains
         !!              of its lateral boundary.
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_cylinder(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_ib_cylinder(patch_id, patch_id_fp)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
         real(wp) :: radius
@@ -807,15 +775,13 @@ contains
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Primitive variables
     !! @param ib True if this patch is an immersed boundary
     !! @param STL_levelset STL levelset
     !! @param STL_levelset_norm STL levelset normals
-    subroutine s_ib_model(patch_id, patch_id_fp, q_prim_vf, STL_levelset, STL_levelset_norm)
+    subroutine s_ib_model(patch_id, patch_id_fp, STL_levelset, STL_levelset_norm)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Variables for IBM+STL
         type(levelset_field), optional, intent(inout) :: STL_levelset !< Levelset determined by models

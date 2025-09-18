@@ -9,7 +9,7 @@
 #:include '3dHardcodedIC.fpp'
 #:include 'macros.fpp'
 
-module m_patches
+module m_icpp_patches
 
     use m_model                 ! Subroutine(s) related to STL files
 
