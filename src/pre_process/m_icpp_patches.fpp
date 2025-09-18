@@ -64,11 +64,10 @@ module m_icpp_patches
 
 contains
 
-    impure subroutine s_apply_icpp_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
+    impure subroutine s_apply_icpp_patches(patch_id_fp, q_prim_vf, levelset, levelset_norm)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp
-        integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
         type(levelset_field), intent(inout), optional :: levelset !< Levelset determined by models
         type(levelset_norm_field), intent(inout), optional :: levelset_norm !< Levelset_norm determined by models
 
@@ -331,13 +330,11 @@ contains
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-        !! @param ib True if this patch is an immersed boundary
-    subroutine s_icpp_circle(patch_id, patch_id_fp, q_prim_vf, ib_flag)
+    subroutine s_icpp_circle(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        logical, optional, intent(in) :: ib_flag
 
         real(wp) :: radius
 
@@ -348,17 +345,11 @@ contains
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
 
-        if (present(ib_flag)) then
-            x_centroid = patch_ib(patch_id)%x_centroid
-            y_centroid = patch_ib(patch_id)%y_centroid
-            radius = patch_ib(patch_id)%radius
-        else
-            x_centroid = patch_icpp(patch_id)%x_centroid
-            y_centroid = patch_icpp(patch_id)%y_centroid
-            radius = patch_icpp(patch_id)%radius
-            smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
-            smooth_coeff = patch_icpp(patch_id)%smooth_coeff
-        end if
+        x_centroid = patch_icpp(patch_id)%x_centroid
+        y_centroid = patch_icpp(patch_id)%y_centroid
+        radius = patch_icpp(patch_id)%radius
+        smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
+        smooth_coeff = patch_icpp(patch_id)%smooth_coeff
 
         ! Initializing the pseudo volume fraction value to 1. The value will
         ! be modified as the patch is laid out on the grid, but only in the
@@ -373,7 +364,7 @@ contains
         do j = 0, n
             do i = 0, m
 
-                if (.not. present(ib_flag) .and. patch_icpp(patch_id)%smoothen) then
+                if (patch_icpp(patch_id)%smoothen) then
 
                     eta = tanh(smooth_coeff/min(dx, dy)* &
                                (sqrt((x_cc(i) - x_centroid)**2 &
@@ -382,369 +373,29 @@ contains
 
                 end if
 
-                if (present(ib_flag) .and. ((x_cc(i) - x_centroid)**2 &
-                                            + (y_cc(j) - y_centroid)**2 <= radius**2)) &
+
+                if (((x_cc(i) - x_centroid)**2 &
+                      + (y_cc(j) - y_centroid)**2 <= radius**2 &
+                      .and. &
+                      patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                    .or. &
+                    patch_id_fp(i, j, 0) == smooth_patch_id) &
                     then
 
-                    patch_id_fp(i, j, 0) = patch_id
-                else
-                    if (((x_cc(i) - x_centroid)**2 &
-                         + (y_cc(j) - y_centroid)**2 <= radius**2 &
-                         .and. &
-                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
-                        .or. &
-                        (.not. present(ib_flag) .and. patch_id_fp(i, j, 0) == smooth_patch_id)) &
-                        then
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                            eta, q_prim_vf, patch_id_fp)
 
-                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                                eta, q_prim_vf, patch_id_fp)
-
-                        @:analytical()
-                        if (patch_icpp(patch_id)%hcid /= dflt_int) then
-                            @:Hardcoded2D()
-                        end if
-
+                    @:analytical()
+                    if (patch_icpp(patch_id)%hcid /= dflt_int) then
+                        @:Hardcoded2D()
                     end if
+
                 end if
             end do
         end do
         @:HardcodedDellacation()
 
     end subroutine s_icpp_circle
-
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
-    !! @param ib True if this patch is an immersed boundary
-    subroutine s_icpp_airfoil(patch_id, patch_id_fp, q_prim_vf, ib_flag)
-
-        integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        logical, optional, intent(in) :: ib_flag
-
-        real(wp) :: x0, y0, f, x_act, y_act, ca_in, pa, ma, ta, theta
-        real(wp) :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
-        integer :: i, j, k
-        integer :: Np1, Np2
-
-        if (.not. present(ib_flag)) return
-        x0 = patch_ib(patch_id)%x_centroid
-        y0 = patch_ib(patch_id)%y_centroid
-        ca_in = patch_ib(patch_id)%c
-        pa = patch_ib(patch_id)%p
-        ma = patch_ib(patch_id)%m
-        ta = patch_ib(patch_id)%t
-        theta = pi*patch_ib(patch_id)%theta/180._wp
-
-        Np1 = int((pa*ca_in/dx)*20)
-        Np2 = int(((ca_in - pa*ca_in)/dx)*20)
-        Np = Np1 + Np2 + 1
-
-        allocate (airfoil_grid_u(1:Np))
-        allocate (airfoil_grid_l(1:Np))
-
-        airfoil_grid_u(1)%x = x0
-        airfoil_grid_u(1)%y = y0
-
-        airfoil_grid_l(1)%x = x0
-        airfoil_grid_l(1)%y = y0
-
-        eta = 1._wp
-
-        do i = 1, Np1 + Np2 - 1
-            if (i <= Np1) then
-                xc = x0 + i*(pa*ca_in/Np1)
-                xa = (xc - x0)/ca_in
-                yc = (ma/pa**2)*(2*pa*xa - xa**2)
-                dycdxc = (2*ma/pa**2)*(pa - xa)
-            else
-                xc = x0 + pa*ca_in + (i - Np1)*((ca_in - pa*ca_in)/Np2)
-                xa = (xc - x0)/ca_in
-                yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
-                dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
-            end if
-
-            yt = (5._wp*ta)*(0.2969_wp*xa**0.5_wp - 0.126_wp*xa - 0.3516_wp*xa**2._wp + 0.2843_wp*xa**3 - 0.1015_wp*xa**4)
-            sin_c = dycdxc/(1 + dycdxc**2)**0.5_wp
-            cos_c = 1/(1 + dycdxc**2)**0.5_wp
-
-            xu = xa - yt*sin_c
-            yu = yc + yt*cos_c
-
-            xl = xa + yt*sin_c
-            yl = yc - yt*cos_c
-
-            xu = xu*ca_in + x0
-            yu = yu*ca_in + y0
-
-            xl = xl*ca_in + x0
-            yl = yl*ca_in + y0
-
-            airfoil_grid_u(i + 1)%x = xu
-            airfoil_grid_u(i + 1)%y = yu
-
-            airfoil_grid_l(i + 1)%x = xl
-            airfoil_grid_l(i + 1)%y = yl
-
-        end do
-
-        airfoil_grid_u(Np)%x = x0 + ca_in
-        airfoil_grid_u(Np)%y = y0
-
-        airfoil_grid_l(Np)%x = x0 + ca_in
-        airfoil_grid_l(Np)%y = y0
-
-        do j = 0, n
-            do i = 0, m
-
-                if (.not. f_is_default(patch_ib(patch_id)%theta)) then
-                    x_act = (x_cc(i) - x0)*cos(theta) - (y_cc(j) - y0)*sin(theta) + x0
-                    y_act = (x_cc(i) - x0)*sin(theta) + (y_cc(j) - y0)*cos(theta) + y0
-                else
-                    x_act = x_cc(i)
-                    y_act = y_cc(j)
-                end if
-
-                if (x_act >= x0 .and. x_act <= x0 + ca_in) then
-                    xa = (x_act - x0)/ca_in
-                    if (xa <= pa) then
-                        yc = (ma/pa**2)*(2*pa*xa - xa**2)
-                        dycdxc = (2*ma/pa**2)*(pa - xa)
-                    else
-                        yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
-                        dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
-                    end if
-                    if (y_act >= y0) then
-                        k = 1
-                        do while (airfoil_grid_u(k)%x < x_act)
-                            k = k + 1
-                        end do
-                        if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
-                            if (y_act <= airfoil_grid_u(k)%y) then
-                                !!IB
-                                !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                !eta, q_prim_vf, patch_id_fp)
-                                patch_id_fp(i, j, 0) = patch_id
-                            end if
-                        else
-                            f = (airfoil_grid_u(k)%x - x_act)/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
-                            if (y_act <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
-                                !!IB
-                                !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                !eta, q_prim_vf, patch_id_fp)
-                                patch_id_fp(i, j, 0) = patch_id
-                            end if
-                        end if
-                    else
-                        k = 1
-                        do while (airfoil_grid_l(k)%x < x_act)
-                            k = k + 1
-                        end do
-                        if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
-                            if (y_act >= airfoil_grid_l(k)%y) then
-                                !!IB
-                                !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                !eta, q_prim_vf, patch_id_fp)
-                                patch_id_fp(i, j, 0) = patch_id
-                            end if
-                        else
-                            f = (airfoil_grid_l(k)%x - x_act)/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
-
-                            if (y_act >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
-                                   !!IB
-                                !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                !eta, q_prim_vf, patch_id_fp)
-                                patch_id_fp(i, j, 0) = patch_id
-                            end if
-                        end if
-                    end if
-                end if
-            end do
-        end do
-
-        if (.not. f_is_default(patch_ib(patch_id)%theta)) then
-            do i = 1, Np
-                airfoil_grid_l(i)%x = (airfoil_grid_l(i)%x - x0)*cos(theta) + (airfoil_grid_l(i)%y - y0)*sin(theta) + x0
-                airfoil_grid_l(i)%y = -1._wp*(airfoil_grid_l(i)%x - x0)*sin(theta) + (airfoil_grid_l(i)%y - y0)*cos(theta) + y0
-
-                airfoil_grid_u(i)%x = (airfoil_grid_u(i)%x - x0)*cos(theta) + (airfoil_grid_u(i)%y - y0)*sin(theta) + x0
-                airfoil_grid_u(i)%y = -1._wp*(airfoil_grid_u(i)%x - x0)*sin(theta) + (airfoil_grid_u(i)%y - y0)*cos(theta) + y0
-            end do
-        end if
-
-    end subroutine s_icpp_airfoil
-
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
-    !! @param ib True if this patch is an immersed boundary
-    subroutine s_icpp_3D_airfoil(patch_id, patch_id_fp, q_prim_vf, ib_flag)
-
-        integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        logical, optional, intent(in) :: ib_flag
-
-        real(wp) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca_in, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
-        integer :: i, j, k, l
-        integer :: Np1, Np2
-
-        if (.not. present(ib_flag)) return
-        x0 = patch_ib(patch_id)%x_centroid
-        y0 = patch_ib(patch_id)%y_centroid
-        z0 = patch_ib(patch_id)%z_centroid
-        lz = patch_ib(patch_id)%length_z
-        ca_in = patch_ib(patch_id)%c
-        pa = patch_ib(patch_id)%p
-        ma = patch_ib(patch_id)%m
-        ta = patch_ib(patch_id)%t
-        theta = pi*patch_ib(patch_id)%theta/180._wp
-
-        Np1 = int((pa*ca_in/dx)*20)
-        Np2 = int(((ca_in - pa*ca_in)/dx)*20)
-        Np = Np1 + Np2 + 1
-
-        allocate (airfoil_grid_u(1:Np))
-        allocate (airfoil_grid_l(1:Np))
-
-        airfoil_grid_u(1)%x = x0
-        airfoil_grid_u(1)%y = y0
-
-        airfoil_grid_l(1)%x = x0
-        airfoil_grid_l(1)%y = y0
-
-        z_max = z0 + lz/2
-        z_min = z0 - lz/2
-
-        eta = 1._wp
-
-        do i = 1, Np1 + Np2 - 1
-            if (i <= Np1) then
-                xc = x0 + i*(pa*ca_in/Np1)
-                xa = (xc - x0)/ca_in
-                yc = (ma/pa**2)*(2*pa*xa - xa**2)
-                dycdxc = (2*ma/pa**2)*(pa - xa)
-            else
-                xc = x0 + pa*ca_in + (i - Np1)*((ca_in - pa*ca_in)/Np2)
-                xa = (xc - x0)/ca_in
-                yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
-                dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
-            end if
-
-            yt = (5._wp*ta)*(0.2969_wp*xa**0.5_wp - 0.126_wp*xa - 0.3516_wp*xa**2._wp + 0.2843_wp*xa**3 - 0.1015_wp*xa**4)
-            sin_c = dycdxc/(1 + dycdxc**2)**0.5_wp
-            cos_c = 1/(1 + dycdxc**2)**0.5_wp
-
-            xu = xa - yt*sin_c
-            yu = yc + yt*cos_c
-
-            xl = xa + yt*sin_c
-            yl = yc - yt*cos_c
-
-            xu = xu*ca_in + x0
-            yu = yu*ca_in + y0
-
-            xl = xl*ca_in + x0
-            yl = yl*ca_in + y0
-
-            airfoil_grid_u(i + 1)%x = xu
-            airfoil_grid_u(i + 1)%y = yu
-
-            airfoil_grid_l(i + 1)%x = xl
-            airfoil_grid_l(i + 1)%y = yl
-
-        end do
-
-        airfoil_grid_u(Np)%x = x0 + ca_in
-        airfoil_grid_u(Np)%y = y0
-
-        airfoil_grid_l(Np)%x = x0 + ca_in
-        airfoil_grid_l(Np)%y = y0
-
-        do l = 0, p
-            if (z_cc(l) >= z_min .and. z_cc(l) <= z_max) then
-                do j = 0, n
-                    do i = 0, m
-
-                        if (.not. f_is_default(patch_ib(patch_id)%theta)) then
-                            x_act = (x_cc(i) - x0)*cos(theta) - (y_cc(j) - y0)*sin(theta) + x0
-                            y_act = (x_cc(i) - x0)*sin(theta) + (y_cc(j) - y0)*cos(theta) + y0
-                        else
-                            x_act = x_cc(i)
-                            y_act = y_cc(j)
-                        end if
-
-                        if (x_act >= x0 .and. x_act <= x0 + ca_in) then
-                            xa = (x_act - x0)/ca_in
-                            if (xa <= pa) then
-                                yc = (ma/pa**2)*(2*pa*xa - xa**2)
-                                dycdxc = (2*ma/pa**2)*(pa - xa)
-                            else
-                                yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
-                                dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
-                            end if
-                            if (y_act >= y0) then
-                                k = 1
-                                do while (airfoil_grid_u(k)%x < x_act)
-                                    k = k + 1
-                                end do
-                                if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
-                                    if (y_act <= airfoil_grid_u(k)%y) then
-                                        !!IB
-                                        !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                        !eta, q_prim_vf, patch_id_fp)
-                                        patch_id_fp(i, j, l) = patch_id
-                                    end if
-                                else
-                                    f = (airfoil_grid_u(k)%x - x_act)/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
-                                    if (y_act <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
-                                        !!IB
-                                        !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                        !eta, q_prim_vf, patch_id_fp)
-                                        patch_id_fp(i, j, l) = patch_id
-                                    end if
-                                end if
-                            else
-                                k = 1
-                                do while (airfoil_grid_l(k)%x < x_act)
-                                    k = k + 1
-                                end do
-                                if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
-                                    if (y_act >= airfoil_grid_l(k)%y) then
-                                        !!IB
-                                        !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                        !eta, q_prim_vf, patch_id_fp)
-                                        patch_id_fp(i, j, l) = patch_id
-                                    end if
-                                else
-                                    f = (airfoil_grid_l(k)%x - x_act)/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
-
-                                    if (y_act >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
-                                           !!IB
-                                        !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                        !eta, q_prim_vf, patch_id_fp)
-                                        patch_id_fp(i, j, l) = patch_id
-                                    end if
-                                end if
-                            end if
-                        end if
-                    end do
-                end do
-            end if
-        end do
-
-        if (.not. f_is_default(patch_ib(patch_id)%theta)) then
-            do i = 1, Np
-                airfoil_grid_l(i)%x = (airfoil_grid_l(i)%x - x0)*cos(theta) + (airfoil_grid_l(i)%y - y0)*sin(theta) + x0
-                airfoil_grid_l(i)%y = -1._wp*(airfoil_grid_l(i)%x - x0)*sin(theta) + (airfoil_grid_l(i)%y - y0)*cos(theta) + y0
-
-                airfoil_grid_u(i)%x = (airfoil_grid_u(i)%x - x0)*cos(theta) + (airfoil_grid_u(i)%y - y0)*sin(theta) + x0
-                airfoil_grid_u(i)%y = -1._wp*(airfoil_grid_u(i)%x - x0)*sin(theta) + (airfoil_grid_u(i)%y - y0)*cos(theta) + y0
-            end do
-        end if
-
-    end subroutine s_icpp_3D_airfoil
 
     !>  The varcircle patch is a 2D geometry that may be used
         !!             . It  generatres an annulus
