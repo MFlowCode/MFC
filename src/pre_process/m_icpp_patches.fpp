@@ -66,12 +66,10 @@ module m_icpp_patches
 
 contains
 
-    impure subroutine s_apply_icpp_patches(patch_id_fp, q_prim_vf, levelset, levelset_norm)
+    impure subroutine s_apply_icpp_patches(patch_id_fp, q_prim_vf)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp
-        type(levelset_field), intent(inout), optional :: levelset !< Levelset determined by models
-        type(levelset_norm_field), intent(inout), optional :: levelset_norm !< Levelset_norm determined by models
 
         integer :: i
 
@@ -1523,15 +1521,13 @@ contains
     !! @param q_prim_vf Primitive variables
     !! @param STL_levelset STL levelset
     !! @param STL_levelset_norm STL levelset normals
-    subroutine s_icpp_model(patch_id, patch_id_fp, q_prim_vf, STL_levelset, STL_levelset_norm)
+    subroutine s_icpp_model(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Variables for IBM+STL
-        type(levelset_field), optional, intent(inout) :: STL_levelset !< Levelset determined by models
-        type(levelset_norm_field), optional, intent(inout) :: STL_levelset_norm !< Levelset_norm determined by models
         real(wp) :: normals(1:3) !< Boundary normal buffer
         integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
         real(wp), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
