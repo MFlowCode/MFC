@@ -78,7 +78,7 @@
 
 #:def compute_low_Mach_correction()
 
-    if (riemann_solver == 1) then
+    if (riemann_solver == 1 .or. riemann_solver == 5) then
 
         zcoef = min(1._wp, max(vel_L_rms**5.e-1_wp/c_L, vel_R_rms**5.e-1_wp/c_R))
         pcorr = 0._wp
