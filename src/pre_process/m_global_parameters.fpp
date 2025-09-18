@@ -288,6 +288,8 @@ module m_global_parameters
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
+    logical :: fft_wrt
+
 contains
 
     !>  Assigns default values to user inputs prior to reading
@@ -394,6 +396,8 @@ contains
         fluid_rho = dflt_real
         elliptic_smoothing_iters = dflt_int
         elliptic_smoothing = .false.
+
+        fft_wrt = .false.
 
         ! Initial condition parameters
         num_patches = dflt_int
