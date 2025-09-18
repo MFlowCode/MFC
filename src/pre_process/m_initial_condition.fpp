@@ -191,7 +191,7 @@ contains
 
         if (ib) then
             call s_apply_ib_patches(patch_id_fp, ib_markers%sf, levelset, levelset_norm)
-        else
+        end if
         call s_apply_icpp_patches(patch_id_fp, q_prim_vf)
 
         if (num_bc_patches > 0) call s_apply_boundary_patches(q_prim_vf, bc_type)

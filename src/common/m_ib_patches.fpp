@@ -82,16 +82,16 @@ contains
 
                 if (patch_ib(i)%geometry == 8) then
                     call s_ib_sphere(i, ib_markers_sf)
-                    call s_ib_sphere_levelset(i, levelset, levelset_norm)
+                    call s_sphere_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 9) then
                     call s_ib_cuboid(i, ib_markers_sf)
-                    call s_ib_cuboid_levelset(i, levelset, levelset_norm)
+                    call s_cuboid_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 10) then
                     call s_ib_cylinder(i, ib_markers_sf)
-                    call s_ib_cylinder_levelset(i, levelset, levelset_norm)
+                    call s_cylinder_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 11) then
                     call s_ib_3D_airfoil(i, ib_markers_sf)
-                    call s_ib_3D_airfoil_levelset(i, levelset, levelset_norm)
+                    call s_3D_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 12) then
                     call s_ib_model(i, ib_markers_sf, levelset, levelset_norm)
