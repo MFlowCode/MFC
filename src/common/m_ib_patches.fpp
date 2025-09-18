@@ -76,9 +76,6 @@ contains
             !> @{
             ! Spherical patch
             do i = 1, num_ibs
-                if (proc_rank == 0) then
-                    print *, 'Processing 3D ib patch ', i
-                end if
 
                 if (patch_ib(i)%geometry == 8) then
                     call s_ib_sphere(i, ib_markers_sf)
@@ -107,9 +104,6 @@ contains
             !> IB Patches
             !> @{
             do i = 1, num_ibs
-                if (proc_rank == 0) then
-                    print *, 'Processing 2D ib patch ', i
-                end if
                 if (patch_ib(i)%geometry == 2) then
                     call s_ib_circle(i, ib_markers_sf)
                     call s_circle_levelset(i, levelset, levelset_norm)

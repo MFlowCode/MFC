@@ -450,7 +450,7 @@ function(MFC_SETUP_TARGET)
 
         if (ARGS_SILO)
             find_package(SILO REQUIRED)
-            target_link_libraries(${a_target} PRIVATE SILO::SILO)
+            target_link_libraries(${a_target} PRIVATE SILO::SILO stdc++)
         endif()
 
         if (ARGS_HDF5)
