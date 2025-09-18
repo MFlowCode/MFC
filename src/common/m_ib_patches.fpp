@@ -9,7 +9,7 @@
 #:include '3dHardcodedIC.fpp'
 #:include 'macros.fpp'
 
-module m_patches
+module m_ib_patches
 
     use m_model                 ! Subroutine(s) related to STL files
 
@@ -728,40 +728,25 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_cylinder(patch_id, patch_id_fp, q_prim_vf, ib_flag)
+    subroutine s_ib_cylinder(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        logical, optional, intent(in) :: ib_flag   !< True if this patch is an immersed boundary
 
         integer :: i, j, k !< Generic loop iterators
         real(wp) :: radius
-        @:HardcodedDimensionsExtrusion()
-        @:Hardcoded3DVariables()
 
         ! Transferring the cylindrical patch's centroid, length, radius,
         ! smoothing patch identity and smoothing coefficient information
 
-        if (present(ib_flag)) then
-            x_centroid = patch_ib(patch_id)%x_centroid
-            y_centroid = patch_ib(patch_id)%y_centroid
-            z_centroid = patch_ib(patch_id)%z_centroid
-            length_x = patch_ib(patch_id)%length_x
-            length_y = patch_ib(patch_id)%length_y
-            length_z = patch_ib(patch_id)%length_z
-            radius = patch_ib(patch_id)%radius
-        else
-            x_centroid = patch_icpp(patch_id)%x_centroid
-            y_centroid = patch_icpp(patch_id)%y_centroid
-            z_centroid = patch_icpp(patch_id)%z_centroid
-            length_x = patch_icpp(patch_id)%length_x
-            length_y = patch_icpp(patch_id)%length_y
-            length_z = patch_icpp(patch_id)%length_z
-            radius = patch_icpp(patch_id)%radius
-            smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
-            smooth_coeff = patch_icpp(patch_id)%smooth_coeff
-        end if
+        x_centroid = patch_ib(patch_id)%x_centroid
+        y_centroid = patch_ib(patch_id)%y_centroid
+        z_centroid = patch_ib(patch_id)%z_centroid
+        length_x = patch_ib(patch_id)%length_x
+        length_y = patch_ib(patch_id)%length_y
+        length_z = patch_ib(patch_id)%length_z
+        radius = patch_ib(patch_id)%radius
 
         ! Computing the beginning and the end x-, y- and z-coordinates of
         ! the cylinder based on its centroid and lengths
@@ -792,85 +777,30 @@ contains
                         cart_z = z_cc(k)
                     end if
 
-                    if (.not. present(ib_flag) .and. patch_icpp(patch_id)%smoothen) then
-                        if (.not. f_is_default(length_x)) then
-                            eta = tanh(smooth_coeff/min(dy, dz)* &
-                                       (sqrt((cart_y - y_centroid)**2 &
-                                             + (cart_z - z_centroid)**2) &
-                                        - radius))*(-0.5_wp) + 0.5_wp
-                        elseif (.not. f_is_default(length_y)) then
-                            eta = tanh(smooth_coeff/min(dx, dz)* &
-                                       (sqrt((x_cc(i) - x_centroid)**2 &
-                                             + (cart_z - z_centroid)**2) &
-                                        - radius))*(-0.5_wp) + 0.5_wp
-                        else
-                            eta = tanh(smooth_coeff/min(dx, dy)* &
-                                       (sqrt((x_cc(i) - x_centroid)**2 &
-                                             + (cart_y - y_centroid)**2) &
-                                        - radius))*(-0.5_wp) + 0.5_wp
-                        end if
-                    end if
+                    if (((.not. f_is_default(length_x) .and. &
+                          (cart_y - y_centroid)**2 &
+                          + (cart_z - z_centroid)**2 <= radius**2 .and. &
+                          x_boundary%beg <= x_cc(i) .and. &
+                          x_boundary%end >= x_cc(i)) &
+                          .or. &
+                          (.not. f_is_default(length_y) .and. &
+                          (x_cc(i) - x_centroid)**2 &
+                          + (cart_z - z_centroid)**2 <= radius**2 .and. &
+                          y_boundary%beg <= cart_y .and. &
+                          y_boundary%end >= cart_y) &
+                          .or. &
+                          (.not. f_is_default(length_z) .and. &
+                          (x_cc(i) - x_centroid)**2 &
+                          + (cart_y - y_centroid)**2 <= radius**2 .and. &
+                          z_boundary%beg <= cart_z .and. &
+                          z_boundary%end >= cart_z))) then
 
-                    if (present(ib_flag)) then
-                        if (((.not. f_is_default(length_x) .and. &
-                              (cart_y - y_centroid)**2 &
-                              + (cart_z - z_centroid)**2 <= radius**2 .and. &
-                              x_boundary%beg <= x_cc(i) .and. &
-                              x_boundary%end >= x_cc(i)) &
-                             .or. &
-                             (.not. f_is_default(length_y) .and. &
-                              (x_cc(i) - x_centroid)**2 &
-                              + (cart_z - z_centroid)**2 <= radius**2 .and. &
-                              y_boundary%beg <= cart_y .and. &
-                              y_boundary%end >= cart_y) &
-                             .or. &
-                             (.not. f_is_default(length_z) .and. &
-                              (x_cc(i) - x_centroid)**2 &
-                              + (cart_y - y_centroid)**2 <= radius**2 .and. &
-                              z_boundary%beg <= cart_z .and. &
-                              z_boundary%end >= cart_z))) then
-
-                            ! Updating the patch identities bookkeeping variable
-                            patch_id_fp(i, j, k) = patch_id
-                        end if
-
-                    else
-                        if (((.not. f_is_default(length_x) .and. &
-                              (cart_y - y_centroid)**2 &
-                              + (cart_z - z_centroid)**2 <= radius**2 .and. &
-                              x_boundary%beg <= x_cc(i) .and. &
-                              x_boundary%end >= x_cc(i)) &
-                             .or. &
-                             (.not. f_is_default(length_y) .and. &
-                              (x_cc(i) - x_centroid)**2 &
-                              + (cart_z - z_centroid)**2 <= radius**2 .and. &
-                              y_boundary%beg <= cart_y .and. &
-                              y_boundary%end >= cart_y) &
-                             .or. &
-                             (.not. f_is_default(length_z) .and. &
-                              (x_cc(i) - x_centroid)**2 &
-                              + (cart_y - y_centroid)**2 <= radius**2 .and. &
-                              z_boundary%beg <= cart_z .and. &
-                              z_boundary%end >= cart_z) .and. &
-                             patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. &
-                            patch_id_fp(i, j, k) == smooth_patch_id) then
-
-                            call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                                    eta, q_prim_vf, patch_id_fp)
-
-                            @:analytical()
-                            if (patch_icpp(patch_id)%hcid /= dflt_int) then
-                                @:Hardcoded3D()
-                            end if
-
-                            ! Updating the patch identities bookkeeping variable
-                            if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
-                        end if
+                        ! Updating the patch identities bookkeeping variable
+                        patch_id_fp(i, j, k) = patch_id
                     end if
                 end do
             end do
         end do
-        @:HardcodedDellacation()
 
     end subroutine s_ib_cylinder
 
@@ -881,7 +811,7 @@ contains
     !! @param ib True if this patch is an immersed boundary
     !! @param STL_levelset STL levelset
     !! @param STL_levelset_norm STL levelset normals
-    subroutine s_ib_model(patch_id, patch_id_fp, q_prim_vf, ib_flag, STL_levelset, STL_levelset_norm)
+    subroutine s_ib_model(patch_id, patch_id_fp, q_prim_vf, STL_levelset, STL_levelset_norm)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -890,7 +820,6 @@ contains
         ! Variables for IBM+STL
         type(levelset_field), optional, intent(inout) :: STL_levelset !< Levelset determined by models
         type(levelset_norm_field), optional, intent(inout) :: STL_levelset_norm !< Levelset_norm determined by models
-        logical, optional, intent(in) :: ib_flag   !< True if this patch is an immersed boundary
         real(wp) :: normals(1:3) !< Boundary normal buffer
         integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
         real(wp), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
@@ -913,27 +842,14 @@ contains
 
         real(wp), dimension(1:4, 1:4) :: transform, transform_n
 
-        if (present(ib_flag) .and. proc_rank == 0) then
-            print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
-        else if (proc_rank == 0) then
-            print *, " * Reading model: "//trim(patch_icpp(patch_id)%model_filepath)
-        end if
+        print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
 
-        if (present(ib_flag)) then
-            model = f_model_read(patch_ib(patch_id)%model_filepath)
-            params%scale(:) = patch_ib(patch_id)%model_scale(:)
-            params%translate(:) = patch_ib(patch_id)%model_translate(:)
-            params%rotate(:) = patch_ib(patch_id)%model_rotate(:)
-            params%spc = patch_ib(patch_id)%model_spc
-            params%threshold = patch_ib(patch_id)%model_threshold
-        else
-            model = f_model_read(patch_icpp(patch_id)%model_filepath)
-            params%scale(:) = patch_icpp(patch_id)%model_scale(:)
-            params%translate(:) = patch_icpp(patch_id)%model_translate(:)
-            params%rotate(:) = patch_icpp(patch_id)%model_rotate(:)
-            params%spc = patch_icpp(patch_id)%model_spc
-            params%threshold = patch_icpp(patch_id)%model_threshold
-        end if
+        model = f_model_read(patch_ib(patch_id)%model_filepath)
+        params%scale(:) = patch_ib(patch_id)%model_scale(:)
+        params%translate(:) = patch_ib(patch_id)%model_translate(:)
+        params%rotate(:) = patch_ib(patch_id)%model_rotate(:)
+        params%spc = patch_ib(patch_id)%model_spc
+        params%threshold = patch_ib(patch_id)%model_threshold
 
         if (proc_rank == 0) then
             print *, " * Transforming model."
@@ -1035,93 +951,73 @@ contains
                         eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_icpp(patch_id)%model_spc)
                     end if
 
-                    if (present(ib_flag)) then
-                        ! Reading STL boundary vertices and compute the levelset and levelset_norm
-                        if (eta > patch_ib(patch_id)%model_threshold) then
-                            patch_id_fp(i, j, k) = patch_id
-                        end if
-
-                        ! 3D models
-                        if (p > 0) then
-
-                            ! Get the boundary normals and shortest distance between the cell center and the model boundary
-                            call f_distance_normals_3D(model, point, normals, distance)
-
-                            ! Get the shortest distance between the cell center and the interpolated model boundary
-                            if (interpolate) then
-                                STL_levelset%sf(i, j, k, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
-                                                                                             total_vertices, &
-                                                                                             point)
-                            else
-                                STL_levelset%sf(i, j, k, patch_id) = distance
-                            end if
-
-                            ! Correct the sign of the levelset
-                            if (patch_id_fp(i, j, k) > 0) then
-                                STL_levelset%sf(i, j, k, patch_id) = -abs(STL_levelset%sf(i, j, k, patch_id))
-                            end if
-
-                            ! Correct the sign of the levelset_norm
-                            if (patch_id_fp(i, j, k) == 0) then
-                                normals(1:3) = -normals(1:3)
-                            end if
-
-                            ! Assign the levelset_norm
-                            STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
-                        else
-                            ! 2D models
-                            if (interpolate) then
-                                ! Get the shortest distance between the cell center and the model boundary
-                                STL_levelset%sf(i, j, 0, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
-                                                                                             total_vertices, &
-                                                                                             point)
-                            else
-                                ! Get the shortest distance between the cell center and the interpolated model boundary
-                                STL_levelset%sf(i, j, 0, patch_id) = f_distance(boundary_v, &
-                                                                                boundary_edge_count, &
-                                                                                point)
-                            end if
-
-                            ! Correct the sign of the levelset
-                            if (patch_id_fp(i, j, k) > 0) then
-                                STL_levelset%sf(i, j, 0, patch_id) = -abs(STL_levelset%sf(i, j, 0, patch_id))
-                            end if
-
-                            ! Get the boundary normals
-                            call f_normals(boundary_v, &
-                                           boundary_edge_count, &
-                                           point, &
-                                           normals)
-
-                            ! Correct the sign of the levelset_norm
-                            if (patch_id_fp(i, j, k) == 0) then
-                                normals(1:3) = -normals(1:3)
-                            end if
-
-                            ! Assign the levelset_norm
-                            STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
-
-                        end if
-                    else
-                        if (patch_icpp(patch_id)%smoothen) then
-                            if (eta > patch_icpp(patch_id)%model_threshold) then
-                                eta = 1._wp
-                            end if
-                        else
-                            if (eta > patch_icpp(patch_id)%model_threshold) then
-                                eta = 1._wp
-                            else
-                                eta = 0._wp
-                            end if
-                        end if
-                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                                eta, q_prim_vf, patch_id_fp)
-
-                        ! Note: Should probably use *eta* to compute primitive variables
-                        ! if defining them analytically.
-                        @:analytical()
+                    ! Reading STL boundary vertices and compute the levelset and levelset_norm
+                    if (eta > patch_ib(patch_id)%model_threshold) then
+                        patch_id_fp(i, j, k) = patch_id
                     end if
-                end do; end do; end do
+
+                    ! 3D models
+                    if (p > 0) then
+
+                        ! Get the boundary normals and shortest distance between the cell center and the model boundary
+                        call f_distance_normals_3D(model, point, normals, distance)
+
+                        ! Get the shortest distance between the cell center and the interpolated model boundary
+                        if (interpolate) then
+                            STL_levelset%sf(i, j, k, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
+                                                                                          total_vertices, &
+                                                                                          point)
+                        else
+                            STL_levelset%sf(i, j, k, patch_id) = distance
+                        end if
+
+                        ! Correct the sign of the levelset
+                        if (patch_id_fp(i, j, k) > 0) then
+                            STL_levelset%sf(i, j, k, patch_id) = -abs(STL_levelset%sf(i, j, k, patch_id))
+                        end if
+
+                        ! Correct the sign of the levelset_norm
+                        if (patch_id_fp(i, j, k) == 0) then
+                            normals(1:3) = -normals(1:3)
+                        end if
+
+                        ! Assign the levelset_norm
+                        STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
+                    else
+                        ! 2D models
+                        if (interpolate) then
+                            ! Get the shortest distance between the cell center and the model boundary
+                            STL_levelset%sf(i, j, 0, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
+                                                                                          total_vertices, &
+                                                                                          point)
+                        else
+                            ! Get the shortest distance between the cell center and the interpolated model boundary
+                            STL_levelset%sf(i, j, 0, patch_id) = f_distance(boundary_v, &
+                                                                            boundary_edge_count, &
+                                                                            point)
+                        end if
+
+                        ! Correct the sign of the levelset
+                        if (patch_id_fp(i, j, k) > 0) then
+                            STL_levelset%sf(i, j, 0, patch_id) = -abs(STL_levelset%sf(i, j, 0, patch_id))
+                        end if
+
+                        ! Get the boundary normals
+                        call f_normals(boundary_v, &
+                                        boundary_edge_count, &
+                                        point, &
+                                        normals)
+
+                        ! Correct the sign of the levelset_norm
+                        if (patch_id_fp(i, j, k) == 0) then
+                            normals(1:3) = -normals(1:3)
+                        end if
+
+                        ! Assign the levelset_norm
+                        STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
+
+                    end if
+                  end do; end do; end do
 
         if (proc_rank == 0) then
             print *, ""
@@ -1180,4 +1076,4 @@ contains
         f_r = a + b*myth + offset
     end function f_r
 
-end module m_patches
+end module m_ib_patches
