@@ -1014,18 +1014,18 @@ contains
 
     end subroutine s_hll_riemann_solver
 
-        subroutine s_lf_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-                                    dqL_prim_dy_vf, &
-                                    dqL_prim_dz_vf, &
-                                    qL_prim_vf, &
-                                    qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
-                                    dqR_prim_dy_vf, &
-                                    dqR_prim_dz_vf, &
-                                    qR_prim_vf, &
-                                    q_prim_vf, &
-                                    flux_vf, flux_src_vf, &
-                                    flux_gsrc_vf, &
-                                    norm_dir, ix, iy, iz)
+    subroutine s_lf_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
+                                   dqL_prim_dy_vf, &
+                                   dqL_prim_dz_vf, &
+                                   qL_prim_vf, &
+                                   qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+                                   dqR_prim_dy_vf, &
+                                   dqR_prim_dz_vf, &
+                                   qR_prim_vf, &
+                                   q_prim_vf, &
+                                   flux_vf, flux_src_vf, &
+                                   flux_gsrc_vf, &
+                                   norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -1368,19 +1368,19 @@ contains
                                 call s_compute_fast_magnetosonic_speed(rho_R, c_R, B%R, norm_dir, c_fast%R, H_R)
                             end if
 
-                            s_L = 0._wp; s_R = 0._wp 
+                            s_L = 0._wp; s_R = 0._wp
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
-                                s_L = s_L + vel_L(i)**2._wp 
-                                s_R = s_R + vel_R(i)**2._wp 
+                                s_L = s_L + vel_L(i)**2._wp
+                                s_R = s_R + vel_R(i)**2._wp
                             end do
 
                             s_L = sqrt(s_L)
                             s_R = sqrt(s_R)
 
                             s_P = max(s_L, s_R) + max(c_L, c_R)
-                            s_M = -s_P 
+                            s_M = -s_P
 
                             ! Low Mach correction
                             if (low_Mach == 1) then
@@ -1645,7 +1645,7 @@ contains
 
         #:endfor
 
-        if(viscous) then 
+        if (viscous) then
             $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, vel_L, vel_R, Re_L, Re_R]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
@@ -1655,40 +1655,40 @@ contains
                         idx_right_phys(3) = l
                         idx_right_phys(norm_dir) = idx_right_phys(norm_dir) + 1
 
-                        if(norm_dir == 1) then 
+                        if (norm_dir == 1) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rsx_vf(j, k, l, E_idx+i)
-                                alpha_R(i) = qR_prim_rsx_vf(j+1, k, l, E_idx+i)
+                                alpha_L(i) = qL_prim_rsx_vf(j, k, l, E_idx + i)
+                                alpha_R(i) = qR_prim_rsx_vf(j + 1, k, l, E_idx + i)
                             end do
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
-                                vel_L(i) = qL_prim_rsx_vf(j, k, l,momxb+i-1)
-                                vel_R(i) = qR_prim_rsx_vf(j+1, k, l,momxb+i-1)
+                                vel_L(i) = qL_prim_rsx_vf(j, k, l, momxb + i - 1)
+                                vel_R(i) = qR_prim_rsx_vf(j + 1, k, l, momxb + i - 1)
                             end do
-                        else if(norm_dir == 2) then
+                        else if (norm_dir == 2) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rsy_vf(k, j, l, E_idx+i)
-                                alpha_R(i) = qR_prim_rsy_vf(k+1, j, l, E_idx+i)
+                                alpha_L(i) = qL_prim_rsy_vf(k, j, l, E_idx + i)
+                                alpha_R(i) = qR_prim_rsy_vf(k + 1, j, l, E_idx + i)
                             end do
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
-                                vel_L(i) = qL_prim_rsy_vf(k, j, l,momxb+i-1)
-                                vel_R(i) = qR_prim_rsy_vf(k+1, j, l,momxb+i-1)
+                                vel_L(i) = qL_prim_rsy_vf(k, j, l, momxb + i - 1)
+                                vel_R(i) = qR_prim_rsy_vf(k + 1, j, l, momxb + i - 1)
                             end do
                         else
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rsz_vf(l, k, j, E_idx+i)
-                                alpha_R(i) = qR_prim_rsz_vf(l+1, k, j, E_idx+i)
+                                alpha_L(i) = qL_prim_rsz_vf(l, k, j, E_idx + i)
+                                alpha_R(i) = qR_prim_rsz_vf(l + 1, k, j, E_idx + i)
                             end do
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
-                                vel_L(i) = qL_prim_rsz_vf(l, k, j,momxb+i-1)
-                                vel_R(i) = qR_prim_rsz_vf(l+1, k, j,momxb+i-1)
+                                vel_L(i) = qL_prim_rsz_vf(l, k, j, momxb + i - 1)
+                                vel_R(i) = qR_prim_rsz_vf(l + 1, k, j, momxb + i - 1)
                             end do
                         end if
 
@@ -1712,130 +1712,130 @@ contains
                             Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
                         end do
 
-                        if(shear_stress) then 
+                        if (shear_stress) then
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
-                                vel_grad_L(i, 1) = (dqL_prim_dx_vf(momxb+i-1)%sf(j, k, l)/Re_L(1))
-                                vel_grad_R(i, 1) = (dqR_prim_dx_vf(momxb+i-1)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3))/Re_R(1))
+                                vel_grad_L(i, 1) = (dqL_prim_dx_vf(momxb + i - 1)%sf(j, k, l)/Re_L(1))
+                                vel_grad_R(i, 1) = (dqR_prim_dx_vf(momxb + i - 1)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3))/Re_R(1))
                                 if (num_dims > 1) then
-                                    vel_grad_L(i, 2) = (dqL_prim_dy_vf(momxb+i-1)%sf(j, k, l)/Re_L(1))
-                                    vel_grad_R(i, 2) = (dqR_prim_dy_vf(momxb+i-1)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3))/Re_R(1))
+                                    vel_grad_L(i, 2) = (dqL_prim_dy_vf(momxb + i - 1)%sf(j, k, l)/Re_L(1))
+                                    vel_grad_R(i, 2) = (dqR_prim_dy_vf(momxb + i - 1)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3))/Re_R(1))
                                 end if
                                 if (num_dims > 2) then
-                                    vel_grad_L(i, 3) = (dqL_prim_dz_vf(momxb+i-1)%sf(j, k, l)/Re_L(1))
-                                    vel_grad_R(i, 3) = (dqR_prim_dz_vf(momxb+i-1)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3))/Re_R(1))
+                                    vel_grad_L(i, 3) = (dqL_prim_dz_vf(momxb + i - 1)%sf(j, k, l)/Re_L(1))
+                                    vel_grad_R(i, 3) = (dqR_prim_dz_vf(momxb + i - 1)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3))/Re_R(1))
                                 end if
                             end do
 
-                            if(norm_dir == 1) then 
-                                flux_src_vf(momxb)%sf(j,k,l) = flux_src_vf(momxb)%sf(j,k,l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(1,1) + vel_grad_R(1,1))
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(1,1)*vel_L(1) + vel_grad_R(1,1)*vel_R(1))
-                                if(num_dims > 1) then 
-                                    flux_src_vf(momxb)%sf(j,k,l) = flux_src_vf(momxb)%sf(j,k,l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2,2) + vel_grad_R(2,2)) 
-                                    flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2,2)*vel_L(1) + vel_grad_R(2,2)*vel_R(1)) 
+                            if (norm_dir == 1) then
+                                flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1)*vel_L(1) + vel_grad_R(1, 1)*vel_R(1))
+                                if (num_dims > 1) then
+                                    flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
+                                    flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2)*vel_L(1) + vel_grad_R(2, 2)*vel_R(1))
 
-                                    flux_src_vf(momxb+1)%sf(j,k,l) = flux_src_vf(momxb+1)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,2) + vel_grad_R(1,2)) - 0.5_wp*(vel_grad_L(2,1) + vel_grad_R(2,1))
-                                    flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,2)*vel_L(2) + vel_grad_R(1,2)*vel_R(2)) - 0.5_wp*(vel_grad_L(2,1)*vel_L(2) + vel_grad_R(2,1)*vel_R(2))
-                                    if(num_dims > 2) then 
-                                        flux_src_vf(momxb)%sf(j,k,l) = flux_src_vf(momxb)%sf(j,k,l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3,3) + vel_grad_R(3,3))
-                                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3,3)*vel_L(1) + vel_grad_R(3,3)*vel_R(1)) 
+                                    flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 2) + vel_grad_R(1, 2)) - 0.5_wp*(vel_grad_L(2, 1) + vel_grad_R(2, 1))
+                                    flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 2)*vel_L(2) + vel_grad_R(1, 2)*vel_R(2)) - 0.5_wp*(vel_grad_L(2, 1)*vel_L(2) + vel_grad_R(2, 1)*vel_R(2))
+                                    if (num_dims > 2) then
+                                        flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
+                                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3)*vel_L(1) + vel_grad_R(3, 3)*vel_R(1))
 
-                                        flux_src_vf(momxb+2)%sf(j,k,l) = flux_src_vf(momxb+2)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,3) + vel_grad_R(1,3)) - 0.5_wp*(vel_grad_L(3,1) + vel_grad_R(3,1))
-                                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,3)*vel_L(3) + vel_grad_R(1,3)*vel_R(3)) - 0.5_wp*(vel_grad_L(3,1)*vel_L(3) + vel_grad_R(3,1)*vel_R(3))
-                                    end if 
+                                        flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 3) + vel_grad_R(1, 3)) - 0.5_wp*(vel_grad_L(3, 1) + vel_grad_R(3, 1))
+                                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 3)*vel_L(3) + vel_grad_R(1, 3)*vel_R(3)) - 0.5_wp*(vel_grad_L(3, 1)*vel_L(3) + vel_grad_R(3, 1)*vel_R(3))
+                                    end if
                                 end if
 
-                            else if(norm_dir == 2) then 
-                                flux_src_vf(momxb+1)%sf(j,k,l) = flux_src_vf(momxb+1)%sf(j,k,l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1,1) + vel_grad_R(1,1))
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1,1)*vel_L(2) + vel_grad_R(1,1)*vel_R(2))
-                                
-                                flux_src_vf(momxb+1)%sf(j,k,l) = flux_src_vf(momxb+1)%sf(j,k,l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(2,2) + vel_grad_R(2,2)) 
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(2,2)*vel_L(2) + vel_grad_R(2,2)*vel_R(2)) 
+                            else if (norm_dir == 2) then
+                                flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1)*vel_L(2) + vel_grad_R(1, 1)*vel_R(2))
 
-                                flux_src_vf(momxb)%sf(j,k,l) = flux_src_vf(momxb)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,2) + vel_grad_R(1,2)) - 0.5_wp*(vel_grad_L(2,1) + vel_grad_R(2,1))
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,2)*vel_L(1) + vel_grad_R(1,2)*vel_R(1)) - 0.5_wp*(vel_grad_L(2,1)*vel_L(1) + vel_grad_R(2,1)*vel_R(1))
-                                if(num_dims > 2) then 
-                                    flux_src_vf(momxb+1)%sf(j,k,l) = flux_src_vf(momxb+1)%sf(j,k,l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3,3) + vel_grad_R(3,3))
-                                    flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3,3)*vel_L(2) + vel_grad_R(3,3)*vel_R(2)) 
+                                flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2)*vel_L(2) + vel_grad_R(2, 2)*vel_R(2))
 
-                                    flux_src_vf(momxb+2)%sf(j,k,l) = flux_src_vf(momxb+2)%sf(j,k,l) - 0.5_wp*(vel_grad_L(2,3) + vel_grad_R(2,3)) - 0.5_wp*(vel_grad_L(3,2) + vel_grad_R(3,2))
-                                    flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(2,3)*vel_L(3) + vel_grad_R(2,3)*vel_R(3)) - 0.5_wp*(vel_grad_L(3,2)*vel_L(3) + vel_grad_R(3,2)*vel_R(3))
+                                flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 2) + vel_grad_R(1, 2)) - 0.5_wp*(vel_grad_L(2, 1) + vel_grad_R(2, 1))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 2)*vel_L(1) + vel_grad_R(1, 2)*vel_R(1)) - 0.5_wp*(vel_grad_L(2, 1)*vel_L(1) + vel_grad_R(2, 1)*vel_R(1))
+                                if (num_dims > 2) then
+                                    flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
+                                    flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3)*vel_L(2) + vel_grad_R(3, 3)*vel_R(2))
+
+                                    flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, l) - 0.5_wp*(vel_grad_L(2, 3) + vel_grad_R(2, 3)) - 0.5_wp*(vel_grad_L(3, 2) + vel_grad_R(3, 2))
+                                    flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(2, 3)*vel_L(3) + vel_grad_R(2, 3)*vel_R(3)) - 0.5_wp*(vel_grad_L(3, 2)*vel_L(3) + vel_grad_R(3, 2)*vel_R(3))
                                 end if
                             else
-                                flux_src_vf(momxb+2)%sf(j,k,l) = flux_src_vf(momxb+2)%sf(j,k,l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1,1) + vel_grad_R(1,1))
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1,1)*vel_L(3) + vel_grad_R(1,1)*vel_R(3))
-                                
-                                flux_src_vf(momxb+2)%sf(j,k,l) = flux_src_vf(momxb+2)%sf(j,k,l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2,2) + vel_grad_R(2,2)) 
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2,2)*vel_L(3) + vel_grad_R(2,2)*vel_R(3)) 
+                                flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1)*vel_L(3) + vel_grad_R(1, 1)*vel_R(3))
 
-                                flux_src_vf(momxb)%sf(j,k,l) = flux_src_vf(momxb)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,3) + vel_grad_R(1,3)) - 0.5_wp*(vel_grad_L(3,1) + vel_grad_R(3,1))
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,3)*vel_L(1) + vel_grad_R(1,3)*vel_R(1)) - 0.5_wp*(vel_grad_L(3,1)*vel_L(1) + vel_grad_R(3,1)*vel_R(1))
+                                flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2)*vel_L(3) + vel_grad_R(2, 2)*vel_R(3))
 
-                                flux_src_vf(momxb+2)%sf(j,k,l) = flux_src_vf(momxb+2)%sf(j,k,l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(3,3) + vel_grad_R(3,3))
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(3,3)*vel_L(3) + vel_grad_R(3,3)*vel_R(3)) 
+                                flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 3) + vel_grad_R(1, 3)) - 0.5_wp*(vel_grad_L(3, 1) + vel_grad_R(3, 1))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 3)*vel_L(1) + vel_grad_R(1, 3)*vel_R(1)) - 0.5_wp*(vel_grad_L(3, 1)*vel_L(1) + vel_grad_R(3, 1)*vel_R(1))
 
-                                flux_src_vf(momxb+1)%sf(j,k,l) = flux_src_vf(momxb+1)%sf(j,k,l) - 0.5_wp*(vel_grad_L(2,3) + vel_grad_R(2,3)) - 0.5_wp*(vel_grad_L(3,2) + vel_grad_R(3,2))
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(2,3)*vel_L(2) + vel_grad_R(2,3)*vel_R(2)) - 0.5_wp*(vel_grad_L(3,2)*vel_L(2) + vel_grad_R(3,2)*vel_R(2))
+                                flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3)*vel_L(3) + vel_grad_R(3, 3)*vel_R(3))
+
+                                flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, l) - 0.5_wp*(vel_grad_L(2, 3) + vel_grad_R(2, 3)) - 0.5_wp*(vel_grad_L(3, 2) + vel_grad_R(3, 2))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(2, 3)*vel_L(2) + vel_grad_R(2, 3)*vel_R(2)) - 0.5_wp*(vel_grad_L(3, 2)*vel_L(2) + vel_grad_R(3, 2)*vel_R(2))
 
                             end if
                         end if
 
-                        if(bulk_stress) then 
+                        if (bulk_stress) then
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
-                                vel_grad_L(i, 1) = (dqL_prim_dx_vf(momxb+i-1)%sf(j, k, l)/Re_L(2))
-                                vel_grad_R(i, 1) = (dqR_prim_dx_vf(momxb+i-1)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3))/Re_R(2))
+                                vel_grad_L(i, 1) = (dqL_prim_dx_vf(momxb + i - 1)%sf(j, k, l)/Re_L(2))
+                                vel_grad_R(i, 1) = (dqR_prim_dx_vf(momxb + i - 1)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3))/Re_R(2))
                                 if (num_dims > 1) then
-                                    vel_grad_L(i, 2) = (dqL_prim_dy_vf(momxb+i-1)%sf(j, k, l)/Re_L(2))
-                                    vel_grad_R(i, 2) = (dqR_prim_dy_vf(momxb+i-1)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3))/Re_R(2))
+                                    vel_grad_L(i, 2) = (dqL_prim_dy_vf(momxb + i - 1)%sf(j, k, l)/Re_L(2))
+                                    vel_grad_R(i, 2) = (dqR_prim_dy_vf(momxb + i - 1)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3))/Re_R(2))
                                 end if
                                 if (num_dims > 2) then
-                                    vel_grad_L(i, 3) = (dqL_prim_dz_vf(momxb+i-1)%sf(j, k, l)/Re_L(2))
-                                    vel_grad_R(i, 3) = (dqR_prim_dz_vf(momxb+i-1)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3))/Re_R(2))
+                                    vel_grad_L(i, 3) = (dqL_prim_dz_vf(momxb + i - 1)%sf(j, k, l)/Re_L(2))
+                                    vel_grad_R(i, 3) = (dqR_prim_dz_vf(momxb + i - 1)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3))/Re_R(2))
                                 end if
                             end do
 
-                            if(norm_dir == 1) then 
-                                flux_src_vf(momxb)%sf(j,k,l) = flux_src_vf(momxb)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,1) + vel_grad_R(1,1))
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,1)*vel_L(1) + vel_grad_R(1,1)*vel_R(1))
-                                if(num_dims > 1) then 
-                                    flux_src_vf(momxb)%sf(j,k,l) = flux_src_vf(momxb)%sf(j,k,l) - 0.5_wp*(vel_grad_L(2,2) + vel_grad_R(2,2)) 
-                                    flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(2,2)*vel_L(1) + vel_grad_R(2,2)*vel_R(1)) 
+                            if (norm_dir == 1) then
+                                flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 1)*vel_L(1) + vel_grad_R(1, 1)*vel_R(1))
+                                if (num_dims > 1) then
+                                    flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, l) - 0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
+                                    flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(2, 2)*vel_L(1) + vel_grad_R(2, 2)*vel_R(1))
 
-                                    if(num_dims > 2) then 
-                                        flux_src_vf(momxb)%sf(j,k,l) = flux_src_vf(momxb)%sf(j,k,l) - 0.5_wp*(vel_grad_L(3,3) + vel_grad_R(3,3))
-                                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(3,3)*vel_L(1) + vel_grad_R(3,3)*vel_R(1)) 
-                                    end if 
+                                    if (num_dims > 2) then
+                                        flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, l) - 0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
+                                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(3, 3)*vel_L(1) + vel_grad_R(3, 3)*vel_R(1))
+                                    end if
                                 end if
 
-                            else if(norm_dir == 2) then 
-                                flux_src_vf(momxb+1)%sf(j,k,l) = flux_src_vf(momxb+1)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,1) + vel_grad_R(1,1))
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,1)*vel_L(2) + vel_grad_R(1,1)*vel_R(2))
-                                
-                                flux_src_vf(momxb+1)%sf(j,k,l) = flux_src_vf(momxb+1)%sf(j,k,l) - 0.5_wp*(vel_grad_L(2,2) + vel_grad_R(2,2)) 
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(2,2)*vel_L(2) + vel_grad_R(2,2)*vel_R(2)) 
+                            else if (norm_dir == 2) then
+                                flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 1)*vel_L(2) + vel_grad_R(1, 1)*vel_R(2))
 
-                                if(num_dims > 2) then 
-                                    flux_src_vf(momxb+1)%sf(j,k,l) = flux_src_vf(momxb+1)%sf(j,k,l) - 0.5_wp*(vel_grad_L(3,3) + vel_grad_R(3,3))
-                                    flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(3,3)*vel_L(2) + vel_grad_R(3,3)*vel_R(2)) 
+                                flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, l) - 0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(2, 2)*vel_L(2) + vel_grad_R(2, 2)*vel_R(2))
+
+                                if (num_dims > 2) then
+                                    flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, l) - 0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
+                                    flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(3, 3)*vel_L(2) + vel_grad_R(3, 3)*vel_R(2))
                                 end if
                             else
-                                flux_src_vf(momxb+2)%sf(j,k,l) = flux_src_vf(momxb+2)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,1) + vel_grad_R(1,1))
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(1,1)*vel_L(3) + vel_grad_R(1,1)*vel_R(3))
-                                
-                                flux_src_vf(momxb+2)%sf(j,k,l) = flux_src_vf(momxb+2)%sf(j,k,l) - 0.5_wp*(vel_grad_L(2,2) + vel_grad_R(2,2)) 
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(2,2)*vel_L(3) + vel_grad_R(2,2)*vel_R(3)) 
+                                flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, 1)*vel_L(3) + vel_grad_R(1, 1)*vel_R(3))
 
-                                flux_src_vf(momxb+2)%sf(j,k,l) = flux_src_vf(momxb+2)%sf(j,k,l) - 0.5_wp*(vel_grad_L(3,3) + vel_grad_R(3,3))
-                                flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) - 0.5_wp*(vel_grad_L(3,3)*vel_L(3) + vel_grad_R(3,3)*vel_R(3)) 
+                                flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, l) - 0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(2, 2)*vel_L(3) + vel_grad_R(2, 2)*vel_R(3))
+
+                                flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, l) - 0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) - 0.5_wp*(vel_grad_L(3, 3)*vel_L(3) + vel_grad_R(3, 3)*vel_R(3))
 
                             end if
 
                         end if
-                    end do 
-                end do 
+                    end do
+                end do
             end do
 
         end if

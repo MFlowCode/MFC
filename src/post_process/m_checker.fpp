@@ -116,6 +116,7 @@ contains
         integer :: num_procs_x, num_procs_y, num_procs_z
 
         @:PROHIBIT(fft_wrt .and. (n == 0 .or. p == 0), "FFT WRT only in 3D")
+        @:PROHIBIT(fft_wrt .and. cyl_coord, "FFT WRT incompatible with cylindrical coordinates")
         @:PROHIBIT(fft_wrt .and. (MOD(m_glb+1,2) == 1 .or. MOD(n_glb+1,2) == 1 .or. MOD(p_glb+1,2) == 1), "FFT WRT requires global dimensions divisible by 2")
         num_procs_x = (m_glb + 1)/(m + 1)
         num_procs_y = (n_glb + 1)/(n + 1)
