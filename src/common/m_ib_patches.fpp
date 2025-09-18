@@ -82,20 +82,20 @@ contains
                 end if
 
                 if (patch_ib(i)%geometry == 8) then
-                    call s_ib_sphere(i, ib_markers_sf, q_prim_vf, ib)
+                    call s_ib_sphere(i, ib_markers_sf, q_prim_vf)
                     call s_ib_sphere_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 9) then
-                    call s_ib_cuboid(i, ib_markers_sf, q_prim_vf, ib)
+                    call s_ib_cuboid(i, ib_markers_sf, q_prim_vf)
                     call s_ib_cuboid_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 10) then
-                    call s_ib_cylinder(i, ib_markers_sf, q_prim_vf, ib)
+                    call s_ib_cylinder(i, ib_markers_sf, q_prim_vf)
                     call s_ib_cylinder_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 11) then
-                    call s_ib_3D_airfoil(i, ib_markers_sf, q_prim_vf, ib)
+                    call s_ib_3D_airfoil(i, ib_markers_sf, q_prim_vf)
                     call s_ib_3D_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 12) then
-                    call s_ib_model(i, ib_markers_sf, q_prim_vf, ib, levelset, levelset_norm)
+                    call s_ib_model(i, ib_markers_sf, q_prim_vf, levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -110,17 +110,17 @@ contains
                     print *, 'Processing 2D ib patch ', i
                 end if
                 if (patch_ib(i)%geometry == 2) then
-                    call s_ib_circle(i, ib_markers_sf, q_prim_vf, ib)
+                    call s_ib_circle(i, ib_markers_sf, q_prim_vf)
                     call s_circle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 3) then
-                    call s_ib_rectangle(i, ib_markers_sf, q_prim_vf, ib)
+                    call s_ib_rectangle(i, ib_markers_sf, q_prim_vf)
                     call s_rectangle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 4) then
-                    call s_ib_airfoil(i, ib_markers_sf, q_prim_vf, ib)
+                    call s_ib_airfoil(i, ib_markers_sf, q_prim_vf)
                     call s_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 5) then
-                    call s_ib_model(i, ib_markers_sf, q_prim_vf, ib, levelset, levelset_norm)
+                    call s_ib_model(i, ib_markers_sf, q_prim_vf, levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -138,33 +138,23 @@ contains
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_circle(patch_id, patch_id_fp, q_prim_vf, ib_flag)
+    subroutine s_ib_circle(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        logical, optional, intent(in) :: ib_flag
 
         real(wp) :: radius
 
         integer :: i, j, k !< Generic loop iterators
-        @:HardcodedDimensionsExtrusion()
-        @:Hardcoded2DVariables()
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
 
-        if (present(ib_flag)) then
-            x_centroid = patch_ib(patch_id)%x_centroid
-            y_centroid = patch_ib(patch_id)%y_centroid
-            radius = patch_ib(patch_id)%radius
-        else
-            x_centroid = patch_icpp(patch_id)%x_centroid
-            y_centroid = patch_icpp(patch_id)%y_centroid
-            radius = patch_icpp(patch_id)%radius
-            smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
-            smooth_coeff = patch_icpp(patch_id)%smooth_coeff
-        end if
+        x_centroid = patch_ib(patch_id)%x_centroid
+        y_centroid = patch_ib(patch_id)%y_centroid
+        radius = patch_ib(patch_id)%radius
+
 
         ! Initializing the pseudo volume fraction value to 1. The value will
         ! be modified as the patch is laid out on the grid, but only in the
@@ -178,43 +168,13 @@ contains
 
         do j = 0, n
             do i = 0, m
-
-                if (.not. present(ib_flag) .and. patch_icpp(patch_id)%smoothen) then
-
-                    eta = tanh(smooth_coeff/min(dx, dy)* &
-                               (sqrt((x_cc(i) - x_centroid)**2 &
-                                     + (y_cc(j) - y_centroid)**2) &
-                                - radius))*(-0.5_wp) + 0.5_wp
-
-                end if
-
-                if (present(ib_flag) .and. ((x_cc(i) - x_centroid)**2 &
-                                            + (y_cc(j) - y_centroid)**2 <= radius**2)) &
+                if ((x_cc(i) - x_centroid)**2 &
+                                            + (y_cc(j) - y_centroid)**2 <= radius**2) &
                     then
-
                     patch_id_fp(i, j, 0) = patch_id
-                else
-                    if (((x_cc(i) - x_centroid)**2 &
-                         + (y_cc(j) - y_centroid)**2 <= radius**2 &
-                         .and. &
-                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
-                        .or. &
-                        (.not. present(ib_flag) .and. patch_id_fp(i, j, 0) == smooth_patch_id)) &
-                        then
-
-                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                                eta, q_prim_vf, patch_id_fp)
-
-                        @:analytical()
-                        if (patch_icpp(patch_id)%hcid /= dflt_int) then
-                            @:Hardcoded2D()
-                        end if
-
-                    end if
                 end if
             end do
         end do
-        @:HardcodedDellacation()
 
     end subroutine s_ib_circle
 
