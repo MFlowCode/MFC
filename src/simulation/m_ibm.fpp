@@ -24,6 +24,8 @@ module m_ibm
 
     use m_compute_levelset
 
+    use m_ib_patches
+
     implicit none
 
     private :: s_compute_image_points, &
@@ -883,35 +885,9 @@ contains
 
     end subroutine s_propagate_mib
 
-    impure subroutine s_update_levelset_norms(patch_id, ib_markers_sf, q_prim_vf, levelset, levelset_norm)
-
-      integer, intent(in) :: patch_id
-      type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-      integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
-      type(levelset_field), intent(inout), optional :: levelset !< Levelset determined by models
-      type(levelset_norm_field), intent(inout), optional :: levelset_norm !< Levelset_norm determined by models
-
-      if (patch_ib(patch_id)%geometry == 2) then
-          call s_circle(patch_id, ib_markers_sf, q_prim_vf, ib)
-          call s_circle_levelset(patch_id, levelset, levelset_norm)
-      elseif (patch_ib(patch_id)%geometry == 3) then
-          call s_rectangle(patch_id, ib_markers_sf, q_prim_vf, ib)
-          call s_rectangle_levelset(patch_id, levelset, levelset_norm)
-      elseif (patch_ib(patch_id)%geometry == 4) then
-          call s_airfoil(patch_id, ib_markers_sf, q_prim_vf, ib)
-          call s_airfoil_levelset(patch_id, levelset, levelset_norm)
-          ! STL+IBM patch
-      elseif (patch_ib(patch_id)%geometry == 5) then
-          call s_model(patch_id, ib_markers_sf, q_prim_vf, ib, levelset, levelset_norm)
-      end if
-
-
-    end subroutine s_update_levelset_norms
-
-    impure subroutine s_update_mib(num_ibs, ib_markers_sf, q_prim_vf, levelset, levelset_norm)
+    impure subroutine s_update_mib(num_ibs, ib_markers_sf, levelset, levelset_norm)
 
       integer, intent(in) :: num_ibs
-      type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
       integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
       type(levelset_field), intent(inout), optional :: levelset
       type(levelset_norm_field), intent(inout), optional :: levelset_norm
@@ -921,7 +897,7 @@ contains
       do i = 1, num_ibs
         if (patch_ib(i)%moving_ibm .ne. 0) then
           call s_propagate_mib(i)  ! TODO :: THIS IS DONE TERRIBLY WITH EULER METHOD
-          call s_update_levelset_norms(i, ib_markers_sf, q_prim_vf, levelset, levelset_norm)  ! TODO :: VERIFY THAT I AM ALLOWED TO JUST APPLY THEM LIKE THIS
+          call s_apply_ib_patches(patch_id_fp, ib_markers_sf, levelset, levelset_norm)
         end if
       end do
 

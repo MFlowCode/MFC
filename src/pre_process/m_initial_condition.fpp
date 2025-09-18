@@ -27,7 +27,9 @@ module m_initial_condition
     use m_variables_conversion  ! Subroutines to change the state variables from
     ! one form to another
 
-    use m_patches
+    use m_ib_patches
+
+    use m_icpp_patches
 
     use m_assign_variables
 
