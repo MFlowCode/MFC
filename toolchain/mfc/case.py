@@ -7,7 +7,6 @@ from .printer import cons
 from .state import ARG
 from .run   import case_dicts
 
-import pprint
 
 QPVF_IDX_VARS = {
     'alpha_rho': 'contxb', 'vel'  : 'momxb',         'pres': 'E_idx', 
@@ -283,10 +282,6 @@ class Case:
             "pre_process"      : self.__get_pre_fpp,
             "simulation"  : self.__get_sim_fpp,
         }.get(build.get_target(target).name, _default)(print)
-
-        pprint.pprint(build.get_target(target).name)
-        if build.get_target(target).name == 'common':
-          raise 0
 
         return _prepend() + result
 

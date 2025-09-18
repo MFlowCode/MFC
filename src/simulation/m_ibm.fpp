@@ -38,6 +38,7 @@ module m_ibm
  s_ibm_correct_state, &
  s_finalize_ibm_module
 
+    integer, allocatable, dimension(:, :, :) :: patch_id_fp
     type(integer_field), public :: ib_markers
     type(levelset_field), public :: levelset
     type(levelset_norm_field), public :: levelset_norm
@@ -85,6 +86,9 @@ contains
     impure subroutine s_ibm_setup()
 
         integer :: i, j, k
+
+        ! Allocating the patch identities bookkeeping variable
+        allocate (patch_id_fp(0:m, 0:n, 0:p))
 
         $:GPU_UPDATE(device='[ib_markers%sf]')
         $:GPU_UPDATE(device='[levelset%sf]')
@@ -897,9 +901,10 @@ contains
       do i = 1, num_ibs
         if (patch_ib(i)%moving_ibm .ne. 0) then
           call s_propagate_mib(i)  ! TODO :: THIS IS DONE TERRIBLY WITH EULER METHOD
-          call s_apply_ib_patches(patch_id_fp, ib_markers_sf, levelset, levelset_norm)
         end if
       end do
+
+      call s_apply_ib_patches(patch_id_fp, ib_markers_sf, levelset, levelset_norm) ! TODO, THIS IS NOT OPTIMIA
 
     end subroutine s_update_mib
 

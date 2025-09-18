@@ -332,6 +332,7 @@ macro(HANDLE_SOURCES target useCommon)
         # If we're building post_process, exclude m_compute_levelset.fpp
         if("${target}" STREQUAL "post_process")
             list(FILTER common_FPPs EXCLUDE REGEX ".*/m_compute_levelset\.fpp$")
+            list(FILTER common_FPPs EXCLUDE REGEX ".*/m_ib_patches\.fpp$")
         endif()
 
         list(APPEND ${target}_FPPs ${common_FPPs})

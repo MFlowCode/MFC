@@ -62,7 +62,7 @@ contains
 
     impure subroutine s_apply_ib_patches(patch_id_fp, ib_markers_sf, levelset, levelset_norm)
 
-        integer, dimension(0:m, 0:m, 0:m), intent(inout) :: patch_id_fp
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
         type(levelset_field), intent(inout), optional :: levelset !< Levelset determined by models
         type(levelset_norm_field), intent(inout), optional :: levelset_norm !< Levelset_norm determined by models
@@ -90,8 +90,10 @@ contains
                     call s_ib_cylinder(i, ib_markers_sf)
                     call s_cylinder_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 11) then
+#ifdef MFC_PRE_PROCESS
                     call s_ib_3D_airfoil(i, ib_markers_sf)
                     call s_3D_airfoil_levelset(i, levelset, levelset_norm)
+#endif
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 12) then
                     call s_ib_model(i, ib_markers_sf, levelset, levelset_norm)
@@ -115,8 +117,10 @@ contains
                     call s_ib_rectangle(i, ib_markers_sf)
                     call s_rectangle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 4) then
+#ifdef MFC_PRE_PROCESS
                     call s_ib_airfoil(i, ib_markers_sf)
                     call s_airfoil_levelset(i, levelset, levelset_norm)
+#endif
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 5) then
                     call s_ib_model(i, ib_markers_sf, levelset, levelset_norm)
@@ -178,9 +182,11 @@ contains
 
     end subroutine s_ib_circle
 
+! airfoils are not supported for moving immersed boundaries
+! TODO :: REPLACE THIS IFDEF WITH SOMETHING MORE SUSTAINABLE
+#ifdef MFC_PRE_PROCESS
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
-    !! @param ib True if this patch is an immersed boundary
     subroutine s_ib_airfoil(patch_id, patch_id_fp)
 
         integer, intent(in) :: patch_id
@@ -190,6 +196,7 @@ contains
         real(wp) :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k
         integer :: Np1, Np2
+
 
         x0 = patch_ib(patch_id)%x_centroid
         y0 = patch_ib(patch_id)%y_centroid
@@ -487,6 +494,8 @@ contains
         end if
 
     end subroutine s_ib_3D_airfoil
+
+#endif
 
     !> The rectangular patch is a 2D geometry that may be used,
         !!              for example, in creating a solid boundary, or pre-/post-
