@@ -868,7 +868,7 @@ contains
 
     end subroutine s_interpolate_image_point
 
-    !> Subroutine the updates the moving imersed boundary positions
+    !> Subroutine the updates the moving imersed boundary positions via Euler's method
     impure subroutine s_propagate_mib(patch_id)
 
     integer, intent(in) :: patch_id
@@ -889,6 +889,8 @@ contains
 
     end subroutine s_propagate_mib
 
+    !> Resets the current indexes of immersed boundaries and replaces them after updating
+    !> the position of each moving immersed boundary
     impure subroutine s_update_mib(num_ibs, ib_markers_sf, levelset, levelset_norm)
 
       integer, intent(in) :: num_ibs
@@ -896,7 +898,16 @@ contains
       type(levelset_field), intent(inout), optional :: levelset
       type(levelset_norm_field), intent(inout), optional :: levelset_norm
 
-      integer :: i
+      integer :: i, j, k
+
+      ! Clears the existing immersed boundary indices
+      do i = 0, m
+        do j = 0, n
+          do k = 0, p
+            patch_id_fp(i, j, k) = 0
+          end do
+        end do
+      end do
       
       do i = 1, num_ibs
         if (patch_ib(i)%moving_ibm .ne. 0) then

@@ -75,7 +75,10 @@ program p_main
     ! Time-stepping Loop
     do
 
-        call s_update_mib(num_ibs, ib_markers%sf, levelset, levelset_norm)
+        if (ib) 
+          ! TODO :: FIND A WAY TO ONLY UPDATE WITH MIBM
+          call s_update_mib(num_ibs, ib_markers%sf, levelset, levelset_norm)
+        end if
 
         if (cfl_dt) then
             if (mytime >= t_stop) then
