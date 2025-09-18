@@ -27,7 +27,7 @@ module m_ib_patches
 
     implicit none
 
-    private; public :: s_apply_domain_patches
+    private; public :: s_apply_ib_patches
 
     real(wp) :: x_centroid, y_centroid, z_centroid
     real(wp) :: length_x, length_y, length_z
@@ -512,17 +512,10 @@ contains
         lit_gamma = (1._wp + gamma)/gamma
 
         ! Transferring the rectangle's centroid and length information
-        if (present(ib_flag)) then
-            x_centroid = patch_ib(patch_id)%x_centroid
-            y_centroid = patch_ib(patch_id)%y_centroid
-            length_x = patch_ib(patch_id)%length_x
-            length_y = patch_ib(patch_id)%length_y
-        else
-            x_centroid = patch_icpp(patch_id)%x_centroid
-            y_centroid = patch_icpp(patch_id)%y_centroid
-            length_x = patch_icpp(patch_id)%length_x
-            length_y = patch_icpp(patch_id)%length_y
-        end if
+        x_centroid = patch_ib(patch_id)%x_centroid
+        y_centroid = patch_ib(patch_id)%y_centroid
+        length_x = patch_ib(patch_id)%length_x
+        length_y = patch_ib(patch_id)%length_y
 
         ! Computing the beginning and the end x- and y-coordinates of the
         ! rectangle based on its centroid and lengths
@@ -911,11 +904,7 @@ contains
                         point = f_convert_cyl_to_cart(point)
                     end if
 
-                    if (present(ib_flag)) then
-                        eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_ib(patch_id)%model_spc)
-                    else
-                        eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_icpp(patch_id)%model_spc)
-                    end if
+                    eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_ib(patch_id)%model_spc)
 
                     ! Reading STL boundary vertices and compute the levelset and levelset_norm
                     if (eta > patch_ib(patch_id)%model_threshold) then

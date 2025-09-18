@@ -33,7 +33,7 @@ module m_icpp_patches
 
     implicit none
 
-    private; public :: s_apply_domain_patches
+    private; public :: s_apply_icpp_patches
 
     real(wp) :: x_centroid, y_centroid, z_centroid
     real(wp) :: length_x, length_y, length_z
@@ -1689,4 +1689,52 @@ contains
 
     end subroutine s_icpp_model
 
-end module m_patches
+    subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: cyl_y, cyl_z
+
+        cart_y = cyl_y*sin(cyl_z)
+        cart_z = cyl_y*cos(cyl_z)
+
+    end subroutine s_convert_cylindrical_to_cartesian_coord
+
+    pure function f_convert_cyl_to_cart(cyl) result(cart)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), dimension(1:3), intent(in) :: cyl
+        real(wp), dimension(1:3) :: cart
+
+        cart = (/cyl(1), &
+                 cyl(2)*sin(cyl(3)), &
+                 cyl(2)*cos(cyl(3))/)
+
+    end function f_convert_cyl_to_cart
+
+    subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(IN) :: cyl_x, cyl_y
+
+        sph_phi = atan(cyl_y/cyl_x)
+
+    end subroutine s_convert_cylindrical_to_spherical_coord
+
+    !> Archimedes spiral function
+    !! @param myth Angle
+    !! @param offset Thickness
+    !! @param a Starting position
+    pure elemental function f_r(myth, offset, a)
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: myth, offset, a
+        real(wp) :: b
+        real(wp) :: f_r
+
+        !r(th) = a + b*th
+
+        b = 2._wp*a/(2._wp*pi)
+        f_r = a + b*myth + offset
+    end function f_r
+
+end module m_icpp_patches
