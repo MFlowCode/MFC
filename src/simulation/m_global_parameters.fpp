@@ -250,6 +250,7 @@ module m_global_parameters
     !! Processor coordinates in MPI_CART_COMM
 
     type(bounds_info), allocatable, dimension(:) :: pcomm_coords
+    $:GPU_DECLARE(create='[pcomm_coords]')
     !! Coordinates for EL particle transfer
 
     type(int_bounds_info), dimension(3) :: nidx !< Indices for neighboring processors
@@ -1389,7 +1390,7 @@ contains
         #:endif
 
         allocate (proc_coords(1:num_dims))
-        allocate (pcomm_coords(1:num_dims))
+        @:ALLOCATE(pcomm_coords(1:num_dims))
 
         if (parallel_io .neqv. .true.) return
 
@@ -1426,7 +1427,7 @@ contains
         end if
 
         deallocate (proc_coords)
-        deallocate (pcomm_coords)
+        @:DEALLOCATE(pcomm_coords)
         if (parallel_io) then
             deallocate (start_idx)
 

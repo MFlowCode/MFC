@@ -593,11 +593,11 @@ contains
                 eta(1) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - &
                           q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) - 2))/ &
                          (z_cc(cell(3)) - z_cc(cell(3) - 2))
-                xi(2) = y_cc(cell(3))
+                xi(2) = z_cc(cell(3))
                 eta(2) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1) - &
                           q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) - 1))/ &
                          (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
-                xi(3) = y_cc(cell(3) + 1)
+                xi(3) = z_cc(cell(3) + 1)
                 eta(3) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 2) - &
                           q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/ &
                          (z_cc(cell(3) + 2) - z_cc(cell(3)))

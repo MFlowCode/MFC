@@ -114,12 +114,15 @@ contains
 
         pcomm_coords(1)%beg = x_cb(buff_size - fd_number - 1)
         pcomm_coords(1)%end = x_cb(m - buff_size + fd_number)
+        $:GPU_UPDATE(device='[pcomm_coords(1)]')
         if (n > 0) then
             pcomm_coords(2)%beg = y_cb(buff_size - fd_number - 1)
             pcomm_coords(2)%end = y_cb(n - buff_size + fd_number)
+            $:GPU_UPDATE(device='[pcomm_coords(2)]')
             if (p > 0) then
                 pcomm_coords(3)%beg = z_cb(buff_size - fd_number - 1)
                 pcomm_coords(3)%end = z_cb(p - buff_size + fd_number)
+                $:GPU_UPDATE(device='[pcomm_coords(3)]')
             end if
         end if
 
@@ -1482,8 +1485,8 @@ contains
         $:GPU_UPDATE(host='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
             & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
             & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
-            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, keep_bubble, &
-            & nBubs]')
+            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, keep_bubble, nBubs, &
+            & wrap_bubble_dir, wrap_bubble_loc]')
         call nvtxEndRange
 
         if (nBubs > 0) then
