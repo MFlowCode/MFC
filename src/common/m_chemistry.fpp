@@ -16,6 +16,13 @@ module m_chemistry
 
     implicit none
 
+    #:block DEF_AMD
+        real(dp) :: molecular_weights_nonparameter(10) = &
+                    (/2.016d0, 1.008d0, 15.999d0, 31.998d0, 17.007d0, 18.015d0, 33.006d0, &
+                      34.014d0, 39.95d0, 28.014d0/)
+        $:GPU_DECLARE(create='[molecular_weights_nonparameter]')
+    #:endblock DEF_AMD
+
 contains
 
     subroutine s_compute_q_T_sf(q_T_sf, q_cons_vf, bounds)
@@ -99,33 +106,37 @@ contains
         real(wp), dimension(num_species) :: Ys
         real(wp), dimension(num_species) :: omega
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega]')
-        do z = bounds(3)%beg, bounds(3)%end
-            do y = bounds(2)%beg, bounds(2)%end
-                do x = bounds(1)%beg, bounds(1)%end
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega]')
+            do z = bounds(3)%beg, bounds(3)%end
+                do y = bounds(2)%beg, bounds(2)%end
+                    do x = bounds(1)%beg, bounds(1)%end
 
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do eqn = chemxb, chemxe
-                        Ys(eqn - chemxb + 1) = q_prim_qp(eqn)%sf(x, y, z)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eqn = chemxb, chemxe
+                            Ys(eqn - chemxb + 1) = q_prim_qp(eqn)%sf(x, y, z)
+                        end do
+
+                        rho = q_cons_qp(contxe)%sf(x, y, z)
+                        T = q_T_sf%sf(x, y, z)
+
+                        call get_net_production_rates(rho, T, Ys, omega)
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eqn = chemxb, chemxe
+                            #:block UNDEF_AMD
+                                omega_m = molecular_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+                            #:endblock UNDEF_AMD
+                            #:block DEF_AMD
+                                omega_m = molecular_weights_nonparameter(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+                            #:endblock DEF_AMD
+                            rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
+
+                        end do
+
                     end do
-
-                    rho = q_cons_qp(contxe)%sf(x, y, z)
-                    T = q_T_sf%sf(x, y, z)
-
-                    call get_net_production_rates(rho, T, Ys, omega)
-
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do eqn = chemxb, chemxe
-
-                        omega_m = molecular_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
-
-                        rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
-
-                    end do
-
                 end do
             end do
-        end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_compute_chemistry_reaction_flux
 

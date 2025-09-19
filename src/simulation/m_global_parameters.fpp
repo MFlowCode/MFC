@@ -21,9 +21,7 @@ module m_global_parameters
 
     use m_helper_basic         !< Functions to compare floating point numbers
 
-#ifdef MFC_OpenACC
-    use openacc
-#endif
+    ! $:USE_GPU_MODULE()
 
     implicit none
 
@@ -194,8 +192,6 @@ module m_global_parameters
     integer :: num_igr_warm_start_iters !< number of warm start iterations for elliptic solve
     real(wp) :: alf_factor  !< alpha factor for IGR
 
-    $:GPU_DECLARE(create='[chemistry]')
-
     logical :: bodyForces
     logical :: bf_x, bf_y, bf_z !< body force toggle in three directions
     !< amplitude, frequency, and phase shift sinusoid in each direction
@@ -206,6 +202,7 @@ module m_global_parameters
     #:endfor
     real(wp), dimension(3) :: accel_bf
     $:GPU_DECLARE(create='[accel_bf]')
+    ! $:GPU_DECLARE(create='[k_x,w_x,p_x,g_x,k_y,w_y,p_y,g_y,k_z,w_z,p_z,g_z]')
 
     integer :: cpu_start, cpu_end, cpu_rate
 
@@ -235,10 +232,13 @@ module m_global_parameters
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
+#if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
     $:GPU_DECLARE(create='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
     $:GPU_DECLARE(create='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
-
+#elif defined(MFC_OpenMP)
+    $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
+#endif
     type(bounds_info) :: x_domain, y_domain, z_domain
     real(wp) :: x_a, y_a, z_a
     real(wp) :: x_b, y_b, z_b
