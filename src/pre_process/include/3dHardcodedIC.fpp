@@ -1,6 +1,6 @@
 #:def Hardcoded3DVariables()
     ! Place any declaration of intermediate variables here
-    real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
+    real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph, Mach
 
     real(wp) :: eps
 
@@ -94,10 +94,11 @@
         ! This is patch is hard-coded for test suite optimization used in the
         ! 3D_TaylorGreenVortex case:
         ! This analytic patch used geometry 9
+        Mach = 0.1
         if (patch_id == 1) then
-            q_prim_vf(E_idx)%sf(i, j, k) = 101325 + (1*37.6636429464809**2/16)*(cos(2*x_cc(i)/1) + cos(2*y_cc(j)/1))*(cos(2*z_cc(k)/1) + 2)
-            q_prim_vf(momxb + 0)%sf(i, j, k) = 37.6636429464809*sin(x_cc(i)/1)*cos(y_cc(j)/1)*sin(z_cc(k)/1)
-            q_prim_vf(momxb + 1)%sf(i, j, k) = -37.6636429464809*cos(x_cc(i)/1)*sin(y_cc(j)/1)*sin(z_cc(k)/1)
+            q_prim_vf(E_idx)%sf(i, j, k) = 101325 + (Mach**2*376.636429464809**2/16)*(cos(2*x_cc(i)/1) + cos(2*y_cc(j)/1))*(cos(2*z_cc(k)/1) + 2)
+            q_prim_vf(momxb + 0)%sf(i, j, k) = Mach*376.636429464809*sin(x_cc(i)/1)*cos(y_cc(j)/1)*sin(z_cc(k)/1)
+            q_prim_vf(momxb + 1)%sf(i, j, k) = -Mach*376.636429464809*cos(x_cc(i)/1)*sin(y_cc(j)/1)*sin(z_cc(k)/1)
         end if
 
     case default

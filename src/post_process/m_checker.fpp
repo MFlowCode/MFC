@@ -17,7 +17,7 @@ module m_checker
 
     implicit none
 
-    private; public :: s_check_inputs
+    private; public :: s_check_inputs, s_check_inputs_fft
 
 contains
 
@@ -110,6 +110,21 @@ contains
         @:PROHIBIT(p == 0 .and. (omega_wrt(1) .or. omega_wrt(2)))
         @:PROHIBIT(any(omega_wrt) .and. fd_order == dflt_int, "fd_order must be set for omega_wrt")
     end subroutine s_check_inputs_vorticity
+
+    !> Checks constraints on fft_wrt
+    impure subroutine s_check_inputs_fft
+        integer :: num_procs_x, num_procs_y, num_procs_z
+
+        @:PROHIBIT(fft_wrt .and. (n == 0 .or. p == 0), "FFT WRT only in 3D")
+        @:PROHIBIT(fft_wrt .and. cyl_coord, "FFT WRT incompatible with cylindrical coordinates")
+        @:PROHIBIT(fft_wrt .and. (MOD(m_glb+1,2) == 1 .or. MOD(n_glb+1,2) == 1 .or. MOD(p_glb+1,2) == 1), "FFT WRT requires global dimensions divisible by 2")
+        num_procs_x = (m_glb + 1)/(m + 1)
+        num_procs_y = (n_glb + 1)/(n + 1)
+        num_procs_z = (p_glb + 1)/(p + 1)
+        @:PROHIBIT(fft_wrt .and. (MOD(m_glb+1,num_procs_y) /= 0 .or. MOD(m_glb+1,num_procs_z) /= 0), "FFT WRT requires m_glb to be divisble by num_procs_y and num_procs_z")
+        @:PROHIBIT(fft_wrt .and. (MOD(n_glb+1,num_procs_y) /= 0 .or. MOD(n_glb+1,num_procs_z) /= 0), "FFT WRT requires n_glb to be divisble by num_procs_y and num_procs_z")
+        @:PROHIBIT(fft_wrt .and. (MOD(p_glb+1,num_procs_y) /= 0 .or. MOD(p_glb+1,num_procs_z) /= 0), "FFT WRT requires p_glb to be divisble by num_procs_y and num_procs_z")
+    end subroutine s_check_inputs_fft
 
     !> Checks constraints on Q-criterion parameters
     impure subroutine s_check_inputs_qm
