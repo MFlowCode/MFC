@@ -75,7 +75,7 @@ program p_main
     ! Time-stepping Loop
     do
 
-        if (ib) 
+        if (ib) then
           ! TODO :: FIND A WAY TO ONLY UPDATE WITH MIBM
           call s_update_mib(num_ibs, ib_markers%sf, levelset, levelset_norm)
         end if

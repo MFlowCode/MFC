@@ -247,7 +247,13 @@ contains
                 vel_norm_IP = sum(vel_IP*norm)*norm
                 vel_g = vel_IP - vel_norm_IP
             else
-                vel_g = 0._wp
+                if (patch_ib(patch_id)%mibm .eq. 0) then
+                  vel_g = 0._wp
+                else
+                  do q = 1, 3
+                    vel_g(q) = patch_ib(patch_id)%vel(q)
+                  end do
+                end if
             end if
 
             ! Set momentum
