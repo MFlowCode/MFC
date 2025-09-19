@@ -908,11 +908,26 @@ contains
 
       integer :: i, j, k
 
+      print *, "patch_id_fp at (380, 255, 0): ", patch_id_fp(380, 255, 0)
+      print *, "IB Markers at (380, 255, 0): ", ib_markers_sf(380+1, 255+1, 1)
+
       ! Clears the existing immersed boundary indices
       do i = 0, m
         do j = 0, n
           do k = 0, p
+            ! if (patch_id_fp(i, j, k) .ne. 0) then
+            !   print *, i, j, k
+            ! end if
             patch_id_fp(i, j, k) = 0
+          end do
+        end do
+      end do
+
+      ! Clears the existing immersed boundary indices
+      do i = 1, m
+        do j = 1, n
+          do k = 1, p
+            ib_markers_sf(i, j, k) = 0
           end do
         end do
       end do

@@ -53,6 +53,7 @@ program p_main
     call nvtxStartRange("INIT-GPU-VARS")
     call s_initialize_gpu_vars()
     call nvtxEndRange
+    print *, "Printing IB conditions:", patch_ib(1)%geometry, patch_ib(1)%x_centroid, patch_ib(1)%y_centroid, patch_ib(1)%radius
     print *, "Printing mibm conditions:", patch_ib(1)%moving_ibm, patch_ib(1)%vel(1), patch_ib(1)%vel(2), patch_ib(1)%vel(3)
 
     ! Setting the time-step iterator to the first time-step
