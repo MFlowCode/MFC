@@ -142,12 +142,17 @@ contains
         type(scalar_field), intent(in), optional :: beta
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
-        integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
+#ifndef MFC_POST_PROCESS
 
+        integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
+#endif
 #ifdef MFC_MPI
 
         ! Generic loop iterator
-        integer :: i, j
+        integer :: i
+#ifndef MFC_POST_PROCESS
+        integer :: j
+#endif
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
         !Altered system size for the lagrangian subgrid bubble model
@@ -428,11 +433,18 @@ contains
         real(wp), intent(out) :: icfl_max_glb
         real(wp), intent(out) :: vcfl_max_glb
         real(wp), intent(out) :: Rc_min_glb
-
 #ifdef MFC_SIMULATION
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
+#endif
+#endif
+        ! Initiate the global variables to the local values
+        icfl_max_glb = icfl_max_loc
+        vcfl_max_glb = vcfl_max_loc
+        Rc_min_glb = Rc_min_loc
 
+#ifdef MFC_SIMULATION
+#ifdef MFC_MPI
         ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their
         ! global extrema and bookkeeping the results on the rank 0 processor
         call MPI_REDUCE(icfl_max_loc, icfl_max_glb, 1, &

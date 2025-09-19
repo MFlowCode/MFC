@@ -101,17 +101,16 @@ contains
             end if
             ! Computing centered finite difference coefficients
             call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
-                                                          fd_number, fd_order)
+                                                          fd_order, fd_number)
             $:GPU_UPDATE(device='[fd_coeff_x]')
-
             if (n > 0) then
                 call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
-                                                              fd_number, fd_order)
+                                                              fd_order, fd_number)
                 $:GPU_UPDATE(device='[fd_coeff_y]')
             end if
             if (p > 0) then
                 call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
-                                                              fd_number, fd_order)
+                                                              fd_order, fd_number)
                 $:GPU_UPDATE(device='[fd_coeff_z]')
             end if
         end if

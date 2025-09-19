@@ -55,9 +55,11 @@ module m_variables_conversion
 
     real(wp), allocatable, dimension(:) :: Gs
     integer, allocatable, dimension(:) :: bubrs
+
+#ifdef MFC_SIMULATION
     real(wp), allocatable, dimension(:, :) :: Res
     $:GPU_DECLARE(create='[bubrs,Gs,Res]')
-
+#endif
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
     $:GPU_DECLARE(create='[is1b,is2b,is3b,is1e,is2e,is3e]')
 
@@ -132,9 +134,17 @@ contains
         real(wp) :: e_Per_Kg, Pdyn_Per_Kg
         real(wp) :: T_guess
         real(wp), dimension(1:num_species) :: Y_rs
+        #:if not chemistry
+            integer :: s !< Generic loop iterator
+        #:endif
 
-        integer :: s !< Generic loop iterator
+        ! Initiate the variables
+        Y_rs(:) = rhoYks(:)/rho
+        e_Per_Kg = energy/rho
+        Pdyn_Per_Kg = dyn_p/rho
+        E_e = 0._wp
 
+        T_guess = T
         #:if not chemistry
             ! Depending on model_eqns and bubbles_euler, the appropriate procedure
             ! for computing pressure is targeted by the procedure pointer
@@ -154,7 +164,6 @@ contains
 
             if (hypoelasticity .and. present(G)) then
                 ! calculate elastic contribution to Energy
-                E_e = 0._wp
                 do s = stress_idx%beg, stress_idx%end
                     if (G > 0) then
                         E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
@@ -174,12 +183,6 @@ contains
             end if
 
         #:else
-
-            Y_rs(:) = rhoYks(:)/rho
-            e_Per_Kg = energy/rho
-            Pdyn_Per_Kg = dyn_p/rho
-
-            T_guess = T
 
             call get_temperature(e_Per_Kg - Pdyn_Per_Kg, T_guess, Y_rs, .true., T)
             call get_pressure(rho, T, Y_rs, pres)
@@ -257,7 +260,10 @@ contains
 
         real(wp), optional, dimension(2), intent(out) :: Re_K
 
-        integer :: i, q
+        integer :: i
+#ifdef MFC_SIMULATION
+        integer :: q
+#endif
         real(wp), dimension(num_fluids) :: alpha_rho_K, alpha_K
 
         ! Constraining the partial densities and the volume fractions within
@@ -321,14 +327,16 @@ contains
                 qv = fluid_pp(1)%qv
             end if
         end if
-
+        if (present(Re_K)) then
+            Re_K(:) = dflt_real
+        end if
 #ifdef MFC_SIMULATION
         ! Computing the shear and bulk Reynolds numbers from species analogs
         if (viscous) then
             if (num_fluids == 1) then ! need to consider case with num_fluids >= 2
                 do i = 1, 2
 
-                    Re_K(i) = dflt_real; if (Re_size(i) > 0) Re_K(i) = 0._wp
+                    if (Re_size(i) > 0) Re_K(i) = 0._wp
 
                     do q = 1, Re_size(i)
                         Re_K(i) = (1 - alpha_K(Re_idx(i, q)))/fluid_pp(Re_idx(i, q))%Re(i) &
@@ -384,8 +392,10 @@ contains
 
         real(wp), dimension(num_fluids) :: alpha_rho_K, alpha_K !<
 
-        integer :: i, j !< Generic loop iterator
-
+        integer :: i !< Generic loop iterator
+#ifdef MFC_SIMULATION
+        integer :: j !< Generic loop iterator
+#endif
         ! Computing the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
 
@@ -430,11 +440,14 @@ contains
             pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
             qv = qv + alpha_rho_K(i)*qvs(i)
         end do
+        if (present(Re_K)) then
+            Re_K(:) = dflt_real
+        end if
 #ifdef MFC_SIMULATION
         ! Computing the shear and bulk Reynolds numbers from species analogs
         do i = 1, 2
 
-            Re_K(i) = dflt_real; if (Re_size(i) > 0) Re_K(i) = 0._wp
+            if (Re_size(i) > 0) Re_K(i) = 0._wp
 
             do j = 1, Re_size(i)
                 Re_K(i) = alpha_K(Re_idx(i, j))/fluid_pp(Re_idx(i, j))%Re(i) &
@@ -479,21 +492,26 @@ contains
 
         real(wp), optional, intent(out) :: G_K
         real(wp), optional, dimension(num_fluids), intent(in) :: G
-
-        integer :: i, j !< Generic loop iterators
         real(wp) :: alpha_K_sum
+        integer :: i
+#ifdef MFC_SIMULATION
+        integer :: j !< Generic loop iterators
+#endif
+        ! Initiate the variables
+        rho_K = 0._wp
+        gamma_K = 0._wp
+        pi_inf_K = 0._wp
+        qv_K = 0._wp
+        alpha_K_sum = 0._wp
 
+        do i = 1, 2
+            Re_K(i) = dflt_real
+        end do
 #ifdef MFC_SIMULATION
         ! Constraining the partial densities and the volume fractions within
         ! their physical bounds to make sure that any mixture variables that
         ! are derived from them result within the limits that are set by the
         ! fluids physical parameters that make up the mixture
-        rho_K = 0._wp
-        gamma_K = 0._wp
-        pi_inf_K = 0._wp
-        qv_K = 0._wp
-
-        alpha_K_sum = 0._wp
 
         if (mpp_lim) then
             do i = 1, num_fluids
@@ -526,8 +544,6 @@ contains
         if (viscous) then
 
             do i = 1, 2
-                Re_K(i) = dflt_real
-
                 if (Re_size(i) > 0) Re_K(i) = 0._wp
 
                 do j = 1, Re_size(i)
@@ -553,33 +569,36 @@ contains
 
         real(wp), dimension(num_fluids), intent(in) :: alpha_K, alpha_rho_K !<
             !! Partial densities and volume fractions
-
+        real(wp), dimension(num_fluids) :: alpha_K_local, alpha_rho_K_local !<
         real(wp), dimension(2), intent(out) :: Re_K
-
-        integer :: i, j !< Generic loop iterators
-
 #ifdef MFC_SIMULATION
+        integer :: i, j !< Generic loop iterators
+#endif
+        ! Initiate the variables
         rho_K = 0._wp
         gamma_K = 0._wp
         pi_inf_K = 0._wp
         qv_K = 0._wp
-
+        Re_K(:) = dflt_real
+        alpha_K_local(:) = alpha_K(:)
+        alpha_rho_K_local(:) = alpha_rho_K(:)
+#ifdef MFC_SIMULATION
         if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
             do i = 1, num_fluids
-                rho_K = rho_K + alpha_rho_K(i)
-                gamma_K = gamma_K + alpha_K(i)*gammas(i)
-                pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
-                qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+                rho_K = rho_K + alpha_rho_K_local(i)
+                gamma_K = gamma_K + alpha_K_local(i)*gammas(i)
+                pi_inf_K = pi_inf_K + alpha_K_local(i)*pi_infs(i)
+                qv_K = qv_K + alpha_rho_K_local(i)*qvs(i)
             end do
         else if ((model_eqns == 2) .and. (num_fluids > 2)) then
             do i = 1, num_fluids - 1
-                rho_K = rho_K + alpha_rho_K(i)
-                gamma_K = gamma_K + alpha_K(i)*gammas(i)
-                pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
-                qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+                rho_K = rho_K + alpha_rho_K_local(i)
+                gamma_K = gamma_K + alpha_K_local(i)*gammas(i)
+                pi_inf_K = pi_inf_K + alpha_K_local(i)*pi_infs(i)
+                qv_K = qv_K + alpha_rho_K_local(i)*qvs(i)
             end do
         else
-            rho_K = alpha_rho_K(1)
+            rho_K = alpha_rho_K_local(1)
             gamma_K = gammas(1)
             pi_inf_K = pi_infs(1)
             qv_K = qvs(1)
@@ -589,12 +608,10 @@ contains
             if (num_fluids == 1) then ! need to consider case with num_fluids >= 2
 
                 do i = 1, 2
-                    Re_K(i) = dflt_real
-
                     if (Re_size(i) > 0) Re_K(i) = 0._wp
 
                     do j = 1, Re_size(i)
-                        Re_K(i) = (1._wp - alpha_K(Re_idx(i, j)))/Res(i, j) &
+                        Re_K(i) = (1._wp - alpha_K_local(Re_idx(i, j)))/Res(i, j) &
                                   + Re_K(i)
                     end do
 
@@ -604,7 +621,6 @@ contains
             end if
         end if
 #endif
-
     end subroutine s_convert_species_to_mixture_variables_bubbles_acc
 
     !>  The computation of parameters, the allocation of memory,
@@ -612,11 +628,11 @@ contains
         !!      other procedures that are necessary to setup the module.
     impure subroutine s_initialize_variables_conversion_module
 
-        integer :: i, j
-
-        $:GPU_ENTER_DATA(copyin='[is1b,is1e,is2b,is2e,is3b,is3e]')
+        integer :: i
 
 #ifdef MFC_SIMULATION
+        integer :: j
+
         @:ALLOCATE(gammas (1:num_fluids))
         @:ALLOCATE(gs_min (1:num_fluids))
         @:ALLOCATE(pi_infs(1:num_fluids))
@@ -635,6 +651,7 @@ contains
         @:ALLOCATE(qvps    (1:num_fluids))
         @:ALLOCATE(Gs     (1:num_fluids))
 #endif
+        $:GPU_ENTER_DATA(copyin='[is1b,is1e,is2b,is2e,is3b,is3e]')
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
@@ -1187,6 +1204,8 @@ contains
         ! Density, specific heat ratio function, liquid stiffness function
         ! and dynamic pressure, as defined in the incompressible flow sense,
         ! respectively
+
+#ifndef MFC_SIMULATION
         real(wp) :: rho
         real(wp) :: gamma
         real(wp) :: pi_inf
@@ -1213,8 +1232,6 @@ contains
         pres_mag = 0._wp
 
         G = 0._wp
-
-#ifndef MFC_SIMULATION
         ! Converting the primitive variables to the conservative variables
         do l = 0, p
             do k = 0, n
@@ -1467,6 +1484,7 @@ contains
         ! Partial densities, density, velocity, pressure, energy, advection
         ! variables, the specific heat ratio and liquid stiffness functions,
         ! the shear and volume Reynolds numbers and the Weber numbers
+#ifdef MFC_SIMULATION
         real(wp), dimension(num_fluids) :: alpha_rho_K
         real(wp), dimension(num_fluids) :: alpha_K
         real(wp) :: rho_K
@@ -1483,7 +1501,7 @@ contains
         real(wp) :: T_K, mix_mol_weight, R_gas
 
         integer :: i, j, k, l !< Generic loop iterators
-
+#endif
         is1b = is1%beg; is1e = is1%end
         is2b = is2%beg; is2e = is2%end
         is3b = is3%beg; is3e = is3%end

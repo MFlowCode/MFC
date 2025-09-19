@@ -70,18 +70,20 @@ contains
     !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
     !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
     pure subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s, local_buff_size, &
-                                                             fd_number_in, fd_order_in, offset_s)
+                                                             fd_order_in, fd_number_in, offset_s)
 
         integer :: lB, lE !< loop bounds
         integer, intent(IN) :: q
-        integer, intent(IN) :: local_buff_size, fd_number_in, fd_order_in
+        integer, intent(IN) :: local_buff_size, fd_order_in
+        integer, optional, intent(IN) :: fd_number_in
+
         type(int_bounds_info), optional, intent(IN) :: offset_s
         real(wp), allocatable, dimension(:, :), intent(INOUT) :: fd_coeff_s
 
         real(wp), &
             dimension(-local_buff_size:q + local_buff_size), &
             intent(IN) :: s_cc
-
+        integer :: fd_number
         integer :: i !< Generic loop iterator
 
         if (present(offset_s)) then
@@ -91,10 +93,15 @@ contains
             lB = 0
             lE = q
         end if
+        if (present(fd_number_in)) then
+            fd_number = fd_number_in
+        else
+            fd_number = 2
+        end if
 
 #ifdef MFC_POST_PROCESS
         if (allocated(fd_coeff_s)) deallocate (fd_coeff_s)
-        allocate (fd_coeff_s(-fd_number_in:fd_number_in, lb:lE))
+        allocate (fd_coeff_s(-fd_number:fd_number, lb:lE))
 #endif
 
         ! Computing the 1st order finite-difference coefficients
