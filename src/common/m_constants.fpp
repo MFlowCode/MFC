@@ -13,6 +13,7 @@ module m_constants
     real(wp), parameter :: small_alf = 1.e-11_wp                !< Small alf tolerance
     real(wp), parameter :: pi = 3.141592653589793_wp !< Pi
     real(wp), parameter :: verysmall = 1.e-12_wp              !< Very small number
+    real(wp), parameter :: Re_b_min = 1.e-6_wp                !< minimum bubble reynolds number for drag coeff calc.
 
     integer, parameter :: num_stcls_min = 5                       !< Minimum # of stencils
     integer, parameter :: path_len = 400                          !< Maximum path length
@@ -59,8 +60,9 @@ module m_constants
     real(wp), parameter :: initial_distance_buffer = 1.e12_wp !< Initialized levelset distance for the shortest path pair algorithm
 
     ! Lagrange bubbles constants
-    integer, parameter :: mapCells = 3         !< Number of cells around the bubble where the smoothening function will have effect
-    real(wp), parameter :: R_uni = 8314._wp    !< Universal gas constant - J/kmol/K
+    integer, parameter :: mapCells = 3 !< Number of cells around the bubble where the smoothening function will have effect
+    real(wp), parameter :: R_uni = 8314._wp ! Universal gas constant - J/kmol/K
+    integer, parameter :: lag_io_vars = 21 ! Number of variables per particle for MPI_IO
 
     ! Strang Splitting constants
     real(wp), parameter :: dflt_adap_dt_tol = 1.e-4_wp !< Default tolerance for adaptive step size

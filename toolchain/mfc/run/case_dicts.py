@@ -106,6 +106,13 @@ PRE_PROCESS.update({
     'elliptic_smoothing_iters': ParamType.INT,
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
+    'lag_params%vel_model': ParamType.INT,
+    'fd_order': ParamType.INT,
+    'normFac': ParamType.REAL,
+    'interface_file': ParamType.STR,
+    'normMag': ParamType.REAL,
+    'g0': ParamType.REAL,
+    'p0': ParamType.REAL,
 })
 
 for ib_id in range(1, 10+1):
@@ -322,11 +329,12 @@ for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
              'write_bubbles', 'write_bubbles_stats' ]:
     SIMULATION[f'lag_params%{var}'] = ParamType.LOG
 
-for var in [ 'solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb']:
+for var in [ 'solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb',
+             'vel_model', 'drag_model']:
     SIMULATION[f'lag_params%{var}'] = ParamType.INT
 
 for var in [ 'epsilonb', 'valmaxvoid', 'charwidth', 'diffcoefvap',
-            'c0', 'rho0', 'T0', 'x0', 'Thost' ]:
+            'c0', 'rho0', 'T0', 'x0', 'Thost', 'c_d' ]:
     SIMULATION[f'lag_params%{var}'] = ParamType.REAL
 
 for var in [ 'diffusion', 'reactions' ]:
@@ -373,10 +381,6 @@ for cmp in ["x", "y", "z"]:
     for var in ["k", "w", "p", "g"]:
         SIMULATION[f'{var}_{cmp}'] = ParamType.REAL
     SIMULATION[f'bf_{cmp}'] = ParamType.LOG
-
-
-    for prepend in ["domain%beg", "domain%end"]:
-        SIMULATION[f"{cmp}_{prepend}"] = ParamType.REAL
 
 for probe_id in range(1,10+1):
     for cmp in ["x", "y", "z"]:
@@ -440,6 +444,24 @@ POST_PROCESS.update({
     'pres_inf_wrt': ParamType.LOG,
     'cons_vars_wrt': ParamType.LOG,
     'prim_vars_wrt': ParamType.LOG,
+    'lag_header': ParamType.LOG,
+    'lag_txt_wrt': ParamType.LOG,
+    'lag_db_wrt': ParamType.LOG,
+    'lag_id_wrt': ParamType.LOG,
+    'lag_pos_wrt': ParamType.LOG,
+    'lag_pos_prev_wrt': ParamType.LOG,
+    'lag_vel_wrt': ParamType.LOG,
+    'lag_rad_wrt': ParamType.LOG,
+    'lag_rvel_wrt': ParamType.LOG,
+    'lag_r0_wrt': ParamType.LOG,
+    'lag_rmax_wrt': ParamType.LOG,
+    'lag_rmin_wrt': ParamType.LOG,
+    'lag_dphidt_wrt': ParamType.LOG,
+    'lag_pres_wrt': ParamType.LOG,
+    'lag_mv_wrt': ParamType.LOG,
+    'lag_mg_wrt': ParamType.LOG,
+    'lag_betaT_wrt': ParamType.LOG,
+    'lag_betaC_wrt': ParamType.LOG,
     'c_wrt': ParamType.LOG,
     'omega_wrt': ParamType.LOG,
     'qbmm': ParamType.LOG,
