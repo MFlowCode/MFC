@@ -193,4 +193,31 @@
 #endif
 
 #:enddef
+
+#:def DEF_AMD(code)
+    #:if MFC_COMPILER == AMD_COMPILER_ID
+        $:code
+    #:endif
+#:enddef
+
+#:def UNDEF_CCE(code)
+    #:if MFC_COMPILER != CCE_COMPILER_ID
+        $:code
+    #:endif
+#:enddef
+
+#:def DEF_CCE(code)
+    #:if MFC_COMPILER == CCE_COMPILER_ID
+        $:code
+    #:endif
+#:enddef
+
+#:def UNDEF_NVIDIA(code)
+    #:if MFC_COMPILER != NVIDIA_COMPILER_ID and MFC_COMPILER != PGI_COMPILER_ID
+        $:code
+    #:endif
+#:enddef
+
+#:set USING_NVHPC = (MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID)
+#:set USING_CCE = (MFC_COMPILER == CCE_COMPILER_ID)
 ! New line at end of file is required for FYPP
