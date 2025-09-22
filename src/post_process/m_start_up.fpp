@@ -428,7 +428,7 @@ contains
 
             call s_mpi_FFT_fwd()
 
-            En_real = 0.5_wp*abs(data_cmplx_z)**2._wp/(Nx*Ny*Nz)**2._wp
+            En_real = 0.5_wp*abs(data_cmplx_z)**2._wp/(1._wp*Nx*Ny*Nz)**2._wp
 
             do l = 0, p
                 do k = 0, n
@@ -440,7 +440,7 @@ contains
 
             call s_mpi_FFT_fwd()
 
-            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp/(Nx*Ny*Nz)**2._wp
+            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp/(1._wp*Nx*Ny*Nz)**2._wp
 
             do l = 0, p
                 do k = 0, n
@@ -452,7 +452,7 @@ contains
 
             call s_mpi_FFT_fwd()
 
-            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp/(Nx*Ny*Nz)**2._wp
+            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp/(1._wp*Nx*Ny*Nz)**2._wp
 
             do kf = 1, Nf
                 En(kf) = 0._wp
