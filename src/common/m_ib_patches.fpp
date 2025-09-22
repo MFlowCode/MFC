@@ -60,9 +60,8 @@ module m_ib_patches
 
 contains
 
-    impure subroutine s_apply_ib_patches(patch_id_fp, ib_markers_sf, levelset, levelset_norm)
+    impure subroutine s_apply_ib_patches(ib_markers_sf, levelset, levelset_norm)
 
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
         type(levelset_field), intent(inout), optional :: levelset !< Levelset determined by models
         type(levelset_norm_field), intent(inout), optional :: levelset_norm !< Levelset_norm determined by models
@@ -132,12 +131,12 @@ contains
         !!              are provided. Note that the circular patch DOES allow for
         !!              the smoothing of its boundary.
         !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
+        !! @param ib_markers_sf Array to track patch ids
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_circle(patch_id, patch_id_fp)
+    subroutine s_ib_circle(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
         real(wp) :: radius
 
@@ -161,7 +160,7 @@ contains
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
 
-        ! TODO :: THIS SETS PATCH_ID_FP TO HODL THE PATCH ID, BUT WE NEED TO
+        ! TODO :: THIS SETS ib_markers_sf TO HOLD THE PATCH ID, BUT WE NEED TO
         ! NOW ALSO SEARCH FOR OTHER POINTS TO DELETE THE CURRENT PATCH ID
 
         do j = 0, n
@@ -169,7 +168,10 @@ contains
                 if ((x_cc(i) - x_centroid)**2 &
                                             + (y_cc(j) - y_centroid)**2 <= radius**2) &
                     then
-                    patch_id_fp(i, j, 0) = patch_id
+                      if (i .eq. 0) then
+                        print *, "Inside circle: ", i, j
+                      end if
+                    ib_markers_sf(i, j, 0) = patch_id
                 end if
             end do
         end do
@@ -180,11 +182,11 @@ contains
 ! TODO :: REPLACE THIS IFDEF WITH SOMETHING MORE SUSTAINABLE
 #ifdef MFC_PRE_PROCESS
     !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    subroutine s_ib_airfoil(patch_id, patch_id_fp)
+    !! @param ib_markers_sf Array to track patch ids
+    subroutine s_ib_airfoil(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
         real(wp) :: x0, y0, f, x_act, y_act, ca_in, pa, ma, ta, theta
         real(wp) :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
@@ -286,13 +288,13 @@ contains
                         if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
                             if (y_act <= airfoil_grid_u(k)%y) then
                                 !!IB
-                                patch_id_fp(i, j, 0) = patch_id
+                                ib_markers_sf(i, j, 0) = patch_id
                             end if
                         else
                             f = (airfoil_grid_u(k)%x - x_act)/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
                             if (y_act <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
                                 !!IB
-                                patch_id_fp(i, j, 0) = patch_id
+                                ib_markers_sf(i, j, 0) = patch_id
                             end if
                         end if
                     else
@@ -303,14 +305,14 @@ contains
                         if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
                             if (y_act >= airfoil_grid_l(k)%y) then
                                 !!IB
-                                patch_id_fp(i, j, 0) = patch_id
+                                ib_markers_sf(i, j, 0) = patch_id
                             end if
                         else
                             f = (airfoil_grid_l(k)%x - x_act)/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
                             if (y_act >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
                                 !!IB
-                                patch_id_fp(i, j, 0) = patch_id
+                                ib_markers_sf(i, j, 0) = patch_id
                             end if
                         end if
                     end if
@@ -331,12 +333,12 @@ contains
     end subroutine s_ib_airfoil
 
     !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
+    !! @param ib_markers_sf Array to track patch ids
     !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_3D_airfoil(patch_id, patch_id_fp)
+    subroutine s_ib_3D_airfoil(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
         real(wp) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca_in, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k, l
@@ -443,13 +445,13 @@ contains
                                 if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
                                     if (y_act <= airfoil_grid_u(k)%y) then
                                         !!IB
-                                        patch_id_fp(i, j, l) = patch_id
+                                        ib_markers_sf(i, j, l) = patch_id
                                     end if
                                 else
                                     f = (airfoil_grid_u(k)%x - x_act)/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
                                     if (y_act <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
                                         !!IB
-                                        patch_id_fp(i, j, l) = patch_id
+                                        ib_markers_sf(i, j, l) = patch_id
                                     end if
                                 end if
                             else
@@ -460,14 +462,14 @@ contains
                                 if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
                                     if (y_act >= airfoil_grid_l(k)%y) then
                                         !!IB
-                                        patch_id_fp(i, j, l) = patch_id
+                                        ib_markers_sf(i, j, l) = patch_id
                                     end if
                                 else
                                     f = (airfoil_grid_l(k)%x - x_act)/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
                                     if (y_act >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
                                         !!IB
-                                        patch_id_fp(i, j, l) = patch_id
+                                        ib_markers_sf(i, j, l) = patch_id
                                     end if
                                 end if
                             end if
@@ -500,12 +502,12 @@ contains
         !!              rectangular patch DOES NOT allow for the smoothing of its
         !!              boundaries.
         !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
+        !! @param ib_markers_sf Array to track patch ids
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_rectangle(patch_id, patch_id_fp)
+    subroutine s_ib_rectangle(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
@@ -545,7 +547,7 @@ contains
                     y_boundary%end >= y_cc(j)) then
 
                     ! Updating the patch identities bookkeeping variable
-                    patch_id_fp(i, j, 0) = patch_id
+                    ib_markers_sf(i, j, 0) = patch_id
                     
                 end if
             end do
@@ -559,12 +561,12 @@ contains
         !!              provided. Please note that the spherical patch DOES allow
         !!              for the smoothing of its boundary.
         !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
+        !! @param ib_markers_sf Array to track patch ids
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_sphere(patch_id, patch_id_fp)
+    subroutine s_ib_sphere(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -603,7 +605,7 @@ contains
                     if (((x_cc(i) - x_centroid)**2 &
                           + (cart_y - y_centroid)**2 &
                           + (cart_z - z_centroid)**2 <= radius**2)) then
-                        patch_id_fp(i, j, k) = patch_id
+                        ib_markers_sf(i, j, k) = patch_id
                     end if
                 end do
             end do
@@ -620,11 +622,11 @@ contains
         !!              the cuboidal patch DOES NOT allow for the smearing of its
         !!              boundaries.
         !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-    subroutine s_ib_cuboid(patch_id, patch_id_fp)
+        !! @param ib_markers_sf Array to track patch ids
+    subroutine s_ib_cuboid(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -674,7 +676,7 @@ contains
                         z_boundary%end >= cart_z) then
 
                         ! Updating the patch identities bookkeeping variable
-                        patch_id_fp(i, j, k) = patch_id
+                        ib_markers_sf(i, j, k) = patch_id
                     end if
                 end do
             end do
@@ -691,12 +693,12 @@ contains
         !!              that the cylindrical patch DOES allow for the smoothing
         !!              of its lateral boundary.
         !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
+        !! @param ib_markers_sf Array to track patch ids
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_cylinder(patch_id, patch_id_fp)
+    subroutine s_ib_cylinder(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
         integer :: i, j, k !< Generic loop iterators
         real(wp) :: radius
@@ -760,7 +762,7 @@ contains
                           z_boundary%end >= cart_z))) then
 
                         ! Updating the patch identities bookkeeping variable
-                        patch_id_fp(i, j, k) = patch_id
+                        ib_markers_sf(i, j, k) = patch_id
                     end if
                 end do
             end do
@@ -770,14 +772,14 @@ contains
 
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
+    !! @param ib_markers_sf Array to track patch ids
     !! @param ib True if this patch is an immersed boundary
     !! @param STL_levelset STL levelset
     !! @param STL_levelset_norm STL levelset normals
-    subroutine s_ib_model(patch_id, patch_id_fp, STL_levelset, STL_levelset_norm)
+    subroutine s_ib_model(patch_id, ib_markers_sf, STL_levelset, STL_levelset_norm)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
         ! Variables for IBM+STL
         type(levelset_field), optional, intent(inout) :: STL_levelset !< Levelset determined by models
@@ -911,7 +913,7 @@ contains
 
                     ! Reading STL boundary vertices and compute the levelset and levelset_norm
                     if (eta > patch_ib(patch_id)%model_threshold) then
-                        patch_id_fp(i, j, k) = patch_id
+                        ib_markers_sf(i, j, k) = patch_id
                     end if
 
                     ! 3D models
@@ -930,12 +932,12 @@ contains
                         end if
 
                         ! Correct the sign of the levelset
-                        if (patch_id_fp(i, j, k) > 0) then
+                        if (ib_markers_sf(i, j, k) > 0) then
                             STL_levelset%sf(i, j, k, patch_id) = -abs(STL_levelset%sf(i, j, k, patch_id))
                         end if
 
                         ! Correct the sign of the levelset_norm
-                        if (patch_id_fp(i, j, k) == 0) then
+                        if (ib_markers_sf(i, j, k) == 0) then
                             normals(1:3) = -normals(1:3)
                         end if
 
@@ -956,7 +958,7 @@ contains
                         end if
 
                         ! Correct the sign of the levelset
-                        if (patch_id_fp(i, j, k) > 0) then
+                        if (ib_markers_sf(i, j, k) > 0) then
                             STL_levelset%sf(i, j, 0, patch_id) = -abs(STL_levelset%sf(i, j, 0, patch_id))
                         end if
 
@@ -967,7 +969,7 @@ contains
                                         normals)
 
                         ! Correct the sign of the levelset_norm
-                        if (patch_id_fp(i, j, k) == 0) then
+                        if (ib_markers_sf(i, j, k) == 0) then
                             normals(1:3) = -normals(1:3)
                         end if
 

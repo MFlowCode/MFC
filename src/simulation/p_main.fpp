@@ -78,7 +78,7 @@ program p_main
 
         if (ib) then
           ! TODO :: FIND A WAY TO ONLY UPDATE WITH MIBM
-          call s_update_mib(num_ibs, ib_markers%sf, levelset, levelset_norm)
+          call s_update_mib(num_ibs, levelset, levelset_norm)
         end if
 
         if (cfl_dt) then
