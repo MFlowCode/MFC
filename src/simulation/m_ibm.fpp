@@ -318,21 +318,21 @@ contains
 
         !Correct the state of the inner points in IBs
         if (num_inner_gps > 0) then
-        #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,vel_g,rho,gamma,pi_inf,Re_K,innerp,j,k,l,q]')
-              do i = 1, num_inner_gps
+            #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,vel_g,rho,gamma,pi_inf,Re_K,innerp,j,k,l,q]')
+                do i = 1, num_inner_gps
 
-                innerp = inner_points(i)
-                j = innerp%loc(1)
-                k = innerp%loc(2)
-                l = innerp%loc(3)
+                    innerp = inner_points(i)
+                    j = innerp%loc(1)
+                    k = innerp%loc(2)
+                    l = innerp%loc(3)
 
-                $:GPU_LOOP(parallelism='[seq]')
-                do q = momxb, momxe
-                    q_cons_vf(q)%sf(j, k, l) = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = momxb, momxe
+                        q_cons_vf(q)%sf(j, k, l) = 0._wp
+                    end do
                 end do
-            end do
-        #:endcall GPU_PARALLEL_LOOP
-      end if
+            #:endcall GPU_PARALLEL_LOOP
+        end if
 
     end subroutine s_ibm_correct_state
 
