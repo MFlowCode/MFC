@@ -80,7 +80,7 @@ class MFCConfig:
 
 
 gCFG: MFCConfig = MFCConfig()
-gARG: dict      = {}
+gARG: dict      = {"rdma_mpi": False}
 
 def ARG(arg: str, dflt = None) -> typing.Any:
     # pylint: disable=global-variable-not-assigned
