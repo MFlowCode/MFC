@@ -29,9 +29,9 @@ module m_volume_filtering
     private; public :: s_initialize_fftw_explicit_filter_module, &
  s_initialize_filtering_kernel, s_initialize_fluid_indicator_function, & 
  s_initialize_filtered_fluid_indicator_function, s_initialize_fluid_indicator_gradient, &
- s_finalize_fftw_explicit_filter_module, s_volume_filter_momentum_eqn, s_apply_fftw_filter_scalarfield, &
+ s_finalize_fftw_explicit_filter_module, s_volume_filter_momentum_eqn, s_apply_fftw_filter_scalarfield, s_filter_tensor_field, &
  s_compute_viscous_stress_tensor, s_compute_stress_tensor, s_compute_divergence_stress_tensor, s_compute_particle_forces, &
- s_mpi_transpose_slabZ2Y, s_mpi_transpose_slabY2Z, s_mpi_FFT_fwd, s_mpi_FFT_bwd, &
+ s_mpi_transpose_slabZ2Y, s_mpi_transpose_slabY2Z, s_mpi_transpose_slabZ2Y_tensor, s_mpi_transpose_slabY2Z_tensor, s_mpi_FFT_fwd, s_mpi_FFT_bwd, &
  s_setup_terms_filtering, s_compute_pseudo_turbulent_reynolds_stress, s_compute_effective_viscosity
 
 #if !defined(MFC_OpenACC)
@@ -94,6 +94,8 @@ module m_volume_filtering
 
     ! 3D arrays for slab transposes
     complex(c_double_complex), allocatable :: data_cmplx_slabz(:, :, :), data_cmplx_slaby(:, :, :)
+    ! 3D arrays for slab transposes of tensor quantities
+    complex(c_double_complex), allocatable :: data_cmplx_slabz_tensor(:, :, :, :), data_cmplx_slaby_tensor(:, :, :, :)
 
     ! input/output array for FFT routine
     real(c_double), allocatable :: data_real_3D_slabz(:, :, :)
@@ -105,7 +107,12 @@ module m_volume_filtering
     complex(c_double_complex), allocatable :: cmplx_kernelG1d(:)
 
     !$acc declare create(Nx, Ny, Nz, NxC, Nyloc, Nzloc)
-    !$acc declare create(data_real_in1d, data_cmplx_out1d, data_cmplx_out1dy, data_cmplx_slabz, data_cmplx_slaby, data_real_3D_slabz, real_kernelG_in, cmplx_kernelG1d)
+    !$acc declare create(data_real_in1d, data_cmplx_out1d, data_cmplx_out1dy)
+    !$acc declare create(data_cmplx_slabz, data_cmplx_slaby, data_cmplx_slabz_tensor, data_cmplx_slaby_tensor, data_real_3D_slabz, real_kernelG_in, cmplx_kernelG1d)
+
+    ! buffers for data transpose
+    complex(c_double_complex), allocatable :: sendbuf_sf(:), recvbuf_sf(:)
+    complex(c_double_complex), allocatable :: sendbuf_tensor(:), recvbuf_tensor(:)
 
 contains
 
@@ -232,6 +239,13 @@ contains
         @:ALLOCATE(data_real_3D_slabz(Nx, Ny, Nzloc))
         @:ALLOCATE(data_cmplx_slabz(NxC, Ny, Nzloc))
         @:ALLOCATE(data_cmplx_slaby(NxC, Nyloc, Nz))
+        @:ALLOCATE(data_cmplx_slabz_tensor(9, NxC, Ny, Nzloc))
+        @:ALLOCATE(data_cmplx_slaby_tensor(9, NxC, Nyloc, Nz))
+
+        allocate(sendbuf_sf(NxC*Nyloc*Nzloc*num_procs))
+        allocate(recvbuf_sf(NxC*Nyloc*Nzloc*num_procs))
+        allocate(sendbuf_tensor(9*NxC*Nyloc*Nzloc*num_procs))
+        allocate(recvbuf_tensor(9*NxC*Nyloc*Nzloc*num_procs))
 
 #if defined(MFC_OpenACC)
         !< GPU FFT plans
@@ -564,17 +578,19 @@ contains
         call s_setup_terms_filtering(q_cons_vf, q_prim_vf, reynolds_stress, visc_stress, pres_visc_stress, div_pres_visc_stress)
 
         ! pseudo turbulent reynolds stress
-        do i = 1, num_dims 
-            do j = 1, num_dims
-                call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., reynolds_stress(i)%vf(j))
-            end do
-        end do 
+        ! do i = 1, num_dims 
+        !     do j = 1, num_dims
+        !         call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., reynolds_stress(i)%vf(j))
+        !     end do
+        ! end do 
+        call s_filter_tensor_field(reynolds_stress)
         ! effective viscosity
-        do i = 1, num_dims 
-            do j = 1, num_dims
-                call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., visc_stress(i)%vf(j), eff_visc(i)%vf(j))
-            end do
-        end do 
+        ! do i = 1, num_dims 
+        !     do j = 1, num_dims
+        !         call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., visc_stress(i)%vf(j), eff_visc(i)%vf(j))
+        !     end do
+        ! end do 
+        call s_filter_tensor_field(visc_stress, eff_visc)
         ! interphase momentum exchange
         call s_compute_interphase_momentum_exchange(filtered_fluid_indicator_function, grad_fluid_indicator, pres_visc_stress, int_mom_exch)
 
@@ -1006,77 +1022,339 @@ contains
 
     !< transpose domain from z-slabs to y-slabs on each processor
     subroutine s_mpi_transpose_slabZ2Y
-        complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
         integer :: dest_rank, src_rank
         integer :: i, j, k
 
-        allocate(sendbuf(NxC*Nyloc*Nzloc*num_procs))
-        allocate(recvbuf(NxC*Nyloc*Nzloc*num_procs))
-
-        !$acc parallel loop collapse(4) gang vector default(present) copy(sendbuf)
+        !$acc parallel loop collapse(4) gang vector default(present) copy(sendbuf_sf)
         do dest_rank = 0, num_procs-1
             do k = 1, Nzloc 
                 do j = 1, Nyloc
                     do i = 1, NxC
-                        sendbuf(i + (j-1)*NxC + (k-1)*NxC*Nyloc + dest_rank*NxC*Nyloc*Nzloc) = data_cmplx_slabz(i, j+dest_rank*Nyloc, k)
+                        sendbuf_sf(i + (j-1)*NxC + (k-1)*NxC*Nyloc + dest_rank*NxC*Nyloc*Nzloc) = data_cmplx_slabz(i, j+dest_rank*Nyloc, k)
                     end do 
                 end do
             end do
         end do
 
-        call MPI_Alltoall(sendbuf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
-                          recvbuf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
+        call MPI_Alltoall(sendbuf_sf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
+                          recvbuf_sf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
 
-        !$acc parallel loop collapse(4) gang vector default(present) copy(recvbuf)
+        !$acc parallel loop collapse(4) gang vector default(present) copy(recvbuf_sf)
         do src_rank = 0, num_procs-1
             do k = 1, Nzloc 
                 do j = 1, Nyloc
                     do i = 1, NxC
-                        data_cmplx_slaby(i, j, k+src_rank*Nzloc) = recvbuf(i + (j-1)*NxC + (k-1)*NxC*Nyloc + src_rank*NxC*Nyloc*Nzloc)
+                        data_cmplx_slaby(i, j, k+src_rank*Nzloc) = recvbuf_sf(i + (j-1)*NxC + (k-1)*NxC*Nyloc + src_rank*NxC*Nyloc*Nzloc)
                     end do 
                 end do
             end do 
         end do
 
-        deallocate(sendbuf, recvbuf)
     end subroutine s_mpi_transpose_slabZ2Y
 
     !< transpose domain from y-slabs to z-slabs on each processor
     subroutine s_mpi_transpose_slabY2Z 
-        complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
         integer :: dest_rank, src_rank
         integer :: i, j, k
 
-        allocate(sendbuf(NxC*Nyloc*Nzloc*num_procs))
-        allocate(recvbuf(NxC*Nyloc*Nzloc*num_procs))
-
-        !$acc parallel loop collapse(4) gang vector default(present) copy(sendbuf)
+        !$acc parallel loop collapse(4) gang vector default(present) copy(sendbuf_sf)
         do dest_rank = 0, num_procs-1
             do k = 1, Nzloc 
                 do j = 1, Nyloc 
                     do i = 1, NxC 
-                        sendbuf(i + (j-1)*NxC + (k-1)*NxC*Nyloc + dest_rank*NxC*Nyloc*Nzloc) = data_cmplx_slaby(i, j, k+dest_rank*Nzloc)
+                        sendbuf_sf(i + (j-1)*NxC + (k-1)*NxC*Nyloc + dest_rank*NxC*Nyloc*Nzloc) = data_cmplx_slaby(i, j, k+dest_rank*Nzloc)
                     end do 
                 end do 
             end do 
         end do
 
-        call MPI_Alltoall(sendbuf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
-                          recvbuf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
+        call MPI_Alltoall(sendbuf_sf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
+                          recvbuf_sf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
 
-        !$acc parallel loop collapse(4) gang vector default(present) copy(recvbuf) 
+        !$acc parallel loop collapse(4) gang vector default(present) copy(recvbuf_sf) 
         do src_rank = 0, num_procs-1
             do k = 1, Nzloc
                 do j = 1, Nyloc 
                     do i = 1, NxC 
-                        data_cmplx_slabz(i, j+src_rank*Nyloc, k) = recvbuf(i + (j-1)*NxC + (k-1)*NxC*Nyloc + src_rank*NxC*Nyloc*Nzloc)
+                        data_cmplx_slabz(i, j+src_rank*Nyloc, k) = recvbuf_sf(i + (j-1)*NxC + (k-1)*NxC*Nyloc + src_rank*NxC*Nyloc*Nzloc)
                     end do 
                 end do
             end do 
         end do
         
-        deallocate(sendbuf, recvbuf)
     end subroutine s_mpi_transpose_slabY2Z
+
+    !< transpose domain from z-slabs to y-slabs on each processor for batched 9 element tensors
+    subroutine s_mpi_transpose_slabZ2Y_tensor
+        integer :: dest_rank, src_rank
+        integer :: i, j, k, l
+
+        !$acc parallel loop collapse(5) gang vector default(present) copy(sendbuf_tensor)
+        do dest_rank = 0, num_procs-1
+            do k = 1, Nzloc 
+                do j = 1, Nyloc
+                    do i = 1, NxC
+                        do l = 1, 9
+                            sendbuf_tensor(l + (i-1)*9 + (j-1)*9*NxC + (k-1)*9*NxC*Nyloc + dest_rank*9*NxC*Nyloc*Nzloc) = data_cmplx_slabz_tensor(l, i, j+dest_rank*Nyloc, k)
+                        end do 
+                    end do
+                end do
+            end do
+        end do 
+
+        call MPI_Alltoall(sendbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
+                          recvbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
+
+        !$acc parallel loop collapse(5) gang vector default(present) copy(recvbuf_tensor)
+        do src_rank = 0, num_procs-1
+            do k = 1, Nzloc 
+                do j = 1, Nyloc
+                    do i = 1, NxC
+                        do l = 1, 9
+                            data_cmplx_slaby_tensor(l, i, j, k+src_rank*Nzloc) = recvbuf_tensor(l + (i-1)*9 + (j-1)*9*NxC + (k-1)*9*NxC*Nyloc + src_rank*9*NxC*Nyloc*Nzloc)
+                        end do 
+                    end do
+                end do 
+            end do
+        end do
+
+    end subroutine s_mpi_transpose_slabZ2Y_tensor
+
+    !< transpose domain from y-slabs to z-slabs on each processor for batched 9 element tensors
+    subroutine s_mpi_transpose_slabY2Z_tensor
+        integer :: dest_rank, src_rank
+        integer :: i, j, k, l
+
+        !$acc parallel loop collapse(5) gang vector default(present) copy(sendbuf_tensor)
+        do dest_rank = 0, num_procs-1
+            do k = 1, Nzloc 
+                do j = 1, Nyloc 
+                    do i = 1, NxC 
+                        do l = 1, 9
+                            sendbuf_tensor(l + (i-1)*9 + (j-1)*9*NxC + (k-1)*9*NxC*Nyloc + dest_rank*9*NxC*Nyloc*Nzloc) = data_cmplx_slaby_tensor(l, i, j, k+dest_rank*Nzloc)
+                        end do 
+                    end do 
+                end do 
+            end do
+        end do
+
+        call MPI_Alltoall(sendbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
+                          recvbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
+
+        !$acc parallel loop collapse(5) gang vector default(present) copy(recvbuf_tensor) 
+        do src_rank = 0, num_procs-1
+            do k = 1, Nzloc
+                do j = 1, Nyloc 
+                    do i = 1, NxC 
+                        do l = 1, 9
+                            data_cmplx_slabz_tensor(l, i, j+src_rank*Nyloc, k) = recvbuf_tensor(l + (i-1)*9 + (j-1)*9*NxC + (k-1)*9*NxC*Nyloc + src_rank*9*NxC*Nyloc*Nzloc)
+                        end do 
+                    end do
+                end do 
+            end do
+        end do
+        
+    end subroutine s_mpi_transpose_slabY2Z_tensor
+
+
+
+    !< compute forward FFT, input: data_real_3D_slabz, output: data_cmplx_out1d
+    subroutine s_filter_tensor_field(q_tensor_in, q_tensor_out)
+        type(vector_field), dimension(3), intent(inout) :: q_tensor_in
+        type(vector_field), dimension(3), intent(inout), optional :: q_tensor_out
+        integer :: i, j, k, l, q
+
+        ! ===== forward FFT =====
+        ! outer tensor element loop
+        do l = 1, 3
+            do q = 1, 3
+
+                !$acc parallel loop collapse(3)
+                do i = 0, m 
+                    do j = 0, n 
+                        do k = 0, p 
+                            data_real_3D_slabz(i+1, j+1, k+1) = q_tensor_in(l)%vf(q)%sf(i, j, k) * fluid_indicator_function%sf(i, j, k)
+                        end do 
+                    end do 
+                end do
+
+                ! 3D z-slab -> 1D x, y, z
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do i = 1, Nx 
+                    do j = 1, Ny 
+                        do k = 1, Nzloc
+                            data_real_in1d(i + (j-1)*Nx + (k-1)*Nx*Ny) = data_real_3D_slabz(i, j, k)
+                        end do 
+                    end do 
+                end do
+        
+                ! X FFT
+#if defined(MFC_OpenACC)
+                ierr = cufftExecD2Z(plan_x_fwd_gpu, data_real_in1d, data_cmplx_out1d)
+#else
+                call fftw_execute_dft_r2c(plan_x_r2c_fwd, data_real_in1d, data_cmplx_out1d)
+#endif
+        
+                ! 1D x, y, z -> 1D y, x, z (CMPLX)
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do i = 1, NxC
+                    do j = 1, Ny 
+                        do k = 1, Nzloc
+                            data_cmplx_out1dy(j + (i-1)*Ny + (k-1)*Ny*NxC) = data_cmplx_out1d(i + (j-1)*NxC + (k-1)*NxC*Ny)
+                        end do 
+                    end do 
+                end do
+        
+                ! Y FFT 
+#if defined(MFC_OpenACC)
+                ierr = cufftExecZ2Z(plan_y_gpu, data_cmplx_out1dy, data_cmplx_out1dy, CUFFT_FORWARD)
+#else
+                call fftw_execute_dft(plan_y_c2c_fwd, data_cmplx_out1dy, data_cmplx_out1dy)
+#endif 
+        
+                ! 1D y, x, z -> 3D z-slab
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do i = 1, NxC 
+                    do j = 1, Ny 
+                        do k = 1, Nzloc
+                            data_cmplx_slabz_tensor((l-1)*3 + q, i, j, k) = data_cmplx_out1dy(j + (i-1)*Ny + (k-1)*Ny*NxC)
+                        end do 
+                    end do 
+                end do 
+                ! pack data_cmplx_slabz_tensor for MPI tranpose
+            end do
+        end do 
+
+        ! tensor MPI data transpose
+        call s_mpi_transpose_slabZ2Y_tensor
+
+        ! outer tensor element loop
+        do l = 1, 3
+            do q = 1, 3
+                ! 3D y-slab -> 1D z, x, y
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do i = 1, NxC 
+                    do j = 1, Nyloc 
+                        do k = 1, Nz
+                            data_cmplx_out1d(k + (i-1)*Nz + (j-1)*Nz*NxC) = data_cmplx_slaby_tensor((l-1)*3 + q, i, j, k)
+                        end do 
+                    end do 
+                end do
+
+                ! Z FFT
+#if defined(MFC_OpenACC)
+                ierr = cufftExecZ2Z(plan_z_gpu, data_cmplx_out1d, data_cmplx_out1d, CUFFT_FORWARD)
+#else
+                call fftw_execute_dft(plan_z_c2c_fwd, data_cmplx_out1d, data_cmplx_out1d)
+#endif
+                
+                ! convolution with filtering kernel in Fourier space
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do i = 1, NxC 
+                    do j = 1, Nyloc 
+                        do k = 1, Nz 
+                            data_cmplx_out1d(k + (i-1)*Nz + (j-1)*Nz*NxC) = data_cmplx_out1d(k + (i-1)*Nz + (j-1)*Nz*NxC) * cmplx_kernelG1d(k + (i-1)*Nz + (j-1)*Nz*NxC)
+                        end do 
+                    end do 
+                end do
+
+                ! ===== begin backward FFT =====
+                ! Z inv FFT 
+#if defined(MFC_OpenACC)
+                ierr = cufftExecZ2Z(plan_z_gpu, data_cmplx_out1d, data_cmplx_out1d, CUFFT_INVERSE)
+#else
+                call fftw_execute_dft(plan_z_c2c_bwd, data_cmplx_out1d, data_cmplx_out1d)
+#endif
+
+                ! 1D z, x, y -> 3D y-slab
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do i = 1, NxC 
+                    do j = 1, Nyloc 
+                        do k = 1, Nz 
+                            data_cmplx_slaby_tensor((l-1)*3 + q, i, j, k) = data_cmplx_out1d(k + (i-1)*Nz + (j-1)*Nz*NxC)
+                        end do 
+                    end do 
+                end do
+                ! pack data_cmplx_slaby_tensor for MPI tranpose
+            end do
+        end do
+
+        call s_mpi_transpose_slabY2Z_tensor
+
+        ! outer tensor element loop
+        do l = 1, 3
+            do q = 1, 3
+                
+                ! 3D z-slab -> 1D y, x, z
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do i = 1, NxC 
+                    do j = 1, Ny 
+                        do k = 1, Nzloc
+                            data_cmplx_out1dy(j + (i-1)*Ny + (k-1)*Ny*NxC) = data_cmplx_slabz_tensor((l-1)*3 + q, i, j, k)
+                        end do 
+                    end do 
+                end do
+
+                ! Y inv FFT 
+#if defined(MFC_OpenACC)
+                ierr = cufftExecZ2Z(plan_y_gpu, data_cmplx_out1dy, data_cmplx_out1dy, CUFFT_INVERSE)
+#else
+                call fftw_execute_dft(plan_y_c2c_bwd, data_cmplx_out1dy, data_cmplx_out1dy)
+#endif
+
+                ! 1D y, x, z -> 1D x, y, z 
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do i = 1, NxC 
+                    do j = 1, Ny 
+                        do k = 1, Nzloc
+                            data_cmplx_out1d(i + (j-1)*NxC + (k-1)*NxC*Ny) = data_cmplx_out1dy(j + (i-1)*Ny + (k-1)*Ny*NxC)
+                        end do 
+                    end do 
+                end do
+
+                ! X inv FFT
+#if defined(MFC_OpenACC)
+                ierr = cufftExecZ2D(plan_x_bwd_gpu, data_cmplx_out1d, data_real_in1d)
+#else
+                call fftw_execute_dft_c2r(plan_x_c2r_bwd, data_cmplx_out1d, data_real_in1d)
+#endif
+
+                ! 1D x, y, z -> 3D z-slab
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do i = 1, Nx 
+                    do j = 1, Ny 
+                        do k = 1, Nzloc
+                            data_real_3D_slabz(i, j, k) = data_real_in1d(i + (j-1)*Nx + (k-1)*Nx*Ny)
+                        end do 
+                    end do 
+                end do
+
+                if (present(q_tensor_out)) then 
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do i = 0, m
+                        do j = 0, n
+                            do k = 0, p
+                                q_tensor_out(l)%vf(q)%sf(i, j, k) = data_real_3D_slabz(i+1, j+1, k+1) / (real(Nx*Ny*Nz, dp) * filtered_fluid_indicator_function%sf(i, j, k))
+                            end do 
+                        end do 
+                    end do
+                else
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do i = 0, m
+                        do j = 0, n
+                            do k = 0, p
+                                q_tensor_in(l)%vf(q)%sf(i, j, k) = data_real_3D_slabz(i+1, j+1, k+1) / (real(Nx*Ny*Nz, dp) * filtered_fluid_indicator_function%sf(i, j, k))
+                            end do 
+                        end do 
+                    end do
+                end if
+
+            end do
+        end do
+
+    end subroutine s_filter_tensor_field
+
+
 
     !< compute forward FFT, input: data_real_3D_slabz, output: data_cmplx_out1d
     subroutine s_mpi_FFT_fwd
@@ -1288,6 +1566,10 @@ contains
         @:DEALLOCATE(data_real_in1d, data_cmplx_out1d, data_cmplx_out1dy)
         @:DEALLOCATE(cmplx_kernelG1d, real_kernelG_in)
         @:DEALLOCATE(data_real_3D_slabz, data_cmplx_slabz, data_cmplx_slaby)
+        @:DEALLOCATE(data_cmplx_slabz_tensor, data_cmplx_slaby_tensor)
+        
+        deallocate(sendbuf_sf, recvbuf_sf)
+        deallocate(sendbuf_tensor, recvbuf_tensor)
 
 #if defined(MFC_OpenACC)
         ierr = cufftDestroy(plan_x_fwd_gpu)
