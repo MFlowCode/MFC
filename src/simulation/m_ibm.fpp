@@ -317,8 +317,9 @@ contains
         #:endcall GPU_PARALLEL_LOOP
 
         !Correct the state of the inner points in IBs
+        if (num_inner_gps > 0) then
         #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,vel_g,rho,gamma,pi_inf,Re_K,innerp,j,k,l,q]')
-            do i = 1, num_inner_gps
+              do i = 1, num_inner_gps
 
                 innerp = inner_points(i)
                 j = innerp%loc(1)
@@ -331,6 +332,7 @@ contains
                 end do
             end do
         #:endcall GPU_PARALLEL_LOOP
+      end if
 
     end subroutine s_ibm_correct_state
 
