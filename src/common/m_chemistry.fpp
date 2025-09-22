@@ -17,9 +17,9 @@ module m_chemistry
     implicit none
 
     #:block DEF_AMD
-        real(dp) :: molecular_weights_nonparameter(10) = &
-                    (/2.016d0, 1.008d0, 15.999d0, 31.998d0, 17.007d0, 18.015d0, 33.006d0, &
-                      34.014d0, 39.95d0, 28.014d0/)
+        real(wp) :: molecular_weights_nonparameter(10) = &
+                    (/2.016, 1.008, 15.999, 31.998, 17.007, 18.015, 33.006, &
+                      34.014, 39.95, 28.014/)
         $:GPU_DECLARE(create='[molecular_weights_nonparameter]')
     #:endblock DEF_AMD
 
