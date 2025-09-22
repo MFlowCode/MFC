@@ -102,6 +102,7 @@ contains
         call s_find_num_ghost_points(num_gps, num_inner_gps)
 
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
+        ! TODO :: THIS ALLOCATION COULD CAUSE PROBLEMS LATER WHEN WE ALLOW ODD-SHAPED IBS MOVE
         @:ALLOCATE(ghost_points(1:num_gps))
         @:ALLOCATE(inner_points(1:num_inner_gps))
 
@@ -407,6 +408,7 @@ contains
                 end if
 
                 if (f_approx_equal(norm(dim), 0._wp)) then
+                    ! if the ghost point is almost equal to a cell location, we set it equal and continue
                     ghost_points_in(q)%ip_grid(dim) = ghost_points_in(q)%loc(dim)
                 else
                     if (norm(dim) > 0) then
@@ -421,6 +423,8 @@ contains
                                .or. temp_loc > s_cc(index + 1)))
                         index = index + dir
                         if (index < -buff_size .or. index > bound) then
+                            print *, q, index, bound, buff_size
+                            print *, "temp_loc=", temp_loc, " s_cc(index)=", s_cc(index), " s_cc(index+1)=", s_cc(index+1)
                             print *, "Increase buff_size further in m_helper_basic (currently set to a minimum of 10)"
                             error stop "Increase buff_size"
                         end if
@@ -487,7 +491,7 @@ contains
     end subroutine s_find_num_ghost_points
 
     !> Function that finds the ghost points
-    pure subroutine s_find_ghost_points(ghost_points_in, inner_points_in)
+    subroutine s_find_ghost_points(ghost_points_in, inner_points_in)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points_in
         type(ghost_point), dimension(num_inner_gps), intent(INOUT) :: inner_points_in
@@ -505,11 +509,16 @@ contains
         do i = 0, m
             do j = 0, n
                 if (p == 0) then
+                    ! 2D
                     if (ib_markers%sf(i, j, 0) /= 0) then
                         subsection_2D = ib_markers%sf( &
                                         i - gp_layers:i + gp_layers, &
                                         j - gp_layers:j + gp_layers, 0)
                         if (any(subsection_2D == 0)) then
+                            if (count == 1) then
+                              print *, "Found first ghost point: ", i, j
+                              print *, "IB Marker", ib_markers%sf(i, j, 0)
+                            end if
                             ghost_points_in(count)%loc = [i, j, 0]
                             patch_id = ib_markers%sf(i, j, 0)
                             ghost_points_in(count)%ib_patch_id = &
@@ -546,6 +555,7 @@ contains
                         end if
                     end if
                 else
+                    ! 3D
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) /= 0) then
                             subsection_3D = ib_markers%sf( &
@@ -902,35 +912,19 @@ contains
     impure subroutine s_update_mib(num_ibs, ib_markers_sf, levelset, levelset_norm)
 
       integer, intent(in) :: num_ibs
-      integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
-      type(levelset_field), intent(inout), optional :: levelset
-      type(levelset_norm_field), intent(inout), optional :: levelset_norm
+      integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
+      type(levelset_field), intent(inout) :: levelset
+      type(levelset_norm_field), intent(inout) :: levelset_norm
 
       integer :: i, j, k
 
-      print *, "patch_id_fp at (380, 255, 0): ", patch_id_fp(380, 255, 0)
-      print *, "IB Markers at (380, 255, 0): ", ib_markers_sf(380+1, 255+1, 1)
+      print *, "Beginning to update MIBs"
+
+      print *, ghost_points(1)%loc(1)
 
       ! Clears the existing immersed boundary indices
-      do i = 0, m
-        do j = 0, n
-          do k = 0, p
-            ! if (patch_id_fp(i, j, k) .ne. 0) then
-            !   print *, i, j, k
-            ! end if
-            patch_id_fp(i, j, k) = 0
-          end do
-        end do
-      end do
-
-      ! Clears the existing immersed boundary indices
-      do i = 1, m
-        do j = 1, n
-          do k = 1, p
-            ib_markers_sf(i, j, k) = 0
-          end do
-        end do
-      end do
+      patch_id_fp = 0
+      ib_markers_sf = 0
       
       do i = 1, num_ibs
         if (patch_ib(i)%moving_ibm .ne. 0) then
@@ -938,7 +932,23 @@ contains
         end if
       end do
 
-      call s_apply_ib_patches(patch_id_fp, ib_markers_sf, levelset, levelset_norm) ! TODO, THIS IS NOT OPTIMIA
+      call s_apply_ib_patches(patch_id_fp, ib_markers_sf, levelset, levelset_norm) ! TODO, THIS IS NOT OPTIMIAL
+      
+
+      ! recalculate the ghost point locations
+      print *, "x = ", patch_ib(1)%x_centroid
+      print *, "y = ", patch_ib(1)%y_centroid
+      print *, ghost_points(1)%loc(1), ghost_points(1)%loc(2)
+
+      call s_find_num_ghost_points(num_gps, num_inner_gps)
+      call s_find_ghost_points(ghost_points, inner_points)
+      print *, "a"
+      do i = 230, 240
+        print *, ib_markers%sf(0, i, 0), i
+      end do
+      call s_compute_image_points(ghost_points, levelset, levelset_norm)
+      print *, "b"
+      call s_compute_interpolation_coeffs(ghost_points)
 
     end subroutine s_update_mib
 
