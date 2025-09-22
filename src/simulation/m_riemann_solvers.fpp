@@ -1382,6 +1382,9 @@ contains
                             s_P = max(s_L, s_R) + max(c_L, c_R)
                             s_M = -s_P
 
+                            s_L = s_M
+                            s_R = s_P
+
                             ! Low Mach correction
                             if (low_Mach == 1) then
                                 @:compute_low_Mach_correction()

@@ -462,8 +462,8 @@ contains
                 do k = 1, Nyloc2
                     do j = 1, Nxloc
 
-                        j_glb = j + proc_coords(2)*Nxloc
-                        k_glb = k + proc_coords(3)*Nyloc2
+                        j_glb = j + cart3d_coords(2)*Nxloc
+                        k_glb = k + cart3d_coords(3)*Nyloc2
                         l_glb = l
 
                         if (j_glb >= (m_glb + 1)/2) then
@@ -864,6 +864,78 @@ contains
 
     end subroutine s_save_data
 
+    subroutine s_mpi_transpose_x2y
+        complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
+        integer :: dest_rank, src_rank
+        integer :: i, j, k, l
+
+        allocate (sendbuf(Nx*Nyloc*Nzloc))
+        allocate (recvbuf(Nx*Nyloc*Nzloc))
+
+        do dest_rank = 0, num_procs_y - 1
+            do l = 1, Nzloc
+                do k = 1, Nyloc
+                    do j = 1, Nxloc
+                        sendbuf(j + (k - 1)*Nxloc + (l - 1)*Nxloc*Nyloc + dest_rank*Nxloc*Nyloc*Nzloc) = data_cmplx(j + dest_rank*Nxloc, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+        call MPI_Alltoall(sendbuf, Nxloc*Nyloc*Nzloc, MPI_C_DOUBLE_COMPLEX, &
+                          recvbuf, Nxloc*Nyloc*Nzloc, MPI_C_DOUBLE_COMPLEX, MPI_COMM_CART12, ierr)
+
+        do src_rank = 0, num_procs_y - 1
+            do l = 1, Nzloc
+                do k = 1, Nyloc
+                    do j = 1, Nxloc
+                        data_cmplx_y(j, k + src_rank*Nyloc, l) = recvbuf(j + (k - 1)*Nxloc + (l - 1)*Nxloc*Nyloc + src_rank*Nxloc*Nyloc*Nzloc)
+                    end do
+                end do
+            end do
+        end do
+
+        deallocate (sendbuf)
+        deallocate (recvbuf)
+
+    end subroutine s_mpi_transpose_x2y
+
+    subroutine s_mpi_transpose_y2z
+        complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
+        integer :: dest_rank, src_rank
+        integer :: j, k, l
+
+        allocate (sendbuf(Ny*Nxloc*Nzloc))
+        allocate (recvbuf(Ny*Nxloc*Nzloc))
+
+        do dest_rank = 0, num_procs_z - 1
+            do l = 1, Nzloc
+                do j = 1, Nxloc
+                    do k = 1, Nyloc2
+                        sendbuf(k + (j - 1)*Nyloc2 + (l - 1)*(Nyloc2*Nxloc) + dest_rank*Nyloc2*Nxloc*Nzloc) = data_cmplx_y(j, k + dest_rank*Nyloc2, l)
+                    end do
+                end do
+            end do
+        end do
+
+        call MPI_Alltoall(sendbuf, Nyloc2*Nxloc*Nzloc, MPI_C_DOUBLE_COMPLEX, &
+                          recvbuf, Nyloc2*Nxloc*Nzloc, MPI_C_DOUBLE_COMPLEX, MPI_COMM_CART13, ierr)
+
+        do src_rank = 0, num_procs_z - 1
+            do l = 1, Nzloc
+                do j = 1, Nxloc
+                    do k = 1, Nyloc2
+                        data_cmplx_z(j, k, l + src_rank*Nzloc) = recvbuf(k + (j - 1)*Nyloc2 + (l - 1)*(Nyloc2*Nxloc) + src_rank*Nyloc2*Nxloc*Nzloc)
+                    end do
+                end do
+            end do
+        end do
+
+        deallocate (sendbuf)
+        deallocate (recvbuf)
+
+    end subroutine s_mpi_transpose_y2z
+
     impure subroutine s_initialize_modules
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
@@ -1029,78 +1101,6 @@ contains
 
     end subroutine s_mpi_FFT_fwd
 
-    subroutine s_mpi_transpose_x2y
-        complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
-        integer :: dest_rank, src_rank
-        integer :: i, j, k, l
-
-        allocate (sendbuf(Nx*Nyloc*Nzloc))
-        allocate (recvbuf(Nx*Nyloc*Nzloc))
-
-        do dest_rank = 0, num_procs_y - 1
-            do l = 1, Nzloc
-                do k = 1, Nyloc
-                    do j = 1, Nxloc
-                        sendbuf(j + (k - 1)*Nxloc + (l - 1)*Nxloc*Nyloc + dest_rank*Nxloc*Nyloc*Nzloc) = data_cmplx(j + dest_rank*Nxloc, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-        call MPI_Alltoall(sendbuf, Nxloc*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, &
-                          recvbuf, Nxloc*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_CART12, ierr)
-
-        do src_rank = 0, num_procs_y - 1
-            do l = 1, Nzloc
-                do k = 1, Nyloc
-                    do j = 1, Nxloc
-                        data_cmplx_y(j, k + src_rank*Nyloc, l) = recvbuf(j + (k - 1)*Nxloc + (l - 1)*Nxloc*Nyloc + src_rank*Nxloc*Nyloc*Nzloc)
-                    end do
-                end do
-            end do
-        end do
-
-        deallocate (sendbuf)
-        deallocate (recvbuf)
-
-    end subroutine s_mpi_transpose_x2y
-
-    subroutine s_mpi_transpose_y2z
-        complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
-        integer :: dest_rank, src_rank
-        integer :: j, k, l
-
-        allocate (sendbuf(Ny*Nxloc*Nzloc))
-        allocate (recvbuf(Ny*Nxloc*Nzloc))
-
-        do dest_rank = 0, num_procs_z - 1
-            do l = 1, Nzloc
-                do j = 1, Nxloc
-                    do k = 1, Nyloc2
-                        sendbuf(k + (j - 1)*Nyloc2 + (l - 1)*(Nyloc2*Nxloc) + dest_rank*Nyloc2*Nxloc*Nzloc) = data_cmplx_y(j, k + dest_rank*Nyloc2, l)
-                    end do
-                end do
-            end do
-        end do
-
-        call MPI_Alltoall(sendbuf, Nyloc2*Nxloc*Nzloc, MPI_DOUBLE_COMPLEX, &
-                          recvbuf, Nyloc2*Nxloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_CART13, ierr)
-
-        do src_rank = 0, num_procs_z - 1
-            do l = 1, Nzloc
-                do j = 1, Nxloc
-                    do k = 1, Nyloc2
-                        data_cmplx_z(j, k, l + src_rank*Nzloc) = recvbuf(k + (j - 1)*Nyloc2 + (l - 1)*(Nyloc2*Nxloc) + src_rank*Nyloc2*Nxloc*Nzloc)
-                    end do
-                end do
-            end do
-        end do
-
-        deallocate (sendbuf)
-        deallocate (recvbuf)
-
-    end subroutine s_mpi_transpose_y2z
-
     impure subroutine s_initialize_mpi_domain
         ! Initialization of the MPI environment
         call s_mpi_initialize()
@@ -1135,6 +1135,26 @@ contains
 !            call s_close_intf_data_file()
 !            call s_close_energy_data_file()
 !        end if
+
+        if (fft_wrt) then
+            if (c_associated(fwd_plan_x)) call fftw_destroy_plan(fwd_plan_x)
+            if (c_associated(fwd_plan_y)) call fftw_destroy_plan(fwd_plan_y)
+            if (c_associated(fwd_plan_z)) call fftw_destroy_plan(fwd_plan_z)
+            if (allocated(data_in)) deallocate (data_in)
+            if (allocated(data_out)) deallocate (data_out)
+            if (allocated(data_cmplx)) deallocate (data_cmplx)
+            if (allocated(data_cmplx_y)) deallocate (data_cmplx_y)
+            if (allocated(data_cmplx_z)) deallocate (data_cmplx_z)
+            if (allocated(En_real)) deallocate (En_real)
+            if (allocated(En)) deallocate (En)
+            call fftw_cleanup()
+        end if
+
+        if (fft_wrt) then
+            if (MPI_COMM_CART12 /= MPI_COMM_NULL) call MPI_Comm_free(MPI_COMM_CART12, ierr)
+            if (MPI_COMM_CART13 /= MPI_COMM_NULL) call MPI_Comm_free(MPI_COMM_CART13, ierr)
+            if (MPI_COMM_CART /= MPI_COMM_NULL) call MPI_Comm_free(MPI_COMM_CART, ierr)
+        end if
 
         ! Deallocation procedures for the modules
         call s_finalize_data_output_module()
