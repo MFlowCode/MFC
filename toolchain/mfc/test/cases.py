@@ -193,7 +193,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             cases.append(define_case_d(stack, "mixture_err",   {'mixture_err': 'T'}))
 
-            if riemann_solver == 1 or riemann_solver == 2:
+            if riemann_solver in (1, 2):
                 cases.append(define_case_d(stack, "avg_state=1",   {'avg_state':   1}))
                 cases.append(define_case_d(stack, "wave_speeds=2", {'wave_speeds': 2}))
 
