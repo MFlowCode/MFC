@@ -91,7 +91,7 @@ contains
 
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
-          if (ib_patch%moving_ibm .ne. 0)
+          if (patch_ib(i)%moving_ibm .ne. 0) then
             moving_immersed_boundary_flag = .true.
             exit
           end if
