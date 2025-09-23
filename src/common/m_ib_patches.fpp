@@ -149,7 +149,6 @@ contains
         y_centroid = patch_ib(patch_id)%y_centroid
         radius = patch_ib(patch_id)%radius
 
-
         ! Initializing the pseudo volume fraction value to 1. The value will
         ! be modified as the patch is laid out on the grid, but only in the
         ! case that smoothing of the circular patch's boundary is enabled.
@@ -166,7 +165,7 @@ contains
         do j = 0, n
             do i = 0, m
                 if ((x_cc(i) - x_centroid)**2 &
-                                            + (y_cc(j) - y_centroid)**2 <= radius**2) &
+                    + (y_cc(j) - y_centroid)**2 <= radius**2) &
                     then
                     ib_markers_sf(i, j, 0) = patch_id
                 end if
@@ -187,7 +186,6 @@ contains
         integer :: i, j, k
         integer :: Np1, Np2
 
-
         x0 = patch_ib(patch_id)%x_centroid
         y0 = patch_ib(patch_id)%y_centroid
         ca_in = patch_ib(patch_id)%c
@@ -196,7 +194,7 @@ contains
         ta = patch_ib(patch_id)%t
         theta = pi*patch_ib(patch_id)%theta/180._wp
 
-        ! rank(dx) is not consitent between pre_process and simulation. This IFDEF prevents compilation errors
+        ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
 #ifdef MFC_PRE_PROCESS
         Np1 = int((pa*ca_in/dx)*20)
         Np2 = int(((ca_in - pa*ca_in)/dx)*20)
@@ -354,7 +352,7 @@ contains
         ta = patch_ib(patch_id)%t
         theta = pi*patch_ib(patch_id)%theta/180._wp
 
-        ! rank(dx) is not consitent between pre_process and simulation. This IFDEF prevents compilation errors
+        ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
 #ifdef MFC_PRE_PROCESS
         Np1 = int((pa*ca_in/dx)*20)
         Np2 = int(((ca_in - pa*ca_in)/dx)*20)
@@ -552,7 +550,7 @@ contains
 
                     ! Updating the patch identities bookkeeping variable
                     ib_markers_sf(i, j, 0) = patch_id
-                    
+
                 end if
             end do
         end do
@@ -586,7 +584,6 @@ contains
         z_centroid = patch_ib(patch_id)%z_centroid
         radius = patch_ib(patch_id)%radius
 
-
         ! Initializing the pseudo volume fraction value to 1. The value will
         ! be modified as the patch is laid out on the grid, but only in the
         ! case that smoothing of the spherical patch's boundary is enabled.
@@ -607,8 +604,8 @@ contains
                     end if
                     ! Updating the patch identities bookkeeping variable
                     if (((x_cc(i) - x_centroid)**2 &
-                          + (cart_y - y_centroid)**2 &
-                          + (cart_z - z_centroid)**2 <= radius**2)) then
+                         + (cart_y - y_centroid)**2 &
+                         + (cart_z - z_centroid)**2 <= radius**2)) then
                         ib_markers_sf(i, j, k) = patch_id
                     end if
                 end do
@@ -752,14 +749,14 @@ contains
                           + (cart_z - z_centroid)**2 <= radius**2 .and. &
                           x_boundary%beg <= x_cc(i) .and. &
                           x_boundary%end >= x_cc(i)) &
-                          .or. &
-                          (.not. f_is_default(length_y) .and. &
+                         .or. &
+                         (.not. f_is_default(length_y) .and. &
                           (x_cc(i) - x_centroid)**2 &
                           + (cart_z - z_centroid)**2 <= radius**2 .and. &
                           y_boundary%beg <= cart_y .and. &
                           y_boundary%end >= cart_y) &
-                          .or. &
-                          (.not. f_is_default(length_z) .and. &
+                         .or. &
+                         (.not. f_is_default(length_z) .and. &
                           (x_cc(i) - x_centroid)**2 &
                           + (cart_y - y_centroid)**2 <= radius**2 .and. &
                           z_boundary%beg <= cart_z .and. &
@@ -929,8 +926,8 @@ contains
                         ! Get the shortest distance between the cell center and the interpolated model boundary
                         if (interpolate) then
                             STL_levelset%sf(i, j, k, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
-                                                                                          total_vertices, &
-                                                                                          point)
+                                                                                         total_vertices, &
+                                                                                         point)
                         else
                             STL_levelset%sf(i, j, k, patch_id) = distance
                         end if
@@ -952,8 +949,8 @@ contains
                         if (interpolate) then
                             ! Get the shortest distance between the cell center and the model boundary
                             STL_levelset%sf(i, j, 0, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
-                                                                                          total_vertices, &
-                                                                                          point)
+                                                                                         total_vertices, &
+                                                                                         point)
                         else
                             ! Get the shortest distance between the cell center and the interpolated model boundary
                             STL_levelset%sf(i, j, 0, patch_id) = f_distance(boundary_v, &
@@ -968,9 +965,9 @@ contains
 
                         ! Get the boundary normals
                         call f_normals(boundary_v, &
-                                        boundary_edge_count, &
-                                        point, &
-                                        normals)
+                                       boundary_edge_count, &
+                                       point, &
+                                       normals)
 
                         ! Correct the sign of the levelset_norm
                         if (ib_markers_sf(i, j, k) == 0) then
@@ -981,7 +978,7 @@ contains
                         STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
 
                     end if
-                  end do; end do; end do
+                end do; end do; end do
 
         if (proc_rank == 0) then
             print *, ""

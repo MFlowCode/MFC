@@ -91,10 +91,10 @@ contains
 
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
-          if (patch_ib(i)%moving_ibm .ne. 0) then
-            moving_immersed_boundary_flag = .true.
-            exit
-          end if
+            if (patch_ib(i)%moving_ibm /= 0) then
+                moving_immersed_boundary_flag = .true.
+                exit
+            end if
         end do
 
         ! Allocating the patch identities bookkeeping variable
@@ -257,14 +257,14 @@ contains
                 vel_norm_IP = sum(vel_IP*norm)*norm
                 vel_g = vel_IP - vel_norm_IP
             else
-                if (patch_ib(patch_id)%moving_ibm .eq. 0) then
-                  ! we know the object is not moving if moving_ibm is 0 (false)
-                  vel_g = 0._wp
+                if (patch_ib(patch_id)%moving_ibm == 0) then
+                    ! we know the object is not moving if moving_ibm is 0 (false)
+                    vel_g = 0._wp
                 else
-                  do q = 1, 3
-                    ! if mibm is 1 or 2, then the boundary may be moving
-                    vel_g(q) = patch_ib(patch_id)%vel(q)
-                  end do
+                    do q = 1, 3
+                        ! if mibm is 1 or 2, then the boundary may be moving
+                        vel_g(q) = patch_ib(patch_id)%vel(q)
+                    end do
                 end if
             end if
 
@@ -433,7 +433,7 @@ contains
                         index = index + dir
                         if (index < -buff_size .or. index > bound) then
                             print *, q, index, bound, buff_size
-                            print *, "temp_loc=", temp_loc, " s_cc(index)=", s_cc(index), " s_cc(index+1)=", s_cc(index+1)
+                            print *, "temp_loc=", temp_loc, " s_cc(index)=", s_cc(index), " s_cc(index+1)=", s_cc(index + 1)
                             print *, "Increase buff_size further in m_helper_basic (currently set to a minimum of 10)"
                             error stop "Increase buff_size"
                         end if
@@ -528,7 +528,7 @@ contains
                             patch_id = ib_markers%sf(i, j, 0)
                             ghost_points_in(count)%ib_patch_id = &
                                 patch_id
-                            
+
                             ghost_points_in(count)%slip = patch_ib(patch_id)%slip
                             ! ghost_points(count)%rank = proc_rank
 
@@ -895,21 +895,20 @@ contains
     !> Subroutine the updates the moving imersed boundary positions via Euler's method
     impure subroutine s_propagate_mib(patch_id)
 
-    integer, intent(in) :: patch_id
-    integer :: i
+        integer, intent(in) :: patch_id
+        integer :: i
 
-    ! start by using euler's method naiively, but eventually incorporate more sophistocation
-    if (patch_ib(patch_id)%moving_ibm .eq. 1) then
-      ! this continues with euler's method, which is obviously not that great and we need to add acceleration
-      do i = 1, 3
-        patch_ib(patch_id)%vel(i) = patch_ib(patch_id)%vel(i) + 0.0 * dt ! TODO :: ADD EXTERNAL FORCES HERE
-      end do
+        ! start by using euler's method naiively, but eventually incorporate more sophistocation
+        if (patch_ib(patch_id)%moving_ibm == 1) then
+            ! this continues with euler's method, which is obviously not that great and we need to add acceleration
+            do i = 1, 3
+                patch_ib(patch_id)%vel(i) = patch_ib(patch_id)%vel(i) + 0.0*dt ! TODO :: ADD EXTERNAL FORCES HERE
+            end do
 
-      patch_ib(patch_id)%x_centroid = patch_ib(patch_id)%x_centroid + patch_ib(patch_id)%vel(1) * dt
-      patch_ib(patch_id)%y_centroid = patch_ib(patch_id)%y_centroid + patch_ib(patch_id)%vel(2) * dt
-      patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid + patch_ib(patch_id)%vel(3) * dt
-    end if
-
+            patch_ib(patch_id)%x_centroid = patch_ib(patch_id)%x_centroid + patch_ib(patch_id)%vel(1)*dt
+            patch_ib(patch_id)%y_centroid = patch_ib(patch_id)%y_centroid + patch_ib(patch_id)%vel(2)*dt
+            patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid + patch_ib(patch_id)%vel(3)*dt
+        end if
 
     end subroutine s_propagate_mib
 
@@ -917,32 +916,32 @@ contains
     !> the position of each moving immersed boundary
     impure subroutine s_update_mib(num_ibs, levelset, levelset_norm)
 
-      integer, intent(in) :: num_ibs
-      type(levelset_field), intent(inout) :: levelset
-      type(levelset_norm_field), intent(inout) :: levelset_norm
+        integer, intent(in) :: num_ibs
+        type(levelset_field), intent(inout) :: levelset
+        type(levelset_norm_field), intent(inout) :: levelset_norm
 
-      integer :: i, j, k
-      integer, dimension(0:m, 0:n, 0:p) :: ib_markers_sf_reduced
+        integer :: i, j, k
+        integer, dimension(0:m, 0:n, 0:p) :: ib_markers_sf_reduced
 
-      ! Clears the existing immersed boundary indices
-      ib_markers%sf = 0
-      ib_markers_sf_reduced = 0 ! a copy of ib_markers_sf with reduced size to work with s_apply_ib_patches
-      
-      do i = 1, num_ibs
-        if (patch_ib(i)%moving_ibm .ne. 0) then
-          call s_propagate_mib(i)  ! TODO :: THIS IS DONE TERRIBLY WITH EULER METHOD
-        end if
-      end do
+        ! Clears the existing immersed boundary indices
+        ib_markers%sf = 0
+        ib_markers_sf_reduced = 0 ! a copy of ib_markers_sf with reduced size to work with s_apply_ib_patches
 
-      call s_apply_ib_patches(ib_markers_sf_reduced, levelset, levelset_norm)
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm /= 0) then
+                call s_propagate_mib(i)  ! TODO :: THIS IS DONE TERRIBLY WITH EULER METHOD
+            end if
+        end do
 
-      ib_markers%sf(0:m, 0:n, 0:p) = ib_markers_sf_reduced
-      
-      ! recalculate the ghost point locations
-      call s_find_num_ghost_points(num_gps, num_inner_gps)
-      call s_find_ghost_points(ghost_points, inner_points)
-      call s_compute_image_points(ghost_points, levelset, levelset_norm)
-      call s_compute_interpolation_coeffs(ghost_points)
+        call s_apply_ib_patches(ib_markers_sf_reduced, levelset, levelset_norm)
+
+        ib_markers%sf(0:m, 0:n, 0:p) = ib_markers_sf_reduced
+
+        ! recalculate the ghost point locations
+        call s_find_num_ghost_points(num_gps, num_inner_gps)
+        call s_find_ghost_points(ghost_points, inner_points)
+        call s_compute_image_points(ghost_points, levelset, levelset_norm)
+        call s_compute_interpolation_coeffs(ghost_points)
 
     end subroutine s_update_mib
 

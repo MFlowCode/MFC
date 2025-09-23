@@ -258,8 +258,6 @@ contains
 
     impure subroutine s_check_moving_IBM
 
-      
-
     end subroutine s_check_moving_IBM
 
 end module m_checker

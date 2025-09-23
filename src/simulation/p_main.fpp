@@ -75,7 +75,7 @@ program p_main
     do
 
         if (moving_immersed_boundary_flag) then
-          call s_update_mib(num_ibs, levelset, levelset_norm)
+            call s_update_mib(num_ibs, levelset, levelset_norm)
         end if
 
         if (cfl_dt) then

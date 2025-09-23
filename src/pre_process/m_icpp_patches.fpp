@@ -373,11 +373,10 @@ contains
 
                 end if
 
-
                 if (((x_cc(i) - x_centroid)**2 &
-                      + (y_cc(j) - y_centroid)**2 <= radius**2 &
-                      .and. &
-                      patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                     + (y_cc(j) - y_centroid)**2 <= radius**2 &
+                     .and. &
+                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                     .or. &
                     patch_id_fp(i, j, 0) == smooth_patch_id) &
                     then
@@ -1200,7 +1199,7 @@ contains
                     if ((((x_cc(i) - x_centroid)**2 &
                           + (cart_y - y_centroid)**2 &
                           + (cart_z - z_centroid)**2 <= radius**2) .and. &
-                          patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. &
+                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. &
                         patch_id_fp(i, j, k) == smooth_patch_id) then
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
@@ -1394,19 +1393,19 @@ contains
                           + (cart_z - z_centroid)**2 <= radius**2 .and. &
                           x_boundary%beg <= x_cc(i) .and. &
                           x_boundary%end >= x_cc(i)) &
-                          .or. &
-                          (.not. f_is_default(length_y) .and. &
+                         .or. &
+                         (.not. f_is_default(length_y) .and. &
                           (x_cc(i) - x_centroid)**2 &
                           + (cart_z - z_centroid)**2 <= radius**2 .and. &
                           y_boundary%beg <= cart_y .and. &
                           y_boundary%end >= cart_y) &
-                          .or. &
-                          (.not. f_is_default(length_z) .and. &
+                         .or. &
+                         (.not. f_is_default(length_z) .and. &
                           (x_cc(i) - x_centroid)**2 &
                           + (cart_y - y_centroid)**2 <= radius**2 .and. &
                           z_boundary%beg <= cart_z .and. &
                           z_boundary%end >= cart_z) .and. &
-                          patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. &
+                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. &
                         patch_id_fp(i, j, k) == smooth_patch_id) then
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
@@ -1553,7 +1552,7 @@ contains
         if (proc_rank == 0) then
             print *, " * Reading model: "//trim(patch_icpp(patch_id)%model_filepath)
         end if
-        
+
         model = f_model_read(patch_icpp(patch_id)%model_filepath)
         params%scale(:) = patch_icpp(patch_id)%model_scale(:)
         params%translate(:) = patch_icpp(patch_id)%model_translate(:)
@@ -1654,7 +1653,7 @@ contains
                     if (grid_geometry == 3) then
                         point = f_convert_cyl_to_cart(point)
                     end if
-                    
+
                     eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_icpp(patch_id)%model_spc)
 
                     if (patch_icpp(patch_id)%smoothen) then
