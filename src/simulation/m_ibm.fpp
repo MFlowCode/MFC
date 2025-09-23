@@ -52,6 +52,8 @@ module m_ibm
     integer :: num_inner_gps !< Number of ghost points
     $:GPU_DECLARE(create='[gp_layers,num_gps,num_inner_gps]')
 
+    logical :: moving_immersed_boundary_flag
+
 contains
 
     !>  Allocates memory for the variables in the IBM module
@@ -87,6 +89,14 @@ contains
 
         integer :: i, j, k
 
+        moving_immersed_boundary_flag = .false.
+        do i = 1, num_ibs
+          if (ib_patch%moving_ibm .ne. 0)
+            moving_immersed_boundary_flag = .true.
+            exit
+          end if
+        end do
+
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
@@ -102,9 +112,8 @@ contains
         call s_find_num_ghost_points(num_gps, num_inner_gps)
 
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
-        ! TODO :: THIS ALLOCATION COULD CAUSE PROBLEMS LATER WHEN WE ALLOW ODD-SHAPED IBS MOVE
-        @:ALLOCATE(ghost_points(1:int(num_gps * 1.5)))
-        @:ALLOCATE(inner_points(1:int(num_inner_gps * 1.5)))
+        @:ALLOCATE(ghost_points(1:int(num_gps * 1.2)))
+        @:ALLOCATE(inner_points(1:int(num_inner_gps * 1.2)))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
 
@@ -925,7 +934,7 @@ contains
         end if
       end do
 
-      call s_apply_ib_patches(ib_markers_sf_reduced, levelset, levelset_norm) ! TODO, THIS IS NOT OPTIMIAL
+      call s_apply_ib_patches(ib_markers_sf_reduced, levelset, levelset_norm)
 
       ib_markers%sf(0:m, 0:n, 0:p) = ib_markers_sf_reduced
       

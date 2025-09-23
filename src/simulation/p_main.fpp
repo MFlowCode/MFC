@@ -74,8 +74,7 @@ program p_main
     ! Time-stepping Loop
     do
 
-        if (ib) then
-          ! TODO :: FIND A WAY TO ONLY UPDATE WITH MIBM
+        if (moving_immersed_boundary_flag) then
           call s_update_mib(num_ibs, levelset, levelset_norm)
         end if
 
