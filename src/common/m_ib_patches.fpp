@@ -175,9 +175,6 @@ contains
 
     end subroutine s_ib_circle
 
-! airfoils are not supported for moving immersed boundaries
-! TODO :: REPLACE THIS IFDEF WITH SOMETHING MORE SUSTAINABLE
-#ifdef MFC_PRE_PROCESS
     !! @param patch_id is the patch identifier
     !! @param ib_markers_sf Array to track patch ids
     subroutine s_ib_airfoil(patch_id, ib_markers_sf)
@@ -199,8 +196,14 @@ contains
         ta = patch_ib(patch_id)%t
         theta = pi*patch_ib(patch_id)%theta/180._wp
 
+        ! rank(dx) is not consitent between pre_process and simulation. This IFDEF prevents compilation errors
+#ifdef MFC_PRE_PROCESS
         Np1 = int((pa*ca_in/dx)*20)
         Np2 = int(((ca_in - pa*ca_in)/dx)*20)
+#else
+        Np1 = int((pa*ca_in/dx(0))*20)
+        Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
+#endif
         Np = Np1 + Np2 + 1
 
         allocate (airfoil_grid_u(1:Np))
@@ -351,8 +354,14 @@ contains
         ta = patch_ib(patch_id)%t
         theta = pi*patch_ib(patch_id)%theta/180._wp
 
+        ! rank(dx) is not consitent between pre_process and simulation. This IFDEF prevents compilation errors
+#ifdef MFC_PRE_PROCESS
         Np1 = int((pa*ca_in/dx)*20)
         Np2 = int(((ca_in - pa*ca_in)/dx)*20)
+#else
+        Np1 = int((pa*ca_in/dx(0))*20)
+        Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
+#endif
         Np = Np1 + Np2 + 1
 
         allocate (airfoil_grid_u(1:Np))
@@ -487,8 +496,6 @@ contains
         end if
 
     end subroutine s_ib_3D_airfoil
-
-#endif
 
     !> The rectangular patch is a 2D geometry that may be used,
         !!              for example, in creating a solid boundary, or pre-/post-
