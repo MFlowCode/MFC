@@ -515,13 +515,11 @@ contains
                                         i - gp_layers:i + gp_layers, &
                                         j - gp_layers:j + gp_layers, 0)
                         if (any(subsection_2D == 0)) then
-                            if (count == 1) then
-                              print *, "Found first ghost point: ", i, j, ib_markers%sf(i, j, 0)
-                            end if
                             ghost_points_in(count)%loc = [i, j, 0]
                             patch_id = ib_markers%sf(i, j, 0)
                             ghost_points_in(count)%ib_patch_id = &
                                 patch_id
+                            
                             ghost_points_in(count)%slip = patch_ib(patch_id)%slip
                             ! ghost_points(count)%rank = proc_rank
 
@@ -915,15 +913,11 @@ contains
       type(levelset_norm_field), intent(inout) :: levelset_norm
 
       integer :: i, j, k
-      integer, dimension(0:m, 0:n, 0:p) :: ib_marker_sf_reduced
-
-      print *, "Beginning to update MIBs"
-
-      print *, ghost_points(1)%loc(1)
+      integer, dimension(0:m, 0:n, 0:p) :: ib_markers_sf_reduced
 
       ! Clears the existing immersed boundary indices
-      patch_id_fp = 0
       ib_markers%sf = 0
+      ib_markers_sf_reduced = 0 ! a copy of ib_markers_sf with reduced size to work with s_apply_ib_patches
       
       do i = 1, num_ibs
         if (patch_ib(i)%moving_ibm .ne. 0) then
@@ -931,15 +925,12 @@ contains
         end if
       end do
 
-      call s_apply_ib_patches(patch_id_fp, ib_marker_sf_reduced, levelset, levelset_norm) ! TODO, THIS IS NOT OPTIMIAL
+      call s_apply_ib_patches(ib_markers_sf_reduced, levelset, levelset_norm) ! TODO, THIS IS NOT OPTIMIAL
 
-      ib_markers%sf(0:m, 0:n, 0:p) = ib_marker_sf_reduced
+      ib_markers%sf(0:m, 0:n, 0:p) = ib_markers_sf_reduced
       
       ! recalculate the ghost point locations
-      print *, "x = ", patch_ib(1)%x_centroid
-
       call s_find_num_ghost_points(num_gps, num_inner_gps)
-      print *, "Number of points: ", num_gps, num_inner_gps
       call s_find_ghost_points(ghost_points, inner_points)
       call s_compute_image_points(ghost_points, levelset, levelset_norm)
       call s_compute_interpolation_coeffs(ghost_points)

@@ -168,9 +168,6 @@ contains
                 if ((x_cc(i) - x_centroid)**2 &
                                             + (y_cc(j) - y_centroid)**2 <= radius**2) &
                     then
-                      if (i .eq. 0) then
-                        print *, "Inside circle: ", i, j
-                      end if
                     ib_markers_sf(i, j, 0) = patch_id
                 end if
             end do
