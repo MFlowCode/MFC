@@ -939,13 +939,18 @@ contains
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
         call s_populate_ib_buffers() ! transmitts the new IB markers via MPI
 
-        ! recalculate the ghost point locations
+        ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
 
         call s_find_ghost_points(ghost_points, inner_points)
+        $:GPU_UPDATE(device='[ghost_points, inner_points]')
+
         call s_compute_image_points(ghost_points, levelset, levelset_norm)
+        $:GPU_UPDATE(device='[ghost_points]')
+
         call s_compute_interpolation_coeffs(ghost_points)
+        $:GPU_UPDATE(device='[ghost_points]')
 
     end subroutine s_update_mib
 
