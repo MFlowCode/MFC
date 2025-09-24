@@ -68,7 +68,6 @@ contains
 
             $:GPU_UPDATE(device='[i_halo_size]')
             @:ALLOCATE(ib_buff_send(0:i_halo_size), ib_buff_recv(0:i_halo_size))
-            print *, "Halo Size", proc_rank, i_halo_size
         end if
 #endif
 
@@ -270,7 +269,7 @@ contains
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
         call nvtxStartRange("IB-MARKER-COMM-PACKBUF")
-                
+
         buffer_counts = (/ &
                         buff_size*(n + 1)*(p + 1), &
                         buff_size*(m + 2*buff_size + 1)*(p + 1), &

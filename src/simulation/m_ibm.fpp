@@ -88,6 +88,7 @@ contains
     impure subroutine s_ibm_setup()
 
         integer :: i, j, k
+        integer :: max_num_gps, max_num_inner_gps
 
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
@@ -109,11 +110,14 @@ contains
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
 
+        ! find the number of ghost points and set them to be the maximum total across ranks
         call s_find_num_ghost_points(num_gps, num_inner_gps)
+        call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
+        call s_mpi_allreduce_integer_sum(num_inner_gps, max_num_inner_gps)
 
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
-        @:ALLOCATE(ghost_points(1:int(num_gps * 1.2)))
-        @:ALLOCATE(inner_points(1:int(num_inner_gps * 1.2)))
+        @:ALLOCATE(ghost_points(1:int(max_num_gps * 1.2)))
+        @:ALLOCATE(inner_points(1:int(max_num_inner_gps * 1.2)))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
 

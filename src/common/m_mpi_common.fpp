@@ -473,6 +473,29 @@ contains
     end subroutine s_mpi_allreduce_sum
 
     !>  The following subroutine takes the input local variable
+        !!      from all processors and reduces to the sum of all
+        !!      values. The reduced variable is recorded back onto the
+        !!      original local variable on each processor.
+        !!  @param var_loc Some variable containing the local value which should be
+        !!  reduced amongst all the processors in the communicator.
+        !!  @param var_glb The globally reduced value
+    impure subroutine s_mpi_allreduce_integer_sum(var_loc, var_glb)
+
+        integer, intent(in) :: var_loc
+        integer, intent(out) :: var_glb
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+
+        ! Performing the reduction procedure
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
+                           MPI_SUM, MPI_COMM_WORLD, ierr)
+
+#endif
+
+    end subroutine s_mpi_allreduce_integer_sum
+
+    !>  The following subroutine takes the input local variable
         !!      from all processors and reduces to the minimum of all
         !!      values. The reduced variable is recorded back onto the
         !!      original local variable on each processor.
