@@ -253,8 +253,7 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = chemxb, chemxe
                             mass_diffusivities_mixavg_Cell(i - chemxb + 1) = &
-                                (mass_diffusivities_mixavg2(i - chemxb + 1) + mass_diffusivities_mixavg1(i - chemxb + 1))/ &
-                                2.0_wp*(1.0_wp - Xs_cell(i - chemxb + 1))/(1.0_wp - Ys_cell(i - chemxb + 1))
+                                (mass_diffusivities_mixavg2(i - chemxb + 1) + mass_diffusivities_mixavg1(i - chemxb + 1))/2.0_wp
                         end do
 
                         lambda_Cell = 0.5_wp*(lambda_R + lambda_L)
