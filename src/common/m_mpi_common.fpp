@@ -98,16 +98,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-#endif
-
-#ifndef MFC_MPI
-
-        ! Serial run only has 1 processor
-        num_procs = 1
-        ! Local processor rank is 0
-        proc_rank = 0
-
-#else
 
         ! Initializing the MPI environment
         call MPI_INIT(ierr)
@@ -123,7 +113,11 @@ contains
 
         ! Querying the rank of the local processor
         call MPI_COMM_RANK(MPI_COMM_WORLD, proc_rank, ierr)
-
+#else
+        ! Serial run only has 1 processor
+        num_procs = 1
+        ! Local processor rank is 0
+        proc_rank = 0
 #endif
 
     end subroutine s_mpi_initialize
@@ -168,27 +162,20 @@ contains
         end if
 
         !Additional variables pb and mv for non-polytropic qbmm
-#ifdef MFC_PRE_PROCESS
         if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do j = 1, nnode
+#ifdef MFC_PRE_PROCESS
                     MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => pb%sf(0:m, 0:n, 0:p, j, i)
                     MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv%sf(0:m, 0:n, 0:p, j, i)
-                end do
-            end do
-        end if
-#endif
-
-#ifdef MFC_SIMULATION
-        if (qbmm .and. .not. polytropic) then
-            do i = 1, nb
-                do j = 1, nnode
+#elif defined (MFC_SIMULATION)
                     MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => pb_ts(1)%sf(0:m, 0:n, 0:p, j, i)
                     MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv_ts(1)%sf(0:m, 0:n, 0:p, j, i)
+#endif
                 end do
             end do
         end if
-#endif
+
         ! Define global(g) and local(l) sizes for flow variables
         sizes_glb(1) = m_glb + 1; sizes_loc(1) = m + 1
         if (n > 0) then
