@@ -91,7 +91,7 @@ contains
 
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm /= 0) then
+            if (patch_ib(i)%moving_ibm .ne. 0) then
                 moving_immersed_boundary_flag = .true.
                 exit
             end if
@@ -899,7 +899,7 @@ contains
         integer :: i
 
         ! start by using euler's method naiively, but eventually incorporate more sophistocation
-        if (patch_ib(patch_id)%moving_ibm == 1) then
+        if (patch_ib(patch_id)%moving_ibm .eq. 1) then
             ! this continues with euler's method, which is obviously not that great and we need to add acceleration
             do i = 1, 3
                 patch_ib(patch_id)%vel(i) = patch_ib(patch_id)%vel(i) + 0.0*dt ! TODO :: ADD EXTERNAL FORCES HERE
@@ -920,25 +920,25 @@ contains
         type(levelset_field), intent(inout) :: levelset
         type(levelset_norm_field), intent(inout) :: levelset_norm
 
-        integer :: i, j, k
-        integer, dimension(0:m, 0:n, 0:p) :: ib_markers_sf_reduced
+        integer :: i
 
         ! Clears the existing immersed boundary indices
         ib_markers%sf = 0
-        ib_markers_sf_reduced = 0 ! a copy of ib_markers_sf with reduced size to work with s_apply_ib_patches
 
         do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm /= 0) then
+            if (patch_ib(i)%moving_ibm .ne. 0) then
                 call s_propagate_mib(i)  ! TODO :: THIS IS DONE TERRIBLY WITH EULER METHOD
             end if
         end do
 
-        call s_apply_ib_patches(ib_markers_sf_reduced, levelset, levelset_norm)
-
-        ib_markers%sf(0:m, 0:n, 0:p) = ib_markers_sf_reduced
+        ! recompute the new ib_patch locations and broadcast them.
+        call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
+        call s_populate_ib_buffers() ! transmitts the new IB markers via MPI
 
         ! recalculate the ghost point locations
         call s_find_num_ghost_points(num_gps, num_inner_gps)
+        $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
+
         call s_find_ghost_points(ghost_points, inner_points)
         call s_compute_image_points(ghost_points, levelset, levelset_norm)
         call s_compute_interpolation_coeffs(ghost_points)

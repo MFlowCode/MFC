@@ -68,6 +68,7 @@ contains
 
             $:GPU_UPDATE(device='[i_halo_size]')
             @:ALLOCATE(ib_buff_send(0:i_halo_size), ib_buff_recv(0:i_halo_size))
+            print *, "Halo Size", proc_rank, i_halo_size
         end if
 #endif
 
@@ -203,7 +204,8 @@ contains
 
         do i = 1, num_ibs
             #:for VAR in [ 'radius', 'length_x', 'length_y', &
-                & 'x_centroid', 'y_centroid', 'c', 'm', 'p', 't', 'theta', 'slip' ]
+                & 'x_centroid', 'y_centroid', 'c', 'm', 'p', 't', 'theta', 'slip', &
+                'moving_ibm', 'vel',]
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             call MPI_BCAST(patch_ib(i)%geometry, 2, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
@@ -268,7 +270,7 @@ contains
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
         call nvtxStartRange("IB-MARKER-COMM-PACKBUF")
-
+                
         buffer_counts = (/ &
                         buff_size*(n + 1)*(p + 1), &
                         buff_size*(m + 2*buff_size + 1)*(p + 1), &

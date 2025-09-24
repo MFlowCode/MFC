@@ -37,6 +37,7 @@ program p_main
 
     call nvtxStartRange("INIT")
 
+
     !Initialize MPI
     call nvtxStartRange("INIT-MPI")
     call s_initialize_mpi_domain()
