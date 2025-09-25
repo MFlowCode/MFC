@@ -114,6 +114,8 @@ module m_volume_filtering
     complex(c_double_complex), allocatable :: sendbuf_sf(:), recvbuf_sf(:)
     complex(c_double_complex), allocatable :: sendbuf_tensor(:), recvbuf_tensor(:)
 
+    !$acc declare create(sendbuf_sf, recvbuf_sf, sendbuf_tensor, recvbuf_tensor)
+
 contains
 
     !< create fft plans to be used for explicit filtering of data 
@@ -242,10 +244,10 @@ contains
         @:ALLOCATE(data_cmplx_slabz_tensor(9, NxC, Ny, Nzloc))
         @:ALLOCATE(data_cmplx_slaby_tensor(9, NxC, Nyloc, Nz))
 
-        allocate(sendbuf_sf(NxC*Nyloc*Nzloc*num_procs))
-        allocate(recvbuf_sf(NxC*Nyloc*Nzloc*num_procs))
-        allocate(sendbuf_tensor(9*NxC*Nyloc*Nzloc*num_procs))
-        allocate(recvbuf_tensor(9*NxC*Nyloc*Nzloc*num_procs))
+        @:ALLOCATE(sendbuf_sf(NxC*Nyloc*Nzloc*num_procs))
+        @:ALLOCATE(recvbuf_sf(NxC*Nyloc*Nzloc*num_procs))
+        @:ALLOCATE(sendbuf_tensor(9*NxC*Nyloc*Nzloc*num_procs))
+        @:ALLOCATE(recvbuf_tensor(9*NxC*Nyloc*Nzloc*num_procs))
 
 #if defined(MFC_OpenACC)
         !< GPU FFT plans
@@ -1025,7 +1027,7 @@ contains
         integer :: dest_rank, src_rank
         integer :: i, j, k
 
-        !$acc parallel loop collapse(4) gang vector default(present) copy(sendbuf_sf)
+        !$acc parallel loop collapse(4) gang vector default(present)
         do dest_rank = 0, num_procs-1
             do k = 1, Nzloc 
                 do j = 1, Nyloc
@@ -1036,10 +1038,14 @@ contains
             end do
         end do
 
+        !$acc update host(sendbuf_sf)
+
         call MPI_Alltoall(sendbuf_sf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
                           recvbuf_sf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
 
-        !$acc parallel loop collapse(4) gang vector default(present) copy(recvbuf_sf)
+        !$acc update device(recvbuf_sf)
+
+        !$acc parallel loop collapse(4) gang vector default(present) 
         do src_rank = 0, num_procs-1
             do k = 1, Nzloc 
                 do j = 1, Nyloc
@@ -1057,7 +1063,7 @@ contains
         integer :: dest_rank, src_rank
         integer :: i, j, k
 
-        !$acc parallel loop collapse(4) gang vector default(present) copy(sendbuf_sf)
+        !$acc parallel loop collapse(4) gang vector default(present) 
         do dest_rank = 0, num_procs-1
             do k = 1, Nzloc 
                 do j = 1, Nyloc 
@@ -1068,10 +1074,14 @@ contains
             end do 
         end do
 
+        !$acc update host(sendbuf_sf)
+
         call MPI_Alltoall(sendbuf_sf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
                           recvbuf_sf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
 
-        !$acc parallel loop collapse(4) gang vector default(present) copy(recvbuf_sf) 
+        !$acc update device(recvbuf_sf)
+
+        !$acc parallel loop collapse(4) gang vector default(present) 
         do src_rank = 0, num_procs-1
             do k = 1, Nzloc
                 do j = 1, Nyloc 
@@ -1089,7 +1099,7 @@ contains
         integer :: dest_rank, src_rank
         integer :: i, j, k, l
 
-        !$acc parallel loop collapse(5) gang vector default(present) copy(sendbuf_tensor)
+        !$acc parallel loop collapse(5) gang vector default(present)
         do dest_rank = 0, num_procs-1
             do k = 1, Nzloc 
                 do j = 1, Nyloc
@@ -1102,10 +1112,14 @@ contains
             end do
         end do 
 
+        !$acc update host(sendbuf_tensor)
+
         call MPI_Alltoall(sendbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
                           recvbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
 
-        !$acc parallel loop collapse(5) gang vector default(present) copy(recvbuf_tensor)
+        !$acc update device(recvbuf_tensor)
+
+        !$acc parallel loop collapse(5) gang vector default(present) 
         do src_rank = 0, num_procs-1
             do k = 1, Nzloc 
                 do j = 1, Nyloc
@@ -1125,7 +1139,7 @@ contains
         integer :: dest_rank, src_rank
         integer :: i, j, k, l
 
-        !$acc parallel loop collapse(5) gang vector default(present) copy(sendbuf_tensor)
+        !$acc parallel loop collapse(5) gang vector default(present) 
         do dest_rank = 0, num_procs-1
             do k = 1, Nzloc 
                 do j = 1, Nyloc 
@@ -1138,10 +1152,14 @@ contains
             end do
         end do
 
+        !$acc update host(sendbuf_tensor)
+
         call MPI_Alltoall(sendbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
                           recvbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
 
-        !$acc parallel loop collapse(5) gang vector default(present) copy(recvbuf_tensor) 
+        !$acc update device(recvbuf_tensor)
+
+        !$acc parallel loop collapse(5) gang vector default(present) 
         do src_rank = 0, num_procs-1
             do k = 1, Nzloc
                 do j = 1, Nyloc 
@@ -1568,8 +1586,8 @@ contains
         @:DEALLOCATE(data_real_3D_slabz, data_cmplx_slabz, data_cmplx_slaby)
         @:DEALLOCATE(data_cmplx_slabz_tensor, data_cmplx_slaby_tensor)
         
-        deallocate(sendbuf_sf, recvbuf_sf)
-        deallocate(sendbuf_tensor, recvbuf_tensor)
+        @:DEALLOCATE(sendbuf_sf, recvbuf_sf)
+        @:DEALLOCATE(sendbuf_tensor, recvbuf_tensor)
 
 #if defined(MFC_OpenACC)
         ierr = cufftDestroy(plan_x_fwd_gpu)
