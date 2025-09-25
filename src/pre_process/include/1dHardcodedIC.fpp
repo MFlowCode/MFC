@@ -29,7 +29,6 @@
         q_prim_vf(momxb)%sf(i, 0, 0) = 0.0_wp
         q_prim_vf(E_idx)%sf(i, 0, 0) = 1.01325_wp*(10.0_wp)**5
         q_prim_vf(advxb)%sf(i, 0, 0) = 1.0_wp
-        q_prim_vf(advxb)%sf(i, 0, 0) = 1.0_wp
 
         y1 = (0.195_wp - 0.142_wp)*profile_shape + 0.142_wp
         y2 = (0.0_wp - 0.1_wp)*profile_shape + 0.1_wp
