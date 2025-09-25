@@ -1,0 +1,18 @@
+The reference data was collected on 9/12/25 using commit
+
+    465819231aa95c16d23f3d7cff1c93c9b17df43e
+
+from
+
+    https://github.com/wilfonba
+
+with the following modules loaded
+
+Currently Loaded Modules:
+  1) craype-x86-trento                5) Core/25.03          9) DefApps            13) cray-libsci/25.03.0  17) perftools-base/25.03.0  21) cray-hdf5/1.12.2.11        25) darshan-runtime/3.4.6-mpi (E4S)
+  2) libfabric/1.22.0                 6) tmux/3.4           10) PrgEnv-cray/8.6.0  14) cray-mpich/8.1.32    18) cpe/25.03               22) cray-python/3.11.7
+  3) craype-network-ofi               7) hsi/default        11) cce/19.0.0         15) cray-pmi/6.1.15      19) rocm/6.3.1              23) craype-accel-amd-gfx90a
+  4) xpmem/2.11.3-1.3_gdbda01a1eb3d   8) lfs-wrapper/0.0.1  12) cray-dsmml/0.3.1   16) craype/2.7.34        20) cray-fftw/3.3.10.9      24) rocprofiler-compute/3.0.0
+
+  Where:
+   E4S:  E4S: Extreme-scale Scientific Software Stack (E4S) https://e4s.io/index.html

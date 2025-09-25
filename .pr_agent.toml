@@ -4,12 +4,12 @@
 pr_commands = ["/describe", "/review", "/improve"]
 
 [pr_reviewer]                # (all fields optional)
-num_max_findings        = 5  # how many items to surface
-require_tests_review     = true
+num_max_findings        = 10  # how many items to surface
+require_tests_review    = true
 extra_instructions = """
 Focus on duplicate code, the possibility of bugs, and if the PR added appropriate tests if it added a simulation feature.
 """
 
 [pr_code_suggestions]
-commitable_code_suggestions = false   # purely advisory, no write ops
-apply_suggestions_checkbox  = false   # hides the “Apply/Chat” boxes
+commitable_code_suggestions = true
+apply_suggestions_checkbox  = true
