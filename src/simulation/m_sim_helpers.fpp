@@ -235,12 +235,12 @@ contains
             if (p > 0) then ! 3D
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    ccfl_sf(j, k, l) = dt/sqrt(rho * max(dx(j), dy(k), fltr_dtheta)**3._wp / sigma)
+                    ccfl_sf(j, k, l) = dt/sqrt(rho * min(dx(j), dy(k), fltr_dtheta)**3._wp / sigma)
                 else
-                    ccfl_sf(j, k, l) = dt/sqrt(rho * max(dx(j), dy(k), dz(l))**3._wp / sigma)
+                    ccfl_sf(j, k, l) = dt/sqrt(rho * min(dx(j), dy(k), dz(l))**3._wp / sigma)
                 end if
             elseif (n > 0) then ! 2D
-                ccfl_sf(j, k, l) = dt/sqrt(rho * max(dx(j), dy(k))**3._wp / sigma)
+                ccfl_sf(j, k, l) = dt/sqrt(rho * min(dx(j), dy(k))**3._wp / sigma)
             end if
         end if
 
@@ -296,12 +296,12 @@ contains
             if (p > 0) then ! 3D
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    ccfl_dt = cfl_target*sqrt(rho * max(dx(j), dy(k), fltr_dtheta)**3._wp / sigma)
+                    ccfl_dt = cfl_target*sqrt(rho * min(dx(j), dy(k), fltr_dtheta)**3._wp / sigma)
                 else
-                    ccfl_dt = cfl_target*sqrt(rho * max(dx(j), dy(k), dz(l))**3._wp / sigma)
+                    ccfl_dt = cfl_target*sqrt(rho * min(dx(j), dy(k), dz(l))**3._wp / sigma)
                 end if
             elseif (n > 0) then ! 2D
-                ccfl_dt = cfl_target*sqrt(rho * max(dx(j), dy(k))**3._wp / sigma)
+                ccfl_dt = cfl_target*sqrt(rho * min(dx(j), dy(k))**3._wp / sigma)
             end if
         end if
 

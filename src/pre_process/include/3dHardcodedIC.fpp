@@ -46,6 +46,28 @@
         end if
     end if
 
+    if (patch_icpp(patch_id)%hcid == 304) then
+        allocate(ih(0:n_glb, 0:0))
+        if (interface_file == '.') then
+            call s_mpi_abort("Error: interface_file must be specified for hcid=304")
+        else
+            inquire (file=trim(interface_file), exist=file_exist)
+            if (file_exist) then
+                open(unit=10, file=trim(interface_file), status="old", action="read")
+                do i = 0, n_glb
+                    read(10, '(A)') line  ! Read a full line as a string
+                    value = trim(line)
+                    read(value, *) ih(i, 0)  ! Convert string to numeric value
+                    if (.not. f_is_default(normMag)) ih(i, 0) = ih(i, 0) * normMag
+                    if (.not. f_is_default(normFac)) ih(i, 0) = ih(i, 0) + normFac
+                end do
+                close(10)
+            else
+                call s_mpi_abort("Error: interface_file specified for hcid=304 does not exist")
+            end if
+        end if
+    end if
+
     eps = 1e-9_wp
 
 #:enddef
@@ -125,10 +147,27 @@
 
         q_prim_vf(E_idx)%sf(i, j, k) = p_th*f_cut_on(r - r_th, eps_smooth)*f_cut_on(x_cc(i), eps_smooth) + p_am
 
-    case (303) ! 3D Interface from file
+    case (303) ! 3D Interface from file cartesian
 
         alph = 0.5_wp * (1 + (1._wp - 2._wp * eps) * &
-                    tanh((ih(start_idx(1) + i,start_idx(3) + k)  - y_cc(j))*0.1_wp))
+                    tanh((ih(start_idx(1) + i,start_idx(3) + k)  - y_cc(j))*(0.5_wp / dx)))
+
+        q_prim_vf(advxb)%sf(i,j,k) = alph
+        q_prim_vf(advxe)%sf(i,j,k) = 1._wp - alph
+
+        q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k) * 1._wp
+        q_prim_vf(contxe)%sf(i,j,k) = q_prim_vf(advxe)%sf(i,j,k) * (1._wp / 950._wp)
+
+        q_prim_vf(E_idx)%sf(i,j,k) = p0 + &
+            (q_prim_vf(contxb)%sf(i,j,k) + q_prim_vf(contxe)%sf(i,j,k)) * g0 * &
+            (ih(start_idx(1) + i, start_idx(3) + k) - y_cc(j))
+
+        if (surface_tension) q_prim_vf(c_idx)%sf(i,j,k) = alph
+
+    case (304) ! 3D Interface from file axisymmetric
+
+        alph = 0.5_wp * (1 + (1._wp - 2._wp * eps) * &
+                    tanh((ih(start_idx(2) + j,0)  - x_cc(i))*(0.01_wp / dx)))
 
         q_prim_vf(advxb)%sf(i,j,k) = alph
         q_prim_vf(advxe)%sf(i,j,k) = 1._wp - alph

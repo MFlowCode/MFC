@@ -157,8 +157,8 @@ contains
         write (3, '(A)') ''; write (3, '(A)') ''
 
         ! Generating table header for the stability criteria to be outputted
-        write (3, '(13X,A8,13X,A10,13X,A10,13X,A10,)', advance="no") &
-            trim('Time-steps'), trim('dt'), trim('Time'), trim('ICFL Max')
+        write (3, '(13X,A9,13X,A10,13X,A10,13X,A10,)', advance="no") &
+            trim('Time-step'), trim('dt'), trim('Time'), trim('ICFL Max')
 
         if (viscous) then
             write(3, '(13X,A10,13X,A16)', advance="no") &
@@ -309,7 +309,7 @@ contains
 
         ! Determining local stability criteria extrema at current time-step
 
-#ifdef _CRAYFTN
+!#ifdef _CRAYFTN
         $:GPU_UPDATE(host='[icfl_sf]')
         icfl_max_loc = maxval(icfl_sf)
 
@@ -323,23 +323,23 @@ contains
             $:GPU_UPDATE(host='[ccfl_sf]')
             ccfl_max_loc = maxval(ccfl_sf)
         end if
-#else
-        #:call GPU_PARALLEL(copyout='[icfl_max_loc]', copyin='[icfl_sf]')
-            icfl_max_loc = maxval(icfl_sf)
-        #:endcall GPU_PARALLEL
-        if (viscous) then
-            #:call GPU_PARALLEL(copyout='[vcfl_max_loc, Rc_min_loc]', copyin='[vcfl_sf,Rc_sf]')
-                vcfl_max_loc = maxval(vcfl_sf)
-                Rc_min_loc = minval(Rc_sf)
-            #:endcall GPU_PARALLEL
-        end if
+!#else
+        !#:call GPU_PARALLEL(copyout='[icfl_max_loc]', copyin='[icfl_sf]')
+            !icfl_max_loc = maxval(icfl_sf)
+        !#:endcall GPU_PARALLEL
+        !if (viscous) then
+            !#:call GPU_PARALLEL(copyout='[vcfl_max_loc, Rc_min_loc]', copyin='[vcfl_sf,Rc_sf]')
+                !vcfl_max_loc = maxval(vcfl_sf)
+                !Rc_min_loc = minval(Rc_sf)
+            !#:endcall GPU_PARALLEL
+        !end if
 
-        if (surface_tension) then
-            #:call GPU_PARALLEL(copyout='[ccfl_max_loc]', copyin='[ccfl_sf]')
-                ccfl_max_loc = maxval(ccfl_sf)
-            #:endcall GPU_PARALLEL
-        end if
-#endif
+        !if (surface_tension) then
+            !#:call GPU_PARALLEL(copyout='[ccfl_max_loc]', copyin='[ccfl_sf]')
+                !ccfl_max_loc = maxval(ccfl_sf)
+            !#:endcall GPU_PARALLEL
+        !end if
+!#endif
 
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
@@ -372,8 +372,8 @@ contains
 
         ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
-            write (3, '(13X,I8,13X,F10.6,13X,F10.6,13X,F10.6)', advance="no") &
-                t_step, dt, t_step*dt, icfl_max_glb
+            write (3, '(13X,I9,13X,F10.6,13X,F10.6,13X,F10.6)', advance="no") &
+                t_step, dt, mytime, icfl_max_glb
 
             if (viscous) then
                 write (3, '(13X,F10.6,13X,ES16.6)', advance="no") &

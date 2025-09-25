@@ -453,8 +453,8 @@ contains
         end if
 
         if (surface_tension) then
-            call MPI_REDUCE(Rc_min_loc, Rc_min_glb, 1, &
-                            mpi_p, MPI_MIN, 0, &
+            call MPI_REDUCE(ccfl_max_loc, ccfl_max_glb, 1, &
+                            mpi_p, MPI_MAX, 0, &
                             MPI_COMM_WORLD, ierr)
         end if
 
