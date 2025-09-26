@@ -488,9 +488,10 @@ contains
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Performing the reduction procedure
-        call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, &
                            MPI_SUM, MPI_COMM_WORLD, ierr)
-
+#else
+        var_glb = var_loc
 #endif
 
     end subroutine s_mpi_allreduce_integer_sum
