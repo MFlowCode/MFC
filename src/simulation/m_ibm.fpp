@@ -92,7 +92,7 @@ contains
 
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm .ne. 0) then
+            if (patch_ib(i)%moving_ibm /= 0) then
                 moving_immersed_boundary_flag = .true.
                 exit
             end if
@@ -903,7 +903,7 @@ contains
         integer :: i
 
         ! start by using euler's method naiively, but eventually incorporate more sophistocation
-        if (patch_ib(patch_id)%moving_ibm .eq. 1) then
+        if (patch_ib(patch_id)%moving_ibm == 1) then
             ! this continues with euler's method, which is obviously not that great and we need to add acceleration
             do i = 1, 3
                 patch_ib(patch_id)%vel(i) = patch_ib(patch_id)%vel(i) + 0.0*dt ! TODO :: ADD EXTERNAL FORCES HERE
@@ -930,14 +930,14 @@ contains
         ib_markers%sf = 0
 
         do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm .ne. 0) then
+            if (patch_ib(i)%moving_ibm /= 0) then
                 call s_propagate_mib(i)  ! TODO :: THIS IS DONE TERRIBLY WITH EULER METHOD
             end if
         end do
 
         ! recompute the new ib_patch locations and broadcast them.
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
-        call s_populate_ib_buffers() ! transmitts the new IB markers via MPI
+        call s_populate_ib_buffers() ! transmits the new IB markers via MPI
 
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)
