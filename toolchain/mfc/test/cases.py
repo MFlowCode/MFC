@@ -1050,10 +1050,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 mods={
                     **common_mods,
                     'riemann_solver': riemann_solver,
-                    'chem_params%gamma_method': gamma_method
+                    'chem_params%gamma_method': gamma_method,
+                    'weno_order': 3, "mapped_weno": 'F', 'mp_weno': 'F'
                 },
-                override_tol=1
+                override_tol=10**(-10)
             ))
+
+        stack.push(f'1D -> Chemistry -> MultiComponent Diffusion', {'m': 200,
+                    'dt': 0.1e-06, 'num_patches': 1, 'num_fluids': 1, 'x_domain%beg': 0.0, 'x_domain%end': 0.05,
+                    'bc_x%beg': -1, 'bc_x%end': -1, 'weno_order': 5,'weno_eps': 1e-16, 'weno_avg': 'F',
+                    'mapped_weno': 'T', 'mp_weno': 'T','weno_Re_flux': 'F', 'riemann_solver': 2, 'wave_speeds': 1,
+                    'avg_state': 1,'chemistry': 'T', 'chem_params%diffusion': 'T','chem_params%reactions': 'F', 'chem_wrt_T' : 'T',
+                    'patch_icpp(1)%geometry': 1, 'patch_icpp(1)%hcid': 182, 'patch_icpp(1)%x_centroid': 0.05 / 2,
+		    'patch_icpp(1)%length_x': 0.05, 'patch_icpp(1)%vel(1)': '0', 'patch_icpp(1)%pres': 1.01325e5,  'patch_icpp(1)%alpha(1)': 1,
+                    'fluid_pp(1)%gamma': 1.0e00 / (1.9326e00 - 1.0e00),  'fluid_pp(1)%pi_inf': 0, 'cantera_file': 'h2o2.yaml', 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50
+        })
+        cases.append(define_case_d(stack, '', {},override_tol=10**(-9)))
+
+        stack.pop()
 
     foreach_dimension()
 
