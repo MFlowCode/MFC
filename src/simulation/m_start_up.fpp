@@ -155,8 +155,6 @@ contains
             rdma_mpi, teno_CT, mp_weno, weno_avg, &
             riemann_solver, low_Mach, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
-            x_a, y_a, z_a, x_b, y_b, z_b, &
-            x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
             fluid_pp, probe_wrt, prim_vars_wrt, &
@@ -225,10 +223,14 @@ contains
 
             if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
-            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. &
+            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_DIRICHLET) .or. &
                 num_bc_patches > 0) then
                 bc_io = .true.
             endif
+
+            if (bc_x%beg == BC_PERIODIC .and. bc_x%end == BC_PERIODIC) periodic_bc(1) = .true.
+            if (bc_y%beg == BC_PERIODIC .and. bc_y%end == BC_PERIODIC) periodic_bc(2) = .true.
+            if (bc_z%beg == BC_PERIODIC .and. bc_z%end == BC_PERIODIC) periodic_bc(3) = .true.
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
@@ -1270,8 +1272,10 @@ contains
 
             $:GPU_UPDATE(host='[q_beta%vf(1)%sf]')
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta%vf(1))
-            $:GPU_UPDATE(host='[Rmax_stats,Rmin_stats,gas_p,gas_mv,intfc_vel]')
+            $:GPU_UPDATE(host='[Rmax_stats,Rmin_stats,gas_p,gas_mv,intfc_vel, mtn_pos, mtn_vel]')
+
             call s_write_restart_lag_bubbles(save_count) !parallel
+
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
@@ -1393,8 +1397,8 @@ contains
         end if
 
         call s_initialize_derived_variables()
-        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
 
+        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
 
@@ -1509,6 +1513,10 @@ contains
         $:GPU_UPDATE(device='[bc_x%vb1,bc_x%vb2,bc_x%vb3,bc_x%ve1,bc_x%ve2,bc_x%ve3]')
         $:GPU_UPDATE(device='[bc_y%vb1,bc_y%vb2,bc_y%vb3,bc_y%ve1,bc_y%ve2,bc_y%ve3]')
         $:GPU_UPDATE(device='[bc_z%vb1,bc_z%vb2,bc_z%vb3,bc_z%ve1,bc_z%ve2,bc_z%ve3]')
+
+        $:GPU_UPDATE(device='[bc_x%beg, bc_x%end]') 
+        $:GPU_UPDATE(device='[bc_y%beg, bc_y%end]') 
+        $:GPU_UPDATE(device='[bc_z%beg, bc_z%end]') 
 
         $:GPU_UPDATE(device='[bc_x%grcbc_in,bc_x%grcbc_out,bc_x%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_y%grcbc_in,bc_y%grcbc_out,bc_y%grcbc_vel_out]')

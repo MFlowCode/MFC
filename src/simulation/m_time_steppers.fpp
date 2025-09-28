@@ -485,7 +485,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=1)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -604,7 +604,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=1)
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
@@ -696,7 +696,7 @@ contains
         ! Stage 2 of 2
         call s_compute_rhs(q_cons_ts(dest)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
 
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=2)
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
@@ -840,7 +840,7 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=1)
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
@@ -932,7 +932,7 @@ contains
         ! Stage 2 of 3
         call s_compute_rhs(q_cons_ts(dest)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
 
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=2)
 
 #if  defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
@@ -1025,7 +1025,7 @@ contains
         ! Stage 3 of 3
         call s_compute_rhs(q_cons_ts(dest)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
 
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
+        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=3)
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
