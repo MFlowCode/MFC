@@ -111,7 +111,8 @@ module m_volume_filtering
 
     !$acc declare create(Nx, Ny, Nz, NxC, Nyloc, Nzloc)
     !$acc declare create(data_real_in1d, data_cmplx_out1d, data_cmplx_out1dy)
-    !$acc declare create(data_cmplx_slabz, data_cmplx_slaby, data_cmplx_slabz_tensor, data_cmplx_slaby_tensor, data_real_3D_slabz, real_kernelG_in, cmplx_kernelG1d)
+    !$acc declare create(data_cmplx_slabz, data_cmplx_slaby, data_cmplx_slabz_tensor, data_cmplx_slaby_tensor, data_cmplx_slabz_cons, data_cmplx_slaby_cons)
+    !$acc declare create(data_real_3D_slabz, real_kernelG_in, cmplx_kernelG1d)
 
     ! buffers for data transpose
     complex(c_double_complex), allocatable :: sendbuf_sf(:), recvbuf_sf(:)
@@ -247,8 +248,8 @@ contains
         @:ALLOCATE(data_cmplx_slaby(NxC, Nyloc, Nz))
         @:ALLOCATE(data_cmplx_slabz_tensor(9, NxC, Ny, Nzloc))
         @:ALLOCATE(data_cmplx_slaby_tensor(9, NxC, Nyloc, Nz))
-        @:ALLOCATE(data_cmplx_slabz_cons(4, NxC, Ny, Nzloc))
-        @:ALLOCATE(data_cmplx_slaby_cons(4, NxC, Nyloc, Nz))
+        @:ALLOCATE(data_cmplx_slabz_cons(5, NxC, Ny, Nzloc))
+        @:ALLOCATE(data_cmplx_slaby_cons(5, NxC, Nyloc, Nz))
 
         @:ALLOCATE(sendbuf_sf(NxC*Nyloc*Nzloc*num_procs))
         @:ALLOCATE(recvbuf_sf(NxC*Nyloc*Nzloc*num_procs))
@@ -578,10 +579,10 @@ contains
         integer :: i, j, k
 
         call nvtxStartRange("FILTER-CONS-VARS")
-        call s_filter_cons_vars(q_cons_vf, q_cons_filtered)
-        ! do i = 1, sys_size-1
-        !     call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., q_cons_vf(i), q_cons_filtered(i))
-        ! end do 
+        !call s_filter_cons_vars(q_cons_vf, q_cons_filtered)
+        do i = 1, sys_size-1
+            call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., q_cons_vf(i), q_cons_filtered(i))
+        end do 
         call s_apply_fftw_filter_scalarfield(filtered_fluid_indicator_function, .true., q_prim_vf(E_idx), filtered_pressure)
         call nvtxEndRange
 
@@ -1223,7 +1224,7 @@ contains
 
     end subroutine s_mpi_transpose_slabZ2Y_cons
 
-    !< transpose domain from y-slabs to z-slabs on each processor for batched 4 element conserved variables
+    !< transpose domain from y-slabs to z-slabs on each processor for batched 5 element conserved variables
     subroutine s_mpi_transpose_slabY2Z_cons
         integer :: dest_rank, src_rank
         integer :: i, j, k, l

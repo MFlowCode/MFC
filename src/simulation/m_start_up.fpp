@@ -1322,7 +1322,7 @@ contains
         ! Volume filter flow variables, compute unclosed terms and their statistics
         if (volume_filtering_momentum_eqn) then 
             if (t_step > t_step_stat_start) then  
-                call nvtxStartRange("VOLUME-FILTERED-MOMENTUM-EQUATION")  
+                call nvtxStartRange("VOLUME-FILTER-MOMENTUM-EQUATION")  
                 call s_volume_filter_momentum_eqn(q_cons_ts(1)%vf, q_prim_vf)
                 call nvtxEndRange
 
