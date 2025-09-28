@@ -188,21 +188,23 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
 
     def alter_riemann_solvers(num_fluids):
-        for riemann_solver in [1, 2]:
+        for riemann_solver in [1, 5, 2]:
             stack.push(f"riemann_solver={riemann_solver}", {'riemann_solver': riemann_solver})
 
             cases.append(define_case_d(stack, "mixture_err",   {'mixture_err': 'T'}))
-            cases.append(define_case_d(stack, "avg_state=1",   {'avg_state':   1}))
-            cases.append(define_case_d(stack, "wave_speeds=2", {'wave_speeds': 2}))
 
-            if riemann_solver == 2:
-                cases.append(define_case_d(stack, "model_eqns=3", {'model_eqns': 3}))
+            if riemann_solver in (1, 2):
+                cases.append(define_case_d(stack, "avg_state=1",   {'avg_state':   1}))
+                cases.append(define_case_d(stack, "wave_speeds=2", {'wave_speeds': 2}))
 
-            if num_fluids == 2:
                 if riemann_solver == 2:
-                    cases.append(define_case_d(stack, 'alt_soundspeed', {'alt_soundspeed': 'T'}))
+                    cases.append(define_case_d(stack, "model_eqns=3", {'model_eqns': 3}))
 
-                cases.append(define_case_d(stack, 'mpp_lim', {'mpp_lim': 'T'}))
+                if num_fluids == 2:
+                    if riemann_solver == 2:
+                        cases.append(define_case_d(stack, 'alt_soundspeed', {'alt_soundspeed': 'T'}))
+
+                    cases.append(define_case_d(stack, 'mpp_lim', {'mpp_lim': 'T'}))
 
             stack.pop()
 
@@ -255,6 +257,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
                 cases.append(define_case_d(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
+                cases.append(define_case_d(stack, "riemann_solver=5", {'riemann_solver':5}))
 
                 for weno_Re_flux in ['T']:
                     stack.push("weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
@@ -276,6 +279,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
                 cases.append(define_case_d(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
+                cases.append(define_case_d(stack, "riemann_solver=5", {'riemann_solver':5}))
                 for weno_Re_flux in ['T']:
                     stack.push("weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
                     cases.append(define_case_d(stack, "weno_avg", {'weno_avg': 'T'}))

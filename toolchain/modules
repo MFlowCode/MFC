@@ -49,7 +49,7 @@ p-gpu MFC_CUDA_CC=70,75,80,89,90 NVHPC_CUDA_HOME=$CUDA_HOME CC=nvc CXX=nvc++ FC=
 
 f     OLCF Frontier
 f-all cpe/25.03 rocm/6.3.1
-f-all cray-fftw cray-hdf5 cray-python
+f-all cray-fftw cray-hdf5 cray-python cmake
 f-gpu craype-accel-amd-gfx90a rocprofiler-compute/3.0.0
 
 d     NCSA Delta

@@ -539,6 +539,8 @@ module m_global_parameters
     logical :: powell !< Powell‐correction for div B = 0
     $:GPU_DECLARE(create='[Bx0,powell]')
 
+    logical :: fft_wrt
+
     !> @name Continuum damage model parameters
     !> @{!
     real(wp) :: tau_star        !< Stress threshold for continuum damage modeling
@@ -738,6 +740,8 @@ contains
                 ${param}$_${dir}$ = dflt_real
             #:endfor
         #:endfor
+
+        fft_wrt = .false.
 
         do j = 1, num_probes_max
             acoustic(j)%pulse = dflt_int

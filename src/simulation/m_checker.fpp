@@ -142,15 +142,16 @@ contains
     !> Checks constraints on Riemann solver parameters
     impure subroutine s_check_inputs_riemann_solver
         @:PROHIBIT(riemann_solver /= 2 .and. model_eqns == 3, "6-equation model (model_eqns = 3) requires riemann_solver = 2")
-        @:PROHIBIT(riemann_solver < 1 .or. riemann_solver > 4, "riemann_solver must be 1, 2, 3, or 4")
+        @:PROHIBIT(riemann_solver < 1 .or. riemann_solver > 5, "riemann_solver must be 1, 2, 3, 4 or 5")
         @:PROHIBIT(all(wave_speeds /= (/dflt_int, 1, 2/)), "wave_speeds must be 1 or 2")
         @:PROHIBIT(riemann_solver == 3 .and. wave_speeds /= dflt_int, "Exact Riemann (riemann_solver = 3) does not support wave_speeds")
         @:PROHIBIT(all(avg_state /= (/dflt_int, 1, 2/)), "Unsupported value of avg_state")
-        @:PROHIBIT(riemann_solver /= 3 .and. wave_speeds == dflt_int, "wave_speeds must be set if riemann_solver != 3")
-        @:PROHIBIT(riemann_solver /= 3 .and. avg_state == dflt_int, "avg_state must be set if riemann_solver != 3")
+        @:PROHIBIT(riemann_solver /= 3 .and. riemann_solver /= 5 .and. wave_speeds == dflt_int, "wave_speeds must be set if riemann_solver != 3,5")
+        @:PROHIBIT(riemann_solver /= 3 .and. riemann_solver /= 5 .and. avg_state == dflt_int, "avg_state must be set if riemann_solver != 3,5")
         @:PROHIBIT(all(low_Mach /= (/0, 1, 2/)), "low_Mach must be 0, 1 or 2")
         @:PROHIBIT(riemann_solver /= 2 .and. low_Mach == 2, "low_Mach = 2 requires riemann_solver = 2")
         @:PROHIBIT(low_Mach /= 0 .and. all(model_eqns /= (/2, 3/)), "low_Mach = 1 or 2 requires model_eqns = 2 or 3")
+        @:PROHIBIT(riemann_solver == 5 .and. cyl_coord .and. viscous, "Lax Friedrichs with cylincrical viscous flux not supported")
     end subroutine s_check_inputs_riemann_solver
 
     !> Checks constraints on geometry and precision
