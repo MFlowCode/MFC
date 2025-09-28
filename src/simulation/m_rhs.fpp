@@ -762,34 +762,75 @@ contains
                 call nvtxStartRange("RHS-WENO")
 
                 if (.not. surface_tension) then
-                    ! Reconstruct densitiess
-                    iv%beg = 1; iv%end = sys_size
-                    call s_reconstruct_cell_boundary_values( &
-                        q_prim_qp%vf(1:sys_size), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
+                    if (all(Re_size == 0)) then
+                        ! Reconstruct densitiess
+                        iv%beg = 1; iv%end = sys_size
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(1:sys_size), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+                    else
+                        iv%beg = 1; iv%end = contxe
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+
+                        iv%beg = E_idx; iv%end = sys_size
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+                    end if
+
                 else
-                    iv%beg = 1; iv%end = E_idx - 1
-                    call s_reconstruct_cell_boundary_values( &
-                        q_prim_qp%vf(iv%beg:iv%end), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
+                    if (all(Re_size == 0)) then
+                        iv%beg = 1; iv%end = E_idx - 1
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
 
-                    iv%beg = E_idx; iv%end = E_idx
-                    call s_reconstruct_cell_boundary_values_first_order( &
-                        q_prim_qp%vf(E_idx), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
+                        iv%beg = E_idx; iv%end = E_idx
+                        call s_reconstruct_cell_boundary_values_first_order( &
+                            q_prim_qp%vf(E_idx), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
 
-                    iv%beg = E_idx + 1; iv%end = sys_size
-                    call s_reconstruct_cell_boundary_values( &
-                        q_prim_qp%vf(iv%beg:iv%end), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
+                        iv%beg = E_idx + 1; iv%end = sys_size
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+                    else
+                        iv%beg = 1; iv%end = contxe
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+
+                        iv%beg = E_idx; iv%end = E_idx
+                        call s_reconstruct_cell_boundary_values_first_order( &
+                            q_prim_qp%vf(E_idx), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+
+                        iv%beg = E_idx + 1; iv%end = sys_size
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+                    end if
+
                 end if
 
                 ! Reconstruct viscous derivatives for viscosity
