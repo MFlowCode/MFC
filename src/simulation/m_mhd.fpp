@@ -21,10 +21,10 @@ module m_mhd
  s_finalize_mhd_powell_module, &
  s_compute_mhd_powell_rhs
 
-    real(wp), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
-    real(wp), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
+    real(wp), allocatable, dimension(:, :, :) :: du_dx, du_dy
+    real(wp), allocatable, dimension(:, :, :) :: dv_dx, dv_dy
     real(wp), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
-    $:GPU_DECLARE(create='[du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz]')
+    $:GPU_DECLARE(create='[du_dx,du_dy,dv_dx,dv_dy,dw_dx,dw_dy,dw_dz]')
 
     real(wp), allocatable, dimension(:, :) :: fd_coeff_x_h
     real(wp), allocatable, dimension(:, :) :: fd_coeff_y_h
@@ -51,12 +51,12 @@ contains
         end if
 
         ! Computing centered finite difference coefficients
-        call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_h, buff_size, fd_number, fd_order)
+        call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_h, buff_size, fd_order, fd_number)
         $:GPU_UPDATE(device='[fd_coeff_x_h]')
-        call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_h, buff_size, fd_number, fd_order)
+        call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_h, buff_size, fd_order, fd_number)
         $:GPU_UPDATE(device='[fd_coeff_y_h]')
         if (p > 0) then
-            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_h, buff_size, fd_number, fd_order)
+            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_h, buff_size, fd_order, fd_number)
             $:GPU_UPDATE(device='[fd_coeff_z_h]')
         end if
 

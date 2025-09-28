@@ -54,23 +54,21 @@ module m_data_output
 
     real(wp), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
-    real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     real(wp), public, allocatable, dimension(:, :) :: c_mass
-    $:GPU_DECLARE(create='[icfl_sf,vcfl_sf,ccfl_sf,Rc_sf,c_mass]')
+    $:GPU_DECLARE(create='[icfl_sf,vcfl_sf,Rc_sf,c_mass]')
 
     real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
-    real(wp) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
     real(wp) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
     $:GPU_DECLARE(create='[icfl_max_loc,icfl_max_glb,vcfl_max_loc,vcfl_max_glb]')
-    $:GPU_DECLARE(create='[ccfl_max_loc,ccfl_max_glb,Rc_min_loc,Rc_min_glb]')
+    $:GPU_DECLARE(create='[Rc_min_loc,Rc_min_glb]')
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
     !> @{
     real(wp) :: icfl_max !< ICFL criterion maximum
     real(wp) :: vcfl_max !< VCFL criterion maximum
-    real(wp) :: ccfl_max !< CCFL criterion maximum
+    !real(wp) :: ccfl_max !< CCFL criterion maximum
     real(wp) :: Rc_min !< Rc criterion maximum
     !> @}
 
@@ -223,9 +221,15 @@ contains
 
         character(LEN=path_len + 3*name_len) :: file_path !<
             !! Relative path to the probe data file in the case directory
+        character(LEN=path_len + 3*name_len) :: dir_path !<
 
         integer :: i !< Generic loop iterator
         logical :: file_exist
+        logical :: dir_exist
+
+        write (dir_path, '(A)') trim(case_dir)//'/D'
+        inquire (FILE=trim(dir_path), EXIST=dir_exist)
+        if (.not. dir_exist) call s_create_directory(trim(dir_path))
 
         do i = 1, num_probes
             ! Generating the relative path to the data file

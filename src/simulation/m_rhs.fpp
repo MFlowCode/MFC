@@ -113,21 +113,6 @@ module m_rhs
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
     $:GPU_DECLARE(create='[tau_Re_vf]')
 
-    type(vector_field) :: gm_alpha_qp  !<
-    !! The gradient magnitude of the volume fractions at cell-interior Gaussian
-    !! quadrature points. gm_alpha_qp is calculated from individual first-order
-    !! spatial derivatives located in dq_prim_ds_qp.
-
-    $:GPU_DECLARE(create='[gm_alpha_qp]')
-
-    !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
-    !! average gradient magnitude of volume fractions, located in gm_alpha_qp.
-    !> @{
-    type(vector_field), allocatable, dimension(:) :: gm_alphaL_n
-    type(vector_field), allocatable, dimension(:) :: gm_alphaR_n
-    $:GPU_DECLARE(create='[gm_alphaL_n,gm_alphaR_n]')
-    !> @}
-
     !> @name The cell-boundary values of the fluxes (src - source, gsrc - geometrical
     !! source). These are computed by applying the chosen Riemann problem solver
     !! .on the left and right cell-boundary values of the primitive variables
@@ -607,10 +592,6 @@ contains
             @:ALLOCATE(alf_sum%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end if
         ! END: Allocation/Association of qK_cons_n and qK_prim_n
-
-        ! Allocation of gm_alphaK_n
-        @:ALLOCATE(gm_alphaL_n(1:num_dims))
-        @:ALLOCATE(gm_alphaR_n(1:num_dims))
 
         if (alt_soundspeed) then
             @:ALLOCATE(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, 0:n, 0:p))

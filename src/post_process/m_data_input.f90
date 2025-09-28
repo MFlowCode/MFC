@@ -337,9 +337,8 @@ contains
         integer :: ifile, ierr, data_size, filetype, stride
         integer, dimension(MPI_STATUS_SIZE) :: status
 
-        integer(KIND=MPI_OFFSET_KIND) :: disp
         integer(KIND=MPI_OFFSET_KIND) :: m_MOK, n_MOK, p_MOK
-        integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
+        integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, str_MOK
         integer(KIND=MPI_OFFSET_KIND) :: NVARS_MOK
         integer(KIND=MPI_OFFSET_KIND) :: MOK
         integer(kind=MPI_OFFSET_KIND) :: offset
@@ -347,10 +346,6 @@ contains
 
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
-
-        character(len=10) :: t_step_string
-
-        integer :: i
 
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))
@@ -584,8 +579,6 @@ contains
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
     impure subroutine s_initialize_data_input_module
-
-        integer :: i !< Generic loop iterator
 
         ! Allocating the parts of the conservative and primitive variables
         ! that do not require the direct knowledge of the dimensionality of

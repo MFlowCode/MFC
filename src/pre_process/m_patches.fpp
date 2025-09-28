@@ -49,7 +49,7 @@ module m_patches
     !! is to act as a pseudo volume fraction to indicate the contribution of each
     !! patch toward the composition of a cell's fluid state.
 
-    real(wp) :: cart_x, cart_y, cart_z
+    real(wp) :: cart_y, cart_z
     real(wp) :: sph_phi !<
     !! Variables to be used to hold cell locations in Cartesian coordinates if
     !! 3D simulation is using cylindrical coordinates
@@ -465,11 +465,10 @@ contains
     !! @param patch_id_fp Array to track patch ids
     !! @param q_prim_vf Array of primitive variables
     !! @param ib True if this patch is an immersed boundary
-    subroutine s_airfoil(patch_id, patch_id_fp, q_prim_vf, ib_flag)
+    subroutine s_airfoil(patch_id, patch_id_fp, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib_flag
 
         real(wp) :: x0, y0, f, x_act, y_act, ca_in, pa, ma, ta, theta
@@ -628,11 +627,10 @@ contains
     !! @param patch_id_fp Array to track patch ids
     !! @param q_prim_vf Array of primitive variables
     !! @param ib True if this patch is an immersed boundary
-    subroutine s_3D_airfoil(patch_id, patch_id_fp, q_prim_vf, ib_flag)
+    subroutine s_3D_airfoil(patch_id, patch_id_fp, ib_flag)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib_flag
 
         real(wp) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca_in, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c

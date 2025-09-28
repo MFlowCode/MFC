@@ -312,7 +312,6 @@ contains
         real(wp), dimension(6) :: tau_e_L, tau_e_R
         real(wp) :: G_L, G_R
         real(wp), dimension(2) :: Re_L, Re_R
-        real(wp), dimension(3) :: xi_field_L, xi_field_R
 
         real(wp) :: rho_avg
         real(wp) :: H_avg
@@ -360,7 +359,7 @@ contains
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, &
                     & vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R, &
                     & G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, &
-                    & s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, &
+                    & s_L, s_R, s_S, Ys_L, Ys_R, &
                     & Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, &
                     & Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, &
                     & pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, &
@@ -3577,7 +3576,6 @@ contains
         !!  @param ix Index bounds in the x-dir
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
-        !!  @param q_prim_vf Cell-averaged primitive variables
     subroutine s_initialize_riemann_solver( &
         flux_src_vf, &
         norm_dir)

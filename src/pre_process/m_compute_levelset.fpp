@@ -157,8 +157,6 @@ contains
         real(wp) :: x_centroid, y_centroid, z_centroid, lz, z_max, z_min, x_act, y_act, theta
         real(wp), dimension(3) :: dist_vec
 
-        real(wp) :: length_z
-
         integer :: i, j, k, l !< Loop index variables
 
         x_centroid = patch_ib(ib_patch_id)%x_centroid

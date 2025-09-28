@@ -7,6 +7,7 @@
 module m_helper_basic
 
     use m_derived_types        !< Definitions of the derived types
+    use m_precision_select     !< Definitions of the precision types
 
     implicit none
 
@@ -24,7 +25,7 @@ contains
     !> This procedure checks if two floating point numbers of wp are within tolerance.
     !! @param a First number.
     !! @param b Second number.
-    !! @param tol_input Relative error (default = 1.e-10_wp).
+    !! @param tol_input Relative error (default = 1.e-10_wp for double and 1e-6 for single).
     !! @return Result of the comparison.
     logical pure elemental function f_approx_equal(a, b, tol_input) result(res)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -35,7 +36,11 @@ contains
         if (present(tol_input)) then
             tol = tol_input
         else
-            tol = 1.e-10_wp
+            if (wp == single_precision) then
+                tol = 1.e-6_wp
+            else
+                tol = 1.e-10_wp
+            end if
         end if
 
         if (a == b) then
@@ -50,7 +55,7 @@ contains
     !> This procedure checks if the point numbers of wp belongs to another array are within tolerance.
     !! @param a First number.
     !! @param b Array that contains several point numbers.
-    !! @param tol_input Relative error (default = 1e-10_wp).
+    !! @param tol_input Relative error (default = 1.e-10_wp for double and 1e-6 for single).
     !! @return Result of the comparison.
     logical pure function f_approx_in_array(a, b, tol_input) result(res)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -65,7 +70,11 @@ contains
         if (present(tol_input)) then
             tol = tol_input
         else
-            tol = 1e-10_wp
+            if (wp == single_precision) then
+                tol = 1.e-6_wp
+            else
+                tol = 1.e-10_wp
+            end if
         end if
 
         do i = 1, size(b)
