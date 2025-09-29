@@ -86,10 +86,8 @@ contains
                     call s_ib_cylinder(i, ib_markers_sf)
                     call s_cylinder_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 11) then
-#ifdef MFC_PRE_PROCESS
                     call s_ib_3D_airfoil(i, ib_markers_sf)
                     call s_3D_airfoil_levelset(i, levelset, levelset_norm)
-#endif
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 12) then
                     call s_ib_model(i, ib_markers_sf, levelset, levelset_norm)
@@ -110,10 +108,8 @@ contains
                     call s_ib_rectangle(i, ib_markers_sf)
                     call s_rectangle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 4) then
-#ifdef MFC_PRE_PROCESS
                     call s_ib_airfoil(i, ib_markers_sf)
                     call s_airfoil_levelset(i, levelset, levelset_norm)
-#endif
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 5) then
                     call s_ib_model(i, ib_markers_sf, levelset, levelset_norm)
@@ -277,7 +273,7 @@ contains
                     end if
                     if (y_act >= y0) then
                         k = 1
-                        do while (airfoil_grid_u(k)%x < x_act)
+                        do while (airfoil_grid_u(k)%x < x_act .and. k <= Np)
                             k = k + 1
                         end do
                         if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
@@ -771,7 +767,6 @@ contains
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
     !! @param ib_markers_sf Array to track patch ids
-    !! @param ib True if this patch is an immersed boundary
     !! @param STL_levelset STL levelset
     !! @param STL_levelset_norm STL levelset normals
     subroutine s_ib_model(patch_id, ib_markers_sf, STL_levelset, STL_levelset_norm)
