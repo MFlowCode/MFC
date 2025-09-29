@@ -74,10 +74,6 @@ program p_main
     ! Time-stepping Loop
     do
 
-        if (moving_immersed_boundary_flag) then
-            call s_update_mib(num_ibs, levelset, levelset_norm)
-        end if
-
         if (cfl_dt) then
             if (mytime >= t_stop) then
                 call s_save_performance_metrics(time_avg, time_final, io_time_avg, &
