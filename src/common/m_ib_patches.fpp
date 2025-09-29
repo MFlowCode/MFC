@@ -159,9 +159,6 @@ contains
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
 
-        ! TODO :: THIS SETS ib_markers_sf TO HOLD THE PATCH ID, BUT WE NEED TO
-        ! NOW ALSO SEARCH FOR OTHER POINTS TO DELETE THE CURRENT PATCH ID
-
         do j = 0, n
             do i = 0, m
                 if ((x_cc(i) - x_centroid)**2 &
