@@ -1661,7 +1661,7 @@ contains
                     else if (.not. patch_icpp(patch_id)%smoothen) then
                         eta = 0._wp
                     end if
-                    
+
                     call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                             eta, q_prim_vf, patch_id_fp)
 
