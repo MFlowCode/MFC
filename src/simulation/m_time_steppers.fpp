@@ -77,7 +77,9 @@ module m_time_steppers
 
     $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt]')
 
-#if defined(FRONTIER_UNIFIED)
+#if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+    real(wp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
+#elif defined(FRONTIER_UNIFIED)
     real(wp), pointer, contiguous, dimension(:, :, :, :) :: q_cons_ts_pool_host, q_cons_ts_pool_device
     integer(kind=8) :: pool_dims(4), pool_starts(4)
 #endif
@@ -105,12 +107,47 @@ contains
 
         ! Allocating the cell-average conservative variables
         @:ALLOCATE(q_cons_ts(1:num_ts))
+        @:PREFER_GPU(q_cons_ts)
 
         do i = 1, num_ts
             @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
+            @:PREFER_GPU(q_cons_ts(i)%vf)
         end do
 
-#ifdef FRONTIER_UNIFIED
+#if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+        if (num_ts == 2 .and. nv_uvm_out_of_core) then
+            ! host allocation for q_cons_ts(2)%vf(j)%sf for all j
+            allocate (q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
+                                          idwbuff(2)%beg:idwbuff(2)%end, &
+                                          idwbuff(3)%beg:idwbuff(3)%end, &
+                                          1:sys_size))
+        end if
+
+        do j = 1, sys_size
+            ! q_cons_ts(1) lives on the device
+            @:ALLOCATE(q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end))
+            @:PREFER_GPU(q_cons_ts(1)%vf(j)%sf)
+            if (num_ts == 2) then
+                if (nv_uvm_out_of_core) then
+                    ! q_cons_ts(2) lives on the host
+                    q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                          idwbuff(2)%beg:idwbuff(2)%end, &
+                                          idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:, :, :, j)
+                else
+                    @:ALLOCATE(q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end))
+                    @:PREFER_GPU(q_cons_ts(2)%vf(j)%sf)
+                end if
+            end if
+        end do
+
+        do i = 1, num_ts
+            @:ACC_SETUP_VFs(q_cons_ts(i))
+        end do
+#elif defined(FRONTIER_UNIFIED)
         ! Allocate to memory regions using hip calls
         ! that we will attach pointers to
         do i = 1, 3
@@ -357,11 +394,13 @@ contains
 
         ! Allocating the cell-average RHS variables
         @:ALLOCATE(rhs_vf(1:sys_size))
+        @:PREFER_GPU(rhs_vf)
 
         if (igr) then
             do i = 1, sys_size
                 @:ALLOCATE(rhs_vf(i)%sf(-1:m+1,-1:n+1,-1:p+1))
                 @:ACC_SETUP_SFs(rhs_vf(i))
+                @:PREFER_GPU(rhs_vf(i)%sf)
             end do
         else
             do i = 1, sys_size
@@ -536,8 +575,8 @@ contains
         real(wp), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
-        integer :: dest
         real(wp) :: start, finish
+        integer :: dest
 
         ! Stage 1 of 2
 
@@ -567,7 +606,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-#ifdef FRONTIER_UNIFIED
+#if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -659,7 +698,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
-#ifdef FRONTIER_UNIFIED
+#if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -668,7 +707,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(2)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                             + dt*rhs_vf(i)%sf(j, k, l))/2._wp
                     end do
                 end do
             end do
@@ -771,9 +810,8 @@ contains
         real(wp), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
-        integer :: dest
-
         real(wp) :: start, finish
+        integer :: dest
 
         ! Stage 1 of 3
 
@@ -804,7 +842,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-#ifdef FRONTIER_UNIFIED
+#if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -896,7 +934,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
-#if defined(FRONTIER_UNIFIED)
+#if  defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -989,7 +1027,7 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
-#ifdef FRONTIER_UNIFIED
+#if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do l = 0, p
@@ -1094,6 +1132,7 @@ contains
             end if
 
         end if
+
     end subroutine s_3rd_order_tvd_rk
 
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
@@ -1338,29 +1377,44 @@ contains
         use hipfort_hipmalloc
         use hipfort_check
 #endif
-
         integer :: i, j !< Generic loop iterators
 
         ! Deallocating the cell-average conservative variables
+#if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+        do j = 1, sys_size
+            @:DEALLOCATE(q_cons_ts(1)%vf(j)%sf)
+            if (num_ts == 2) then
+                if (nv_uvm_out_of_core) then
+                    nullify (q_cons_ts(2)%vf(j)%sf)
+                else
+                    @:DEALLOCATE(q_cons_ts(2)%vf(j)%sf)
+                end if
+            end if
+        end do
+        if (num_ts == 2 .and. nv_uvm_out_of_core) then
+            deallocate (q_cons_ts_pool_host)
+        end if
+#elif defined(FRONTIER_UNIFIED)
         do i = 1, num_ts
-#ifdef FRONTIER_UNIFIED
             do j = 1, sys_size
                 nullify (q_cons_ts(i)%vf(j)%sf)
             end do
+        end do
+
+        call hipCheck(hipHostFree(q_cons_ts_pool_host))
+        call hipCheck(hipFree(q_cons_ts_pool_device))
 #else
+        do i = 1, num_ts
             do j = 1, sys_size
                 @:DEALLOCATE(q_cons_ts(i)%vf(j)%sf)
             end do
+        end do
 #endif
+        do i = 1, num_ts
             @:DEALLOCATE(q_cons_ts(i)%vf)
         end do
 
         @:DEALLOCATE(q_cons_ts)
-
-#ifdef FRONTIER_UNIFIED
-        call hipCheck(hipHostFree(q_cons_ts_pool_host))
-        call hipCheck(hipFree(q_cons_ts_pool_device))
-#endif
 
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then

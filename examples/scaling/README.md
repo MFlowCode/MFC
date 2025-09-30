@@ -1,11 +1,10 @@
-# Strong- & Weak-scaling
+# Scaling and Performance test
 
 The scaling case can exercise both weak- and strong-scaling. It
 adjusts itself depending on the number of requested ranks.
 
-This directory also contains a collection of scripts used to test strong-scaling
-on OLCF Frontier. They required modifying MFC to collect some metrics but are
-meant to serve as a reference to users wishing to run similar experiments.
+This directory also contains a collection of scripts used to test strong and weak
+scaling on OLCF Frontier.
 
 ## Weak Scaling
 

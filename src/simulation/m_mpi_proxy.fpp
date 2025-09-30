@@ -53,17 +53,17 @@ contains
         if (ib) then
             if (n > 0) then
                 if (p > 0) then
-                    i_halo_size = -1 + gp_layers* &
-                                            & (m + 2*gp_layers + 1)* &
-                                            & (n + 2*gp_layers + 1)* &
-                                            & (p + 2*gp_layers + 1)/ &
-                                            & (cells_bounds%mnp_min + 2*gp_layers + 1)
+                    i_halo_size = -1 + buff_size* &
+                                            & (m + 2*buff_size + 1)* &
+                                            & (n + 2*buff_size + 1)* &
+                                            & (p + 2*buff_size + 1)/ &
+                                            & (cells_bounds%mnp_min + 2*buff_size + 1)
                 else
-                    i_halo_size = -1 + gp_layers* &
-                                            & (cells_bounds%mn_max + 2*gp_layers + 1)
+                    i_halo_size = -1 + buff_size* &
+                                            & (cells_bounds%mn_max + 2*buff_size + 1)
                 end if
             else
-                i_halo_size = -1 + gp_layers
+                i_halo_size = -1 + buff_size
             end if
 
             $:GPU_UPDATE(device='[i_halo_size]')
@@ -237,6 +237,11 @@ contains
             #:endfor
         end do
 
+        ! NVIDIA UVM variables
+        call MPI_BCAST(nv_uvm_out_of_core, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(nv_uvm_igr_temps_on_gpu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(nv_uvm_pref_gpu, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
 #endif
 
     end subroutine s_mpi_bcast_user_inputs
@@ -265,9 +270,9 @@ contains
         call nvtxStartRange("IB-MARKER-COMM-PACKBUF")
 
         buffer_counts = (/ &
-                        gp_layers*(n + 1)*(p + 1), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1) &
+                        buff_size*(n + 1)*(p + 1), &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        buff_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
                         /)
 
         buffer_count = buffer_counts(mpi_dir)
@@ -292,12 +297,12 @@ contains
 
         pack_offset = 0
         if (f_xor(pbc_loc == 1, beg_end_geq_0)) then
-            pack_offset = grid_dims(mpi_dir) - gp_layers + 1
+            pack_offset = grid_dims(mpi_dir) - buff_size + 1
         end if
 
         unpack_offset = 0
         if (pbc_loc == 1) then
-            unpack_offset = grid_dims(mpi_dir) + gp_layers + 1
+            unpack_offset = grid_dims(mpi_dir) + buff_size + 1
         end if
 
         ! Pack Buffer to Send
@@ -307,8 +312,8 @@ contains
                     $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, p
                         do k = 0, n
-                            do j = 0, gp_layers - 1
-                                r = (j + gp_layers*(k + (n + 1)*l))
+                            do j = 0, buff_size - 1
+                                r = (j + buff_size*(k + (n + 1)*l))
                                 ib_buff_send(r) = ib_markers%sf(j + pack_offset, k, l)
                             end do
                         end do
@@ -316,21 +321,21 @@ contains
                 #:elif mpi_dir == 2
                     $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, p
-                        do k = 0, gp_layers - 1
-                            do j = -gp_layers, m + gp_layers
-                                r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                     (k + gp_layers*l))
+                        do k = 0, buff_size - 1
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     (k + buff_size*l))
                                 ib_buff_send(r) = ib_markers%sf(j, k + pack_offset, l)
                             end do
                         end do
                     end do
                 #:else
                     $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                    do l = 0, gp_layers - 1
-                        do k = -gp_layers, n + gp_layers
-                            do j = -gp_layers, m + gp_layers
-                                r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                     ((k + gp_layers) + (n + 2*gp_layers + 1)*l))
+                    do l = 0, buff_size - 1
+                        do k = -buff_size, n + buff_size
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     ((k + buff_size) + (n + 2*buff_size + 1)*l))
                                 ib_buff_send(r) = ib_markers%sf(j, k, l + pack_offset)
                             end do
                         end do
@@ -340,12 +345,38 @@ contains
         #:endfor
         call nvtxEndRange ! Packbuf
 
-        call nvtxStartRange("IB-MARKER-SENDRECV")
-        call MPI_SENDRECV( &
-            ib_buff_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
-            ib_buff_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
-            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-        call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
+        #:for rdma_mpi in [False, True]
+            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+                #:if rdma_mpi
+                    #:call GPU_HOST_DATA(use_device='[ib_buff_send, ib_buff_recv]')
+
+                        call nvtxStartRange("IB-MARKER-SENDRECV-RDMA")
+                        call MPI_SENDRECV( &
+                            ib_buff_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
+                            ib_buff_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
+                            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        call nvtxEndRange
+
+                    #:endcall GPU_HOST_DATA
+                    $:GPU_WAIT()
+                #:else
+                    call nvtxStartRange("IB-MARKER-DEV2HOST")
+                    $:GPU_UPDATE(host='[ib_buff_send]')
+                    call nvtxEndRange
+
+                    call nvtxStartRange("IB-MARKER-SENDRECV-NO-RMDA")
+                    call MPI_SENDRECV( &
+                        ib_buff_send, buffer_count, MPI_INTEGER, dst_proc, send_tag, &
+                        ib_buff_recv, buffer_count, MPI_INTEGER, src_proc, recv_tag, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call nvtxEndRange
+
+                    call nvtxStartRange("IB-MARKER-HOST2DEV")
+                    $:GPU_UPDATE(device='[ib_buff_recv]')
+                    call nvtxEndRange
+                #:endif
+            end if
+        #:endfor
 
         ! Unpack Received Buffer
         call nvtxStartRange("IB-MARKER-COMM-UNPACKBUF")
@@ -355,8 +386,8 @@ contains
                     $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, p
                         do k = 0, n
-                            do j = -gp_layers, -1
-                                r = (j + gp_layers*((k + 1) + (n + 1)*l))
+                            do j = -buff_size, -1
+                                r = (j + buff_size*((k + 1) + (n + 1)*l))
                                 ib_markers%sf(j + unpack_offset, k, l) = ib_buff_recv(r)
                             end do
                         end do
@@ -364,10 +395,10 @@ contains
                 #:elif mpi_dir == 2
                     $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                     do l = 0, p
-                        do k = -gp_layers, -1
-                            do j = -gp_layers, m + gp_layers
-                                r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                     ((k + gp_layers) + gp_layers*l))
+                        do k = -buff_size, -1
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     ((k + buff_size) + buff_size*l))
                                 ib_markers%sf(j, k + unpack_offset, l) = ib_buff_recv(r)
                             end do
                         end do
@@ -375,12 +406,12 @@ contains
                 #:else
                     ! Unpacking buffer from bc_z%beg
                     $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                    do l = -gp_layers, -1
-                        do k = -gp_layers, n + gp_layers
-                            do j = -gp_layers, m + gp_layers
-                                r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                     ((k + gp_layers) + (n + 2*gp_layers + 1)* &
-                                      (l + gp_layers)))
+                    do l = -buff_size, -1
+                        do k = -buff_size, n + buff_size
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     ((k + buff_size) + (n + 2*buff_size + 1)* &
+                                      (l + buff_size)))
                                 ib_markers%sf(j, k, l + unpack_offset) = ib_buff_recv(r)
                             end do
                         end do

@@ -3,12 +3,13 @@ import typing, dataclasses
 
 @dataclasses.dataclass
 class MFCConfig:
-    mpi:     bool = True
-    gpu:     bool = False
-    debug:   bool = False
-    gcov:    bool = False
-    unified: bool = False
-    single: bool = False
+    mpi:       bool = True
+    gpu:       bool = False
+    debug:     bool = False
+    gcov:      bool = False
+    unified:   bool = False
+    single:    bool = False
+    fastmath : bool = False
 
     @staticmethod
     def from_dict(d: dict):
@@ -49,7 +50,7 @@ class MFCConfig:
 
 
 gCFG: MFCConfig = MFCConfig()
-gARG: dict      = {}
+gARG: dict      = {"rdma_mpi": False}
 
 def ARG(arg: str, dflt = None) -> typing.Any:
     # pylint: disable=global-variable-not-assigned

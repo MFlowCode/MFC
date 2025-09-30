@@ -3,6 +3,7 @@ import os, typing, itertools
 
 from mfc   import common
 from .case import Nt, define_case_d, define_case_f, CaseGeneratorStack, TestCaseBuilder
+from ..state   import ARG
 
 def get_bc_mods(bc: int, dimInfo):
     params = {}
@@ -362,10 +363,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_ppn(dimInfo):
         if len(dimInfo[0]) == 3:
             cases.append(define_case_d(stack, '2 MPI Ranks', {'m': 29, 'n': 29, 'p': 49}, ppn=2))
-            cases.append(define_case_d(stack, '2 MPI Ranks -> RDMA MPI', {'m': 29, 'n': 29, 'p': 49, 'rdma_mpi': 'T'}, ppn=2))
+            if ARG("rdma_mpi"):
+                cases.append(define_case_d(stack, '2 MPI Ranks -> RDMA MPI', {'m': 29, 'n': 29, 'p': 49, 'rdma_mpi': 'T'}, ppn=2))
         else:
             cases.append(define_case_d(stack, '2 MPI Ranks', {}, ppn=2))
-            cases.append(define_case_d(stack, '2 MPI Ranks -> RDMA MPI', {'rdma_mpi': 'T'}, ppn=2))
+            if ARG("rdma_mpi"):
+                cases.append(define_case_d(stack, '2 MPI Ranks -> RDMA MPI', {'rdma_mpi': 'T'}, ppn=2))
 
     def alter_ib(dimInfo, six_eqn_model=False):
         for slip in [True, False]:
@@ -693,17 +696,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 'patch_icpp(1)%vel(1)': 1.0, 'patch_icpp(1)%vel(2)': 0.0, 'patch_icpp(1)%vel(3)': 0.0,
                 'patch_icpp(1)%pres': 17.8571428571, 'patch_icpp(1)%alpha_rho(1)': 1.0, 'patch_icpp(1)%alpha(1)': 1.0,
                 'patch_icpp(1)%r0': -1e6, 'patch_icpp(1)%v0': -1e6,
-                'patch_icpp(2)%geometry': -100, 
+                'patch_icpp(2)%geometry': -100,
                 'patch_icpp(2)%x_centroid': -1e6, 'patch_icpp(2)%length_x': -1e6,
-                'patch_icpp(2)%y_centroid': -1e6, 'patch_icpp(2)%length_y': -1e6, 
-                'patch_icpp(2)%z_centroid': -1e6, 'patch_icpp(2)%length_z': -1e6, 
-                'patch_icpp(2)%vel(1)': -1e6, 'patch_icpp(2)%vel(2)': -1e6, 'patch_icpp(2)%vel(3)': -1e6, 
+                'patch_icpp(2)%y_centroid': -1e6, 'patch_icpp(2)%length_y': -1e6,
+                'patch_icpp(2)%z_centroid': -1e6, 'patch_icpp(2)%length_z': -1e6,
+                'patch_icpp(2)%vel(1)': -1e6, 'patch_icpp(2)%vel(2)': -1e6, 'patch_icpp(2)%vel(3)': -1e6,
                 'patch_icpp(2)%r0': -1e6, 'patch_icpp(2)%v0': -1e6,
-                'patch_icpp(3)%geometry': -100, 
+                'patch_icpp(3)%geometry': -100,
                 'patch_icpp(3)%x_centroid': -1e6, 'patch_icpp(3)%length_x': -1e6,
-                'patch_icpp(3)%y_centroid': -1e6, 'patch_icpp(3)%length_y': -1e6, 
-                'patch_icpp(3)%z_centroid': -1e6, 'patch_icpp(3)%length_z': -1e6, 
-                'patch_icpp(3)%vel(1)': -1e6, 'patch_icpp(3)%vel(2)': -1e6, 'patch_icpp(3)%vel(3)': -1e6, 
+                'patch_icpp(3)%y_centroid': -1e6, 'patch_icpp(3)%length_y': -1e6,
+                'patch_icpp(3)%z_centroid': -1e6, 'patch_icpp(3)%length_z': -1e6,
+                'patch_icpp(3)%vel(1)': -1e6, 'patch_icpp(3)%vel(2)': -1e6, 'patch_icpp(3)%vel(3)': -1e6,
                 'patch_icpp(3)%r0': -1e6, 'patch_icpp(3)%v0': -1e6
             }))
 
@@ -993,11 +996,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                            "2D_lagrange_bubblescreen",
                            "3D_lagrange_bubblescreen", "2D_triple_point",
                            "1D_shuosher_analytical",
-                           "1D_titarevtorro_analytical", 
+                           "1D_titarevtorro_analytical",
                            "2D_acoustic_pulse_analytical",
                            "2D_isentropicvortex_analytical",
                            "2D_zero_circ_vortex_analytical",
-                           "3D_TaylorGreenVortex_analytical"]
+                           "3D_TaylorGreenVortex_analytical",
+                           "3D_IGR_TaylorGreenVortex_nvidia",
+                           "2D_backward_facing_step",
+                           "2D_forward_facing_step"]
             if path in casesToSkip:
                 continue
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"
@@ -1044,10 +1050,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 mods={
                     **common_mods,
                     'riemann_solver': riemann_solver,
-                    'chem_params%gamma_method': gamma_method
+                    'chem_params%gamma_method': gamma_method,
+                    'weno_order': 3, "mapped_weno": 'F', 'mp_weno': 'F'
                 },
-                override_tol=1
+                override_tol=10**(-10)
             ))
+
+        stack.push(f'1D -> Chemistry -> MultiComponent Diffusion', {'m': 200,
+                    'dt': 0.1e-06, 'num_patches': 1, 'num_fluids': 1, 'x_domain%beg': 0.0, 'x_domain%end': 0.05,
+                    'bc_x%beg': -1, 'bc_x%end': -1, 'weno_order': 5,'weno_eps': 1e-16, 'weno_avg': 'F',
+                    'mapped_weno': 'T', 'mp_weno': 'T','weno_Re_flux': 'F', 'riemann_solver': 2, 'wave_speeds': 1,
+                    'avg_state': 1,'chemistry': 'T', 'chem_params%diffusion': 'T','chem_params%reactions': 'F', 'chem_wrt_T' : 'T',
+                    'patch_icpp(1)%geometry': 1, 'patch_icpp(1)%hcid': 182, 'patch_icpp(1)%x_centroid': 0.05 / 2,
+		    'patch_icpp(1)%length_x': 0.05, 'patch_icpp(1)%vel(1)': '0', 'patch_icpp(1)%pres': 1.01325e5,  'patch_icpp(1)%alpha(1)': 1,
+                    'fluid_pp(1)%gamma': 1.0e00 / (1.9326e00 - 1.0e00),  'fluid_pp(1)%pi_inf': 0, 'cantera_file': 'h2o2.yaml', 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50
+        })
+        cases.append(define_case_d(stack, '', {},override_tol=10**(-9)))
+
+        stack.pop()
 
     foreach_dimension()
 
