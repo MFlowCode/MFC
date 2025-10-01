@@ -145,6 +145,16 @@ Examples:
 - Build MFC using a single thread without MPI, GPU, and Debug support: `./mfc.sh build --no-mpi`.
 - Build MFC's `simulation` code in Debug mode with MPI and GPU support: `./mfc.sh build --debug --gpu -t simulation`.
 
+## Using Containers
+As an alternative to building MFC from scratch, use containers to quickly access pre-built MFC with all its dependencies.
+
+Run the latest MFC container.
+```bash
+docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu
+```
+Please refer to the [Docker](https://mflowcode.github.io/documentation/docker.html) document for more information.
+
+
 ## Running the Test Suite
 
 Run MFC's test suite with 8 threads:
