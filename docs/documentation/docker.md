@@ -5,7 +5,7 @@
 - Install Docker on [Mac](https://docs.docker.com/desktop/setup/install/mac-install/), [Windows](https://docs.docker.com/desktop/setup/install/windows-install/), or [Linux](https://docs.docker.com/desktop/setup/install/linux/).
 
 Via Docker Desktop GUI,
-- Search for [sbryngelson/mfc](https://hub.docker.com/r/sbryngelson/mfc) repository where all MFC images are stored then pull a release tag (e.g. `lastest-cpu`). 
+- Search for [sbryngelson/mfc](https://hub.docker.com/r/sbryngelson/mfc) repository where all MFC images are stored then pull a release tag (e.g. `latest-cpu`). 
 
     Read through **Tag Details** below to distinguish between them. Docker Desktop's left sidebar has two key tabs: **Images** stores your program copies, while **Containers** shows instances of those images. You can launch multiple containers from a single image.
 
@@ -20,6 +20,15 @@ Or via Docker CLI,
 ```bash
 docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu
 ```
+<br>
+
+**Selecting OS/ARCH:** 
+
+Docker by default selects the compatible architecture when pulling and running a container. However, you can manually specify your platform (i.e. `linux/amd64` for most devices or `linux/arm64`for Apple Silicon).
+```bash
+docker run -it --rm --entrypoint bash --platform linux/amd64 sbryngelson/mfc:latest-cpu
+```
+<br>
 
 ## Running Containers
 
@@ -47,7 +56,7 @@ docker run -it --rm --entrypoint bash -v "$PWD":/mnt sbryngelson/mfc:latest-cpu
 
 **Shared Memory:** 
 
-Increase the shared memory size to prevent MPI memory binding errors which may fail some tests and cases. Otherwie, you can disable MPI inside the container `--no-mpi`. 
+Increase the shared memory size to prevent MPI memory binding errors which may fail some tests and cases. Otherwise, you can disable MPI inside the container `--no-mpi`. 
 ```bash
 docker run -it --rm --entrypoint bash --shm-size=<e.g. 4gb> sbryngelson/mfc:latest-cpu
 ```

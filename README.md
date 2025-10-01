@@ -84,9 +84,9 @@ And here is a high amplitude acoustic wave reflecting and emerging through a cir
 
 
 ## Getting started
-for a quick start, open a GitHub Codespace to load a pre-configured docker container to get familiar with MFC. Click <kbd> <> Code</kbd> (green button at top right) → <kbd>Codespaces</kbd> (right tab) → <kbd>+</kbd> (create a codespace).
+For a quick start, open a GitHub Codespace to load a pre-configured docker container to get familiar with MFC commands. Click <kbd> <> Code</kbd> (green button at top right) → <kbd>Codespaces</kbd> (right tab) → <kbd>+</kbd> (create a codespace).
 
-****Notes:**** Codespaces is a free service with a monthly quota of compute time and storage usage. It is commended for testing commands, troubleshooting, and running simple case files without the need to install dependencies and build MFC on your device. Remember to save any important files locally before closing your codespace. To learn more, read through [docker](https://mflowcode.github.io/documentation/docker.html).
+****Notes:**** Codespaces is a free service with a monthly quota of compute time and storage usage. It is commended for testing commands, troubleshooting, and running simple case files without the need to install dependencies and build MFC on your device. Remember to save any important files locally before closing your codespace. To learn more, read through [how docker & containers work](https://mflowcode.github.io/documentation/docker.html).
 
 Otherwise, you can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
 It's rather straightforward.
