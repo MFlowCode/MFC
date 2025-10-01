@@ -115,9 +115,9 @@ module m_volume_filtering
     !$acc declare create(data_real_3D_slabz, real_kernelG_in, cmplx_kernelG1d)
 
     ! buffers for data transpose
-    complex(c_double_complex), allocatable :: sendbuf_sf(:), recvbuf_sf(:)
-    complex(c_double_complex), allocatable :: sendbuf_tensor(:), recvbuf_tensor(:)
-    complex(c_double_complex), allocatable :: sendbuf_cons(:), recvbuf_cons(:)
+    complex(c_float_complex), allocatable :: sendbuf_sf(:), recvbuf_sf(:)
+    complex(c_float_complex), allocatable :: sendbuf_tensor(:), recvbuf_tensor(:)
+    complex(c_float_complex), allocatable :: sendbuf_cons(:), recvbuf_cons(:)
 
     !$acc declare create(sendbuf_sf, recvbuf_sf, sendbuf_tensor, recvbuf_tensor, sendbuf_cons, recvbuf_cons)
 
@@ -1050,8 +1050,8 @@ contains
 
         !$acc update host(sendbuf_sf)
 
-        call MPI_Alltoall(sendbuf_sf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
-                          recvbuf_sf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
+        call MPI_Alltoall(sendbuf_sf, NxC*Nyloc*Nzloc, MPI_COMPLEX, & 
+                          recvbuf_sf, NxC*Nyloc*Nzloc, MPI_COMPLEX, MPI_COMM_WORLD, ierr)
 
         !$acc update device(recvbuf_sf)
 
@@ -1086,8 +1086,8 @@ contains
 
         !$acc update host(sendbuf_sf)
 
-        call MPI_Alltoall(sendbuf_sf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
-                          recvbuf_sf, NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
+        call MPI_Alltoall(sendbuf_sf, NxC*Nyloc*Nzloc, MPI_COMPLEX, & 
+                          recvbuf_sf, NxC*Nyloc*Nzloc, MPI_COMPLEX, MPI_COMM_WORLD, ierr)
 
         !$acc update device(recvbuf_sf)
 
@@ -1124,8 +1124,8 @@ contains
 
         !$acc update host(sendbuf_tensor)
 
-        call MPI_Alltoall(sendbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
-                          recvbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
+        call MPI_Alltoall(sendbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_COMPLEX, & 
+                          recvbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_COMPLEX, MPI_COMM_WORLD, ierr)
 
         !$acc update device(recvbuf_tensor)
 
@@ -1164,8 +1164,8 @@ contains
 
         !$acc update host(sendbuf_tensor)
 
-        call MPI_Alltoall(sendbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
-                          recvbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
+        call MPI_Alltoall(sendbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_COMPLEX, & 
+                          recvbuf_tensor, 9*NxC*Nyloc*Nzloc, MPI_COMPLEX, MPI_COMM_WORLD, ierr)
 
         !$acc update device(recvbuf_tensor)
 
@@ -1204,8 +1204,8 @@ contains
 
         !$acc update host(sendbuf_cons)
 
-        call MPI_Alltoall(sendbuf_cons, 5*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
-                          recvbuf_cons, 5*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
+        call MPI_Alltoall(sendbuf_cons, 5*NxC*Nyloc*Nzloc, MPI_COMPLEX, & 
+                          recvbuf_cons, 5*NxC*Nyloc*Nzloc, MPI_COMPLEX, MPI_COMM_WORLD, ierr)
 
         !$acc update device(recvbuf_cons)
 
@@ -1244,8 +1244,8 @@ contains
 
         !$acc update host(sendbuf_cons)
 
-        call MPI_Alltoall(sendbuf_cons, 5*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, & 
-                          recvbuf_cons, 5*NxC*Nyloc*Nzloc, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
+        call MPI_Alltoall(sendbuf_cons, 5*NxC*Nyloc*Nzloc, MPI_COMPLEX, & 
+                          recvbuf_cons, 5*NxC*Nyloc*Nzloc, MPI_COMPLEX, MPI_COMM_WORLD, ierr)
 
         !$acc update device(recvbuf_cons)
 
