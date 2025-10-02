@@ -290,6 +290,8 @@ module m_derived_types
         real(wp) :: x_centroid, y_centroid, z_centroid !<
         !! Location of the geometric center, i.e. the centroid, of the patch. It
         !! is specified through its x-, y- and z-coordinates, respectively.
+        real(wp) :: step_x_centroid, step_y_centroid, step_z_centroid !<
+        !! Centroid locations of intermediate steps in the time_stepper module
 
         real(wp) :: c, p, t, m
 
@@ -322,6 +324,7 @@ module m_derived_types
         !! Patch conditions for moving imersed boundaries
         integer :: moving_ibm ! 0 for no moving, 1 for moving, 2 for moving on forced path
         real(wp), dimension(1:3) :: vel
+        real(wp), dimension(1:3) :: step_vel ! velcoity array used to store intermediate steps in the time_stepper module
 
     end type ib_patch_parameters
 

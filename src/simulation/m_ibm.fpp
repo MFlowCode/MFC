@@ -929,12 +929,6 @@ contains
         ! Clears the existing immersed boundary indices
         ib_markers%sf = 0
 
-        do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm /= 0) then
-                call s_propagate_mib(i)  ! TODO :: THIS IS DONE TERRIBLY WITH EULER METHOD
-            end if
-        end do
-
         ! recompute the new ib_patch locations and broadcast them.
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
         call s_populate_ib_buffers() ! transmits the new IB markers via MPI

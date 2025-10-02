@@ -1135,10 +1135,6 @@ contains
             end do
         end if
 
-        if (moving_immersed_boundary_flag) then
-            call s_update_mib(num_ibs, levelset, levelset_norm)
-        end if
-
         call s_compute_derived_variables(t_step)
 
 
