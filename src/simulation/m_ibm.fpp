@@ -897,24 +897,45 @@ contains
     end subroutine s_interpolate_image_point
 
     !> Subroutine the updates the moving imersed boundary positions via Euler's method
-    impure subroutine s_propagate_mib(patch_id)
+    impure subroutine s_update_mib_rotation_matrix(patch_id)
 
         integer, intent(in) :: patch_id
         integer :: i
 
-        ! start by using euler's method naiively, but eventually incorporate more sophistocation
-        if (patch_ib(patch_id)%moving_ibm == 1) then
-            ! this continues with euler's method, which is obviously not that great and we need to add acceleration
-            do i = 1, 3
-                patch_ib(patch_id)%vel(i) = patch_ib(patch_id)%vel(i) + 0.0*dt ! TODO :: ADD EXTERNAL FORCES HERE
-            end do
+        real(wp), dimension(3, 3, 3) :: rotation
+        real(wp) :: angle
 
-            patch_ib(patch_id)%x_centroid = patch_ib(patch_id)%x_centroid + patch_ib(patch_id)%vel(1)*dt
-            patch_ib(patch_id)%y_centroid = patch_ib(patch_id)%y_centroid + patch_ib(patch_id)%vel(2)*dt
-            patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid + patch_ib(patch_id)%vel(3)*dt
+        ! construct the x, y, and z rotation matrices
+        if (num_dims == 3) then
+          ! also compute the x and y axes in 3D
+          angle = patch_ib(patch_id)%angles(1)
+          rotation(1, 1, :) = (1._wp, 0._wp     , 0._wp      )
+          rotation(1, 2, :) = (0._wp, cos(angle), -sin(angle))
+          rotation(1, 3, :) = (0._wp, sin(angle), cos(angle) )
+
+          angle = patch_ib(patch_id)%angles(2)
+          rotation(2, 1, :) = (cos(angle) , 0._wp, sin(angle))
+          rotation(2, 2, :) = (0._wp      , 1._wp, 0._wp     )
+          rotation(2, 3, :) = (-sin(angle), 0._wp, cos(angle))
+
+          ! apply the y rotation to the x rotation
+          rotation(1, :, :) = matmul(rotation(1, :, :), rotation(2, :, :))
+        end if
+        ! z component first, since it applies in 2D and 3D
+        angle = patch_ib(patch_id)%angles(3)
+        rotation(3, 1, :) = (cos(angle), -sin(angle), 0._wp)
+        rotation(3, 2, :) = (sin(angle), cos(angle) , 0._wp)
+        rotation(3, 3, :) = (0._wp     , 0._wp      , 1._wp)
+
+        if (num_dims == 3) then
+          ! apply the z rotation to the xy rotation in 3D
+          patch_ib(patch_id)%rotation_matrix(:, :) = matmul(rotation(1, :, :), rotation(3, :, :))
+        else
+          ! write out only the z rotation in 2D
+          patch_ib(patch_id)%rotation_matrix(:, :) = rotation(3, :, :)
         end if
 
-    end subroutine s_propagate_mib
+    end subroutine s_update_mib_rotation_matrix
 
     !> Resets the current indexes of immersed boundaries and replaces them after updating
     !> the position of each moving immersed boundary
