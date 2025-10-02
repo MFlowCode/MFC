@@ -182,6 +182,8 @@ contains
         real(wp), dimension(3) :: norm !< Normal vector from GP to IP
         real(wp), dimension(3) :: physical_loc !< Physical loc of GP
         real(wp), dimension(3) :: vel_g !< Velocity of GP
+        real(wp), dimension(3) :: radial_vector !< vector from centroid to ghost point
+        real(wp), dimension(3) :: rotation_velocity !< speed of the ghost point due to rotation
 
         real(wp) :: nbub
         real(wp) :: buf
@@ -265,9 +267,13 @@ contains
                     ! we know the object is not moving if moving_ibm is 0 (false)
                     vel_g = 0._wp
                 else
+                    radial_vector = physical_loc - (patch_ib(patch_id)%x_centroid, &
+                        patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid)
+                    rotational_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
                     do q = 1, 3
                         ! if mibm is 1 or 2, then the boundary may be moving
-                        vel_g(q) = patch_ib(patch_id)%vel(q)
+                        vel_g(q) = patch_ib(patch_id)%vel(q) ! add the linear velocity
+                        vel_g(q) = vel_g(q) + rotational_velocity(q) ! add the rotational velocity
                     end do
                 end if
             end if
@@ -977,5 +983,15 @@ contains
         @:DEALLOCATE(levelset_norm%sf)
 
     end subroutine s_finalize_ibm_module
+
+    function cross_product(a, b) result(c)
+      implicit none
+      real(8), intent(in) :: a(3), b(3)
+      real(8) :: c(3)
+
+      c(1) = a(2)*b(3) - a(3)*b(2)
+      c(2) = a(3)*b(1) - a(1)*b(3)
+      c(3) = a(1)*b(2) - a(2)*b(1)
+    end function cross_product
 
 end module m_ibm
