@@ -979,11 +979,10 @@ contains
         if (ib) then
             if (moving_immersed_boundary_flag) then
               do i = 1, num_ibs
-                ! start by using euler's method naiively, but eventually incorporate more sophistocation
                 if (patch_ib(i)%moving_ibm == 1) then
                     patch_ib(i)%step_vel = patch_ib(i)%vel
                     do j = 1, 3
-                        patch_ib(i)%vel(j) = patch_ib(i)%step_vel(j) + 0.0*dt ! TODO :: ADD EXTERNAL FORCES HERE
+                        patch_ib(i)%vel(j) = patch_ib(i)%step_vel(j) + 0.0*dt
                     end do
 
                     patch_ib(i)%step_x_centroid = patch_ib(i)%x_centroid
@@ -1093,11 +1092,9 @@ contains
         if (ib) then
             if (moving_immersed_boundary_flag) then
               do i = 1, num_ibs
-                ! start by using euler's method naiively, but eventually incorporate more sophistocation
                 if (patch_ib(i)%moving_ibm == 1) then
-                    ! patch_ib(i)%step_vel = patch_ib(i)%vel
                     do j = 1, 3
-                        patch_ib(i)%vel(j) = patch_ib(i)%step_vel(j) + 0.0*dt ! TODO :: ADD EXTERNAL FORCES HERE
+                        patch_ib(i)%vel(j) = (patch_ib(i)%vel(j) + 3._wp*patch_ib(i)%step_vel(j) + 0.0*dt)/4._wp
                     end do
 
                     patch_ib(i)%x_centroid = (patch_ib(i)%x_centroid + 3._wp*patch_ib(i)%step_x_centroid + patch_ib(i)%vel(1)*dt)/4._wp
@@ -1207,10 +1204,9 @@ contains
         if (ib) then
             if (moving_immersed_boundary_flag) then
               do i = 1, num_ibs
-                ! start by using euler's method naiively, but eventually incorporate more sophistocation
                 if (patch_ib(i)%moving_ibm == 1) then
                     do j = 1, 3
-                        patch_ib(i)%vel(j) = patch_ib(i)%step_vel(j) + 0.0*dt ! TODO :: ADD EXTERNAL FORCES HERE
+                        patch_ib(i)%vel(j) = (2._wp*patch_ib(i)%vel(j) + patch_ib(i)%step_vel(j) + 0.0*dt)/3._wp
                     end do
 
                     patch_ib(i)%x_centroid = (2._wp*patch_ib(i)%x_centroid + patch_ib(i)%step_x_centroid + 2._wp*patch_ib(i)%vel(1)*dt)/3._wp

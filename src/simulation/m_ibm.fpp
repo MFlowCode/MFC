@@ -116,8 +116,8 @@ contains
         call s_mpi_allreduce_integer_sum(num_inner_gps, max_num_inner_gps)
 
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
-        @:ALLOCATE(ghost_points(1:int(max_num_gps * 1.2)))
-        @:ALLOCATE(inner_points(1:int(max_num_inner_gps * 1.2)))
+        @:ALLOCATE(ghost_points(1:int(max_num_gps * 1.5)))
+        @:ALLOCATE(inner_points(1:int(max_num_inner_gps * 1.5)))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
 
