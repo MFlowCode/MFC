@@ -295,6 +295,7 @@ module m_derived_types
 
         real(wp), dimension(1:3) :: angles
         real(wp), dimension(1:3) :: step_angles
+        real(wp), dimension(3:3) :: rotaiton_matrix !< matrix that converts from IB reference frame to fluid reference frame
 
         real(wp) :: c, p, t, m
 
