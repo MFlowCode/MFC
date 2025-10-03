@@ -10,6 +10,7 @@ if [ "$job_device" = "gpu" ]; then
       build_opts+=" acc"
   elif [ "$job_interface" = "omp" ]; then
       build_opts+=" mp"
+      exit 0
   fi
 fi
 
