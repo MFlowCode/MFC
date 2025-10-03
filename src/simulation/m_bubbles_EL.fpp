@@ -1518,7 +1518,7 @@ contains
         lsizes(1) = max(1, bub_id)
         lsizes(2) = 21
 
-        ! if the partcle number is zero, put 1 since MPI cannot deal with writing
+        ! if the particle number is zero, put 1 since MPI cannot deal with writing
         ! zero particle
         part_order(:) = 1
         part_order(proc_rank + 1) = max(1, bub_id)
