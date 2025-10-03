@@ -1642,7 +1642,7 @@ contains
         integer :: q
 
         if (chemistry) then
-            if (avg_state == 1 .and. abs(c_c) > Chem_Tolerance) then
+            if (avg_state == 1 .and. abs(c_c) > verysmall) then
                 c = sqrt(c_c - (gamma - 1.0_wp)*(vel_sum - H))
             else
                 c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
