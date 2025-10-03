@@ -1566,38 +1566,38 @@ contains
 
             if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
                 #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            if (surface_tension .or. viscous) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = momxb, E_idx
-                                    rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
-                                        (flux_src_n_in(i)%sf(j - 1, k, l) &
-                                         - flux_src_n_in(i)%sf(j, k, l))
-                                end do
-                            end if
-
-                            if (chem_params%diffusion) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = chemxb, chemxe
-                                    rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
-                                        (flux_src_n_in(i)%sf(j - 1, k, l) &
-                                         - flux_src_n_in(i)%sf(j, k, l))
-                                end do
-
-                                if (.not. viscous) then
-                                    rhs_vf(E_idx)%sf(j, k, l) = &
-                                        rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dx(j)* &
-                                        (flux_src_n_in(E_idx)%sf(j - 1, k, l) &
-                                         - flux_src_n_in(E_idx)%sf(j, k, l))
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                if (surface_tension .or. viscous) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = momxb, E_idx
+                                        rhs_vf(i)%sf(j, k, l) = &
+                                            rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
+                                            (flux_src_n_in(i)%sf(j - 1, k, l) &
+                                             - flux_src_n_in(i)%sf(j, k, l))
+                                    end do
                                 end if
-                            end if
+
+                                if (chem_params%diffusion) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = chemxb, chemxe
+                                        rhs_vf(i)%sf(j, k, l) = &
+                                            rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
+                                            (flux_src_n_in(i)%sf(j - 1, k, l) &
+                                             - flux_src_n_in(i)%sf(j, k, l))
+                                    end do
+
+                                    if (.not. viscous) then
+                                        rhs_vf(E_idx)%sf(j, k, l) = &
+                                            rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dx(j)* &
+                                            (flux_src_n_in(E_idx)%sf(j - 1, k, l) &
+                                             - flux_src_n_in(E_idx)%sf(j, k, l))
+                                    end if
+                                end if
+                            end do
                         end do
                     end do
-                end do
                 #:endcall GPU_PARALLEL_LOOP
             end if
 
@@ -1673,37 +1673,37 @@ contains
 
                 if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
                     #:call GPU_PARALLEL_LOOP(collapse=3)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                if (surface_tension .or. viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = momxb, E_idx
-                                        rhs_vf(i)%sf(j, k, l) = &
-                                            rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
-                                            (flux_src_n_in(i)%sf(j, k - 1, l) &
-                                             - flux_src_n_in(i)%sf(j, k, l))
-                                    end do
-                                end if
-
-                                if (chem_params%diffusion) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = chemxb, chemxe
-                                        rhs_vf(i)%sf(j, k, l) = &
-                                            rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
-                                            (flux_src_n_in(i)%sf(j, k - 1, l) &
-                                             - flux_src_n_in(i)%sf(j, k, l))
-                                    end do
-                                    if (.not. viscous) then
-                                        rhs_vf(E_idx)%sf(j, k, l) = &
-                                            rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dy(k)* &
-                                            (flux_src_n_in(E_idx)%sf(j, k - 1, l) &
-                                             - flux_src_n_in(E_idx)%sf(j, k, l))
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    if (surface_tension .or. viscous) then
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = momxb, E_idx
+                                            rhs_vf(i)%sf(j, k, l) = &
+                                                rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
+                                                (flux_src_n_in(i)%sf(j, k - 1, l) &
+                                                 - flux_src_n_in(i)%sf(j, k, l))
+                                        end do
                                     end if
-                                end if
+
+                                    if (chem_params%diffusion) then
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = chemxb, chemxe
+                                            rhs_vf(i)%sf(j, k, l) = &
+                                                rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
+                                                (flux_src_n_in(i)%sf(j, k - 1, l) &
+                                                 - flux_src_n_in(i)%sf(j, k, l))
+                                        end do
+                                        if (.not. viscous) then
+                                            rhs_vf(E_idx)%sf(j, k, l) = &
+                                                rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dy(k)* &
+                                                (flux_src_n_in(E_idx)%sf(j, k - 1, l) &
+                                                 - flux_src_n_in(E_idx)%sf(j, k, l))
+                                        end if
+                                    end if
+                                end do
                             end do
                         end do
-                    end do
                     #:endcall GPU_PARALLEL_LOOP
                 end if
             end if
@@ -1782,19 +1782,19 @@ contains
             end if
 
             #:call GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = momxb, E_idx
-                            rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
-                                (flux_src_n_in(i)%sf(j, k, l - 1) &
-                                 - flux_src_n_in(i)%sf(j, k, l))
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = momxb, E_idx
+                                rhs_vf(i)%sf(j, k, l) = &
+                                    rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
+                                    (flux_src_n_in(i)%sf(j, k, l - 1) &
+                                     - flux_src_n_in(i)%sf(j, k, l))
+                            end do
                         end do
                     end do
                 end do
-            end do
             #:endcall GPU_PARALLEL_LOOP
 
             if (grid_geometry == 3) then
