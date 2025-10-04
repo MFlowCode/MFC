@@ -328,6 +328,13 @@ macro(HANDLE_SOURCES target useCommon)
                                                "${CMAKE_BINARY_DIR}/modules/${target}/*.fpp")
     if (${useCommon})
         file(GLOB common_FPPs CONFIGURE_DEPENDS "${common_DIR}/*.fpp")
+
+        # If we're building post_process, exclude m_compute_levelset.fpp
+        if("${target}" STREQUAL "post_process")
+            list(FILTER common_FPPs EXCLUDE REGEX ".*/m_compute_levelset\.fpp$")
+            list(FILTER common_FPPs EXCLUDE REGEX ".*/m_ib_patches\.fpp$")
+        endif()
+
         list(APPEND ${target}_FPPs ${common_FPPs})
     endif()
 
@@ -443,7 +450,7 @@ function(MFC_SETUP_TARGET)
 
         if (ARGS_SILO)
             find_package(SILO REQUIRED)
-            target_link_libraries(${a_target} PRIVATE SILO::SILO)
+            target_link_libraries(${a_target} PRIVATE SILO::SILO stdc++)
         endif()
 
         if (ARGS_HDF5)

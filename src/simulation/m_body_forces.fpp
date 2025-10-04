@@ -26,7 +26,7 @@ module m_body_forces
 
 contains
 
-    !> This subroutine inializes the module global array of mixture
+    !> This subroutine initializes the module global array of mixture
     !! densities in each grid cell
     impure subroutine s_initialize_body_forces_module
 

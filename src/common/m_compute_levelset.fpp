@@ -300,6 +300,7 @@ contains
                         end if
                     end do
 
+                    ! TODO :: This entire if/else tree can be simplified by just calling arrays by idx index
                     if (idx == 1) then
                         levelset%sf(i, j, 0, ib_patch_id) = side_dists(1)
                         if (f_approx_equal(side_dists(1), 0._wp)) then

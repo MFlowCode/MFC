@@ -165,7 +165,7 @@ contains
                         ! depleting the mass of liquid
                         q_cons_vf(lp + contxb - 1)%sf(j, k, l) = mixM*rM
 
-                        ! tranferring the total mass to vapor
+                        ! transferring the total mass to vapor
                         q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
 
                         ! calling pT-equilibrium for overheated vapor, which is MFL = 0
@@ -175,7 +175,7 @@ contains
                         call s_TSat(pSOV, TSatOV, TSOV)
 
                         ! subcooled liquid case
-                        ! tranferring the total mass to liquid
+                        ! transferring the total mass to liquid
                         q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
 
                         ! depleting the mass of vapor

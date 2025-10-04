@@ -31,7 +31,7 @@ Note: Ordering is not guaranteed or stable, so use key-value pairing when using 
 
 - Data on the GPU has a reference counter
 - When data is referred to being allocated, it means that GPU memory is allocated if it is not already present in GPU memory. If a variable is already present, the reference counter is just incremented.
-- When data is referred to being dellocated, it means that the reference counter is decremented. If the reference counter is zero, then the data is actually deallocated from GPU memory
+- When data is referred to being deallocated, it means that the reference counter is decremented. If the reference counter is zero, then the data is actually deallocated from GPU memory
 - When data is referred to being attached, it means that the device pointer attaches to target if it not already attached. If pointer is already attached, then the attachment counter is just incremented
 - When data is referred to being detached, it means that the attachment counter is decremented. If attachment counter is zero, then actually detached
 

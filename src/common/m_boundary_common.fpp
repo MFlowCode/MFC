@@ -3,7 +3,7 @@
 !! @brief Contains module m_boundary_conditions_common
 
 !> @brief The purpose of the module is to apply noncharacteristic and processor
-!! boundary condiitons
+!! boundary conditions
 
 #:include 'macros.fpp'
 

@@ -27,7 +27,9 @@ module m_initial_condition
     use m_variables_conversion  ! Subroutines to change the state variables from
     ! one form to another
 
-    use m_patches
+    use m_ib_patches
+
+    use m_icpp_patches
 
     use m_assign_variables
 
@@ -188,10 +190,9 @@ contains
         end if
 
         if (ib) then
-            call s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers%sf, levelset, levelset_norm)
-        else
-            call s_apply_domain_patches(patch_id_fp, q_prim_vf)
+            call s_apply_ib_patches(ib_markers%sf, levelset, levelset_norm)
         end if
+        call s_apply_icpp_patches(patch_id_fp, q_prim_vf)
 
         if (num_bc_patches > 0) call s_apply_boundary_patches(q_prim_vf, bc_type)
 
