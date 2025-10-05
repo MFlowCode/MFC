@@ -38,8 +38,8 @@ dependencies = [
 
     # Chemistry
     "cantera==3.1.0",
-    "pyrometheus == 1.0.3",
-
+    "pyrometheus == 1.0.5",
+    
     # Frontier Profiling
     "astunparse==1.6.2",
     "colorlover",

@@ -70,8 +70,8 @@ case = {
     "mapped_weno": "T",
     "mp_weno": "T",
     "riemann_solver": 2,
-    "wave_speeds": 2,
-    "avg_state": 1,
+    "wave_speeds": 1,
+    "avg_state": 2,
     "bc_x%beg": -2,
     "bc_x%end": -3,
     # Chemistry

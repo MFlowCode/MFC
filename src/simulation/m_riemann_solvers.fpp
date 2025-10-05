@@ -646,6 +646,9 @@ contains
                             end if
 
                             if (viscous) then
+                                if (chemistry) then
+                                    call compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L(1), Re_R(1))
+                                end if
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, 2
                                     Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2._wp/(1._wp/Re_L(i) + 1._wp/Re_R(i))
@@ -2342,6 +2345,9 @@ contains
                                                               vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
                                 if (viscous) then
+                                    if (chemistry) then
+                                        call compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L(1), Re_R(1))
+                                    end if
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, 2
                                         Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2._wp/(1._wp/Re_L(i) + 1._wp/Re_R(i))
@@ -3408,6 +3414,21 @@ contains
                 end do
             end if
 
+            if (chem_params%diffusion) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = E_idx, chemxe
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                if (i == E_idx .or. i >= chemxb) then
+                                    flux_src_vf(i)%sf(j, k, l) = 0._wp
+                                end if
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
             if (qbmm) then
 
                 $:GPU_PARALLEL_LOOP(collapse=4)
@@ -3438,6 +3459,21 @@ contains
                 end do
             end if
 
+            if (chem_params%diffusion) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = E_idx, chemxe
+                    do l = is3%beg, is3%end
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                if (i == E_idx .or. i >= chemxb) then
+                                    flux_src_vf(i)%sf(k, j, l) = 0._wp
+                                end if
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
             if (qbmm) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, 4
@@ -3461,6 +3497,21 @@ contains
                         do k = is2%beg, is2%end
                             do l = is3%beg, is3%end
                                 flux_src_vf(i)%sf(l, k, j) = 0._wp
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if (chem_params%diffusion) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = E_idx, chemxe
+                    do j = is1%beg, is1%end
+                        do k = is2%beg, is2%end
+                            do l = is3%beg, is3%end
+                                if (i == E_idx .or. i >= chemxb) then
+                                    flux_src_vf(i)%sf(l, k, j) = 0._wp
+                                end if
                             end do
                         end do
                     end do
