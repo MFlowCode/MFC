@@ -28,7 +28,9 @@ module m_start_up
 
     use m_compile_specific      !< Compile-specific procedures
 
-    use m_patches
+    use m_ib_patches
+
+    use m_icpp_patches
 
     use m_assign_variables
 
