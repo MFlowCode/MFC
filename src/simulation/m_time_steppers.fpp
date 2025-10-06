@@ -543,7 +543,7 @@ contains
                         do k = 0, n
                             do j = 0, m
                                 do q = 1, nnode
-                                    if (s == 1 .and. time_stepper /= 1) then
+                                    if (s == 1 .and. nstage > 1) then
                                         pb_ts(stor)%sf(j, k, l, q, i) = &
                                             pb_ts(1)%sf(j, k, l, q, i)
                                         mv_ts(stor)%sf(j, k, l, q, i) = &
