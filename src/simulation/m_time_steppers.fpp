@@ -442,36 +442,36 @@ contains
         end do
 
         if (any(time_stepper == (/1, 2, 3/))) then
-          ! Time stepper index
-          if (time_stepper == 1) then
-            stor = 1
-          else
-            stor = 2
-          end if
+            ! Time stepper index
+            if (time_stepper == 1) then
+                stor = 1
+            else
+                stor = 2
+            end if
 
-          @:ALLOCATE (rk_coef(time_stepper, 3))
-          if (time_stepper == 1) then
-            rk_coef(1, 1) = 1._wp
-            rk_coef(1, 2) = 0._wp
-            rk_coef(1, 3) = 1._wp
-          else if (time_stepper == 2) then
-            rk_coef(1, 1) = 1._wp
-            rk_coef(1, 2) = 0._wp
-            rk_coef(1, 3) = 1._wp
-            rk_coef(2, 1) = 0.5_wp
-            rk_coef(2, 2) = 0.5_wp
-            rk_coef(2, 3) = 0.5_wp
-          else if (time_stepper == 3) then
-            rk_coef(1, 1) = 1._wp
-            rk_coef(1, 2) = 0._wp
-            rk_coef(1, 3) = 1._wp
-            rk_coef(2, 1) = 1._wp/4._wp
-            rk_coef(2, 2) = 3._wp/4._wp
-            rk_coef(2, 3) = 1._wp/4._wp
-            rk_coef(3, 1) = 2._wp/3._wp
-            rk_coef(3, 2) = 1._wp/3._wp
-            rk_coef(3, 3) = 2._wp/3._wp
-          end if
+            @:ALLOCATE (rk_coef(time_stepper, 3))
+            if (time_stepper == 1) then
+                rk_coef(1, 1) = 1._wp
+                rk_coef(1, 2) = 0._wp
+                rk_coef(1, 3) = 1._wp
+            else if (time_stepper == 2) then
+                rk_coef(1, 1) = 1._wp
+                rk_coef(1, 2) = 0._wp
+                rk_coef(1, 3) = 1._wp
+                rk_coef(2, 1) = 0.5_wp
+                rk_coef(2, 2) = 0.5_wp
+                rk_coef(2, 3) = 0.5_wp
+            else if (time_stepper == 3) then
+                rk_coef(1, 1) = 1._wp
+                rk_coef(1, 2) = 0._wp
+                rk_coef(1, 3) = 1._wp
+                rk_coef(2, 1) = 1._wp/4._wp
+                rk_coef(2, 2) = 3._wp/4._wp
+                rk_coef(2, 3) = 1._wp/4._wp
+                rk_coef(3, 1) = 2._wp/3._wp
+                rk_coef(3, 2) = 1._wp/3._wp
+                rk_coef(3, 3) = 2._wp/3._wp
+            end if
         end if
 
     end subroutine s_initialize_time_steppers_module
@@ -491,7 +491,7 @@ contains
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
 
-        ! Adaptive dt: initial stage 
+        ! Adaptive dt: initial stage
         if (adap_dt) call s_adaptive_dt_bubble(1)
 
         do s = 1, nstage
@@ -523,13 +523,13 @@ contains
                     do k = 0, n
                         do j = 0, m
                             if (s == 1 .and. time_stepper /= 1) then
-                              q_cons_ts(stor)%vf(i)%sf(j, k, l) = &
-                                  q_cons_ts(1)%vf(i)%sf(j, k, l)
+                                q_cons_ts(stor)%vf(i)%sf(j, k, l) = &
+                                    q_cons_ts(1)%vf(i)%sf(j, k, l)
                             end if
                             q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                                 rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                              + rk_coef(s, 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) &
-                              + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l)
+                                + rk_coef(s, 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) &
+                                + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
@@ -544,17 +544,17 @@ contains
                             do j = 0, m
                                 do q = 1, nnode
                                     if (s == 1 .and. time_stepper /= 1) then
-                                      pb_ts(stor)%sf(j, k, l, q, i) = &
-                                        pb_ts(1)%sf(j, k, l, q, i)
-                                      mv_ts(stor)%sf(j, k, l, q, i) = &
-                                        mv_ts(1)%sf(j, k, l, q, i)
+                                        pb_ts(stor)%sf(j, k, l, q, i) = &
+                                            pb_ts(1)%sf(j, k, l, q, i)
+                                        mv_ts(stor)%sf(j, k, l, q, i) = &
+                                            mv_ts(1)%sf(j, k, l, q, i)
                                     end if
                                     pb_ts(1)%sf(j, k, l, q, i) = &
-                                          rk_coef(s, 1)*pb_ts(1)%sf(j, k, l, q, i) &
+                                        rk_coef(s, 1)*pb_ts(1)%sf(j, k, l, q, i) &
                                         + rk_coef(s, 2)*pb_ts(stor)%sf(j, k, l, q, i) &
                                         + rk_coef(s, 3)*dt*rhs_pb(j, k, l, q, i)
                                     mv_ts(1)%sf(j, k, l, q, i) = &
-                                          rk_coef(s, 1)*mv_ts(1)%sf(j, k, l, q, i) &
+                                        rk_coef(s, 1)*mv_ts(1)%sf(j, k, l, q, i) &
                                         + rk_coef(s, 2)*mv_ts(stor)%sf(j, k, l, q, i) &
                                         + rk_coef(s, 3)*dt*rhs_mv(j, k, l, q, i)
                                 end do
@@ -583,7 +583,7 @@ contains
             end if
         end do
 
-        ! Adaptive dt: final stage 
+        ! Adaptive dt: final stage
         if (adap_dt) call s_adaptive_dt_bubble(3)
 
         call nvtxEndRange
