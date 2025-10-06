@@ -522,7 +522,7 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            if (s == 1 .and. time_stepper /= 1) then
+                            if (s == 1 .and. nstage > 1) then
                                 q_cons_ts(stor)%vf(i)%sf(j, k, l) = &
                                     q_cons_ts(1)%vf(i)%sf(j, k, l)
                             end if
