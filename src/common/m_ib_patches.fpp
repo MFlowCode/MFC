@@ -512,6 +512,8 @@ contains
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
+        real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -522,13 +524,14 @@ contains
         y_centroid = patch_ib(patch_id)%y_centroid
         length_x = patch_ib(patch_id)%length_x
         length_y = patch_ib(patch_id)%length_y
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! Computing the beginning and the end x- and y-coordinates of the
         ! rectangle based on its centroid and lengths
-        x_boundary%beg = x_centroid - 0.5_wp*length_x
-        x_boundary%end = x_centroid + 0.5_wp*length_x
-        y_boundary%beg = y_centroid - 0.5_wp*length_y
-        y_boundary%end = y_centroid + 0.5_wp*length_y
+        x_boundary%beg = -0.5_wp*length_x
+        x_boundary%end =  0.5_wp*length_x
+        y_boundary%beg = -0.5_wp*length_y
+        y_boundary%end =  0.5_wp*length_y
 
         ! Since the rectangular patch does not allow for its boundaries to
         ! be smoothed out, the pseudo volume fraction is set to 1 to ensure
@@ -542,10 +545,13 @@ contains
         ! variables of the current patch are assigned to this cell.
         do j = 0, n
             do i = 0, m
-                if (x_boundary%beg <= x_cc(i) .and. &
-                    x_boundary%end >= x_cc(i) .and. &
-                    y_boundary%beg <= y_cc(j) .and. &
-                    y_boundary%end >= y_cc(j)) then
+                ! get the x and y coodinates in the local IB frame
+                xy_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid]
+                xy_local = matmul(inverse_rotation, xy_local)
+                if (x_boundary%beg <= xy_local(1) .and. &
+                    x_boundary%end >= xy_local(1) .and. &
+                    y_boundary%beg <= xy_local(2) .and. &
+                    y_boundary%end >= xy_local(2)) then
 
                     ! Updating the patch identities bookkeeping variable
                     ib_markers_sf(i, j, 0) = patch_id

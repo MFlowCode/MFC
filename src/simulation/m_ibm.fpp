@@ -94,8 +94,9 @@ contains
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
                 moving_immersed_boundary_flag = .true.
-                exit
+                
             end if
+            call s_update_ib_rotation_matrix(i)
         end do
 
         ! Allocating the patch identities bookkeeping variable
@@ -149,7 +150,7 @@ contains
         !!  @param q_prim_vf Primitive variables
         !!  @param pb Internal bubble pressure
         !!  @param mv Mass of vapor in bubble
-    pure subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
+    subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -267,13 +268,15 @@ contains
                     ! we know the object is not moving if moving_ibm is 0 (false)
                     vel_g = 0._wp
                 else
-                    radial_vector = physical_loc - (patch_ib(patch_id)%x_centroid, &
-                        patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid)
-                    rotational_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
+                    ! get the vector that points from the centroid to the ghost
+                    radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
+                        patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
+                    ! convert the angular velcoity from the inertial reference frame to the fluids frame, then convert to linear velocity
+                    rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
                     do q = 1, 3
                         ! if mibm is 1 or 2, then the boundary may be moving
                         vel_g(q) = patch_ib(patch_id)%vel(q) ! add the linear velocity
-                        vel_g(q) = vel_g(q) + rotational_velocity(q) ! add the rotational velocity
+                        vel_g(q) = vel_g(q) + rotation_velocity(q) ! add the rotational velocity
                     end do
                 end if
             end if
@@ -902,8 +905,8 @@ contains
 
     end subroutine s_interpolate_image_point
 
-    !> Subroutine the updates the moving imersed boundary positions via Euler's method
-    impure subroutine s_update_mib_rotation_matrix(patch_id)
+    !> Subroutine that computes a rotation matrix for converting to the rotating frame of the boundary
+    impure subroutine s_update_ib_rotation_matrix(patch_id)
 
         integer, intent(in) :: patch_id
         integer :: i
@@ -915,33 +918,36 @@ contains
         if (num_dims == 3) then
           ! also compute the x and y axes in 3D
           angle = patch_ib(patch_id)%angles(1)
-          rotation(1, 1, :) = (1._wp, 0._wp     , 0._wp      )
-          rotation(1, 2, :) = (0._wp, cos(angle), -sin(angle))
-          rotation(1, 3, :) = (0._wp, sin(angle), cos(angle) )
+          rotation(1, 1, :) = [1._wp, 0._wp     , 0._wp      ]
+          rotation(1, 2, :) = [0._wp, cos(angle), -sin(angle)]
+          rotation(1, 3, :) = [0._wp, sin(angle), cos(angle) ]
 
           angle = patch_ib(patch_id)%angles(2)
-          rotation(2, 1, :) = (cos(angle) , 0._wp, sin(angle))
-          rotation(2, 2, :) = (0._wp      , 1._wp, 0._wp     )
-          rotation(2, 3, :) = (-sin(angle), 0._wp, cos(angle))
+          rotation(2, 1, :) = [cos(angle) , 0._wp, sin(angle)]
+          rotation(2, 2, :) = [0._wp      , 1._wp, 0._wp     ]
+          rotation(2, 3, :) = [-sin(angle), 0._wp, cos(angle)]
 
           ! apply the y rotation to the x rotation
-          rotation(1, :, :) = matmul(rotation(1, :, :), rotation(2, :, :))
+          patch_ib(patch_id)%rotation_matrix(:, :) = matmul(rotation(1, :, :), rotation(2, :, :))
+          patch_ib(patch_id)%rotation_matrix_inverse(:, :) = matmul(tranpose(rotation(2, :, :)), transpose(rotation(1, :, :)))
         end if
         ! z component first, since it applies in 2D and 3D
         angle = patch_ib(patch_id)%angles(3)
-        rotation(3, 1, :) = (cos(angle), -sin(angle), 0._wp)
-        rotation(3, 2, :) = (sin(angle), cos(angle) , 0._wp)
-        rotation(3, 3, :) = (0._wp     , 0._wp      , 1._wp)
+        rotation(3, 1, :) = [cos(angle), -sin(angle), 0._wp]
+        rotation(3, 2, :) = [sin(angle), cos(angle) , 0._wp]
+        rotation(3, 3, :) = [0._wp     , 0._wp      , 1._wp]
 
         if (num_dims == 3) then
           ! apply the z rotation to the xy rotation in 3D
-          patch_ib(patch_id)%rotation_matrix(:, :) = matmul(rotation(1, :, :), rotation(3, :, :))
+          patch_ib(patch_id)%rotation_matrix(:, :) = matmul(patch_ib(patch_id)%rotation_matrix(:, :), rotation(3, :, :))
+          patch_ib(patch_id)%rotation_matrix_inverse(:, :) = matmul(transpose(rotation(3, :, :)), patch_ib(patch_id)%rotation_matrix_inverse(:, :))
         else
           ! write out only the z rotation in 2D
           patch_ib(patch_id)%rotation_matrix(:, :) = rotation(3, :, :)
+          patch_ib(patch_id)%rotation_matrix_inverse(:, :) = transpose(rotation(3, :, :))
         end if
 
-    end subroutine s_update_mib_rotation_matrix
+    end subroutine s_update_ib_rotation_matrix
 
     !> Resets the current indexes of immersed boundaries and replaces them after updating
     !> the position of each moving immersed boundary

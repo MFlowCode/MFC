@@ -546,7 +546,7 @@ contains
             patch_ib(i)%angular_vel(:) = 0._wp
 
             ! sets values of a rotation matrix which can be used when calculating rotaitons
-            patch_ib(i)%rotation_matrix(:) = 0._wp
+            patch_ib(i)%rotation_matrix = 0._wp
             patch_ib(i)%rotation_matrix(1, 1) = 1._wp
             patch_ib(i)%rotation_matrix(2, 2) = 1._wp
             patch_ib(i)%rotation_matrix(3, 3) = 1._wp
