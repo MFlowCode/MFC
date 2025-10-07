@@ -17,7 +17,7 @@ if [ "$job_device" = "gpu" ]; then
 fi
 
 if [ "$job_device" = "gpu" ]; then
-    ./mfc.sh test -a --rdma-mpi --max-attempts 3 -j $ngpus $job_device -- -c frontier
+    ./mfc.sh test -a --rdma-mpi --max-attempts 3 -j $ngpus $device_opts -- -c frontier
 else
     ./mfc.sh test -a --max-attempts 3 -j 32 -- -c frontier
 fi
