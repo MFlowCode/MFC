@@ -953,8 +953,8 @@ contains
 
     function cross_product(a, b) result(c)
         implicit none
-        real(8), intent(in) :: a(3), b(3)
-        real(8) :: c(3)
+        real(wp), intent(in) :: a(3), b(3)
+        real(wp) :: c(3)
 
         c(1) = a(2)*b(3) - a(3)*b(2)
         c(2) = a(3)*b(1) - a(1)*b(3)
