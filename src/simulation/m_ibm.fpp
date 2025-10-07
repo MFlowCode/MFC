@@ -22,6 +22,10 @@ module m_ibm
 
     use m_constants
 
+    use m_compute_levelset
+
+    use m_ib_patches
+
     implicit none
 
     private :: s_compute_image_points, &
@@ -34,6 +38,7 @@ module m_ibm
  s_ibm_correct_state, &
  s_finalize_ibm_module
 
+    integer, allocatable, dimension(:, :, :) :: patch_id_fp
     type(integer_field), public :: ib_markers
     type(levelset_field), public :: levelset
     type(levelset_norm_field), public :: levelset_norm
@@ -50,6 +55,8 @@ module m_ibm
 #elif defined(MFC_OpenMP)
     $:GPU_DECLARE(create='[num_gps,num_inner_gps]')
 #endif
+    logical :: moving_immersed_boundary_flag
+
 contains
 
     !>  Allocates memory for the variables in the IBM module
@@ -84,6 +91,18 @@ contains
     impure subroutine s_ibm_setup()
 
         integer :: i, j, k
+        integer :: max_num_gps, max_num_inner_gps
+
+        moving_immersed_boundary_flag = .false.
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm /= 0) then
+                moving_immersed_boundary_flag = .true.
+                exit
+            end if
+        end do
+
+        ! Allocating the patch identities bookkeeping variable
+        allocate (patch_id_fp(0:m, 0:n, 0:p))
 
         $:GPU_UPDATE(device='[ib_markers%sf]')
         $:GPU_UPDATE(device='[levelset%sf]')
@@ -94,11 +113,14 @@ contains
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
 
+        ! find the number of ghost points and set them to be the maximum total across ranks
         call s_find_num_ghost_points(num_gps, num_inner_gps)
+        call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
+        call s_mpi_allreduce_integer_sum(num_inner_gps, max_num_inner_gps)
 
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
-        @:ALLOCATE(ghost_points(1:num_gps))
-        @:ALLOCATE(inner_points(1:num_inner_gps))
+        @:ALLOCATE(ghost_points(1:int(max_num_gps * 1.2)))
+        @:ALLOCATE(inner_points(1:int(max_num_inner_gps * 1.2)))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
 
@@ -228,16 +250,24 @@ contains
                         end if
                     end if
 
-                    ! Calculate velocity of ghost cell
-                    if (gp%slip) then
-                        norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
-                        buf = sqrt(sum(norm**2))
-                        norm = norm/buf
-                        vel_norm_IP = sum(vel_IP*norm)*norm
-                        vel_g = vel_IP - vel_norm_IP
-                    else
-                        vel_g = 0._wp
-                    end if
+            ! Calculate velocity of ghost cell
+            if (gp%slip) then
+                norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
+                buf = sqrt(sum(norm**2))
+                norm = norm/buf
+                vel_norm_IP = sum(vel_IP*norm)*norm
+                vel_g = vel_IP - vel_norm_IP
+            else
+                if (patch_ib(patch_id)%moving_ibm == 0) then
+                    ! we know the object is not moving if moving_ibm is 0 (false)
+                    vel_g = 0._wp
+                else
+                    do q = 1, 3
+                        ! if mibm is 1 or 2, then the boundary may be moving
+                        vel_g(q) = patch_ib(patch_id)%vel(q)
+                    end do
+                end if
+            end if
 
                     ! Set momentum
                     $:GPU_LOOP(parallelism='[seq]')
@@ -396,6 +426,7 @@ contains
                 end if
 
                 if (f_approx_equal(norm(dim), 0._wp)) then
+                    ! if the ghost point is almost equal to a cell location, we set it equal and continue
                     ghost_points_in(q)%ip_grid(dim) = ghost_points_in(q)%loc(dim)
                 else
                     if (norm(dim) > 0) then
@@ -410,6 +441,8 @@ contains
                                .or. temp_loc > s_cc(index + 1)))
                         index = index + dir
                         if (index < -buff_size .or. index > bound) then
+                            print *, q, index, bound, buff_size
+                            print *, "temp_loc=", temp_loc, " s_cc(index)=", s_cc(index), " s_cc(index+1)=", s_cc(index + 1)
                             print *, "Increase buff_size further in m_helper_basic (currently set to a minimum of 10)"
                             error stop "Increase buff_size"
                         end if
@@ -494,6 +527,7 @@ contains
         do i = 0, m
             do j = 0, n
                 if (p == 0) then
+                    ! 2D
                     if (ib_markers%sf(i, j, 0) /= 0) then
                         subsection_2D = ib_markers%sf( &
                                         i - gp_layers:i + gp_layers, &
@@ -503,6 +537,7 @@ contains
                             patch_id = ib_markers%sf(i, j, 0)
                             ghost_points_in(count)%ib_patch_id = &
                                 patch_id
+
                             ghost_points_in(count)%slip = patch_ib(patch_id)%slip
                             ! ghost_points(count)%rank = proc_rank
 
@@ -535,6 +570,7 @@ contains
                         end if
                     end if
                 else
+                    ! 3D
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) /= 0) then
                             subsection_3D = ib_markers%sf( &
@@ -864,6 +900,64 @@ contains
         end do
 
     end subroutine s_interpolate_image_point
+
+    !> Subroutine the updates the moving imersed boundary positions via Euler's method
+    impure subroutine s_propagate_mib(patch_id)
+
+        integer, intent(in) :: patch_id
+        integer :: i
+
+        ! start by using euler's method naiively, but eventually incorporate more sophistocation
+        if (patch_ib(patch_id)%moving_ibm == 1) then
+            ! this continues with euler's method, which is obviously not that great and we need to add acceleration
+            do i = 1, 3
+                patch_ib(patch_id)%vel(i) = patch_ib(patch_id)%vel(i) + 0.0*dt ! TODO :: ADD EXTERNAL FORCES HERE
+            end do
+
+            patch_ib(patch_id)%x_centroid = patch_ib(patch_id)%x_centroid + patch_ib(patch_id)%vel(1)*dt
+            patch_ib(patch_id)%y_centroid = patch_ib(patch_id)%y_centroid + patch_ib(patch_id)%vel(2)*dt
+            patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid + patch_ib(patch_id)%vel(3)*dt
+        end if
+
+    end subroutine s_propagate_mib
+
+    !> Resets the current indexes of immersed boundaries and replaces them after updating
+    !> the position of each moving immersed boundary
+    impure subroutine s_update_mib(num_ibs, levelset, levelset_norm)
+
+        integer, intent(in) :: num_ibs
+        type(levelset_field), intent(inout) :: levelset
+        type(levelset_norm_field), intent(inout) :: levelset_norm
+
+        integer :: i
+
+        ! Clears the existing immersed boundary indices
+        ib_markers%sf = 0
+
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm /= 0) then
+                call s_propagate_mib(i)  ! TODO :: THIS IS DONE TERRIBLY WITH EULER METHOD
+            end if
+        end do
+
+        ! recompute the new ib_patch locations and broadcast them.
+        call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
+        call s_populate_ib_buffers() ! transmits the new IB markers via MPI
+
+        ! recalculate the ghost point locations and coefficients
+        call s_find_num_ghost_points(num_gps, num_inner_gps)
+        $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
+
+        call s_find_ghost_points(ghost_points, inner_points)
+        $:GPU_UPDATE(device='[ghost_points, inner_points]')
+
+        call s_compute_image_points(ghost_points, levelset, levelset_norm)
+        $:GPU_UPDATE(device='[ghost_points]')
+
+        call s_compute_interpolation_coeffs(ghost_points)
+        $:GPU_UPDATE(device='[ghost_points]')
+
+    end subroutine s_update_mib
 
     !> Subroutine to deallocate memory reserved for the IBM module
     impure subroutine s_finalize_ibm_module()

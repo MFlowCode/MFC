@@ -162,8 +162,8 @@ contains
                             ! depleting the mass of liquid
                             q_cons_vf(lp + contxb - 1)%sf(j, k, l) = mixM*rM
 
-                            ! transferring the total mass to vapor
-                            q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
+                        ! transferring the total mass to vapor
+                        q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
 
                             ! calling pT-equilibrium for overheated vapor, which is MFL = 0
                             call s_infinite_pt_relaxation_k(j, k, l, 0, pSOV, p_infOV, q_cons_vf, rhoe, TSOV)
@@ -171,9 +171,9 @@ contains
                             ! calculating Saturation temperature
                             call s_TSat(pSOV, TSatOV, TSOV)
 
-                            ! subcooled liquid case
-                            ! transferring the total mass to liquid
-                            q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
+                        ! subcooled liquid case
+                        ! transferring the total mass to liquid
+                        q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
 
                             ! depleting the mass of vapor
                             q_cons_vf(vp + contxb - 1)%sf(j, k, l) = mixM*rM
