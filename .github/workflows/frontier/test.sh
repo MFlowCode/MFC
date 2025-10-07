@@ -12,7 +12,6 @@ if [ "$job_device" = "gpu" ]; then
         device_opts+=" acc"
     elif [ "$job_interface" = "omp" ]; then
         device_opts+=" mp"
-        exit 0
     fi
     device_opts+=" -g $gpu_ids"
 fi
