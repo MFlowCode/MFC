@@ -250,24 +250,24 @@ contains
                         end if
                     end if
 
-            ! Calculate velocity of ghost cell
-            if (gp%slip) then
-                norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
-                buf = sqrt(sum(norm**2))
-                norm = norm/buf
-                vel_norm_IP = sum(vel_IP*norm)*norm
-                vel_g = vel_IP - vel_norm_IP
-            else
-                if (patch_ib(patch_id)%moving_ibm == 0) then
-                    ! we know the object is not moving if moving_ibm is 0 (false)
-                    vel_g = 0._wp
-                else
-                    do q = 1, 3
-                        ! if mibm is 1 or 2, then the boundary may be moving
-                        vel_g(q) = patch_ib(patch_id)%vel(q)
-                    end do
-                end if
-            end if
+                    ! Calculate velocity of ghost cell
+                    if (gp%slip) then
+                        norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
+                        buf = sqrt(sum(norm**2))
+                        norm = norm/buf
+                        vel_norm_IP = sum(vel_IP*norm)*norm
+                        vel_g = vel_IP - vel_norm_IP
+                    else
+                        if (patch_ib(patch_id)%moving_ibm == 0) then
+                            ! we know the object is not moving if moving_ibm is 0 (false)
+                            vel_g = 0._wp
+                        else
+                            do q = 1, 3
+                                ! if mibm is 1 or 2, then the boundary may be moving
+                                vel_g(q) = patch_ib(patch_id)%vel(q)
+                            end do
+                        end if
+                    end if
 
                     ! Set momentum
                     $:GPU_LOOP(parallelism='[seq]')
