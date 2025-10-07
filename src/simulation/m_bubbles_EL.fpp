@@ -279,7 +279,7 @@ contains
 
         print *, " Lagrange bubbles running, in proc", proc_rank, "number:", bub_id, "/", id
 
-        call s_mpi_reduce_int_sum(bub_id)
+        call s_mpi_reduce_int_sum(bub_id, bub_id)
 
         if (proc_rank == 0) then
             if (bub_id == 0) call s_mpi_abort('No bubbles in the domain. Check input/lag_bubbles.dat')
@@ -621,7 +621,7 @@ contains
         real(wp) :: myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot
         real(wp) :: myPinf, aux1, aux2, myCson, myRho
         real(wp), dimension(3) :: myPos, myVel
-        real(wp) :: gamma, pi_inf, qv
+        real(wp) :: gamma, pi_inf, qv, f_b
         real(wp), dimension(contxe) :: myalpha_rho, myalpha
         real(wp), dimension(2) :: Re
         integer, dimension(3) :: cell
@@ -734,10 +734,18 @@ contains
                         mtn_dveldt(k, l, stage) = 0._wp
                     elseif (lag_params%vel_model == 2) then
                         mtn_dposdt(k, l, stage) = myVel(l)
-                        mtn_dveldt(k, l, stage) = f_get_acceleration(myPos(l), &
-                                                                     myR, myVel(l), &
-                                                                     myMass_n, myMass_v, &
-                                                                     Re(1), myRho, cell, l, q_prim_vf)
+                        f_b = f_get_bubble_force(myPos(l), &
+                                                 myR, myV, myVel, &
+                                                 myMass_n, myMass_v, &
+                                                 Re(1), myRho, cell, l, q_prim_vf)
+                        mtn_dveldt(k, l, stage) = f_b / (myMass_n + myMass_v)
+                    elseif (lag_params%vel_model == 3) then
+                        mtn_dposdt(k, l, stage) = myVel(l)
+                        f_b = f_get_bubble_force(myPos(l), &
+                                                 myR, myV, myVel, &
+                                                 myMass_n, myMass_v, &
+                                                 Re(1), myRho, cell, l, q_prim_vf)
+                        mtn_dveldt(k, l, stage) = 2._wp * f_b / (myMass_n + myMass_v) - 3._wp * myV * myVel(l) / myR
                     else
                         mtn_dposdt(k, l, stage) = 0._wp
                         mtn_dveldt(k, l, stage) = 0._wp
@@ -776,6 +784,7 @@ contains
 
         if (lag_params%solver_approach == 2) then
 
+            ! (q / (1 - beta)) * d(beta)/dt source
             if (p == 0) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do k = 0, p
@@ -813,6 +822,7 @@ contains
 
                 call s_gradient_dir(q_prim_vf(E_idx), q_beta%vf(3), l)
 
+                ! (beta / (1 - beta)) * dP/dl source
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do k = 0, p
                     do j = 0, n
@@ -839,6 +849,7 @@ contains
 
                 call s_gradient_dir(q_beta%vf(3), q_beta%vf(4), l)
 
+                ! (beta / (1 - beta)) * d(Pu)/dl source
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do k = 0, p
                     do j = 0, n
@@ -852,7 +863,6 @@ contains
                     end do
                 end do
             end do
-
         end if
 
     end subroutine s_compute_bubbles_EL_source
@@ -1541,6 +1551,13 @@ contains
             nBubs = nBubs + newBubs
         end if
 
+        if (run_time_info) then
+            call s_mpi_reduce_int_sum(nBubs, active_bubs)
+            if (proc_rank == 0 .and. active_bubs == 0) then
+                call s_mpi_abort('No bubbles remain in the domain. Simulation ending.')
+            end if
+        end if
+
         ! Handle MPI transfer of bubbles going to another processor's local domain
         if (num_procs > 1) then
             call nvtxStartRange("LAG-BC-TRANSFER-LIST")
@@ -1745,36 +1762,34 @@ contains
                     end do
                 end do
             end do
-        else
-            if (dir == 2) then
-                ! Gradient in y dir.
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do k = 0, p
-                    do j = 0, n
-                        do i = 0, m
-                            dq%sf(i, j, k) = q%sf(i, j, k)*(dy(j + 1) - dy(j - 1)) &
-                                             + q%sf(i, j + 1, k)*(dy(j) + dy(j - 1)) &
-                                             - q%sf(i, j - 1, k)*(dy(j) + dy(j + 1))
-                            dq%sf(i, j, k) = dq%sf(i, j, k)/ &
-                                             ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
-                        end do
+        elseif (dir == 2) then
+            ! Gradient in y dir.
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        dq%sf(i, j, k) = q%sf(i, j, k)*(dy(j + 1) - dy(j - 1)) &
+                                         + q%sf(i, j + 1, k)*(dy(j) + dy(j - 1)) &
+                                         - q%sf(i, j - 1, k)*(dy(j) + dy(j + 1))
+                        dq%sf(i, j, k) = dq%sf(i, j, k)/ &
+                                         ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
                     end do
                 end do
-            else
-                ! Gradient in z dir.
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do k = 0, p
-                    do j = 0, n
-                        do i = 0, m
-                            dq%sf(i, j, k) = q%sf(i, j, k)*(dz(k + 1) - dz(k - 1)) &
-                                             + q%sf(i, j, k + 1)*(dz(k) + dz(k - 1)) &
-                                             - q%sf(i, j, k - 1)*(dz(k) + dz(k + 1))
-                            dq%sf(i, j, k) = dq%sf(i, j, k)/ &
-                                             ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
-                        end do
+            end do
+        elseif (dir == 3) then
+            ! Gradient in z dir.
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        dq%sf(i, j, k) = q%sf(i, j, k)*(dz(k + 1) - dz(k - 1)) &
+                                         + q%sf(i, j, k + 1)*(dz(k) + dz(k - 1)) &
+                                         - q%sf(i, j, k - 1)*(dz(k) + dz(k + 1))
+                        dq%sf(i, j, k) = dq%sf(i, j, k)/ &
+                                         ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
                     end do
                 end do
-            end if
+            end do
         end if
 
     end subroutine s_gradient_dir

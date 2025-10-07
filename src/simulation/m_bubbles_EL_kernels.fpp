@@ -523,10 +523,11 @@ contains
 
     end function f_interpolate_velocity
 
-    !! This function calculates the acceleration of the bubble
+    !! This function calculates the force on a bubble
             !!      based on the pressure gradient, velocity, and drag model.
             !! @param pos Position of the bubble in direction i
             !! @param rad Radius of the bubble
+            !! @param rdot Radial velocity of the bubble
             !! @param vel Velocity of the bubble
             !! @param mg Mass of the gas in the bubble
             !! @param mv Mass of the liquid in the bubble
@@ -536,16 +537,18 @@ contains
             !! @param i Direction of the velocity (1: x, 2: y, 3: z)
             !! @param q_prim_vf Eulerian field with primitive variables
             !! @return a Acceleration of the bubble in direction i
-    pure function f_get_acceleration(pos, rad, vel, mg, mv, Re, rho, cell, i, q_prim_vf) result(a)
+    pure function f_get_bubble_force(pos, rad, rdot, vel, mg, mv, Re, rho, cell, i, q_prim_vf) result(force)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in) :: pos, rad, vel, mg, mv, Re, rho
+        real(wp), intent(in) :: pos, rad, rdot, mg, mv, Re, rho
+        real(wp), intent(in), dimension(3) :: vel
         integer, dimension(3), intent(in) :: cell
         integer, intent(in) :: i
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-        real(wp) :: a
-        real(wp) :: dp, vol, force, v_rel
+        real(wp) :: a, dp, vol, force, Re_b, C_d, v_rel_mag, rho_b
+        real(wp), dimension(3) :: v_rel
         real(wp), dimension(fd_order - 1) :: xi, eta, L
+        integer :: j
 
         if (fd_order == 2) then
             if (i == 1) then
@@ -610,19 +613,43 @@ contains
             dp = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3)
         end if
 
-        vol = (4._wp/3._wp)*pi*rad**3._wp
-        force = -1._wp*vol*dp
+        vol = (4._wp/3._wp) * pi * (rad**3._wp)
+        v_rel_mag = 0._wp
 
-        v_rel = vel - f_interpolate_velocity(pos, cell, i, q_prim_vf)
+        do j = 1, num_dims
+            v_rel(j) = vel(j) - f_interpolate_velocity(pos, cell, j, q_prim_vf)
+            v_rel_mag = v_rel_mag + v_rel(j)**2._wp
+        end do
+
+        force = 0._wp
 
         if (lag_params%drag_model == 1) then ! Free slip Stokes drag
-            force = force - (4._wp*pi*rad*v_rel)/Re
+            force = force - (4._wp*pi*rad*v_rel(i))/Re
         else if (lag_params%drag_model == 2) then ! No slip Stokes drag
-            force = force - (6._wp*pi*rad*v_rel)/Re
+            force = force - (6._wp*pi*rad*v_rel(i))/Re
+        else if (lag_params%drag_model == 3) then ! Levich drag
+            force = force - (12._wp*pi*rad*v_rel(i))/Re
+        else if (lag_params%drag_model > 0) then ! Drag coefficient model
+            v_rel_mag = sqrt(v_rel_mag)
+            Re_b = max(1e-3, rho * v_rel_mag * 2._wp * rad * Re)
+            if (lag_params%drag_model == 4) then ! Mei et al. 1994
+                C_d = 16._wp / Re_b * (1._wp + (8._wp / Re_b + 0.5_wp * (1._wp + 3.315_wp * Re_b**(-0.5_wp))) ** -1._wp)
+            end if
+            force = force - 0.5_wp * C_d * rho * pi * rad**2._wp * v_rel(i) * v_rel_mag
         end if
 
-        a = force/(mg + mv)
+        if (lag_params%pressure_force) then
+            force = force - vol * dp
+        end if
 
-    end function f_get_acceleration
+        if (lag_params%gravity_force) then
+            force = force + (mg + mv) * accel_bf(i)
+        end if
+
+        if (lag_params%momentum_transfer_force) then
+            force = force  - 4._wp * pi * rho * rad**2._wp * v_rel(i) * rdot
+        end if
+
+    end function f_get_bubble_force
 
 end module m_bubbles_EL_kernels

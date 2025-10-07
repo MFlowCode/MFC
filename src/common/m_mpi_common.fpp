@@ -479,22 +479,19 @@ contains
         !!  @param var_loc holds the local value to be reduced among
         !!      all the processors in communicator. On output, the variable holds
         !!      the sum, reduced amongst all of the local values.
-    subroutine s_mpi_reduce_int_sum(var_loc)
+    subroutine s_mpi_reduce_int_sum(var_loc, sum)
 
         integer, intent(inout) :: var_loc
+        integer, intent(inout) :: sum
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
-        ! Temporary storage variable that holds the reduced sum value
-        integer :: var_glb
-
         ! Performing reduction procedure and eventually storing its result
         ! into the variable that was initially inputted into the subroutine
-        call MPI_REDUCE(var_loc, var_glb, 1, MPI_INTEGER, &
+        call MPI_REDUCE(var_loc, sum, 1, MPI_INTEGER, &
                         MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
-        var_loc = var_glb
 #endif
 
     end subroutine s_mpi_reduce_int_sum

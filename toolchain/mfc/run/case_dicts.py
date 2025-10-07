@@ -163,7 +163,7 @@ for bc_p_id in range(1, 10+1):
 
     PRE_PROCESS[f"patch_bc({bc_p_id})%radius"] = ParamType.REAL
 
-for p_id in range(1, 10+1):
+for p_id in range(1, 20+1):
     for attribute, ty in [("geometry", ParamType.INT), ("smoothen", ParamType.LOG),
                       ("smooth_patch_id", ParamType.INT), ("hcid", ParamType.INT)]:
         PRE_PROCESS[f"patch_icpp({p_id})%{attribute}"] = ty
@@ -326,7 +326,8 @@ SIMULATION.update({
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
-             'write_bubbles', 'write_bubbles_stats' ]:
+             'write_bubbles', 'write_bubbles_stats', 'pressure_force', 
+             'gravity_force', 'momentum_transfer_force']:
     SIMULATION[f'lag_params%{var}'] = ParamType.LOG
 
 for var in [ 'solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb',

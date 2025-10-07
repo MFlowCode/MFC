@@ -450,7 +450,7 @@ contains
         !!  @param fRho Current density
         !!  @param fP Current driving pressure
         !!  @param fR Current bubble radius
-        !!  @param fV Current bubble velocity
+        !!  @param fV Current bubble radial velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fpb Internal bubble pressure
         !!  @param fpbdot Time-derivative of internal bubble pressure
@@ -490,7 +490,7 @@ contains
         real(wp) :: h !< Time step size
         real(wp), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2 !< Bubble radius, radial velocity, and radial acceleration for the inner loop
         real(wp), dimension(4) :: myPb_tmp1, myMv_tmp1, myPb_tmp2, myMv_tmp2 !< Gas pressure and vapor mass for the inner loop (EL)
-        real(wp) :: fR2, fV2, fpb2, fmass_v2, vTemp, aTemp
+        real(wp) :: fR2, fV2, fpb2, fmass_v2, vTemp, aTemp, f_bTemp
         integer :: l, iter_count
 
         call s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
@@ -571,10 +571,19 @@ contains
                             end do
                         elseif (lag_params%vel_model == 2) then
                             do l = 1, num_dims
-                                aTemp = f_get_acceleration(fPos(l), fR, fVel(l), fmass_n, fmass_v, &
+                                f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel, fmass_n, fmass_v, &
                                                            fRe, fRho, cell, l, q_prim_vf)
-                                fPos(l) = fPos(l) + h*fVel(l)
-                                fVel(l) = fVel(l) + h*aTemp
+                                aTemp = f_bTemp/(fmass_n + fmass_v)
+                                fPos(l) = fPos(l) + h * fVel(l)
+                                fVel(l) = fVel(l) + h * aTemp
+                            end do
+                        elseif (lag_params%vel_model == 3) then
+                            do l = 1, num_dims
+                                f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel, fmass_n, fmass_v, &
+                                                           fRe, fRho, cell, l, q_prim_vf)
+                                aTemp = 2._wp * f_bTemp / (fmass_n + fmass_v) - 3 * fV * fVel(l) / fR
+                                fPos(l) = fPos(l) + h * fVel(l)
+                                fVel(l) = fVel(l) + h * aTemp
                             end do
                         end if
                     end if
