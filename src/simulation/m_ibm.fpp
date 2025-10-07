@@ -962,6 +962,11 @@ contains
         ! Clears the existing immersed boundary indices
         ib_markers%sf = 0
 
+        ! recalulcate the rotation matrix based upon the new angles
+        do i = 1, num_ibs
+          if patch_ib(i)%moving_ibm call s_update_ib_rotation_matrix(i)
+        end if
+
         ! recompute the new ib_patch locations and broadcast them.
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
         call s_populate_ib_buffers() ! transmits the new IB markers via MPI
