@@ -5,15 +5,12 @@ ngpus=`echo "$gpus" | tr -d '[:space:]' | wc -c`
 
 device_opts=""
 if [ "$job_device" = "gpu" ]; then
-    n_ranks=$(echo "$gpus" | wc -w)         # number of GPUs on node
-    gpu_ids=$(echo "$gpus" | tr ' ' '\n' | tr '\n' ' ' | sed 's/ $//')  # GPU IDs from rocm-smi
     device_opts+="--gpu"
     if [ "$job_interface" = "acc" ]; then
         device_opts+=" acc"
     elif [ "$job_interface" = "omp" ]; then
         device_opts+=" mp"
     fi
-    device_opts+=" -g $gpu_ids"
 fi
 
 if [ "$job_device" = "gpu" ]; then
