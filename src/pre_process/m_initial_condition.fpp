@@ -193,7 +193,7 @@ contains
 
         if (ib) then
             do i = 1, num_ibs
-              ! call s_update_ib_rotation_matrix(i)
+                ! call s_update_ib_rotation_matrix(i)
             end do
             call s_apply_ib_patches(ib_markers%sf, levelset, levelset_norm)
         end if

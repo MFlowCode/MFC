@@ -94,7 +94,7 @@ contains
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
                 moving_immersed_boundary_flag = .true.
-                
+
             end if
             call s_update_ib_rotation_matrix(i)
         end do
@@ -270,8 +270,8 @@ contains
                 else
                     ! get the vector that points from the centroid to the ghost
                     radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
-                        patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
-                    ! convert the angular velcoity from the inertial reference frame to the fluids frame, then convert to linear velocity
+                                                    patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
+                    ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear velocity
                     rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
                     do q = 1, 3
                         ! if mibm is 1 or 2, then the boundary may be moving
@@ -920,7 +920,7 @@ contains
 
         ! recalulcate the rotation matrix based upon the new angles
         do i = 1, num_ibs
-          if (patch_ib(i)%moving_ibm .ne. 0) call s_update_ib_rotation_matrix(i)
+            if (patch_ib(i)%moving_ibm /= 0) call s_update_ib_rotation_matrix(i)
         end do
 
         ! recompute the new ib_patch locations and broadcast them.
@@ -952,13 +952,13 @@ contains
     end subroutine s_finalize_ibm_module
 
     function cross_product(a, b) result(c)
-      implicit none
-      real(8), intent(in) :: a(3), b(3)
-      real(8) :: c(3)
+        implicit none
+        real(8), intent(in) :: a(3), b(3)
+        real(8) :: c(3)
 
-      c(1) = a(2)*b(3) - a(3)*b(2)
-      c(2) = a(3)*b(1) - a(1)*b(3)
-      c(3) = a(1)*b(2) - a(2)*b(1)
+        c(1) = a(2)*b(3) - a(3)*b(2)
+        c(2) = a(3)*b(1) - a(1)*b(3)
+        c(3) = a(1)*b(2) - a(2)*b(1)
     end function cross_product
 
 end module m_ibm
