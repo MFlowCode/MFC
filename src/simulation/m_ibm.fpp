@@ -905,50 +905,6 @@ contains
 
     end subroutine s_interpolate_image_point
 
-    !> Subroutine that computes a rotation matrix for converting to the rotating frame of the boundary
-    impure subroutine s_update_ib_rotation_matrix(patch_id)
-
-        integer, intent(in) :: patch_id
-        integer :: i
-
-        real(wp), dimension(3, 3, 3) :: rotation
-        real(wp) :: angle
-
-        ! construct the x, y, and z rotation matrices
-        if (num_dims == 3) then
-          ! also compute the x and y axes in 3D
-          angle = patch_ib(patch_id)%angles(1)
-          rotation(1, 1, :) = [1._wp, 0._wp     , 0._wp      ]
-          rotation(1, 2, :) = [0._wp, cos(angle), -sin(angle)]
-          rotation(1, 3, :) = [0._wp, sin(angle), cos(angle) ]
-
-          angle = patch_ib(patch_id)%angles(2)
-          rotation(2, 1, :) = [cos(angle) , 0._wp, sin(angle)]
-          rotation(2, 2, :) = [0._wp      , 1._wp, 0._wp     ]
-          rotation(2, 3, :) = [-sin(angle), 0._wp, cos(angle)]
-
-          ! apply the y rotation to the x rotation
-          patch_ib(patch_id)%rotation_matrix(:, :) = matmul(rotation(1, :, :), rotation(2, :, :))
-          patch_ib(patch_id)%rotation_matrix_inverse(:, :) = matmul(tranpose(rotation(2, :, :)), transpose(rotation(1, :, :)))
-        end if
-        ! z component first, since it applies in 2D and 3D
-        angle = patch_ib(patch_id)%angles(3)
-        rotation(3, 1, :) = [cos(angle), -sin(angle), 0._wp]
-        rotation(3, 2, :) = [sin(angle), cos(angle) , 0._wp]
-        rotation(3, 3, :) = [0._wp     , 0._wp      , 1._wp]
-
-        if (num_dims == 3) then
-          ! apply the z rotation to the xy rotation in 3D
-          patch_ib(patch_id)%rotation_matrix(:, :) = matmul(patch_ib(patch_id)%rotation_matrix(:, :), rotation(3, :, :))
-          patch_ib(patch_id)%rotation_matrix_inverse(:, :) = matmul(transpose(rotation(3, :, :)), patch_ib(patch_id)%rotation_matrix_inverse(:, :))
-        else
-          ! write out only the z rotation in 2D
-          patch_ib(patch_id)%rotation_matrix(:, :) = rotation(3, :, :)
-          patch_ib(patch_id)%rotation_matrix_inverse(:, :) = transpose(rotation(3, :, :))
-        end if
-
-    end subroutine s_update_ib_rotation_matrix
-
     !> Resets the current indexes of immersed boundaries and replaces them after updating
     !> the position of each moving immersed boundary
     impure subroutine s_update_mib(num_ibs, levelset, levelset_norm)
@@ -964,8 +920,8 @@ contains
 
         ! recalulcate the rotation matrix based upon the new angles
         do i = 1, num_ibs
-          if patch_ib(i)%moving_ibm call s_update_ib_rotation_matrix(i)
-        end if
+          if (patch_ib(i)%moving_ibm .ne. 0) call s_update_ib_rotation_matrix(i)
+        end do
 
         ! recompute the new ib_patch locations and broadcast them.
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)

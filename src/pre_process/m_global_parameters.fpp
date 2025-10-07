@@ -550,6 +550,7 @@ contains
             patch_ib(i)%rotation_matrix(1, 1) = 1._wp
             patch_ib(i)%rotation_matrix(2, 2) = 1._wp
             patch_ib(i)%rotation_matrix(3, 3) = 1._wp
+            patch_ib(i)%rotation_matrix_inverse = patch_ib(i)%rotation_matrix
         end do
 
         ! Fluids physical parameters

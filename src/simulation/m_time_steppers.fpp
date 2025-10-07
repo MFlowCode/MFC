@@ -836,7 +836,7 @@ contains
                 if (patch_ib(i)%moving_ibm == 1) then
                     do j = 1, 3
                         patch_ib(i)%vel(j) = (patch_ib(i)%vel(j) + patch_ib(i)%step_vel(j) + 0.0*dt)/2._wp
-                        patch_ib(i)%angular_vel(j) = (patch_ib(i)%angular_vel(j) + patch_ib(i)%angular_step_vel(j) + 0.0*dt)/2._wp
+                        patch_ib(i)%angular_vel(j) = (patch_ib(i)%angular_vel(j) + patch_ib(i)%step_angular_vel(j) + 0.0*dt)/2._wp
 
                         patch_ib(i)%angles(j) = (patch_ib(i)%angles(j) + patch_ib(i)%step_angles(j) + patch_ib(i)%step_angular_vel(j)*dt)/2._wp
                     end do
@@ -1235,7 +1235,7 @@ contains
                         patch_ib(i)%vel(j) = (2._wp*patch_ib(i)%vel(j) + patch_ib(i)%step_vel(j) + 0.0*dt)/3._wp
                         patch_ib(i)%angular_vel(j) = (2._wp*patch_ib(i)%angular_vel(j) + patch_ib(i)%step_angular_vel(j) + 0.0*dt)/3._wp
 
-                        patch_ib(i)%angles(j) = (2._wp*patch_ib(i)%angles(j) + patch_ib(i)%step_angles(j) + patch_ib(i)%angular_vel(j)*dt)/3._wp
+                        patch_ib(i)%angles(j) = (2._wp*patch_ib(i)%angles(j) + patch_ib(i)%step_angles(j) + 2._wp*patch_ib(i)%angular_vel(j)*dt)/3._wp
                     end do
 
                     patch_ib(i)%x_centroid = (2._wp*patch_ib(i)%x_centroid + patch_ib(i)%step_x_centroid + 2._wp*patch_ib(i)%vel(1)*dt)/3._wp
