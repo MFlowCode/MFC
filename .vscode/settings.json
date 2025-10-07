@@ -49,7 +49,7 @@
     // Enable ONLY fortls language server
     "fortran.enableLanguageServer": true,
     "fortran.languageServer": "fortls",
-    "fortran.fortls.disabled": false,
+    "fortran.fortls.disabled": true,
     "fortran.fortls.path": "fortls",
     
     // Try to disable any built-in language features

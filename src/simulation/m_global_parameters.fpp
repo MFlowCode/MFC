@@ -1312,6 +1312,8 @@ contains
 
         $:GPU_UPDATE(device='[Bx0, powell]')
 
+        $:GPU_UPDATE(device='[chem_params]')
+
         $:GPU_UPDATE(device='[cont_damage,tau_star,cont_damage_s,alpha_bar]')
 
         #:if not MFC_CASE_OPTIMIZATION
