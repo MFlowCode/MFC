@@ -185,13 +185,17 @@ contains
         integer :: i, j, k
         integer :: Np1, Np2
 
-        x0 = patch_ib(patch_id)%x_centroid
-        y0 = patch_ib(patch_id)%y_centroid
+        real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation
+
+        x_centroid = patch_ib(patch_id)%x_centroid
+        y_centroid = patch_ib(patch_id)%y_centroid
         ca_in = patch_ib(patch_id)%c
         pa = patch_ib(patch_id)%p
         ma = patch_ib(patch_id)%m
         ta = patch_ib(patch_id)%t
         theta = pi*patch_ib(patch_id)%theta/180._wp
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
 #ifdef MFC_PRE_PROCESS
@@ -259,14 +263,16 @@ contains
 
         do j = 0, n
             do i = 0, m
-
                 if (.not. f_is_default(patch_ib(patch_id)%theta)) then
-                    x_act = (x_cc(i) - x0)*cos(theta) - (y_cc(j) - y0)*sin(theta) + x0
-                    y_act = (x_cc(i) - x0)*sin(theta) + (y_cc(j) - y0)*cos(theta) + y0
+                    x_act = (x_cc(i) - x0)*cos(theta) - (y_cc(j) - y0)*sin(theta)
+                    y_act = (x_cc(i) - x0)*sin(theta) + (y_cc(j) - y0)*cos(theta)
                 else
-                    x_act = x_cc(i)
+                    x_act = x_cc(i) - 
                     y_act = y_cc(j)
                 end if
+
+                xyz_local = [x_act, y_act, 0._wp] ! get coordinate frame centered on IB
+                xyz_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordiantes
 
                 if (x_act >= x0 .and. x_act <= x0 + ca_in) then
                     xa = (x_act - x0)/ca_in
@@ -714,6 +720,8 @@ contains
 
         integer :: i, j, k !< Generic loop iterators
         real(wp) :: radius
+        real(wp), dimension(1:3) :: xyz_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         ! Transferring the cylindrical patch's centroid, length, radius,
         ! smoothing patch identity and smoothing coefficient information
@@ -725,15 +733,16 @@ contains
         length_y = patch_ib(patch_id)%length_y
         length_z = patch_ib(patch_id)%length_z
         radius = patch_ib(patch_id)%radius
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! Computing the beginning and the end x-, y- and z-coordinates of
         ! the cylinder based on its centroid and lengths
-        x_boundary%beg = x_centroid - 0.5_wp*length_x
-        x_boundary%end = x_centroid + 0.5_wp*length_x
-        y_boundary%beg = y_centroid - 0.5_wp*length_y
-        y_boundary%end = y_centroid + 0.5_wp*length_y
-        z_boundary%beg = z_centroid - 0.5_wp*length_z
-        z_boundary%end = z_centroid + 0.5_wp*length_z
+        x_boundary%beg = -0.5_wp*length_x
+        x_boundary%end =  0.5_wp*length_x
+        y_boundary%beg = -0.5_wp*length_y
+        y_boundary%end =  0.5_wp*length_y
+        z_boundary%beg = -0.5_wp*length_z
+        z_boundary%end =  0.5_wp*length_z
 
         ! Initializing the pseudo volume fraction value to 1. The value will
         ! be modified as the patch is laid out on the grid, but only in the
