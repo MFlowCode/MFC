@@ -459,10 +459,13 @@ contains
         real(wp) :: radius
         real(wp) :: x_centroid, y_centroid, z_centroid
         real(wp) :: length_x, length_y, length_z
-        real(wp), dimension(3) :: pos_vec, centroid_vec, dist_sides_vec, dist_surface_vec
+        real(wp), dimension(3) :: centroid_vec, dist_sides_vec, dist_surface_vec
         real(wp) :: dist_side, dist_surface, side_pos
         type(bounds_info) :: boundary
         integer :: i, j, k !< Loop index variables
+
+        real(wp), dimension(1:3) :: xyz_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
         radius = patch_ib(ib_patch_id)%radius
         x_centroid = patch_ib(ib_patch_id)%x_centroid
@@ -472,19 +475,22 @@ contains
         length_y = patch_ib(ib_patch_id)%length_y
         length_z = patch_ib(ib_patch_id)%length_z
 
+        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
+        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
+
         if (.not. f_approx_equal(length_x, 0._wp)) then
-            boundary%beg = x_centroid - 0.5_wp*length_x
-            boundary%end = x_centroid + 0.5_wp*length_x
+            boundary%beg = -0.5_wp*length_x
+            boundary%end = 0.5_wp*length_x
             dist_sides_vec = (/1, 0, 0/)
             dist_surface_vec = (/0, 1, 1/)
         else if (.not. f_approx_equal(length_y, 0._wp)) then
-            boundary%beg = y_centroid - 0.5_wp*length_y
-            boundary%end = y_centroid + 0.5_wp*length_y
+            boundary%beg = -0.5_wp*length_y
+            boundary%end = 0.5_wp*length_y
             dist_sides_vec = (/0, 1, 0/)
             dist_surface_vec = (/1, 0, 1/)
         else if (.not. f_approx_equal(length_z, 0._wp)) then
-            boundary%beg = z_centroid - 0.5_wp*length_z
-            boundary%end = z_centroid + 0.5_wp*length_z
+            boundary%beg = -0.5_wp*length_z
+            boundary%end = 0.5_wp*length_z
             dist_sides_vec = (/0, 0, 1/)
             dist_surface_vec = (/1, 1, 0/)
         end if
@@ -492,16 +498,19 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    pos_vec = [x_cc(i), y_cc(j), z_cc(k)]
-                    centroid_vec = [x_centroid, y_centroid, z_centroid]
-                    side_pos = dot_product(pos_vec, dist_sides_vec)
+                    xyz_local = [x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid] ! get coordinate frame centered on IB
+                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
+
+                    ! get distance to flat edge of cylinder
+                    side_pos = dot_product(xyz_local, dist_sides_vec)
                     dist_side = min(abs(side_pos - boundary%beg), &
                                     abs(boundary%end - side_pos))
-
-                    dist_surface = norm2((pos_vec - centroid_vec)*dist_surface_vec) &
+                    ! get distance to curved side of cylinder
+                    dist_surface = norm2(xyz_local*dist_surface_vec) &
                                    - radius
 
                     if (dist_side < abs(dist_surface)) then
+                        ! if the closest edge is flat
                         levelset%sf(i, j, k, ib_patch_id) = -dist_side
                         if (f_approx_equal(dist_side, abs(side_pos - boundary%beg))) then
                             levelset_norm%sf(i, j, k, ib_patch_id, :) = -dist_sides_vec
@@ -512,11 +521,13 @@ contains
                         levelset%sf(i, j, k, ib_patch_id) = dist_surface
 
                         levelset_norm%sf(i, j, k, ib_patch_id, :) = &
-                            (pos_vec - centroid_vec)*dist_surface_vec
+                            xyz_local*dist_surface_vec
                         levelset_norm%sf(i, j, k, ib_patch_id, :) = &
                             levelset_norm%sf(i, j, k, ib_patch_id, :)/ &
                             norm2(levelset_norm%sf(i, j, k, ib_patch_id, :))
                     end if
+                    levelset_norm%sf(i, j, k, ib_patch_id, :) = &
+                      matmul(rotation, levelset_norm%sf(i, j, k, ib_patch_id, :))
                 end do
             end do
         end do
