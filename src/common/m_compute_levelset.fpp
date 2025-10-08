@@ -180,10 +180,10 @@ contains
                     xyz_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, z_cc(l) - z_centroid] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
 
-                    if (xzy_local(2) >= y_centroid) then
+                    if (xyz_local(2) >= y_centroid) then
                         do k = 1, Np
-                            dist_vec(1) = x_cc(i) - airfoil_grid_u(k)%x
-                            dist_vec(2) = y_cc(j) - airfoil_grid_u(k)%y
+                            dist_vec(1) = xzy_local(1) - airfoil_grid_u(k)%x
+                            dist_vec(2) = xyz_local(2) - airfoil_grid_u(k)%y
                             dist_vec(3) = 0
                             dist_surf = sqrt(sum(dist_vec**2))
                             if (k == 1) then
@@ -196,14 +196,14 @@ contains
                                 end if
                             end if
                         end do
-                        dist_vec(1) = x_cc(i) - airfoil_grid_u(global_id)%x
-                        dist_vec(2) = y_cc(j) - airfoil_grid_u(global_id)%y
+                        dist_vec(1) = xyz_local(1) - airfoil_grid_u(global_id)%x
+                        dist_vec(2) = xyz_local(2) - airfoil_grid_u(global_id)%y
                         dist_vec(3) = 0
                         dist_surf = global_dist
                     else
                         do k = 1, Np
-                            dist_vec(1) = x_cc(i) - airfoil_grid_l(k)%x
-                            dist_vec(2) = y_cc(j) - airfoil_grid_l(k)%y
+                            dist_vec(1) = xyz_local(1) - airfoil_grid_l(k)%x
+                            dist_vec(2) = xyz_local(2) - airfoil_grid_l(k)%y
                             dist_vec(3) = 0
                             dist_surf = sqrt(sum(dist_vec**2))
                             if (k == 1) then
@@ -216,8 +216,8 @@ contains
                                 end if
                             end if
                         end do
-                        dist_vec(1) = x_cc(i) - airfoil_grid_l(global_id)%x
-                        dist_vec(2) = y_cc(j) - airfoil_grid_l(global_id)%y
+                        dist_vec(1) = xyz_local(1) - airfoil_grid_l(global_id)%x
+                        dist_vec(2) = xyz_local(2) - airfoil_grid_l(global_id)%y
                         dist_vec(3) = 0
                         dist_surf = global_dist
                     end if
@@ -237,7 +237,7 @@ contains
                             levelset_norm%sf(i, j, l, ib_patch_id, :) = 0
                         else
                             levelset_norm%sf(i, j, l, ib_patch_id, :) = &
-                                dist_vec(:)/dist_surf
+                                matmul(rotation, dist_vec(:)/dist_surf)
                         end if
                     end if
 
@@ -255,11 +255,13 @@ contains
 
         integer, intent(in) :: ib_patch_id
         real(wp) :: top_right(2), bottom_left(2)
-        real(wp) :: x, y, min_dist
+        real(wp) :: min_dist
         real(wp) :: side_dists(4)
 
         real(wp) :: x_centroid, y_centroid
         real(wp) :: length_x, length_y
+        real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
         integer :: i, j, k !< Loop index variables
         integer :: idx !< Shortest path direction indicator
@@ -268,26 +270,26 @@ contains
         length_y = patch_ib(ib_patch_id)%length_y
         x_centroid = patch_ib(ib_patch_id)%x_centroid
         y_centroid = patch_ib(ib_patch_id)%y_centroid
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+        rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
 
-        top_right(1) = x_centroid + length_x/2
-        top_right(2) = y_centroid + length_y/2
-
-        bottom_left(1) = x_centroid - length_x/2
-        bottom_left(2) = y_centroid - length_y/2
+        top_right(1) = length_x/2
+        top_right(2) = length_y/2
+        bottom_left(1) = -length_x/2
+        bottom_left(2) = -length_y/2
 
         do i = 0, m
             do j = 0, n
+                xy_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp]
+                xy_local = matmul(inverse_rotation, xy_local)
 
-                x = x_cc(i)
-                y = y_cc(j)
+                if ((xy_local(1) > bottom_left(1) .and. xy_local(1) < top_right(1)) .or. &
+                    (xy_local(2) > bottom_left(2) .and. xy_local(2) < top_right(2))) then
 
-                if ((x > bottom_left(1) .and. x < top_right(1)) .or. &
-                    (y > bottom_left(2) .and. y < top_right(2))) then
-
-                    side_dists(1) = bottom_left(1) - x
-                    side_dists(2) = x - top_right(1)
-                    side_dists(3) = bottom_left(2) - y
-                    side_dists(4) = y - top_right(2)
+                    side_dists(1) = bottom_left(1) - xy_local(1)
+                    side_dists(2) = xy_local(1) - top_right(1)
+                    side_dists(3) = bottom_left(2) - xy_local(2)
+                    side_dists(4) = xy_local(2) - top_right(2)
                     min_dist = initial_distance_buffer
                     idx = 1
 
@@ -298,49 +300,22 @@ contains
                         end if
                     end do
 
-                    ! TODO :: This entire if/else tree can be simplified by just calling arrays by idx index
-                    if (idx == 1) then
-                        levelset%sf(i, j, 0, ib_patch_id) = side_dists(1)
-                        if (f_approx_equal(side_dists(1), 0._wp)) then
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0._wp
+                    levelset%sf(i, j, 0, ib_patch_id) = side_dists(idx)
+                    if (.not. f_approx_equal(side_dists(idx), 0._wp)) then
+                        if (idx == 1 .or. idx == 2) then
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = side_dists(idx)/ &
+                                                                        abs(side_dists(idx))
                         else
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = side_dists(1)/ &
-                                                                        abs(side_dists(1))
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 2) = side_dists(idx)/ &
+                                                                        abs(side_dists(idx))
                         end if
-
-                    else if (idx == 2) then
-                        levelset%sf(i, j, 0, ib_patch_id) = side_dists(2)
-                        if (f_approx_equal(side_dists(2), 0._wp)) then
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0._wp
-                        else
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = -side_dists(2)/ &
-                                                                        abs(side_dists(2))
-                        end if
-
-                    else if (idx == 3) then
-                        levelset%sf(i, j, 0, ib_patch_id) = side_dists(3)
-                        if (f_approx_equal(side_dists(3), 0._wp)) then
-
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 2) = 0._wp
-                        else
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 2) = side_dists(3)/ &
-                                                                        abs(side_dists(3))
-                        end if
-
-                    else if (idx == 4) then
-                        levelset%sf(i, j, 0, ib_patch_id) = side_dists(4)
-                        if (f_approx_equal(side_dists(4), 0._wp)) then
-
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 2) = 0._wp
-                        else
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 2) = -side_dists(4)/ &
-                                                                        abs(side_dists(4))
-                        end if
-
+                        ! convert the normal vector back into the global coordinate system
+                        levelset_norm%sf(i, j, 0, ib_patch_id, 1) = &
+                            matmul(rotation, levelset_norm%sf(i, j, 0, ib_patch_id, 1))
+                    else
+                        levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0._wp
                     end if
-
                 end if
-
             end do
         end do
 
