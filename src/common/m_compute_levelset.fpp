@@ -81,8 +81,8 @@ contains
 
         x_centroid = patch_ib(ib_patch_id)%x_centroid
         y_centroid = patch_ib(ib_patch_id)%y_centroid
-        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
-        rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
+        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
+        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
         do i = 0, m
             do j = 0, n
@@ -182,7 +182,7 @@ contains
 
                     if (xyz_local(2) >= y_centroid) then
                         do k = 1, Np
-                            dist_vec(1) = xzy_local(1) - airfoil_grid_u(k)%x
+                            dist_vec(1) = xyz_local(1) - airfoil_grid_u(k)%x
                             dist_vec(2) = xyz_local(2) - airfoil_grid_u(k)%y
                             dist_vec(3) = 0
                             dist_surf = sqrt(sum(dist_vec**2))
@@ -364,7 +364,7 @@ contains
             do j = 0, n
                 do k = 0, p
 
-                    xyz_local = [x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid] ! get coordinate frame centered on IB
+                    xyz_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, z_cc(k) - z_centroid] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
 
                     if ((xyz_local(1) > Left .and. xyz_local(1) < Right) .or. &
@@ -498,7 +498,7 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    xyz_local = [x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid] ! get coordinate frame centered on IB
+                    xyz_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, z_cc(k) - z_centroid] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
 
                     ! get distance to flat edge of cylinder
