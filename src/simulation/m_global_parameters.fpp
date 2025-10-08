@@ -505,7 +505,7 @@ module m_global_parameters
     logical :: compute_particle_drag
     real(wp) :: u_inf_ref !< reference freestream velocity
     real(wp) :: rho_inf_ref !< reference freestream density 
-    real(wp) :: T_inf_ref !< reference freestream temperature
+    real(wp) :: P_inf_ref !< reference freestream temperature
     logical :: periodic_forcing
     logical :: volume_filtering_momentum_eqn
     logical :: store_levelset
@@ -515,7 +515,7 @@ module m_global_parameters
     real(wp) :: filter_width
     logical :: q_filtered_wrt
 
-    !$acc declare create(u_inf_ref, rho_inf_ref, T_inf_ref, filter_width)
+    !$acc declare create(u_inf_ref, rho_inf_ref, P_inf_ref, filter_width)
 
 contains
 
@@ -796,7 +796,7 @@ contains
         compute_particle_drag = .false.
         u_inf_ref = dflt_real
         rho_inf_ref = dflt_real
-        T_inf_ref = dflt_real
+        P_inf_ref = dflt_real
         periodic_forcing = .false.
         volume_filtering_momentum_eqn = .false.
         store_levelset = .true.

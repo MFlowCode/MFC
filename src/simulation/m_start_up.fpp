@@ -187,7 +187,7 @@ contains
             rkck_adap_dt, rkck_tolerance, &
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar, & 
-            periodic_ibs, compute_particle_drag, u_inf_ref, rho_inf_ref, T_inf_ref, & 
+            periodic_ibs, compute_particle_drag, u_inf_ref, rho_inf_ref, P_inf_ref, & 
             periodic_forcing, volume_filtering_momentum_eqn, store_levelset, & 
             slab_domain_decomposition, compute_autocorrelation, t_step_stat_start, & 
             filter_width, q_filtered_wrt
@@ -1755,7 +1755,7 @@ contains
             !$acc update device(ib_markers%sf)
         end if
 
-        !$acc update device(u_inf_ref, rho_inf_ref, T_inf_ref, filter_width)
+        !$acc update device(u_inf_ref, rho_inf_ref, P_inf_ref, filter_width)
 
     end subroutine s_initialize_gpu_vars
 

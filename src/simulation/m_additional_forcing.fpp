@@ -20,11 +20,11 @@ module m_additional_forcing
     type(scalar_field), allocatable, dimension(:) :: q_periodic_force
     real(wp) :: volfrac_phi
     integer :: N_x_total_glb
-    real(wp) :: spatial_rho, spatial_u
-    real(wp) :: phase_rho, phase_u
+    real(wp) :: spatial_rho, spatial_u, spatial_E
+    real(wp) :: phase_rho, phase_u, phase_E
 
     !$acc declare create(q_periodic_force, volfrac_phi, N_x_total_glb)
-    !$acc declare create(spatial_rho, spatial_u, phase_rho, phase_u)
+    !$acc declare create(spatial_rho, spatial_u, spatial_E, phase_rho, phase_u, phase_E)
 
 contains
 
@@ -65,35 +65,39 @@ contains
     subroutine s_compute_periodic_forcing(q_cons_vf, t_step)
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer, intent(in) :: t_step
-        real(wp) :: spatial_rho_glb, spatial_u_glb
+        real(wp) :: spatial_rho_glb, spatial_u_glb, spatial_E_glb
         integer :: i, j, k
 
         ! zero spatial averages
         spatial_rho = 0._wp
         spatial_u = 0._wp
-        !$acc update device(spatial_rho, spatial_u)
+        spatial_E = 0._wp
+        !$acc update device(spatial_rho, spatial_u, spatial_E)
 
         ! compute spatial averages
-        !$acc parallel loop collapse(3) gang vector default(present) reduction(+:spatial_rho, spatial_u)
+        !$acc parallel loop collapse(3) gang vector default(present) reduction(+:spatial_rho, spatial_u, spatial_E)
         do i = 0, m 
             do j = 0, n 
                 do k = 0, p 
                     spatial_rho = spatial_rho + q_cons_vf(1)%sf(i, j, k) * fluid_indicator_function%sf(i, j, k) ! rho
-                    spatial_u = spatial_u + q_cons_vf(2)%sf(i, j, k) * fluid_indicator_function%sf(i, j, k) ! u
+                    spatial_u = spatial_u + q_cons_vf(2)%sf(i, j, k) * fluid_indicator_function%sf(i, j, k) ! rho*u
+                    spatial_E = spatial_E + q_cons_vf(5)%sf(i, j, k)* fluid_indicator_function%sf(i, j, k) ! E 
                 end do
             end do
         end do
 
-        !$acc update host(spatial_rho, spatial_u)
+        !$acc update host(spatial_rho, spatial_u, spatial_E)
 
         ! reduction sum across entire domain
         call s_mpi_allreduce_sum(spatial_rho, spatial_rho_glb)
         call s_mpi_allreduce_sum(spatial_u, spatial_u_glb)
-
+        call s_mpi_allreduce_sum(spatial_E, spatial_E_glb)
+        
         ! compute phase averages
         phase_rho = phase_rho + (spatial_rho_glb / real(N_x_total_glb, wp) - phase_rho) / real(t_step, wp)
         phase_u = phase_u + (spatial_u_glb / real(N_x_total_glb, wp) - phase_u) / real(t_step, wp)
-        !$acc update device(phase_rho, phase_u)
+        phase_E = phase_E + (spatial_E_glb / real(N_x_total_glb, wp) - phase_E) / real(t_step, wp)
+        !$acc update device(phase_rho, phase_u, phase_E)
 
         ! compute periodic forcing terms for mass, momentum, energy
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -107,7 +111,7 @@ contains
                     q_periodic_force(2)%sf(i, j, k) = (rho_inf_ref*u_inf_ref - phase_u/(1._wp - volfrac_phi)) / dt
 
                     ! u*f_u
-                    q_periodic_force(3)%sf(i, j, k) = q_cons_vf(2)%sf(i, j, k)/q_cons_vf(1)%sf(i, j, k) * q_periodic_force(2)%sf(i, j, k)
+                    q_periodic_force(3)%sf(i, j, k) = (P_inf_ref*gammas(1) + 0.5_wp*rho_inf_ref*u_inf_ref**2 - phase_E/(1._wp - volfrac_phi)) / dt
                 end do 
             end do
         end do

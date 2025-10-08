@@ -303,7 +303,7 @@ SIMULATION.update({
     'compute_particle_drag': ParamType.LOG,
     'u_inf_ref': ParamType.REAL,
     'rho_inf_ref': ParamType.REAL,
-    'T_inf_ref': ParamType.REAL,
+    'P_inf_ref': ParamType.REAL,
     'periodic_forcing': ParamType.LOG,
     'volume_filtering_momentum_eqn': ParamType.LOG,
     'compute_autocorrelation': ParamType.LOG,
