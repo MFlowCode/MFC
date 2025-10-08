@@ -167,8 +167,8 @@ contains
         y_centroid = patch_ib(ib_patch_id)%y_centroid
         z_centroid = patch_ib(ib_patch_id)%z_centroid
         lz = patch_ib(ib_patch_id)%length_z
-        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
-        rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
+        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
+        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
         z_max = z_centroid + lz/2
         z_min = z_centroid - lz/2
@@ -270,8 +270,8 @@ contains
         length_y = patch_ib(ib_patch_id)%length_y
         x_centroid = patch_ib(ib_patch_id)%x_centroid
         y_centroid = patch_ib(ib_patch_id)%y_centroid
-        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
-        rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
+        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
+        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
         top_right(1) = length_x/2
         top_right(2) = length_y/2
@@ -303,9 +303,11 @@ contains
                     levelset%sf(i, j, 0, ib_patch_id) = side_dists(idx)
                     if (.not. f_approx_equal(side_dists(idx), 0._wp)) then
                         if (idx == 1 .or. idx == 2) then
+                            ! vector points along the x axis
                             levelset_norm%sf(i, j, 0, ib_patch_id, 1) = side_dists(idx)/ &
                                                                         abs(side_dists(idx))
                         else
+                            ! vector points along the y axis
                             levelset_norm%sf(i, j, 0, ib_patch_id, 2) = side_dists(idx)/ &
                                                                         abs(side_dists(idx))
                         end if
@@ -333,6 +335,8 @@ contains
 
         real(wp) :: x_centroid, y_centroid, z_centroid
         real(wp) :: length_x, length_y, length_z
+        real(wp), dimension(1:3) :: xyz_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
         integer :: i, j, k !< Loop index variables
 
@@ -344,14 +348,17 @@ contains
         y_centroid = patch_ib(ib_patch_id)%y_centroid
         z_centroid = patch_ib(ib_patch_id)%z_centroid
 
-        Right = x_centroid + length_x/2
-        Left = x_centroid - length_x/2
+        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
+        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
-        Top = y_centroid + length_y/2
-        Bottom = y_centroid - length_y/2
+        Right = length_x/2
+        Left = -length_x/2
 
-        Front = z_centroid + length_z/2
-        Back = z_centroid - length_z/2
+        Top = length_y/2
+        Bottom = -length_y/2
+
+        Front = length_z/2
+        Back = -length_z/2
 
         do i = 0, m
             do j = 0, n
