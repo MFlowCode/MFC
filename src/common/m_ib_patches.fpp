@@ -180,7 +180,7 @@ contains
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
-        real(wp) :: x0, y0, f, x_act, y_act, ca_in, pa, ma, ta, theta
+        real(wp) :: f, ca_in, pa, ma, ta, theta
         real(wp) :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k
         integer :: Np1, Np2
@@ -207,26 +207,26 @@ contains
 #endif
         Np = Np1 + Np2 + 1
 
-        allocate (airfoil_grid_u(1:Np))
+        allocate (airfoil_grid_u(1:Np)) 
         allocate (airfoil_grid_l(1:Np))
 
-        airfoil_grid_u(1)%x = x0
-        airfoil_grid_u(1)%y = y0
+        airfoil_grid_u(1)%x = 0._wp
+        airfoil_grid_u(1)%y = 0._wp
 
-        airfoil_grid_l(1)%x = x0
-        airfoil_grid_l(1)%y = y0
+        airfoil_grid_l(1)%x = 0._wp
+        airfoil_grid_l(1)%y = 0._wp
 
         eta = 1._wp
 
         do i = 1, Np1 + Np2 - 1
             if (i <= Np1) then
-                xc = x0 + i*(pa*ca_in/Np1)
-                xa = (xc - x0)/ca_in
+                xc = i*(pa*ca_in/Np1)
+                xa = xc/ca_in
                 yc = (ma/pa**2)*(2*pa*xa - xa**2)
                 dycdxc = (2*ma/pa**2)*(pa - xa)
             else
-                xc = x0 + pa*ca_in + (i - Np1)*((ca_in - pa*ca_in)/Np2)
-                xa = (xc - x0)/ca_in
+                xc = pa*ca_in + (i - Np1)*((ca_in - pa*ca_in)/Np2)
+                xa = xc/ca_in
                 yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
                 dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
             end if
@@ -241,11 +241,11 @@ contains
             xl = xa + yt*sin_c
             yl = yc - yt*cos_c
 
-            xu = xu*ca_in + x0
-            yu = yu*ca_in + y0
+            xu = xu*ca_in
+            yu = yu*ca_in
 
-            xl = xl*ca_in + x0
-            yl = yl*ca_in + y0
+            xl = xl*ca_in
+            yl = yl*ca_in
 
             airfoil_grid_u(i + 1)%x = xu
             airfoil_grid_u(i + 1)%y = yu
@@ -255,27 +255,19 @@ contains
 
         end do
 
-        airfoil_grid_u(Np)%x = x0 + ca_in
-        airfoil_grid_u(Np)%y = y0
+        airfoil_grid_u(Np)%x = ca_in
+        airfoil_grid_u(Np)%y = 0._wp
 
-        airfoil_grid_l(Np)%x = x0 + ca_in
-        airfoil_grid_l(Np)%y = y0
+        airfoil_grid_l(Np)%x = ca_in
+        airfoil_grid_l(Np)%y = 0._wp
 
         do j = 0, n
             do i = 0, m
-                if (.not. f_is_default(patch_ib(patch_id)%theta)) then
-                    x_act = (x_cc(i) - x0)*cos(theta) - (y_cc(j) - y0)*sin(theta)
-                    y_act = (x_cc(i) - x0)*sin(theta) + (y_cc(j) - y0)*cos(theta)
-                else
-                    x_act = x_cc(i) - 
-                    y_act = y_cc(j)
-                end if
+                xy_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp] ! get coordinate frame centered on IB
+                xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordiantes
 
-                xyz_local = [x_act, y_act, 0._wp] ! get coordinate frame centered on IB
-                xyz_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordiantes
-
-                if (x_act >= x0 .and. x_act <= x0 + ca_in) then
-                    xa = (x_act - x0)/ca_in
+                if (xy_local(1) >= 0._wp .and. xy_local(1) <= ca_in) then
+                    xa = xy_local(1)/ca_in
                     if (xa <= pa) then
                         yc = (ma/pa**2)*(2*pa*xa - xa**2)
                         dycdxc = (2*ma/pa**2)*(pa - xa)
@@ -283,37 +275,37 @@ contains
                         yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
                         dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
                     end if
-                    if (y_act >= y0) then
+                    if (xy_local(1) >= 0._wp) then
                         k = 1
-                        do while (airfoil_grid_u(k)%x < x_act .and. k <= Np)
+                        do while (airfoil_grid_u(k)%x < xy_local(1) .and. k <= Np)
                             k = k + 1
                         end do
-                        if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
-                            if (y_act <= airfoil_grid_u(k)%y) then
+                        if (f_approx_equal(airfoil_grid_u(k)%x, xy_local(1))) then
+                            if (xy_local(1) <= airfoil_grid_u(k)%y) then
                                 !!IB
                                 ib_markers_sf(i, j, 0) = patch_id
                             end if
                         else
-                            f = (airfoil_grid_u(k)%x - x_act)/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
-                            if (y_act <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
+                            f = (airfoil_grid_u(k)%x - xy_local(1))/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
+                            if (xy_local(1) <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
                                 !!IB
                                 ib_markers_sf(i, j, 0) = patch_id
                             end if
                         end if
                     else
                         k = 1
-                        do while (airfoil_grid_l(k)%x < x_act)
+                        do while (airfoil_grid_l(k)%x < xy_local(1))
                             k = k + 1
                         end do
-                        if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
-                            if (y_act >= airfoil_grid_l(k)%y) then
+                        if (f_approx_equal(airfoil_grid_l(k)%x, xy_local(1))) then
+                            if (xy_local(1) >= airfoil_grid_l(k)%y) then
                                 !!IB
                                 ib_markers_sf(i, j, 0) = patch_id
                             end if
                         else
-                            f = (airfoil_grid_l(k)%x - x_act)/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
+                            f = (airfoil_grid_l(k)%x - xy_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
-                            if (y_act >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
+                            if (xy_local(1) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
                                 !!IB
                                 ib_markers_sf(i, j, 0) = patch_id
                             end if
@@ -322,16 +314,6 @@ contains
                 end if
             end do
         end do
-
-        if (.not. f_is_default(patch_ib(patch_id)%theta)) then
-            do i = 1, Np
-                airfoil_grid_l(i)%x = (airfoil_grid_l(i)%x - x0)*cos(theta) + (airfoil_grid_l(i)%y - y0)*sin(theta) + x0
-                airfoil_grid_l(i)%y = -1._wp*(airfoil_grid_l(i)%x - x0)*sin(theta) + (airfoil_grid_l(i)%y - y0)*cos(theta) + y0
-
-                airfoil_grid_u(i)%x = (airfoil_grid_u(i)%x - x0)*cos(theta) + (airfoil_grid_u(i)%y - y0)*sin(theta) + x0
-                airfoil_grid_u(i)%y = -1._wp*(airfoil_grid_u(i)%x - x0)*sin(theta) + (airfoil_grid_u(i)%y - y0)*cos(theta) + y0
-            end do
-        end if
 
     end subroutine s_ib_airfoil
 
@@ -343,19 +325,21 @@ contains
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
-        real(wp) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca_in, pa, ma, ta, theta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
+        real(wp) :: lz, z_max, z_min, f, ca_in, pa, ma, ta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k, l
         integer :: Np1, Np2
 
-        x0 = patch_ib(patch_id)%x_centroid
-        y0 = patch_ib(patch_id)%y_centroid
-        z0 = patch_ib(patch_id)%z_centroid
+        real(wp), dimension(1:3) :: xyz_local !< x, y, z coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation
+
+        x_centroid = patch_ib(patch_id)%x_centroid
+        y_centroid = patch_ib(patch_id)%y_centroid
+        z_centroid = patch_ib(patch_id)%z_centroid
         lz = patch_ib(patch_id)%length_z
         ca_in = patch_ib(patch_id)%c
         pa = patch_ib(patch_id)%p
         ma = patch_ib(patch_id)%m
         ta = patch_ib(patch_id)%t
-        theta = pi*patch_ib(patch_id)%theta/180._wp
 
         ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
 #ifdef MFC_PRE_PROCESS
@@ -370,26 +354,26 @@ contains
         allocate (airfoil_grid_u(1:Np))
         allocate (airfoil_grid_l(1:Np))
 
-        airfoil_grid_u(1)%x = x0
-        airfoil_grid_u(1)%y = y0
+        airfoil_grid_u(1)%x = 0._wp
+        airfoil_grid_u(1)%y = 0._wp
 
-        airfoil_grid_l(1)%x = x0
-        airfoil_grid_l(1)%y = y0
+        airfoil_grid_l(1)%x = 0._wp
+        airfoil_grid_l(1)%y = 0._wp
 
-        z_max = z0 + lz/2
-        z_min = z0 - lz/2
+        z_max = lz/2
+        z_min = -lz/2
 
         eta = 1._wp
 
         do i = 1, Np1 + Np2 - 1
             if (i <= Np1) then
-                xc = x0 + i*(pa*ca_in/Np1)
-                xa = (xc - x0)/ca_in
+                xc = i*(pa*ca_in/Np1)
+                xa = xc/ca_in
                 yc = (ma/pa**2)*(2*pa*xa - xa**2)
                 dycdxc = (2*ma/pa**2)*(pa - xa)
             else
-                xc = x0 + pa*ca_in + (i - Np1)*((ca_in - pa*ca_in)/Np2)
-                xa = (xc - x0)/ca_in
+                xc = pa*ca_in + (i - Np1)*((ca_in - pa*ca_in)/Np2)
+                xa = xc/ca_in
                 yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
                 dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
             end if
@@ -404,11 +388,11 @@ contains
             xl = xa + yt*sin_c
             yl = yc - yt*cos_c
 
-            xu = xu*ca_in + x0
-            yu = yu*ca_in + y0
+            xu = xu*ca_in
+            yu = yu*ca_in
 
-            xl = xl*ca_in + x0
-            yl = yl*ca_in + y0
+            xl = xl*ca_in
+            yl = yl*ca_in
 
             airfoil_grid_u(i + 1)%x = xu
             airfoil_grid_u(i + 1)%y = yu
@@ -418,27 +402,22 @@ contains
 
         end do
 
-        airfoil_grid_u(Np)%x = x0 + ca_in
-        airfoil_grid_u(Np)%y = y0
+        airfoil_grid_u(Np)%x = ca_in
+        airfoil_grid_u(Np)%y = 0._wp
 
-        airfoil_grid_l(Np)%x = x0 + ca_in
-        airfoil_grid_l(Np)%y = y0
+        airfoil_grid_l(Np)%x = ca_in
+        airfoil_grid_l(Np)%y = 0._wp
 
         do l = 0, p
-            if (z_cc(l) >= z_min .and. z_cc(l) <= z_max) then
-                do j = 0, n
-                    do i = 0, m
+            do j = 0, n
+                do i = 0, m
+                    xyz_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, z_cc(l) - z_centroid] ! get coordinate frame centered on IB
+                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
 
-                        if (.not. f_is_default(patch_ib(patch_id)%theta)) then
-                            x_act = (x_cc(i) - x0)*cos(theta) - (y_cc(j) - y0)*sin(theta) + x0
-                            y_act = (x_cc(i) - x0)*sin(theta) + (y_cc(j) - y0)*cos(theta) + y0
-                        else
-                            x_act = x_cc(i)
-                            y_act = y_cc(j)
-                        end if
+                    if (xyz_local(3) >= z_min .and. xyz_local(3) <= z_max) then
 
-                        if (x_act >= x0 .and. x_act <= x0 + ca_in) then
-                            xa = (x_act - x0)/ca_in
+                        if (xyz_local(1) >= 0._wp .and. xyz_local(1) <= ca_in) then
+                            xa = xyz_local(1)/ca_in
                             if (xa <= pa) then
                                 yc = (ma/pa**2)*(2*pa*xa - xa**2)
                                 dycdxc = (2*ma/pa**2)*(pa - xa)
@@ -446,57 +425,47 @@ contains
                                 yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
                                 dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
                             end if
-                            if (y_act >= y0) then
+                            if (xyz_local(2) >= 0._wp) then
                                 k = 1
-                                do while (airfoil_grid_u(k)%x < x_act)
+                                do while (airfoil_grid_u(k)%x < xyz_local(1))
                                     k = k + 1
                                 end do
-                                if (f_approx_equal(airfoil_grid_u(k)%x, x_act)) then
-                                    if (y_act <= airfoil_grid_u(k)%y) then
+                                if (f_approx_equal(airfoil_grid_u(k)%x, xyz_local(1))) then
+                                    if (xyz_local(2) <= airfoil_grid_u(k)%y) then
                                         !!IB
                                         ib_markers_sf(i, j, l) = patch_id
                                     end if
                                 else
-                                    f = (airfoil_grid_u(k)%x - x_act)/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
-                                    if (y_act <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
+                                    f = (airfoil_grid_u(k)%x - xyz_local(1))/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
+                                    if (xyz_local(2) <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
                                         !!IB
                                         ib_markers_sf(i, j, l) = patch_id
                                     end if
                                 end if
                             else
                                 k = 1
-                                do while (airfoil_grid_l(k)%x < x_act)
+                                do while (airfoil_grid_l(k)%x < xyz_local(1))
                                     k = k + 1
                                 end do
-                                if (f_approx_equal(airfoil_grid_l(k)%x, x_act)) then
-                                    if (y_act >= airfoil_grid_l(k)%y) then
+                                if (f_approx_equal(airfoil_grid_l(k)%x, xyz_local(1))) then
+                                    if (xyz_local(2) >= airfoil_grid_l(k)%y) then
                                         !!IB
                                         ib_markers_sf(i, j, l) = patch_id
                                     end if
                                 else
-                                    f = (airfoil_grid_l(k)%x - x_act)/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
+                                    f = (airfoil_grid_l(k)%x - xyz_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
-                                    if (y_act >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
+                                    if (xyz_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
                                         !!IB
                                         ib_markers_sf(i, j, l) = patch_id
                                     end if
                                 end if
                             end if
                         end if
-                    end do
+                    end if
                 end do
-            end if
-        end do
-
-        if (.not. f_is_default(patch_ib(patch_id)%theta)) then
-            do i = 1, Np
-                airfoil_grid_l(i)%x = (airfoil_grid_l(i)%x - x0)*cos(theta) + (airfoil_grid_l(i)%y - y0)*sin(theta) + x0
-                airfoil_grid_l(i)%y = -1._wp*(airfoil_grid_l(i)%x - x0)*sin(theta) + (airfoil_grid_l(i)%y - y0)*cos(theta) + y0
-
-                airfoil_grid_u(i)%x = (airfoil_grid_u(i)%x - x0)*cos(theta) + (airfoil_grid_u(i)%y - y0)*sin(theta) + x0
-                airfoil_grid_u(i)%y = -1._wp*(airfoil_grid_u(i)%x - x0)*sin(theta) + (airfoil_grid_u(i)%y - y0)*cos(theta) + y0
             end do
-        end if
+        end do
 
     end subroutine s_ib_3D_airfoil
 
