@@ -287,9 +287,9 @@ contains
                     (xy_local(2) > bottom_left(2) .and. xy_local(2) < top_right(2))) then
 
                     side_dists(1) = bottom_left(1) - xy_local(1)
-                    side_dists(2) = xy_local(1) - top_right(1)
+                    side_dists(2) = top_right(1)   - xy_local(1)
                     side_dists(3) = bottom_left(2) - xy_local(2)
-                    side_dists(4) = xy_local(2) - top_right(2)
+                    side_dists(4) = top_right(2)   - xy_local(2)
                     min_dist = initial_distance_buffer
                     idx = 1
 
@@ -312,8 +312,8 @@ contains
                                                                         abs(side_dists(idx))
                         end if
                         ! convert the normal vector back into the global coordinate system
-                        levelset_norm%sf(i, j, 0, ib_patch_id, 1) = &
-                            matmul(rotation, levelset_norm%sf(i, j, 0, ib_patch_id, 1))
+                        levelset_norm%sf(i, j, 0, ib_patch_id, :) = &
+                            matmul(rotation, levelset_norm%sf(i, j, 0, ib_patch_id, :))
                     else
                         levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0._wp
                     end if
@@ -338,7 +338,7 @@ contains
         real(wp), dimension(1:3) :: xyz_local !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
-        integer :: i, j, k !< Loop index variables
+        integer :: i, j, k, l, idx !< Loop index variables
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
@@ -364,81 +364,49 @@ contains
             do j = 0, n
                 do k = 0, p
 
-                    x = x_cc(i)
-                    y = y_cc(j)
-                    z = z_cc(k)
+                    xyz_local = [x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid] ! get coordinate frame centered on IB
+                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
 
-                    if ((x > Left .and. x < Right) .or. &
-                        (y > Bottom .and. y < Top) .or. &
-                        (z > Back .and. z < Front)) then
+                    if ((xyz_local(1) > Left .and. xyz_local(1) < Right) .or. &
+                        (xyz_local(2) > Bottom .and. xyz_local(2) < Top) .or. &
+                        (xyz_local(3) > Back .and. xyz_local(3) < Front)) then
 
-                        side_dists(1) = Left - x
-                        side_dists(2) = x - Right
-                        side_dists(3) = Bottom - y
-                        side_dists(4) = y - Top
-                        side_dists(5) = Back - z
-                        side_dists(6) = z - Front
+                        side_dists(1) = Left - xyz_local(1)
+                        side_dists(2) = Right - xyz_local(1)
+                        side_dists(3) = Bottom - xyz_local(2)
+                        side_dists(4) = Top - xyz_local(2)
+                        side_dists(5) = Back - xyz_local(3)
+                        side_dists(6) = Front - xyz_local(3)
 
-                        min_dist = minval(abs(side_dists))
-
-                        if (f_approx_equal(min_dist, abs(side_dists(1)))) then
-                            levelset%sf(i, j, k, ib_patch_id) = side_dists(1)
-                            if (f_approx_equal(side_dists(1), 0._wp)) then
-                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = 0._wp
-                            else
-                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = side_dists(1)/ &
-                                                                            abs(side_dists(1))
+                        ! get the minimal_distance
+                        min_dist = side_dists(1)
+                        idx = 1
+                        do l = 2, 6
+                            if (abs(side_dists(l)) < abs(min_dist)) then
+                                idx = l
+                                min_dist = side_dists(idx)
                             end if
+                        end do
 
-                        else if (f_approx_equal(min_dist, abs(side_dists(2)))) then
-                            levelset%sf(i, j, k, ib_patch_id) = side_dists(2)
-                            if (f_approx_equal(side_dists(2), 0._wp)) then
-                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = 0._wp
+                        levelset%sf(i, j, k, ib_patch_id) = min_dist
+                        if (f_approx_equal(min_dist, 0._wp)) then
+                            levelset_norm%sf(i, j, k, ib_patch_id, :) = 0._wp
+                        else
+                            if (idx == 1 .or. idx == 2) then
+                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = side_dists(idx)/ &
+                                                                                abs(side_dists(idx))
+                            else if (idx == 3 .or. idx == 4) then
+                                levelset_norm%sf(i, j, k, ib_patch_id, 2) = side_dists(idx)/ &
+                                                                                abs(side_dists(idx))
                             else
-                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = -side_dists(2)/ &
-                                                                            abs(side_dists(2))
+                                levelset_norm%sf(i, j, k, ib_patch_id, 2) = side_dists(idx)/ &
+                                                                                abs(side_dists(idx))
                             end if
-
-                        else if (f_approx_equal(min_dist, abs(side_dists(3)))) then
-                            levelset%sf(i, j, k, ib_patch_id) = side_dists(3)
-                            if (f_approx_equal(side_dists(3), 0._wp)) then
-                                levelset_norm%sf(i, j, k, ib_patch_id, 2) = 0._wp
-                            else
-                                levelset_norm%sf(i, j, k, ib_patch_id, 2) = side_dists(3)/ &
-                                                                            abs(side_dists(3))
-                            end if
-
-                        else if (f_approx_equal(min_dist, abs(side_dists(4)))) then
-                            levelset%sf(i, j, k, ib_patch_id) = side_dists(4)
-                            if (f_approx_equal(side_dists(4), 0._wp)) then
-                                levelset_norm%sf(i, j, k, ib_patch_id, 2) = 0._wp
-                            else
-                                levelset_norm%sf(i, j, k, ib_patch_id, 2) = -side_dists(4)/ &
-                                                                            abs(side_dists(4))
-                            end if
-
-                        else if (f_approx_equal(min_dist, abs(side_dists(5)))) then
-                            levelset%sf(i, j, k, ib_patch_id) = side_dists(5)
-                            if (f_approx_equal(side_dists(5), 0._wp)) then
-                                levelset_norm%sf(i, j, k, ib_patch_id, 3) = 0._wp
-                            else
-                                levelset_norm%sf(i, j, k, ib_patch_id, 3) = side_dists(5)/ &
-                                                                            abs(side_dists(5))
-                            end if
-
-                        else if (f_approx_equal(min_dist, abs(side_dists(6)))) then
-                            levelset%sf(i, j, k, ib_patch_id) = side_dists(6)
-                            if (f_approx_equal(side_dists(6), 0._wp)) then
-                                levelset_norm%sf(i, j, k, ib_patch_id, 3) = 0._wp
-                            else
-                                levelset_norm%sf(i, j, k, ib_patch_id, 3) = -side_dists(6)/ &
-                                                                            abs(side_dists(6))
-                            end if
-
+                            ! convert the normal vector back into the global coordinate system
+                            levelset_norm%sf(i, j, k, ib_patch_id, :) = &
+                                matmul(rotation, levelset_norm%sf(i, j, k, ib_patch_id, :))
                         end if
-
                     end if
-
                 end do
             end do
         end do
