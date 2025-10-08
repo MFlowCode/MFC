@@ -635,6 +635,8 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
         integer :: i, j, k !< Generic loop iterators
+        real(wp), dimension(1:3) :: xyz_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         ! Transferring the cuboid's centroid and length information
         x_centroid = patch_ib(patch_id)%x_centroid
@@ -643,15 +645,16 @@ contains
         length_x = patch_ib(patch_id)%length_x
         length_y = patch_ib(patch_id)%length_y
         length_z = patch_ib(patch_id)%length_z
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! Computing the beginning and the end x-, y- and z-coordinates of
         ! the cuboid based on its centroid and lengths
-        x_boundary%beg = x_centroid - 0.5_wp*length_x
-        x_boundary%end = x_centroid + 0.5_wp*length_x
-        y_boundary%beg = y_centroid - 0.5_wp*length_y
-        y_boundary%end = y_centroid + 0.5_wp*length_y
-        z_boundary%beg = z_centroid - 0.5_wp*length_z
-        z_boundary%end = z_centroid + 0.5_wp*length_z
+        x_boundary%beg = -0.5_wp*length_x
+        x_boundary%end =  0.5_wp*length_x
+        y_boundary%beg = -0.5_wp*length_y
+        y_boundary%end =  0.5_wp*length_y
+        z_boundary%beg = -0.5_wp*length_z
+        z_boundary%end =  0.5_wp*length_z
 
         ! Since the cuboidal patch does not allow for its boundaries to get
         ! smoothed out, the pseudo volume fraction is set to 1 to make sure
@@ -668,18 +671,21 @@ contains
                 do i = 0, m
 
                     if (grid_geometry == 3) then
+                        ! TODO :: This does not work and is not covered by any tests. This should be fixed
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
                         cart_y = y_cc(j)
                         cart_z = z_cc(k)
                     end if
+                    xyz_local = [x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid] ! get coordinate frame centered on IB
+                    xyz_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordiantes
 
-                    if (x_boundary%beg <= x_cc(i) .and. &
-                        x_boundary%end >= x_cc(i) .and. &
-                        y_boundary%beg <= cart_y .and. &
-                        y_boundary%end >= cart_y .and. &
-                        z_boundary%beg <= cart_z .and. &
-                        z_boundary%end >= cart_z) then
+                    if (x_boundary%beg <= xyz_local(1) .and. &
+                        x_boundary%end >= xyz_local(1) .and. &
+                        y_boundary%beg <= xyz_local(2) .and. &
+                        y_boundary%end >= xyz_local(2) .and. &
+                        z_boundary%beg <= xyz_local(3) .and. &
+                        z_boundary%end >= xyz_local(3)) then
 
                         ! Updating the patch identities bookkeeping variable
                         ib_markers_sf(i, j, k) = patch_id
@@ -748,24 +754,26 @@ contains
                         cart_y = y_cc(j)
                         cart_z = z_cc(k)
                     end if
+                    xyz_local = [x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid] ! get coordinate frame centered on IB
+                    xyz_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordiantes
 
                     if (((.not. f_is_default(length_x) .and. &
-                          (cart_y - y_centroid)**2 &
-                          + (cart_z - z_centroid)**2 <= radius**2 .and. &
-                          x_boundary%beg <= x_cc(i) .and. &
-                          x_boundary%end >= x_cc(i)) &
+                          xyz_local(2)**2 &
+                          + xyz_local(3)**2 <= radius**2 .and. &
+                          x_boundary%beg <= xyz_local(1) .and. &
+                          x_boundary%end >= xyz_local(1)) &
                          .or. &
                          (.not. f_is_default(length_y) .and. &
-                          (x_cc(i) - x_centroid)**2 &
-                          + (cart_z - z_centroid)**2 <= radius**2 .and. &
-                          y_boundary%beg <= cart_y .and. &
-                          y_boundary%end >= cart_y) &
+                          xyz_local(1)**2 &
+                          + xyz_local(3)**2 <= radius**2 .and. &
+                          y_boundary%beg <= xyz_local(2) .and. &
+                          y_boundary%end >= xyz_local(2)) &
                          .or. &
                          (.not. f_is_default(length_z) .and. &
-                          (x_cc(i) - x_centroid)**2 &
-                          + (cart_y - y_centroid)**2 <= radius**2 .and. &
-                          z_boundary%beg <= cart_z .and. &
-                          z_boundary%end >= cart_z))) then
+                          xyz_local(1)**2 &
+                          + xyz_local(2)**2 <= radius**2 .and. &
+                          z_boundary%beg <= xyz_local(3) .and. &
+                          z_boundary%end >= xyz_local(3)))) then
 
                         ! Updating the patch identities bookkeeping variable
                         ib_markers_sf(i, j, k) = patch_id
