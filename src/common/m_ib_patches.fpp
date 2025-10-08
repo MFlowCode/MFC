@@ -180,7 +180,7 @@ contains
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
-        real(wp) :: f, ca_in, pa, ma, ta, theta
+        real(wp) :: f, ca_in, pa, ma, ta
         real(wp) :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k
         integer :: Np1, Np2
@@ -194,7 +194,6 @@ contains
         pa = patch_ib(patch_id)%p
         ma = patch_ib(patch_id)%m
         ta = patch_ib(patch_id)%t
-        theta = pi*patch_ib(patch_id)%theta/180._wp
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
@@ -340,6 +339,7 @@ contains
         pa = patch_ib(patch_id)%p
         ma = patch_ib(patch_id)%m
         ta = patch_ib(patch_id)%t
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
 #ifdef MFC_PRE_PROCESS
@@ -653,7 +653,7 @@ contains
                         cart_z = z_cc(k)
                     end if
                     xyz_local = [x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid] ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordiantes
+                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
 
                     if (x_boundary%beg <= xyz_local(1) .and. &
                         x_boundary%end >= xyz_local(1) .and. &
@@ -733,7 +733,7 @@ contains
                         cart_z = z_cc(k)
                     end if
                     xyz_local = [x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid] ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordiantes
+                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
 
                     if (((.not. f_is_default(length_x) .and. &
                           xyz_local(2)**2 &

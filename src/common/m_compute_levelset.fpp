@@ -65,36 +65,35 @@ contains
 
     pure subroutine s_airfoil_levelset(ib_patch_id, levelset, levelset_norm)
 
-        type(levelset_field), intent(INOUT), optional :: levelset
-        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
-        integer, intent(IN) :: ib_patch_id
+        type(levelset_field), intent(inout), optional :: levelset
+        type(levelset_norm_field), intent(inout), optional :: levelset_norm
+        integer, intent(in) :: ib_patch_id
 
         real(wp) :: dist, global_dist
         integer :: global_id
-        real(wp) :: x_centroid, y_centroid, x_act, y_act, theta
+        real(wp) :: x_centroid, y_centroid
         real(wp), dimension(3) :: dist_vec
+
+        real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
         integer :: i, j, k !< Loop index variables
 
         x_centroid = patch_ib(ib_patch_id)%x_centroid
         y_centroid = patch_ib(ib_patch_id)%y_centroid
-        theta = pi*patch_ib(ib_patch_id)%theta/180._wp
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+        rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
 
         do i = 0, m
             do j = 0, n
+                xy_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp] ! get coordinate frame centered on IB
+                xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordiantes
 
-                if (.not. f_is_default(patch_ib(ib_patch_id)%theta)) then
-                    x_act = (x_cc(i) - x_centroid)*cos(theta) - (y_cc(j) - y_centroid)*sin(theta) + x_centroid
-                    y_act = (x_cc(i) - x_centroid)*sin(theta) + (y_cc(j) - y_centroid)*cos(theta) + y_centroid
-                else
-                    x_act = x_cc(i)
-                    y_act = y_cc(j)
-                end if
-
-                if (y_act >= y_centroid) then
+                if (xy_local(2) >= 0._wp) then
                     do k = 1, Np
-                        dist_vec(1) = x_cc(i) - airfoil_grid_u(k)%x
-                        dist_vec(2) = y_cc(j) - airfoil_grid_u(k)%y
+                        ! TODO :: I think that witht he IBM implementation that airfoil_grid_u(k).y = 0._wp for all indices. Delete?
+                        dist_vec(1) = xy_local(1) - airfoil_grid_u(k)%x
+                        dist_vec(2) = xy_local(2) - airfoil_grid_u(k)%y
                         dist_vec(3) = 0
                         dist = sqrt(sum(dist_vec**2))
                         if (k == 1) then
@@ -107,14 +106,14 @@ contains
                             end if
                         end if
                     end do
-                    dist_vec(1) = x_cc(i) - airfoil_grid_u(global_id)%x
-                    dist_vec(2) = y_cc(j) - airfoil_grid_u(global_id)%y
+                    dist_vec(1) = xy_local(1) - airfoil_grid_u(global_id)%x
+                    dist_vec(2) = xy_local(2) - airfoil_grid_u(global_id)%y
                     dist_vec(3) = 0
                     dist = global_dist
                 else
                     do k = 1, Np
-                        dist_vec(1) = x_cc(i) - airfoil_grid_l(k)%x
-                        dist_vec(2) = y_cc(j) - airfoil_grid_l(k)%y
+                        dist_vec(1) = xy_local(1) - airfoil_grid_l(k)%x
+                        dist_vec(2) = xy_local(2) - airfoil_grid_l(k)%y
                         dist_vec(3) = 0
                         dist = sqrt(sum(dist_vec**2))
                         if (k == 1) then
@@ -127,8 +126,8 @@ contains
                             end if
                         end if
                     end do
-                    dist_vec(1) = x_cc(i) - airfoil_grid_l(global_id)%x
-                    dist_vec(2) = y_cc(j) - airfoil_grid_l(global_id)%y
+                    dist_vec(1) = xy_local(1) - airfoil_grid_l(global_id)%x
+                    dist_vec(2) = xy_local(2) - airfoil_grid_l(global_id)%y
                     dist_vec(3) = 0
                     dist = global_dist
                 end if
@@ -138,7 +137,7 @@ contains
                     levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0
                 else
                     levelset_norm%sf(i, j, 0, ib_patch_id, :) = &
-                        dist_vec(:)/dist
+                        matmul(rotation, dist_vec(:)/dist) ! convert the normal vector back to global grid coordinates
                 end if
 
             end do
@@ -154,8 +153,11 @@ contains
 
         real(wp) :: dist, dist_surf, dist_side, global_dist
         integer :: global_id
-        real(wp) :: x_centroid, y_centroid, z_centroid, lz, z_max, z_min, x_act, y_act, theta
+        real(wp) :: x_centroid, y_centroid, z_centroid, lz, z_max, z_min
         real(wp), dimension(3) :: dist_vec
+
+        real(wp), dimension(1:3) :: xyz_local !< x, y, z coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
         real(wp) :: length_z
 
@@ -165,7 +167,8 @@ contains
         y_centroid = patch_ib(ib_patch_id)%y_centroid
         z_centroid = patch_ib(ib_patch_id)%z_centroid
         lz = patch_ib(ib_patch_id)%length_z
-        theta = pi*patch_ib(ib_patch_id)%theta/180._wp
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+        rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
 
         z_max = z_centroid + lz/2
         z_min = z_centroid - lz/2
@@ -174,15 +177,10 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    if (.not. f_is_default(patch_ib(ib_patch_id)%theta)) then
-                        x_act = (x_cc(i) - x_centroid)*cos(theta) - (y_cc(j) - y_centroid)*sin(theta) + x_centroid
-                        y_act = (x_cc(i) - x_centroid)*sin(theta) + (y_cc(j) - y_centroid)*cos(theta) + y_centroid
-                    else
-                        x_act = x_cc(i)
-                        y_act = y_cc(j)
-                    end if
+                    xyz_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, z_cc(l) - z_centroid] ! get coordinate frame centered on IB
+                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
 
-                    if (y_act >= y_centroid) then
+                    if (xzy_local(2) >= y_centroid) then
                         do k = 1, Np
                             dist_vec(1) = x_cc(i) - airfoil_grid_u(k)%x
                             dist_vec(2) = y_cc(j) - airfoil_grid_u(k)%y
