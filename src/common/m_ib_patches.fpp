@@ -206,8 +206,11 @@ contains
 #endif
         Np = Np1 + Np2 + 1
 
-        allocate (airfoil_grid_u(1:Np)) 
-        allocate (airfoil_grid_l(1:Np))
+        if (.not. allocated(airfoil_grid_u)) then
+          allocate (airfoil_grid_u(1:Np)) 
+          allocate (airfoil_grid_l(1:Np))
+        end if
+        
 
         ! TODO :: The below instantiations are already handles by the loop below
         airfoil_grid_u(1)%x = 0._wp

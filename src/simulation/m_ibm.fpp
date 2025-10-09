@@ -396,7 +396,6 @@ contains
         integer :: index
 
         do q = 1, num_gps
-          print *, q, num_gps
             gp = ghost_points_in(q)
             i = gp%loc(1)
             j = gp%loc(2)
