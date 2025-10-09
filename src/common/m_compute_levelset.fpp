@@ -87,14 +87,14 @@ contains
         do i = 0, m
             do j = 0, n
                 xy_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp] ! get coordinate frame centered on IB
-                xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordiantes
+                xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinate
 
                 if (xy_local(2) >= 0._wp) then
                     ! finds the location on the airfoil grid with the minimum distance (closest)
                     do k = 1, Np
                         dist_vec(1) = xy_local(1) - airfoil_grid_u(k)%x
                         dist_vec(2) = xy_local(2) - airfoil_grid_u(k)%y
-                        dist_vec(3) = 0
+                        dist_vec(3) = 0._wp
                         dist = sqrt(sum(dist_vec**2))
                         if (k == 1) then
                             global_dist = dist
@@ -135,10 +135,10 @@ contains
 
                 levelset%sf(i, j, 0, ib_patch_id) = dist
                 if (f_approx_equal(dist, 0._wp)) then
-                    levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0
+                    levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0._wp
                 else
                     levelset_norm%sf(i, j, 0, ib_patch_id, :) = &
-                        matmul(rotation, dist_vec(:)/dist) ! convert the normal vector back to global grid coordinates
+                        matmul(rotation, dist_vec(:))/dist ! convert the normal vector back to global grid coordinates
                 end if
 
             end do
@@ -179,7 +179,7 @@ contains
                 do i = 0, m
 
                     xyz_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, z_cc(l) - z_centroid] ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
+                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
 
                     if (xyz_local(2) >= y_centroid) then
                         do k = 1, Np
@@ -288,9 +288,9 @@ contains
                     (xy_local(2) > bottom_left(2) .and. xy_local(2) < top_right(2))) then
 
                     side_dists(1) = bottom_left(1) - xy_local(1)
-                    side_dists(2) = top_right(1)   - xy_local(1)
+                    side_dists(2) = top_right(1) - xy_local(1)
                     side_dists(3) = bottom_left(2) - xy_local(2)
-                    side_dists(4) = top_right(2)   - xy_local(2)
+                    side_dists(4) = top_right(2) - xy_local(2)
                     min_dist = initial_distance_buffer
                     idx = 1
 
@@ -366,7 +366,7 @@ contains
                 do k = 0, p
 
                     xyz_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, z_cc(k) - z_centroid] ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
+                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinate
 
                     if ((xyz_local(1) > Left .and. xyz_local(1) < Right) .or. &
                         (xyz_local(2) > Bottom .and. xyz_local(2) < Top) .or. &
@@ -388,13 +388,13 @@ contains
                         ! and this code should be cleaned up. I verified this behavior
                         ! with tests.
                         if (f_approx_equal(min_dist, abs(side_dists(1)))) then
-                          levelset%sf(i, j, k, ib_patch_id) = side_dists(1)
-                          if (f_approx_equal(side_dists(1), 0._wp)) then
-                              levelset_norm%sf(i, j, k, ib_patch_id, 1) = 0._wp
-                          else
-                              levelset_norm%sf(i, j, k, ib_patch_id, 1) = side_dists(1)/ &
-                                                                          abs(side_dists(1))
-                          end if
+                            levelset%sf(i, j, k, ib_patch_id) = side_dists(1)
+                            if (f_approx_equal(side_dists(1), 0._wp)) then
+                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = 0._wp
+                            else
+                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = side_dists(1)/ &
+                                                                            abs(side_dists(1))
+                            end if
 
                         else if (f_approx_equal(min_dist, abs(side_dists(2)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(2)
@@ -422,7 +422,7 @@ contains
                                 levelset_norm%sf(i, j, k, ib_patch_id, 2) = -side_dists(4)/ &
                                                                             abs(side_dists(4))
                             end if
-                            
+
                         else if (f_approx_equal(min_dist, abs(side_dists(5)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(5)
                             if (f_approx_equal(side_dists(5), 0._wp)) then
@@ -442,7 +442,7 @@ contains
                             end if
                         end if
                         levelset_norm%sf(i, j, 0, ib_patch_id, :) = &
-                              matmul(rotation, levelset_norm%sf(i, j, 0, ib_patch_id, :))
+                            matmul(rotation, levelset_norm%sf(i, j, 0, ib_patch_id, :))
                     end if
                 end do
             end do
@@ -536,7 +536,7 @@ contains
             do j = 0, n
                 do k = 0, p
                     xyz_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, z_cc(k) - z_centroid] ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
+                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
 
                     ! get distance to flat edge of cylinder
                     side_pos = dot_product(xyz_local, dist_sides_vec)
@@ -564,7 +564,7 @@ contains
                             norm2(levelset_norm%sf(i, j, k, ib_patch_id, :))
                     end if
                     levelset_norm%sf(i, j, k, ib_patch_id, :) = &
-                      matmul(rotation, levelset_norm%sf(i, j, k, ib_patch_id, :))
+                        matmul(rotation, levelset_norm%sf(i, j, k, ib_patch_id, :))
                 end do
             end do
         end do

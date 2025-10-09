@@ -207,10 +207,9 @@ contains
         Np = Np1 + Np2 + 1
 
         if (.not. allocated(airfoil_grid_u)) then
-          allocate (airfoil_grid_u(1:Np)) 
-          allocate (airfoil_grid_l(1:Np))
+            allocate (airfoil_grid_u(1:Np))
+            allocate (airfoil_grid_l(1:Np))
         end if
-        
 
         ! TODO :: The below instantiations are already handles by the loop below
         airfoil_grid_u(1)%x = 0._wp
@@ -222,7 +221,7 @@ contains
         eta = 1._wp
 
         do i = 1, Np1 + Np2 - 1
-          ! TODO :: This allcoated the upper and lower airfoil arrays, and does not need to be performed each time the IB markers are updated. Place this as a separate subroutine.
+            ! TODO :: This allocated the upper and lower airfoil arrays, and does not need to be performed each time the IB markers are updated. Place this as a separate subroutine.
             if (i <= Np1) then
                 xc = i*(pa*ca_in/Np1)
                 xa = xc/ca_in
@@ -268,7 +267,7 @@ contains
         do j = 0, n
             do i = 0, m
                 xy_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp] ! get coordinate frame centered on IB
-                xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordiantes
+                xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinates
 
                 if (xy_local(1) >= 0._wp .and. xy_local(1) <= ca_in) then
                     xa = xy_local(1)/ca_in
@@ -417,7 +416,7 @@ contains
             do j = 0, n
                 do i = 0, m
                     xyz_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, z_cc(l) - z_centroid] ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
+                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
 
                     if (xyz_local(3) >= z_min .and. xyz_local(3) <= z_max) then
 
@@ -630,11 +629,11 @@ contains
         ! Computing the beginning and the end x-, y- and z-coordinates of
         ! the cuboid based on its centroid and lengths
         x_boundary%beg = -0.5_wp*length_x
-        x_boundary%end =  0.5_wp*length_x
+        x_boundary%end = 0.5_wp*length_x
         y_boundary%beg = -0.5_wp*length_y
-        y_boundary%end =  0.5_wp*length_y
+        y_boundary%end = 0.5_wp*length_y
         z_boundary%beg = -0.5_wp*length_z
-        z_boundary%end =  0.5_wp*length_z
+        z_boundary%end = 0.5_wp*length_z
 
         ! Since the cuboidal patch does not allow for its boundaries to get
         ! smoothed out, the pseudo volume fraction is set to 1 to make sure
@@ -658,7 +657,7 @@ contains
                         cart_z = z_cc(k)
                     end if
                     xyz_local = [x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid] ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
+                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
 
                     if (x_boundary%beg <= xyz_local(1) .and. &
                         x_boundary%end >= xyz_local(1) .and. &
@@ -712,11 +711,11 @@ contains
         ! Computing the beginning and the end x-, y- and z-coordinates of
         ! the cylinder based on its centroid and lengths
         x_boundary%beg = -0.5_wp*length_x
-        x_boundary%end =  0.5_wp*length_x
+        x_boundary%end = 0.5_wp*length_x
         y_boundary%beg = -0.5_wp*length_y
-        y_boundary%end =  0.5_wp*length_y
+        y_boundary%end = 0.5_wp*length_y
         z_boundary%beg = -0.5_wp*length_z
-        z_boundary%end =  0.5_wp*length_z
+        z_boundary%end = 0.5_wp*length_z
 
         ! Initializing the pseudo volume fraction value to 1. The value will
         ! be modified as the patch is laid out on the grid, but only in the
@@ -738,7 +737,7 @@ contains
                         cart_z = z_cc(k)
                     end if
                     xyz_local = [x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid] ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordiantes
+                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
 
                     if (((.not. f_is_default(length_x) .and. &
                           xyz_local(2)**2 &
