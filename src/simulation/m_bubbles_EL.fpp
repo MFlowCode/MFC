@@ -1402,7 +1402,7 @@ contains
 
     end subroutine s_gradient_dir
 
-     !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
+    !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
         !!  @param q_time Current time
     impure subroutine s_write_lag_particles(qtime)
 

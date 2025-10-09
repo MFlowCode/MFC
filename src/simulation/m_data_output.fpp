@@ -36,7 +36,7 @@ module m_data_output
 
     implicit none
 
-    private;
+    private; 
     public :: s_initialize_data_output_module, &
               s_open_run_time_information_file, &
               s_open_com_files, &
@@ -161,11 +161,11 @@ contains
             trim('Time-step'), trim('dt'), trim('Time'), trim('ICFL Max')
 
         if (viscous) then
-            write(3, '(13X,A10,13X,A16)', advance="no") &
+            write (3, '(13X,A10,13X,A16)', advance="no") &
                 trim('VCFL Max'), trim('Rc Min')
         end if
 
-        write(3, *) ! new line
+        write (3, *) ! new line
 
     end subroutine s_open_run_time_information_file
 
@@ -359,7 +359,7 @@ contains
                     Rc_min_glb
             end if
 
-            write(3, *) ! new line
+            write (3, *) ! new line
 
             if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
                 call s_mpi_abort('ICFL is NaN. Exiting.')

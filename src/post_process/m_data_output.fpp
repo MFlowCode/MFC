@@ -1257,8 +1257,7 @@ contains
 
     end subroutine s_write_lag_bubbles_results_to_text
 
-
- impure subroutine s_write_lag_bubbles_to_formatted_database_file(t_step)
+    impure subroutine s_write_lag_bubbles_to_formatted_database_file(t_step)
 
         integer, intent(in) :: t_step
 
@@ -1360,9 +1359,9 @@ contains
         if (nBub > 0) then
 
             #:for VAR in ['bub_id', 'px', 'py', 'pz', 'ppx', 'ppy', 'ppz', 'vx', 'vy', 'vz', &
-                          'radius', 'rvel', 'rnot', 'rmax', 'rmin', 'dphidt', &
-                          'pressure', 'mv', 'mg', 'betaT', 'betaC']
-                allocate(${VAR}$(nBub))
+                'radius', 'rvel', 'rnot', 'rmax', 'rmin', 'dphidt', &
+                'pressure', 'mv', 'mg', 'betaT', 'betaC']
+                allocate (${VAR}$ (nBub))
             #:endfor
             allocate (MPI_IO_DATA_lg_bubbles(nBub, 1:lag_io_vars))
 
@@ -1387,10 +1386,10 @@ contains
             ! Extract data from MPI_IO_DATA_lg_bubbles array
             ! Adjust these indices based on your actual data layout
             #:for VAR, IDX in [('bub_id', 1), ('px', 2), ('py',3), ('pz',4), ('ppx',5), ('ppy',6), ('ppz',7), &
-                              ('vx',8), ('vy',9), ('vz',10), ('radius',11), ('rvel',12), &
-                              ('rnot',13), ('rmax',14), ('rmin',15), ('dphidt',16), &
-                              ('pressure',17), ('mv',18), ('mg',19), ('betaT',20), ('betaC',21)]
-                ${VAR}$(:) = MPI_IO_DATA_lg_bubbles(:, ${IDX}$) 
+                ('vx',8), ('vy',9), ('vz',10), ('radius',11), ('rvel',12), &
+                ('rnot',13), ('rmax',14), ('rmin',15), ('dphidt',16), &
+                ('pressure',17), ('mv',18), ('mg',19), ('betaT',20), ('betaC',21)]
+                ${VAR}$ (:) = MPI_IO_DATA_lg_bubbles(:, ${IDX}$)
             #:endfor
 
             ! Next, the root processor proceeds to record all of the spatial
