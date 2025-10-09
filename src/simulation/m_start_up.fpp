@@ -581,7 +581,6 @@ contains
                 if (patch_ib(i)%c > 0) then
                     Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0))*20) + 1
                     allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
-                    print *, "HERE Np", Np
                 end if
             end do
         end if
@@ -942,8 +941,6 @@ contains
 
             do j = 1, num_ibs
                 if (patch_ib(j)%c > 0) then
-
-                    print *, "HERE Np", Np
 
                     allocate (airfoil_grid_u(1:Np))
                     allocate (airfoil_grid_l(1:Np))

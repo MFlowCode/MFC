@@ -90,8 +90,8 @@ contains
                 xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordiantes
 
                 if (xy_local(2) >= 0._wp) then
+                    ! finds the location on the airfoil grid with the minimum distance (closest)
                     do k = 1, Np
-                        ! TODO :: I think that witht he IBM implementation that airfoil_grid_u(k).y = 0._wp for all indices. Delete?
                         dist_vec(1) = xy_local(1) - airfoil_grid_u(k)%x
                         dist_vec(2) = xy_local(2) - airfoil_grid_u(k)%y
                         dist_vec(3) = 0
@@ -111,6 +111,7 @@ contains
                     dist_vec(3) = 0
                     dist = global_dist
                 else
+                    ! TODO :: This looks identical to the above code but using the lower array. Refactor this.
                     do k = 1, Np
                         dist_vec(1) = xy_local(1) - airfoil_grid_l(k)%x
                         dist_vec(2) = xy_local(2) - airfoil_grid_l(k)%y

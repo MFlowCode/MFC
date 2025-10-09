@@ -209,6 +209,7 @@ contains
         allocate (airfoil_grid_u(1:Np)) 
         allocate (airfoil_grid_l(1:Np))
 
+        ! TODO :: The below instantiations are already handles by the loop below
         airfoil_grid_u(1)%x = 0._wp
         airfoil_grid_u(1)%y = 0._wp
 
@@ -218,6 +219,7 @@ contains
         eta = 1._wp
 
         do i = 1, Np1 + Np2 - 1
+          ! TODO :: This allcoated the upper and lower airfoil arrays, and does not need to be performed each time the IB markers are updated. Place this as a separate subroutine.
             if (i <= Np1) then
                 xc = i*(pa*ca_in/Np1)
                 xa = xc/ca_in
@@ -274,19 +276,19 @@ contains
                         yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
                         dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
                     end if
-                    if (xy_local(1) >= 0._wp) then
+                    if (xy_local(2) >= 0._wp) then
                         k = 1
                         do while (airfoil_grid_u(k)%x < xy_local(1) .and. k <= Np)
                             k = k + 1
                         end do
                         if (f_approx_equal(airfoil_grid_u(k)%x, xy_local(1))) then
-                            if (xy_local(1) <= airfoil_grid_u(k)%y) then
+                            if (xy_local(2) <= airfoil_grid_u(k)%y) then
                                 !!IB
                                 ib_markers_sf(i, j, 0) = patch_id
                             end if
                         else
                             f = (airfoil_grid_u(k)%x - xy_local(1))/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
-                            if (xy_local(1) <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
+                            if (xy_local(2) <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
                                 !!IB
                                 ib_markers_sf(i, j, 0) = patch_id
                             end if
@@ -297,14 +299,14 @@ contains
                             k = k + 1
                         end do
                         if (f_approx_equal(airfoil_grid_l(k)%x, xy_local(1))) then
-                            if (xy_local(1) >= airfoil_grid_l(k)%y) then
+                            if (xy_local(2) >= airfoil_grid_l(k)%y) then
                                 !!IB
                                 ib_markers_sf(i, j, 0) = patch_id
                             end if
                         else
                             f = (airfoil_grid_l(k)%x - xy_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
-                            if (xy_local(1) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
+                            if (xy_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
                                 !!IB
                                 ib_markers_sf(i, j, 0) = patch_id
                             end if

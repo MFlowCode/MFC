@@ -396,6 +396,7 @@ contains
         integer :: index
 
         do q = 1, num_gps
+          print *, q, num_gps
             gp = ghost_points_in(q)
             i = gp%loc(1)
             j = gp%loc(2)
@@ -445,7 +446,6 @@ contains
                                .or. temp_loc > s_cc(index + 1)))
                         index = index + dir
                         if (index < -buff_size .or. index > bound) then
-                            print *, q, index, bound, buff_size
                             print *, "temp_loc=", temp_loc, " s_cc(index)=", s_cc(index), " s_cc(index+1)=", s_cc(index + 1)
                             print *, "Increase buff_size further in m_helper_basic (currently set to a minimum of 10)"
                             error stop "Increase buff_size"
