@@ -529,6 +529,8 @@ contains
                 gas_mg(i) = MPI_IO_DATA_lag_bubbles(i, 19)
                 gas_betaT(i) = MPI_IO_DATA_lag_bubbles(i, 20)
                 gas_betaC(i) = MPI_IO_DATA_lag_bubbles(i, 21)
+                cell = -buff_size
+                call s_locate_cell(mtn_pos(i, 1:3, 1), cell, mtn_s(i, 1:3, 1))
             end do
 
             deallocate (MPI_IO_DATA_lag_bubbles)
@@ -1402,7 +1404,7 @@ contains
 
     end subroutine s_gradient_dir
 
-     !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
+    !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
         !!  @param q_time Current time
     impure subroutine s_write_lag_particles(qtime)
 

@@ -59,7 +59,7 @@ contains
 
         #:for DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (bf_${XYZ}$) then
-                accel_bf(${DIR}$) = g_${XYZ}$ + k_${XYZ}$*sin(w_${XYZ}$*t - p_${XYZ}$)
+                accel_bf(${DIR}$) = g_${XYZ}$+k_${XYZ}$*sin(w_${XYZ}$*t - p_${XYZ}$)
             end if
         #:endfor
 

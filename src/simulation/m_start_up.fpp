@@ -1261,7 +1261,9 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            $:GPU_UPDATE(host='[intfc_rad]')
+            $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, &
+                & intfc_vel, bub_R0, Rmax_stats, Rmin_stats, bub_dphidt, gas_p, &
+                & gas_mv, gas_mg, gas_betaT, gas_betaC]')
             do i = 1, nBubs
                 if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
                     call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
@@ -1270,7 +1272,7 @@ contains
 
             $:GPU_UPDATE(host='[q_beta%vf(1)%sf]')
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta%vf(1))
-            $:GPU_UPDATE(host='[Rmax_stats,Rmin_stats,gas_p,gas_mv,intfc_vel]')
+
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
