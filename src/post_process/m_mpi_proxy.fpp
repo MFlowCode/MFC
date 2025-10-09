@@ -106,9 +106,18 @@ contains
             & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange',        &
             & 'output_partial_domain', 'relativity', 'cont_damage', 'bc_io',   &
             & 'down_sample' ]
-
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
+
+        if (bubbles_lagrange) then
+            #:for VAR in ['lag_header', 'lag_txt_wrt', 'lag_db_wrt', 'lag_id_wrt',         &
+                & 'lag_pos_wrt', 'lag_pos_prev_wrt', 'lag_vel_wrt', 'lag_rad_wrt', &
+                & 'lag_rvel_wrt', 'lag_r0_wrt', 'lag_rmax_wrt', 'lag_rmin_wrt',    &
+                & 'lag_dphidt_wrt', 'lag_pres_wrt', 'lag_mv_wrt', 'lag_mg_wrt',    &
+                & 'lag_betaT_wrt', 'lag_betaC_wrt', 'bc_io', 'down_sample' ]
+                call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end if
 
         call MPI_BCAST(flux_wrt(1), 3, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(omega_wrt(1), 3, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)

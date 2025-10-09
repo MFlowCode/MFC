@@ -258,6 +258,24 @@ module m_global_parameters
     logical :: ib
     logical :: chem_wrt_Y(1:num_species)
     logical :: chem_wrt_T
+    logical :: lag_header
+    logical :: lag_txt_wrt
+    logical :: lag_db_wrt
+    logical :: lag_id_wrt
+    logical :: lag_pos_wrt
+    logical :: lag_pos_prev_wrt
+    logical :: lag_vel_wrt
+    logical :: lag_rad_wrt
+    logical :: lag_rvel_wrt
+    logical :: lag_r0_wrt
+    logical :: lag_rmax_wrt
+    logical :: lag_rmin_wrt
+    logical :: lag_dphidt_wrt
+    logical :: lag_pres_wrt
+    logical :: lag_mv_wrt
+    logical :: lag_mg_wrt
+    logical :: lag_betaT_wrt
+    logical :: lag_betaC_wrt
     !> @}
 
     real(wp), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -328,6 +346,8 @@ module m_global_parameters
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
+
+    real(wp) :: wall_time, wall_time_avg !< Wall time measurements
 
 contains
 
@@ -438,6 +458,24 @@ contains
         sim_data = .false.
         cf_wrt = .false.
         ib = .false.
+        lag_txt_wrt = .false.
+        lag_header = .true.
+        lag_db_wrt = .false.
+        lag_id_wrt = .true.
+        lag_pos_wrt = .true.
+        lag_pos_prev_wrt = .false.
+        lag_vel_wrt = .true.
+        lag_rad_wrt = .true.
+        lag_rvel_wrt = .false.
+        lag_r0_wrt = .false.
+        lag_rmax_wrt = .false.
+        lag_rmin_wrt = .false.
+        lag_dphidt_wrt = .false.
+        lag_pres_wrt = .false.
+        lag_mv_wrt = .false.
+        lag_mg_wrt = .false.
+        lag_betaT_wrt = .false.
+        lag_betaC_wrt = .false.
 
         schlieren_alpha = dflt_real
 

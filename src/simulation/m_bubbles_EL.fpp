@@ -226,7 +226,7 @@ contains
                 do while (ios == 0)
                     read (94, *, iostat=ios) (inputBubble(i), i=1, 8)
                     if (ios /= 0) cycle
-                    indomain = particle_in_domain(inputBubble(1:3))
+                    indomain = particle_in_domain_physical(inputBubble(1:3))
                     id = id + 1
                     if (id > lag_params%nBubs_glb .and. proc_rank == 0) then
                         call s_mpi_abort("Current number of bubbles is larger than nBubs_glb")
@@ -324,25 +324,25 @@ contains
         cell = -buff_size
         call s_locate_cell(mtn_pos(bub_id, 1:3, 1), cell, mtn_s(bub_id, 1:3, 1))
 
-        ! Check if the bubble is located in the ghost cell of a symmetric boundary
-        if ((bc_x%beg == BC_REFLECTIVE .and. cell(1) < 0) .or. &
-            (bc_x%end == BC_REFLECTIVE .and. cell(1) > m) .or. &
-            (bc_y%beg == BC_REFLECTIVE .and. cell(2) < 0) .or. &
-            (bc_y%end == BC_REFLECTIVE .and. cell(2) > n)) then
-            call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric boundary.")
+        ! Check if the bubble is located in the ghost cell of a symmetric, or wall boundary
+        if ((any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(1) < 0) .or. &
+            (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(1) > m) .or. &
+            (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(2) < 0) .or. &
+            (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(2) > n)) then
+            call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric or wall boundary.")
         end if
 
         if (p > 0) then
-            if ((bc_z%beg == BC_REFLECTIVE .and. cell(3) < 0) .or. &
-                (bc_z%end == BC_REFLECTIVE .and. cell(3) > p)) then
-                call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric boundary.")
+            if ((any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(3) < 0) .or. &
+                (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(3) > p)) then
+                call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric or wall boundary.")
             end if
         end if
 
         ! If particle is in the ghost cells, find the closest non-ghost cell
-        cell(1) = min(max(cell(1), 0), m)
-        cell(2) = min(max(cell(2), 0), n)
-        if (p > 0) cell(3) = min(max(cell(3), 0), p)
+        !cell(1) = min(max(cell(1), 0), m)
+        !cell(2) = min(max(cell(2), 0), n)
+        !if (p > 0) cell(3) = min(max(cell(3), 0), p)
         call s_convert_to_mixture_variables(q_cons_vf, cell(1), cell(2), cell(3), &
                                             rhol, gamma, pi_inf, qv, Re)
         dynP = 0._wp
@@ -405,6 +405,8 @@ contains
         integer, intent(inout) :: bub_id, save_count
 
         character(LEN=path_len + 2*name_len) :: file_loc
+        real(wp) :: file_time, file_dt
+        integer :: file_num_procs, file_tot_part, tot_part
 
 #ifdef MFC_MPI
         real(wp), dimension(20) :: inputvals
@@ -419,81 +421,144 @@ contains
         integer :: ifile, ierr, tot_data, id
         integer :: i
 
-        write (file_loc, '(a,i0,a)') 'lag_bubbles_mpi_io_', save_count, '.dat'
-        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-        inquire (file=trim(file_loc), exist=file_exist)
+        integer, dimension(:), allocatable :: proc_bubble_counts
+        real(wp), dimension(1:1, 1:lag_io_vars) :: dummy
+        dummy = 0._wp
 
-        if (file_exist) then
-            if (proc_rank == 0) then
-                open (9, file=trim(file_loc), form='unformatted', status='unknown')
-                read (9) tot_data, mytime, dt
-                close (9)
-                print *, 'Reading lag_bubbles_mpi_io: ', tot_data, mytime, dt
-            end if
-        else
-            print '(a)', trim(file_loc)//' is missing. exiting.'
-            call s_mpi_abort
+        ! Construct file path
+        write (file_loc, '(A,I0,A)') 'lag_bubbles_', save_count, '.dat'
+        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+
+        ! Check if file exists
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if (.not. file_exist) then
+            call s_mpi_abort('Restart file '//trim(file_loc)//' does not exist!')
         end if
 
-        call MPI_BCAST(tot_data, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(mytime, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        if (.not. parallel_io) return
 
-        gsizes(1) = tot_data
-        gsizes(2) = 21
-        lsizes(1) = tot_data
-        lsizes(2) = 21
-        start_idx_part(1) = 0
-        start_idx_part(2) = 0
-
-        call MPI_type_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, &
-                                      MPI_ORDER_FORTRAN, mpi_p, view, ierr)
-        call MPI_type_COMMIT(view, ierr)
-
-        ! Open the file to write all flow variables
-        write (file_loc, '(a,i0,a)') 'lag_bubbles_', save_count, '.dat'
-        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-        inquire (file=trim(file_loc), exist=particle_file)
-
-        if (particle_file) then
-            call MPI_FILE_open(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, &
+        if (proc_rank == 0) then
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, &
                                mpi_info_int, ifile, ierr)
-            disp = 0._wp
-            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, &
-                                   'native', mpi_info_null, ierr)
-            allocate (MPI_IO_DATA_lag_bubbles(tot_data, 1:21))
-            call MPI_FILE_read_ALL(ifile, MPI_IO_DATA_lag_bubbles, 21*tot_data, &
-                                   mpi_p, status, ierr)
-            do i = 1, tot_data
-                id = int(MPI_IO_DATA_lag_bubbles(i, 1))
-                inputvals(1:20) = MPI_IO_DATA_lag_bubbles(i, 2:21)
-                indomain = particle_in_domain(inputvals(1:3))
-                if (indomain .and. (id > 0)) then
-                    bub_id = bub_id + 1
-                    nBubs = bub_id                  ! local number of bubbles
-                    lag_id(bub_id, 1) = id          ! global ID
-                    lag_id(bub_id, 2) = bub_id      ! local ID
-                    mtn_pos(bub_id, 1:3, 1) = inputvals(1:3)
-                    mtn_posPrev(bub_id, 1:3, 1) = inputvals(4:6)
-                    mtn_vel(bub_id, 1:3, 1) = inputvals(7:9)
-                    intfc_rad(bub_id, 1) = inputvals(10)
-                    intfc_vel(bub_id, 1) = inputvals(11)
-                    bub_R0(bub_id) = inputvals(12)
-                    Rmax_stats(bub_id) = inputvals(13)
-                    Rmin_stats(bub_id) = inputvals(14)
-                    bub_dphidt(bub_id) = inputvals(15)
-                    gas_p(bub_id, 1) = inputvals(16)
-                    gas_mv(bub_id, 1) = inputvals(17)
-                    gas_mg(bub_id) = inputvals(18)
-                    gas_betaT(bub_id) = inputvals(19)
-                    gas_betaC(bub_id) = inputvals(20)
-                    cell = -buff_size
-                    call s_locate_cell(mtn_pos(bub_id, 1:3, 1), cell, mtn_s(bub_id, 1:3, 1))
-                end if
-            end do
-            deallocate (MPI_IO_DATA_lag_bubbles)
+
+            call MPI_FILE_READ(ifile, file_tot_part, 1, MPI_INTEGER, status, ierr)
+            call MPI_FILE_READ(ifile, file_time, 1, mpi_p, status, ierr)
+            call MPI_FILE_READ(ifile, file_dt, 1, mpi_p, status, ierr)
+            call MPI_FILE_READ(ifile, file_num_procs, 1, MPI_INTEGER, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
         end if
-        call MPI_FILE_CLOSE(ifile, ierr)
+
+        call MPI_BCAST(file_tot_part, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_time, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_num_procs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+        allocate (proc_bubble_counts(file_num_procs))
+
+        if (proc_rank == 0) then
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, &
+                               mpi_info_int, ifile, ierr)
+
+            ! Skip to processor counts position
+            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs), &
+                       MPI_OFFSET_KIND)
+            call MPI_FILE_SEEK(ifile, disp, MPI_SEEK_SET, ierr)
+            call MPI_FILE_READ(ifile, proc_bubble_counts, file_num_procs, MPI_INTEGER, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
+
+        call MPI_BCAST(proc_bubble_counts, file_num_procs, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+        ! Set time variables from file
+        mytime = file_time
+        dt = file_dt
+
+        bub_id = proc_bubble_counts(proc_rank + 1)
+
+        start_idx_part(1) = 0
+        do i = 1, proc_rank
+            start_idx_part(1) = start_idx_part(1) + proc_bubble_counts(i)
+        end do
+
+        start_idx_part(2) = 0
+        lsizes(1) = bub_id
+        lsizes(2) = lag_io_vars
+
+        gsizes(1) = file_tot_part
+        gsizes(2) = lag_io_vars
+
+        if (bub_id > 0) then
+
+            allocate (MPI_IO_DATA_lag_bubbles(bub_id, 1:lag_io_vars))
+
+            call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, &
+                                          MPI_ORDER_FORTRAN, mpi_p, view, ierr)
+            call MPI_TYPE_COMMIT(view, ierr)
+
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, &
+                               mpi_info_int, ifile, ierr)
+
+            ! Skip extended header
+            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) + &
+                       file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
+
+            call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lag_bubbles, &
+                                   lag_io_vars*bub_id, mpi_p, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+            call MPI_TYPE_FREE(view, ierr)
+
+            nBubs = bub_id
+
+            do i = 1, bub_id
+                lag_id(i, 1) = int(MPI_IO_DATA_lag_bubbles(i, 1))
+                mtn_pos(i, 1:3, 1) = MPI_IO_DATA_lag_bubbles(i, 2:4)
+                mtn_posPrev(i, 1:3, 1) = MPI_IO_DATA_lag_bubbles(i, 5:7)
+                mtn_vel(i, 1:3, 1) = MPI_IO_DATA_lag_bubbles(i, 8:10)
+                intfc_rad(i, 1) = MPI_IO_DATA_lag_bubbles(i, 11)
+                intfc_vel(i, 1) = MPI_IO_DATA_lag_bubbles(i, 12)
+                bub_R0(i) = MPI_IO_DATA_lag_bubbles(i, 13)
+                Rmax_stats(i) = MPI_IO_DATA_lag_bubbles(i, 14)
+                Rmin_stats(i) = MPI_IO_DATA_lag_bubbles(i, 15)
+                bub_dphidt(i) = MPI_IO_DATA_lag_bubbles(i, 16)
+                gas_p(i, 1) = MPI_IO_DATA_lag_bubbles(i, 17)
+                gas_mv(i, 1) = MPI_IO_DATA_lag_bubbles(i, 18)
+                gas_mg(i) = MPI_IO_DATA_lag_bubbles(i, 19)
+                gas_betaT(i) = MPI_IO_DATA_lag_bubbles(i, 20)
+                gas_betaC(i) = MPI_IO_DATA_lag_bubbles(i, 21)
+            end do
+
+            deallocate (MPI_IO_DATA_lag_bubbles)
+
+        else
+            nBubs = 0
+
+            call MPI_TYPE_CONTIGUOUS(0, mpi_p, view, ierr)
+            call MPI_TYPE_COMMIT(view, ierr)
+
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, &
+                               mpi_info_int, ifile, ierr)
+
+            ! Skip extended header
+            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) + &
+                       file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
+
+            call MPI_FILE_READ_ALL(ifile, dummy, 0, mpi_p, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+            call MPI_TYPE_FREE(view, ierr)
+        end if
+
+        if (proc_rank == 0) then
+            write (*, '(A,I0,A,I0)') 'Read ', file_tot_part, ' particles from restart file at t_step = ', save_count
+            write (*, '(A,E15.7,A,E15.7)') 'Restart time = ', mytime, ', dt = ', dt
+        end if
+
+        deallocate (proc_bubble_counts)
 #endif
 
     end subroutine s_restart_bubbles
@@ -649,6 +714,7 @@ contains
 
         if (lag_params%solver_approach == 2) then
 
+            ! (q / (1 - beta)) * d(beta)/dt source
             if (p == 0) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do k = 0, p
@@ -686,6 +752,7 @@ contains
 
                 call s_gradient_dir(q_prim_vf(E_idx), q_beta%vf(3), l)
 
+                ! (q / (1 - beta)) * d(beta)/dt source
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do k = 0, p
                     do j = 0, n
@@ -712,6 +779,7 @@ contains
 
                 call s_gradient_dir(q_beta%vf(3), q_beta%vf(4), l)
 
+                ! (beta / (1 - beta)) * d(Pu)/dl source
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do k = 0, p
                     do j = 0, n
@@ -1234,25 +1302,24 @@ contains
                                   (pos_part(3) < z_cb(p + buff_size)) .and. (pos_part(3) >= z_cb(-buff_size - 1)))
         end if
 
-        ! For symmetric boundary condition
-        if (bc_x%beg == BC_REFLECTIVE) then
+        ! For symmetric and wall boundary condition
+        if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
             particle_in_domain = (particle_in_domain .and. (pos_part(1) >= x_cb(-1)))
         end if
-        if (bc_x%end == BC_REFLECTIVE) then
+        if (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
             particle_in_domain = (particle_in_domain .and. (pos_part(1) < x_cb(m)))
         end if
-        if (bc_y%beg == BC_REFLECTIVE .and. (.not. cyl_coord)) then
+        if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. (.not. cyl_coord)) then
             particle_in_domain = (particle_in_domain .and. (pos_part(2) >= y_cb(-1)))
         end if
-        if (bc_y%end == BC_REFLECTIVE .and. (.not. cyl_coord)) then
+        if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. (.not. cyl_coord)) then
             particle_in_domain = (particle_in_domain .and. (pos_part(2) < y_cb(n)))
         end if
-
         if (p > 0) then
-            if (bc_z%beg == BC_REFLECTIVE) then
+            if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
                 particle_in_domain = (particle_in_domain .and. (pos_part(3) >= z_cb(-1)))
             end if
-            if (bc_z%end == BC_REFLECTIVE) then
+            if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
                 particle_in_domain = (particle_in_domain .and. (pos_part(3) < z_cb(p)))
             end if
         end if
@@ -1303,41 +1370,39 @@ contains
                     end do
                 end do
             end do
-        else
-            if (dir == 2) then
-                ! Gradient in y dir.
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do k = 0, p
-                    do j = 0, n
-                        do i = 0, m
-                            dq%sf(i, j, k) = q%sf(i, j, k)*(dy(j + 1) - dy(j - 1)) &
-                                             + q%sf(i, j + 1, k)*(dy(j) + dy(j - 1)) &
-                                             - q%sf(i, j - 1, k)*(dy(j) + dy(j + 1))
-                            dq%sf(i, j, k) = dq%sf(i, j, k)/ &
-                                             ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
-                        end do
+        elseif (dir == 2) then
+            ! Gradient in y dir.
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        dq%sf(i, j, k) = q%sf(i, j, k)*(dy(j + 1) - dy(j - 1)) &
+                                         + q%sf(i, j + 1, k)*(dy(j) + dy(j - 1)) &
+                                         - q%sf(i, j - 1, k)*(dy(j) + dy(j + 1))
+                        dq%sf(i, j, k) = dq%sf(i, j, k)/ &
+                                         ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
                     end do
                 end do
-            else
-                ! Gradient in z dir.
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do k = 0, p
-                    do j = 0, n
-                        do i = 0, m
-                            dq%sf(i, j, k) = q%sf(i, j, k)*(dz(k + 1) - dz(k - 1)) &
-                                             + q%sf(i, j, k + 1)*(dz(k) + dz(k - 1)) &
-                                             - q%sf(i, j, k - 1)*(dz(k) + dz(k + 1))
-                            dq%sf(i, j, k) = dq%sf(i, j, k)/ &
-                                             ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
-                        end do
+            end do
+        elseif (dir == 3) then
+            ! Gradient in z dir.
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        dq%sf(i, j, k) = q%sf(i, j, k)*(dz(k + 1) - dz(k - 1)) &
+                                         + q%sf(i, j, k + 1)*(dz(k) + dz(k - 1)) &
+                                         - q%sf(i, j, k - 1)*(dz(k) + dz(k + 1))
+                        dq%sf(i, j, k) = dq%sf(i, j, k)/ &
+                                         ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
                     end do
                 end do
-            end if
+            end do
         end if
 
     end subroutine s_gradient_dir
 
-    !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
+     !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
         !!  @param q_time Current time
     impure subroutine s_write_lag_particles(qtime)
 
@@ -1465,7 +1530,7 @@ contains
 
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
-        integer :: bub_id, tot_part, tot_part_wrtn, npart_wrtn
+        integer :: bub_id, tot_part
         integer :: i, k
 
 #ifdef MFC_MPI
@@ -1476,6 +1541,9 @@ contains
         integer :: view
         integer, dimension(2) :: gsizes, lsizes, start_idx_part
         integer, dimension(num_procs) :: part_order, part_ord_mpi
+        integer, dimension(num_procs) :: proc_bubble_counts
+        real(wp), dimension(1:1, 1:lag_io_vars) :: dummy
+        dummy = 0._wp
 
         bub_id = 0._wp
         if (nBubs /= 0) then
@@ -1488,78 +1556,60 @@ contains
 
         if (.not. parallel_io) return
 
+        lsizes(1) = bub_id
+        lsizes(2) = lag_io_vars
+
         ! Total number of particles
         call MPI_ALLREDUCE(bub_id, tot_part, 1, MPI_integer, &
                            MPI_SUM, MPI_COMM_WORLD, ierr)
 
-        ! Total number of particles written so far
-        call MPI_ALLREDUCE(npart_wrtn, tot_part_wrtn, 1, MPI_integer, &
-                           MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_ALLGATHER(bub_id, 1, MPI_INTEGER, proc_bubble_counts, 1, MPI_INTEGER, &
+                           MPI_COMM_WORLD, ierr)
 
-        lsizes(1) = max(1, bub_id)
-        lsizes(2) = 21
-
-        ! if the partcle number is zero, put 1 since MPI cannot deal with writing
-        ! zero particle
-        part_order(:) = 1
-        part_order(proc_rank + 1) = max(1, bub_id)
-
-        call MPI_ALLREDUCE(part_order, part_ord_mpi, num_procs, MPI_integer, &
-                           MPI_MAX, MPI_COMM_WORLD, ierr)
-
-        gsizes(1) = sum(part_ord_mpi(1:num_procs))
-        gsizes(2) = 21
-
-        start_idx_part(1) = sum(part_ord_mpi(1:proc_rank + 1)) - part_ord_mpi(proc_rank + 1)
+        ! Calculate starting index for this processor's particles
+        call MPI_EXSCAN(lsizes(1), start_idx_part(1), 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
+        if (proc_rank == 0) start_idx_part(1) = 0
         start_idx_part(2) = 0
 
-        write (file_loc, '(A,I0,A)') 'lag_bubbles_mpi_io_', t_step, '.dat'
-        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
-        if (file_exist .and. proc_rank == 0) then
-            call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
-        end if
+        gsizes(1) = tot_part
+        gsizes(2) = lag_io_vars
 
-        ! Writing down the total number of particles
-        if (proc_rank == 0) then
-            open (9, FILE=trim(file_loc), FORM='unformatted', STATUS='unknown')
-            write (9) gsizes(1), mytime, dt
-            close (9)
-        end if
-
-        call MPI_type_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, &
-                                      MPI_ORDER_FORTRAN, mpi_p, view, ierr)
-        call MPI_type_COMMIT(view, ierr)
-
-        allocate (MPI_IO_DATA_lag_bubbles(1:max(1, bub_id), 1:21))
-
-        ! Open the file to write all flow variables
         write (file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
         file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
-        if (file_exist .and. proc_rank == 0) then
-            call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+
+        ! Clean up existing file
+        if (proc_rank == 0) then
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist) then
+                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            end if
         end if
 
-        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                           mpi_info_int, ifile, ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
-        disp = 0._wp
+        if (proc_rank == 0) then
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, &
+                               ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                               mpi_info_int, ifile, ierr)
 
-        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, &
-                               'native', mpi_info_null, ierr)
+            ! Write header using MPI I/O for consistency
+            call MPI_FILE_WRITE(ifile, tot_part, 1, MPI_INTEGER, status, ierr)
+            call MPI_FILE_WRITE(ifile, mytime, 1, mpi_p, status, ierr)
+            call MPI_FILE_WRITE(ifile, dt, 1, mpi_p, status, ierr)
+            call MPI_FILE_WRITE(ifile, num_procs, 1, MPI_INTEGER, status, ierr)
+            call MPI_FILE_WRITE(ifile, proc_bubble_counts, num_procs, MPI_INTEGER, status, ierr)
 
-        ! Cycle through list
-        i = 1
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
 
-        if (bub_id == 0) then
-            MPI_IO_DATA_lag_bubbles(1, 1:21) = 0._wp
-        else
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
+        if (bub_id > 0) then
+            allocate (MPI_IO_DATA_lag_bubbles(max(1, bub_id), 1:lag_io_vars))
+
+            i = 1
             do k = 1, nBubs
-
                 if (particle_in_domain_physical(mtn_pos(k, 1:3, 1))) then
-
                     MPI_IO_DATA_lag_bubbles(i, 1) = real(lag_id(k, 1))
                     MPI_IO_DATA_lag_bubbles(i, 2:4) = mtn_pos(k, 1:3, 1)
                     MPI_IO_DATA_lag_bubbles(i, 5:7) = mtn_posPrev(k, 1:3, 1)
@@ -1575,21 +1625,47 @@ contains
                     MPI_IO_DATA_lag_bubbles(i, 19) = gas_mg(k)
                     MPI_IO_DATA_lag_bubbles(i, 20) = gas_betaT(k)
                     MPI_IO_DATA_lag_bubbles(i, 21) = gas_betaC(k)
-
                     i = i + 1
-
                 end if
-
             end do
 
+            call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, &
+                                          MPI_ORDER_FORTRAN, mpi_p, view, ierr)
+            call MPI_TYPE_COMMIT(view, ierr)
+
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, &
+                               ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                               mpi_info_int, ifile, ierr)
+
+            ! Skip header (written by rank 0)
+            disp = int(sizeof(tot_part) + 2*sizeof(mytime) + sizeof(num_procs) + &
+                       num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
+
+            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA_lag_bubbles, &
+                                    lag_io_vars*bub_id, mpi_p, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+
+            deallocate (MPI_IO_DATA_lag_bubbles)
+
+        else
+            call MPI_TYPE_CONTIGUOUS(0, mpi_p, view, ierr)
+            call MPI_TYPE_COMMIT(view, ierr)
+
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, &
+                               ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                               mpi_info_int, ifile, ierr)
+
+            ! Skip header (written by rank 0)
+            disp = int(sizeof(tot_part) + 2*sizeof(mytime) + sizeof(num_procs) + &
+                       num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
+
+            call MPI_FILE_WRITE_ALL(ifile, dummy, 0, mpi_p, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
         end if
-
-        call MPI_FILE_write_ALL(ifile, MPI_IO_DATA_lag_bubbles, 21*max(1, bub_id), &
-                                mpi_p, status, ierr)
-
-        call MPI_FILE_CLOSE(ifile, ierr)
-
-        deallocate (MPI_IO_DATA_lag_bubbles)
 
 #endif
 

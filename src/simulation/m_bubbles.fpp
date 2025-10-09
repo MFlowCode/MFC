@@ -72,6 +72,9 @@ contains
             ! Rayleigh-Plesset bubbles
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
             f_rddot = f_rddot_RP(fP, fRho, fR, fV, fCpbw)
+        else
+            ! Default: No bubble dynamics
+            f_rddot = 0._wp
         end if
 
     end function f_rddot
@@ -445,7 +448,7 @@ contains
         !!  @param fRho Current density
         !!  @param fP Current driving pressure
         !!  @param fR Current bubble radius
-        !!  @param fV Current bubble velocity
+        !!  @param fV Current bubble radial velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fpb Internal bubble pressure
         !!  @param fpbdot Time-derivative of internal bubble pressure
