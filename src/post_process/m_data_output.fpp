@@ -1230,7 +1230,7 @@ contains
                     if (lag_id_wrt) write (29, '(I6, A)', advance='no') id, ', '
                     if (lag_pos_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(1), ', ', inputvals(2), ', ', inputvals(3), ', '
                     if (lag_pos_prev_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(4), ', ', inputvals(5), ', ', inputvals(6), ', '
-                    if (lag_vel_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(7), ', ', inputvals(8), ', ', inputvals(8), ', '
+                    if (lag_vel_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(7), ', ', inputvals(8), ', ', inputvals(9), ', '
                     if (lag_rad_wrt) write (29, '(E15.7, A)', advance='no') inputvals(10), ', '
                     if (lag_rvel_wrt) write (29, '(E15.7, A)', advance='no') inputvals(11), ', '
                     if (lag_r0_wrt) write (29, '(E15.7, A)', advance='no') inputvals(12), ', '

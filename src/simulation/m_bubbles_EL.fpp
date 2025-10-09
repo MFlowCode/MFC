@@ -339,10 +339,6 @@ contains
             end if
         end if
 
-        ! If particle is in the ghost cells, find the closest non-ghost cell
-        !cell(1) = min(max(cell(1), 0), m)
-        !cell(2) = min(max(cell(2), 0), n)
-        !if (p > 0) cell(3) = min(max(cell(3), 0), p)
         call s_convert_to_mixture_variables(q_cons_vf, cell(1), cell(2), cell(3), &
                                             rhol, gamma, pi_inf, qv, Re)
         dynP = 0._wp
