@@ -487,23 +487,23 @@ contains
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, s)
 
             if (s == 1) then
-              if (run_time_info) then
-                if (igr) then
-                    call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-                else
-                    call s_write_run_time_information(q_prim_vf, t_step)
+                if (run_time_info) then
+                    if (igr) then
+                        call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
+                    else
+                        call s_write_run_time_information(q_prim_vf, t_step)
+                    end if
                 end if
-              end if
 
-              if (probe_wrt) then
-                  call s_time_step_cycling(t_step)
-              end if
+                if (probe_wrt) then
+                    call s_time_step_cycling(t_step)
+                end if
 
-              if (cfl_dt) then
-                  if (mytime >= t_stop) return
-              else
-                  if (t_step == t_step_stop) return
-              end if
+                if (cfl_dt) then
+                    if (mytime >= t_stop) return
+                else
+                    if (t_step == t_step_stop) return
+                end if
             end if
 
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
@@ -519,8 +519,8 @@ contains
                             end if
                             q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                                 (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                                + rk_coef(s, 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) &
-                                + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
+                                 + rk_coef(s, 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) &
+                                 + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
                         end do
                     end do
                 end do
@@ -542,12 +542,12 @@ contains
                                     end if
                                     pb_ts(1)%sf(j, k, l, q, i) = &
                                         (rk_coef(s, 1)*pb_ts(1)%sf(j, k, l, q, i) &
-                                        + rk_coef(s, 2)*pb_ts(stor)%sf(j, k, l, q, i) &
-                                        + rk_coef(s, 3)*dt*rhs_pb(j, k, l, q, i))/rk_coef(s, 4)
+                                         + rk_coef(s, 2)*pb_ts(stor)%sf(j, k, l, q, i) &
+                                         + rk_coef(s, 3)*dt*rhs_pb(j, k, l, q, i))/rk_coef(s, 4)
                                     mv_ts(1)%sf(j, k, l, q, i) = &
                                         (rk_coef(s, 1)*mv_ts(1)%sf(j, k, l, q, i) &
-                                        + rk_coef(s, 2)*mv_ts(stor)%sf(j, k, l, q, i) &
-                                        + rk_coef(s, 3)*dt*rhs_mv(j, k, l, q, i))/rk_coef(s, 4)
+                                         + rk_coef(s, 2)*mv_ts(stor)%sf(j, k, l, q, i) &
+                                         + rk_coef(s, 3)*dt*rhs_mv(j, k, l, q, i))/rk_coef(s, 4)
                                 end do
                             end do
                         end do
