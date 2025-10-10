@@ -235,7 +235,7 @@ contains
                                  ierr)
             end if
             ! Simulation is 2D
-        else
+        elseif (n > 0) then
 
             ! Minimum spatial extent in the x-direction
             call MPI_GATHERV(minval(x_cb), 1, mpi_p, &
@@ -260,7 +260,20 @@ contains
                              spatial_extents(4, 0), recvcounts, 4*displs, &
                              mpi_p, 0, MPI_COMM_WORLD, &
                              ierr)
+            ! Simulation is 1D
+        else
 
+            ! Minimum spatial extent in the x-direction
+            call MPI_GATHERV(minval(x_cb), 1, mpi_p, &
+                             spatial_extents(1, 0), recvcounts, 4*displs, &
+                             mpi_p, 0, MPI_COMM_WORLD, &
+                             ierr)
+
+            ! Maximum spatial extent in the x-direction
+            call MPI_GATHERV(maxval(x_cb), 1, mpi_p, &
+                             spatial_extents(2, 0), recvcounts, 4*displs, &
+                             mpi_p, 0, MPI_COMM_WORLD, &
+                             ierr)
         end if
 
 #endif
