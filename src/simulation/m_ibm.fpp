@@ -390,7 +390,7 @@ contains
         type(ghost_point) :: gp
 
         integer :: q, dim !< Iterator variables
-        integer :: i, j, k !< Location indexes
+        integer :: i, j, k, l !< Location indexes
         integer :: patch_id !< IB Patch ID
         integer :: dir
         integer :: index
@@ -912,14 +912,16 @@ contains
         type(levelset_field), intent(inout) :: levelset
         type(levelset_norm_field), intent(inout) :: levelset_norm
 
-        integer :: i
+        integer :: i, ierr
 
         ! Clears the existing immersed boundary indices
         ib_markers%sf = 0
 
         ! recalulcate the rotation matrix based upon the new angles
         do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm /= 0) call s_update_ib_rotation_matrix(i)
+            if (patch_ib(i)%moving_ibm /= 0) then
+              call s_update_ib_rotation_matrix(i)
+            end if
         end do
 
         ! recompute the new ib_patch locations and broadcast them.
