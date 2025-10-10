@@ -442,35 +442,24 @@ contains
         end do
 
         if (any(time_stepper == (/1, 2, 3/))) then
-            ! Time stepper index
+            ! temporary array index for TVD RK
             if (time_stepper == 1) then
                 stor = 1
             else
                 stor = 2
             end if
 
-            @:ALLOCATE (rk_coef(time_stepper, 3))
+            ! TVD RK coefficients
+            @:ALLOCATE (rk_coef(time_stepper, 4))
             if (time_stepper == 1) then
-                rk_coef(1, 1) = 1._wp
-                rk_coef(1, 2) = 0._wp
-                rk_coef(1, 3) = 1._wp
+                rk_coef(1, :) = (/1._wp, 0._wp, 1._wp, 1._wp/)
             else if (time_stepper == 2) then
-                rk_coef(1, 1) = 1._wp
-                rk_coef(1, 2) = 0._wp
-                rk_coef(1, 3) = 1._wp
-                rk_coef(2, 1) = 0.5_wp
-                rk_coef(2, 2) = 0.5_wp
-                rk_coef(2, 3) = 0.5_wp
+                rk_coef(1, :) = (/1._wp, 0._wp, 1._wp, 1._wp/)
+                rk_coef(2, :) = (/1._wp, 1._wp, 1._wp, 2._wp/)
             else if (time_stepper == 3) then
-                rk_coef(1, 1) = 1._wp
-                rk_coef(1, 2) = 0._wp
-                rk_coef(1, 3) = 1._wp
-                rk_coef(2, 1) = 1._wp/4._wp
-                rk_coef(2, 2) = 3._wp/4._wp
-                rk_coef(2, 3) = 1._wp/4._wp
-                rk_coef(3, 1) = 2._wp/3._wp
-                rk_coef(3, 2) = 1._wp/3._wp
-                rk_coef(3, 3) = 2._wp/3._wp
+                rk_coef(1, :) = (/1._wp, 0._wp, 1._wp, 1._wp/)
+                rk_coef(2, :) = (/1._wp, 3._wp, 1._wp, 4._wp/)
+                rk_coef(3, :) = (/2._wp, 1._wp, 2._wp, 3._wp/)
             end if
         end if
 
@@ -497,22 +486,24 @@ contains
         do s = 1, nstage
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, s)
 
-            if (s == 1 .and. run_time_info) then
+            if (s == 1) then
+              if (run_time_info) then
                 if (igr) then
                     call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
                 else
                     call s_write_run_time_information(q_prim_vf, t_step)
                 end if
-            end if
+              end if
 
-            if (probe_wrt) then
-                call s_time_step_cycling(t_step)
-            end if
+              if (probe_wrt) then
+                  call s_time_step_cycling(t_step)
+              end if
 
-            if (cfl_dt) then
-                if (mytime >= t_stop) return
-            else
-                if (t_step == t_step_stop) return
+              if (cfl_dt) then
+                  if (mytime >= t_stop) return
+              else
+                  if (t_step == t_step_stop) return
+              end if
             end if
 
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
@@ -527,9 +518,9 @@ contains
                                     q_cons_ts(1)%vf(i)%sf(j, k, l)
                             end if
                             q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                                rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                                 + rk_coef(s, 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) &
-                                + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l)
+                                + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
                         end do
                     end do
                 end do
@@ -550,13 +541,13 @@ contains
                                             mv_ts(1)%sf(j, k, l, q, i)
                                     end if
                                     pb_ts(1)%sf(j, k, l, q, i) = &
-                                        rk_coef(s, 1)*pb_ts(1)%sf(j, k, l, q, i) &
+                                        (rk_coef(s, 1)*pb_ts(1)%sf(j, k, l, q, i) &
                                         + rk_coef(s, 2)*pb_ts(stor)%sf(j, k, l, q, i) &
-                                        + rk_coef(s, 3)*dt*rhs_pb(j, k, l, q, i)
+                                        + rk_coef(s, 3)*dt*rhs_pb(j, k, l, q, i))/rk_coef(s, 4)
                                     mv_ts(1)%sf(j, k, l, q, i) = &
-                                        rk_coef(s, 1)*mv_ts(1)%sf(j, k, l, q, i) &
+                                        (rk_coef(s, 1)*mv_ts(1)%sf(j, k, l, q, i) &
                                         + rk_coef(s, 2)*mv_ts(stor)%sf(j, k, l, q, i) &
-                                        + rk_coef(s, 3)*dt*rhs_mv(j, k, l, q, i)
+                                        + rk_coef(s, 3)*dt*rhs_mv(j, k, l, q, i))/rk_coef(s, 4)
                                 end do
                             end do
                         end do
@@ -564,7 +555,7 @@ contains
                 end do
             end if
 
-            if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt)
+            if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
 
             if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
