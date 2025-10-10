@@ -1570,14 +1570,14 @@ contains
 
 #ifdef MFC_POST_PROCESS
         ! Ghost zone at the beginning
-        if (proc_coords(1) > 0 .and. format == 1 .and. n > 0) then
+        if (proc_coords(1) > 0 .and. format == 1) then
             offset_x%beg = 2
         else
             offset_x%beg = 0
         end if
 
         ! Ghost zone at the end
-        if (proc_coords(1) < num_procs_x - 1 .and. format == 1 .and. n > 0) then
+        if (proc_coords(1) < num_procs_x - 1 .and. format == 1) then
             offset_x%end = 2
         else
             offset_x%end = 0
