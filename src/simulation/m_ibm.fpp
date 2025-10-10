@@ -920,7 +920,7 @@ contains
         ! recalulcate the rotation matrix based upon the new angles
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
-              call s_update_ib_rotation_matrix(i)
+                call s_update_ib_rotation_matrix(i)
             end if
         end do
 
