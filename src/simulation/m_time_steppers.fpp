@@ -461,6 +461,7 @@ contains
                 rk_coef(2, :) = (/1._wp, 3._wp, 1._wp, 4._wp/)
                 rk_coef(3, :) = (/2._wp, 1._wp, 2._wp, 3._wp/)
             end if
+            $:GPU_UPDATE(device='[rk_coef]') 
         end if
 
     end subroutine s_initialize_time_steppers_module
