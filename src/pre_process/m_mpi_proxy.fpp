@@ -79,7 +79,7 @@ contains
             #:for VAR in ['geometry', 'type', 'dir', 'loc']
                 call MPI_BCAST(patch_bc(i)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
-            
+
             #:for VAR in ['vel', 'angular_vel', 'angles']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
