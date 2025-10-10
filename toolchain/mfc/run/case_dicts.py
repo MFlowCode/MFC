@@ -116,8 +116,10 @@ for ib_id in range(1, 10+1):
                           ("moving_ibm", ParamType.INT)]:
         PRE_PROCESS[f"patch_ib({ib_id})%{real_attr}"] = ty
 
-    for vel_id in range(1, 4):
-        PRE_PROCESS[f"patch_ib({ib_id})%vel({vel_id})"] = ParamType.REAL
+    for dir_id in range(1, 4):
+        PRE_PROCESS[f"patch_ib({ib_id})%vel({dir_id})"] = ParamType.REAL
+        PRE_PROCESS[f"patch_ib({ib_id})%angles({dir_id})"] = ParamType.REAL
+        PRE_PROCESS[f"patch_ib({ib_id})%angular_vel({dir_id})"] = ParamType.REAL
 
     for cmp_id, cmp in enumerate(["x", "y", "z"]):
         cmp_id += 1
@@ -347,8 +349,10 @@ for ib_id in range(1, 10+1):
                           ("moving_ibm", ParamType.INT)]:
         SIMULATION[f"patch_ib({ib_id})%{real_attr}"] = ty
 
-    for vel_id in range(1, 4):
-        SIMULATION[f"patch_ib({ib_id})%vel({vel_id})"] = ParamType.REAL
+    for dir_id in range(1, 4):
+        SIMULATION[f"patch_ib({ib_id})%vel({dir_id})"] = ParamType.REAL
+        SIMULATION[f"patch_ib({ib_id})%angles({dir_id})"] = ParamType.REAL
+        SIMULATION[f"patch_ib({ib_id})%angular_vel({dir_id})"] = ParamType.REAL
 
     for cmp_id, cmp in enumerate(["x", "y", "z"]):
         cmp_id += 1

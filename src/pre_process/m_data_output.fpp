@@ -550,8 +550,6 @@ contains
                         write (2, FMT) airfoil_grid_l(j)%x, airfoil_grid_l(j)%y
                     end do
                     close (2)
-
-                    print *, "Np", Np
                 end if
             end do
         end if

@@ -94,8 +94,9 @@ contains
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
                 moving_immersed_boundary_flag = .true.
-                exit
+
             end if
+            call s_update_ib_rotation_matrix(i)
         end do
 
         ! Allocating the patch identities bookkeeping variable
@@ -116,8 +117,8 @@ contains
         call s_mpi_allreduce_integer_sum(num_inner_gps, max_num_inner_gps)
 
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
-        @:ALLOCATE(ghost_points(1:int(max_num_gps * 1.2)))
-        @:ALLOCATE(inner_points(1:int(max_num_inner_gps * 1.2)))
+        @:ALLOCATE(ghost_points(1:int(max_num_gps * 1.5)))
+        @:ALLOCATE(inner_points(1:int(max_num_inner_gps * 1.5)))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
 
@@ -149,7 +150,7 @@ contains
         !!  @param q_prim_vf Primitive variables
         !!  @param pb Internal bubble pressure
         !!  @param mv Mass of vapor in bubble
-    pure subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
+    subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -182,6 +183,8 @@ contains
         real(wp), dimension(3) :: norm !< Normal vector from GP to IP
         real(wp), dimension(3) :: physical_loc !< Physical loc of GP
         real(wp), dimension(3) :: vel_g !< Velocity of GP
+        real(wp), dimension(3) :: radial_vector !< vector from centroid to ghost point
+        real(wp), dimension(3) :: rotation_velocity !< speed of the ghost point due to rotation
 
         real(wp) :: nbub
         real(wp) :: buf
@@ -191,8 +194,8 @@ contains
         $:GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, &
             & alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, &
             & v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, &
-            & gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, &
-            & j,k,l,q]')
+            & gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, &
+            & rotation_velocity, j,k,l,q]')
         do i = 1, num_gps
 
             gp = ghost_points(i)
@@ -265,9 +268,15 @@ contains
                     ! we know the object is not moving if moving_ibm is 0 (false)
                     vel_g = 0._wp
                 else
+                    ! get the vector that points from the centroid to the ghost
+                    radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
+                                                    patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
+                    ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear velocity
+                    rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
                     do q = 1, 3
                         ! if mibm is 1 or 2, then the boundary may be moving
-                        vel_g(q) = patch_ib(patch_id)%vel(q)
+                        vel_g(q) = patch_ib(patch_id)%vel(q) ! add the linear velocity
+                        vel_g(q) = vel_g(q) + rotation_velocity(q) ! add the rotational velocity
                     end do
                 end if
             end if
@@ -381,7 +390,7 @@ contains
         type(ghost_point) :: gp
 
         integer :: q, dim !< Iterator variables
-        integer :: i, j, k !< Location indexes
+        integer :: i, j, k, l !< Location indexes
         integer :: patch_id !< IB Patch ID
         integer :: dir
         integer :: index
@@ -436,7 +445,6 @@ contains
                                .or. temp_loc > s_cc(index + 1)))
                         index = index + dir
                         if (index < -buff_size .or. index > bound) then
-                            print *, q, index, bound, buff_size
                             print *, "temp_loc=", temp_loc, " s_cc(index)=", s_cc(index), " s_cc(index+1)=", s_cc(index + 1)
                             print *, "Increase buff_size further in m_helper_basic (currently set to a minimum of 10)"
                             error stop "Increase buff_size"
@@ -896,26 +904,6 @@ contains
 
     end subroutine s_interpolate_image_point
 
-    !> Subroutine the updates the moving imersed boundary positions via Euler's method
-    impure subroutine s_propagate_mib(patch_id)
-
-        integer, intent(in) :: patch_id
-        integer :: i
-
-        ! start by using euler's method naiively, but eventually incorporate more sophistocation
-        if (patch_ib(patch_id)%moving_ibm == 1) then
-            ! this continues with euler's method, which is obviously not that great and we need to add acceleration
-            do i = 1, 3
-                patch_ib(patch_id)%vel(i) = patch_ib(patch_id)%vel(i) + 0.0*dt ! TODO :: ADD EXTERNAL FORCES HERE
-            end do
-
-            patch_ib(patch_id)%x_centroid = patch_ib(patch_id)%x_centroid + patch_ib(patch_id)%vel(1)*dt
-            patch_ib(patch_id)%y_centroid = patch_ib(patch_id)%y_centroid + patch_ib(patch_id)%vel(2)*dt
-            patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid + patch_ib(patch_id)%vel(3)*dt
-        end if
-
-    end subroutine s_propagate_mib
-
     !> Resets the current indexes of immersed boundaries and replaces them after updating
     !> the position of each moving immersed boundary
     impure subroutine s_update_mib(num_ibs, levelset, levelset_norm)
@@ -924,14 +912,15 @@ contains
         type(levelset_field), intent(inout) :: levelset
         type(levelset_norm_field), intent(inout) :: levelset_norm
 
-        integer :: i
+        integer :: i, ierr
 
         ! Clears the existing immersed boundary indices
         ib_markers%sf = 0
 
+        ! recalulcate the rotation matrix based upon the new angles
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
-                call s_propagate_mib(i)  ! TODO :: THIS IS DONE TERRIBLY WITH EULER METHOD
+                call s_update_ib_rotation_matrix(i)
             end if
         end do
 
@@ -962,5 +951,15 @@ contains
         @:DEALLOCATE(levelset_norm%sf)
 
     end subroutine s_finalize_ibm_module
+
+    function cross_product(a, b) result(c)
+        implicit none
+        real(wp), intent(in) :: a(3), b(3)
+        real(wp) :: c(3)
+
+        c(1) = a(2)*b(3) - a(3)*b(2)
+        c(2) = a(3)*b(1) - a(1)*b(3)
+        c(3) = a(1)*b(2) - a(2)*b(1)
+    end function cross_product
 
 end module m_ibm

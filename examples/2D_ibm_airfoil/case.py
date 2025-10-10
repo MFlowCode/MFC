@@ -94,12 +94,12 @@ print(
             "patch_ib(1)%t": 0.15,
             "patch_ib(1)%p": 0.4,
             "patch_ib(1)%m": 0.02,
-            "patch_ib(1)%theta": 30,
+            "patch_ib(1)%angles(3)": -0.5235987756,  # 30 degrees clockwise rotation, in radians
             # Fluids Physical Parameters
             # Use the same stiffness as the air bubble
-            "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
+            "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50 (Not 1.40)
             "fluid_pp(1)%pi_inf": 0,
-            "fluid_pp(2)%gamma": 1.0e00 / (gam_b - 1.0e00),  # 2.50(Not 1.40)
+            "fluid_pp(2)%gamma": 1.0e00 / (gam_b - 1.0e00),  # 2.50 (Not 1.40)
             "fluid_pp(2)%pi_inf": 0,
         }
     )
