@@ -676,7 +676,6 @@ contains
             ! database master file.
             if (num_procs > 1) then
                 call s_mpi_gather_spatial_extents(spatial_extents)
-
             elseif (p > 0) then
                 if (grid_geometry == 3) then
                     spatial_extents(:, 0) = (/minval(y_cb), minval(z_cb), &
@@ -687,13 +686,10 @@ contains
                                               minval(z_cb), maxval(x_cb), &
                                               maxval(y_cb), maxval(z_cb)/)
                 end if
-
             elseif (n > 0) then
                 spatial_extents(:, 0) = (/minval(x_cb), minval(y_cb), &
                                           maxval(x_cb), maxval(y_cb)/)
-
             else
-
                 spatial_extents(:, 0) = (/minval(x_cb), maxval(x_cb)/)
             end if
 
@@ -1171,7 +1167,6 @@ contains
                 inputvals(1:20) = MPI_IO_DATA_lg_bubbles(i, 2:21)
                 if (id > 0) then
                     write (29, '(100(A))', advance='no') ''
-
                     if (lag_id_wrt) write (29, '(I6, A)', advance='no') id, ', '
                     if (lag_pos_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(1), ', ', inputvals(2), ', ', inputvals(3), ', '
                     if (lag_pos_prev_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(4), ', ', inputvals(5), ', ', inputvals(6), ', '
@@ -1359,61 +1354,23 @@ contains
                           px, py, pz, nBub, &
                           DB_DOUBLE, DB_F77NULL, ierr)
 
-            if (lag_id_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_id', t_step, bub_id, nBub)
-            end if
-
+            if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step, bub_id, nBub)
             if (lag_vel_wrt) then
                 call s_write_lag_variable_to_formatted_database_file('part_vel1', t_step, vx, nBub)
                 call s_write_lag_variable_to_formatted_database_file('part_vel2', t_step, vy, nBub)
-                if (p > 0) then
-                    call s_write_lag_variable_to_formatted_database_file('part_vel3', t_step, vz, nBub)
-                end if
+                if (p > 0) call s_write_lag_variable_to_formatted_database_file('part_vel3', t_step, vz, nBub)
             end if
-
-            if (lag_rad_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_radius', t_step, radius, nBub)
-            end if
-
-            if (lag_rvel_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rdot', t_step, rvel, nBub)
-            end if
-
-            if (lag_r0_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_r0', t_step, rnot, nBub)
-            end if
-
-            if (lag_rmax_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rmax', t_step, rmax, nBub)
-            end if
-
-            if (lag_rmin_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rmin', t_step, rmin, nBub)
-            end if
-
-            if (lag_dphidt_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_dphidt', t_step, dphidt, nBub)
-            end if
-
-            if (lag_pres_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_pressure', t_step, pressure, nBub)
-            end if
-
-            if (lag_mv_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_mv', t_step, mv, nBub)
-            end if
-
-            if (lag_mg_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_mg', t_step, mg, nBub)
-            end if
-
-            if (lag_betaT_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step, betaT, nBub)
-            end if
-
-            if (lag_betaC_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step, betaC, nBub)
-            end if
+            if (lag_rad_wrt) call s_write_lag_variable_to_formatted_database_file('part_radius', t_step, radius, nBub)
+            if (lag_rvel_wrt) call s_write_lag_variable_to_formatted_database_file('part_rdot', t_step, rvel, nBub)
+            if (lag_r0_wrt) call s_write_lag_variable_to_formatted_database_file('part_r0', t_step, rnot, nBub)
+            if (lag_rmax_wrt) call s_write_lag_variable_to_formatted_database_file('part_rmax', t_step, rmax, nBub)
+            if (lag_rmin_wrt) call s_write_lag_variable_to_formatted_database_file('part_rmin', t_step, rmin, nBub)
+            if (lag_dphidt_wrt) call s_write_lag_variable_to_formatted_database_file('part_dphidt', t_step, dphidt, nBub)
+            if (lag_pres_wrt) call s_write_lag_variable_to_formatted_database_file('part_pressure', t_step, pressure, nBub)
+            if (lag_mv_wrt) call s_write_lag_variable_to_formatted_database_file('part_mv', t_step, mv, nBub)
+            if (lag_mg_wrt) call s_write_lag_variable_to_formatted_database_file('part_mg', t_step, mg, nBub)
+            if (lag_betaT_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step, betaT, nBub)
+            if (lag_betaC_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step, betaC, nBub)
 
             deallocate (bub_id, px, py, pz, ppx, ppy, ppz, vx, vy, vz, radius, &
                         rvel, rnot, rmax, rmin, dphidt, pressure, mv, mg, &
@@ -1455,62 +1412,23 @@ contains
                           dummy_data, dummy_data, dummy_data, 0, &
                           DB_DOUBLE, DB_F77NULL, ierr)
 
-            if (lag_id_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_id', t_step)
-            end if
-
+            if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step)
             if (lag_vel_wrt) then
                 call s_write_lag_variable_to_formatted_database_file('part_vel1', t_step)
                 call s_write_lag_variable_to_formatted_database_file('part_vel2', t_step)
-                if (p > 0) then
-                    call s_write_lag_variable_to_formatted_database_file('part_vel3', t_step)
-                end if
+                if (p > 0) call s_write_lag_variable_to_formatted_database_file('part_vel3', t_step)
             end if
-
-            if (lag_rad_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_radius', t_step)
-            end if
-
-            if (lag_rvel_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rdot', t_step)
-            end if
-
-            if (lag_r0_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_r0', t_step)
-            end if
-
-            if (lag_rmax_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rmax', t_step)
-            end if
-
-            if (lag_rmin_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rmin', t_step)
-            end if
-
-            if (lag_dphidt_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_dphidt', t_step)
-            end if
-
-            if (lag_pres_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_pressure', t_step)
-            end if
-
-            if (lag_mv_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_mv', t_step)
-            end if
-
-            if (lag_mg_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_mg', t_step)
-            end if
-
-            if (lag_betaT_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step)
-            end if
-
-            if (lag_betaC_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step)
-            end if
-
+            if (lag_rad_wrt) call s_write_lag_variable_to_formatted_database_file('part_radius', t_step)
+            if (lag_rvel_wrt) call s_write_lag_variable_to_formatted_database_file('part_rdot', t_step)
+            if (lag_r0_wrt) call s_write_lag_variable_to_formatted_database_file('part_r0', t_step)
+            if (lag_rmax_wrt) call s_write_lag_variable_to_formatted_database_file('part_rmax', t_step)
+            if (lag_rmin_wrt) call s_write_lag_variable_to_formatted_database_file('part_rmin', t_step)
+            if (lag_dphidt_wrt) call s_write_lag_variable_to_formatted_database_file('part_dphidt', t_step)
+            if (lag_pres_wrt) call s_write_lag_variable_to_formatted_database_file('part_pressure', t_step)
+            if (lag_mv_wrt) call s_write_lag_variable_to_formatted_database_file('part_mv', t_step)
+            if (lag_mg_wrt) call s_write_lag_variable_to_formatted_database_file('part_mg', t_step)
+            if (lag_betaT_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step)
+            if (lag_betaC_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step)
         end if
 
 #endif
