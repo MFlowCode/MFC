@@ -18,14 +18,24 @@ jobs:
     strategy:
       matrix:
         config:
-            - { name: 'cpu', runner: 'ubuntu-22.04',     base_image: 'ubuntu:22.04' }
-            - { name: 'cpu', runner: 'ubuntu-22.04-arm', base_image: 'ubuntu:22.04' }
-            - { name: 'gpu', runner: 'ubuntu-22.04',     base_image: 'nvcr.io/nvidia/nvhpc:23.11-devel-cuda12.3-ubuntu22.04' }
-            - { name: 'gpu', runner: 'ubuntu-22.04-arm', base_image: 'nvcr.io/nvidia/nvhpc:23.11-devel-cuda12.3-ubuntu22.04' }
+            - { name: 'cpu', runner: 'ubuntu-22.04',         base_image: 'ubuntu:22.04' }
+            - { name: 'gpu', runner: 'ubuntu-22.04',         base_image: 'nvcr.io/nvidia/nvhpc:23.11-devel-cuda_multi-ubuntu22.04' }
+            - { name: 'gpu', runner: 'ubuntu-22.04-arm',     base_image: 'nvcr.io/nvidia/nvhpc:23.11-devel-cuda_multi-ubuntu22.04' }
     runs-on: ${{ matrix.config.runner }}
     outputs:
       tag: ${{ steps.clone.outputs.tag }}
     steps:
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
       - name: Login
         uses: docker/login-action@v3
         with:
@@ -48,15 +58,43 @@ jobs:
 
       - name: Stage
         run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          sudo mkdir -p /home/runner/tmp
+          export TMPDIR=/home/runner/tmp
+          free -h
           sudo mkdir -p /mnt/share
           sudo chmod 777 /mnt/share
           cp -r mfc/* /mnt/share/
           cp -r mfc/.git /mnt/share/.git
           cp mfc/.github/Dockerfile /mnt/share/
           cp mfc/.github/.dockerignore /mnt/share/
+          docker buildx create --name mfcbuilder --driver docker-container --use
 
-      - name: Build and Deploy
+      - name: Build and push image (cpu)
+        if: ${{ matrix.config.name == 'cpu' }}
         uses: docker/build-push-action@v6
+        with:
+          builder: mfcbuilder
+          context: /mnt/share
+          file: /mnt/share/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            BASE_IMAGE=${{ matrix.config.base_image }}
+            TARGET=${{ matrix.config.name }}
+            CC_COMPILER=${{ 'gcc' }}
+            CXX_COMPILER=${{ 'g++' }}
+            FC_COMPILER=${{ 'gfortran' }}
+            COMPILER_PATH=${{ '/usr/bin' }}
+            COMPILER_LD_LIBRARY_PATH=${{ '/usr/lib' }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}
+          push: true
+
+      - name: Build and push image (gpu)
+        if: ${{ matrix.config.name == 'gpu' }}
+        uses: docker/build-push-action@v5
         with:
           builder: default
           context: /mnt/share
@@ -64,11 +102,11 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ matrix.config.base_image }}
             TARGET=${{ matrix.config.name }}
-            CC_COMPILER=${{ contains(matrix.config.name, 'gpu') && 'nvc' || 'gcc' }}
-            CXX_COMPILER=${{ contains(matrix.config.name, 'gpu') && 'nvc++' || 'g++' }}
-            FC_COMPILER=${{ contains(matrix.config.name, 'gpu') && 'nvfortran' || 'gfortran' }}
-            COMPILER_PATH=${{ contains(matrix.config.name, 'gpu') && '/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/bin' || '/usr/bin' }}
-            COMPILER_LD_LIBRARY_PATH=${{ contains(matrix.config.name, 'gpu') && '/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/lib' || '/usr/lib' }}
+            CC_COMPILER=${{ 'nvc' }}
+            CXX_COMPILER=${{ 'nvc++' }}
+            FC_COMPILER=${{ 'nvfortran' }}
+            COMPILER_PATH=${{ '/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/bin' }}
+            COMPILER_LD_LIBRARY_PATH=${{ '/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/lib' }}
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}-${{ matrix.config.runner}}
           push: true
 
@@ -87,12 +125,8 @@ jobs:
           TAG: ${{ needs.Container.outputs.tag }}
           REGISTRY: ${{ secrets.DOCKERHUB_USERNAME }}/mfc
         run: |
-          docker manifest create $REGISTRY:$TAG-cpu $REGISTRY:$TAG-cpu-ubuntu-22.04 $REGISTRY:$TAG-cpu-ubuntu-22.04-arm
+          docker buildx imagetools create -t $REGISTRY:latest-cpu $REGISTRY:$TAG-cpu
           docker manifest create $REGISTRY:$TAG-gpu $REGISTRY:$TAG-gpu-ubuntu-22.04 $REGISTRY:$TAG-gpu-ubuntu-22.04-arm
-          docker manifest create $REGISTRY:latest-cpu $REGISTRY:$TAG-cpu-ubuntu-22.04 $REGISTRY:$TAG-cpu-ubuntu-22.04-arm
           docker manifest create $REGISTRY:latest-gpu $REGISTRY:$TAG-gpu-ubuntu-22.04 $REGISTRY:$TAG-gpu-ubuntu-22.04-arm
-          
-          docker manifest push $REGISTRY:$TAG-cpu
           docker manifest push $REGISTRY:$TAG-gpu
-          docker manifest push $REGISTRY:latest-cpu
           docker manifest push $REGISTRY:latest-gpu
