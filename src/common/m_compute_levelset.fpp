@@ -232,9 +232,11 @@ contains
                         else
                             levelset_norm%sf(i, j, l, ib_patch_id, :) = (/0, 0, 1/)
                         end if
+                        levelset_norm%sf(i, j, l, ib_patch_id, :) = &
+                            matmul(rotation, levelset_norm%sf(i, j, l, ib_patch_id, :)/dist_surf)
                     else
                         levelset%sf(i, j, l, ib_patch_id) = dist_surf
-                        if (f_approx_equal(dist, 0._wp)) then
+                        if (f_approx_equal(dist_surf, 0._wp)) then
                             levelset_norm%sf(i, j, l, ib_patch_id, :) = 0
                         else
                             levelset_norm%sf(i, j, l, ib_patch_id, :) = &
