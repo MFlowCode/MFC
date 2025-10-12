@@ -487,52 +487,55 @@ contains
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                + dt*rhs_vf(i)%sf(j, k, l)
+                        end do
                     end do
                 end do
             end do
-        end do
+        #:endcall GPU_PARALLEL_LOOP
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(1)%sf(j, k, l, q, i) = &
-                                    pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    pb_ts(1)%sf(j, k, l, q, i) = &
+                                        pb_ts(1)%sf(j, k, l, q, i) &
+                                        + dt*rhs_pb(j, k, l, q, i)
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(1)%sf(j, k, l, q, i) = &
-                                    mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    mv_ts(1)%sf(j, k, l, q, i) = &
+                                        mv_ts(1)%sf(j, k, l, q, i) &
+                                        + dt*rhs_mv(j, k, l, q, i)
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
@@ -607,72 +610,75 @@ contains
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l)
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l)
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                + dt*rhs_vf(i)%sf(j, k, l)
+                        end do
                     end do
                 end do
             end do
-        end do
+        #:endcall GPU_PARALLEL_LOOP
 
         dest = 1 ! Result in q_cons_ts(1)%vf
 #else
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                + dt*rhs_vf(i)%sf(j, k, l)
+                        end do
                     end do
                 end do
             end do
-        end do
+        #:endcall GPU_PARALLEL_LOOP
 
         dest = 2 ! Result in q_cons_ts(2)%vf
 #endif
-
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(2)%sf(j, k, l, q, i) = &
-                                    pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    pb_ts(2)%sf(j, k, l, q, i) = &
+                                        pb_ts(1)%sf(j, k, l, q, i) &
+                                        + dt*rhs_pb(j, k, l, q, i)
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(2)%sf(j, k, l, q, i) = &
-                                    mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    mv_ts(2)%sf(j, k, l, q, i) = &
+                                        mv_ts(1)%sf(j, k, l, q, i) &
+                                        + dt*rhs_mv(j, k, l, q, i)
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt)
@@ -699,73 +705,76 @@ contains
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/2._wp
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                (q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                                 + q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                 + dt*rhs_vf(i)%sf(j, k, l))/2._wp
+                        end do
                     end do
                 end do
             end do
-        end do
 
+        #:endcall GPU_PARALLEL_LOOP
         dest = 1 ! Result in q_cons_ts(1)%vf
 #else
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/2._wp
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                (q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                 + q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                                 + dt*rhs_vf(i)%sf(j, k, l))/2._wp
+                        end do
                     end do
                 end do
             end do
-        end do
-
+        #:endcall GPU_PARALLEL_LOOP
         dest = 1 ! Result in q_cons_ts(1)%vf
 #endif
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(1)%sf(j, k, l, q, i) = &
-                                    (pb_ts(1)%sf(j, k, l, q, i) &
-                                     + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/2._wp
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    pb_ts(1)%sf(j, k, l, q, i) = &
+                                        (pb_ts(1)%sf(j, k, l, q, i) &
+                                         + pb_ts(2)%sf(j, k, l, q, i) &
+                                         + dt*rhs_pb(j, k, l, q, i))/2._wp
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(1)%sf(j, k, l, q, i) = &
-                                    (mv_ts(1)%sf(j, k, l, q, i) &
-                                     + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/2._wp
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    mv_ts(1)%sf(j, k, l, q, i) = &
+                                        (mv_ts(1)%sf(j, k, l, q, i) &
+                                         + mv_ts(2)%sf(j, k, l, q, i) &
+                                         + dt*rhs_mv(j, k, l, q, i))/2._wp
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
@@ -843,72 +852,75 @@ contains
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l)
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l)
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                + dt*rhs_vf(i)%sf(j, k, l)
+                        end do
                     end do
                 end do
             end do
-        end do
-
+        #:endcall GPU_PARALLEL_LOOP
         dest = 1 ! result in q_cons_ts(1)%vf
 #else
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                + dt*rhs_vf(i)%sf(j, k, l)
+                        end do
                     end do
                 end do
             end do
-        end do
 
+        #:endcall GPU_PARALLEL_LOOP
         dest = 2 ! result in q_cons_ts(2)%vf
 #endif
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(2)%sf(j, k, l, q, i) = &
-                                    pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    pb_ts(2)%sf(j, k, l, q, i) = &
+                                        pb_ts(1)%sf(j, k, l, q, i) &
+                                        + dt*rhs_pb(j, k, l, q, i)
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(2)%sf(j, k, l, q, i) = &
-                                    mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    mv_ts(2)%sf(j, k, l, q, i) = &
+                                        mv_ts(1)%sf(j, k, l, q, i) &
+                                        + dt*rhs_mv(j, k, l, q, i)
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt)
@@ -935,73 +947,76 @@ contains
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
 #if  defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (3._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                (3._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                                 + q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                 + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                        end do
                     end do
                 end do
             end do
-        end do
-
+        #:endcall GPU_PARALLEL_LOOP
         dest = 1 ! Result in q_cons_ts(1)%vf
 #else
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                 + q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                                 + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                        end do
                     end do
                 end do
             end do
-        end do
 
+        #:endcall GPU_PARALLEL_LOOP
         dest = 2 ! Result in q_cons_ts(2)%vf
 #endif
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(2)%sf(j, k, l, q, i) = &
-                                    (3._wp*pb_ts(1)%sf(j, k, l, q, i) &
-                                     + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/4._wp
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    pb_ts(2)%sf(j, k, l, q, i) = &
+                                        (3._wp*pb_ts(1)%sf(j, k, l, q, i) &
+                                         + pb_ts(2)%sf(j, k, l, q, i) &
+                                         + dt*rhs_pb(j, k, l, q, i))/4._wp
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(2)%sf(j, k, l, q, i) = &
-                                    (3._wp*mv_ts(1)%sf(j, k, l, q, i) &
-                                     + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/4._wp
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    mv_ts(2)%sf(j, k, l, q, i) = &
+                                        (3._wp*mv_ts(1)%sf(j, k, l, q, i) &
+                                         + mv_ts(2)%sf(j, k, l, q, i) &
+                                         + dt*rhs_mv(j, k, l, q, i))/4._wp
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt/4._wp)
@@ -1028,73 +1043,76 @@ contains
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                (q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                                 + 2._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                 + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+                        end do
                     end do
                 end do
             end do
-        end do
-
+        #:endcall GPU_PARALLEL_LOOP
         dest = 1 ! Result in q_cons_ts(1)%vf
 #else
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                (q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                 + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                                 + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+                        end do
                     end do
                 end do
             end do
-        end do
 
+        #:endcall GPU_PARALLEL_LOOP
         dest = 1 ! Result in q_cons_ts(2)%vf
 #endif
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(1)%sf(j, k, l, q, i) = &
-                                    (pb_ts(1)%sf(j, k, l, q, i) &
-                                     + 2._wp*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2._wp*dt*rhs_pb(j, k, l, q, i))/3._wp
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    pb_ts(1)%sf(j, k, l, q, i) = &
+                                        (pb_ts(1)%sf(j, k, l, q, i) &
+                                         + 2._wp*pb_ts(2)%sf(j, k, l, q, i) &
+                                         + 2._wp*dt*rhs_pb(j, k, l, q, i))/3._wp
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(1)%sf(j, k, l, q, i) = &
-                                    (mv_ts(1)%sf(j, k, l, q, i) &
-                                     + 2._wp*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2._wp*dt*rhs_mv(j, k, l, q, i))/3._wp
+            #:call GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    mv_ts(1)%sf(j, k, l, q, i) = &
+                                        (mv_ts(1)%sf(j, k, l, q, i) &
+                                         + 2._wp*mv_ts(2)%sf(j, k, l, q, i) &
+                                         + 2._wp*dt*rhs_mv(j, k, l, q, i))/3._wp
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
@@ -1236,23 +1254,24 @@ contains
                 idwint)
         end if
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    if (igr) then
-                        call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-                    else
-                        call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-                    end if
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (igr) then
+                            call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+                        else
+                            call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+                        end if
 
-                    ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
+                        ! Compute mixture sound speed
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
 
-                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+                    end do
                 end do
             end do
-        end do
+        #:endcall GPU_PARALLEL_LOOP
 
         #:call GPU_PARALLEL(copyout='[dt_local]', copyin='[max_dt]')
             dt_local = minval(max_dt)
@@ -1283,17 +1302,18 @@ contains
         call nvtxStartRange("RHS-BODYFORCES")
         call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = momxb, E_idx
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + &
-                                                   ldt*rhs_vf_in(i)%sf(j, k, l)
+        #:call GPU_PARALLEL_LOOP(collapse=4)
+            do i = momxb, E_idx
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + &
+                                                       ldt*rhs_vf_in(i)%sf(j, k, l)
+                        end do
                     end do
                 end do
             end do
-        end do
+        #:endcall GPU_PARALLEL_LOOP
 
         call nvtxEndRange
 
@@ -1309,63 +1329,68 @@ contains
         integer :: i, j, k, l !< Generic loop iterator
 
         if (t_step == t_step_start) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         elseif (t_step == t_step_start + 1) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         elseif (t_step == t_step_start + 2) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         elseif (t_step == t_step_start + 3) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         else ! All other timesteps
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_ts(2)%vf(i)%sf(j, k, l)
-                            q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_ts(1)%vf(i)%sf(j, k, l)
-                            q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_ts(0)%vf(i)%sf(j, k, l)
-                            q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+            #:call GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_ts(2)%vf(i)%sf(j, k, l)
+                                q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_ts(1)%vf(i)%sf(j, k, l)
+                                q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_ts(0)%vf(i)%sf(j, k, l)
+                                q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_time_step_cycling
