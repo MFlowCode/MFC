@@ -404,21 +404,17 @@ contains
     impure subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
                                                               vcfl_max_loc, &
                                                               Rc_min_loc, &
-                                                              ccfl_max_loc, &
                                                               icfl_max_glb, &
                                                               vcfl_max_glb, &
-                                                              Rc_min_glb, &
-                                                              ccfl_max_glb)
+                                                              Rc_min_glb)
 
         real(wp), intent(in) :: icfl_max_loc
         real(wp), intent(in) :: vcfl_max_loc
         real(wp), intent(in) :: Rc_min_loc
-        real(wp), intent(in) :: ccfl_max_loc
 
         real(wp), intent(out) :: icfl_max_glb
         real(wp), intent(out) :: vcfl_max_glb
         real(wp), intent(out) :: Rc_min_glb
-        real(wp), intent(out) :: ccfl_max_glb
 
 #ifdef MFC_SIMULATION
 #ifdef MFC_MPI
@@ -438,24 +434,13 @@ contains
                             mpi_p, MPI_MIN, 0, &
                             MPI_COMM_WORLD, ierr)
         end if
-
-        if (surface_tension) then
-            call MPI_REDUCE(ccfl_max_loc, ccfl_max_glb, 1, &
-                            mpi_p, MPI_MAX, 0, &
-                            MPI_COMM_WORLD, ierr)
-        end if
-
 #else
-
         icfl_max_glb = icfl_max_loc
 
         if (viscous) then
             vcfl_max_glb = vcfl_max_loc
             Rc_min_glb = Rc_min_loc
         end if
-
-        if (surface_tension) ccfl_max_glb = ccfl_max_loc
-
 #endif
 #endif
 
