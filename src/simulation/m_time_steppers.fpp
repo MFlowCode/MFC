@@ -566,35 +566,35 @@ contains
             if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
             if (ib) then
-              ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
-              if (moving_immersed_boundary_flag) then
-                do i = 1, num_ibs
-                    if (s == 1) then
-                        patch_ib(i)%step_vel = patch_ib(i)%vel
-                        patch_ib(i)%step_angular_vel = patch_ib(i)%angular_vel
-                        patch_ib(i)%step_angles = patch_ib(i)%angles
-                        patch_ib(i)%step_x_centroid = patch_ib(i)%x_centroid
-                        patch_ib(i)%step_y_centroid = patch_ib(i)%y_centroid
-                        patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
-                    end if
-                    
-                    if (patch_ib(i)%moving_ibm == 1) then
-                        do j = 1, 3
-                            patch_ib(i)%vel(j) = (rk_coef(s, 1)*patch_ib(i)%step_vel(j) + rk_coef(s, 2)*patch_ib(i)%vel(j) + rk_coef(s, 3)*0._wp*dt)/rk_coef(s, 4) ! 0.0 is a placeholder for accelerations
-                            patch_ib(i)%angular_vel(j) = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel(j) + rk_coef(s, 2)*patch_ib(i)%angular_vel(j) + rk_coef(s, 3)*0._wp*dt)/rk_coef(s, 4)
+                ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
+                if (moving_immersed_boundary_flag) then
+                    do i = 1, num_ibs
+                        if (s == 1) then
+                            patch_ib(i)%step_vel = patch_ib(i)%vel
+                            patch_ib(i)%step_angular_vel = patch_ib(i)%angular_vel
+                            patch_ib(i)%step_angles = patch_ib(i)%angles
+                            patch_ib(i)%step_x_centroid = patch_ib(i)%x_centroid
+                            patch_ib(i)%step_y_centroid = patch_ib(i)%y_centroid
+                            patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
+                        end if
 
-                            ! Update the angle of the IB
-                            patch_ib(i)%angles(j) = (rk_coef(s, 1)*patch_ib(i)%step_angles(j) + rk_coef(s, 2)*patch_ib(i)%angles(j) + rk_coef(s, 3)*patch_ib(i)%angular_vel(j)*dt)/rk_coef(s, 4)
-                        end do
+                        if (patch_ib(i)%moving_ibm == 1) then
+                            do j = 1, 3
+                                patch_ib(i)%vel(j) = (rk_coef(s, 1)*patch_ib(i)%step_vel(j) + rk_coef(s, 2)*patch_ib(i)%vel(j) + rk_coef(s, 3)*0._wp*dt)/rk_coef(s, 4) ! 0.0 is a placeholder for accelerations
+                                patch_ib(i)%angular_vel(j) = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel(j) + rk_coef(s, 2)*patch_ib(i)%angular_vel(j) + rk_coef(s, 3)*0._wp*dt)/rk_coef(s, 4)
 
-                        ! Update the position of the IB
-                        patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
-                        patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%step_y_centroid + rk_coef(s, 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
-                        patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%step_z_centroid + rk_coef(s, 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
-                    end if
-                end do
-                call s_update_mib(num_ibs, levelset, levelset_norm)
-            end if
+                                ! Update the angle of the IB
+                                patch_ib(i)%angles(j) = (rk_coef(s, 1)*patch_ib(i)%step_angles(j) + rk_coef(s, 2)*patch_ib(i)%angles(j) + rk_coef(s, 3)*patch_ib(i)%angular_vel(j)*dt)/rk_coef(s, 4)
+                            end do
+
+                            ! Update the position of the IB
+                            patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
+                            patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%step_y_centroid + rk_coef(s, 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
+                            patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%step_z_centroid + rk_coef(s, 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
+                        end if
+                    end do
+                    call s_update_mib(num_ibs, levelset, levelset_norm)
+                end if
                 if (qbmm .and. .not. polytropic) then
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 else
