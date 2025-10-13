@@ -46,9 +46,9 @@ RUN echo "TARGET=$TARGET CC=$CC_COMPILER FC=$FC_COMPILER" && \
 
 RUN cd /opt/MFC && \
     if [ "$TARGET" = "gpu" ]; then \
-      ./mfc.sh test --dry-run --gpu -j $(nproc); \
+      ./mfc.sh test -a --dry-run --gpu -j $(nproc); \
     else \
-      ./mfc.sh test --dry-run -j $(nproc); \
+      ./mfc.sh test -a --dry-run -j $(nproc); \
     fi
 
 WORKDIR /opt/MFC
