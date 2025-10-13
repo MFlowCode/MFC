@@ -1265,6 +1265,23 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
 
+        ! --- HLLC star-state helpers / aliases (new) ---
+        real(wp), dimension(sys_size) :: U_L, U_R, U_star_L, U_star_R
+        real(wp), dimension(sys_size) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
+        real(wp) :: u_n_HLLC, u_t_HLLC
+        
+        real(wp) :: pres_tot_L, pres_tot_R
+        real(wp) :: u_n_L, u_n_R, u_t_L, u_t_R
+        real(wp) :: tau_nn_L, tau_nn_R, tau_nt_L, tau_nt_R, tau_tt_L, tau_tt_R
+        
+        real(wp) :: A_L, A_R, denom_A, denom_L, denom_R
+        real(wp) :: fac_L, fac_R
+        real(wp) :: rho_L_star, rho_R_star
+        real(wp) :: u_t_star, tau_nt_star
+        real(wp) :: pres_tot_star
+        real(wp) :: E_L_star, E_R_star
+        real(wp) :: S_Mid             ! contact speed used in star formulas
+        
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
 
@@ -2475,6 +2492,56 @@ contains
                                 pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
                                 pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
+                                ! Hypoelasticity (Note: HLLC with Hypo only works for 1D or 2D for now)
+                                
+                                !$acc loop seq
+                                do i = 1, strxe - strxb + 1
+                                    tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
+                                    tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
+                                end do
+
+                                i = 1
+                                ! print *, "qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)", qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
+                                ! print *, "tau_e_L(i)", tau_e_L(i)
+                                
+                                if (n == 0) then
+                                    ! Normal stress
+                                    tau_nn_L = tau_e_L(1)
+                                    tau_nn_R = tau_e_R(1)
+                                    ! Normal velocity
+                                    u_n_L = vel_L(1)
+                                    u_n_R = vel_R(1)
+                                else
+                                    ! Shear stress
+                                    tau_nt_L = tau_e_L(2)
+                                    tau_nt_R = tau_e_R(2)
+                                    ! Normal stress
+                                    if (idx1 == 1) then
+                                        ! tau_xx is normal
+                                        tau_nn_L = tau_e_L(1)
+                                        tau_nn_R = tau_e_R(1)
+                                        tau_tt_L = tau_e_L(3)
+                                        tau_tt_R = tau_e_R(3)
+                                        u_n_L = vel_L(1)
+                                        u_n_R = vel_R(1)
+                                        u_t_L = vel_L(2)
+                                        u_t_R = vel_R(2)
+                                    else
+                                        ! tau_yy is normal
+                                        tau_nn_L = tau_e_L(3)
+                                        tau_nn_R = tau_e_R(3)
+                                        tau_tt_L = tau_e_L(1)
+                                        tau_tt_R = tau_e_R(1)
+                                        u_n_L = vel_L(2)
+                                        u_n_R = vel_R(2)
+                                        u_t_L = vel_L(1)
+                                        u_t_R = vel_R(1)
+                                    end if
+                                end if
+                                ! Total pressure (replace the usual pressure to define SM)
+                                pres_tot_L = pres_L - tau_nn_L
+                                pres_tot_R = pres_R - tau_nn_R
+
                                 rho_L = 0._wp
                                 gamma_L = 0._wp
                                 pi_inf_L = 0._wp
@@ -2768,91 +2835,93 @@ contains
                                     pcorr = 0._wp
                                 end if
 
-                                ! COMPUTING THE HLLC FLUXES
-                                ! MASS FLUX.
-                                !$acc loop seq
-                                do i = 1, contxe
-                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
-                                        *(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
-                                        *(vel_R(idx1) + s_P*(xi_R - 1._wp))
-                                end do
+                                ! Later comment all original HLLC below to see if it still works
+                                ! ! COMPUTING THE HLLC FLUXES
+                                ! ! MASS FLUX.
+                                ! !$acc loop seq
+                                ! do i = 1, contxe
+                                !     flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                !         xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
+                                !         *(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
+                                !         + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
+                                !         *(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                ! end do
 
-                                ! MOMENTUM FLUX.
-                                ! f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-                                !$acc loop seq
-                                do i = 1, num_dims
-                                    idxi = dir_idx(i)
-                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
-                                        xi_M*(rho_L*(vel_L(idx1)* &
-                                                     vel_L(idxi) + &
-                                                     s_M*(xi_L*(dir_flg(idxi)*s_S + &
-                                                                (1._wp - dir_flg(idxi))* &
-                                                                vel_L(idxi)) - vel_L(idxi))) + &
-                                              dir_flg(idxi)*(pres_L)) &
-                                        + xi_P*(rho_R*(vel_R(idx1)* &
-                                                       vel_R(idxi) + &
-                                                       s_P*(xi_R*(dir_flg(idxi)*s_S + &
-                                                                  (1._wp - dir_flg(idxi))* &
-                                                                  vel_R(idxi)) - vel_R(idxi))) + &
-                                                dir_flg(idxi)*(pres_R)) &
-                                        + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
-                                end do
+                                ! ! MOMENTUM FLUX.
+                                ! ! f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
+                                ! !$acc loop seq
+                                ! do i = 1, num_dims
+                                !     idxi = dir_idx(i)
+                                !     flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
+                                !         xi_M*(rho_L*(vel_L(idx1)* &
+                                !                      vel_L(idxi) + &
+                                !                      s_M*(xi_L*(dir_flg(idxi)*s_S + &
+                                !                                 (1._wp - dir_flg(idxi))* &
+                                !                                 vel_L(idxi)) - vel_L(idxi))) + &
+                                !               dir_flg(idxi)*(pres_L)) &
+                                !         + xi_P*(rho_R*(vel_R(idx1)* &
+                                !                        vel_R(idxi) + &
+                                !                        s_P*(xi_R*(dir_flg(idxi)*s_S + &
+                                !                                   (1._wp - dir_flg(idxi))* &
+                                !                                   vel_R(idxi)) - vel_R(idxi))) + &
+                                !                 dir_flg(idxi)*(pres_R)) &
+                                !         + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
+                                ! end do
 
-                                ! ENERGY FLUX.
-                                ! f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
-                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                    xi_M*(vel_L(idx1)*(E_L + pres_L) + &
-                                          s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
-                                                     (rho_L*s_S + pres_L/ &
-                                                      (s_L - vel_L(idx1)))) - E_L)) &
-                                    + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
-                                            s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
-                                                       (rho_R*s_S + pres_R/ &
-                                                        (s_R - vel_R(idx1)))) - E_R)) &
-                                    + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
+                                ! ! ENERGY FLUX.
+                                ! ! f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
+                                ! flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                !     xi_M*(vel_L(idx1)*(E_L + pres_L) + &
+                                !           s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
+                                !                      (rho_L*s_S + pres_L/ &
+                                !                       (s_L - vel_L(idx1)))) - E_L)) &
+                                !     + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
+                                !             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
+                                !                        (rho_R*s_S + pres_R/ &
+                                !                         (s_R - vel_R(idx1)))) - E_R)) &
+                                !     + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
-                                ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
-                                if (elasticity) then
-                                    flux_ene_e = 0_wp
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        idxi = dir_idx(i)
-                                        ! MOMENTUM ELASTIC FLUX.
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
-                                            flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) &
-                                            - xi_M*tau_e_L(dir_idx_tau(i)) - xi_P*tau_e_R(dir_idx_tau(i))
-                                        ! ENERGY ELASTIC FLUX.
-                                        flux_ene_e = flux_ene_e - &
-                                                     xi_M*(vel_L(idxi)*tau_e_L(dir_idx_tau(i)) + &
-                                                           s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
-                                                     xi_P*(vel_R(idxi)*tau_e_R(dir_idx_tau(i)) + &
-                                                           s_P*(xi_R*((s_S - vel_R(i))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
-                                    end do
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) + flux_ene_e
-                                end if
+                                ! ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
+                                ! if (elasticity) then
+                                !     flux_ene_e = 0_wp
+                                !     !$acc loop seq
+                                !     do i = 1, num_dims
+                                !         idxi = dir_idx(i)
+                                !         ! MOMENTUM ELASTIC FLUX.
+                                !         flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
+                                !             flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) &
+                                !             - xi_M*tau_e_L(dir_idx_tau(i)) - xi_P*tau_e_R(dir_idx_tau(i))
+                                !         ! ENERGY ELASTIC FLUX.
+                                !         flux_ene_e = flux_ene_e - &
+                                !                      xi_M*(vel_L(idxi)*tau_e_L(dir_idx_tau(i)) + &
+                                !                            s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
+                                !                      xi_P*(vel_R(idxi)*tau_e_R(dir_idx_tau(i)) + &
+                                !                            s_P*(xi_R*((s_S - vel_R(i))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
+                                !     end do
+                                !     flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) + flux_ene_e
+                                ! end if
 
-                                ! HYPOELASTIC STRESS EVOLUTION FLUX.
-                                if (hypoelasticity) then
-                                    !$acc loop seq
-                                    do i = 1, strxe - strxb + 1
-                                        flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
-                                            xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*tau_e_L(i) - rho_L*vel_L(idx1)*tau_e_L(i)) + &
-                                            xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*tau_e_R(i) - rho_R*vel_R(idx1)*tau_e_R(i))
-                                    end do
-                                end if
+                                ! ! HYPOELASTIC STRESS EVOLUTION FLUX.
+                                ! if (hypoelasticity) then
+                                !     !$acc loop seq
+                                !     do i = 1, strxe - strxb + 1
+                                !         flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
+                                !             xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*tau_e_L(i) - rho_L*vel_L(idx1)*tau_e_L(i)) + &
+                                !             xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*tau_e_R(i) - rho_R*vel_R(idx1)*tau_e_R(i))
+                                !     end do
+                                ! end if
 
-                                ! VOLUME FRACTION FLUX.
-                                !$acc loop seq
-                                do i = advxb, advxe
-                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
-                                        *(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
-                                        *(vel_R(idx1) + s_P*(xi_R - 1._wp))
-                                end do
+                                ! ! VOLUME FRACTION FLUX.
+                                ! !$acc loop seq
+                                ! do i = advxb, advxe
+                                !     flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                !         xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
+                                !         *(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
+                                !         + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
+                                !         *(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                ! end do
 
+                                ! PEND This depends on previously (probably correct) SM (fixed for hypo using total pressure)
                                 ! VOLUME FRACTION SOURCE FLUX.
                                 !$acc loop seq
                                 do i = 1, num_dims
@@ -2866,40 +2935,248 @@ contains
                                                 s_P*(xi_R - 1._wp))
                                 end do
 
-                                ! COLOR FUNCTION FLUX
-                                if (surface_tension) then
-                                    flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, c_idx) &
-                                        *(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx) &
-                                        *(vel_R(idx1) + s_P*(xi_R - 1._wp))
-                                end if
+                                ! ! COLOR FUNCTION FLUX
+                                ! if (surface_tension) then
+                                !     flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                !         xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, c_idx) &
+                                !         *(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
+                                !         + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx) &
+                                !         *(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                ! end if
 
-                                ! REFERENCE MAP FLUX.
-                                if (hyperelasticity) then
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
-                                            xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*xi_field_L(i) &
-                                                                    - rho_L*vel_L(idx1)*xi_field_L(i)) + &
-                                            xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*xi_field_R(i) &
-                                                                    - rho_R*vel_R(idx1)*xi_field_R(i))
-                                    end do
-                                end if
+                                ! ! REFERENCE MAP FLUX.
+                                ! if (hyperelasticity) then
+                                !     !$acc loop seq
+                                !     do i = 1, num_dims
+                                !         flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
+                                !             xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*xi_field_L(i) &
+                                !                                     - rho_L*vel_L(idx1)*xi_field_L(i)) + &
+                                !             xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*xi_field_R(i) &
+                                !                                     - rho_R*vel_R(idx1)*xi_field_R(i))
+                                !     end do
+                                ! end if
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
 
-                                if (chemistry) then
-                                    !$acc loop seq
-                                    do i = chemxb, chemxe
-                                        Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
-                                        Y_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                ! if (chemistry) then
+                                !     !$acc loop seq
+                                !     do i = chemxb, chemxe
+                                !         Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                !         Y_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
 
-                                        flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*rho_L*Y_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                                                        + xi_P*rho_R*Y_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
-                                        flux_src_rs${XYZ}$_vf(j, k, l, i) = 0.0_wp
+                                !         flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*rho_L*Y_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
+                                !                                         + xi_P*rho_R*Y_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                !         flux_src_rs${XYZ}$_vf(j, k, l, i) = 0.0_wp
+                                !     end do
+                                ! end if
+
+                                ! print *, '*** indices ***'
+                                ! print *, 'advxb', advxb
+                                ! print *, 'momxb', momxb
+                                ! print *, 'E_idx', E_idx
+                                ! print *, 'strxb', strxb
+
+                                ! print *, 'tau_nn_L', tau_nn_L
+
+                                ! print *, '===== dir, i, j ====='
+                                ! print *, dir_idx, i, j
+
+                                ! Hypo section
+                                if (hypoelasticity) then
+                                    eps = 1e-12
+
+                                    ! Prim to Cons: Find U_L & U_R
+                                    ! Ordered: alpha1*rho, (alpha2*rho), rho, vel_n, vel_t, E, alpha1, (alpha2), rho*tau_nn, rho*tau_nt, rho*tau_tt
+                                    do i = 1, num_fluids
+                                        U_L(i) = alpha_L(i)*rho_L
+                                        U_R(i) = alpha_R(i)*rho_R
+
+                                        U_L(advxb - 1 + i) = alpha_L(i)
+                                        U_R(advxb - 1 + i) = alpha_R(i)
                                     end do
+
+                                    U_L(momxb) = rho_L*u_n_L
+                                    U_R(momxb) = rho_R*u_n_R
+                                    if (n /= 0) then
+                                        U_L(momxb + 1) = rho_L*u_t_L
+                                        U_R(momxb + 1) = rho_R*u_t_R
+                                    end if
+
+                                    U_L(E_idx) = E_L
+                                    U_R(E_idx) = E_R
+
+                                    U_L(strxb) = rho_L*tau_nn_L
+                                    U_R(strxb) = rho_R*tau_nn_R
+                                    if (n /= 0) then
+                                        U_L(strxb + 1) = rho_L*tau_nt_L
+                                        U_L(strxb + 2) = rho_L*tau_tt_L
+                                        U_R(strxb + 1) = rho_R*tau_nt_R
+                                        U_R(strxb + 2) = rho_R*tau_tt_R
+                                    end if
+
+                                    ! print *, "U_L", U_L
+                                    ! print *, "U_R", U_R
+
+                                    ! Find prim star_L and star_R
+                                    A_L = rho_L*(S_L - u_n_L)
+                                    A_R = rho_R*(S_R - u_n_R)
+                                    denom_A = (A_R - A_L)
+
+                                    S_Mid = ((pres_tot_R - pres_tot_L) + A_L*u_n_L - A_R*u_n_R) / (A_L - A_R + eps) ! fallback not used
+
+                                    pres_tot_star = pres_tot_L + A_L*(S_Mid - u_n_L)
+
+                                    u_t_star    = (A_R*u_t_R - A_L*u_t_L + (tau_nt_R - tau_nt_L)) / (denom_A + eps)
+                                    tau_nt_star = (A_R*tau_nt_R - A_L*tau_nt_L) / (denom_A + eps)
+
+                                    denom_L = (S_L - S_Mid) + eps
+                                    denom_R = (S_R - S_Mid) + eps
+                                    rho_L_star = rho_L * (S_L - u_n_L) / denom_L
+                                    rho_R_star = rho_R * (S_R - u_n_R) / denom_R
+                                    fac_L = (S_L - u_n_L) / denom_L
+                                    fac_R = (S_R - u_n_R) / denom_R
+
+                                    if (n == 0) then
+                                        u_t_L = 0._wp; u_t_R = 0._wp
+                                        tau_nt_L = 0._wp; tau_nt_R = 0._wp
+                                    end if                                      
+
+                                    E_L_star = ((S_L - u_n_L)*E_L - u_n_L*pres_tot_L + S_Mid*pres_tot_star - u_t_star*tau_nt_star + u_t_L*tau_nt_L) / denom_L
+                                    E_R_star = ((S_R - u_n_R)*E_R - u_n_R*pres_tot_R + S_Mid*pres_tot_star - u_t_star*tau_nt_star + u_t_R*tau_nt_R) / denom_R
+
+                                    ! Find U_star_L & U_star_R
+                                    do i = 1, num_fluids
+                                        U_star_L(i) = alpha_L(i)*rho_L*fac_L
+                                        U_star_R(i) = alpha_R(i)*rho_R*fac_R
+
+                                        U_star_L(advxb - 1 + i) = alpha_L(i)*fac_L
+                                        U_star_R(advxb - 1 + i) = alpha_R(i)*fac_R
+                                    end do
+
+                                    U_star_L(momxb) = rho_L_star*S_Mid
+                                    U_star_R(momxb) = rho_R_star*S_Mid
+                                    if (n /= 0) then
+                                        U_star_L(momxb + 1) = rho_L_star*u_t_star
+                                        U_star_R(momxb + 1) = rho_R_star*u_t_star
+                                    end if
+
+                                    U_star_L(E_idx) = E_L_star
+                                    U_star_R(E_idx) = E_R_star
+
+                                    U_star_L(strxb) = rho_L_star*tau_nn_L
+                                    U_star_R(strxb) = rho_R_star*tau_nn_R
+                                    if (n /= 0) then
+                                        U_star_L(strxb + 1) = rho_L_star*tau_nt_star
+                                        U_star_L(strxb + 2) = rho_L_star*tau_tt_L
+                                        U_star_R(strxb + 1) = rho_R_star*tau_nt_star
+                                        U_star_R(strxb + 2) = rho_R_star*tau_tt_R
+                                    end if
+
+                                    ! print *, "U_L", U_L
+                                    ! print *, "U_R", U_R
+
+                                    ! Find F_L & F_R
+                                    do i = 1, num_fluids
+                                        F_L(i) = alpha_L(i)*rho_L*u_n_L
+                                        F_R(i) = alpha_R(i)*rho_R*u_n_R
+
+                                        F_L(advxb - 1 + i) = alpha_L(i)*u_n_L
+                                        F_R(advxb - 1 + i) = alpha_R(i)*u_n_R
+                                    end do
+
+                                    F_L(momxb) = rho_L*u_n_L*u_n_L + pres_tot_L
+                                    F_R(momxb) = rho_R*u_n_R*u_n_R + pres_tot_R
+                                    if (n /= 0) then
+                                        F_L(momxb + 1) = rho_L*u_n_L*u_t_L - tau_nt_L
+                                        F_R(momxb + 1) = rho_R*u_n_R*u_t_R - tau_nt_R
+                                    end if
+
+                                    F_L(E_idx) = (E_L + pres_tot_L)*u_n_L - u_t_L*tau_nt_L
+                                    F_R(E_idx) = (E_R + pres_tot_R)*u_n_R - u_t_R*tau_nt_R
+
+                                    F_L(strxb) = rho_L*u_n_L*tau_nn_L
+                                    F_R(strxb) = rho_R*u_n_R*tau_nn_R
+                                    if (n /= 0) then
+                                        F_L(strxb + 1) = rho_L*u_n_L*tau_nt_L
+                                        F_L(strxb + 2) = rho_L*u_n_L*tau_tt_L
+                                        F_R(strxb + 1) = rho_R*u_n_R*tau_nt_R
+                                        F_R(strxb + 2) = rho_R*u_n_R*tau_tt_R
+                                    end if
+
+                                    ! print *, "F_L", F_L
+                                    ! print *, "F_R", F_R
+
+                                    ! Find F_star_L & F_star_R (array operation)
+                                    F_star_L = F_L + S_L * (U_star_L - U_L)
+                                    F_star_R = F_R + S_R * (U_star_R - U_R)
+
+                                    ! print *, "F_star_L", F_star_L
+                                    ! print *, "F_star_R", F_star_R
+
+                                    ! Find F_HLLC and velocity fluxes based on wave location
+                                    if (S_L >= 0d0) then
+                                        F_HLLC = F_L
+                                        u_n_HLLC = u_n_L
+                                        u_t_HLLC = u_t_L
+                                    else if (S_R <= 0d0) then
+                                        F_HLLC = F_R
+                                        u_n_HLLC = u_n_R
+                                        u_t_HLLC = u_t_R
+                                    else if (S_mid >= 0d0) then
+                                        F_HLLC = F_star_L
+                                        u_n_HLLC = u_n_L + S_L * (rho_L_star / (rho_L + eps) - 1d0)
+                                        u_t_HLLC = u_t_star
+                                    else
+                                        F_HLLC = F_star_R
+                                        u_n_HLLC = u_n_R + S_R * (rho_R_star / (rho_R + eps) - 1d0)
+                                        u_t_HLLC = u_t_star
+                                    end if
+
+                                    ! print *, "F_HLLC", F_HLLC
+
+                                    ! Assign flux_rs to F_HLLC with the right indexing order
+                                    do i = 1, num_fluids
+                                        flux_rs${XYZ}$_vf(j, k, l, i) = F_HLLC(i)
+                                        flux_rs${XYZ}$_vf(j, k, l, advxb - 1 + i) = F_HLLC(advxb - 1 + i)
+                                    end do
+
+                                    if (n == 0) then
+                                        flux_rs${XYZ}$_vf(j, k, l, strxb) = F_HLLC(strxb)
+
+                                        flux_rs${XYZ}$_vf(j, k, l, momxb) = F_HLLC(momxb)
+                                    else
+                                        if (idx1 == 1) then
+                                            flux_rs${XYZ}$_vf(j, k, l, strxb)     = F_HLLC(strxb)
+                                            flux_rs${XYZ}$_vf(j, k, l, strxb + 1) = F_HLLC(strxb + 1)
+                                            flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = F_HLLC(strxb + 2)
+
+                                            flux_rs${XYZ}$_vf(j, k, l, momxb)     = F_HLLC(momxb)
+                                            flux_rs${XYZ}$_vf(j, k, l, momxb + 1) = F_HLLC(momxb + 1)
+
+                                            ! Borrow geometric source term
+                                            ! flux_gsrc_rs${XYZ}$_vf(j, k, l, 1) = 1d0
+                                            ! flux_gsrc_rs${XYZ}$_vf(j, k, l, 2) = 2d0
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
+                                        else
+                                            flux_rs${XYZ}$_vf(j, k, l, strxb)     = F_HLLC(strxb + 2)
+                                            flux_rs${XYZ}$_vf(j, k, l, strxb + 1) = F_HLLC(strxb + 1)
+                                            flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = F_HLLC(strxb)
+
+                                            flux_rs${XYZ}$_vf(j, k, l, momxb)     = F_HLLC(momxb + 1)
+                                            flux_rs${XYZ}$_vf(j, k, l, momxb + 1) = F_HLLC(momxb)
+
+                                            ! Borrow geometric source term
+                                            ! flux_gsrc_rs${XYZ}$_vf(j, k, l, 1) = 3d0
+                                            ! flux_gsrc_rs${XYZ}$_vf(j, k, l, 2) = 4d0
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
+                                        end if
+                                    end if
+
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = F_HLLC(E_idx)
                                 end if
+
 
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
@@ -5009,6 +5286,20 @@ contains
                 end do
             end if
 
+            if (hypoelasticity) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, 2
+                    do l = is3%beg, is3%end
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                flux_gsrc_vf(i)%sf(k, j, l) = &
+                                    flux_gsrc_rsy_vf(j, k, l, i)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = is3%beg, is3%end
                 do j = is1%beg, is1%end
@@ -5098,6 +5389,20 @@ contains
                     end do
                 end do
             end do
+
+            if (hypoelasticity) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, 2
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                flux_gsrc_vf(i)%sf(j, k, l) = &
+                                    flux_gsrc_rsx_vf(j, k, l, i)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
 
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = is3%beg, is3%end
