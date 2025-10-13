@@ -209,8 +209,8 @@ contains
             #:for VAR in ['vel', 'angular_vel', 'angles']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
-            call MPI_BCAST(patch_ib(i)%geometry, 2, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%moving_ibm, 2, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%moving_ibm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         end do
 
         do j = 1, num_probes_max
