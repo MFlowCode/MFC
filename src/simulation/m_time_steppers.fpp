@@ -573,6 +573,9 @@ contains
                         patch_ib(i)%step_vel = patch_ib(i)%vel
                         patch_ib(i)%step_angular_vel = patch_ib(i)%angular_vel
                         patch_ib(i)%step_angles = patch_ib(i)%angles
+                        patch_ib(i)%step_x_centroid = patch_ib(i)%x_centroid
+                        patch_ib(i)%step_y_centroid = patch_ib(i)%y_centroid
+                        patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
                     end if
                     
                     if (patch_ib(i)%moving_ibm == 1) then
