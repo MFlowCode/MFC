@@ -1142,14 +1142,8 @@ contains
         mytime = mytime + dt
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
-        if (time_stepper == 1) then
-            call s_1st_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 2) then
-            call s_2nd_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 3 .and. (.not. adap_dt)) then
-            call s_3rd_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 3 .and. adap_dt) then
-            call s_strang_splitting(t_step, time_avg)
+        if (any(time_stepper == (/1, 2, 3/))) then
+            call s_tvd_rk(t_step, time_avg, time_stepper)
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)

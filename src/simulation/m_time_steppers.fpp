@@ -75,7 +75,10 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt]')
+    integer :: stor !< storage index
+    real(wp), allocatable, dimension(:, :) :: rk_coef
+
+    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt,rk_coef]')
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
     real(wp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
@@ -438,143 +441,169 @@ contains
             end do
         end do
 
+        if (any(time_stepper == (/1, 2, 3/))) then
+            ! temporary array index for TVD RK
+            if (time_stepper == 1) then
+                stor = 1
+            else
+                stor = 2
+            end if
+
+            ! TVD RK coefficients
+            @:ALLOCATE (rk_coef(time_stepper, 4))
+            if (time_stepper == 1) then
+                rk_coef(1, :) = (/1._wp, 0._wp, 1._wp, 1._wp/)
+            else if (time_stepper == 2) then
+                rk_coef(1, :) = (/1._wp, 0._wp, 1._wp, 1._wp/)
+                rk_coef(2, :) = (/1._wp, 1._wp, 1._wp, 2._wp/)
+            else if (time_stepper == 3) then
+                rk_coef(1, :) = (/1._wp, 0._wp, 1._wp, 1._wp/)
+                rk_coef(2, :) = (/1._wp, 3._wp, 1._wp, 4._wp/)
+                rk_coef(3, :) = (/2._wp, 1._wp, 2._wp, 3._wp/)
+            end if
+            $:GPU_UPDATE(device='[rk_coef]')
+        end if
+
     end subroutine s_initialize_time_steppers_module
 
-    !> 1st order TVD RK time-stepping algorithm
-        !! @param t_step Current time step
-    impure subroutine s_1st_order_tvd_rk(t_step, time_avg)
+    impure subroutine s_tvd_rk(t_step, time_avg, nstage)
 #ifdef _CRAYFTN
         !DIR$ OPTIMIZE (-haggress)
 #endif
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
+        integer, intent(in) :: nstage
 
-        integer :: i, j, k, l, q !< Generic loop iterator
-
+        integer :: i, j, k, l, q, s !< Generic loop iterator
         real(wp) :: start, finish
 
-        ! Stage 1 of 1
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
+        ! Adaptive dt: initial stage
+        if (adap_dt) call s_adaptive_dt_bubble(1)
 
-#ifdef DEBUG
-        print *, 'got rhs'
-#endif
+        do s = 1, nstage
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, s)
 
-        if (run_time_info) then
-            if (igr) then
-                call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-            else
-                call s_write_run_time_information(q_prim_vf, t_step)
+            if (s == 1) then
+                if (run_time_info) then
+                    if (igr) then
+                        call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
+                    else
+                        call s_write_run_time_information(q_prim_vf, t_step)
+                    end if
+                end if
+
+                if (probe_wrt) then
+                    call s_time_step_cycling(t_step)
+                end if
+
+                if (cfl_dt) then
+                    if (mytime >= t_stop) return
+                else
+                    if (t_step == t_step_stop) return
+                end if
             end if
-        end if
 
-#ifdef DEBUG
-        print *, 'wrote runtime info'
-#endif
+            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
 
-        if (probe_wrt) then
-            call s_time_step_cycling(t_step)
-        end if
-
-        if (cfl_dt) then
-            if (mytime >= t_stop) return
-        else
-            if (t_step == t_step_stop) return
-        end if
-
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
-
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-        !Evolve pb and mv for non-polytropic qbmm
-        if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(1)%sf(j, k, l, q, i) = &
-                                    pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
-                            end do
+                            if (s == 1 .and. nstage > 1) then
+                                q_cons_ts(stor)%vf(i)%sf(j, k, l) = &
+                                    q_cons_ts(1)%vf(i)%sf(j, k, l)
+                            end if
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                 + rk_coef(s, 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) &
+                                 + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
                         end do
                     end do
                 end do
             end do
-        end if
 
-        if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(1)%sf(j, k, l, q, i) = &
-                                    mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
+            !Evolve pb and mv for non-polytropic qbmm
+            if (qbmm .and. (.not. polytropic)) then
+                $:GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    if (s == 1 .and. nstage > 1) then
+                                        pb_ts(stor)%sf(j, k, l, q, i) = &
+                                            pb_ts(1)%sf(j, k, l, q, i)
+                                        mv_ts(stor)%sf(j, k, l, q, i) = &
+                                            mv_ts(1)%sf(j, k, l, q, i)
+                                    end if
+                                    pb_ts(1)%sf(j, k, l, q, i) = &
+                                        (rk_coef(s, 1)*pb_ts(1)%sf(j, k, l, q, i) &
+                                         + rk_coef(s, 2)*pb_ts(stor)%sf(j, k, l, q, i) &
+                                         + rk_coef(s, 3)*dt*rhs_pb(j, k, l, q, i))/rk_coef(s, 4)
+                                    mv_ts(1)%sf(j, k, l, q, i) = &
+                                        (rk_coef(s, 1)*mv_ts(1)%sf(j, k, l, q, i) &
+                                         + rk_coef(s, 2)*mv_ts(stor)%sf(j, k, l, q, i) &
+                                         + rk_coef(s, 3)*dt*rhs_mv(j, k, l, q, i))/rk_coef(s, 4)
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
-        end if
+            end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
+            if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+            if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
-        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+            if (model_eqns == 3 .and. (.not. relax)) then
+                call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+            end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+            if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-        if (ib) then
-            ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
-            if (moving_immersed_boundary_flag) then
+            if (ib) then
+              ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
+              if (moving_immersed_boundary_flag) then
                 do i = 1, num_ibs
-                    ! start by using euler's method naiively, but eventually incorporate more sophistocation
+                    if (s == 1) then
+                        patch_ib(i)%step_vel = patch_ib(i)%vel
+                        patch_ib(i)%step_angular_vel = patch_ib(i)%angular_vel
+                        patch_ib(i)%step_angles = patch_ib(i)%angles
+                    end if
+                    
                     if (patch_ib(i)%moving_ibm == 1) then
                         do j = 1, 3
-                            patch_ib(i)%vel(j) = patch_ib(i)%vel(j) + 0.0*dt
-                            patch_ib(i)%angular_vel(j) = patch_ib(i)%angular_vel(j) + 0.0*dt
+                            patch_ib(i)%vel(j) = (rk_coef(s, 1)*patch_ib(i)%step_vel(j) + rk_coef(s, 2)*patch_ib(i)%vel(j) + rk_coef(s, 3)*0._wp*dt)/rk_coef(s, 4) ! 0.0 is a placeholder for accelerations
+                            patch_ib(i)%angular_vel(j) = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel(j) + rk_coef(s, 2)*patch_ib(i)%angular_vel(j) + rk_coef(s, 3)*0._wp*dt)/rk_coef(s, 4)
 
                             ! Update the angle of the IB
-                            patch_ib(i)%angles(j) = patch_ib(i)%angles(j) + patch_ib(i)%angular_vel(j)*dt
+                            patch_ib(i)%angles(j) = (rk_coef(s, 1)*patch_ib(i)%step_angles(j) + rk_coef(s, 2)*patch_ib(i)%angles(j) + rk_coef(s, 3)*patch_ib(i)%angular_vel(j)*dt)/rk_coef(s, 4)
                         end do
 
                         ! Update the position of the IB
-                        patch_ib(i)%x_centroid = patch_ib(i)%x_centroid + patch_ib(i)%vel(1)*dt
-                        patch_ib(i)%y_centroid = patch_ib(i)%y_centroid + patch_ib(i)%vel(2)*dt
-                        patch_ib(i)%z_centroid = patch_ib(i)%z_centroid + patch_ib(i)%vel(3)*dt
+                        patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
+                        patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%step_y_centroid + rk_coef(s, 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
+                        patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%step_z_centroid + rk_coef(s, 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
                     end if
                 end do
                 call s_update_mib(num_ibs, levelset, levelset_norm)
             end if
-
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+                if (qbmm .and. .not. polytropic) then
+                    call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+                else
+                    call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+                end if
             end if
-        end if
+        end do
+
+        ! Adaptive dt: final stage
+        if (adap_dt) call s_adaptive_dt_bubble(3)
 
         call nvtxEndRange
-
         call cpu_time(finish)
 
         wall_time = abs(finish - start)
@@ -585,727 +614,7 @@ contains
             wall_time_avg = 0._wp
         end if
 
-    end subroutine s_1st_order_tvd_rk
-
-    !> 2nd order TVD RK time-stepping algorithm
-        !! @param t_step Current time-step
-    impure subroutine s_2nd_order_tvd_rk(t_step, time_avg)
-#ifdef _CRAYFTN
-        !DIR$ OPTIMIZE (-haggress)
-#endif
-        integer, intent(in) :: t_step
-        real(wp), intent(inout) :: time_avg
-
-        integer :: i, j, k, l, q!< Generic loop iterator
-        real(wp) :: start, finish
-        integer :: dest
-
-        ! Stage 1 of 2
-
-        call cpu_time(start)
-
-        call nvtxStartRange("TIMESTEP")
-
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
-
-        if (run_time_info) then
-            if (igr) then
-                call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-            else
-                call s_write_run_time_information(q_prim_vf, t_step)
-            end if
-        end if
-
-        if (probe_wrt) then
-            call s_time_step_cycling(t_step)
-        end if
-
-        if (cfl_dt) then
-            if (mytime >= t_stop) return
-        else
-            if (t_step == t_step_stop) return
-        end if
-
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
-
-#if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l)
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-        dest = 1 ! Result in q_cons_ts(1)%vf
-#else
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-        dest = 2 ! Result in q_cons_ts(2)%vf
-#endif
-
-        !Evolve pb and mv for non-polytropic qbmm
-        if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(2)%sf(j, k, l, q, i) = &
-                                    pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(2)%sf(j, k, l, q, i) = &
-                                    mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt)
-
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
-
-        if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
-        end if
-
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
-
-        if (ib) then
-            ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
-            if (moving_immersed_boundary_flag) then
-                do i = 1, num_ibs
-                    ! start by using euler's method naiively, but eventually incorporate more sophistocation
-                    if (patch_ib(i)%moving_ibm == 1) then
-                        patch_ib(i)%step_vel = patch_ib(i)%vel
-                        patch_ib(i)%step_angular_vel = patch_ib(i)%angular_vel
-                        patch_ib(i)%step_angles = patch_ib(i)%angles
-
-                        do j = 1, 3
-                            patch_ib(i)%vel(j) = patch_ib(i)%step_vel(j) + 0.0*dt
-                            patch_ib(i)%angular_vel(j) = patch_ib(i)%step_angular_vel(j) + 0.0*dt
-
-                            ! Update the angle of the IB
-                            patch_ib(i)%angles(j) = patch_ib(i)%step_angles(j) + patch_ib(i)%angular_vel(j)*dt
-                        end do
-
-                        patch_ib(i)%step_x_centroid = patch_ib(i)%x_centroid
-                        patch_ib(i)%step_y_centroid = patch_ib(i)%y_centroid
-                        patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
-
-                        patch_ib(i)%x_centroid = patch_ib(i)%step_x_centroid + patch_ib(i)%vel(1)*dt
-                        patch_ib(i)%y_centroid = patch_ib(i)%step_y_centroid + patch_ib(i)%vel(2)*dt
-                        patch_ib(i)%z_centroid = patch_ib(i)%step_z_centroid + patch_ib(i)%vel(3)*dt
-                    end if
-                end do
-                call s_update_mib(num_ibs, levelset, levelset_norm)
-            end if
-
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
-            end if
-        end if
-
-        ! Stage 2 of 2
-        call s_compute_rhs(q_cons_ts(dest)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
-
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
-
-#if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/2._wp
-                    end do
-                end do
-            end do
-        end do
-
-        dest = 1 ! Result in q_cons_ts(1)%vf
-#else
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/2._wp
-                    end do
-                end do
-            end do
-        end do
-
-        dest = 1 ! Result in q_cons_ts(1)%vf
-#endif
-
-        if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(1)%sf(j, k, l, q, i) = &
-                                    (pb_ts(1)%sf(j, k, l, q, i) &
-                                     + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/2._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(1)%sf(j, k, l, q, i) = &
-                                    (mv_ts(1)%sf(j, k, l, q, i) &
-                                     + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/2._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
-
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
-
-        if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
-        end if
-
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
-
-        if (ib) then
-            if (moving_immersed_boundary_flag) then
-                do i = 1, num_ibs
-                    ! start by using euler's method naiively, but eventually incorporate more sophistocation
-                    if (patch_ib(i)%moving_ibm == 1) then
-                        do j = 1, 3
-                            patch_ib(i)%vel(j) = (patch_ib(i)%vel(j) + patch_ib(i)%step_vel(j) + 0.0*dt)/2._wp
-                            patch_ib(i)%angular_vel(j) = (patch_ib(i)%angular_vel(j) + patch_ib(i)%step_angular_vel(j) + 0.0*dt)/2._wp
-
-                            patch_ib(i)%angles(j) = (patch_ib(i)%angles(j) + patch_ib(i)%step_angles(j) + patch_ib(i)%step_angular_vel(j)*dt)/2._wp
-                        end do
-
-                        patch_ib(i)%x_centroid = (patch_ib(i)%x_centroid + patch_ib(i)%step_x_centroid + patch_ib(i)%step_vel(1)*dt)/2._wp
-                        patch_ib(i)%y_centroid = (patch_ib(i)%y_centroid + patch_ib(i)%step_y_centroid + patch_ib(i)%step_vel(2)*dt)/2._wp
-                        patch_ib(i)%z_centroid = (patch_ib(i)%z_centroid + patch_ib(i)%step_z_centroid + patch_ib(i)%step_vel(3)*dt)/2._wp
-                    end if
-                end do
-                call s_update_mib(num_ibs, levelset, levelset_norm)
-            end if
-
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
-            end if
-        end if
-
-        call nvtxEndRange
-
-        call cpu_time(finish)
-
-        wall_time = abs(finish - start)
-
-        if (t_step >= 2) then
-            wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
-        else
-            wall_time_avg = 0._wp
-        end if
-
-    end subroutine s_2nd_order_tvd_rk
-
-    !> 3rd order TVD RK time-stepping algorithm
-        !! @param t_step Current time-step
-    impure subroutine s_3rd_order_tvd_rk(t_step, time_avg)
-#ifdef _CRAYFTN
-        !DIR$ OPTIMIZE (-haggress)
-#endif
-        integer, intent(IN) :: t_step
-        real(wp), intent(INOUT) :: time_avg
-
-        integer :: i, j, k, l, q !< Generic loop iterator
-        real(wp) :: start, finish
-        integer :: dest
-
-        ! Stage 1 of 3
-
-        if (.not. adap_dt) then
-            call cpu_time(start)
-            call nvtxStartRange("TIMESTEP")
-        end if
-
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
-
-        if (run_time_info) then
-            if (igr) then
-                call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-            else
-                call s_write_run_time_information(q_prim_vf, t_step)
-            end if
-        end if
-
-        if (probe_wrt) then
-            call s_time_step_cycling(t_step)
-        end if
-
-        if (cfl_dt) then
-            if (mytime >= t_stop) return
-        else
-            if (t_step == t_step_stop) return
-        end if
-
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=1)
-
-#if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l)
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-        dest = 1 ! result in q_cons_ts(1)%vf
-#else
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-        dest = 2 ! result in q_cons_ts(2)%vf
-#endif
-
-        !Evolve pb and mv for non-polytropic qbmm
-        if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(2)%sf(j, k, l, q, i) = &
-                                    pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(2)%sf(j, k, l, q, i) = &
-                                    mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt)
-
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
-
-        if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
-        end if
-
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
-
-        if (ib) then
-            if (moving_immersed_boundary_flag) then
-                do i = 1, num_ibs
-                    if (patch_ib(i)%moving_ibm == 1) then
-                        patch_ib(i)%step_vel = patch_ib(i)%vel
-                        patch_ib(i)%step_angular_vel = patch_ib(i)%angular_vel
-                        patch_ib(i)%step_angles = patch_ib(i)%angles
-
-                        do j = 1, 3
-                            patch_ib(i)%vel(j) = patch_ib(i)%step_vel(j) + 0.0*dt
-                            patch_ib(i)%angular_vel(j) = patch_ib(i)%step_angular_vel(j) + 0.0*dt
-
-                            ! Update the angle of the IB
-                            patch_ib(i)%angles(j) = patch_ib(i)%step_angles(j) + patch_ib(i)%angular_vel(j)*dt
-                        end do
-
-                        patch_ib(i)%step_x_centroid = patch_ib(i)%x_centroid
-                        patch_ib(i)%step_y_centroid = patch_ib(i)%y_centroid
-                        patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
-
-                        patch_ib(i)%x_centroid = patch_ib(i)%step_x_centroid + patch_ib(i)%vel(1)*dt
-                        patch_ib(i)%y_centroid = patch_ib(i)%step_y_centroid + patch_ib(i)%vel(2)*dt
-                        patch_ib(i)%z_centroid = patch_ib(i)%step_z_centroid + patch_ib(i)%vel(3)*dt
-                    end if
-                end do
-                call s_update_mib(num_ibs, levelset, levelset_norm)
-            end if
-
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
-            end if
-        end if
-
-        ! Stage 2 of 3
-        call s_compute_rhs(q_cons_ts(dest)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
-
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
-
-#if  defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (3._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
-                    end do
-                end do
-            end do
-        end do
-
-        dest = 1 ! Result in q_cons_ts(1)%vf
-#else
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
-                    end do
-                end do
-            end do
-        end do
-
-        dest = 2 ! Result in q_cons_ts(2)%vf
-#endif
-
-        if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(2)%sf(j, k, l, q, i) = &
-                                    (3._wp*pb_ts(1)%sf(j, k, l, q, i) &
-                                     + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/4._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(2)%sf(j, k, l, q, i) = &
-                                    (3._wp*mv_ts(1)%sf(j, k, l, q, i) &
-                                     + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/4._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, dt/4._wp)
-
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
-
-        if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
-        end if
-
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
-
-        if (ib) then
-            if (moving_immersed_boundary_flag) then
-                do i = 1, num_ibs
-                    if (patch_ib(i)%moving_ibm == 1) then
-                        do j = 1, 3
-                            patch_ib(i)%vel(j) = (patch_ib(i)%vel(j) + 3._wp*patch_ib(i)%step_vel(j) + 0.0*dt)/4._wp
-                            patch_ib(i)%angular_vel(j) = (patch_ib(i)%angular_vel(j) + 3._wp*patch_ib(i)%step_angular_vel(j) + 0.0*dt)/4._wp
-
-                            patch_ib(i)%angles(j) = (patch_ib(i)%angles(j) + 3._wp*patch_ib(i)%step_angles(j) + patch_ib(i)%angular_vel(j)*dt)/4._wp
-
-                        end do
-
-                        patch_ib(i)%x_centroid = (patch_ib(i)%x_centroid + 3._wp*patch_ib(i)%step_x_centroid + patch_ib(i)%vel(1)*dt)/4._wp
-                        patch_ib(i)%y_centroid = (patch_ib(i)%y_centroid + 3._wp*patch_ib(i)%step_y_centroid + patch_ib(i)%vel(2)*dt)/4._wp
-                        patch_ib(i)%z_centroid = (patch_ib(i)%z_centroid + 3._wp*patch_ib(i)%step_z_centroid + patch_ib(i)%vel(3)*dt)/4._wp
-                    end if
-                end do
-                call s_update_mib(num_ibs, levelset, levelset_norm)
-            end if
-
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
-            end if
-        end if
-
-        ! Stage 3 of 3
-        call s_compute_rhs(q_cons_ts(dest)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
-
-        if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
-
-#if defined(__NVCOMPILER_GPU_UNIFIED_MEM) || defined(FRONTIER_UNIFIED)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
-                    end do
-                end do
-            end do
-        end do
-
-        dest = 1 ! Result in q_cons_ts(1)%vf
-#else
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                            (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
-                    end do
-                end do
-            end do
-        end do
-
-        dest = 1 ! Result in q_cons_ts(2)%vf
-#endif
-
-        if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_ts(1)%sf(j, k, l, q, i) = &
-                                    (pb_ts(1)%sf(j, k, l, q, i) &
-                                     + 2._wp*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2._wp*dt*rhs_pb(j, k, l, q, i))/3._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (qbmm .and. (.not. polytropic)) then
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                mv_ts(1)%sf(j, k, l, q, i) = &
-                                    (mv_ts(1)%sf(j, k, l, q, i) &
-                                     + 2._wp*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2._wp*dt*rhs_mv(j, k, l, q, i))/3._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(dest)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
-
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(dest)%vf)
-
-        if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(dest)%vf)
-        end if
-
-        call nvtxStartRange("RHS-ELASTIC")
-        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(dest)%vf, q_prim_vf)
-        call nvtxEndRange
-
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(dest)%vf)
-
-        if (ib) then
-            if (moving_immersed_boundary_flag) then
-                do i = 1, num_ibs
-                    if (patch_ib(i)%moving_ibm == 1) then
-                        do j = 1, 3
-                            patch_ib(i)%vel(j) = (2._wp*patch_ib(i)%vel(j) + patch_ib(i)%step_vel(j) + 0.0*dt)/3._wp
-                            patch_ib(i)%angular_vel(j) = (2._wp*patch_ib(i)%angular_vel(j) + patch_ib(i)%step_angular_vel(j) + 0.0*dt)/3._wp
-
-                            patch_ib(i)%angles(j) = (2._wp*patch_ib(i)%angles(j) + patch_ib(i)%step_angles(j) + 2._wp*patch_ib(i)%angular_vel(j)*dt)/3._wp
-                        end do
-
-                        patch_ib(i)%x_centroid = (2._wp*patch_ib(i)%x_centroid + patch_ib(i)%step_x_centroid + 2._wp*patch_ib(i)%vel(1)*dt)/3._wp
-                        patch_ib(i)%y_centroid = (2._wp*patch_ib(i)%y_centroid + patch_ib(i)%step_y_centroid + 2._wp*patch_ib(i)%vel(2)*dt)/3._wp
-                        patch_ib(i)%z_centroid = (2._wp*patch_ib(i)%z_centroid + patch_ib(i)%step_z_centroid + 2._wp*patch_ib(i)%vel(3)*dt)/3._wp
-                    end if
-                end do
-                call s_update_mib(num_ibs, levelset, levelset_norm)
-            end if
-
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(dest)%vf, q_prim_vf)
-            end if
-        end if
-
-        if (.not. adap_dt) then
-            call nvtxEndRange
-            call cpu_time(finish)
-
-            wall_time = abs(finish - start)
-
-            if (t_step >= 2) then
-                wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
-            else
-                wall_time_avg = 0._wp
-            end if
-
-        end if
-
-    end subroutine s_3rd_order_tvd_rk
-
-    !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
-        !!      the flux term and adaptive time stepping algorithm for
-        !!      the source term
-        !! @param t_step Current time-step
-    subroutine s_strang_splitting(t_step, time_avg)
-
-        integer, intent(in) :: t_step
-        real(wp), intent(inout) :: time_avg
-
-        real(wp) :: start, finish
-
-        call cpu_time(start)
-
-        call nvtxStartRange("TIMESTEP")
-
-        ! Stage 1 of 3
-        call s_adaptive_dt_bubble(1)
-
-        ! Stage 2 of 3
-        call s_3rd_order_tvd_rk(t_step, time_avg)
-
-        ! Stage 3 of 3
-        call s_adaptive_dt_bubble(3)
-
-        call nvtxEndRange
-
-        call cpu_time(finish)
-
-        wall_time = abs(finish - start)
-
-        if (t_step >= 2) then
-            wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
-        else
-            wall_time_avg = 0._wp
-        end if
-
-    end subroutine s_strang_splitting
+    end subroutine s_tvd_rk
 
     !> Bubble source part in Strang operator splitting scheme
         !! @param t_step Current time-step
