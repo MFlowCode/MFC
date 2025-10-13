@@ -286,10 +286,16 @@ contains
                     if (chemistry) then
                         do l = chemxb, chemxe
                             @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
-                                     & idwbuff(1)%beg:idwbuff(1)%end, &
-                                     & idwbuff(2)%beg:idwbuff(2)%end, &
-                                     & idwbuff(3)%beg:idwbuff(3)%end))
+                                    & idwbuff(1)%beg:idwbuff(1)%end, &
+                                    & idwbuff(2)%beg:idwbuff(2)%end, &
+                                    & idwbuff(3)%beg:idwbuff(3)%end))
                         end do
+                        if (chem_params%diffusion .and. .not. viscous) then
+                            @:ALLOCATE(flux_src_n(i)%vf(E_idx)%sf( &
+                                    & idwbuff(1)%beg:idwbuff(1)%end, &
+                                    & idwbuff(2)%beg:idwbuff(2)%end, &
+                                    & idwbuff(3)%beg:idwbuff(3)%end))
+                        end if
                     end if
 
                 else
@@ -762,34 +768,75 @@ contains
                 call nvtxStartRange("RHS-WENO")
 
                 if (.not. surface_tension) then
-                    ! Reconstruct densitiess
-                    iv%beg = 1; iv%end = sys_size
-                    call s_reconstruct_cell_boundary_values( &
-                        q_prim_qp%vf(1:sys_size), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
+                    if (all(Re_size == 0)) then
+                        ! Reconstruct densitiess
+                        iv%beg = 1; iv%end = sys_size
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(1:sys_size), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+                    else
+                        iv%beg = 1; iv%end = contxe
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+
+                        iv%beg = E_idx; iv%end = sys_size
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+                    end if
+
                 else
-                    iv%beg = 1; iv%end = E_idx - 1
-                    call s_reconstruct_cell_boundary_values( &
-                        q_prim_qp%vf(iv%beg:iv%end), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
+                    if (all(Re_size == 0)) then
+                        iv%beg = 1; iv%end = E_idx - 1
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
 
-                    iv%beg = E_idx; iv%end = E_idx
-                    call s_reconstruct_cell_boundary_values_first_order( &
-                        q_prim_qp%vf(E_idx), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
+                        iv%beg = E_idx; iv%end = E_idx
+                        call s_reconstruct_cell_boundary_values_first_order( &
+                            q_prim_qp%vf(E_idx), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
 
-                    iv%beg = E_idx + 1; iv%end = sys_size
-                    call s_reconstruct_cell_boundary_values( &
-                        q_prim_qp%vf(iv%beg:iv%end), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
+                        iv%beg = E_idx + 1; iv%end = sys_size
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+                    else
+                        iv%beg = 1; iv%end = contxe
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+
+                        iv%beg = E_idx; iv%end = E_idx
+                        call s_reconstruct_cell_boundary_values_first_order( &
+                            q_prim_qp%vf(E_idx), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+
+                        iv%beg = E_idx + 1; iv%end = sys_size
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+                    end if
+
                 end if
 
                 ! Reconstruct viscous derivatives for viscosity
@@ -867,8 +914,15 @@ contains
                                                                    rhs_vf)
                 call nvtxEndRange
 
+                ! RHS for diffusion
+                if (chemistry .and. chem_params%diffusion) then
+                    call nvtxStartRange("RHS-CHEM-DIFFUSION")
+                    call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz)
+                    call nvtxEndRange
+                end if
+
                 ! RHS additions for viscosity
-                if (viscous .or. surface_tension) then
+                if (viscous .or. surface_tension .or. chem_params%diffusion) then
                     call nvtxStartRange("RHS-ADD-PHYSICS")
                     call s_compute_additional_physics_rhs(id, &
                                                           q_prim_qp%vf, &
@@ -1502,20 +1556,41 @@ contains
                 end do
             end if
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = momxb, E_idx
-                            rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
-                                (flux_src_n_in(i)%sf(j - 1, k, l) &
-                                 - flux_src_n_in(i)%sf(j, k, l))
+            if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            if (surface_tension .or. viscous) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = momxb, E_idx
+                                    rhs_vf(i)%sf(j, k, l) = &
+                                        rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
+                                        (flux_src_n_in(i)%sf(j - 1, k, l) &
+                                         - flux_src_n_in(i)%sf(j, k, l))
+                                end do
+                            end if
+
+                            if (chem_params%diffusion) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = chemxb, chemxe
+                                    rhs_vf(i)%sf(j, k, l) = &
+                                        rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
+                                        (flux_src_n_in(i)%sf(j - 1, k, l) &
+                                         - flux_src_n_in(i)%sf(j, k, l))
+                                end do
+
+                                if (.not. viscous) then
+                                    rhs_vf(E_idx)%sf(j, k, l) = &
+                                        rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dx(j)* &
+                                        (flux_src_n_in(E_idx)%sf(j - 1, k, l) &
+                                         - flux_src_n_in(E_idx)%sf(j, k, l))
+                                end if
+                            end if
                         end do
                     end do
                 end do
-            end do
+            end if
 
         elseif (idir == 2) then ! y-direction
 
@@ -1583,20 +1658,41 @@ contains
                 end do
 
             else
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = momxb, E_idx
-                                rhs_vf(i)%sf(j, k, l) = &
-                                    rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
-                                    (flux_src_n_in(i)%sf(j, k - 1, l) &
-                                     - flux_src_n_in(i)%sf(j, k, l))
+
+                if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                if (surface_tension .or. viscous) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = momxb, E_idx
+                                        rhs_vf(i)%sf(j, k, l) = &
+                                            rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
+                                            (flux_src_n_in(i)%sf(j, k - 1, l) &
+                                             - flux_src_n_in(i)%sf(j, k, l))
+                                    end do
+                                end if
+
+                                if (chem_params%diffusion) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = chemxb, chemxe
+                                        rhs_vf(i)%sf(j, k, l) = &
+                                            rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
+                                            (flux_src_n_in(i)%sf(j, k - 1, l) &
+                                             - flux_src_n_in(i)%sf(j, k, l))
+                                    end do
+                                    if (.not. viscous) then
+                                        rhs_vf(E_idx)%sf(j, k, l) = &
+                                            rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dy(k)* &
+                                            (flux_src_n_in(E_idx)%sf(j, k - 1, l) &
+                                             - flux_src_n_in(E_idx)%sf(j, k, l))
+                                    end if
+                                end if
                             end do
                         end do
                     end do
-                end do
+                end if
             end if
 
             ! Applying the geometrical viscous Riemann source fluxes calculated as average
@@ -1669,20 +1765,40 @@ contains
                 end do
             end if
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = momxb, E_idx
-                            rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
-                                (flux_src_n_in(i)%sf(j, k, l - 1) &
-                                 - flux_src_n_in(i)%sf(j, k, l))
+            if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            if (surface_tension .or. viscous) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = momxb, E_idx
+                                    rhs_vf(i)%sf(j, k, l) = &
+                                        rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
+                                        (flux_src_n_in(i)%sf(j, k, l - 1) &
+                                         - flux_src_n_in(i)%sf(j, k, l))
+                                end do
+                            end if
+
+                            if (chem_params%diffusion) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = chemxb, chemxe
+                                    rhs_vf(i)%sf(j, k, l) = &
+                                        rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
+                                        (flux_src_n_in(i)%sf(j, k, l - 1) &
+                                         - flux_src_n_in(i)%sf(j, k, l))
+                                end do
+                                if (.not. viscous) then
+                                    rhs_vf(E_idx)%sf(j, k, l) = &
+                                        rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dz(l)* &
+                                        (flux_src_n_in(E_idx)%sf(j, k, l - 1) &
+                                         - flux_src_n_in(E_idx)%sf(j, k, l))
+                                end if
+                            end if
                         end do
                     end do
                 end do
-            end do
+            end if
 
             if (grid_geometry == 3) then
                 $:GPU_PARALLEL_LOOP(collapse=3)
@@ -1996,6 +2112,10 @@ contains
                         do l = mom_idx%beg, E_idx
                             @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                         end do
+                    end if
+
+                    if (chem_params%diffusion .and. .not. viscous) then
+                        @:DEALLOCATE(flux_src_n(i)%vf(E_idx)%sf)
                     end if
 
                     if (riemann_solver == 1 .or. riemann_solver == 4) then

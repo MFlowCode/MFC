@@ -26,7 +26,7 @@ module m_body_forces
 
 contains
 
-    !> This subroutine inializes the module global array of mixture
+    !> This subroutine initializes the module global array of mixture
     !! densities in each grid cell
     impure subroutine s_initialize_body_forces_module
 
@@ -60,7 +60,7 @@ contains
 
         #:for DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (bf_${XYZ}$) then
-                accel_bf(${DIR}$) = g_${XYZ}$ + k_${XYZ}$*sin(w_${XYZ}$*t - p_${XYZ}$)
+                accel_bf(${DIR}$) = g_${XYZ}$+k_${XYZ}$*sin(w_${XYZ}$*t - p_${XYZ}$)
             end if
         #:endfor
 

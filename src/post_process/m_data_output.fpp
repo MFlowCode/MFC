@@ -156,7 +156,7 @@ contains
         ! the offsets and the one bookkeeping the number of cell-boundaries
         ! in each active coordinate direction. Note that all these variables
         ! are only needed by the Silo-HDF5 format for multidimensional data.
-        if (format == 1 .and. n > 0) then
+        if (format == 1) then
 
             allocate (data_extents(1:2, 0:num_procs - 1))
 
@@ -165,11 +165,16 @@ contains
                 allocate (lo_offset(1:3))
                 allocate (hi_offset(1:3))
                 allocate (dims(1:3))
-            else
+            elseif (n > 0) then
                 allocate (spatial_extents(1:4, 0:num_procs - 1))
                 allocate (lo_offset(1:2))
                 allocate (hi_offset(1:2))
                 allocate (dims(1:2))
+            else
+                allocate (spatial_extents(1:2, 0:num_procs - 1))
+                allocate (lo_offset(1:1))
+                allocate (hi_offset(1:1))
+                allocate (dims(1:1))
             end if
 
         end if
@@ -181,7 +186,7 @@ contains
         ! With the same, latter, requirements, the variables bookkeeping the
         ! number of cell-boundaries in each active coordinate direction are
         ! also set here.
-        if (format == 1 .and. n > 0) then
+        if (format == 1) then
             if (p > 0) then
                 if (grid_geometry == 3) then
                     lo_offset(:) = (/offset_y%beg, offset_z%beg, offset_x%beg/)
@@ -200,12 +205,16 @@ contains
                                 n + offset_y%beg + offset_y%end + 2, &
                                 p + offset_z%beg + offset_z%end + 2/)
                 end if
-            else
+            elseif (n > 0) then
                 lo_offset(:) = (/offset_x%beg, offset_y%beg/)
                 hi_offset(:) = (/offset_x%end, offset_y%end/)
 
                 dims(:) = (/m + offset_x%beg + offset_x%end + 2, &
                             n + offset_y%beg + offset_y%end + 2/)
+            else
+                lo_offset(:) = (/offset_x%beg/)
+                hi_offset(:) = (/offset_x%end/)
+                dims(:) = (/m + offset_x%beg + offset_x%end + 2/)
             end if
         end if
 
@@ -659,7 +668,7 @@ contains
 
         ! Silo-HDF5 Database Format
 
-        if (format == 1 .and. n > 0) then
+        if (format == 1) then
 
             ! For multidimensional data sets, the spatial extents of all of
             ! the grid(s) handled by the local processor(s) are recorded so
@@ -667,7 +676,6 @@ contains
             ! database master file.
             if (num_procs > 1) then
                 call s_mpi_gather_spatial_extents(spatial_extents)
-
             elseif (p > 0) then
                 if (grid_geometry == 3) then
                     spatial_extents(:, 0) = (/minval(y_cb), minval(z_cb), &
@@ -678,11 +686,11 @@ contains
                                               minval(z_cb), maxval(x_cb), &
                                               maxval(y_cb), maxval(z_cb)/)
                 end if
-
-            else
+            elseif (n > 0) then
                 spatial_extents(:, 0) = (/minval(x_cb), minval(y_cb), &
                                           maxval(x_cb), maxval(y_cb)/)
-
+            else
+                spatial_extents(:, 0) = (/minval(x_cb), maxval(x_cb)/)
             end if
 
             ! Next, the root processor proceeds to record all of the spatial
@@ -715,48 +723,45 @@ contains
             ! with its offsets that indicate the presence and size of ghost
             ! zone layer(s), are put in the formatted database slave file.
 
-            if (precision == 1) then
-                if (p > 0) then
-                    z_cb_s(:) = real(z_cb(:), sp)
+            if (p > 0) then
+                err = DBMKOPTLIST(2, optlist)
+                err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
+                err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
+                if (grid_geometry == 3) then
+                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                                  'x', 1, 'y', 1, 'z', 1, &
+                                  y_cb, z_cb, x_cb, dims, 3, &
+                                  DB_DOUBLE, DB_COLLINEAR, &
+                                  optlist, ierr)
+                else
+                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                                  'x', 1, 'y', 1, 'z', 1, &
+                                  x_cb, y_cb, z_cb, dims, 3, &
+                                  DB_DOUBLE, DB_COLLINEAR, &
+                                  optlist, ierr)
                 end if
-                x_cb_s(:) = real(x_cb(:), sp)
-                y_cb_s(:) = real(y_cb(:), sp)
+                err = DBFREEOPTLIST(optlist)
+            elseif (n > 0) then
+                err = DBMKOPTLIST(2, optlist)
+                err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
+                err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
+                err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                              'x', 1, 'y', 1, 'z', 1, &
+                              x_cb, y_cb, DB_F77NULL, dims, 2, &
+                              DB_DOUBLE, DB_COLLINEAR, &
+                              optlist, ierr)
+                err = DBFREEOPTLIST(optlist)
+            else
+                err = DBMKOPTLIST(2, optlist)
+                err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
+                err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
+                err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                              'x', 1, 'y', 1, 'z', 1, &
+                              x_cb, DB_F77NULL, DB_F77NULL, dims, 1, &
+                              DB_DOUBLE, DB_COLLINEAR, &
+                              optlist, ierr)
+                err = DBFREEOPTLIST(optlist)
             end if
-
-            #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
-                if (precision == ${PRECISION}$) then
-                    if (p > 0) then
-                        err = DBMKOPTLIST(2, optlist)
-                        err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
-                        err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
-                        if (grid_geometry == 3) then
-                            err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
-                                          'x', 1, 'y', 1, 'z', 1, &
-                                          y_cb${SFX}$, z_cb${SFX}$, x_cb${SFX}$, dims, 3, &
-                                          ${DBT}$, DB_COLLINEAR, &
-                                          optlist, ierr)
-                        else
-                            err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
-                                          'x', 1, 'y', 1, 'z', 1, &
-                                          x_cb${SFX}$, y_cb${SFX}$, z_cb${SFX}$, dims, 3, &
-                                          ${DBT}$, DB_COLLINEAR, &
-                                          optlist, ierr)
-                        end if
-                        err = DBFREEOPTLIST(optlist)
-                    else
-                        err = DBMKOPTLIST(2, optlist)
-                        err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
-                        err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
-                        err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
-                                      'x', 1, 'y', 1, 'z', 1, &
-                                      x_cb${SFX}$, y_cb${SFX}$, DB_F77NULL, dims, 2, &
-                                      ${DBT}$, DB_COLLINEAR, &
-                                      optlist, ierr)
-                        err = DBFREEOPTLIST(optlist)
-                    end if
-                end if
-            #:endfor
-
             ! END: Silo-HDF5 Database Format
 
             ! Binary Database Format
@@ -873,144 +878,46 @@ contains
 
         if (format == 1) then
 
-            ! In 1D, a curve object, featuring the local processor grid and
-            ! flow variable data, is written to the formatted database slave
-            ! file. The root process, on the other hand, will also take care
-            ! of gathering the entire grid and associated flow variable data
-            ! and write it to the formatted database master file.
-            if (n == 0) then
-
-                if (precision == 1 .and. wp == dp) then
-                    x_cc_s(:) = real(x_cc(:), sp)
-                    q_sf_s(:, :, :) = real(q_sf(:, :, :), sp)
-                elseif (precision == 1 .and. wp == sp) then
-                    x_cc_s(:) = x_cc(:)
-                    q_sf_s(:, :, :) = q_sf(:, :, :)
-                end if
-
-                ! Writing the curve object associated with the local process
-                ! to the formatted database slave file
-                #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
-                    if (precision == ${PRECISION}$) then
-                        err = DBPUTCURVE(dbfile, trim(varname), len_trim(varname), &
-                                         x_cc${SFX}$ (0:m), q_sf${SFX}$, ${DBT}$, m + 1, &
-                                         DB_F77NULL, ierr)
-                    end if
-                #:endfor
-
-                ! Assembling the local grid and flow variable data for the
-                ! entire computational domain on to the root process
-
-                if (num_procs > 1) then
-                    call s_mpi_defragment_1d_grid_variable()
-                    call s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
-
-                    if (precision == 1) then
-                        x_root_cc_s(:) = real(x_root_cc(:), sp)
-                        q_root_sf_s(:, :, :) = real(q_root_sf(:, :, :), sp)
-                    end if
-                else
-                    if (precision == 1) then
-                        x_root_cc_s(:) = real(x_cc(:), sp)
-                        q_root_sf_s(:, :, :) = real(q_sf(:, :, :), sp)
-                    else
-                        x_root_cc(:) = x_cc(:)
-                        q_root_sf(:, :, :) = q_sf(:, :, :)
-                    end if
-                end if
-
-                ! Writing the curve object associated with the root process
-                ! to the formatted database master file
-                if (proc_rank == 0) then
-                    #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
-                        if (precision == ${PRECISION}$) then
-                            err = DBPUTCURVE(dbroot, trim(varname), &
-                                             len_trim(varname), &
-                                             x_root_cc${SFX}$, q_root_sf${SFX}$, &
-                                             ${DBT}$, m_root + 1, &
-                                             DB_F77NULL, ierr)
-                        end if
-                    #:endfor
-                end if
-
-                return
-
-                ! In multidimensions, the local process(es) take care of writing
-                ! the flow variable data they are in charge of to the formatted
-                ! database slave file. The root processor, additionally, is also
-                ! responsible in gathering the flow variable extents of each of
-                ! the local processor(s) and writing them to formatted database
-                ! master file.
+            ! Determining the extents of the flow variable on each local
+            ! process and gathering all this information on root process
+            if (num_procs > 1) then
+                call s_mpi_gather_data_extents(q_sf, data_extents)
             else
+                data_extents(:, 0) = (/minval(q_sf), maxval(q_sf)/)
+            end if
 
-                ! Determining the extents of the flow variable on each local
-                ! process and gathering all this information on root process
-                if (num_procs > 1) then
-                    call s_mpi_gather_data_extents(q_sf, data_extents)
-                else
-                    data_extents(:, 0) = (/minval(q_sf), maxval(q_sf)/)
-                end if
+            ! Next, the root process proceeds to write the gathered flow
+            ! variable data extents to formatted database master file.
+            if (proc_rank == 0) then
 
-                ! Next, the root process proceeds to write the gathered flow
-                ! variable data extents to formatted database master file.
-                if (proc_rank == 0) then
+                do i = 1, num_procs
+                    write (varnames(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                        '/', t_step, '.silo:'//trim(varname)
+                end do
 
-                    do i = 1, num_procs
-                        write (varnames(i), '(A,I0,A,I0,A)') '../p', i - 1, &
-                            '/', t_step, '.silo:'//trim(varname)
-                    end do
+                vartypes = DB_QUADVAR
 
-                    vartypes = DB_QUADVAR
+                err = DBSET2DSTRLEN(len(varnames(1)))
+                err = DBMKOPTLIST(2, optlist)
+                err = DBADDIOPT(optlist, DBOPT_EXTENTS_SIZE, 2)
+                err = DBADDDOPT(optlist, DBOPT_EXTENTS, data_extents)
+                err = DBPUTMVAR(dbroot, trim(varname), &
+                                len_trim(varname), num_procs, &
+                                varnames, len_trim(varnames), &
+                                vartypes, optlist, ierr)
+                err = DBFREEOPTLIST(optlist)
 
-                    err = DBSET2DSTRLEN(len(varnames(1)))
-                    err = DBMKOPTLIST(2, optlist)
-                    err = DBADDIOPT(optlist, DBOPT_EXTENTS_SIZE, 2)
-                    err = DBADDDOPT(optlist, DBOPT_EXTENTS, data_extents)
-                    err = DBPUTMVAR(dbroot, trim(varname), &
-                                    len_trim(varname), num_procs, &
-                                    varnames, len_trim(varnames), &
-                                    vartypes, optlist, ierr)
-                    err = DBFREEOPTLIST(optlist)
+            end if
 
-                end if
-
-                ! Finally, each of the local processor(s) proceeds to write
-                ! the flow variable data that it is responsible for to the
-                ! formatted database slave file.
-                if (wp == dp) then
-                    if (precision == 1) then
-                        do i = -offset_x%beg, m + offset_x%end
-                            do j = -offset_y%beg, n + offset_y%end
-                                do k = -offset_z%beg, p + offset_z%end
-                                    q_sf_s(i, j, k) = real(q_sf(i, j, k), sp)
-                                end do
-                            end do
-                        end do
-                        if (grid_geometry == 3) then
-                            do i = -offset_x%beg, m + offset_x%end
-                                do j = -offset_y%beg, n + offset_y%end
-                                    do k = -offset_z%beg, p + offset_z%end
-                                        cyl_q_sf_s(j, k, i) = q_sf_s(i, j, k)
-                                    end do
-                                end do
-                            end do
-                        end if
-                    else
-                        if (grid_geometry == 3) then
-                            do i = -offset_x%beg, m + offset_x%end
-                                do j = -offset_y%beg, n + offset_y%end
-                                    do k = -offset_z%beg, p + offset_z%end
-                                        cyl_q_sf(j, k, i) = q_sf(i, j, k)
-                                    end do
-                                end do
-                            end do
-                        end if
-                    end if
-                elseif (wp == sp) then
+            ! Finally, each of the local processor(s) proceeds to write
+            ! the flow variable data that it is responsible for to the
+            ! formatted database slave file.
+            if (wp == dp) then
+                if (precision == 1) then
                     do i = -offset_x%beg, m + offset_x%end
                         do j = -offset_y%beg, n + offset_y%end
                             do k = -offset_z%beg, p + offset_z%end
-                                q_sf_s(i, j, k) = q_sf(i, j, k)
+                                q_sf_s(i, j, k) = real(q_sf(i, j, k), sp)
                             end do
                         end do
                     end do
@@ -1023,38 +930,72 @@ contains
                             end do
                         end do
                     end if
+                else
+                    if (grid_geometry == 3) then
+                        do i = -offset_x%beg, m + offset_x%end
+                            do j = -offset_y%beg, n + offset_y%end
+                                do k = -offset_z%beg, p + offset_z%end
+                                    cyl_q_sf(j, k, i) = q_sf(i, j, k)
+                                end do
+                            end do
+                        end do
+                    end if
                 end if
+            elseif (wp == sp) then
+                do i = -offset_x%beg, m + offset_x%end
+                    do j = -offset_y%beg, n + offset_y%end
+                        do k = -offset_z%beg, p + offset_z%end
+                            q_sf_s(i, j, k) = q_sf(i, j, k)
+                        end do
+                    end do
+                end do
+                if (grid_geometry == 3) then
+                    do i = -offset_x%beg, m + offset_x%end
+                        do j = -offset_y%beg, n + offset_y%end
+                            do k = -offset_z%beg, p + offset_z%end
+                                cyl_q_sf_s(j, k, i) = q_sf_s(i, j, k)
+                            end do
+                        end do
+                    end do
+                end if
+            end if
 
-                #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
-                    if (precision == ${PRECISION}$) then
-                        if (p > 0) then
-                            if (grid_geometry == 3) then
-                                err = DBPUTQV1(dbfile, trim(varname), &
-                                               len_trim(varname), &
-                                               'rectilinear_grid', 16, &
-                                               cyl_q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
-                                               0, ${DBT}$, DB_ZONECENT, &
-                                               DB_F77NULL, ierr)
-                            else
-                                err = DBPUTQV1(dbfile, trim(varname), &
-                                               len_trim(varname), &
-                                               'rectilinear_grid', 16, &
-                                               q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
-                                               0, ${DBT}$, DB_ZONECENT, &
-                                               DB_F77NULL, ierr)
-                            end if
+            #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
+                if (precision == ${PRECISION}$) then
+                    if (p > 0) then
+                        if (grid_geometry == 3) then
+                            err = DBPUTQV1(dbfile, trim(varname), &
+                                           len_trim(varname), &
+                                           'rectilinear_grid', 16, &
+                                           cyl_q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
+                                           0, ${DBT}$, DB_ZONECENT, &
+                                           DB_F77NULL, ierr)
                         else
                             err = DBPUTQV1(dbfile, trim(varname), &
                                            len_trim(varname), &
                                            'rectilinear_grid', 16, &
-                                           q_sf${SFX}$, dims - 1, 2, DB_F77NULL, &
+                                           q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
                                            0, ${DBT}$, DB_ZONECENT, &
                                            DB_F77NULL, ierr)
                         end if
-                    end if
-                #:endfor
+                    elseif (n > 0) then
+                        err = DBPUTQV1(dbfile, trim(varname), &
+                                       len_trim(varname), &
+                                       'rectilinear_grid', 16, &
+                                       q_sf${SFX}$, dims - 1, 2, DB_F77NULL, &
+                                       0, ${DBT}$, DB_ZONECENT, &
+                                       DB_F77NULL, ierr)
+                    else
+                        err = DBPUTQV1(dbfile, trim(varname), &
+                                       len_trim(varname), &
+                                       'rectilinear_grid', 16, &
+                                       q_sf${SFX}$, dims - 1, 1, DB_F77NULL, &
+                                       0, ${DBT}$, DB_ZONECENT, &
+                                       DB_F77NULL, ierr)
 
-            end if
+                    end if
+                end if
+            #:endfor
 
             ! END: Silo-HDF5 Database Format
 
@@ -1122,8 +1063,8 @@ contains
         integer :: i
 
         integer, dimension(:), allocatable :: proc_bubble_counts
-        real(wp), dimension(1:1, 1:lag_io_vars) :: dummy
-        dummy = 0._wp
+        real(wp), dimension(1:1, 1:lag_io_vars) :: lag_io_null
+        lag_io_null = 0._wp
 
         ! Construct file path
         write (file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
@@ -1226,11 +1167,10 @@ contains
                 inputvals(1:20) = MPI_IO_DATA_lg_bubbles(i, 2:21)
                 if (id > 0) then
                     write (29, '(100(A))', advance='no') ''
-
                     if (lag_id_wrt) write (29, '(I6, A)', advance='no') id, ', '
                     if (lag_pos_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(1), ', ', inputvals(2), ', ', inputvals(3), ', '
                     if (lag_pos_prev_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(4), ', ', inputvals(5), ', ', inputvals(6), ', '
-                    if (lag_vel_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(7), ', ', inputvals(8), ', ', inputvals(8), ', '
+                    if (lag_vel_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(7), ', ', inputvals(8), ', ', inputvals(9), ', '
                     if (lag_rad_wrt) write (29, '(E15.7, A)', advance='no') inputvals(10), ', '
                     if (lag_rvel_wrt) write (29, '(E15.7, A)', advance='no') inputvals(11), ', '
                     if (lag_r0_wrt) write (29, '(E15.7, A)', advance='no') inputvals(12), ', '
@@ -1358,27 +1298,11 @@ contains
 
         if (nBub > 0) then
 
-            allocate (bub_id(nBub))
-            allocate (px(nBub))
-            allocate (py(nBub))
-            allocate (pz(nBub))
-            allocate (ppx(nBub))
-            allocate (ppy(nBub))
-            allocate (ppz(nBub))
-            allocate (vx(nBub))
-            allocate (vy(nBub))
-            allocate (vz(nBub))
-            allocate (radius(nBub))
-            allocate (rvel(nBub))
-            allocate (rnot(nBub))
-            allocate (rmax(nBub))
-            allocate (rmin(nBub))
-            allocate (dphidt(nBub))
-            allocate (pressure(nBub))
-            allocate (mv(nBub))
-            allocate (mg(nBub))
-            allocate (betaT(nBub))
-            allocate (betaC(nBub))
+            #:for VAR in ['bub_id', 'px', 'py', 'pz', 'ppx', 'ppy', 'ppz', 'vx', 'vy', 'vz', &
+                'radius', 'rvel', 'rnot', 'rmax', 'rmin', 'dphidt', &
+                'pressure', 'mv', 'mg', 'betaT', 'betaC']
+                allocate (${VAR}$ (nBub))
+            #:endfor
             allocate (MPI_IO_DATA_lg_bubbles(nBub, 1:lag_io_vars))
 
             call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, &
@@ -1401,27 +1325,12 @@ contains
 
             ! Extract data from MPI_IO_DATA_lg_bubbles array
             ! Adjust these indices based on your actual data layout
-            bub_id(:) = MPI_IO_DATA_lg_bubbles(:, 1)
-            px(:) = MPI_IO_DATA_lg_bubbles(:, 2)
-            py(:) = MPI_IO_DATA_lg_bubbles(:, 3)
-            pz(:) = MPI_IO_DATA_lg_bubbles(:, 4)
-            ppx(:) = MPI_IO_DATA_lg_bubbles(:, 5)
-            ppy(:) = MPI_IO_DATA_lg_bubbles(:, 6)
-            ppz(:) = MPI_IO_DATA_lg_bubbles(:, 7)
-            vx(:) = MPI_IO_DATA_lg_bubbles(:, 8)
-            vy(:) = MPI_IO_DATA_lg_bubbles(:, 9)
-            vz(:) = MPI_IO_DATA_lg_bubbles(:, 10)
-            radius(:) = MPI_IO_DATA_lg_bubbles(:, 11)
-            rvel(:) = MPI_IO_DATA_lg_bubbles(:, 12)
-            rnot(:) = MPI_IO_DATA_lg_bubbles(:, 13)
-            rmax(:) = MPI_IO_DATA_lg_bubbles(:, 14)
-            rmin(:) = MPI_IO_DATA_lg_bubbles(:, 15)
-            dphidt(:) = MPI_IO_DATA_lg_bubbles(:, 16)
-            pressure(:) = MPI_IO_DATA_lg_bubbles(:, 17)
-            mv(:) = MPI_IO_DATA_lg_bubbles(:, 18)
-            mg(:) = MPI_IO_DATA_lg_bubbles(:, 19)
-            betaT(:) = MPI_IO_DATA_lg_bubbles(:, 20)
-            betaC(:) = MPI_IO_DATA_lg_bubbles(:, 21)
+            #:for VAR, IDX in [('bub_id', 1), ('px', 2), ('py',3), ('pz',4), ('ppx',5), ('ppy',6), ('ppz',7), &
+                ('vx',8), ('vy',9), ('vz',10), ('radius',11), ('rvel',12), &
+                ('rnot',13), ('rmax',14), ('rmin',15), ('dphidt',16), &
+                ('pressure',17), ('mv',18), ('mg',19), ('betaT',20), ('betaC',21)]
+                ${VAR}$ (:) = MPI_IO_DATA_lg_bubbles(:, ${IDX}$)
+            #:endfor
 
             ! Next, the root processor proceeds to record all of the spatial
             ! extents in the formatted database master file. In addition, it
@@ -1445,61 +1354,23 @@ contains
                           px, py, pz, nBub, &
                           DB_DOUBLE, DB_F77NULL, ierr)
 
-            if (lag_id_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_id', t_step, bub_id, nBub)
-            end if
-
+            if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step, bub_id, nBub)
             if (lag_vel_wrt) then
                 call s_write_lag_variable_to_formatted_database_file('part_vel1', t_step, vx, nBub)
                 call s_write_lag_variable_to_formatted_database_file('part_vel2', t_step, vy, nBub)
-                if (p > 0) then
-                    call s_write_lag_variable_to_formatted_database_file('part_vel3', t_step, vz, nBub)
-                end if
+                if (p > 0) call s_write_lag_variable_to_formatted_database_file('part_vel3', t_step, vz, nBub)
             end if
-
-            if (lag_rad_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_radius', t_step, radius, nBub)
-            end if
-
-            if (lag_rvel_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rdot', t_step, rvel, nBub)
-            end if
-
-            if (lag_r0_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_r0', t_step, rnot, nBub)
-            end if
-
-            if (lag_rmax_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rmax', t_step, rmax, nBub)
-            end if
-
-            if (lag_rmin_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rmin', t_step, rmin, nBub)
-            end if
-
-            if (lag_dphidt_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_dphidt', t_step, dphidt, nBub)
-            end if
-
-            if (lag_pres_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_pressure', t_step, pressure, nBub)
-            end if
-
-            if (lag_mv_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_mv', t_step, mv, nBub)
-            end if
-
-            if (lag_mg_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_mg', t_step, mg, nBub)
-            end if
-
-            if (lag_betaT_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step, betaT, nBub)
-            end if
-
-            if (lag_betaC_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step, betaC, nBub)
-            end if
+            if (lag_rad_wrt) call s_write_lag_variable_to_formatted_database_file('part_radius', t_step, radius, nBub)
+            if (lag_rvel_wrt) call s_write_lag_variable_to_formatted_database_file('part_rdot', t_step, rvel, nBub)
+            if (lag_r0_wrt) call s_write_lag_variable_to_formatted_database_file('part_r0', t_step, rnot, nBub)
+            if (lag_rmax_wrt) call s_write_lag_variable_to_formatted_database_file('part_rmax', t_step, rmax, nBub)
+            if (lag_rmin_wrt) call s_write_lag_variable_to_formatted_database_file('part_rmin', t_step, rmin, nBub)
+            if (lag_dphidt_wrt) call s_write_lag_variable_to_formatted_database_file('part_dphidt', t_step, dphidt, nBub)
+            if (lag_pres_wrt) call s_write_lag_variable_to_formatted_database_file('part_pressure', t_step, pressure, nBub)
+            if (lag_mv_wrt) call s_write_lag_variable_to_formatted_database_file('part_mv', t_step, mv, nBub)
+            if (lag_mg_wrt) call s_write_lag_variable_to_formatted_database_file('part_mg', t_step, mg, nBub)
+            if (lag_betaT_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step, betaT, nBub)
+            if (lag_betaC_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step, betaC, nBub)
 
             deallocate (bub_id, px, py, pz, ppx, ppy, ppz, vx, vy, vz, radius, &
                         rvel, rnot, rmax, rmin, dphidt, pressure, mv, mg, &
@@ -1541,62 +1412,23 @@ contains
                           dummy_data, dummy_data, dummy_data, 0, &
                           DB_DOUBLE, DB_F77NULL, ierr)
 
-            if (lag_id_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_id', t_step)
-            end if
-
+            if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step)
             if (lag_vel_wrt) then
                 call s_write_lag_variable_to_formatted_database_file('part_vel1', t_step)
                 call s_write_lag_variable_to_formatted_database_file('part_vel2', t_step)
-                if (p > 0) then
-                    call s_write_lag_variable_to_formatted_database_file('part_vel3', t_step)
-                end if
+                if (p > 0) call s_write_lag_variable_to_formatted_database_file('part_vel3', t_step)
             end if
-
-            if (lag_rad_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_radius', t_step)
-            end if
-
-            if (lag_rvel_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rdot', t_step)
-            end if
-
-            if (lag_r0_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_r0', t_step)
-            end if
-
-            if (lag_rmax_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rmax', t_step)
-            end if
-
-            if (lag_rmin_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_rmin', t_step)
-            end if
-
-            if (lag_dphidt_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_dphidt', t_step)
-            end if
-
-            if (lag_pres_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_pressure', t_step)
-            end if
-
-            if (lag_mv_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_mv', t_step)
-            end if
-
-            if (lag_mg_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_mg', t_step)
-            end if
-
-            if (lag_betaT_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step)
-            end if
-
-            if (lag_betaC_wrt) then
-                call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step)
-            end if
-
+            if (lag_rad_wrt) call s_write_lag_variable_to_formatted_database_file('part_radius', t_step)
+            if (lag_rvel_wrt) call s_write_lag_variable_to_formatted_database_file('part_rdot', t_step)
+            if (lag_r0_wrt) call s_write_lag_variable_to_formatted_database_file('part_r0', t_step)
+            if (lag_rmax_wrt) call s_write_lag_variable_to_formatted_database_file('part_rmax', t_step)
+            if (lag_rmin_wrt) call s_write_lag_variable_to_formatted_database_file('part_rmin', t_step)
+            if (lag_dphidt_wrt) call s_write_lag_variable_to_formatted_database_file('part_dphidt', t_step)
+            if (lag_pres_wrt) call s_write_lag_variable_to_formatted_database_file('part_pressure', t_step)
+            if (lag_mv_wrt) call s_write_lag_variable_to_formatted_database_file('part_mv', t_step)
+            if (lag_mg_wrt) call s_write_lag_variable_to_formatted_database_file('part_mg', t_step)
+            if (lag_betaT_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step)
+            if (lag_betaC_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step)
         end if
 
 #endif
@@ -1902,7 +1734,7 @@ contains
         ! the offsets and the one bookkeeping the number of cell-boundaries
         ! in each active coordinate direction. Note that all these variables
         ! were only needed by Silo-HDF5 format for multidimensional data.
-        if (format == 1 .and. n > 0) then
+        if (format == 1) then
             deallocate (spatial_extents)
             deallocate (data_extents)
             deallocate (lo_offset)

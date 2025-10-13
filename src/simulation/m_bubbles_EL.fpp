@@ -369,7 +369,7 @@ contains
         cell = fd_number - buff_size
         call s_locate_cell(mtn_pos(bub_id, 1:3, 1), cell, mtn_s(bub_id, 1:3, 1))
 
-        ! Check if the bubble is located in the ghost cell of a symmetric boundary
+        ! Check if the bubble is located in the ghost cell of a symmetric, or wall boundary
         if ((any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(1) < 0) .or. &
             (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(1) > m) .or. &
             (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. cell(2) < 0) .or. &
@@ -570,6 +570,8 @@ contains
                 gas_mg(i) = MPI_IO_DATA_lag_bubbles(i, 19)
                 gas_betaT(i) = MPI_IO_DATA_lag_bubbles(i, 20)
                 gas_betaC(i) = MPI_IO_DATA_lag_bubbles(i, 21)
+                cell = -buff_size
+                call s_locate_cell(mtn_pos(i, 1:3, 1), cell, mtn_s(i, 1:3, 1))
             end do
 
             deallocate (MPI_IO_DATA_lag_bubbles)
@@ -1706,7 +1708,6 @@ contains
         if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. (.not. cyl_coord)) then
             particle_in_domain = (particle_in_domain .and. (pos_part(2) < y_cb(n)))
         end if
-
         if (p > 0) then
             if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
                 particle_in_domain = (particle_in_domain .and. (pos_part(3) >= z_cb(-1)))

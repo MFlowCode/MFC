@@ -77,6 +77,9 @@ contains
             ! Rayleigh-Plesset bubbles
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
             f_rddot = f_rddot_RP(fP, fRho, fR, fV, fCpbw)
+        else
+            ! Default: No bubble dynamics
+            f_rddot = 0._wp
         end if
 
     end function f_rddot

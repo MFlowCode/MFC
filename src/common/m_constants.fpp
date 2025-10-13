@@ -60,8 +60,8 @@ module m_constants
     real(wp), parameter :: initial_distance_buffer = 1.e12_wp !< Initialized levelset distance for the shortest path pair algorithm
 
     ! Lagrange bubbles constants
-    integer, parameter :: mapCells = 3 !< Number of cells around the bubble where the smoothening function will have effect
-    real(wp), parameter :: R_uni = 8314._wp ! Universal gas constant - J/kmol/K
+    integer, parameter :: mapCells = 3         !< Number of cells around the bubble where the smoothening function will have effect
+    real(wp), parameter :: R_uni = 8314._wp    !< Universal gas constant - J/kmol/K
     integer, parameter :: lag_io_vars = 21 ! Number of variables per particle for MPI_IO
 
     ! Strang Splitting constants
