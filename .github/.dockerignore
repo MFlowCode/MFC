@@ -34,7 +34,6 @@ examples/**/p*
 examples/**/D_*
 examples/**/*.inf
 examples/**/*.inp
-examples/**/*.dat
 examples/**/*.o*
 examples/**/silo*
 examples/**/restart_data*
@@ -50,8 +49,6 @@ examples/*/workloads/
 examples/*/run-*/
 examples/*/logs/
 examples/**/*.f90
-!examples/3D_lag_bubbles_shbubcollapse/input/lag_bubbles.dat
-!examples/3D_lag_bubbles_bubblescreen/input/lag_bubbles.dat
 workloads/
 
 benchmarks/*batch/*/
