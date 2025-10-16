@@ -25,7 +25,7 @@ print(
             "p": 99,
             "dt": 6.0e-6,
             "t_step_start": 0,
-            "t_step_stop": 25,
+            "t_step_stop": 1000,
             "t_step_save": 25,
             # Simulation Algorithm Parameters
             # Only one patches are necessary, the air tube

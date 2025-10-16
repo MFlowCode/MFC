@@ -1,12 +1,12 @@
-This file was created on 2025-10-16 11:03:55.590231.
+This file was created on 2025-10-16 11:06:13.022109.
 
 mfc.sh:
 
-    Invocation: test -o 6076815B --generate
+    Invocation: test -o 6076815B --generate --no-build
     Lock:       mpi=Yes & gpu=Yes & debug=No & gcov=No & unified=No & single=No & fastmath=No
-    Git:        8906927762ca2c9e0d82ff34ef9d44f97f859f8f on add-rotating-mibms (dirty)
+    Git:        d4a1280c8299436aa592cac96618b8d088d052e2 on add-rotating-mibms (dirty)
 
-post_process:
+simulation:
 
     CMake Configuration:
     
@@ -16,8 +16,8 @@ post_process:
         Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -39,7 +39,40 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on wingtip-gpu3
+    
+        C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
+        Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : ON
+    
+        Fypp    : /nethome/dvickers6/repos/MFC-Dan/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
+        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
+        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
 
     CMake Configuration:
     
@@ -49,8 +82,8 @@ simulation:
         Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -105,39 +138,6 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on wingtip-gpu3
-    
-        C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
-        Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : ON
-    
-        Fypp    : /nethome/dvickers6/repos/MFC-Dan/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
 CPU:
 
     CPU Info:
@@ -158,7 +158,7 @@ CPU:
     Model name:                         Intel(R) Xeon(R) Gold 6338 CPU @ 2.00GHz
     Stepping:                           6
     Frequency boost:                    enabled
-    CPU MHz:                            831.624
+    CPU MHz:                            850.674
     CPU max MHz:                        2001.0000
     CPU min MHz:                        800.0000
     BogoMIPS:                           4000.00
