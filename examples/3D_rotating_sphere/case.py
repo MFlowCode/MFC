@@ -20,12 +20,12 @@ print(
             "z_domain%beg": 0.0e00,
             "z_domain%end": 6.0e-03,
             "cyl_coord": "F",
-            "m": 99,
-            "n": 99,
-            "p": 99,
+            "m": 49,
+            "n": 49,
+            "p": 49,
             "dt": 6.0e-6,
             "t_step_start": 0,
-            "t_step_stop": 1000,
+            "t_step_stop": 250,
             "t_step_save": 25,
             # Simulation Algorithm Parameters
             # Only one patches are necessary, the air tube
@@ -95,12 +95,12 @@ print(
             "patch_ib(1)%slip": "F",
             "patch_ib(1)%moving_ibm": 1,
             "patch_ib(1)%vel(1)": 0.0,
-            "patch_ib(1)%angles(1)": 0.0, # x-axis rotation in radians
-            "patch_ib(1)%angles(2)": 0.0, # y-axis rotation
-            "patch_ib(1)%angles(3)": 0.0, # z-axis rotation
-            "patch_ib(1)%angular_vel(1)": 0.0, # x-axis rotational velcoity in radians per second
-            "patch_ib(1)%angular_vel(2)": 0.0, # y-axis rotation
-            "patch_ib(1)%angular_vel(3)": 100.0, # z-axis rotation
+            "patch_ib(1)%angles(1)": 0.0,  # x-axis rotation in radians
+            "patch_ib(1)%angles(2)": 0.0,  # y-axis rotation
+            "patch_ib(1)%angles(3)": 0.0,  # z-axis rotation
+            "patch_ib(1)%angular_vel(1)": 0.0,  # x-axis rotational velcoity in radians per second
+            "patch_ib(1)%angular_vel(2)": 0.0,  # y-axis rotation
+            "patch_ib(1)%angular_vel(3)": 100.0,  # z-axis rotation
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
             "fluid_pp(1)%pi_inf": 0,
