@@ -118,12 +118,12 @@ contains
         @:PROHIBIT(fft_wrt .and. (n == 0 .or. p == 0), "FFT WRT only in 3D")
         @:PROHIBIT(fft_wrt .and. cyl_coord, "FFT WRT incompatible with cylindrical coordinates")
         @:PROHIBIT(fft_wrt .and. (MOD(m_glb+1,2) == 1 .or. MOD(n_glb+1,2) == 1 .or. MOD(p_glb+1,2) == 1), "FFT WRT requires global dimensions divisible by 2")
-        @:PROHIBIT(fft_wrt .and. MOD(n_glb+1,n+1) /= 0, "FFT WRT requires n_glb to be divisble by num_procs_y")
-        @:PROHIBIT(fft_wrt .and. MOD(p_glb+1,p+1) /= 0, "FFT WRT requires p_glb to be divisble by num_procs_z")
+        @:PROHIBIT(fft_wrt .and. MOD(n_glb+1,n+1) /= 0, "FFT WRT requires n_glb to be divisible by num_procs_y")
+        @:PROHIBIT(fft_wrt .and. MOD(p_glb+1,p+1) /= 0, "FFT WRT requires p_glb to be divisible by num_procs_z")
         num_procs_y = (n_glb + 1)/(n + 1)
         num_procs_z = (p_glb + 1)/(p + 1)
-        @:PROHIBIT(fft_wrt .and. MOD(m_glb+1,num_procs_y) /= 0, "FFT WRT requires m_glb to be divisble by num_procs_y")
-        @:PROHIBIT(fft_wrt .and. MOD(n_glb+1,num_procs_z) /= 0, "FFT WRT requires n_glb to be divisble by num_procs_z")
+        @:PROHIBIT(fft_wrt .and. MOD(m_glb+1,num_procs_y) /= 0, "FFT WRT requires m_glb to be divisible by num_procs_y")
+        @:PROHIBIT(fft_wrt .and. MOD(n_glb+1,num_procs_z) /= 0, "FFT WRT requires n_glb to be divisible by num_procs_z")
         @:PROHIBIT(fft_wrt .and. (bc_x%beg < -1 .or. bc_y%beg < -1 .or. bc_z%beg < -1 .or. bc_x%end < -1 .or. bc_y%end < -1 .or. bc_z%end < -1), "FFT WRT requires periodic BCs")
     end subroutine s_check_inputs_fft
 
