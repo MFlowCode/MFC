@@ -616,7 +616,7 @@ contains
                 open (2, FILE=trim(file_path))
                 do j = 0, m
                     do k = 0, n
-                        write (2, FMT) x_cb(j), y_cb(k), beta%sf(0:m, 0:n, 0)
+                        write (2, FMT) x_cb(j), y_cb(k), beta%sf(j, k, 0)
                     end do
                     write (2, *)
                 end do
