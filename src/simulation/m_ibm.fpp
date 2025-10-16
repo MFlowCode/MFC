@@ -99,6 +99,8 @@ contains
             call s_update_ib_rotation_matrix(i)
         end do
 
+        $:GPU_ENTER_DATA(copyin='[patch_ib]')
+
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
@@ -117,8 +119,8 @@ contains
         call s_mpi_allreduce_integer_sum(num_inner_gps, max_num_inner_gps)
 
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
-        @:ALLOCATE(ghost_points(1:int(max_num_gps * 1.5)))
-        @:ALLOCATE(inner_points(1:int(max_num_inner_gps * 1.5)))
+        @:ALLOCATE(ghost_points(1:int(max_num_gps * 2.0)))
+        @:ALLOCATE(inner_points(1:int(max_num_inner_gps * 2.0)))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
 
@@ -924,9 +926,12 @@ contains
             end if
         end do
 
+        $:GPU_UPDATE(device='[patch_ib]')
+
         ! recompute the new ib_patch locations and broadcast them.
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
         call s_populate_ib_buffers() ! transmits the new IB markers via MPI
+        $:GPU_UPDATE(device='[ib_markers%sf, levelset%sf, levelset_norm%sf]')
 
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)
