@@ -1410,22 +1410,36 @@ contains
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
 
+        character(LEN=25) :: FMT
+
         write (file_loc, '(A,I0,A)') 'lag_bubble_evol_', proc_rank, '.dat'
         file_loc = trim(case_dir)//'/D/'//trim(file_loc)
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
+        if (precision == 1) then
+            FMT = "(A16,A14,8A16)"
+        else
+            FMT = "(A24,A14,8A24)"
+        end if
+
         if (.not. file_exist) then
             open (11, FILE=trim(file_loc), FORM='formatted', position='rewind')
-            write (11, *) 'currentTime, particleID, x, y, z, ', &
-                'coreVaporMass, coreVaporConcentration, radius, interfaceVelocity, ', &
+            write (11, FMT) 'currentTime', 'particleID', 'x', 'y', 'z', &
+                'coreVaporMass', 'coreVaporConcentration', 'radius', 'interfaceVelocity', &
                 'corePressure'
         else
             open (11, FILE=trim(file_loc), FORM='formatted', position='append')
         end if
 
+        if (precision == 1) then
+            FMT = "(F16.8,I14,8F16.8)"
+        else
+            FMT = "(F24.16,I14,8F24.16)"
+        end if
+
         ! Cycle through list
         do k = 1, nBubs
-            write (11, '(6X,f12.6,I24.8,8e24.8)') &
+            write (11, FMT) &
                 qtime, &
                 lag_id(k, 1), &
                 mtn_pos(k, 1, 1), &
@@ -1435,7 +1449,7 @@ contains
                 gas_mv(k, 1)/(gas_mv(k, 1) + gas_mg(k)), &
                 intfc_rad(k, 1), &
                 intfc_vel(k, 1), &
-                gas_p(k, 1)
+                gas_p(k, 2)
         end do
 
         close (11)
@@ -1691,16 +1705,30 @@ contains
         integer :: k
         character(LEN=path_len + 2*name_len) :: file_loc
 
+        character(len=20) :: FMT
+
         write (file_loc, '(A,I0,A)') 'stats_lag_bubbles_', proc_rank, '.dat'
         file_loc = trim(case_dir)//'/D/'//trim(file_loc)
 
         $:GPU_UPDATE(host='[Rmax_glb,Rmin_glb]')
 
+        if (precision == 1) then
+            FMT = "(A10,A14,5A16)"
+        else
+            FMT = "(A10,A14,5A24)"
+        end if
+
         open (13, FILE=trim(file_loc), FORM='formatted', position='rewind')
-        write (13, *) 'proc_rank, particleID, x, y, z, Rmax_glb, Rmin_glb'
+        write (13, FMT) 'proc_rank', 'particleID', 'x', 'y', 'z', 'Rmax_glb', 'Rmin_glb'
+
+        if (precision == 1) then
+            FMT = "(I10,I14,5F16.8)"
+        else
+            FMT = "(I10,I14,5F24.16)"
+        end if
 
         do k = 1, nBubs
-            write (13, '(6X,2I24.8,5e24.8)') &
+            write (13, FMT) &
                 proc_rank, &
                 lag_id(k, 1), &
                 mtn_pos(k, 1, 1), &

@@ -135,7 +135,7 @@ def compile(casepath: str) -> typing.Tuple[Pack, str]:
             if "lag_bubble" in short_filepath:
                 lines = content.splitlines()
                 content = "\n".join(lines[1:])  # Skip the first line
-                content = _extract_doubles(content)
+                doubles = _extract_doubles(content)
             else:
                 # Every line is <x> <y> <z> <value> (<y> and <z> are optional). So the
                 # number of dimensions is the number of doubles in the first line minus 1.
