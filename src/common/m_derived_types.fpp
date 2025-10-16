@@ -318,6 +318,11 @@ module m_derived_types
 
         real(wp) :: model_threshold !<
         !! Threshold to turn on smoothen STL patch.
+
+        !! Patch conditions for moving imersed boundaries
+        integer :: moving_ibm ! 0 for no moving, 1 for moving, 2 for moving on forced path
+        real(wp), dimension(1:3) :: vel
+
     end type ib_patch_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These
