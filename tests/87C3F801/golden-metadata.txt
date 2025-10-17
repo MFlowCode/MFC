@@ -1,43 +1,10 @@
-This file was created on 2025-10-09 19:10:26.079059.
+This file was created on 2025-10-15 16:37:45.297321.
 
 mfc.sh:
 
-    Invocation: test --generate --from 0B07F3A1 --to 0B07F3A1
+    Invocation: test --generate --from 87C3F801 --to 87C3F801
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & fastmath=No
-    Git:        24b25ec72674c93ab6651e7738e390335722c6d2 on add-rotating-mibms (dirty)
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.28.3 on schwarzschild
-    
-        C       : GNU v13.3.0 (/usr/bin/cc)
-        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        cbfb2da25f7302aa7af2a1ecf3ae37ba5d3163a5 on add-rotating-mibms (clean)
 
 pre_process:
 
@@ -138,6 +105,39 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on schwarzschild
+    
+        C       : GNU v13.3.0 (/usr/bin/cc)
+        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 CPU:
 
     CPU Info:
@@ -156,7 +156,7 @@ CPU:
     Core(s) per socket:                   12
     Socket(s):                            1
     Stepping:                             2
-    CPU(s) scaling MHz:                   28%
+    CPU(s) scaling MHz:                   17%
     CPU max MHz:                          5100.0000
     CPU min MHz:                          800.0000
     BogoMIPS:                             7219.20
