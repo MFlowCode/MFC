@@ -1188,7 +1188,7 @@ contains
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
 
                 if (lag_params%write_bubbles) then
-                    $:GPU_UPDATE(host='[gas_p,gas_mv,intfc_rad,intfc_vel]')
+                    $:GPU_UPDATE(host='[gas_p,gas_mv,gas_mg,intfc_rad,intfc_vel]')
                     call s_write_lag_particles(mytime)
                 end if
 
@@ -1449,7 +1449,7 @@ contains
                 gas_mv(k, 1)/(gas_mv(k, 1) + gas_mg(k)), &
                 intfc_rad(k, 1), &
                 intfc_vel(k, 1), &
-                gas_p(k, 2)
+                gas_p(k, 1)
         end do
 
         close (11)
