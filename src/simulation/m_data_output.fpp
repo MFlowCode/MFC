@@ -509,7 +509,7 @@ contains
                   FORM='unformatted', &
                   STATUS='new')
 
-            write (2) ib_markers%sf; close (2)
+            write (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
         end if
 
         gamma = fluid_pp(1)%gamma

@@ -253,9 +253,6 @@ contains
         write (t_step_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', t_step
         t_step_dir = trim(case_dir)//trim(t_step_dir)
 
-        write (t_step_ib_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', t_step
-        t_step_ib_dir = trim(case_dir)//trim(t_step_ib_dir)
-
         ! Inquiring as to the existence of the time-step directory
         file_loc = trim(t_step_dir)//'/.'
         call my_inquire(file_loc, dir_check)
@@ -263,15 +260,6 @@ contains
         ! If the time-step directory is missing, the post-process exits.
         if (dir_check .neqv. .true.) then
             call s_mpi_abort('Time-step folder '//trim(t_step_dir)// &
-                             ' is missing. Exiting.')
-        end if
-
-        file_loc = trim(t_step_ib_dir)//'/.'
-        call my_inquire(file_loc, dir_check)
-
-        ! If the time-step directory is missing, the post-process exits.
-        if (dir_check .neqv. .true.) then
-            call s_mpi_abort('Time-step folder '//trim(t_step_ib_dir)// &
                              ' is missing. Exiting.')
         end if
 
@@ -317,7 +305,7 @@ contains
         end do
 
         ! Reading IB data using helper subroutine
-        call s_read_ib_data_files(t_step_ib_dir)
+        call s_read_ib_data_files(t_step_dir)
 
     end subroutine s_read_serial_data_files
 
