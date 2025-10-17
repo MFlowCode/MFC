@@ -111,6 +111,7 @@ print(
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
+            "lag_db_wrt": "T",
             # Patch 1: Water (left)
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.0,

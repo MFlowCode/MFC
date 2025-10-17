@@ -1942,6 +1942,21 @@ contains
         offset_x%beg = buff_size; offset_x%end = buff_size
         offset_y%beg = buff_size; offset_y%end = buff_size
         offset_z%beg = buff_size; offset_z%end = buff_size
+
+#ifdef MFC_MPI
+        ! Populate global domain boundaries with stretched grids
+        call s_mpi_allreduce_min(x_cb(-1), glb_bounds(1)%beg)
+        call s_mpi_allreduce_max(x_cb(m), glb_bounds(1)%end)
+
+        if (n > 0) then
+            call s_mpi_allreduce_min(y_cb(-1), glb_bounds(2)%beg)
+            call s_mpi_allreduce_max(y_cb(n), glb_bounds(2)%end)
+            if (p > 0) then
+                call s_mpi_allreduce_min(z_cb(-1), glb_bounds(3)%beg)
+                call s_mpi_allreduce_max(z_cb(p), glb_bounds(3)%end)
+            end if
+        end if
+#endif
 #endif
 
 #ifndef MFC_PRE_PROCESS

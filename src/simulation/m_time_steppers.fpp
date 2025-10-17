@@ -506,7 +506,7 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
+            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=s)
 
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
@@ -616,7 +616,6 @@ contains
         else
             wall_time_avg = 0._wp
         end if
-
     end subroutine s_tvd_rk
 
     !> Bubble source part in Strang operator splitting scheme

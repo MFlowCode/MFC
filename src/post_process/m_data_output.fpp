@@ -30,7 +30,8 @@ module m_data_output
  s_open_energy_data_file, &
  s_write_grid_to_formatted_database_file, &
  s_write_variable_to_formatted_database_file, &
- s_write_lag_bubbles_results, &
+ s_write_lag_bubbles_results_to_text, &
+ s_write_lag_bubbles_to_formatted_database_file, &
  s_write_intf_data_file, &
  s_write_energy_data_file, &
  s_close_formatted_database_file, &
@@ -155,7 +156,7 @@ contains
         ! the offsets and the one bookkeeping the number of cell-boundaries
         ! in each active coordinate direction. Note that all these variables
         ! are only needed by the Silo-HDF5 format for multidimensional data.
-        if (format == 1 .and. n > 0) then
+        if (format == 1) then
 
             allocate (data_extents(1:2, 0:num_procs - 1))
 
@@ -164,11 +165,16 @@ contains
                 allocate (lo_offset(1:3))
                 allocate (hi_offset(1:3))
                 allocate (dims(1:3))
-            else
+            elseif (n > 0) then
                 allocate (spatial_extents(1:4, 0:num_procs - 1))
                 allocate (lo_offset(1:2))
                 allocate (hi_offset(1:2))
                 allocate (dims(1:2))
+            else
+                allocate (spatial_extents(1:2, 0:num_procs - 1))
+                allocate (lo_offset(1:1))
+                allocate (hi_offset(1:1))
+                allocate (dims(1:1))
             end if
 
         end if
@@ -180,7 +186,7 @@ contains
         ! With the same, latter, requirements, the variables bookkeeping the
         ! number of cell-boundaries in each active coordinate direction are
         ! also set here.
-        if (format == 1 .and. n > 0) then
+        if (format == 1) then
             if (p > 0) then
                 if (grid_geometry == 3) then
                     lo_offset(:) = (/offset_y%beg, offset_z%beg, offset_x%beg/)
@@ -199,12 +205,16 @@ contains
                                 n + offset_y%beg + offset_y%end + 2, &
                                 p + offset_z%beg + offset_z%end + 2/)
                 end if
-            else
+            elseif (n > 0) then
                 lo_offset(:) = (/offset_x%beg, offset_y%beg/)
                 hi_offset(:) = (/offset_x%end, offset_y%end/)
 
                 dims(:) = (/m + offset_x%beg + offset_x%end + 2, &
                             n + offset_y%beg + offset_y%end + 2/)
+            else
+                lo_offset(:) = (/offset_x%beg/)
+                hi_offset(:) = (/offset_x%end/)
+                dims(:) = (/m + offset_x%beg + offset_x%end + 2/)
             end if
         end if
 
@@ -276,12 +286,14 @@ contains
         end if
 
         if (bubbles_lagrange) then !Lagrangian solver
-            dbdir = trim(case_dir)//'/lag_bubbles_post_process'
-            file_loc = trim(dbdir)//'/.'
-            call my_inquire(file_loc, dir_check)
+            if (lag_txt_wrt) then
+                dbdir = trim(case_dir)//'/lag_bubbles_post_process'
+                file_loc = trim(dbdir)//'/.'
+                call my_inquire(file_loc, dir_check)
 
-            if (dir_check .neqv. .true.) then
-                call s_create_directory(trim(dbdir))
+                if (dir_check .neqv. .true.) then
+                    call s_create_directory(trim(dbdir))
+                end if
             end if
         end if
 
@@ -656,7 +668,7 @@ contains
 
         ! Silo-HDF5 Database Format
 
-        if (format == 1 .and. n > 0) then
+        if (format == 1) then
 
             ! For multidimensional data sets, the spatial extents of all of
             ! the grid(s) handled by the local processor(s) are recorded so
@@ -664,7 +676,6 @@ contains
             ! database master file.
             if (num_procs > 1) then
                 call s_mpi_gather_spatial_extents(spatial_extents)
-
             elseif (p > 0) then
                 if (grid_geometry == 3) then
                     spatial_extents(:, 0) = (/minval(y_cb), minval(z_cb), &
@@ -675,11 +686,11 @@ contains
                                               minval(z_cb), maxval(x_cb), &
                                               maxval(y_cb), maxval(z_cb)/)
                 end if
-
-            else
+            elseif (n > 0) then
                 spatial_extents(:, 0) = (/minval(x_cb), minval(y_cb), &
                                           maxval(x_cb), maxval(y_cb)/)
-
+            else
+                spatial_extents(:, 0) = (/minval(x_cb), maxval(x_cb)/)
             end if
 
             ! Next, the root processor proceeds to record all of the spatial
@@ -712,48 +723,45 @@ contains
             ! with its offsets that indicate the presence and size of ghost
             ! zone layer(s), are put in the formatted database slave file.
 
-            if (precision == 1) then
-                if (p > 0) then
-                    z_cb_s(:) = real(z_cb(:), sp)
+            if (p > 0) then
+                err = DBMKOPTLIST(2, optlist)
+                err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
+                err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
+                if (grid_geometry == 3) then
+                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                                  'x', 1, 'y', 1, 'z', 1, &
+                                  y_cb, z_cb, x_cb, dims, 3, &
+                                  DB_DOUBLE, DB_COLLINEAR, &
+                                  optlist, ierr)
+                else
+                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                                  'x', 1, 'y', 1, 'z', 1, &
+                                  x_cb, y_cb, z_cb, dims, 3, &
+                                  DB_DOUBLE, DB_COLLINEAR, &
+                                  optlist, ierr)
                 end if
-                x_cb_s(:) = real(x_cb(:), sp)
-                y_cb_s(:) = real(y_cb(:), sp)
+                err = DBFREEOPTLIST(optlist)
+            elseif (n > 0) then
+                err = DBMKOPTLIST(2, optlist)
+                err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
+                err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
+                err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                              'x', 1, 'y', 1, 'z', 1, &
+                              x_cb, y_cb, DB_F77NULL, dims, 2, &
+                              DB_DOUBLE, DB_COLLINEAR, &
+                              optlist, ierr)
+                err = DBFREEOPTLIST(optlist)
+            else
+                err = DBMKOPTLIST(2, optlist)
+                err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
+                err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
+                err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                              'x', 1, 'y', 1, 'z', 1, &
+                              x_cb, DB_F77NULL, DB_F77NULL, dims, 1, &
+                              DB_DOUBLE, DB_COLLINEAR, &
+                              optlist, ierr)
+                err = DBFREEOPTLIST(optlist)
             end if
-
-            #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
-                if (precision == ${PRECISION}$) then
-                    if (p > 0) then
-                        err = DBMKOPTLIST(2, optlist)
-                        err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
-                        err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
-                        if (grid_geometry == 3) then
-                            err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
-                                          'x', 1, 'y', 1, 'z', 1, &
-                                          y_cb${SFX}$, z_cb${SFX}$, x_cb${SFX}$, dims, 3, &
-                                          ${DBT}$, DB_COLLINEAR, &
-                                          optlist, ierr)
-                        else
-                            err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
-                                          'x', 1, 'y', 1, 'z', 1, &
-                                          x_cb${SFX}$, y_cb${SFX}$, z_cb${SFX}$, dims, 3, &
-                                          ${DBT}$, DB_COLLINEAR, &
-                                          optlist, ierr)
-                        end if
-                        err = DBFREEOPTLIST(optlist)
-                    else
-                        err = DBMKOPTLIST(2, optlist)
-                        err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
-                        err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
-                        err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
-                                      'x', 1, 'y', 1, 'z', 1, &
-                                      x_cb${SFX}$, y_cb${SFX}$, DB_F77NULL, dims, 2, &
-                                      ${DBT}$, DB_COLLINEAR, &
-                                      optlist, ierr)
-                        err = DBFREEOPTLIST(optlist)
-                    end if
-                end if
-            #:endfor
-
             ! END: Silo-HDF5 Database Format
 
             ! Binary Database Format
@@ -870,144 +878,46 @@ contains
 
         if (format == 1) then
 
-            ! In 1D, a curve object, featuring the local processor grid and
-            ! flow variable data, is written to the formatted database slave
-            ! file. The root process, on the other hand, will also take care
-            ! of gathering the entire grid and associated flow variable data
-            ! and write it to the formatted database master file.
-            if (n == 0) then
-
-                if (precision == 1 .and. wp == dp) then
-                    x_cc_s(:) = real(x_cc(:), sp)
-                    q_sf_s(:, :, :) = real(q_sf(:, :, :), sp)
-                elseif (precision == 1 .and. wp == sp) then
-                    x_cc_s(:) = x_cc(:)
-                    q_sf_s(:, :, :) = q_sf(:, :, :)
-                end if
-
-                ! Writing the curve object associated with the local process
-                ! to the formatted database slave file
-                #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
-                    if (precision == ${PRECISION}$) then
-                        err = DBPUTCURVE(dbfile, trim(varname), len_trim(varname), &
-                                         x_cc${SFX}$ (0:m), q_sf${SFX}$, ${DBT}$, m + 1, &
-                                         DB_F77NULL, ierr)
-                    end if
-                #:endfor
-
-                ! Assembling the local grid and flow variable data for the
-                ! entire computational domain on to the root process
-
-                if (num_procs > 1) then
-                    call s_mpi_defragment_1d_grid_variable()
-                    call s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
-
-                    if (precision == 1) then
-                        x_root_cc_s(:) = real(x_root_cc(:), sp)
-                        q_root_sf_s(:, :, :) = real(q_root_sf(:, :, :), sp)
-                    end if
-                else
-                    if (precision == 1) then
-                        x_root_cc_s(:) = real(x_cc(:), sp)
-                        q_root_sf_s(:, :, :) = real(q_sf(:, :, :), sp)
-                    else
-                        x_root_cc(:) = x_cc(:)
-                        q_root_sf(:, :, :) = q_sf(:, :, :)
-                    end if
-                end if
-
-                ! Writing the curve object associated with the root process
-                ! to the formatted database master file
-                if (proc_rank == 0) then
-                    #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
-                        if (precision == ${PRECISION}$) then
-                            err = DBPUTCURVE(dbroot, trim(varname), &
-                                             len_trim(varname), &
-                                             x_root_cc${SFX}$, q_root_sf${SFX}$, &
-                                             ${DBT}$, m_root + 1, &
-                                             DB_F77NULL, ierr)
-                        end if
-                    #:endfor
-                end if
-
-                return
-
-                ! In multidimensions, the local process(es) take care of writing
-                ! the flow variable data they are in charge of to the formatted
-                ! database slave file. The root processor, additionally, is also
-                ! responsible in gathering the flow variable extents of each of
-                ! the local processor(s) and writing them to formatted database
-                ! master file.
+            ! Determining the extents of the flow variable on each local
+            ! process and gathering all this information on root process
+            if (num_procs > 1) then
+                call s_mpi_gather_data_extents(q_sf, data_extents)
             else
+                data_extents(:, 0) = (/minval(q_sf), maxval(q_sf)/)
+            end if
 
-                ! Determining the extents of the flow variable on each local
-                ! process and gathering all this information on root process
-                if (num_procs > 1) then
-                    call s_mpi_gather_data_extents(q_sf, data_extents)
-                else
-                    data_extents(:, 0) = (/minval(q_sf), maxval(q_sf)/)
-                end if
+            ! Next, the root process proceeds to write the gathered flow
+            ! variable data extents to formatted database master file.
+            if (proc_rank == 0) then
 
-                ! Next, the root process proceeds to write the gathered flow
-                ! variable data extents to formatted database master file.
-                if (proc_rank == 0) then
+                do i = 1, num_procs
+                    write (varnames(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                        '/', t_step, '.silo:'//trim(varname)
+                end do
 
-                    do i = 1, num_procs
-                        write (varnames(i), '(A,I0,A,I0,A)') '../p', i - 1, &
-                            '/', t_step, '.silo:'//trim(varname)
-                    end do
+                vartypes = DB_QUADVAR
 
-                    vartypes = DB_QUADVAR
+                err = DBSET2DSTRLEN(len(varnames(1)))
+                err = DBMKOPTLIST(2, optlist)
+                err = DBADDIOPT(optlist, DBOPT_EXTENTS_SIZE, 2)
+                err = DBADDDOPT(optlist, DBOPT_EXTENTS, data_extents)
+                err = DBPUTMVAR(dbroot, trim(varname), &
+                                len_trim(varname), num_procs, &
+                                varnames, len_trim(varnames), &
+                                vartypes, optlist, ierr)
+                err = DBFREEOPTLIST(optlist)
 
-                    err = DBSET2DSTRLEN(len(varnames(1)))
-                    err = DBMKOPTLIST(2, optlist)
-                    err = DBADDIOPT(optlist, DBOPT_EXTENTS_SIZE, 2)
-                    err = DBADDDOPT(optlist, DBOPT_EXTENTS, data_extents)
-                    err = DBPUTMVAR(dbroot, trim(varname), &
-                                    len_trim(varname), num_procs, &
-                                    varnames, len_trim(varnames), &
-                                    vartypes, optlist, ierr)
-                    err = DBFREEOPTLIST(optlist)
+            end if
 
-                end if
-
-                ! Finally, each of the local processor(s) proceeds to write
-                ! the flow variable data that it is responsible for to the
-                ! formatted database slave file.
-                if (wp == dp) then
-                    if (precision == 1) then
-                        do i = -offset_x%beg, m + offset_x%end
-                            do j = -offset_y%beg, n + offset_y%end
-                                do k = -offset_z%beg, p + offset_z%end
-                                    q_sf_s(i, j, k) = real(q_sf(i, j, k), sp)
-                                end do
-                            end do
-                        end do
-                        if (grid_geometry == 3) then
-                            do i = -offset_x%beg, m + offset_x%end
-                                do j = -offset_y%beg, n + offset_y%end
-                                    do k = -offset_z%beg, p + offset_z%end
-                                        cyl_q_sf_s(j, k, i) = q_sf_s(i, j, k)
-                                    end do
-                                end do
-                            end do
-                        end if
-                    else
-                        if (grid_geometry == 3) then
-                            do i = -offset_x%beg, m + offset_x%end
-                                do j = -offset_y%beg, n + offset_y%end
-                                    do k = -offset_z%beg, p + offset_z%end
-                                        cyl_q_sf(j, k, i) = q_sf(i, j, k)
-                                    end do
-                                end do
-                            end do
-                        end if
-                    end if
-                elseif (wp == sp) then
+            ! Finally, each of the local processor(s) proceeds to write
+            ! the flow variable data that it is responsible for to the
+            ! formatted database slave file.
+            if (wp == dp) then
+                if (precision == 1) then
                     do i = -offset_x%beg, m + offset_x%end
                         do j = -offset_y%beg, n + offset_y%end
                             do k = -offset_z%beg, p + offset_z%end
-                                q_sf_s(i, j, k) = q_sf(i, j, k)
+                                q_sf_s(i, j, k) = real(q_sf(i, j, k), sp)
                             end do
                         end do
                     end do
@@ -1020,38 +930,72 @@ contains
                             end do
                         end do
                     end if
+                else
+                    if (grid_geometry == 3) then
+                        do i = -offset_x%beg, m + offset_x%end
+                            do j = -offset_y%beg, n + offset_y%end
+                                do k = -offset_z%beg, p + offset_z%end
+                                    cyl_q_sf(j, k, i) = q_sf(i, j, k)
+                                end do
+                            end do
+                        end do
+                    end if
                 end if
+            elseif (wp == sp) then
+                do i = -offset_x%beg, m + offset_x%end
+                    do j = -offset_y%beg, n + offset_y%end
+                        do k = -offset_z%beg, p + offset_z%end
+                            q_sf_s(i, j, k) = q_sf(i, j, k)
+                        end do
+                    end do
+                end do
+                if (grid_geometry == 3) then
+                    do i = -offset_x%beg, m + offset_x%end
+                        do j = -offset_y%beg, n + offset_y%end
+                            do k = -offset_z%beg, p + offset_z%end
+                                cyl_q_sf_s(j, k, i) = q_sf_s(i, j, k)
+                            end do
+                        end do
+                    end do
+                end if
+            end if
 
-                #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
-                    if (precision == ${PRECISION}$) then
-                        if (p > 0) then
-                            if (grid_geometry == 3) then
-                                err = DBPUTQV1(dbfile, trim(varname), &
-                                               len_trim(varname), &
-                                               'rectilinear_grid', 16, &
-                                               cyl_q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
-                                               0, ${DBT}$, DB_ZONECENT, &
-                                               DB_F77NULL, ierr)
-                            else
-                                err = DBPUTQV1(dbfile, trim(varname), &
-                                               len_trim(varname), &
-                                               'rectilinear_grid', 16, &
-                                               q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
-                                               0, ${DBT}$, DB_ZONECENT, &
-                                               DB_F77NULL, ierr)
-                            end if
+            #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
+                if (precision == ${PRECISION}$) then
+                    if (p > 0) then
+                        if (grid_geometry == 3) then
+                            err = DBPUTQV1(dbfile, trim(varname), &
+                                           len_trim(varname), &
+                                           'rectilinear_grid', 16, &
+                                           cyl_q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
+                                           0, ${DBT}$, DB_ZONECENT, &
+                                           DB_F77NULL, ierr)
                         else
                             err = DBPUTQV1(dbfile, trim(varname), &
                                            len_trim(varname), &
                                            'rectilinear_grid', 16, &
-                                           q_sf${SFX}$, dims - 1, 2, DB_F77NULL, &
+                                           q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
                                            0, ${DBT}$, DB_ZONECENT, &
                                            DB_F77NULL, ierr)
                         end if
-                    end if
-                #:endfor
+                    elseif (n > 0) then
+                        err = DBPUTQV1(dbfile, trim(varname), &
+                                       len_trim(varname), &
+                                       'rectilinear_grid', 16, &
+                                       q_sf${SFX}$, dims - 1, 2, DB_F77NULL, &
+                                       0, ${DBT}$, DB_ZONECENT, &
+                                       DB_F77NULL, ierr)
+                    else
+                        err = DBPUTQV1(dbfile, trim(varname), &
+                                       len_trim(varname), &
+                                       'rectilinear_grid', 16, &
+                                       q_sf${SFX}$, dims - 1, 1, DB_F77NULL, &
+                                       0, ${DBT}$, DB_ZONECENT, &
+                                       DB_F77NULL, ierr)
 
-            end if
+                    end if
+                end if
+            #:endfor
 
             ! END: Silo-HDF5 Database Format
 
@@ -1094,7 +1038,7 @@ contains
 
     !>  Subroutine that writes the post processed results in the folder 'lag_bubbles_data'
             !!  @param t_step Current time step
-    impure subroutine s_write_lag_bubbles_results(t_step)
+    impure subroutine s_write_lag_bubbles_results_to_text(t_step)
 
         integer, intent(in) :: t_step
 
@@ -1112,32 +1056,66 @@ contains
         logical :: lg_bub_file, file_exist
 
         integer, dimension(2) :: gsizes, lsizes, start_idx_part
-        integer :: ifile, tot_data
+        integer :: ifile
         integer :: ierr !< Generic flag used to identify and report MPI errors
+        real(wp) :: file_time, file_dt
+        integer :: file_num_procs, file_tot_part, tot_part
         integer :: i
 
-        write (file_loc, '(A,I0,A)') 'lag_bubbles_mpi_io_', t_step, '.dat'
-        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        integer, dimension(:), allocatable :: proc_bubble_counts
+        real(wp), dimension(1:1, 1:lag_io_vars) :: lag_io_null
+        lag_io_null = 0._wp
 
-        if (file_exist) then
-            if (proc_rank == 0) then
-                open (9, FILE=trim(file_loc), FORM='unformatted', STATUS='unknown')
-                read (9) tot_data, time_real
-                close (9)
-            end if
-        else
-            print '(A)', trim(file_loc)//' is missing. Exiting.'
-            call s_mpi_abort
+        ! Construct file path
+        write (file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
+        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+
+        ! Check if file exists
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if (.not. file_exist) then
+            call s_mpi_abort('Restart file '//trim(file_loc)//' does not exist!')
         end if
 
-        call MPI_BCAST(tot_data, 1, MPI_integer, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(time_real, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        if (.not. parallel_io) return
 
-        gsizes(1) = tot_data
-        gsizes(2) = 21
-        lsizes(1) = tot_data
-        lsizes(2) = 21
+        if (proc_rank == 0) then
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, &
+                               mpi_info_int, ifile, ierr)
+
+            call MPI_FILE_READ(ifile, file_tot_part, 1, MPI_INTEGER, status, ierr)
+            call MPI_FILE_READ(ifile, file_time, 1, mpi_p, status, ierr)
+            call MPI_FILE_READ(ifile, file_dt, 1, mpi_p, status, ierr)
+            call MPI_FILE_READ(ifile, file_num_procs, 1, MPI_INTEGER, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
+
+        call MPI_BCAST(file_tot_part, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_time, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_num_procs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+        allocate (proc_bubble_counts(file_num_procs))
+
+        if (proc_rank == 0) then
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, &
+                               mpi_info_int, ifile, ierr)
+
+            ! Skip to processor counts position
+            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs), &
+                       MPI_OFFSET_KIND)
+            call MPI_FILE_SEEK(ifile, disp, MPI_SEEK_SET, ierr)
+            call MPI_FILE_READ(ifile, proc_bubble_counts, file_num_procs, MPI_INTEGER, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
+
+        call MPI_BCAST(proc_bubble_counts, file_num_procs, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+        gsizes(1) = file_tot_part
+        gsizes(2) = lag_io_vars
+        lsizes(1) = file_tot_part
+        lsizes(2) = lag_io_vars
         start_idx_part(1) = 0
         start_idx_part(2) = 0
 
@@ -1145,59 +1123,372 @@ contains
                                       MPI_ORDER_FORTRAN, mpi_p, view, ierr)
         call MPI_TYPE_COMMIT(view, ierr)
 
-        write (file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
-        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-        inquire (FILE=trim(file_loc), EXIST=lg_bub_file)
+        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, &
+                           mpi_info_int, ifile, ierr)
 
-        if (lg_bub_file) then
+        disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) + &
+                   file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, &
+                               'native', mpi_info_null, ierr)
 
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, &
-                               mpi_info_int, ifile, ierr)
+        allocate (MPI_IO_DATA_lg_bubbles(file_tot_part, 1:lag_io_vars))
 
-            disp = 0._wp
-            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, &
-                                   'native', mpi_info_null, ierr)
+        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lg_bubbles, lag_io_vars*file_tot_part, &
+                               mpi_p, status, ierr)
 
-            allocate (MPI_IO_DATA_lg_bubbles(tot_data, 1:21))
+        write (file_loc, '(A,I0,A)') 'lag_bubbles_post_process_', t_step, '.dat'
+        file_loc = trim(case_dir)//'/lag_bubbles_post_process/'//trim(file_loc)
 
-            call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lg_bubbles, 21*tot_data, &
-                                   mpi_p, status, ierr)
+        if (proc_rank == 0) then
+            open (unit=29, file=file_loc, form='formatted', position='rewind')
 
-            write (file_loc, '(A,I0,A)') 'lag_bubbles_post_process_', t_step, '.dat'
-            file_loc = trim(case_dir)//'/lag_bubbles_post_process/'//trim(file_loc)
-
-            if (proc_rank == 0) then
-                open (unit=29, file=file_loc, form='formatted', position='rewind')
-                !write(29,*) 'lg_bubID, x, y, z, xPrev, yPrev, zPrev, xVel, yVel, ',   &
-                !            'zVel, radius, interfaceVelocity, equilibriumRadius',       &
-                !            'Rmax, Rmin, dphidt, pressure, mv, mg, betaT, betaC, time'
-                do i = 1, tot_data
-                    id = int(MPI_IO_DATA_lg_bubbles(i, 1))
-                    inputvals(1:20) = MPI_IO_DATA_lg_bubbles(i, 2:21)
-                    if (id > 0) then
-                        write (29, 6) int(id), inputvals(1), inputvals(2), &
-                            inputvals(3), inputvals(4), inputvals(5), inputvals(6), inputvals(7), &
-                            inputvals(8), inputvals(9), inputvals(10), inputvals(11), &
-                            inputvals(12), inputvals(13), inputvals(14), inputvals(15), &
-                            inputvals(16), inputvals(17), inputvals(18), inputvals(19), &
-                            inputvals(20), time_real
-6                       format(I6, 21(1x, E15.7))
-                    end if
-                end do
-                close (29)
+            if (lag_header) then
+                write (29, '(A)', advance='no')
+                if (lag_id_wrt) write (29, '(A8)', advance='no') 'id, '
+                if (lag_pos_wrt) write (29, '(3(A17))', advance='no') 'px, ', 'py, ', 'pz, '
+                if (lag_pos_prev_wrt) write (29, '(3(A17))', advance='no') 'pvx, ', 'pvy, ', 'pvz, '
+                if (lag_vel_wrt) write (29, '(3(A17))', advance='no') 'vx, ', 'vy, ', 'vz, '
+                if (lag_rad_wrt) write (29, '(A17)', advance='no') 'radius, '
+                if (lag_rvel_wrt) write (29, '(A17)', advance='no') 'rvel, '
+                if (lag_r0_wrt) write (29, '(A17)', advance='no') 'r0, '
+                if (lag_rmax_wrt) write (29, '(A17)', advance='no') 'rmax, '
+                if (lag_rmin_wrt) write (29, '(A17)', advance='no') 'rmin, '
+                if (lag_dphidt_wrt) write (29, '(A17)', advance='no') 'dphidt, '
+                if (lag_pres_wrt) write (29, '(A17)', advance='no') 'pressure, '
+                if (lag_mv_wrt) write (29, '(A17)', advance='no') 'mv, '
+                if (lag_mg_wrt) write (29, '(A17)', advance='no') 'mg, '
+                if (lag_betaT_wrt) write (29, '(A17)', advance='no') 'betaT, '
+                if (lag_betaC_wrt) write (29, '(A17)', advance='no') 'betaC, '
+                write (29, '(A15)') 'time'
             end if
 
-            deallocate (MPI_IO_DATA_lg_bubbles)
-
+            do i = 1, file_tot_part
+                id = int(MPI_IO_DATA_lg_bubbles(i, 1))
+                inputvals(1:20) = MPI_IO_DATA_lg_bubbles(i, 2:21)
+                if (id > 0) then
+                    write (29, '(100(A))', advance='no') ''
+                    if (lag_id_wrt) write (29, '(I6, A)', advance='no') id, ', '
+                    if (lag_pos_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(1), ', ', inputvals(2), ', ', inputvals(3), ', '
+                    if (lag_pos_prev_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(4), ', ', inputvals(5), ', ', inputvals(6), ', '
+                    if (lag_vel_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(7), ', ', inputvals(8), ', ', inputvals(9), ', '
+                    if (lag_rad_wrt) write (29, '(E15.7, A)', advance='no') inputvals(10), ', '
+                    if (lag_rvel_wrt) write (29, '(E15.7, A)', advance='no') inputvals(11), ', '
+                    if (lag_r0_wrt) write (29, '(E15.7, A)', advance='no') inputvals(12), ', '
+                    if (lag_rmax_wrt) write (29, '(E15.7, A)', advance='no') inputvals(13), ', '
+                    if (lag_rmin_wrt) write (29, '(E15.7, A)', advance='no') inputvals(14), ', '
+                    if (lag_dphidt_wrt) write (29, '(E15.7, A)', advance='no') inputvals(15), ', '
+                    if (lag_pres_wrt) write (29, '(E15.7, A)', advance='no') inputvals(16), ', '
+                    if (lag_mv_wrt) write (29, '(E15.7, A)', advance='no') inputvals(17), ', '
+                    if (lag_mg_wrt) write (29, '(E15.7, A)', advance='no') inputvals(18), ', '
+                    if (lag_betaT_wrt) write (29, '(E15.7, A)', advance='no') inputvals(19), ', '
+                    if (lag_betaC_wrt) write (29, '(E15.7, A)', advance='no') inputvals(20), ', '
+                    write (29, '(E15.7)') time_real
+                end if
+            end do
+            close (29)
         end if
+
+        deallocate (MPI_IO_DATA_lg_bubbles)
 
         call s_mpi_barrier()
 
         call MPI_FILE_CLOSE(ifile, ierr)
+#endif
+
+    end subroutine s_write_lag_bubbles_results_to_text
+
+    impure subroutine s_write_lag_bubbles_to_formatted_database_file(t_step)
+
+        integer, intent(in) :: t_step
+
+        character(len=len_trim(case_dir) + 3*name_len) :: file_loc
+
+        integer :: id
+
+#ifdef MFC_MPI
+        real(wp), dimension(20) :: inputvals
+        real(wp) :: time_real
+        integer, dimension(MPI_STATUS_SIZE) :: status
+        integer(KIND=MPI_OFFSET_KIND) :: disp
+        integer :: view
+
+        logical :: lg_bub_file, file_exist
+
+        integer, dimension(2) :: gsizes, lsizes, start_idx_part
+        integer :: ifile, ierr, tot_data, valid_data, nBub
+        real(wp) :: file_time, file_dt
+        integer :: file_num_procs, file_tot_part
+        integer, dimension(:), allocatable :: proc_bubble_counts
+        real(wp), dimension(1:1, 1:lag_io_vars) :: dummy
+        character(LEN=4*name_len), dimension(num_procs) :: meshnames
+        integer, dimension(num_procs) :: meshtypes
+        real(wp) :: dummy_data
+
+        integer :: i, j
+
+        real(wp), dimension(:), allocatable :: bub_id
+        real(wp), dimension(:), allocatable :: px, py, pz, ppx, ppy, ppz, vx, vy, vz
+        real(wp), dimension(:), allocatable :: radius, rvel, rnot, rmax, rmin, dphidt
+        real(wp), dimension(:), allocatable :: pressure, mv, mg, betaT, betaC
+
+        dummy = 0._wp
+        dummy_data = 0._wp
+
+        ! Construct file path
+        write (file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
+        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+
+        ! Check if file exists
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if (.not. file_exist) then
+            call s_mpi_abort('Restart file '//trim(file_loc)//' does not exist!')
+        end if
+
+        if (.not. parallel_io) return
+
+        if (proc_rank == 0) then
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, &
+                               mpi_info_int, ifile, ierr)
+
+            call MPI_FILE_READ(ifile, file_tot_part, 1, MPI_INTEGER, status, ierr)
+            call MPI_FILE_READ(ifile, file_time, 1, mpi_p, status, ierr)
+            call MPI_FILE_READ(ifile, file_dt, 1, mpi_p, status, ierr)
+            call MPI_FILE_READ(ifile, file_num_procs, 1, MPI_INTEGER, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
+
+        call MPI_BCAST(file_tot_part, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_time, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_num_procs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+        allocate (proc_bubble_counts(file_num_procs))
+
+        if (proc_rank == 0) then
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, &
+                               mpi_info_int, ifile, ierr)
+
+            ! Skip to processor counts position
+            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs), &
+                       MPI_OFFSET_KIND)
+            call MPI_FILE_SEEK(ifile, disp, MPI_SEEK_SET, ierr)
+            call MPI_FILE_READ(ifile, proc_bubble_counts, file_num_procs, MPI_INTEGER, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
+
+        call MPI_BCAST(proc_bubble_counts, file_num_procs, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+        ! Set time variables from file
+
+        nBub = proc_bubble_counts(proc_rank + 1)
+
+        start_idx_part(1) = 0
+        do i = 1, proc_rank
+            start_idx_part(1) = start_idx_part(1) + proc_bubble_counts(i)
+        end do
+
+        start_idx_part(2) = 0
+        lsizes(1) = nBub
+        lsizes(2) = lag_io_vars
+
+        gsizes(1) = file_tot_part
+        gsizes(2) = lag_io_vars
+
+        if (nBub > 0) then
+
+            #:for VAR in ['bub_id', 'px', 'py', 'pz', 'ppx', 'ppy', 'ppz', 'vx', 'vy', 'vz', &
+                'radius', 'rvel', 'rnot', 'rmax', 'rmin', 'dphidt', &
+                'pressure', 'mv', 'mg', 'betaT', 'betaC']
+                allocate (${VAR}$ (nBub))
+            #:endfor
+            allocate (MPI_IO_DATA_lg_bubbles(nBub, 1:lag_io_vars))
+
+            call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, &
+                                          MPI_ORDER_FORTRAN, mpi_p, view, ierr)
+            call MPI_TYPE_COMMIT(view, ierr)
+
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, &
+                               mpi_info_int, ifile, ierr)
+
+            ! Skip extended header
+            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) + &
+                       file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
+
+            call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lg_bubbles, &
+                                   lag_io_vars*nBub, mpi_p, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+            call MPI_TYPE_FREE(view, ierr)
+
+            ! Extract data from MPI_IO_DATA_lg_bubbles array
+            ! Adjust these indices based on your actual data layout
+            #:for VAR, IDX in [('bub_id', 1), ('px', 2), ('py',3), ('pz',4), ('ppx',5), ('ppy',6), ('ppz',7), &
+                ('vx',8), ('vy',9), ('vz',10), ('radius',11), ('rvel',12), &
+                ('rnot',13), ('rmax',14), ('rmin',15), ('dphidt',16), &
+                ('pressure',17), ('mv',18), ('mg',19), ('betaT',20), ('betaC',21)]
+                ${VAR}$ (:) = MPI_IO_DATA_lg_bubbles(:, ${IDX}$)
+            #:endfor
+
+            ! Next, the root processor proceeds to record all of the spatial
+            ! extents in the formatted database master file. In addition, it
+            ! also records a sub-domain connectivity map so that the entire
+            ! grid may be reassembled by looking at the master file.
+            if (proc_rank == 0) then
+
+                do i = 1, num_procs
+                    write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                        '/', t_step, '.silo:lag_bubbles'
+                    meshtypes(i) = DB_POINTMESH
+                end do
+                err = DBSET2DSTRLEN(len(meshnames(1)))
+                err = DBPUTMMESH(dbroot, 'lag_bubbles', 16, &
+                                 num_procs, meshnames, &
+                                 len_trim(meshnames), &
+                                 meshtypes, DB_F77NULL, ierr)
+            end if
+
+            err = DBPUTPM(dbfile, 'lag_bubbles', 11, 3, &
+                          px, py, pz, nBub, &
+                          DB_DOUBLE, DB_F77NULL, ierr)
+
+            if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step, bub_id, nBub)
+            if (lag_vel_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_vel1', t_step, vx, nBub)
+                call s_write_lag_variable_to_formatted_database_file('part_vel2', t_step, vy, nBub)
+                if (p > 0) call s_write_lag_variable_to_formatted_database_file('part_vel3', t_step, vz, nBub)
+            end if
+            if (lag_rad_wrt) call s_write_lag_variable_to_formatted_database_file('part_radius', t_step, radius, nBub)
+            if (lag_rvel_wrt) call s_write_lag_variable_to_formatted_database_file('part_rdot', t_step, rvel, nBub)
+            if (lag_r0_wrt) call s_write_lag_variable_to_formatted_database_file('part_r0', t_step, rnot, nBub)
+            if (lag_rmax_wrt) call s_write_lag_variable_to_formatted_database_file('part_rmax', t_step, rmax, nBub)
+            if (lag_rmin_wrt) call s_write_lag_variable_to_formatted_database_file('part_rmin', t_step, rmin, nBub)
+            if (lag_dphidt_wrt) call s_write_lag_variable_to_formatted_database_file('part_dphidt', t_step, dphidt, nBub)
+            if (lag_pres_wrt) call s_write_lag_variable_to_formatted_database_file('part_pressure', t_step, pressure, nBub)
+            if (lag_mv_wrt) call s_write_lag_variable_to_formatted_database_file('part_mv', t_step, mv, nBub)
+            if (lag_mg_wrt) call s_write_lag_variable_to_formatted_database_file('part_mg', t_step, mg, nBub)
+            if (lag_betaT_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step, betaT, nBub)
+            if (lag_betaC_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step, betaC, nBub)
+
+            deallocate (bub_id, px, py, pz, ppx, ppy, ppz, vx, vy, vz, radius, &
+                        rvel, rnot, rmax, rmin, dphidt, pressure, mv, mg, &
+                        betaT, betaC)
+            deallocate (MPI_IO_DATA_lg_bubbles)
+        else
+            call MPI_TYPE_CONTIGUOUS(0, mpi_p, view, ierr)
+            call MPI_TYPE_COMMIT(view, ierr)
+
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, &
+                               mpi_info_int, ifile, ierr)
+
+            ! Skip extended header
+            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) + &
+                       file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
+
+            call MPI_FILE_READ_ALL(ifile, dummy, 0, mpi_p, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+            call MPI_TYPE_FREE(view, ierr)
+
+            if (proc_rank == 0) then
+
+                do i = 1, num_procs
+                    write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                        '/', t_step, '.silo:lag_bubbles'
+                    meshtypes(i) = DB_POINTMESH
+                end do
+                err = DBSET2DSTRLEN(len(meshnames(1)))
+                err = DBPUTMMESH(dbroot, 'lag_bubbles', 16, &
+                                 num_procs, meshnames, &
+                                 len_trim(meshnames), &
+                                 meshtypes, DB_F77NULL, ierr)
+            end if
+
+            err = DBSETEMPTYOK(1)
+            err = DBPUTPM(dbfile, 'lag_bubbles', 11, 3, &
+                          dummy_data, dummy_data, dummy_data, 0, &
+                          DB_DOUBLE, DB_F77NULL, ierr)
+
+            if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step)
+            if (lag_vel_wrt) then
+                call s_write_lag_variable_to_formatted_database_file('part_vel1', t_step)
+                call s_write_lag_variable_to_formatted_database_file('part_vel2', t_step)
+                if (p > 0) call s_write_lag_variable_to_formatted_database_file('part_vel3', t_step)
+            end if
+            if (lag_rad_wrt) call s_write_lag_variable_to_formatted_database_file('part_radius', t_step)
+            if (lag_rvel_wrt) call s_write_lag_variable_to_formatted_database_file('part_rdot', t_step)
+            if (lag_r0_wrt) call s_write_lag_variable_to_formatted_database_file('part_r0', t_step)
+            if (lag_rmax_wrt) call s_write_lag_variable_to_formatted_database_file('part_rmax', t_step)
+            if (lag_rmin_wrt) call s_write_lag_variable_to_formatted_database_file('part_rmin', t_step)
+            if (lag_dphidt_wrt) call s_write_lag_variable_to_formatted_database_file('part_dphidt', t_step)
+            if (lag_pres_wrt) call s_write_lag_variable_to_formatted_database_file('part_pressure', t_step)
+            if (lag_mv_wrt) call s_write_lag_variable_to_formatted_database_file('part_mv', t_step)
+            if (lag_mg_wrt) call s_write_lag_variable_to_formatted_database_file('part_mg', t_step)
+            if (lag_betaT_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step)
+            if (lag_betaC_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step)
+        end if
 
 #endif
 
-    end subroutine s_write_lag_bubbles_results
+    end subroutine s_write_lag_bubbles_to_formatted_database_file
+
+    subroutine s_write_lag_variable_to_formatted_database_file(varname, t_step, data, nBubs)
+
+        character(len=*), intent(in) :: varname
+        integer, intent(in) :: t_step
+        real(wp), dimension(1:), intent(in), optional :: data
+        integer, intent(in), optional :: nBubs
+
+        character(len=64), dimension(num_procs) :: var_names
+        integer, dimension(num_procs) :: var_types
+        real(wp) :: dummy_data
+
+        integer :: ierr !< Generic flag used to identify and report database errors
+        integer :: i
+
+        dummy_data = 0._wp
+
+        if (present(nBubs) .and. present(data)) then
+            if (proc_rank == 0) then
+                do i = 1, num_procs
+                    write (var_names(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                        '/', t_step, '.silo:'//trim(varname)
+                    var_types(i) = DB_POINTVAR
+                end do
+                err = DBSET2DSTRLEN(len(var_names(1)))
+                err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), &
+                                num_procs, var_names, &
+                                len_trim(var_names), &
+                                var_types, DB_F77NULL, ierr)
+            end if
+
+            err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), &
+                           'lag_bubbles', 11, data, nBubs, DB_DOUBLE, DB_F77NULL, ierr)
+        else
+            if (proc_rank == 0) then
+                do i = 1, num_procs
+                    write (var_names(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                        '/', t_step, '.silo:'//trim(varname)
+                    var_types(i) = DB_POINTVAR
+                end do
+                err = DBSET2DSTRLEN(len(var_names(1)))
+                err = DBSETEMPTYOK(1)
+                err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), &
+                                num_procs, var_names, &
+                                len_trim(var_names), &
+                                var_types, DB_F77NULL, ierr)
+            end if
+
+            err = DBSETEMPTYOK(1)
+            err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), &
+                           'lag_bubbles', 11, dummy_data, 0, DB_DOUBLE, DB_F77NULL, ierr)
+        end if
+
+    end subroutine s_write_lag_variable_to_formatted_database_file
+
     impure subroutine s_write_intf_data_file(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
@@ -1443,7 +1734,7 @@ contains
         ! the offsets and the one bookkeeping the number of cell-boundaries
         ! in each active coordinate direction. Note that all these variables
         ! were only needed by Silo-HDF5 format for multidimensional data.
-        if (format == 1 .and. n > 0) then
+        if (format == 1) then
             deallocate (spatial_extents)
             deallocate (data_extents)
             deallocate (lo_offset)
