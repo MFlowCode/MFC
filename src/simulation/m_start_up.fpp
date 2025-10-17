@@ -583,7 +583,6 @@ contains
                 if (patch_ib(i)%c > 0) then
                     Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0))*20) + 1
                     allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
-                    print *, "HERE Np", Np
                 end if
             end do
         end if
@@ -945,8 +944,6 @@ contains
             do j = 1, num_ibs
                 if (patch_ib(j)%c > 0) then
 
-                    print *, "HERE Np", Np
-
                     allocate (airfoil_grid_u(1:Np))
                     allocate (airfoil_grid_l(1:Np))
 
@@ -1137,10 +1134,6 @@ contains
             end do
         end if
 
-        if (moving_immersed_boundary_flag) then
-            call s_update_mib(num_ibs, levelset, levelset_norm)
-        end if
-
         call s_compute_derived_variables(t_step)
 
 
@@ -1151,14 +1144,8 @@ contains
         mytime = mytime + dt
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
-        if (time_stepper == 1) then
-            call s_1st_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 2) then
-            call s_2nd_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 3 .and. (.not. adap_dt)) then
-            call s_3rd_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 3 .and. adap_dt) then
-            call s_strang_splitting(t_step, time_avg)
+        if (any(time_stepper == (/1, 2, 3/))) then
+            call s_tvd_rk(t_step, time_avg, time_stepper)
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
