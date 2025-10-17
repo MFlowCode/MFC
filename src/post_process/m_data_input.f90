@@ -253,7 +253,7 @@ contains
         write (t_step_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', t_step
         t_step_dir = trim(case_dir)//trim(t_step_dir)
 
-        write (t_step_ib_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', 0
+        write (t_step_ib_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', t_step
         t_step_ib_dir = trim(case_dir)//trim(t_step_ib_dir)
 
         ! Inquiring as to the existence of the time-step directory
