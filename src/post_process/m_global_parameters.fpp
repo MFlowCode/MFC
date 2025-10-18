@@ -60,7 +60,6 @@ module m_global_parameters
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
     real(wp), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
-    real(wp), allocatable, dimension(:) :: x_cb_s, y_cb_s, z_cb_s
     !> @}
 
     !> @name Cell-center locations in the x-, y- and z-coordinate directions
@@ -258,6 +257,24 @@ module m_global_parameters
     logical :: ib
     logical :: chem_wrt_Y(1:num_species)
     logical :: chem_wrt_T
+    logical :: lag_header
+    logical :: lag_txt_wrt
+    logical :: lag_db_wrt
+    logical :: lag_id_wrt
+    logical :: lag_pos_wrt
+    logical :: lag_pos_prev_wrt
+    logical :: lag_vel_wrt
+    logical :: lag_rad_wrt
+    logical :: lag_rvel_wrt
+    logical :: lag_r0_wrt
+    logical :: lag_rmax_wrt
+    logical :: lag_rmin_wrt
+    logical :: lag_dphidt_wrt
+    logical :: lag_pres_wrt
+    logical :: lag_mv_wrt
+    logical :: lag_mg_wrt
+    logical :: lag_betaT_wrt
+    logical :: lag_betaC_wrt
     !> @}
 
     real(wp), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -328,6 +345,8 @@ module m_global_parameters
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
+
+    real(wp) :: wall_time, wall_time_avg !< Wall time measurements
 
 contains
 
@@ -438,6 +457,24 @@ contains
         sim_data = .false.
         cf_wrt = .false.
         ib = .false.
+        lag_txt_wrt = .false.
+        lag_header = .true.
+        lag_db_wrt = .false.
+        lag_id_wrt = .true.
+        lag_pos_wrt = .true.
+        lag_pos_prev_wrt = .false.
+        lag_vel_wrt = .true.
+        lag_rad_wrt = .true.
+        lag_rvel_wrt = .false.
+        lag_r0_wrt = .false.
+        lag_rmax_wrt = .false.
+        lag_rmin_wrt = .false.
+        lag_dphidt_wrt = .false.
+        lag_pres_wrt = .false.
+        lag_mv_wrt = .false.
+        lag_mg_wrt = .false.
+        lag_betaT_wrt = .false.
+        lag_betaC_wrt = .false.
 
         schlieren_alpha = dflt_real
 
@@ -812,10 +849,17 @@ contains
         ! in the Silo-HDF5 format. If this is the case, one must also verify
         ! whether the raw simulation data is 2D or 3D. In the 2D case, size
         ! of the z-coordinate direction ghost zone layer must be zeroed out.
-        if (num_procs == 1 .or. format /= 1 .or. n == 0) then
+        if (num_procs == 1 .or. format /= 1) then
 
             offset_x%beg = 0
             offset_x%end = 0
+            offset_y%beg = 0
+            offset_y%end = 0
+            offset_z%beg = 0
+            offset_z%end = 0
+
+        elseif (n == 0) then
+
             offset_y%beg = 0
             offset_y%end = 0
             offset_z%beg = 0
@@ -855,17 +899,7 @@ contains
         idwbuff(3)%end = idwint(3)%end - idwbuff(3)%beg
 
         ! Allocating single precision grid variables if needed
-        if (precision == 1) then
-            allocate (x_cb_s(-1 - offset_x%beg:m + offset_x%end))
-            if (n > 0) then
-                allocate (y_cb_s(-1 - offset_y%beg:n + offset_y%end))
-                if (p > 0) then
-                    allocate (z_cb_s(-1 - offset_z%beg:p + offset_z%end))
-                end if
-            end if
-        else
-            allocate (x_cc_s(-buff_size:m + buff_size))
-        end if
+        allocate (x_cc_s(-buff_size:m + buff_size))
 
         ! Allocating the grid variables in the x-coordinate direction
         allocate (x_cb(-1 - offset_x%beg:m + offset_x%end))
