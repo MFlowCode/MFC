@@ -545,9 +545,16 @@ contains
 
             ! Variables to handle moving imersed boundaries, defaulting to no movement
             patch_ib(i)%moving_ibm = 0
-            patch_ib(i)%vel(1) = 0._wp
-            patch_ib(i)%vel(2) = 0._wp
-            patch_ib(i)%vel(3) = 0._wp
+            patch_ib(i)%vel(:) = 0._wp
+            patch_ib(i)%angles(:) = 0._wp
+            patch_ib(i)%angular_vel(:) = 0._wp
+
+            ! sets values of a rotation matrix which can be used when calculating rotations
+            patch_ib(i)%rotation_matrix = 0._wp
+            patch_ib(i)%rotation_matrix(1, 1) = 1._wp
+            patch_ib(i)%rotation_matrix(2, 2) = 1._wp
+            patch_ib(i)%rotation_matrix(3, 3) = 1._wp
+            patch_ib(i)%rotation_matrix_inverse = patch_ib(i)%rotation_matrix
         end do
 
         ! Fluids physical parameters
