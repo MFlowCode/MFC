@@ -715,3 +715,12 @@ site_name(SITE_NAME)
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake/configuration.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/configuration.txt")
+
+# -------------------------
+# Small dependency-check executable (used by CI to verify deps like Boost)
+find_package(Boost REQUIRED)
+add_executable(dependency_check examples/dependency_check/dependency_check.cpp)
+# make sure compiler sees Boost headers
+target_include_directories(dependency_check PRIVATE ${Boost_INCLUDE_DIRS})
+# don't force any link libraries: we use Boost header macros only
+# -------------------------

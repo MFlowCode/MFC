@@ -48,39 +48,21 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
+      - name: Install Dependencies (Unified Script)
+        run: |
+          chmod +x ./scripts/install_dependencies.sh
+          ./scripts/install_dependencies.sh
+
+      - name: Verify dependency installation
+        run: |
+          cmake --version
+          gcc --version
+          python3 --version
+
       - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-
-      - name: Setup MacOS
-        if:   matrix.os == 'macos'
-        run:  |
-          brew update
-          brew upgrade
-          brew install coreutils python fftw hdf5 gcc@15 boost open-mpi lapack
-          echo "FC=gfortran-15" >> $GITHUB_ENV
-          echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
-
-      - name: Setup Ubuntu
-        if:   matrix.os == 'ubuntu' && matrix.intel == false
-        run: |
-           sudo apt update -y
-           sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
-                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev \
-                    libblas-dev liblapack-dev
-
-      - name: Setup Ubuntu (Intel)
-        if:   matrix.os == 'ubuntu' && matrix.intel == true
-        run: |
-          wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-          sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-          sudo add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
-          sudo apt-get update
-          sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel
-          source /opt/intel/oneapi/setvars.sh
-          printenv >> $GITHUB_ENV
-
 
       - name: Build
         run:  |
