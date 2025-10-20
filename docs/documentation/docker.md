@@ -30,6 +30,13 @@ docker run -it --rm --entrypoint bash --platform linux/amd64 sbryngelson/mfc:lat
 ```
 <br>
 
+**What is Next:** 
+
+After starting a container, the primary working directory is `/opt/MFC`, where all necessary files are located. Read through [Example Cases](https://mflowcode.github.io/documentation/md_examples.html) to get familiar with running cases, then review [Case Files](https://mflowcode.github.io/documentation/md_case.html) to write a custom case file.
+
+
+<br>
+
 ## Running Containers
 
 Start a CPU container.
@@ -40,7 +47,7 @@ Start a GPU container.
 ```bash
 docker run -it --rm --gpus all --entrypoint bash sbryngelson/mfc:latest-gpu
 ```
-**Note:** `--gpus all` exposes the container to available GPUs, and only Nvidia GPUs are currently supported. Make sure your device's CUDA version is at least 12.3 to avoid backward compatibility issues.
+**Note:** `--gpus all` exposes the container to available GPUs, and only NVIDIA GPUs are currently supported. Make sure your device's CUDA version is at least 12.3 to avoid backward compatibility issues.
 
 <br>
 <br>
@@ -55,7 +62,7 @@ docker run -it --rm --entrypoint bash -v "$PWD":/mnt sbryngelson/mfc:latest-cpu
 
 **Shared Memory:** 
 
-Increase the shared memory size to prevent MPI memory binding errors which may fail some tests and cases. Otherwise, you can disable MPI inside the container (`--no-mpi`). 
+When encountering MPI memory binding errors resulting in failed tests and cases, increase the shared memory size or disable MPI inside the container (`./mfc.sh --no-mpi`).
 ```bash
 docker run -it --rm --entrypoint bash --shm-size=<e.g., 4gb> sbryngelson/mfc:latest-cpu
 ```
@@ -91,6 +98,7 @@ or
 ```bash
 apptainer exec --nv --fakeroot --writable-tmpfs --bind "$PWD":/mnt  docker://sbryngelson/mfc:latest-gpu bash -c "cd /opt/MFC && bash"
 ```
+**Note:** To run MFC on CPU cores, omit `--nv` and use `mfc:latest-cpu` container image.
 
 ### **For Portability,**
 On the source machine,
@@ -107,6 +115,7 @@ apptainer shell --nv --fakeroot --writable-tmpfs --bind "$PWD":/mnt mfc:latest-g
 
 
 ### Slurm Job
+Below is a slurm job template. Refer to your HPC user guide for instructions on properly loading and using apptainer.
 ```bash
 #!/bin/bash
 #SBATCH --job-name=mfc-sim
@@ -116,9 +125,6 @@ apptainer shell --nv --fakeroot --writable-tmpfs --bind "$PWD":/mnt mfc:latest-g
 #SBATCH --partition=
 #SBATCH --output=mfc-sim-%j.out
 #SBATCH --error=mfc-sim-%j.err
-
-# Load required modules
-module load apptainer
 
 cd $SLURM_SUBMIT_DIR
 
@@ -135,7 +141,7 @@ Where,
 `/sim` directory should all the simulation files, including the case setup (`case.py`).
  
 `--nv --fakeroot --writable-tmpfs`, these flags are critical to:
-- Grant access to the host system's Nvidia GPU and its CUDA libraries.
+- Grant access to the host system's NVIDIA GPUs and its CUDA libraries.
 - Enable root-like permissions inside the container without actual root access.
 - Allow temporary write access to the container filesystem.
 

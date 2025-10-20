@@ -146,7 +146,7 @@ Examples:
 - Build MFC's `simulation` code in Debug mode with MPI and GPU support: `./mfc.sh build --debug --gpu -t simulation`.
 
 ## Using Containers
-As an alternative to building MFC from scratch, use containers to quickly access pre-built MFC with all its dependencies.
+Instead of building MFC from scratch, use containers to quickly access pre-built MFC along with its dependencies.
 
 Run the latest MFC container.
 ```bash
