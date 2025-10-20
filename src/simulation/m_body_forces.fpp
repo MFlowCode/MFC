@@ -55,15 +55,11 @@ contains
 
         real(wp), intent(in) :: t
 
-        if (m > 0) then
-            accel_bf(1) = g_x + k_x*sin(w_x*t - p_x)
-            if (n > 0) then
-                accel_bf(2) = g_y + k_y*sin(w_y*t - p_y)
-                if (p > 0) then
-                    accel_bf(3) = g_z + k_z*sin(w_z*t - p_z)
-                end if
+        #:for DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (bf_${XYZ}$) then
+                accel_bf(${DIR}$) = g_${XYZ}$+k_${XYZ}$*sin(w_${XYZ}$*t - p_${XYZ}$)
             end if
-        end if
+        #:endfor
 
         $:GPU_UPDATE(device='[accel_bf]')
 

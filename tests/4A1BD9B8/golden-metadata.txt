@@ -1,4 +1,4 @@
-This file was created on 2025-10-16 16:29:07.111120.
+This file was created on 2025-10-16 16:28:25.869725.
 
 mfc.sh:
 
@@ -158,7 +158,7 @@ CPU:
     Model name:                         Intel(R) Xeon(R) Gold 6338 CPU @ 2.00GHz
     Stepping:                           6
     Frequency boost:                    enabled
-    CPU MHz:                            3192.277
+    CPU MHz:                            3063.763
     CPU max MHz:                        2001.0000
     CPU min MHz:                        800.0000
     BogoMIPS:                           4000.00

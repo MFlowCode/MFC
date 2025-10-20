@@ -577,7 +577,6 @@ contains
                 if (patch_ib(i)%c > 0) then
                     Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0))*20) + 1
                     allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
-                    print *, "HERE Np", Np
                 end if
             end do
         end if
@@ -938,8 +937,6 @@ contains
             do j = 1, num_ibs
                 if (patch_ib(j)%c > 0) then
 
-                    print *, "HERE Np", Np
-
                     allocate (airfoil_grid_u(1:Np))
                     allocate (airfoil_grid_l(1:Np))
 
@@ -1129,10 +1126,6 @@ contains
             end do
         end if
 
-        if (moving_immersed_boundary_flag) then
-            call s_update_mib(num_ibs, levelset, levelset_norm)
-        end if
-
         call s_compute_derived_variables(t_step)
 
 #ifdef DEBUG
@@ -1142,14 +1135,8 @@ contains
         mytime = mytime + dt
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
-        if (time_stepper == 1) then
-            call s_1st_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 2) then
-            call s_2nd_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 3 .and. (.not. adap_dt)) then
-            call s_3rd_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 3 .and. adap_dt) then
-            call s_strang_splitting(t_step, time_avg)
+        if (any(time_stepper == (/1, 2, 3/))) then
+            call s_tvd_rk(t_step, time_avg, time_stepper)
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
@@ -1258,7 +1245,9 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            $:GPU_UPDATE(host='[intfc_rad]')
+            $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, &
+                & intfc_vel, bub_R0, Rmax_stats, Rmin_stats, bub_dphidt, gas_p, &
+                & gas_mv, gas_mg, gas_betaT, gas_betaC]')
             do i = 1, nBubs
                 if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
                     call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
@@ -1267,7 +1256,7 @@ contains
 
             $:GPU_UPDATE(host='[q_beta%vf(1)%sf]')
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta%vf(1))
-            $:GPU_UPDATE(host='[Rmax_stats,Rmin_stats,gas_p,gas_mv,intfc_vel]')
+
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
