@@ -1024,7 +1024,6 @@ contains
             if (ib) then
               write (file_loc, '(A)') 'ib.dat'
               file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-              print *, "Writing file ", file_loc
               call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
                                
