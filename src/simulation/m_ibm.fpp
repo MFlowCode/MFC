@@ -255,30 +255,30 @@ contains
                         end if
                     end if
 
-            ! Calculate velocity of ghost cell
-            if (gp%slip) then
-                norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
-                buf = sqrt(sum(norm**2))
-                norm = norm/buf
-                vel_norm_IP = sum(vel_IP*norm)*norm
-                vel_g = vel_IP - vel_norm_IP
-            else
-                if (patch_ib(patch_id)%moving_ibm == 0) then
-                    ! we know the object is not moving if moving_ibm is 0 (false)
-                    vel_g = 0._wp
-                else
-                    ! get the vector that points from the centroid to the ghost
-                    radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
-                                                    patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
-                    ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear velocity
-                    rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
-                    do q = 1, 3
-                        ! if mibm is 1 or 2, then the boundary may be moving
-                        vel_g(q) = patch_ib(patch_id)%vel(q) ! add the linear velocity
-                        vel_g(q) = vel_g(q) + rotation_velocity(q) ! add the rotational velocity
-                    end do
-                end if
-            end if
+                    ! Calculate velocity of ghost cell
+                    if (gp%slip) then
+                        norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
+                        buf = sqrt(sum(norm**2))
+                        norm = norm/buf
+                        vel_norm_IP = sum(vel_IP*norm)*norm
+                        vel_g = vel_IP - vel_norm_IP
+                    else
+                        if (patch_ib(patch_id)%moving_ibm == 0) then
+                            ! we know the object is not moving if moving_ibm is 0 (false)
+                            vel_g = 0._wp
+                        else
+                            ! get the vector that points from the centroid to the ghost
+                            radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
+                                                            patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
+                            ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear velocity
+                            rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
+                            do q = 1, 3
+                                ! if mibm is 1 or 2, then the boundary may be moving
+                                vel_g(q) = patch_ib(patch_id)%vel(q) ! add the linear velocity
+                                vel_g(q) = vel_g(q) + rotation_velocity(q) ! add the rotational velocity
+                            end do
+                        end if
+                    end if
 
                     ! Set momentum
                     $:GPU_LOOP(parallelism='[seq]')

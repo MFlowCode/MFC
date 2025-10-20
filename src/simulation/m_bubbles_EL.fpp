@@ -1400,7 +1400,7 @@ contains
                         end do
                     end do
                 end do
-                #:endcall GPU_PARALLEL_LOOP
+            #:endcall GPU_PARALLEL_LOOP
         elseif (dir == 3) then
             ! Gradient in z dir.
             #:call GPU_PARALLEL_LOOP(collapse=3)
@@ -1415,7 +1415,7 @@ contains
                         end do
                     end do
                 end do
-                #:endcall GPU_PARALLEL_LOOP
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_gradient_dir
