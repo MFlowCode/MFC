@@ -266,6 +266,15 @@ contains
                 norm = norm/buf
                 vel_norm_IP = sum(vel_IP*norm)*norm
                 vel_g = vel_IP - vel_norm_IP
+                if (patch_ib(patch_id)%moving_ibm /= 0) then
+                    ! compute the linear velocity of the ghost point due to rotation
+                    radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
+                                                    patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
+                    rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
+                    
+                    ! add only the component of the IB's motion that is normal to the surface
+                    vel_g = vel_g + sum((patch_ib(patch_id)%vel+rotation_velocity)*norm)*norm
+                end if
             else
                 if (patch_ib(patch_id)%moving_ibm == 0) then
                     ! we know the object is not moving if moving_ibm is 0 (false)

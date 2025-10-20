@@ -145,17 +145,20 @@ contains
 
     !> Helper subroutine to read IB data files
     !!  @param file_loc_base Base file location for IB data
-    impure subroutine s_read_ib_data_files(file_loc_base)
+    impure subroutine s_read_ib_data_files(file_loc_base, t_step)
 
         character(len=*), intent(in) :: file_loc_base
+        integer, intent(in), optional :: t_step
 
         character(LEN=len_trim(file_loc_base) + 20) :: file_loc
         logical :: file_exist
-        integer :: ifile, ierr, data_size
+        integer :: ifile, ierr, data_size, var_MOK
 
 #ifdef MFC_MPI
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(KIND=MPI_OFFSET_KIND) :: disp
+        integer :: m_MOK, n_MOK, p_MOK, MOK, WP_MOK, save_index
+        
 #endif
         if (.not. ib) return
 
@@ -171,8 +174,16 @@ contains
 #ifdef MFC_MPI
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                save_index = t_step / t_step_save ! get the number of saves done to this point
+
                 data_size = (m + 1)*(n + 1)*(p + 1)
-                disp = 0
+                var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+                disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(save_index, MPI_OFFSET_KIND))
 
                 call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
                                        'native', mpi_info_int, ierr)
@@ -530,7 +541,7 @@ contains
                     end do
                 end if
 
-                call s_read_ib_data_files(trim(case_dir)//'/restart_data'//trim(mpiiofs))
+                call s_read_ib_data_files(trim(case_dir)//'/restart_data'//trim(mpiiofs), t_step)
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
@@ -561,7 +572,7 @@ contains
                 call s_mpi_barrier()
                 call MPI_FILE_CLOSE(ifile, ierr)
 
-                call s_read_ib_data_files(trim(case_dir)//'/restart_data'//trim(mpiiofs))
+                call s_read_ib_data_files(trim(case_dir)//'/restart_data'//trim(mpiiofs), t_step)
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
