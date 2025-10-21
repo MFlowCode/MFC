@@ -1498,7 +1498,7 @@ contains
         $:GPU_UPDATE(device='[sigma, surface_tension]')
 
         $:GPU_UPDATE(device='[dx,dy,dz,x_cb,x_cc,y_cb,y_cc,z_cb,z_cc]')
-! #if defined(MFC_OpenACC)
+
         $:GPU_UPDATE(device='[bc_x%vb1,bc_x%vb2,bc_x%vb3,bc_x%ve1,bc_x%ve2,bc_x%ve3]')
         $:GPU_UPDATE(device='[bc_y%vb1,bc_y%vb2,bc_y%vb3,bc_y%ve1,bc_y%ve2,bc_y%ve3]')
         $:GPU_UPDATE(device='[bc_z%vb1,bc_z%vb2,bc_z%vb3,bc_z%ve1,bc_z%ve2,bc_z%ve3]')
@@ -1506,9 +1506,6 @@ contains
         $:GPU_UPDATE(device='[bc_x%grcbc_in,bc_x%grcbc_out,bc_x%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_y%grcbc_in,bc_y%grcbc_out,bc_y%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_z%grcbc_in,bc_z%grcbc_out,bc_z%grcbc_vel_out]')
-! #elif defined(MFC_OpenMP)
-!         $:GPU_UPDATE(device='[bc_x,bc_y,bc_z]')
-! #endif
 
         $:GPU_UPDATE(device='[relax, relax_model]')
         if (relax) then

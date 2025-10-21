@@ -1263,38 +1263,6 @@ contains
                                             Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
                                         end do
                                     end if
-                                    if (viscous) then
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, 2
-                                            Re_L(i) = dflt_real
-
-                                            if (Re_size(i) > 0) Re_L(i) = 0._wp
-
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do q = 1, Re_size(i)
-                                                Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) &
-                                                          + Re_L(i)
-                                            end do
-
-                                            Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-
-                                        end do
-
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, 2
-                                            Re_R(i) = dflt_real
-
-                                            if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do q = 1, Re_size(i)
-                                                Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) &
-                                                          + Re_R(i)
-                                            end do
-
-                                            Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                        end do
-                                    end if
 
                                     E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
                                     E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
@@ -3655,22 +3623,6 @@ contains
                 #:endcall GPU_PARALLEL_LOOP
             end if
 
-            if (chem_params%diffusion) then
-                #:call GPU_PARALLEL_LOOP(collapse=4)
-                    do i = E_idx, chemxe
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
-                                    if (i == E_idx .or. i >= chemxb) then
-                                        flux_src_vf(i)%sf(j, k, l) = 0._wp
-                                    end if
-                                end do
-                            end do
-                        end do
-                    end do
-                #:endcall GPU_PARALLEL_LOOP
-            end if
-
             if (qbmm) then
                 #:call GPU_PARALLEL_LOOP(collapse=4)
                     do i = 1, 4
@@ -3742,22 +3694,6 @@ contains
                             do k = is2%beg, is2%end
                                 do l = is3%beg, is3%end
                                     flux_src_vf(i)%sf(l, k, j) = 0._wp
-                                end do
-                            end do
-                        end do
-                    end do
-                #:endcall GPU_PARALLEL_LOOP
-            end if
-
-            if (chem_params%diffusion) then
-                #:call GPU_PARALLEL_LOOP(collapse=4)
-                    do i = E_idx, chemxe
-                        do j = is1%beg, is1%end
-                            do k = is2%beg, is2%end
-                                do l = is3%beg, is3%end
-                                    if (i == E_idx .or. i >= chemxb) then
-                                        flux_src_vf(i)%sf(l, k, j) = 0._wp
-                                    end if
                                 end do
                             end do
                         end do

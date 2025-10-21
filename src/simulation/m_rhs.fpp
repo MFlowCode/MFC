@@ -881,9 +881,6 @@ contains
                     irx%beg = 0; iry%beg = 0; irz%beg = -1
                 end if
                 irx%end = m; iry%end = n; irz%end = p
-                ! $:GPU_UPDATE(host='[qL_rsx_vf,qR_rsx_vf]')
-                ! print *, "L", qL_rsx_vf(100:300, 0, 0, 1)
-                ! print *, "R", qR_rsx_vf(100:300, 0, 0, 1)
 
                 !Computing Riemann Solver Flux and Source Flux
                 call nvtxStartRange("RHS-RIEMANN-SOLVER")
@@ -903,9 +900,6 @@ contains
                                       flux_gsrc_n(id)%vf, &
                                       id, irx, iry, irz)
                 call nvtxEndRange
-
-                !$:GPU_UPDATE(host='[flux_n(1)%vf(1)%sf]')
-                !print *, "FLUX", flux_n(1)%vf(1)%sf(100:300, 0, 0)
 
                 ! Additional physics and source terms
                 ! RHS addition for advection source
@@ -1134,8 +1128,7 @@ contains
                     end do
                 end do
             #:endcall GPU_PARALLEL_LOOP
-            ! $:GPU_UPDATE(host='[rhs_vf(1)%sf]')
-            ! print *, "RHS", rhs_vf(1)%sf(100:300, 0, 0)
+
             if (model_eqns == 3) then
                 #:call GPU_PARALLEL_LOOP(collapse=4,private='[inv_ds,advected_qty_val, pressure_val,flux_face1,flux_face2]')
                     do q_loop = 0, p
@@ -1781,21 +1774,41 @@ contains
                 #:endcall GPU_PARALLEL_LOOP
             end if
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = momxb, E_idx
-                                rhs_vf(i)%sf(j, k, l) = &
-                                    rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
-                                    (flux_src_n_in(i)%sf(j, k, l - 1) &
-                                     - flux_src_n_in(i)%sf(j, k, l))
+            if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
+                #:call GPU_PARALLEL_LOOP(collapse=3)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                if (surface_tension .or. viscous) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = momxb, E_idx
+                                        rhs_vf(i)%sf(j, k, l) = &
+                                            rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
+                                            (flux_src_n_in(i)%sf(j, k, l - 1) &
+                                             - flux_src_n_in(i)%sf(j, k, l))
+                                    end do
+                                end if
+
+                                if (chem_params%diffusion) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = chemxb, chemxe
+                                        rhs_vf(i)%sf(j, k, l) = &
+                                            rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
+                                            (flux_src_n_in(i)%sf(j, k, l - 1) &
+                                             - flux_src_n_in(i)%sf(j, k, l))
+                                    end do
+                                    if (.not. viscous) then
+                                        rhs_vf(E_idx)%sf(j, k, l) = &
+                                            rhs_vf(E_idx)%sf(j, k, l) + 1._wp/dz(l)* &
+                                            (flux_src_n_in(E_idx)%sf(j, k, l - 1) &
+                                             - flux_src_n_in(E_idx)%sf(j, k, l))
+                                    end if
+                                end if
                             end do
                         end do
                     end do
-                end do
-            #:endcall GPU_PARALLEL_LOOP
+                #:endcall GPU_PARALLEL_LOOP
+            end if
 
             if (grid_geometry == 3) then
                 #:call GPU_PARALLEL_LOOP(collapse=3)
