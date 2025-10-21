@@ -941,7 +941,7 @@ contains
         ! recompute the new ib_patch locations and broadcast them.
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
         call s_populate_ib_buffers() ! transmits the new IB markers via MPI
-        $:GPU_UPDATE(device='[ib_markers%sf, levelset%sf, levelset_norm%sf]')
+        $:GPU_UPDATE(device='[levelset%sf, levelset_norm%sf]')
 
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)

@@ -492,6 +492,7 @@ contains
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
         real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:2) :: length, center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         pi_inf = fluid_pp(1)%pi_inf
@@ -512,6 +513,11 @@ contains
         y_boundary%beg = -0.5_wp*length_y
         y_boundary%end = 0.5_wp*length_y
 
+        length(1) = length_x
+        length(2) = length_y
+        center(1) = x_centroid
+        center(2) = y_centroid
+
         ! Since the rectangular patch does not allow for its boundaries to
         ! be smoothed out, the pseudo volume fraction is set to 1 to ensure
         ! that only the current patch contributes to the fluid state in the
@@ -522,15 +528,18 @@ contains
         ! domain and verifying whether the current patch has the permission
         ! to write to that cell. If both queries check out, the primitive
         ! variables of the current patch are assigned to this cell.
+        $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]', copy='[ib_markers_sf]',&
+                  & copyin='[patch_id,center,length,inverse_rotation]', collapse=2)
         do j = 0, n
             do i = 0, m
                 ! get the x and y coordinates in the local IB frame
-                xy_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp]
+                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
-                if (x_boundary%beg <= xy_local(1) .and. &
-                    x_boundary%end >= xy_local(1) .and. &
-                    y_boundary%beg <= xy_local(2) .and. &
-                    y_boundary%end >= xy_local(2)) then
+
+                if (-0.5_wp*length(1) <= xy_local(1) .and. &
+                    0.5_wp*length(1)  >= xy_local(1) .and. &
+                    -0.5_wp*length(2) <= xy_local(2) .and. &
+                    0.5_wp*length(2)  >= xy_local(2)) then
 
                     ! Updating the patch identities bookkeeping variable
                     ib_markers_sf(i, j, 0) = patch_id
