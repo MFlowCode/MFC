@@ -1192,55 +1192,7 @@ contains
         if (n > 0) then
 
             if (p > 0) then
-
-                if (cyl_coord .and. p > 0) then
-                    ! Implement pencil processor blocking if using cylindrical coordinates so
-                    ! that all cells in azimuthal direction are stored on a single processor.
-                    ! This is necessary for efficient application of Fourier filter near axis.
-
-                    ! Initial values of the processor factorization optimization
-                    num_procs_x = 1
-                    num_procs_y = num_procs
-                    num_procs_z = 1
-                    ierr = -1
-
-                    ! Computing minimization variable for these initial values
-                    tmp_num_procs_x = num_procs_x
-                    tmp_num_procs_y = num_procs_y
-                    tmp_num_procs_z = num_procs_z
-                    fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
-                                         - (n + 1)/tmp_num_procs_y)
-
-                    ! Searching for optimal computational domain distribution
-                    do i = 1, num_procs
-
-                        if (mod(num_procs, i) == 0 &
-                            .and. &
-                            (m + 1)/i >= num_stcls_min*recon_order) then
-
-                            tmp_num_procs_x = i
-                            tmp_num_procs_y = num_procs/i
-
-                            if (fct_min >= abs((m + 1)/tmp_num_procs_x &
-                                               - (n + 1)/tmp_num_procs_y) &
-                                .and. &
-                                (n + 1)/tmp_num_procs_y &
-                                >= &
-                                num_stcls_min*recon_order) then
-
-                                num_procs_x = i
-                                num_procs_y = num_procs/i
-                                fct_min = abs((m + 1)/tmp_num_procs_x &
-                                              - (n + 1)/tmp_num_procs_y)
-                                ierr = 0
-
-                            end if
-
-                        end if
-
-                    end do
-
-                else
+                if (fft_wrt) then
 
                     ! Initial estimate of optimal processor topology
                     num_procs_x = 1
@@ -1249,60 +1201,152 @@ contains
                     ierr = -1
 
                     ! Benchmarking the quality of this initial guess
-                    tmp_num_procs_x = num_procs_x
                     tmp_num_procs_y = num_procs_y
                     tmp_num_procs_z = num_procs_z
-                    fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
-                                         - (n + 1)/tmp_num_procs_y) &
-                              + 10._wp*abs((n + 1)/tmp_num_procs_y &
-                                           - (p + 1)/tmp_num_procs_z)
+                    fct_min = 10._wp*abs((n + 1)/tmp_num_procs_y &
+                                         - (p + 1)/tmp_num_procs_z)
 
                     ! Optimization of the initial processor topology
                     do i = 1, num_procs
 
                         if (mod(num_procs, i) == 0 &
                             .and. &
-                            (m + 1)/i >= num_stcls_min*recon_order) then
+                            (n + 1)/i >= num_stcls_min*recon_order) then
 
-                            do j = 1, num_procs/i
+                            tmp_num_procs_y = i
+                            tmp_num_procs_z = num_procs/i
 
-                                if (mod(num_procs/i, j) == 0 &
-                                    .and. &
-                                    (n + 1)/j >= num_stcls_min*recon_order) then
+                            if (fct_min >= abs((n + 1)/tmp_num_procs_y &
+                                               - (p + 1)/tmp_num_procs_z) &
+                                .and. &
+                                (p + 1)/tmp_num_procs_z &
+                                >= &
+                                num_stcls_min*recon_order) then
 
-                                    tmp_num_procs_x = i
-                                    tmp_num_procs_y = j
-                                    tmp_num_procs_z = num_procs/(i*j)
+                                num_procs_y = i
+                                num_procs_z = num_procs/i
+                                fct_min = abs((n + 1)/tmp_num_procs_y &
+                                              - (p + 1)/tmp_num_procs_z)
+                                ierr = 0
 
-                                    if (fct_min >= abs((m + 1)/tmp_num_procs_x &
-                                                       - (n + 1)/tmp_num_procs_y) &
-                                        + abs((n + 1)/tmp_num_procs_y &
-                                              - (p + 1)/tmp_num_procs_z) &
-                                        .and. &
-                                        (p + 1)/tmp_num_procs_z &
-                                        >= &
-                                        num_stcls_min*recon_order) &
-                                        then
-
-                                        num_procs_x = i
-                                        num_procs_y = j
-                                        num_procs_z = num_procs/(i*j)
-                                        fct_min = abs((m + 1)/tmp_num_procs_x &
-                                                      - (n + 1)/tmp_num_procs_y) &
-                                                  + abs((n + 1)/tmp_num_procs_y &
-                                                        - (p + 1)/tmp_num_procs_z)
-                                        ierr = 0
-
-                                    end if
-
-                                end if
-
-                            end do
+                            end if
 
                         end if
 
                     end do
+                else
 
+                    if (cyl_coord .and. p > 0) then
+                        ! Implement pencil processor blocking if using cylindrical coordinates so
+                        ! that all cells in azimuthal direction are stored on a single processor.
+                        ! This is necessary for efficient application of Fourier filter near axis.
+
+                        ! Initial values of the processor factorization optimization
+                        num_procs_x = 1
+                        num_procs_y = num_procs
+                        num_procs_z = 1
+                        ierr = -1
+
+                        ! Computing minimization variable for these initial values
+                        tmp_num_procs_x = num_procs_x
+                        tmp_num_procs_y = num_procs_y
+                        tmp_num_procs_z = num_procs_z
+                        fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
+                                             - (n + 1)/tmp_num_procs_y)
+
+                        ! Searching for optimal computational domain distribution
+                        do i = 1, num_procs
+
+                            if (mod(num_procs, i) == 0 &
+                                .and. &
+                                (m + 1)/i >= num_stcls_min*recon_order) then
+
+                                tmp_num_procs_x = i
+                                tmp_num_procs_y = num_procs/i
+
+                                if (fct_min >= abs((m + 1)/tmp_num_procs_x &
+                                                   - (n + 1)/tmp_num_procs_y) &
+                                    .and. &
+                                    (n + 1)/tmp_num_procs_y &
+                                    >= &
+                                    num_stcls_min*recon_order) then
+
+                                    num_procs_x = i
+                                    num_procs_y = num_procs/i
+                                    fct_min = abs((m + 1)/tmp_num_procs_x &
+                                                  - (n + 1)/tmp_num_procs_y)
+                                    ierr = 0
+
+                                end if
+
+                            end if
+
+                        end do
+
+                    else
+
+                        ! Initial estimate of optimal processor topology
+                        num_procs_x = 1
+                        num_procs_y = 1
+                        num_procs_z = num_procs
+                        ierr = -1
+
+                        ! Benchmarking the quality of this initial guess
+                        tmp_num_procs_x = num_procs_x
+                        tmp_num_procs_y = num_procs_y
+                        tmp_num_procs_z = num_procs_z
+                        fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
+                                             - (n + 1)/tmp_num_procs_y) &
+                                  + 10._wp*abs((n + 1)/tmp_num_procs_y &
+                                               - (p + 1)/tmp_num_procs_z)
+
+                        ! Optimization of the initial processor topology
+                        do i = 1, num_procs
+
+                            if (mod(num_procs, i) == 0 &
+                                .and. &
+                                (m + 1)/i >= num_stcls_min*recon_order) then
+
+                                do j = 1, num_procs/i
+
+                                    if (mod(num_procs/i, j) == 0 &
+                                        .and. &
+                                        (n + 1)/j >= num_stcls_min*recon_order) then
+
+                                        tmp_num_procs_x = i
+                                        tmp_num_procs_y = j
+                                        tmp_num_procs_z = num_procs/(i*j)
+
+                                        if (fct_min >= abs((m + 1)/tmp_num_procs_x &
+                                                           - (n + 1)/tmp_num_procs_y) &
+                                            + abs((n + 1)/tmp_num_procs_y &
+                                                  - (p + 1)/tmp_num_procs_z) &
+                                            .and. &
+                                            (p + 1)/tmp_num_procs_z &
+                                            >= &
+                                            num_stcls_min*recon_order) &
+                                            then
+
+                                            num_procs_x = i
+                                            num_procs_y = j
+                                            num_procs_z = num_procs/(i*j)
+                                            fct_min = abs((m + 1)/tmp_num_procs_x &
+                                                          - (n + 1)/tmp_num_procs_y) &
+                                                      + abs((n + 1)/tmp_num_procs_y &
+                                                            - (p + 1)/tmp_num_procs_z)
+                                            ierr = 0
+
+                                        end if
+
+                                    end if
+
+                                end do
+
+                            end if
+
+                        end do
+
+                    end if
                 end if
 
                 ! Verifying that a valid decomposition of the computational
