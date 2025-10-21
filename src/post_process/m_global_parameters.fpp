@@ -240,6 +240,7 @@ module m_global_parameters
     integer :: flux_lim
     logical, dimension(3) :: flux_wrt
     logical :: E_wrt
+    logical :: fft_wrt
     logical :: pres_wrt
     logical, dimension(num_fluids_max) :: alpha_wrt
     logical :: gamma_wrt
@@ -441,6 +442,7 @@ contains
         parallel_io = .false.
         file_per_process = .false.
         E_wrt = .false.
+        fft_wrt = .false.
         pres_wrt = .false.
         alpha_wrt = .false.
         gamma_wrt = .false.

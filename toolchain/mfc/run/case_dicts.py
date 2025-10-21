@@ -106,6 +106,7 @@ PRE_PROCESS.update({
     'elliptic_smoothing_iters': ParamType.INT,
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
+    'fft_wrt': ParamType.LOG,
 })
 
 for ib_id in range(1, 10+1):
@@ -322,6 +323,7 @@ SIMULATION.update({
     'nv_uvm_out_of_core': ParamType.LOG,
     'nv_uvm_igr_temps_on_gpu': ParamType.INT,
     'nv_uvm_pref_gpu': ParamType.LOG,
+    'fft_wrt': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
@@ -443,6 +445,7 @@ POST_PROCESS.update({
     'flux_lim': ParamType.INT,
     'flux_wrt': ParamType.LOG,
     'E_wrt': ParamType.LOG,
+    'fft_wrt': ParamType.LOG,
     'pres_wrt': ParamType.LOG,
     'alpha_wrt': ParamType.LOG,
     'kappa_wrt': ParamType.LOG,
