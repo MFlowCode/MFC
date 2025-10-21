@@ -764,16 +764,16 @@ contains
             do j = 0, n 
                 do k = 0, p
                     div_stress_tensor(1)%sf(i, j, k) = (stress_tensor(1)%vf(1)%sf(i+1, j, k) - stress_tensor(1)%vf(1)%sf(i-1, j, k)) / (dx(i-1) + dx(i+1)) &
-                                                     + (stress_tensor(2)%vf(1)%sf(i, j+1, k) - stress_tensor(2)%vf(1)%sf(i, j-1, k)) / (dy(j-1) + dy(j+1)) &
-                                                     + (stress_tensor(3)%vf(1)%sf(i, j, k+1) - stress_tensor(3)%vf(1)%sf(i, j, k-1)) / (dz(k-1) + dz(k+1))
+                                                     + (stress_tensor(1)%vf(2)%sf(i, j+1, k) - stress_tensor(1)%vf(2)%sf(i, j-1, k)) / (dy(j-1) + dy(j+1)) &
+                                                     + (stress_tensor(1)%vf(3)%sf(i, j, k+1) - stress_tensor(1)%vf(3)%sf(i, j, k-1)) / (dz(k-1) + dz(k+1))
 
-                    div_stress_tensor(2)%sf(i, j, k) = (stress_tensor(1)%vf(2)%sf(i+1, j, k) - stress_tensor(1)%vf(2)%sf(i-1, j, k)) / (dx(i-1) + dx(i+1)) & 
+                    div_stress_tensor(2)%sf(i, j, k) = (stress_tensor(2)%vf(1)%sf(i+1, j, k) - stress_tensor(2)%vf(1)%sf(i-1, j, k)) / (dx(i-1) + dx(i+1)) & 
                                                      + (stress_tensor(2)%vf(2)%sf(i, j+1, k) - stress_tensor(2)%vf(2)%sf(i, j-1, k)) / (dy(j-1) + dy(j+1)) & 
-                                                     + (stress_tensor(3)%vf(2)%sf(i, j, k+1) - stress_tensor(3)%vf(2)%sf(i, j, k-1)) / (dz(k-1) + dz(k+1))
+                                                     + (stress_tensor(2)%vf(3)%sf(i, j, k+1) - stress_tensor(2)%vf(3)%sf(i, j, k-1)) / (dz(k-1) + dz(k+1))
 
-                    div_stress_tensor(3)%sf(i, j, k) = (stress_tensor(1)%vf(3)%sf(i+1, j, k) - stress_tensor(1)%vf(3)%sf(i-1, j, k)) / (dx(i-1) + dx(i+1)) & 
-                                                     + (stress_tensor(2)%vf(3)%sf(i, j+1, k) - stress_tensor(2)%vf(3)%sf(i, j-1, k)) / (dy(j-1) + dy(j+1)) & 
-                                                     + (stress_tensor(3)%vf(3)%sf(i, j, k+1) - stress_tensor(3)%vf(3)%sf(i, j ,k-1)) / (dz(k-1) + dz(k+1))
+                    div_stress_tensor(3)%sf(i, j, k) = (stress_tensor(3)%vf(1)%sf(i+1, j, k) - stress_tensor(3)%vf(1)%sf(i-1, j, k)) / (dx(i-1) + dx(i+1)) & 
+                                                     + (stress_tensor(3)%vf(2)%sf(i, j+1, k) - stress_tensor(3)%vf(2)%sf(i, j-1, k)) / (dy(j-1) + dy(j+1)) & 
+                                                     + (stress_tensor(3)%vf(3)%sf(i, j, k+1) - stress_tensor(3)%vf(3)%sf(i, j, k-1)) / (dz(k-1) + dz(k+1))
                 end do 
             end do 
         end do
@@ -972,11 +972,11 @@ contains
                 do k = 0, p
                     dvol = dx(i) * dy(j) * dz(k)
                     !$acc atomic
-                    particle_forces(ib_markers%sf(i, j, k), 1) = particle_forces(ib_markers%sf(i, j, k), 1) - div_pres_visc_stress(1)%sf(i, j, k) * dvol
+                    particle_forces(ib_markers%sf(i, j, k), 1) = particle_forces(ib_markers%sf(i, j, k), 1) - (div_pres_visc_stress(1)%sf(i, j, k) * dvol)
                     !$acc atomic
-                    particle_forces(ib_markers%sf(i, j, k), 2) = particle_forces(ib_markers%sf(i, j, k), 2) - div_pres_visc_stress(2)%sf(i, j, k) * dvol
+                    particle_forces(ib_markers%sf(i, j, k), 2) = particle_forces(ib_markers%sf(i, j, k), 2) - (div_pres_visc_stress(2)%sf(i, j, k) * dvol)
                     !$acc atomic
-                    particle_forces(ib_markers%sf(i, j, k), 3) = particle_forces(ib_markers%sf(i, j, k), 3) - div_pres_visc_stress(3)%sf(i, j, k) * dvol
+                    particle_forces(ib_markers%sf(i, j, k), 3) = particle_forces(ib_markers%sf(i, j, k), 3) - (div_pres_visc_stress(3)%sf(i, j, k) * dvol)
                 end do 
             end do 
         end do
@@ -998,6 +998,7 @@ contains
         ! write particle forces to file
         if (proc_rank == 0) then
             write(100) force_glb
+            flush(100)
         end if
             
     end subroutine s_compute_particle_forces
