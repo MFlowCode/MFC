@@ -27,8 +27,9 @@
 
 **Welcome!**
 MFC simulates compressible multi-phase flows, [among other things](#what-else-can-this-thing-do). 
-It uses metaprogramming to stay short and portable (~20K lines).
-MFC conducted the largest known, open CFD simulation at <a href="https://arxiv.org/abs/2505.07392" target="_blank">200 trillion grid points</a>, and 1 quadrillion degrees of freedom (as of September 2025), and is a 2025 Gordon Bell Prize finalist.
+It uses metaprogramming and is short (20K lines) and portable.
+MFC conducted the largest known CFD simulation at <a href="https://arxiv.org/abs/2505.07392" target="_blank">200 trillion grid points</a>, and 1 quadrillion degrees of freedom (as of September 2025).
+MFC is a 2025 Gordon Bell Prize Finalist.
 
 <p align="center">
 <a href="https://doi.org/10.48550/arXiv.2503.07953" target="_blank">
@@ -76,7 +77,7 @@ This one simulates high-Mach flow over an airfoil:
     <img src="docs/res/airfoil.png" alt="Airfoil Example" width="700"/><br/>
 </p>
 
-And here is a high amplitude acoustic wave reflecting and emerging through a circular orifice:
+And here is a high-amplitude acoustic wave reflecting and emerging through a circular orifice:
 
 <p align="center">
     <img src="docs/res/orifice.png" alt="Orifice Example" width="700"/><br/>
@@ -84,19 +85,24 @@ And here is a high amplitude acoustic wave reflecting and emerging through a cir
 
 
 ## Getting started
-For a quick start, open a GitHub Codespace to load a pre-configured Docker container to get familiar with MFC commands. Click <kbd> <> Code</kbd> (green button at top right) → <kbd>Codespaces</kbd> (right tab) → <kbd>+</kbd> (create a codespace).
 
-****Notes:**** Codespaces is a free service with a monthly quota of compute time and storage usage. It is recommended for testing commands, troubleshooting, and running simple case files without the need to install dependencies and build MFC on your device. Remember to save any important files locally before closing your codespace. To learn more, read through [how Docker & Containers work](https://mflowcode.github.io/documentation/docker.html).
+For a _very_ quick start, open a GitHub Codespace to load a pre-configured Docker container and familiarize yourself with MFC commands.
+Click <kbd> <> Code</kbd> (green button at top right) → <kbd>Codespaces</kbd> (right tab) → <kbd>+</kbd> (create a codespace).
 
-Otherwise, you can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
+> ****Note:**** Codespaces is a free service with a monthly quota of compute time and storage usage.
+> It is recommended for testing commands, troubleshooting, and running simple case files without installing dependencies or building MFC on your device.
+> Don't conduct any critical work here!
+> To learn more, please see [how Docker & Containers work](https://mflowcode.github.io/documentation/docker.html).
+
+You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get you get started using MFC on your local machine, cluster, or supercomputer!
 It's rather straightforward.
-We'll give a brief intro. here for MacOS.
+We'll give a brief introdocution for MacOS below.
 Using [brew](https://brew.sh), install MFC's dependencies:
 ```shell
 brew install coreutils python cmake fftw hdf5 gcc boost open-mpi lapack
 ```
 You're now ready to build and test MFC!
-Put it to a convenient directory via
+Put it to a local directory via
 ```shell
 git clone https://github.com/MFlowCode/MFC
 cd MFC
@@ -126,17 +132,14 @@ You can visualize the output data in `examples/3d_shockdroplet/silo_hdf5` via Pa
 ## Is this _really_ exascale?
 
 [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) is the first exascale supercomputer.
-The weak scaling of MFC on this machine shows near-ideal utilization. 
+The weak scaling of MFC on this machine shows near-ideal utilization.
+We also scale ideally to >98% of LLNL El Capitan.
 
 <p align="center">
     <img src="docs/res/scaling.png" alt="Scaling" width="400"/>
 </p>
 
-
-## What else can this thing do
-
-MFC has many features.
-They are organized below.
+## What else can this thing do?
 
 ### Physics
 
@@ -212,7 +215,7 @@ They are organized below.
 
 If you use MFC, consider citing it as below.
 Ref. 1 includes all modern MFC features, including GPU acceleration and many new physics features.
-If referencing MFC's (GPU) performance, consider citing ref. 1 and 2, which describe the solver and how it was crafted.
+If referencing MFC's (GPU) performance, consider citing ref. 1 and 2, which describe the solver and its design.
 The original open-source release of MFC is ref. 3, which should be cited for provenance as appropriate.
 
 ```bibtex
@@ -252,11 +255,11 @@ MFC is under the MIT license (see [LICENSE](LICENSE) for full text).
 
 ## Acknowledgements
 
-Federal sponsors have supported MFC development, including the US Department of Defense (DOD), the National Institutes of Health (NIH), the Department of Energy (DOE), and the National Science Foundation (NSF).
+Federal sponsors have supported MFC development, including the US Department of Defense (DOD), the National Institutes of Health (NIH), the Department of Energy (DOE) and National Nuclear Security Administration (NNSA), and the National Science Foundation (NSF).
 
 MFC computations have used many supercomputing systems. A partial list is below
-  * OLCF Frontier and Summit, and testbeds Wombat, Crusher, and Spock (allocation CFD154, PI Bryngelson)
-  * LLNL El Capitan, Tuolumne, and Lassen; El Capitan early access system Tioga
+  * OLCF Frontier and Summit, and testbeds Wombat, Crusher, and Spock (allocation CFD154, PI Bryngelson).
+  * LLNL El Capitan, Tuolumne, and Lassen; El Capitan early access system Tioga.
   * NCSA Delta and DeltaAI, PSC Bridges(1/2), SDSC Comet and Expanse, Purdue Anvil, TACC Stampede(1-3), and TAMU ACES via ACCESS-CI allocations from Bryngelson, Colonius, Rodriguez, and more.
-  * DOD systems Blueback, Onyx, Carpenter, Nautilus, and Narwhal via the DOD HPCMP program
-  * Sandia National Labs systems Doom and Attaway and testbed systems Weaver and Vortex
+  * DOD systems Blueback, Onyx, Carpenter, Nautilus, and Narwhal via the DOD HPCMP program.
+  * Sandia National Labs systems Doom and Attaway, and testbed systems Weaver and Vortex.
