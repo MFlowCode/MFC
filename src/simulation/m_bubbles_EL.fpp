@@ -71,12 +71,11 @@ module m_bubbles_EL
 
     $:GPU_DECLARE(create='[lag_num_ts]')
 
-    integer :: nBubs                            !< Number of bubbles in the local domain
     real(wp) :: Rmax_glb, Rmin_glb       !< Maximum and minimum bubbe size in the local domain
     type(vector_field) :: q_beta                !< Projection of the lagrangian particles in the Eulerian framework
     integer :: q_beta_idx                       !< Size of the q_beta vector field
 
-    $:GPU_DECLARE(create='[nBubs,Rmax_glb,Rmin_glb,q_beta,q_beta_idx]')
+    $:GPU_DECLARE(create='[Rmax_glb,Rmin_glb,q_beta,q_beta_idx]')
 
     integer, allocatable, dimension(:) :: keep_bubble, prefix_sum
     integer, allocatable, dimension(:,:) :: wrap_bubble_loc, wrap_bubble_dir
@@ -265,7 +264,7 @@ contains
                         call s_add_bubbles(inputBubble, q_cons_vf, bub_id)
                         lag_id(bub_id, 1) = id      !global ID
                         lag_id(bub_id, 2) = bub_id  !local ID
-                        nBubs = bub_id              ! local number of bubbles
+                        n_el_bubs_loc = bub_id              ! local number of bubbles
                     end if
                 end do
                 close (94)
@@ -279,19 +278,23 @@ contains
 
         print *, " Lagrange bubbles running, in proc", proc_rank, "number:", bub_id, "/", id
 
-        call s_mpi_reduce_int_sum(bub_id, bub_id)
+        if (num_procs > 1) then
+            call s_mpi_reduce_int_sum(n_el_bubs_loc, n_el_bubs_glb)
+        else
+            n_el_bubs_glb = n_el_bubs_loc
+        end if
 
         if (proc_rank == 0) then
-            if (bub_id == 0) call s_mpi_abort('No bubbles in the domain. Check input/lag_bubbles.dat')
+            if (n_el_bubs_glb == 0) call s_mpi_abort('No bubbles in the domain. Check input/lag_bubbles.dat')
         end if
 
         if (num_procs > 1) then
-            call s_add_particles_to_transfer_list(nBubs, mtn_pos(:, :, 1))
+            call s_add_particles_to_transfer_list(n_el_bubs_loc, mtn_pos(:, :, 1))
             call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
                                           gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
                                           intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
                                           mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs, &
+                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, n_el_bubs_loc, &
                                           dest=1)
         end if
 
@@ -301,7 +304,7 @@ contains
             & gas_betaT,gas_betaC,bub_dphidt,gas_p,gas_mv, &
             & intfc_rad,intfc_vel,mtn_pos,mtn_posPrev,mtn_vel, &
             & mtn_s,intfc_draddt,intfc_dveldt,gas_dpdt,gas_dmvdt, &
-            & mtn_dposdt,mtn_dveldt,nBubs]')
+            & mtn_dposdt,mtn_dveldt,n_el_bubs_loc]')
 
         Rmax_glb = min(dflt_real, -dflt_real)
         Rmin_glb = max(dflt_real, -dflt_real)
@@ -552,7 +555,7 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
             call MPI_TYPE_FREE(view, ierr)
 
-            nBubs = bub_id
+            n_el_bubs_loc = bub_id
 
             do i = 1, bub_id
                 lag_id(i, 1) = int(MPI_IO_DATA_lag_bubbles(i, 1))
@@ -577,7 +580,7 @@ contains
             deallocate (MPI_IO_DATA_lag_bubbles)
 
         else
-            nBubs = 0
+            n_el_bubs_loc = 0
 
             call MPI_TYPE_CONTIGUOUS(0, mpi_p, view, ierr)
             call MPI_TYPE_COMMIT(view, ierr)
@@ -638,7 +641,7 @@ contains
         if (lag_params%pressure_corrector) then
             ! Calculate velocity potentials (valid for one bubble per cell)
             $:GPU_PARALLEL_LOOP(private='[k,cell]')
-            do k = 1, nBubs
+            do k = 1, n_el_bubs_loc
                 call s_get_pinf(k, q_prim_vf, 2, paux, cell, preterm1, term2, Romega)
                 myR0 = bub_R0(k)
                 myR = intfc_rad(k, 2)
@@ -661,7 +664,7 @@ contains
         $:GPU_PARALLEL_LOOP(private='[k,myalpha_rho,myalpha,Re,cell,myPos,myVel]', &
             & reduction='[[adap_dt_stop_max]]',reductionOp='[MAX]', &
             & copy='[adap_dt_stop_max]',copyin='[stage]')
-        do k = 1, nBubs
+        do k = 1, n_el_bubs_loc
 
             ! Current bubble state
             myPb = gas_p(k, 2)
@@ -919,7 +922,7 @@ contains
             end do
         end do
 
-        call s_smoothfunction(nBubs, intfc_rad, intfc_vel, &
+        call s_smoothfunction(n_el_bubs_loc, intfc_rad, intfc_vel, &
                               mtn_s, mtn_pos, q_beta)
 
         !Store 1-beta
@@ -1257,7 +1260,7 @@ contains
 
         if (time_stepper == 1) then ! 1st order TVD RK
             $:GPU_PARALLEL_LOOP(private='[k]')
-            do k = 1, nBubs
+            do k = 1, n_el_bubs_loc
                 !u{1} = u{n} +  dt * RHS{n}
                 intfc_rad(k, 1) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                 intfc_vel(k, 1) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
@@ -1282,7 +1285,7 @@ contains
         elseif (time_stepper == 2) then ! 2nd order TVD RK
             if (stage == 1) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, nBubs
+                do k = 1, n_el_bubs_loc
                     !u{1} = u{n} +  dt * RHS{n}
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                     intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
@@ -1297,7 +1300,7 @@ contains
 
             elseif (stage == 2) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, nBubs
+                do k = 1, n_el_bubs_loc
                     !u{1} = u{n} + (1/2) * dt * (RHS{n} + RHS{1})
                     intfc_rad(k, 1) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/2._wp
                     intfc_vel(k, 1) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/2._wp
@@ -1323,7 +1326,7 @@ contains
         elseif (time_stepper == 3) then ! 3rd order TVD RK
             if (stage == 1) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, nBubs
+                do k = 1, n_el_bubs_loc
                     !u{1} = u{n} +  dt * RHS{n}
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                     intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
@@ -1338,7 +1341,7 @@ contains
 
             elseif (stage == 2) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, nBubs
+                do k = 1, n_el_bubs_loc
                     !u{2} = u{n} + (1/4) * dt * [RHS{n} + RHS{1}]
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/4._wp
                     intfc_vel(k, 2) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/4._wp
@@ -1353,7 +1356,7 @@ contains
 
             elseif (stage == 3) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, nBubs
+                do k = 1, n_el_bubs_loc
                     !u{n+1} = u{n} + (2/3) * dt * [(1/4)* RHS{n} + (1/4)* RHS{1} + RHS{2}]
                     intfc_rad(k, 1) = intfc_rad(k, 1) + (2._wp/3._wp)*dt*(intfc_draddt(k, 1)/4._wp + intfc_draddt(k, 2)/4._wp + intfc_draddt(k, 3))
                     intfc_vel(k, 1) = intfc_vel(k, 1) + (2._wp/3._wp)*dt*(intfc_dveldt(k, 1)/4._wp + intfc_dveldt(k, 2)/4._wp + intfc_dveldt(k, 3))
@@ -1392,7 +1395,7 @@ contains
         integer, dimension(3) :: cell
 
         $:GPU_PARALLEL_LOOP(private='[cell]')
-        do k = 1, nBubs
+        do k = 1, n_el_bubs_loc
             keep_bubble(k) = 1
             wrap_bubble_loc(k,:) = 0
             wrap_bubble_dir(k,:) = 0
@@ -1497,13 +1500,13 @@ contains
         $:GPU_UPDATE(host='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
             & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
             & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
-            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, keep_bubble, nBubs, &
+            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, keep_bubble, n_el_bubs_loc, &
             & wrap_bubble_dir, wrap_bubble_loc]')
         call nvtxEndRange
 
-        if (nBubs > 0) then
+        if (n_el_bubs_loc > 0) then
             ! Handle deletion of bubbles leaving local domain
-            do k = 1, nBubs
+            do k = 1, n_el_bubs_loc
                 if (k == 1) then
                     prefix_sum(k) = keep_bubble(k)
                 else
@@ -1511,9 +1514,9 @@ contains
                 end if
             end do
 
-            active_bubs = prefix_sum(nBubs)
+            active_bubs = prefix_sum(n_el_bubs_loc)
 
-            do k = 1, nBubs
+            do k = 1, n_el_bubs_loc
                 if (keep_bubble(k) == 1) then
                     if (prefix_sum(k) /= k) then
                         call s_copy_lag_bubble(prefix_sum(k), k)
@@ -1523,14 +1526,14 @@ contains
                 end if
             end do
 
-            nBubs = active_bubs
+            n_el_bubs_loc = active_bubs
 
             ! Handle periodic wrapping of bubbles on same processor
             newBubs = 0
-            do k = 1, nBubs
+            do k = 1, n_el_bubs_loc
                 if (any(wrap_bubble_dir(k, :) == 1)) then
                     newBubs = newBubs + 1
-                    new_idx = nBubs + newBubs
+                    new_idx = n_el_bubs_loc + newBubs
                     call s_copy_lag_bubble(new_idx, k)
                     do i = 1, num_dims
                         if (wrap_bubble_dir(k, i) == 1) then
@@ -1550,20 +1553,13 @@ contains
                     end do
                 end if
             end do
-            nBubs = nBubs + newBubs
-        end if
-
-        if (run_time_info) then
-            call s_mpi_reduce_int_sum(nBubs, active_bubs)
-            if (proc_rank == 0 .and. active_bubs == 0) then
-                call s_mpi_abort('No bubbles remain in the domain. Simulation ending.')
-            end if
+            n_el_bubs_loc = n_el_bubs_loc + newBubs
         end if
 
         ! Handle MPI transfer of bubbles going to another processor's local domain
         if (num_procs > 1) then
             call nvtxStartRange("LAG-BC-TRANSFER-LIST")
-            call s_add_particles_to_transfer_list(nBubs, mtn_pos(:, :, dest), mtn_posPrev(:, :, dest))
+            call s_add_particles_to_transfer_list(n_el_bubs_loc, mtn_pos(:, :, dest), mtn_posPrev(:, :, dest))
             call nvtxEndRange
 
             call nvtxStartRange("LAG-BC-SENDRECV")
@@ -1571,7 +1567,7 @@ contains
                                           gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
                                           intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
                                           mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, nBubs, &
+                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, n_el_bubs_loc, &
                                           dest)
             call nvtxEndRange
         end if
@@ -1580,7 +1576,7 @@ contains
         $:GPU_UPDATE(device='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
             & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
             & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
-            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, nBubs]')
+            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, n_el_bubs_loc]')
         call nvtxEndRange
         call nvtxEndRange
 
@@ -1647,7 +1643,7 @@ contains
         integer :: k
 
         $:GPU_PARALLEL_LOOP(private='[k]')
-        do k = 1, nBubs
+        do k = 1, n_el_bubs_loc
             gas_p(k, 2) = gas_p(k, 1)
             gas_mv(k, 2) = gas_mv(k, 1)
             intfc_rad(k, 2) = intfc_rad(k, 1)
@@ -1819,7 +1815,7 @@ contains
         end if
 
         ! Cycle through list
-        do k = 1, nBubs
+        do k = 1, n_el_bubs_loc
             write (11, '(6X,f12.6,I24.8,8e24.8)') &
                 qtime, &
                 lag_id(k, 1), &
@@ -1939,8 +1935,8 @@ contains
         dummy = 0._wp
 
         bub_id = 0._wp
-        if (nBubs /= 0) then
-            do k = 1, nBubs
+        if (n_el_bubs_loc /= 0) then
+            do k = 1, n_el_bubs_loc
                 if (particle_in_domain_physical(mtn_pos(k, 1:3, 1))) then
                     bub_id = bub_id + 1
                 end if
@@ -2001,7 +1997,7 @@ contains
             allocate (MPI_IO_DATA_lag_bubbles(max(1, bub_id), 1:lag_io_vars))
 
             i = 1
-            do k = 1, nBubs
+            do k = 1, n_el_bubs_loc
                 if (particle_in_domain_physical(mtn_pos(k, 1:3, 1))) then
                     MPI_IO_DATA_lag_bubbles(i, 1) = real(lag_id(k, 1))
                     MPI_IO_DATA_lag_bubbles(i, 2:4) = mtn_pos(k, 1:3, 1)
@@ -2071,7 +2067,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(reduction='[[Rmax_glb], [Rmin_glb]]', &
             & reductionOp='[MAX, MIN]', copy='[Rmax_glb,Rmin_glb]')
-        do k = 1, nBubs
+        do k = 1, n_el_bubs_loc
             Rmax_glb = max(Rmax_glb, intfc_rad(k, 1)/bub_R0(k))
             Rmin_glb = min(Rmin_glb, intfc_rad(k, 1)/bub_R0(k))
             Rmax_stats(k) = max(Rmax_stats(k), intfc_rad(k, 1)/bub_R0(k))
@@ -2094,7 +2090,7 @@ contains
         open (13, FILE=trim(file_loc), FORM='formatted', position='rewind')
         write (13, *) 'proc_rank, particleID, x, y, z, Rmax_glb, Rmin_glb'
 
-        do k = 1, nBubs
+        do k = 1, n_el_bubs_loc
             write (13, '(6X,2I24.8,5e24.8)') &
                 proc_rank, &
                 lag_id(k, 1), &

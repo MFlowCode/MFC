@@ -1257,7 +1257,7 @@ contains
             $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, &
                 & intfc_vel, bub_R0, Rmax_stats, Rmin_stats, bub_dphidt, gas_p, &
                 & gas_mv, gas_mg, gas_betaT, gas_betaC]')
-            do i = 1, nBubs
+            do i = 1, n_el_bubs_loc
                 if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
                     call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
                 end if

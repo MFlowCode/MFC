@@ -538,7 +538,9 @@ module m_global_parameters
     !> @{!
     logical :: bubbles_lagrange                         !< Lagrangian subgrid bubble model switch
     type(bubbles_lagrange_parameters) :: lag_params     !< Lagrange bubbles' parameters
-    $:GPU_DECLARE(create='[bubbles_lagrange,lag_params]')
+    integer :: n_el_bubs_loc                            !< Number of Lagrangian bubbles in local domain
+    integer :: n_el_bubs_glb                            !< Number of Lagrangian bubbles in global domain
+    $:GPU_DECLARE(create='[bubbles_lagrange,lag_params,n_el_bubs_loc,n_el_bubs_glb]')
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)

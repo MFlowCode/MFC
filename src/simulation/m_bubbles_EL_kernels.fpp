@@ -130,7 +130,6 @@ contains
             if (p > 0) center(3) = lbk_pos(l, 3, 2)
             cell = fd_number - buff_size
             call s_get_cell(s_coord, cell)
-            !print*, s_coord
             call s_compute_stddsv(cell, volpart, stddsv)
 
             strength_vol = volpart
@@ -638,13 +637,19 @@ contains
             force = force - 0.5_wp * C_d * rho * pi * rad**2._wp * v_rel(i) * v_rel_mag
         end if
 
+        !if (i == 2) print*, "Force drag:", force
+
         if (lag_params%pressure_force) then
             force = force - vol * dp
         end if
 
+        !if (i == 2) print*, "Force pressure:", -vol * dp;print*, ""
+
         if (lag_params%gravity_force) then
             force = force + (mg + mv) * accel_bf(i)
         end if
+
+        !if (i == 2) print*, "Force grav:", (mg + mv) * accel_bf(i)
 
         if (lag_params%momentum_transfer_force) then
             force = force  - 4._wp * pi * rho * rad**2._wp * v_rel(i) * rdot

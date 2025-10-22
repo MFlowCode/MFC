@@ -165,6 +165,10 @@ contains
                 trim('VCFL Max'), trim('Rc Min')
         end if
 
+        if (bubbles_lagrange) then
+            write (3, '(13X,A10)', advance="no") trim('N Bubbles')
+        end if
+
         write (3, *) ! new line
 
     end subroutine s_open_run_time_information_file
@@ -327,13 +331,16 @@ contains
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
                                                          vcfl_max_loc, &
                                                          Rc_min_loc, &
+                                                         n_el_bubs_loc, &
                                                          icfl_max_glb, &
                                                          vcfl_max_glb, &
-                                                         Rc_min_glb)
+                                                         Rc_min_glb, &
+                                                         n_el_bubs_glb)
         else
             icfl_max_glb = icfl_max_loc
             if (viscous) vcfl_max_glb = vcfl_max_loc
             if (viscous) Rc_min_glb = Rc_min_loc
+            if (bubbles_lagrange) n_el_bubs_glb = n_el_bubs_loc
         end if
 
         ! Determining the stability criteria extrema over all the time-steps
@@ -355,6 +362,10 @@ contains
                     Rc_min_glb
             end if
 
+            if (bubbles_lagrange) then
+                write (3, '(13X,I10)', advance="no") n_el_bubs_glb
+            end if
+
             write (3, *) ! new line
 
             if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
@@ -370,6 +381,12 @@ contains
                 elseif (vcfl_max_glb > 1._wp) then
                     print *, 'vcfl', vcfl_max_glb
                     call s_mpi_abort('VCFL is greater than 1.0. Exiting.')
+                end if
+            end if
+
+            if (bubbles_lagrange) then
+                if (n_el_bubs_glb == 0) then
+                    call s_mpi_abort('No Lagrangian bubbles remain in the domain. Exiting.')
                 end if
             end if
 
