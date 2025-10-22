@@ -432,14 +432,6 @@ contains
                     if (xyz_local(3) >= z_min .and. xyz_local(3) <= z_max) then
 
                         if (xyz_local(1) >= 0._wp .and. xyz_local(1) <= ca_in) then
-                            xa = xyz_local(1)/ca_in
-                            if (xa <= pa) then
-                                yc = (ma/pa**2)*(2*pa*xa - xa**2)
-                                dycdxc = (2*ma/pa**2)*(pa - xa)
-                            else
-                                yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
-                                dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
-                            end if
                             if (xyz_local(2) >= 0._wp) then
                                 k = 1
                                 do while (airfoil_grid_u(k)%x < xyz_local(1))
