@@ -71,22 +71,24 @@ contains
 
         real(wp) :: dist, global_dist
         integer :: global_id
-        real(wp) :: x_centroid, y_centroid
         real(wp), dimension(3) :: dist_vec
 
         real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:2) :: center
         real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
         integer :: i, j, k !< Loop index variables
 
-        x_centroid = patch_ib(ib_patch_id)%x_centroid
-        y_centroid = patch_ib(ib_patch_id)%y_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid
+        center(2) = patch_ib(ib_patch_id)%y_centroid
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
+        $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,dist_vec,dist,global_dist,global_id]', copy='[levelset,levelset_norm]',&
+                  & copyin='[ib_patch_id,center,rotation,inverse_rotation,airfoil_grid_u,airfoil_grid_l]', collapse=2)
         do i = 0, m
             do j = 0, n
-                xy_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp] ! get coordinate frame centered on IB
+                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
                 xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinate
 
                 if (xy_local(2) >= 0._wp) then

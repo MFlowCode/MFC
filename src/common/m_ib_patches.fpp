@@ -189,7 +189,7 @@ contains
         integer :: Np1, Np2
 
         real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3) :: center !< x and y coordinates in local IB frame
+        real(wp), dimension(1:2) :: center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         center(1) = patch_ib(patch_id)%x_centroid
@@ -599,7 +599,7 @@ contains
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k]', copy='[ib_markers_sf]',&
-                  & copyin='[patch_id,center,radius,inverse_rotation]', collapse=3)
+                  & copyin='[patch_id,center,radius]', collapse=3)
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -675,12 +675,12 @@ contains
                     xyz_local = [x_cc(i) - center(1), cart_y - center(2), cart_z - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
 
-                    if (-0.5length(1) <= xyz_local(1) .and. &
-                        0.5length(1) >= xyz_local(1) .and. &
-                        -0.5length(2) <= xyz_local(2) .and. &
-                        0.5length(2) >= xyz_local(2) .and. &
-                        -0.5length(3) <= xyz_local(3) .and. &
-                        0.5length(3) >= xyz_local(3)) then
+                    if (-0.5*length(1) <= xyz_local(1) .and. &
+                        0.5*length(1) >= xyz_local(1) .and. &
+                        -0.5*length(2) <= xyz_local(2) .and. &
+                        0.5*length(2) >= xyz_local(2) .and. &
+                        -0.5*length(3) <= xyz_local(3) .and. &
+                        0.5*length(3) >= xyz_local(3)) then
 
                         ! Updating the patch identities bookkeeping variable
                         ib_markers_sf(i, j, k) = patch_id
