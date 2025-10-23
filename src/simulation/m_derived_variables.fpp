@@ -146,23 +146,24 @@ contains
                                                      z_accel)
             end if
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        if (p > 0) then
-                            accel_mag(i, j, k) = sqrt(x_accel(i, j, k)**2._wp + &
-                                                      y_accel(i, j, k)**2._wp + &
-                                                      z_accel(i, j, k)**2._wp)
-                        elseif (n > 0) then
-                            accel_mag(i, j, k) = sqrt(x_accel(i, j, k)**2._wp + &
-                                                      y_accel(i, j, k)**2._wp)
-                        else
-                            accel_mag(i, j, k) = x_accel(i, j, k)
-                        end if
+            #:call GPU_PARALLEL_LOOP(collapse=3)
+                do k = 0, p
+                    do j = 0, n
+                        do i = 0, m
+                            if (p > 0) then
+                                accel_mag(i, j, k) = sqrt(x_accel(i, j, k)**2._wp + &
+                                                          y_accel(i, j, k)**2._wp + &
+                                                          z_accel(i, j, k)**2._wp)
+                            elseif (n > 0) then
+                                accel_mag(i, j, k) = sqrt(x_accel(i, j, k)**2._wp + &
+                                                          y_accel(i, j, k)**2._wp)
+                            else
+                                accel_mag(i, j, k) = x_accel(i, j, k)
+                            end if
+                        end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
 
             $:GPU_UPDATE(host='[accel_mag]')
 
@@ -187,8 +188,8 @@ contains
         !!  @param q_prim_vf2 Primitive variables
         !!  @param q_prim_vf3 Primitive variables
         !!  @param q_sf Acceleration component
-    pure subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, &
-                                                    q_prim_vf2, q_prim_vf3, q_sf)
+    subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, &
+                                               q_prim_vf2, q_prim_vf3, q_sf)
 
         integer, intent(in) :: i
 
@@ -203,200 +204,212 @@ contains
 
         ! Computing the acceleration component in the x-coordinate direction
         if (i == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_sf(j, k, l) = (11._wp*q_prim_vf0(momxb)%sf(j, k, l) &
-                                         - 18._wp*q_prim_vf1(momxb)%sf(j, k, l) &
-                                         + 9._wp*q_prim_vf2(momxb)%sf(j, k, l) &
-                                         - 2._wp*q_prim_vf3(momxb)%sf(j, k, l))/(6._wp*dt)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_sf(j, k, l) = (11._wp*q_prim_vf0(momxb)%sf(j, k, l) &
+                                             - 18._wp*q_prim_vf1(momxb)%sf(j, k, l) &
+                                             + 9._wp*q_prim_vf2(momxb)%sf(j, k, l) &
+                                             - 2._wp*q_prim_vf3(momxb)%sf(j, k, l))/(6._wp*dt)
+                        end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
 
             if (n == 0) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do r = -fd_number, fd_number
-                                q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf0(momxb)%sf(r + j, k, l)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do r = -fd_number, fd_number
+                                    q_sf(j, k, l) = q_sf(j, k, l) &
+                                                    + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(momxb)%sf(r + j, k, l)
+                                end do
                             end do
                         end do
                     end do
-                end do
+                #:endcall GPU_PARALLEL_LOOP
             elseif (p == 0) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do r = -fd_number, fd_number
-                                q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf0(momxb)%sf(r + j, k, l) &
-                                                + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                q_prim_vf0(momxb)%sf(j, r + k, l)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do r = -fd_number, fd_number
+                                    q_sf(j, k, l) = q_sf(j, k, l) &
+                                                    + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(momxb)%sf(r + j, k, l) &
+                                                    + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                    q_prim_vf0(momxb)%sf(j, r + k, l)
+                                end do
                             end do
                         end do
                     end do
-                end do
+                #:endcall GPU_PARALLEL_LOOP
             else
                 if (grid_geometry == 3) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                do r = -fd_number, fd_number
-                                    q_sf(j, k, l) = q_sf(j, k, l) &
-                                                    + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                    q_prim_vf0(momxb)%sf(r + j, k, l) &
-                                                    + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                    q_prim_vf0(momxb)%sf(j, r + k, l) &
-                                                    + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                    q_prim_vf0(momxb)%sf(j, k, r + l)/y_cc(k)
+                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    do r = -fd_number, fd_number
+                                        q_sf(j, k, l) = q_sf(j, k, l) &
+                                                        + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                        q_prim_vf0(momxb)%sf(r + j, k, l) &
+                                                        + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                        q_prim_vf0(momxb)%sf(j, r + k, l) &
+                                                        + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                        q_prim_vf0(momxb)%sf(j, k, r + l)/y_cc(k)
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                    #:endcall GPU_PARALLEL_LOOP
                 else
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                do r = -fd_number, fd_number
-                                    q_sf(j, k, l) = q_sf(j, k, l) &
-                                                    + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                    q_prim_vf0(momxb)%sf(r + j, k, l) &
-                                                    + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                    q_prim_vf0(momxb)%sf(j, r + k, l) &
-                                                    + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                    q_prim_vf0(momxb)%sf(j, k, r + l)
+                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    do r = -fd_number, fd_number
+                                        q_sf(j, k, l) = q_sf(j, k, l) &
+                                                        + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                        q_prim_vf0(momxb)%sf(r + j, k, l) &
+                                                        + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                        q_prim_vf0(momxb)%sf(j, r + k, l) &
+                                                        + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                        q_prim_vf0(momxb)%sf(j, k, r + l)
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                    #:endcall GPU_PARALLEL_LOOP
                 end if
             end if
             ! Computing the acceleration component in the y-coordinate direction
         elseif (i == 2) then
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_sf(j, k, l) = (11._wp*q_prim_vf0(momxb + 1)%sf(j, k, l) &
-                                         - 18._wp*q_prim_vf1(momxb + 1)%sf(j, k, l) &
-                                         + 9._wp*q_prim_vf2(momxb + 1)%sf(j, k, l) &
-                                         - 2._wp*q_prim_vf3(momxb + 1)%sf(j, k, l))/(6._wp*dt)
-                    end do
-                end do
-            end do
-
-            if (p == 0) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            do r = -fd_number, fd_number
-                                q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf0(momxb + 1)%sf(r + j, k, l) &
-                                                + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                q_prim_vf0(momxb + 1)%sf(j, r + k, l)
-                            end do
+                            q_sf(j, k, l) = (11._wp*q_prim_vf0(momxb + 1)%sf(j, k, l) &
+                                             - 18._wp*q_prim_vf1(momxb + 1)%sf(j, k, l) &
+                                             + 9._wp*q_prim_vf2(momxb + 1)%sf(j, k, l) &
+                                             - 2._wp*q_prim_vf3(momxb + 1)%sf(j, k, l))/(6._wp*dt)
                         end do
                     end do
                 end do
+            #:endcall GPU_PARALLEL_LOOP
+
+            if (p == 0) then
+                #:call GPU_PARALLEL_LOOP(collapse=4)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do r = -fd_number, fd_number
+                                    q_sf(j, k, l) = q_sf(j, k, l) &
+                                                    + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(momxb + 1)%sf(r + j, k, l) &
+                                                    + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                    q_prim_vf0(momxb + 1)%sf(j, r + k, l)
+                                end do
+                            end do
+                        end do
+                    end do
+                #:endcall GPU_PARALLEL_LOOP
             else
                 if (grid_geometry == 3) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                do r = -fd_number, fd_number
-                                    q_sf(j, k, l) = q_sf(j, k, l) &
-                                                    + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                    q_prim_vf0(momxb + 1)%sf(r + j, k, l) &
-                                                    + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                    q_prim_vf0(momxb + 1)%sf(j, r + k, l) &
-                                                    + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                    q_prim_vf0(momxb + 1)%sf(j, k, r + l)/y_cc(k) &
-                                                    - (q_prim_vf0(momxe)%sf(j, k, l)**2._wp)/y_cc(k)
+                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    do r = -fd_number, fd_number
+                                        q_sf(j, k, l) = q_sf(j, k, l) &
+                                                        + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                        q_prim_vf0(momxb + 1)%sf(r + j, k, l) &
+                                                        + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                        q_prim_vf0(momxb + 1)%sf(j, r + k, l) &
+                                                        + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                        q_prim_vf0(momxb + 1)%sf(j, k, r + l)/y_cc(k) &
+                                                        - (q_prim_vf0(momxe)%sf(j, k, l)**2._wp)/y_cc(k)
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                    #:endcall GPU_PARALLEL_LOOP
                 else
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                do r = -fd_number, fd_number
-                                    q_sf(j, k, l) = q_sf(j, k, l) &
-                                                    + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                    q_prim_vf0(momxb + 1)%sf(r + j, k, l) &
-                                                    + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                    q_prim_vf0(momxb + 1)%sf(j, r + k, l) &
-                                                    + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                    q_prim_vf0(momxb + 1)%sf(j, k, r + l)
+                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    do r = -fd_number, fd_number
+                                        q_sf(j, k, l) = q_sf(j, k, l) &
+                                                        + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                        q_prim_vf0(momxb + 1)%sf(r + j, k, l) &
+                                                        + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                        q_prim_vf0(momxb + 1)%sf(j, r + k, l) &
+                                                        + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                        q_prim_vf0(momxb + 1)%sf(j, k, r + l)
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                    #:endcall GPU_PARALLEL_LOOP
                 end if
             end if
             ! Computing the acceleration component in the z-coordinate direction
         else
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_sf(j, k, l) = (11._wp*q_prim_vf0(momxe)%sf(j, k, l) &
-                                         - 18._wp*q_prim_vf1(momxe)%sf(j, k, l) &
-                                         + 9._wp*q_prim_vf2(momxe)%sf(j, k, l) &
-                                         - 2._wp*q_prim_vf3(momxe)%sf(j, k, l))/(6._wp*dt)
+            #:call GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_sf(j, k, l) = (11._wp*q_prim_vf0(momxe)%sf(j, k, l) &
+                                             - 18._wp*q_prim_vf1(momxe)%sf(j, k, l) &
+                                             + 9._wp*q_prim_vf2(momxe)%sf(j, k, l) &
+                                             - 2._wp*q_prim_vf3(momxe)%sf(j, k, l))/(6._wp*dt)
+                        end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
 
             if (grid_geometry == 3) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do r = -fd_number, fd_number
-                                q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf0(momxe)%sf(r + j, k, l) &
-                                                + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                q_prim_vf0(momxe)%sf(j, r + k, l) &
-                                                + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                q_prim_vf0(momxe)%sf(j, k, r + l)/y_cc(k) &
-                                                + (q_prim_vf0(momxe)%sf(j, k, l)* &
-                                                   q_prim_vf0(momxb + 1)%sf(j, k, l))/y_cc(k)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do r = -fd_number, fd_number
+                                    q_sf(j, k, l) = q_sf(j, k, l) &
+                                                    + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(momxe)%sf(r + j, k, l) &
+                                                    + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                    q_prim_vf0(momxe)%sf(j, r + k, l) &
+                                                    + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                    q_prim_vf0(momxe)%sf(j, k, r + l)/y_cc(k) &
+                                                    + (q_prim_vf0(momxe)%sf(j, k, l)* &
+                                                       q_prim_vf0(momxb + 1)%sf(j, k, l))/y_cc(k)
+                                end do
                             end do
                         end do
                     end do
-                end do
+                #:endcall GPU_PARALLEL_LOOP
             else
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do r = -fd_number, fd_number
-                                q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf0(momxe)%sf(r + j, k, l) &
-                                                + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                q_prim_vf0(momxe)%sf(j, r + k, l) &
-                                                + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                q_prim_vf0(momxe)%sf(j, k, r + l)
+                #:call GPU_PARALLEL_LOOP(collapse=4)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do r = -fd_number, fd_number
+                                    q_sf(j, k, l) = q_sf(j, k, l) &
+                                                    + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(momxe)%sf(r + j, k, l) &
+                                                    + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                    q_prim_vf0(momxe)%sf(j, r + k, l) &
+                                                    + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                    q_prim_vf0(momxe)%sf(j, k, r + l)
+                                end do
                             end do
                         end do
                     end do
-                end do
+                #:endcall GPU_PARALLEL_LOOP
             end if
         end if
 
@@ -425,78 +438,81 @@ contains
         end do
 
         if (n == 0) then !1D simulation
-            $:GPU_PARALLEL_LOOP(collapse=3,private='[dV]')
-            do l = 0, p !Loop over grid
-                do k = 0, n
-                    do j = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids !Loop over individual fluids
-                            dV = dx(j)
-                            ! Mass
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
-                            ! x-location weighted
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
-                            ! Volume fraction
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 5) = c_m(i, 5) + q_vf(i + advxb - 1)%sf(j, k, l)*dV
+            #:call GPU_PARALLEL_LOOP(collapse=3,private='[dV]')
+                do l = 0, p !Loop over grid
+                    do k = 0, n
+                        do j = 0, m
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids !Loop over individual fluids
+                                dV = dx(j)
+                                ! Mass
+                                $:GPU_ATOMIC(atomic='update')
+                                c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
+                                ! x-location weighted
+                                $:GPU_ATOMIC(atomic='update')
+                                c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
+                                ! Volume fraction
+                                $:GPU_ATOMIC(atomic='update')
+                                c_m(i, 5) = c_m(i, 5) + q_vf(i + advxb - 1)%sf(j, k, l)*dV
+                            end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         elseif (p == 0) then !2D simulation
-            $:GPU_PARALLEL_LOOP(collapse=3,private='[dV]')
-            do l = 0, p !Loop over grid
-                do k = 0, n
-                    do j = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids !Loop over individual fluids
-                            dV = dx(j)*dy(k)
-                            ! Mass
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
-                            ! x-location weighted
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
-                            ! y-location weighted
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
-                            ! Volume fraction
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 5) = c_m(i, 5) + q_vf(i + advxb - 1)%sf(j, k, l)*dV
+            #:call GPU_PARALLEL_LOOP(collapse=3,private='[dV]')
+                do l = 0, p !Loop over grid
+                    do k = 0, n
+                        do j = 0, m
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids !Loop over individual fluids
+                                dV = dx(j)*dy(k)
+                                ! Mass
+                                $:GPU_ATOMIC(atomic='update')
+                                c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
+                                ! x-location weighted
+                                $:GPU_ATOMIC(atomic='update')
+                                c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
+                                ! y-location weighted
+                                $:GPU_ATOMIC(atomic='update')
+                                c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
+                                ! Volume fraction
+                                $:GPU_ATOMIC(atomic='update')
+                                c_m(i, 5) = c_m(i, 5) + q_vf(i + advxb - 1)%sf(j, k, l)*dV
+                            end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         else !3D simulation
-            $:GPU_PARALLEL_LOOP(collapse=3,private='[dV]')
-            do l = 0, p !Loop over grid
-                do k = 0, n
-                    do j = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids !Loop over individual fluids
+            #:call GPU_PARALLEL_LOOP(collapse=3,private='[dV]')
+                do l = 0, p !Loop over grid
+                    do k = 0, n
+                        do j = 0, m
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids !Loop over individual fluids
 
-                            dV = dx(j)*dy(k)*dz(l)
-                            ! Mass
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
-                            ! x-location weighted
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
-                            ! y-location weighted
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
-                            ! z-location weighted
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 4) = c_m(i, 4) + q_vf(i)%sf(j, k, l)*dV*z_cc(l)
-                            ! Volume fraction
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 5) = c_m(i, 5) + q_vf(i + advxb - 1)%sf(j, k, l)*dV
+                                dV = dx(j)*dy(k)*dz(l)
+                                ! Mass
+                                $:GPU_ATOMIC(atomic='update')
+                                c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
+                                ! x-location weighted
+                                $:GPU_ATOMIC(atomic='update')
+                                c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
+                                ! y-location weighted
+                                $:GPU_ATOMIC(atomic='update')
+                                c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
+                                ! z-location weighted
+                                $:GPU_ATOMIC(atomic='update')
+                                c_m(i, 4) = c_m(i, 4) + q_vf(i)%sf(j, k, l)*dV*z_cc(l)
+                                ! Volume fraction
+                                $:GPU_ATOMIC(atomic='update')
+                                c_m(i, 5) = c_m(i, 5) + q_vf(i + advxb - 1)%sf(j, k, l)*dV
+                            end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         $:GPU_UPDATE(host='[c_m]')

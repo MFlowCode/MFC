@@ -1689,7 +1689,7 @@ contains
 
     end subroutine s_convert_cylindrical_to_cartesian_coord
 
-    pure function f_convert_cyl_to_cart(cyl) result(cart)
+    function f_convert_cyl_to_cart(cyl) result(cart)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -1715,7 +1715,8 @@ contains
     !! @param myth Angle
     !! @param offset Thickness
     !! @param a Starting position
-    pure elemental function f_r(myth, offset, a)
+    elemental function f_r(myth, offset, a)
+
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: myth, offset, a
         real(wp) :: b
