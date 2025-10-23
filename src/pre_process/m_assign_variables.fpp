@@ -684,7 +684,7 @@ contains
 
         if (surface_tension) then
             q_prim_vf(c_idx)%sf(j, k, l) = eta*patch_icpp(patch_id)%cf_val + &
-                                           (1._wp - eta)*patch_icpp(smooth_patch_id)%cf_val
+                                           (1._wp - eta)*orig_prim_vf(c_idx)
         end if
 
         ! Updating the patch identities bookkeeping variable
