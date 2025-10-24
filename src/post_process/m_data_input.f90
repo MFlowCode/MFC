@@ -158,7 +158,7 @@ contains
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(KIND=MPI_OFFSET_KIND) :: disp
         integer :: m_MOK, n_MOK, p_MOK, MOK, WP_MOK, save_index
-        
+
 #endif
         if (.not. ib) return
 
@@ -179,7 +179,7 @@ contains
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
                 WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                save_index = t_step / t_step_save ! get the number of saves done to this point
+                save_index = t_step/t_step_save ! get the number of saves done to this point
 
                 data_size = (m + 1)*(n + 1)*(p + 1)
                 var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)

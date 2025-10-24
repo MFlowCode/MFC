@@ -139,7 +139,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
-        
+
         real(wp), dimension(1:2) :: center
         real(wp) :: radius
 
@@ -540,9 +540,9 @@ contains
                 xy_local = matmul(inverse_rotation, xy_local)
 
                 if (-0.5_wp*length(1) <= xy_local(1) .and. &
-                    0.5_wp*length(1)  >= xy_local(1) .and. &
+                    0.5_wp*length(1) >= xy_local(1) .and. &
                     -0.5_wp*length(2) <= xy_local(2) .and. &
-                    0.5_wp*length(2)  >= xy_local(2)) then
+                    0.5_wp*length(2) >= xy_local(2)) then
 
                     ! Updating the patch identities bookkeeping variable
                     ib_markers_sf(i, j, 0) = patch_id
@@ -569,7 +569,7 @@ contains
         ! Generic loop iterators
         integer :: i, j, k
         real(wp) :: radius
-        real(wp), dimension(1:3):: center
+        real(wp), dimension(1:3) :: center
 
         !! Variables to initialize the pressure field that corresponds to the
             !! bubble-collapse test case found in Tiwari et al. (2013)
