@@ -187,7 +187,7 @@ contains
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
 
-                    if (xyz_local(2) >= y_centroid) then
+                    if (xyz_local(2) >= center(2)) then
                         do k = 1, Np
                             dist_vec(1) = xyz_local(1) - airfoil_grid_u(k)%x
                             dist_vec(2) = xyz_local(2) - airfoil_grid_u(k)%y
@@ -268,7 +268,7 @@ contains
         real(wp) :: side_dists(4)
 
         real(wp) :: length_x, length_y
-        real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3) :: xy_local, dist_vec !< x and y coordinates in local IB frame
         real(wp), dimension(2) :: center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
@@ -287,7 +287,7 @@ contains
         bottom_left(1) = -length_x/2
         bottom_left(2) = -length_y/2
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,idx,side_dists,xy_local]', copy='[levelset,levelset_norm]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,idx,side_dists,xy_local,dist_vec]', copy='[levelset,levelset_norm]',&
                   & copyin='[ib_patch_id,center,bottom_left,top_right,initial_distance_buffer,inverse_rotation,rotation]', collapse=2)
         do i = 0, m
             do j = 0, n
@@ -312,20 +312,17 @@ contains
                     end do
 
                     levelset%sf(i, j, 0, ib_patch_id) = side_dists(idx)
-                    levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0._wp
+                    dist_vec = 0._wp
                     if (.not. f_approx_equal(side_dists(idx), 0._wp)) then
                         if (idx == 1 .or. idx == 2) then
                             ! vector points along the x axis
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = side_dists(idx)/ &
-                                                                        abs(side_dists(idx))
+                            dist_vec(1) = side_dists(idx)/abs(side_dists(idx))
                         else
                             ! vector points along the y axis
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 2) = side_dists(idx)/ &
-                                                                        abs(side_dists(idx))
+                            dist_vec(2) = side_dists(idx)/abs(side_dists(idx))
                         end if
                         ! convert the normal vector back into the global coordinate system
-                        levelset_norm%sf(i, j, 0, ib_patch_id, :) = &
-                            matmul(rotation, levelset_norm%sf(i, j, 0, ib_patch_id, :))
+                        levelset_norm%sf(i, j, 0, ib_patch_id, :) = matmul(rotation, dist_vec)
                     else
                         levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0._wp
                     end if
@@ -347,7 +344,7 @@ contains
 
         real(wp), dimension(3) :: center
         real(wp) :: length_x, length_y, length_z
-        real(wp), dimension(1:3) :: xyz_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3) :: xyz_local, dist_vec !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
         integer :: i, j, k !< Loop index variables
@@ -370,7 +367,7 @@ contains
         Front = length_z/2
         Back = -length_z/2
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,side_dists,xyz_local]', copy='[levelset,levelset_norm]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,side_dists,xyz_local,dist_vec]', copy='[levelset,levelset_norm]',&
                   & copyin='[ib_patch_id,center,inverse_rotation,rotation,Right,Left,Top,Bottom,Front,Back]', collapse=3)
         do i = 0, m
             do j = 0, n
@@ -398,51 +395,44 @@ contains
                         ! leading to undesired behavior. This should be resolved
                         ! and this code should be cleaned up. It also means that
                         ! rotating the box 90 degrees will cause tests to fail.
-                        levelset_norm%sf(i, j, k, ib_patch_id, :) = 0._wp
+                        dist_vec = 0._wp
                         if (f_approx_equal(min_dist, abs(side_dists(1)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(1)
                             if (.not. f_approx_equal(side_dists(1), 0._wp)) then
-                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = side_dists(1)/ &
-                                                                            abs(side_dists(1))
+                                dist_vec(1) = side_dists(1)/abs(side_dists(1))
                             end if
 
                         else if (f_approx_equal(min_dist, abs(side_dists(2)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(2)
                             if (.not. f_approx_equal(side_dists(2), 0._wp)) then
-                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = -side_dists(2)/ &
-                                                                            abs(side_dists(2))
+                                dist_vec(1) = -side_dists(2)/abs(side_dists(2))
                             end if
 
                         else if (f_approx_equal(min_dist, abs(side_dists(3)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(3)
                             if (.not. f_approx_equal(side_dists(3), 0._wp)) then
-                                levelset_norm%sf(i, j, k, ib_patch_id, 2) = side_dists(3)/ &
-                                                                            abs(side_dists(3))
+                                dist_vec(2) = side_dists(3)/abs(side_dists(3))
                             end if
 
                         else if (f_approx_equal(min_dist, abs(side_dists(4)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(4)
                             if (.not. f_approx_equal(side_dists(4), 0._wp)) then
-                                levelset_norm%sf(i, j, k, ib_patch_id, 2) = -side_dists(4)/ &
-                                                                            abs(side_dists(4))
+                                dist_vec(2) = -side_dists(4)/abs(side_dists(4))
                             end if
 
                         else if (f_approx_equal(min_dist, abs(side_dists(5)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(5)
                             if (.not. f_approx_equal(side_dists(5), 0._wp)) then
-                                levelset_norm%sf(i, j, k, ib_patch_id, 3) = side_dists(5)/ &
-                                                                            abs(side_dists(5))
+                                dist_vec(3) = side_dists(5)/abs(side_dists(5))
                             end if
 
                         else if (f_approx_equal(min_dist, abs(side_dists(6)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(6)
                             if (.not. f_approx_equal(side_dists(6), 0._wp)) then
-                                levelset_norm%sf(i, j, k, ib_patch_id, 3) = -side_dists(6)/ &
-                                                                            abs(side_dists(6))
+                                dist_vec(3) = -side_dists(6)/abs(side_dists(6))
                             end if
                         end if
-                        levelset_norm%sf(i, j, 0, ib_patch_id, :) = &
-                            matmul(rotation, levelset_norm%sf(i, j, 0, ib_patch_id, :))
+                        levelset_norm%sf(i, j, k, ib_patch_id, :) = matmul(rotation, dist_vec)
                     end if
                 end do
             end do
@@ -479,8 +469,7 @@ contains
                     if (f_approx_equal(dist, 0._wp)) then
                         levelset_norm%sf(i, j, k, ib_patch_id, :) = (/1, 0, 0/)
                     else
-                        levelset_norm%sf(i, j, k, ib_patch_id, :) = &
-                            dist_vec(:)/dist
+                        levelset_norm%sf(i, j, k, ib_patch_id, :) = dist_vec(:)/dist
                     end if
                 end do
             end do
@@ -495,7 +484,7 @@ contains
         integer, intent(IN) :: ib_patch_id
 
         real(wp) :: radius
-        real(wp), dimension(3) :: centroid_vec, dist_sides_vec, dist_surface_vec, length
+        real(wp), dimension(3) :: dist_sides_vec, dist_surface_vec, length
         real(wp), dimension(2) :: boundary
         real(wp) :: dist_side, dist_surface, side_pos
         integer :: i, j, k !< Loop index variables
@@ -514,24 +503,24 @@ contains
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
-        if (.not. f_approx_equal(length_x, 0._wp)) then
+        if (.not. f_approx_equal(length(1), 0._wp)) then
             boundary(1) = -0.5_wp*length(1)
             boundary(2) = 0.5_wp*length(1)
             dist_sides_vec = (/1, 0, 0/)
             dist_surface_vec = (/0, 1, 1/)
-        else if (.not. f_approx_equal(length_y, 0._wp)) then
+        else if (.not. f_approx_equal(length(2), 0._wp)) then
             boundary(1) = -0.5_wp*length(2)
             boundary(2) = 0.5_wp*length(2)
             dist_sides_vec = (/0, 1, 0/)
             dist_surface_vec = (/1, 0, 1/)
-        else if (.not. f_approx_equal(length_z, 0._wp)) then
+        else if (.not. f_approx_equal(length(3), 0._wp)) then
             boundary(1) = -0.5_wp*length(3)
             boundary(2) = 0.5_wp*length(3)
             dist_sides_vec = (/0, 0, 1/)
             dist_surface_vec = (/1, 1, 0/)
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,dist_vec,side_pos,dist_side,dist_surface,xyz_local]', copy='[levelset,levelset_norm]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,side_pos,dist_side,dist_surface,xyz_local]', copy='[levelset,levelset_norm]',&
                   & copyin='[ib_patch_id,center,radius,inverse_rotation,rotation,dist_sides_vec,dist_surface_vec]', collapse=3)
         do i = 0, m
             do j = 0, n
@@ -551,21 +540,17 @@ contains
                         ! if the closest edge is flat
                         levelset%sf(i, j, k, ib_patch_id) = -dist_side
                         if (f_approx_equal(dist_side, abs(side_pos - boundary(1)))) then
-                            levelset_norm%sf(i, j, k, ib_patch_id, :) = -dist_sides_vec
+                            levelset_norm%sf(i, j, k, ib_patch_id, :) = matmul(rotation, -dist_sides_vec)
                         else
-                            levelset_norm%sf(i, j, k, ib_patch_id, :) = dist_sides_vec
+                            levelset_norm%sf(i, j, k, ib_patch_id, :) = matmul(rotation, dist_sides_vec)
                         end if
                     else
                         levelset%sf(i, j, k, ib_patch_id) = dist_surface
 
-                        levelset_norm%sf(i, j, k, ib_patch_id, :) = &
-                            xyz_local*dist_surface_vec
-                        levelset_norm%sf(i, j, k, ib_patch_id, :) = &
-                            levelset_norm%sf(i, j, k, ib_patch_id, :)/ &
-                            norm2(levelset_norm%sf(i, j, k, ib_patch_id, :))
+                        xyz_local = xyz_local*dist_surface_vec
+                        xyz_local = xyz_local/norm2(xyz_local)
+                        levelset_norm%sf(i, j, k, ib_patch_id, :) = matmul(rotation, xyz_local)
                     end if
-                    levelset_norm%sf(i, j, k, ib_patch_id, :) = &
-                        matmul(rotation, levelset_norm%sf(i, j, k, ib_patch_id, :))
                 end do
             end do
         end do

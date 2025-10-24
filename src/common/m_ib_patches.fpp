@@ -565,11 +565,11 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
-        integer, dimension(1:3):: center
 
         ! Generic loop iterators
         integer :: i, j, k
         real(wp) :: radius
+        real(wp), dimension(1:3):: center
 
         !! Variables to initialize the pressure field that corresponds to the
             !! bubble-collapse test case found in Tiwari et al. (2013)
@@ -590,7 +590,7 @@ contains
         ! and verifying whether the current patch has permission to write to
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
-        $:GPU_PARALLEL_LOOP(private='[i,j,k]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,cart_y,cart_z]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,center,radius]', collapse=3)
         do k = 0, p
             do j = 0, n
@@ -651,7 +651,7 @@ contains
         ! and verifying whether the current patch has permission to write to
         ! to that cell. If both queries check out, the primitive variables
         ! of the current patch are assigned to this cell.
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,center,length,inverse_rotation]', collapse=3)
         do k = 0, p
             do j = 0, n
@@ -664,7 +664,7 @@ contains
                         cart_y = y_cc(j)
                         cart_z = z_cc(k)
                     end if
-                    xyz_local = [x_cc(i) - center(1), cart_y - center(2), cart_z - center(3)] ! get coordinate frame centered on IB
+                    xyz_local = [x_cc(i), cart_y, cart_z] - center ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
 
                     if (-0.5*length(1) <= xyz_local(1) .and. &
@@ -725,7 +725,7 @@ contains
         ! domain and verifying whether the current patch has the permission
         ! to write to that cell. If both queries check out, the primitive
         ! variables of the current patch are assigned to this cell.
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,center,length,radius,inverse_rotation]', collapse=3)
         do k = 0, p
             do j = 0, n
@@ -737,26 +737,26 @@ contains
                         cart_y = y_cc(j)
                         cart_z = z_cc(k)
                     end if
-                    xyz_local = [x_cc(i) - center(1), cart_y - center(2), cart_z - center(3)] ! get coordinate frame centered on IB
+                    xyz_local = [x_cc(i), cart_y, cart_z] - center ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
 
-                    if (((.not. f_is_default(length_x) .and. &
+                    if (((.not. f_is_default(length(1)) .and. &
                           xyz_local(2)**2 &
                           + xyz_local(3)**2 <= radius**2 .and. &
-                          -0.5*length(1) <= xyz_local(1) .and. &
-                          0.5*length(1) >= xyz_local(1)) &
+                          -0.5_wp*length(1) <= xyz_local(1) .and. &
+                          0.5_wp*length(1) >= xyz_local(1)) &
                          .or. &
-                         (.not. f_is_default(length_y) .and. &
+                         (.not. f_is_default(length(2)) .and. &
                           xyz_local(1)**2 &
                           + xyz_local(3)**2 <= radius**2 .and. &
-                          -0.5*length(2) <= xyz_local(2) .and. &
-                          0.5*length(2) >= xyz_local(2)) &
+                          -0.5_wp*length(2) <= xyz_local(2) .and. &
+                          0.5_wp*length(2) >= xyz_local(2)) &
                          .or. &
-                         (.not. f_is_default(length_z) .and. &
+                         (.not. f_is_default(length(3)) .and. &
                           xyz_local(1)**2 &
                           + xyz_local(2)**2 <= radius**2 .and. &
-                          -0.5*length(3) <= xyz_local(3) .and. &
-                          0.5*length(3) >= xyz_local(3)))) then
+                          -0.5_wp*length(3) <= xyz_local(3) .and. &
+                          0.5_wp*length(3) >= xyz_local(3)))) then
 
                         ! Updating the patch identities bookkeeping variable
                         ib_markers_sf(i, j, k) = patch_id
