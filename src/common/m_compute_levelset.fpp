@@ -34,21 +34,23 @@ contains
         integer, intent(IN) :: ib_patch_id
 
         real(wp) :: radius, dist
-        real(wp) :: x_centroid, y_centroid
+        real(wp), dimension(2) :: center
         real(wp), dimension(3) :: dist_vec
 
         integer :: i, j !< Loop index variables
 
         radius = patch_ib(ib_patch_id)%radius
-        x_centroid = patch_ib(ib_patch_id)%x_centroid
-        y_centroid = patch_ib(ib_patch_id)%y_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid
+        center(2) = patch_ib(ib_patch_id)%y_centroid
 
+        $:GPU_PARALLEL_LOOP(private='[i,j,dist_vec,dist]', copy='[levelset,levelset_norm]',&
+                  & copyin='[ib_patch_id,center,radius]', collapse=2)
         do i = 0, m
             do j = 0, n
 
-                dist_vec(1) = x_cc(i) - x_centroid
-                dist_vec(2) = y_cc(j) - y_centroid
-                dist_vec(3) = 0
+                dist_vec(1) = x_cc(i) - center(1)
+                dist_vec(2) = y_cc(j) - center(2)
+                dist_vec(3) = 0._wp
                 dist = sqrt(sum(dist_vec**2))
                 levelset%sf(i, j, 0, ib_patch_id) = dist - radius
                 if (f_approx_equal(dist, 0._wp)) then
@@ -156,31 +158,33 @@ contains
 
         real(wp) :: dist, dist_surf, dist_side, global_dist
         integer :: global_id
-        real(wp) :: x_centroid, y_centroid, z_centroid, lz, z_max, z_min
+        real(wp) :: lz, z_max, z_min
         real(wp), dimension(3) :: dist_vec
 
-        real(wp), dimension(1:3) :: xyz_local !< x, y, z coordinates in local IB frame
+        real(wp), dimension(1:3) :: xyz_local, center !< x, y, z coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
         real(wp) :: length_z
 
         integer :: i, j, k, l !< Loop index variables
 
-        x_centroid = patch_ib(ib_patch_id)%x_centroid
-        y_centroid = patch_ib(ib_patch_id)%y_centroid
-        z_centroid = patch_ib(ib_patch_id)%z_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid
+        center(2) = patch_ib(ib_patch_id)%y_centroid
+        center(3) = patch_ib(ib_patch_id)%z_centroid
         lz = patch_ib(ib_patch_id)%length_z
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
-        z_max = z_centroid + lz/2
-        z_min = z_centroid - lz/2
+        z_max = center(3) + lz/2
+        z_min = center(3) - lz/2
 
+        $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,dist_vec,dist,global_dist,global_id,dist_side,dist_surf]', copy='[levelset,levelset_norm]',&
+                  & copyin='[ib_patch_id,center,rotation,inverse_rotation,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
         do l = 0, p
             do j = 0, n
                 do i = 0, m
 
-                    xyz_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, z_cc(l) - z_centroid] ! get coordinate frame centered on IB
+                    xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
 
                     if (xyz_local(2) >= y_centroid) then
@@ -263,9 +267,9 @@ contains
         real(wp) :: min_dist
         real(wp) :: side_dists(4)
 
-        real(wp) :: x_centroid, y_centroid
         real(wp) :: length_x, length_y
         real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
+        real(wp), dimension(2) :: center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
         integer :: i, j, k !< Loop index variables
@@ -273,8 +277,8 @@ contains
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
-        x_centroid = patch_ib(ib_patch_id)%x_centroid
-        y_centroid = patch_ib(ib_patch_id)%y_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid
+        center(2) = patch_ib(ib_patch_id)%y_centroid
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
@@ -283,9 +287,11 @@ contains
         bottom_left(1) = -length_x/2
         bottom_left(2) = -length_y/2
 
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,idx,side_dists,xy_local]', copy='[levelset,levelset_norm]',&
+                  & copyin='[ib_patch_id,center,bottom_left,top_right,initial_distance_buffer,inverse_rotation,rotation]', collapse=2)
         do i = 0, m
             do j = 0, n
-                xy_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp]
+                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
 
                 if ((xy_local(1) > bottom_left(1) .and. xy_local(1) < top_right(1)) .or. &
@@ -336,41 +342,41 @@ contains
 
         integer, intent(IN) :: ib_patch_id
         real(wp) :: Right, Left, Bottom, Top, Front, Back
-        real(wp) :: x, y, z, min_dist
+        real(wp) :: min_dist
         real(wp) :: side_dists(6)
 
-        real(wp) :: x_centroid, y_centroid, z_centroid
+        real(wp), dimension(3) :: center
         real(wp) :: length_x, length_y, length_z
         real(wp), dimension(1:3) :: xyz_local !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
-        integer :: i, j, k, l, idx !< Loop index variables
+        integer :: i, j, k !< Loop index variables
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
         length_z = patch_ib(ib_patch_id)%length_z
 
-        x_centroid = patch_ib(ib_patch_id)%x_centroid
-        y_centroid = patch_ib(ib_patch_id)%y_centroid
-        z_centroid = patch_ib(ib_patch_id)%z_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid
+        center(2) = patch_ib(ib_patch_id)%y_centroid
+        center(3) = patch_ib(ib_patch_id)%z_centroid
 
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
         Right = length_x/2
         Left = -length_x/2
-
         Top = length_y/2
         Bottom = -length_y/2
-
         Front = length_z/2
         Back = -length_z/2
 
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,side_dists,xyz_local]', copy='[levelset,levelset_norm]',&
+                  & copyin='[ib_patch_id,center,inverse_rotation,rotation,Right,Left,Top,Bottom,Front,Back]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
 
-                    xyz_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, z_cc(k) - z_centroid] ! get coordinate frame centered on IB
+                    xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinate
 
                     if ((xyz_local(1) > Left .and. xyz_local(1) < Right) .or. &
@@ -390,8 +396,8 @@ contains
                         ! meaning corners where side_dists are the same will
                         ! trigger on what may not actually be the minimum,
                         ! leading to undesired behavior. This should be resolved
-                        ! and this code should be cleaned up. I verified this behavior
-                        ! with tests.
+                        ! and this code should be cleaned up. It also means that
+                        ! rotating the box 90 degrees will cause tests to fail.
                         levelset_norm%sf(i, j, k, ib_patch_id, :) = 0._wp
                         if (f_approx_equal(min_dist, abs(side_dists(1)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(1)
