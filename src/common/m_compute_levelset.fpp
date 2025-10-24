@@ -457,22 +457,23 @@ contains
         integer, intent(IN) :: ib_patch_id
 
         real(wp) :: radius, dist
-        real(wp) :: x_centroid, y_centroid, z_centroid
-        real(wp), dimension(3) :: dist_vec
+        real(wp), dimension(3) :: dist_vec, center
 
         integer :: i, j, k !< Loop index variables
 
         radius = patch_ib(ib_patch_id)%radius
-        x_centroid = patch_ib(ib_patch_id)%x_centroid
-        y_centroid = patch_ib(ib_patch_id)%y_centroid
-        z_centroid = patch_ib(ib_patch_id)%z_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid
+        center(2) = patch_ib(ib_patch_id)%y_centroid
+        center(3) = patch_ib(ib_patch_id)%z_centroid
 
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,dist_vec,dist]', copy='[levelset,levelset_norm]',&
+                  & copyin='[ib_patch_id,center,radius]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    dist_vec(1) = x_cc(i) - x_centroid
-                    dist_vec(2) = y_cc(j) - y_centroid
-                    dist_vec(3) = z_cc(k) - z_centroid
+                    dist_vec(1) = x_cc(i) - center(1)
+                    dist_vec(2) = y_cc(j) - center(2)
+                    dist_vec(3) = z_cc(k) - center(3)
                     dist = sqrt(sum(dist_vec**2))
                     levelset%sf(i, j, k, ib_patch_id) = dist - radius
                     if (f_approx_equal(dist, 0._wp)) then
@@ -494,54 +495,54 @@ contains
         integer, intent(IN) :: ib_patch_id
 
         real(wp) :: radius
-        real(wp) :: x_centroid, y_centroid, z_centroid
-        real(wp) :: length_x, length_y, length_z
-        real(wp), dimension(3) :: centroid_vec, dist_sides_vec, dist_surface_vec
+        real(wp), dimension(3) :: centroid_vec, dist_sides_vec, dist_surface_vec, length
+        real(wp), dimension(2) :: boundary
         real(wp) :: dist_side, dist_surface, side_pos
-        type(bounds_info) :: boundary
         integer :: i, j, k !< Loop index variables
 
-        real(wp), dimension(1:3) :: xyz_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3) :: xyz_local, center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
         radius = patch_ib(ib_patch_id)%radius
-        x_centroid = patch_ib(ib_patch_id)%x_centroid
-        y_centroid = patch_ib(ib_patch_id)%y_centroid
-        z_centroid = patch_ib(ib_patch_id)%z_centroid
-        length_x = patch_ib(ib_patch_id)%length_x
-        length_y = patch_ib(ib_patch_id)%length_y
-        length_z = patch_ib(ib_patch_id)%length_z
+        center(1) = patch_ib(ib_patch_id)%x_centroid
+        center(2) = patch_ib(ib_patch_id)%y_centroid
+        center(3) = patch_ib(ib_patch_id)%z_centroid
+        length(1) = patch_ib(ib_patch_id)%length_x
+        length(2) = patch_ib(ib_patch_id)%length_y
+        length(3) = patch_ib(ib_patch_id)%length_z
 
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
         if (.not. f_approx_equal(length_x, 0._wp)) then
-            boundary%beg = -0.5_wp*length_x
-            boundary%end = 0.5_wp*length_x
+            boundary(1) = -0.5_wp*length(1)
+            boundary(2) = 0.5_wp*length(1)
             dist_sides_vec = (/1, 0, 0/)
             dist_surface_vec = (/0, 1, 1/)
         else if (.not. f_approx_equal(length_y, 0._wp)) then
-            boundary%beg = -0.5_wp*length_y
-            boundary%end = 0.5_wp*length_y
+            boundary(1) = -0.5_wp*length(2)
+            boundary(2) = 0.5_wp*length(2)
             dist_sides_vec = (/0, 1, 0/)
             dist_surface_vec = (/1, 0, 1/)
         else if (.not. f_approx_equal(length_z, 0._wp)) then
-            boundary%beg = -0.5_wp*length_z
-            boundary%end = 0.5_wp*length_z
+            boundary(1) = -0.5_wp*length(3)
+            boundary(2) = 0.5_wp*length(3)
             dist_sides_vec = (/0, 0, 1/)
             dist_surface_vec = (/1, 1, 0/)
         end if
 
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,dist_vec,side_pos,dist_side,dist_surface,xyz_local]', copy='[levelset,levelset_norm]',&
+                  & copyin='[ib_patch_id,center,radius,inverse_rotation,rotation,dist_sides_vec,dist_surface_vec]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    xyz_local = [x_cc(i) - x_centroid, y_cc(j) - y_centroid, z_cc(k) - z_centroid] ! get coordinate frame centered on IB
+                    xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
 
                     ! get distance to flat edge of cylinder
                     side_pos = dot_product(xyz_local, dist_sides_vec)
-                    dist_side = min(abs(side_pos - boundary%beg), &
-                                    abs(boundary%end - side_pos))
+                    dist_side = min(abs(side_pos - boundary(1)), &
+                                    abs(boundary(2) - side_pos))
                     ! get distance to curved side of cylinder
                     dist_surface = norm2(xyz_local*dist_surface_vec) &
                                    - radius
@@ -549,7 +550,7 @@ contains
                     if (dist_side < abs(dist_surface)) then
                         ! if the closest edge is flat
                         levelset%sf(i, j, k, ib_patch_id) = -dist_side
-                        if (f_approx_equal(dist_side, abs(side_pos - boundary%beg))) then
+                        if (f_approx_equal(dist_side, abs(side_pos - boundary(1)))) then
                             levelset_norm%sf(i, j, k, ib_patch_id, :) = -dist_sides_vec
                         else
                             levelset_norm%sf(i, j, k, ib_patch_id, :) = dist_sides_vec
