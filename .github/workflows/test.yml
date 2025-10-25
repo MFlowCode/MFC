@@ -53,16 +53,16 @@ jobs:
           chmod +x ./scripts/install_dependencies.sh
           ./scripts/install_dependencies.sh
 
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
       - name: Verify dependency installation
         run: |
           cmake --version
           gcc --version
           python3 --version
-
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
 
       - name: Build
         run:  |
