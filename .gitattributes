@@ -1,2 +1,5 @@
+*.fpp text eol=lf
+*.f90 text eol=lf
+*.sh text eol=lf
 /tests/**/* linguist-generated=true
 /toolchain/mechanisms/* linguist-generated=true
