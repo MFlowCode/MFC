@@ -1020,7 +1020,7 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
 
-            !Writeib data
+            !Write ib data
             if (ib) then
                 write (file_loc, '(A)') 'ib.dat'
                 file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)

@@ -264,7 +264,7 @@ contains
 
         integer, intent(in) :: ib_patch_id
         real(wp) :: top_right(2), bottom_left(2)
-        real(wp) :: min_dist
+        real(wp) :: min_dist, initial_min_dist
         real(wp) :: side_dists(4)
 
         real(wp) :: length_x, length_y
@@ -286,9 +286,10 @@ contains
         top_right(2) = length_y/2
         bottom_left(1) = -length_x/2
         bottom_left(2) = -length_y/2
+        initial_min_dist = initial_distance_buffer
 
         $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,idx,side_dists,xy_local,dist_vec]', copy='[levelset,levelset_norm]',&
-                  & copyin='[ib_patch_id,center,bottom_left,top_right,initial_distance_buffer,inverse_rotation,rotation]', collapse=2)
+                  & copyin='[ib_patch_id,center,bottom_left,top_right,initial_min_dist,inverse_rotation,rotation]', collapse=2)
         do i = 0, m
             do j = 0, n
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
@@ -301,7 +302,7 @@ contains
                     side_dists(2) = top_right(1) - xy_local(1)
                     side_dists(3) = bottom_left(2) - xy_local(2)
                     side_dists(4) = top_right(2) - xy_local(2)
-                    min_dist = initial_distance_buffer
+                    min_dist = initial_min_dist
                     idx = 1
 
                     do k = 1, 4

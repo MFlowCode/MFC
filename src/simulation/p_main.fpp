@@ -70,9 +70,6 @@ program p_main
 
     call nvtxEndRange ! INIT
 
-    ! save the data at t_step=0
-    ! call s_save_data(t_step, start, finish, io_time_avg, nt)
-
     call nvtxStartRange("SIMULATION-TIME-MARCH")
     ! Time-stepping Loop
     do
