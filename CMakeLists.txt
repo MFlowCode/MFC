@@ -126,7 +126,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             $<$<COMPILE_LANGUAGE:Fortran>:-fprofile-arcs>
             $<$<COMPILE_LANGUAGE:Fortran>:-ftest-coverage>
             $<$<COMPILE_LANGUAGE:Fortran>:-O1>
-	    )
+        )
 
         add_link_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-lgcov>
@@ -148,7 +148,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             -Wunderflow
             -Wrealloc-lhs
             -Wsurprising
-	    )
+        )
     endif()
 
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)
@@ -195,7 +195,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
-	    $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
     )
 

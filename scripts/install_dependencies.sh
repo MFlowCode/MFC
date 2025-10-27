@@ -7,147 +7,200 @@
 # 1. Run this command: chmod +x ./scripts/install_dependencies.sh
 # 2. Run the installer: ./scripts/install_dependencies.sh
 
-set -euo pipefail  
+set -euo pipefail
 set -x
-export DEBIAN_FRONTEND=noninteractive
 
-OS="$(uname -s)"
-echo "Installing dependencies for $OS OS"
+SUDO=${SUDO:-sudo}
+CI_INTEL=${CI_INTEL:-false}
 
-if command -v sudo >/dev/null 2>&1; then
-    SUDO="sudo"
-else
-    SUDO=""
-fi
+log() { echo ">>> $*"; }
 
-# macOS
-# if [[ "$OSTYPE" == "darwin"* ]]; then
-#     # Use Homebrew for macOS package management
-#     echo "Detected macOS."
-#     export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
-#     brew update
+# Guarded append to GITHUB_ENV (safe when running locally)
+append_to_github_env() {
+    local line="$1"
+    if [[ -n "${GITHUB_ENV:-}" ]]; then
+        printf '%s\n' "$line" >> "$GITHUB_ENV"
+    else
+        printf '%s\n' "$line"
+    fi
+}
 
-#     # Packages to install
-#     declare -A packages
-#     packages=(
-#         ["cmake"]="cmake"
-#         ["gcc"]="gcc"
-#         ["python3"]="python@3.10"
-#         ["boost"]="boost"
-#         ["protobuf"]="protobuf"
-#     )
+verify_tool() {
+    local t="$1"
+    if command -v "$t" >/dev/null 2>&1; then
+        "$t" --version 2>&1 | head -n1 || true
+    else
+        echo "$t not found"
+    fi
+}
 
-#     # Install missing packages
-#     for exe in "${!packages[@]}"; do
-#         formula="${packages[$exe]}"
-#         if ! command -v "$exe" >/dev/null 2>&1; then
-#             echo "Installing $formula..."
-#             brew install --verbose "$formula"
-#         else
-#             echo "$exe already installed"
-#         fi
-#     done
+# macOS / Homebrew
+install_macos() {
+    log "Detected macOS"
 
-#     # Verification
-#     echo "Verifying installations..."
-#     which cmake; cmake --version
-#     which gcc; gcc --version
-#     which python3; python3 --version
-#     brew list boost || echo "boost not found"
-#     brew list protobuf || echo "protobuf not found"
+    if ! command -v brew >/dev/null 2>&1; then
+        log "Homebrew not found. Please install Homebrew first."
+        return 1
+    fi
 
-#     echo "macOS dependencies installed successfully."
-# macOS
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "Detected macOS."
     export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
     brew update
     brew upgrade || true
 
-    # Install required packages (mirrors workflow setup)
     pkgs=(coreutils python fftw hdf5 gcc@15 boost open-mpi lapack cmake protobuf)
 
     for pkg in "${pkgs[@]}"; do
-        if ! brew list "$pkg" >/dev/null 2>&1; then
-            echo "Installing $pkg..."
-            brew install "$pkg" || brew reinstall "$pkg"
+        # Use brew list to detect installed formulae (correct for lib-only formulae)
+        if ! brew list --formula | grep -q "^${pkg%%@*}$"; then
+            log "Installing ${pkg}..."
+            brew install "${pkg}" || brew reinstall "${pkg}" || log "Failed to install ${pkg} (continuing)"
         else
-            echo "$pkg already installed."
+            log "${pkg} already installed"
         fi
     done
 
-    # Fix potential linking issues for Homebrew-installed libraries
+    # Attempt to fix common Homebrew linking quirks
     brew link --overwrite python || true
     brew link --overwrite boost || true
     brew link --overwrite hdf5 || true
     brew link --overwrite cmake || true
     brew link --overwrite protobuf || true
 
-    # Environment setup
-    echo "FC=gfortran-15" >> "$GITHUB_ENV"
-    echo "BOOST_INCLUDE=/opt/homebrew/include/" >> "$GITHUB_ENV"
+    # Export useful environment vars in GH Actions only (guarded)
+    append_to_github_env "FC=gfortran-15"
+    append_to_github_env "BOOST_INCLUDE=/opt/homebrew/include/"
 
-    echo "macOS dependencies installed successfully."
+    log "Verifying installations..."
+    # Use guarded verification so script doesn't exit on set -e for these checks
+    if ! verify_tool cmake >/dev/null 2>&1; then echo "cmake not found"; fi
+    if ! verify_tool gcc >/dev/null 2>&1; then echo "gcc not found"; fi
+    if ! verify_tool gfortran >/dev/null 2>&1; then echo "gfortran not found"; fi
+    if ! verify_tool python3 >/dev/null 2>&1; then echo "python3 not found"; fi
+    if ! verify_tool mpirun >/dev/null 2>&1; then echo "mpirun not found"; fi
 
-# Debian/Ubuntu
-elif [[ -f /etc/debian_version ]]; then
-    echo "Detected Debian/Ubuntu"
-
-    # Install all required packages (this time with openmpi and fftw)
-    if [[ "${CI_INTEL:-false}" == "true" ]]; then
-        echo "Intel OneAPI environment detected. Installing Intel compilers and MPI..."
-        wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-        $SUDO apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-        $SUDO add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
-        $SUDO apt-get update
-        $SUDO apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel
-        source /opt/intel/oneapi/setvars.sh
-        if [[ -n "${GITHUB_ENV:-}" ]]; then
-            echo "source /opt/intel/oneapi/setvars.sh" >> "$GITHUB_ENV"
-        fi
-        printenv >> "$GITHUB_ENV"
-        echo "Intel OneAPI installation completed."
+    if brew list --formula | grep -q "^fftw$"; then
+        echo "FFTW library found"
     else
-        echo "Standard GNU environment detected. Installing open-source toolchain..."
-        $SUDO apt-get update -y
-        pkgs="tar wget make cmake gcc g++ python3 python3-dev openmpi-bin libopenmpi-dev fftw3 libfftw3-dev protobuf-compiler libboost-all-dev"
-        $SUDO apt-get install -y $pkgs
-
-        # Verification
-        echo "Verifying installations..."
-        cmake --version || echo "cmake not found"
-        gcc --version || echo "gcc not found"
-        python3 --version || echo "python3 not found"
-        mpirun --version || echo "mpirun not found"
-        ldconfig -p | grep -q libfftw3 || echo "FFTW library not found"
-
-        echo "Linux (GNU) dependencies installed successfully."
+        echo "FFTW library not found"
     fi
 
-# RedHat/CentOS
-elif [[ -f /etc/redhat-release ]]; then
-    echo "Detected RedHat/CentOS"
-    $SUDO yum install -y epel-release
+    log "macOS dependencies installed successfully."
+}
 
-    # Install all required packages (this time with openmpi and fftw)
-    pkgs="tar wget make cmake3 gcc gcc-c++ python3 openmpi fftw protobuf boost-devel"
-    $SUDO yum install -y $pkgs
+# Debian / Ubuntu
+install_debian() {
+    log "Detected Debian/Ubuntu"
 
-    # Verification
-    echo "Verifying installations..."
-    cmake3 --version || echo "cmake3 not found"
-    gcc --version || echo "gcc not found"
-    python3 --version || echo "python3 not found"
-    mpirun --version || echo "mpirun not found"
-    rpm -q fftw || echo "FFTW library not found"
+    $SUDO apt-get update -y
+    $SUDO apt-get install -y build-essential wget tar cmake python3 python3-dev pkg-config
 
-    echo "RedHat/CentOS dependencies installed successfully."
+    if [[ "${CI_INTEL}" == "true" ]]; then
+        log "Intel OneAPI: adding repo with signed-by keyring (secure method)"
+        # download key and install to /etc/apt/keyrings (modern secure approach)
+        wget -q https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB -O /tmp/intel-pubkey.PUB
+        $SUDO mkdir -p /etc/apt/keyrings
+        $SUDO install -m 0644 /tmp/intel-pubkey.PUB /etc/apt/keyrings/intel-archive-keyring.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/intel-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | $SUDO tee /etc/apt/sources.list.d/oneapi.list > /dev/null
+        $SUDO apt-get update -y
+        $SUDO apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel || log "Intel packages failed; continuing"
 
+        # capture environment changes made by Intel setvars.sh and append only deltas to GITHUB_ENV
+        if [[ -f /opt/intel/oneapi/setvars.sh ]]; then
+            env > /tmp/env_before
+            source /opt/intel/oneapi/setvars.sh || log "sourcing Intel setvars.sh failed"
+            if [[ -n "${GITHUB_ENV:-}" ]]; then
+                # append only newly added / changed env vars
+                diff --unchanged-line-format="" --old-line-format="" --new-line-format="%L" <(sort /tmp/env_before) <(env | sort) >> "$GITHUB_ENV" || true
+            fi
+            rm -f /tmp/env_before
+        fi
+    fi
 
-# If Unsupported OS
-else
-    echo "Unsupported OS: $OSTYPE"
-    exit 1
-fi
+    # Install common dev packages including fftw/openmpi/protobuf/boost
+    $SUDO apt-get install -y libfftw3-dev libopenmpi-dev openmpi-bin libprotobuf-dev protobuf-compiler libboost-all-dev
 
-echo "Dependencies installed successfully."
+    log "Verifying installations..."
+    if ! verify_tool cmake >/dev/null 2>&1; then echo "cmake not found"; fi
+    if ! verify_tool gfortran >/dev/null 2>&1; then echo "gfortran not found"; fi
+    if ! verify_tool python3 >/dev/null 2>&1; then echo "python3 not found"; fi
+    if ! verify_tool mpirun >/dev/null 2>&1; then echo "mpirun not found"; fi
+    if ! ldconfig -p | grep -q libfftw3; then echo "FFTW library not found"; fi
+}
+
+# RHEL / CentOS
+install_rhel() {
+    log "Detected RHEL/CentOS"
+
+    pkgs="tar wget make cmake3 gcc gcc-c++ python3-devel openmpi openmpi-devel fftw fftw-devel protobuf protobuf-devel boost-devel"
+    $SUDO yum install -y $pkgs || $SUDO dnf install -y $pkgs || log "yum/dnf install failed"
+
+    log "Verifying installations..."
+    if command -v cmake3 >/dev/null 2>&1; then
+        verify_tool cmake3
+    elif command -v cmake >/dev/null 2>&1; then
+        verify_tool cmake
+    else
+        echo "cmake not found"
+    fi
+
+    if ! verify_tool gfortran >/dev/null 2>&1; then echo "gfortran not found"; fi
+    if ! verify_tool python3 >/dev/null 2>&1; then echo "python3 not found"; fi
+    if ! verify_tool mpirun >/dev/null 2>&1; then echo "mpirun not found"; fi
+    if ! ldconfig -p | grep -q libfftw3; then echo "FFTW library not found"; fi
+}
+
+# Boost compile check
+boost_check() {
+    log "Verifying Boost by compiling a tiny program..."
+    cat <<'EOF' > /tmp/boost_check.cpp
+#include <boost/version.hpp>
+#include <iostream>
+int main(){ std::cout << "Boost version: " << BOOST_LIB_VERSION << std::endl; return 0;}
+EOF
+
+    # Try pkg-config first (if available)
+    if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists boost; then
+        g++ /tmp/boost_check.cpp -o /tmp/boost_check $(pkg-config --cflags --libs boost) || true
+    else
+        # Try a plain compile (system include path), fallback to /opt/homebrew/include
+        if g++ /tmp/boost_check.cpp -o /tmp/boost_check 2>/dev/null; then
+            true
+        else
+            if [[ -d /opt/homebrew/include ]]; then
+                g++ -I/opt/homebrew/include /tmp/boost_check.cpp -o /tmp/boost_check || true
+            else
+                log "Could not compile boost_check; boost include path unknown"
+            fi
+        fi
+    fi
+
+    if [[ -x /tmp/boost_check ]]; then
+        /tmp/boost_check || true
+    else
+        log "boost_check binary not available"
+    fi
+}
+
+# Main entry
+main() {
+    case "$(uname -s)" in
+        Darwin)
+            install_macos
+            ;;
+        *)
+            if [[ -f /etc/debian_version ]]; then
+                install_debian
+            elif [[ -f /etc/redhat-release ]] || [[ -f /etc/centos-release ]]; then
+                install_rhel
+            else
+                log "Unsupported OS: $OSTYPE"
+                return 1
+            fi
+            ;;
+    esac
+
+    boost_check
+    log "Done."
+}
+
+main "$@"

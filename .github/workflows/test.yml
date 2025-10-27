@@ -48,21 +48,22 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
-      - name: Install Dependencies (Unified Script)
-        run: |
-          chmod +x ./scripts/install_dependencies.sh
-          ./scripts/install_dependencies.sh
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Make dependency installer executable
+        run: chmod +x ./scripts/install_dependencies.sh
+
+      - name: Run dependency installer
+        run: ./scripts/install_dependencies.sh
 
       - name: Verify dependency installation
         run: |
           cmake --version
           gcc --version
           python3 --version
-
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
 
       - name: Build
         run:  |
