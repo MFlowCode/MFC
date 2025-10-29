@@ -1,3 +1,5 @@
+#:include 'macros.fpp'
+
 !>
 !! @file m_start_up.f90
 !! @brief  Contains module m_start_up
@@ -6,9 +8,12 @@
 !!              consistency of the user provided inputs. This module also allocates, initializes and
 !!              deallocates the relevant variables and sets up the time stepping,
 !!              MPI decomposition and I/O procedures
+
 module m_start_up
 
     ! Dependencies
+
+    use, intrinsic :: iso_c_binding
 
     use m_derived_types         !< Definitions of the derived types
 
@@ -45,7 +50,26 @@ module m_start_up
 
     use m_chemistry
 
+#ifdef MFC_MPI
+    use mpi                    !< Message passing interface (MPI) module
+#endif
+
     implicit none
+
+    include 'fftw3.f03'
+
+    type(c_ptr) :: fwd_plan_x, fwd_plan_y, fwd_plan_z
+    complex(c_double_complex), allocatable :: data_in(:), data_out(:)
+    complex(c_double_complex), allocatable :: data_cmplx(:, :, :), data_cmplx_y(:, :, :), data_cmplx_z(:, :, :)
+    real(wp), allocatable, dimension(:, :, :) :: En_real
+    real(wp), allocatable, dimension(:) :: En
+    integer :: num_procs_x, num_procs_y, num_procs_z
+    integer :: Nx, Ny, Nz, Nxloc, Nyloc, Nyloc2, Nzloc, Nf
+    integer :: ierr
+    integer :: MPI_COMM_CART, MPI_COMM_CART12, MPI_COMM_CART13
+    integer, dimension(3) :: cart3d_coords
+    integer, dimension(2) :: cart2d12_coords, cart2d13_coords
+    integer :: proc_rank12, proc_rank13
 
 contains
 
@@ -76,7 +100,7 @@ contains
             hypoelasticity, G, mhd, &
             chem_wrt_Y, chem_wrt_T, avg_state, &
             alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
-            E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
+            E_wrt, fft_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
             heat_ratio_wrt, pi_inf_wrt, pres_inf_wrt, &
             cons_vars_wrt, prim_vars_wrt, c_wrt, &
             omega_wrt, qm_wrt, liutex_wrt, schlieren_wrt, schlieren_alpha, &
@@ -90,7 +114,11 @@ contains
             cfl_target, surface_tension, bubbles_lagrange, &
             sim_data, hyperelasticity, Bx0, relativity, cont_damage, &
             num_bc_patches, igr, igr_order, down_sample, recon_type, &
-            muscl_order
+            muscl_order, lag_header, lag_txt_wrt, lag_db_wrt, &
+            lag_id_wrt, lag_pos_wrt, lag_pos_prev_wrt, lag_vel_wrt, &
+            lag_rad_wrt, lag_rvel_wrt, lag_r0_wrt, lag_rmax_wrt, &
+            lag_rmin_wrt, lag_dphidt_wrt, lag_pres_wrt, lag_mv_wrt, &
+            lag_mg_wrt, lag_betaT_wrt, lag_betaC_wrt
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -176,15 +204,15 @@ contains
         integer, intent(inout) :: t_step
         if (proc_rank == 0) then
             if (cfl_dt) then
-                print '(" [", I3, "%]  Saving ", I8, " of ", I0, "")', &
+                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', &
                     int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), &
-                    t_step, n_save
+                    t_step, n_save, wall_time_avg, wall_time
             else
-                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " @ t_step = ", I0, "")', &
+                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " @ t_step = ", I8, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', &
                     int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                     (t_step - t_step_start)/t_step_save + 1, &
                     (t_step_stop - t_step_start)/t_step_save + 1, &
-                    t_step
+                    t_step, wall_time_avg, wall_time
             end if
         end if
 
@@ -217,8 +245,10 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end, &
                             -offset_y%beg:n + offset_y%end, &
                             -offset_z%beg:p + offset_z%end, 3) :: liutex_axis
-        integer :: i, j, k, l
-
+        integer :: i, j, k, l, kx, ky, kz, kf, j_glb, k_glb, l_glb
+        real(wp) :: En_tot
+        character(50) :: filename, dirname
+        logical :: file_exists, dir_exists
         integer :: x_beg, x_end, y_beg, y_end, z_beg, z_end
 
         if (output_partial_domain) then
@@ -386,6 +416,112 @@ contains
             call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
+
+        end if
+
+        !Adding Energy cascade FFT
+        if (fft_wrt) then
+
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        data_cmplx(j + 1, k + 1, l + 1) = cmplx(q_cons_vf(mom_idx%beg)%sf(j, k, l)/q_cons_vf(1)%sf(j, k, l), 0._wp)
+                    end do
+                end do
+            end do
+
+            call s_mpi_FFT_fwd()
+
+            En_real = 0.5_wp*abs(data_cmplx_z)**2._wp/(1._wp*Nx*Ny*Nz)**2._wp
+
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        data_cmplx(j + 1, k + 1, l + 1) = cmplx(q_cons_vf(mom_idx%beg + 1)%sf(j, k, l)/q_cons_vf(1)%sf(j, k, l), 0._wp)
+                    end do
+                end do
+            end do
+
+            call s_mpi_FFT_fwd()
+
+            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp/(1._wp*Nx*Ny*Nz)**2._wp
+
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        data_cmplx(j + 1, k + 1, l + 1) = cmplx(q_cons_vf(mom_idx%beg + 2)%sf(j, k, l)/q_cons_vf(1)%sf(j, k, l), 0._wp)
+                    end do
+                end do
+            end do
+
+            call s_mpi_FFT_fwd()
+
+            En_real = En_real + 0.5_wp*abs(data_cmplx_z)**2._wp/(1._wp*Nx*Ny*Nz)**2._wp
+
+            do kf = 1, Nf
+                En(kf) = 0._wp
+            end do
+
+            do l = 1, Nz
+                do k = 1, Nyloc2
+                    do j = 1, Nxloc
+
+                        j_glb = j + cart3d_coords(2)*Nxloc
+                        k_glb = k + cart3d_coords(3)*Nyloc2
+                        l_glb = l
+
+                        if (j_glb >= (m_glb + 1)/2) then
+                            kx = (j_glb - 1) - (m_glb + 1)
+                        else
+                            kx = j_glb - 1
+                        end if
+
+                        if (k_glb >= (n_glb + 1)/2) then
+                            ky = (k_glb - 1) - (n_glb + 1)
+                        else
+                            ky = k_glb - 1
+                        end if
+
+                        if (l_glb >= (p_glb + 1)/2) then
+                            kz = (l_glb - 1) - (p_glb + 1)
+                        else
+                            kz = l_glb - 1
+                        end if
+
+                        kf = nint(sqrt(kx**2._wp + ky**2._wp + kz**2._wp)) + 1
+
+                        En(kf) = En(kf) + En_real(j, k, l)
+
+                    end do
+                end do
+            end do
+
+            call MPI_ALLREDUCE(MPI_IN_PLACE, En, Nf, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+
+            if (proc_rank == 0) then
+                call s_create_directory('En_FFT_DATA')
+                write (filename, '(a,i0,a)') 'En_FFT_DATA/En_tot', t_step, '.dat'
+                inquire (FILE=filename, EXIST=file_exists)
+                if (file_exists) then
+                    call s_delete_file(trim(filename))
+                end if
+            end if
+
+            do kf = 1, Nf
+                if (proc_rank == 0) then
+                    write (filename, '(a,i0,a)') 'En_FFT_DATA/En_tot', t_step, '.dat'
+                    inquire (FILE=filename, EXIST=file_exists)
+                    if (file_exists) then
+                        open (1, file=filename, position='append', status='old')
+                        write (1, *) En(kf), t_step
+                        close (1)
+                    else
+                        open (1, file=filename, status='new')
+                        write (1, *) En(kf), t_step
+                        close (1)
+                    end if
+                end if
+            end do
 
         end if
 
@@ -719,7 +855,8 @@ contains
             call s_write_variable_to_formatted_database_file(varname, t_step)
             varname(:) = ' '
 
-            call s_write_lag_bubbles_results(t_step) !! Individual bubble evolution
+            if (lag_txt_wrt) call s_write_lag_bubbles_results_to_text(t_step) ! text output
+            if (lag_db_wrt) call s_write_lag_bubbles_to_formatted_database_file(t_step) ! silo file output
         end if
 
         if (sim_data .and. proc_rank == 0) then
@@ -732,9 +869,83 @@ contains
 
     end subroutine s_save_data
 
+    subroutine s_mpi_transpose_x2y
+        complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
+        integer :: dest_rank, src_rank
+        integer :: i, j, k, l
+
+        allocate (sendbuf(Nx*Nyloc*Nzloc))
+        allocate (recvbuf(Nx*Nyloc*Nzloc))
+
+        do dest_rank = 0, num_procs_y - 1
+            do l = 1, Nzloc
+                do k = 1, Nyloc
+                    do j = 1, Nxloc
+                        sendbuf(j + (k - 1)*Nxloc + (l - 1)*Nxloc*Nyloc + dest_rank*Nxloc*Nyloc*Nzloc) = data_cmplx(j + dest_rank*Nxloc, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+        call MPI_Alltoall(sendbuf, Nxloc*Nyloc*Nzloc, MPI_C_DOUBLE_COMPLEX, &
+                          recvbuf, Nxloc*Nyloc*Nzloc, MPI_C_DOUBLE_COMPLEX, MPI_COMM_CART12, ierr)
+
+        do src_rank = 0, num_procs_y - 1
+            do l = 1, Nzloc
+                do k = 1, Nyloc
+                    do j = 1, Nxloc
+                        data_cmplx_y(j, k + src_rank*Nyloc, l) = recvbuf(j + (k - 1)*Nxloc + (l - 1)*Nxloc*Nyloc + src_rank*Nxloc*Nyloc*Nzloc)
+                    end do
+                end do
+            end do
+        end do
+
+        deallocate (sendbuf)
+        deallocate (recvbuf)
+
+    end subroutine s_mpi_transpose_x2y
+
+    subroutine s_mpi_transpose_y2z
+        complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
+        integer :: dest_rank, src_rank
+        integer :: j, k, l
+
+        allocate (sendbuf(Ny*Nxloc*Nzloc))
+        allocate (recvbuf(Ny*Nxloc*Nzloc))
+
+        do dest_rank = 0, num_procs_z - 1
+            do l = 1, Nzloc
+                do j = 1, Nxloc
+                    do k = 1, Nyloc2
+                        sendbuf(k + (j - 1)*Nyloc2 + (l - 1)*(Nyloc2*Nxloc) + dest_rank*Nyloc2*Nxloc*Nzloc) = data_cmplx_y(j, k + dest_rank*Nyloc2, l)
+                    end do
+                end do
+            end do
+        end do
+
+        call MPI_Alltoall(sendbuf, Nyloc2*Nxloc*Nzloc, MPI_C_DOUBLE_COMPLEX, &
+                          recvbuf, Nyloc2*Nxloc*Nzloc, MPI_C_DOUBLE_COMPLEX, MPI_COMM_CART13, ierr)
+
+        do src_rank = 0, num_procs_z - 1
+            do l = 1, Nzloc
+                do j = 1, Nxloc
+                    do k = 1, Nyloc2
+                        data_cmplx_z(j, k, l + src_rank*Nzloc) = recvbuf(k + (j - 1)*Nyloc2 + (l - 1)*(Nyloc2*Nxloc) + src_rank*Nyloc2*Nxloc*Nzloc)
+                    end do
+                end do
+            end do
+        end do
+
+        deallocate (sendbuf)
+        deallocate (recvbuf)
+
+    end subroutine s_mpi_transpose_y2z
+
     impure subroutine s_initialize_modules
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
+        integer :: size_n(1), inembed(1), onembed(1)
+
         call s_initialize_global_parameters_module()
         if (bubbles_euler .and. nb > 1) then
             call s_simpson(weight, R0)
@@ -758,7 +969,142 @@ contains
         else
             s_read_data_files => s_read_parallel_data_files
         end if
+
+        if (fft_wrt) then
+
+            num_procs_x = (m_glb + 1)/(m + 1)
+            num_procs_y = (n_glb + 1)/(n + 1)
+            num_procs_z = (p_glb + 1)/(p + 1)
+
+            Nx = m_glb + 1
+            Ny = n_glb + 1
+            Nz = p_glb + 1
+
+            Nxloc = (m_glb + 1)/num_procs_y
+            Nyloc = n + 1
+            Nyloc2 = (n_glb + 1)/num_procs_z
+            Nzloc = p + 1
+
+            Nf = max(Nx, Ny, Nz)
+
+            @:ALLOCATE(data_in(Nx*Nyloc*Nzloc))
+            @:ALLOCATE(data_out(Nx*Nyloc*Nzloc))
+
+            @:ALLOCATE(data_cmplx(Nx, Nyloc, Nzloc))
+            @:ALLOCATE(data_cmplx_y(Nxloc, Ny, Nzloc))
+            @:ALLOCATE(data_cmplx_z(Nxloc, Nyloc2, Nz))
+
+            @:ALLOCATE(En_real(Nxloc, Nyloc2, Nz))
+            @:ALLOCATE(En(Nf))
+
+            size_n(1) = Nx
+            inembed(1) = Nx
+            onembed(1) = Nx
+
+            fwd_plan_x = fftw_plan_many_dft(1, size_n, Nyloc*Nzloc, &
+                                            data_in, inembed, 1, Nx, &
+                                            data_out, onembed, 1, Nx, &
+                                            FFTW_FORWARD, FFTW_MEASURE)
+
+            size_n(1) = Ny
+            inembed(1) = Ny
+            onembed(1) = Ny
+
+            fwd_plan_y = fftw_plan_many_dft(1, size_n, Nxloc*Nzloc, &
+                                            data_out, inembed, 1, Ny, &
+                                            data_in, onembed, 1, Ny, &
+                                            FFTW_FORWARD, FFTW_MEASURE)
+
+            size_n(1) = Nz
+            inembed(1) = Nz
+            onembed(1) = Nz
+
+            fwd_plan_z = fftw_plan_many_dft(1, size_n, Nxloc*Nyloc2, &
+                                            data_in, inembed, 1, Nz, &
+                                            data_out, onembed, 1, Nz, &
+                                            FFTW_FORWARD, FFTW_MEASURE)
+
+            call MPI_CART_CREATE(MPI_COMM_WORLD, 3, (/num_procs_x, &
+                                                      num_procs_y, num_procs_z/), &
+                                 (/.true., .true., .true./), &
+                                 .false., MPI_COMM_CART, ierr)
+            call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, &
+                                 cart3d_coords, ierr)
+
+            call MPI_Cart_SUB(MPI_COMM_CART, (/.true., .true., .false./), MPI_COMM_CART12, ierr)
+            call MPI_COMM_RANK(MPI_COMM_CART12, proc_rank12, ierr)
+            call MPI_CART_COORDS(MPI_COMM_CART12, proc_rank12, 2, cart2d12_coords, ierr)
+
+            call MPI_Cart_SUB(MPI_COMM_CART, (/.true., .false., .true./), MPI_COMM_CART13, ierr)
+            call MPI_COMM_RANK(MPI_COMM_CART13, proc_rank13, ierr)
+            call MPI_CART_COORDS(MPI_COMM_CART13, proc_rank13, 2, cart2d13_coords, ierr)
+
+        end if
     end subroutine s_initialize_modules
+
+    subroutine s_mpi_FFT_fwd
+
+        integer :: j, k, l
+
+        do l = 1, Nzloc
+            do k = 1, Nyloc
+                do j = 1, Nx
+                    data_in(j + (k - 1)*Nx + (l - 1)*Nx*Nyloc) = data_cmplx(j, k, l)
+                end do
+            end do
+        end do
+
+        call fftw_execute_dft(fwd_plan_x, data_in, data_out)
+
+        do l = 1, Nzloc
+            do k = 1, Nyloc
+                do j = 1, Nx
+                    data_cmplx(j, k, l) = data_out(j + (k - 1)*Nx + (l - 1)*Nx*Nyloc)
+                end do
+            end do
+        end do
+
+        call s_mpi_transpose_x2y !!Change Pencil from data_cmplx to data_cmpx_y
+
+        do l = 1, Nzloc
+            do k = 1, Nxloc
+                do j = 1, Ny
+                    data_out(j + (k - 1)*Ny + (l - 1)*Ny*Nxloc) = data_cmplx_y(k, j, l)
+                end do
+            end do
+        end do
+
+        call fftw_execute_dft(fwd_plan_y, data_out, data_in)
+
+        do l = 1, Nzloc
+            do k = 1, Nxloc
+                do j = 1, Ny
+                    data_cmplx_y(k, j, l) = data_in(j + (k - 1)*Ny + (l - 1)*Ny*Nxloc)
+                end do
+            end do
+        end do
+
+        call s_mpi_transpose_y2z !!Change Pencil from data_cmplx_y to data_cmpx_z
+
+        do l = 1, Nyloc2
+            do k = 1, Nxloc
+                do j = 1, Nz
+                    data_in(j + (k - 1)*Nz + (l - 1)*Nz*Nxloc) = data_cmplx_z(k, l, j)
+                end do
+            end do
+        end do
+
+        call fftw_execute_dft(fwd_plan_z, data_in, data_out)
+
+        do l = 1, Nyloc2
+            do k = 1, Nxloc
+                do j = 1, Nz
+                    data_cmplx_z(k, l, j) = data_out(j + (k - 1)*Nz + (l - 1)*Nz*Nxloc)
+                end do
+            end do
+        end do
+
+    end subroutine s_mpi_FFT_fwd
 
     impure subroutine s_initialize_mpi_domain
         ! Initialization of the MPI environment
@@ -782,6 +1128,7 @@ contains
         call s_mpi_bcast_user_inputs()
         call s_initialize_parallel_io()
         call s_mpi_decompose_computational_domain()
+        call s_check_inputs_fft()
 
     end subroutine s_initialize_mpi_domain
 
@@ -793,6 +1140,26 @@ contains
 !            call s_close_intf_data_file()
 !            call s_close_energy_data_file()
 !        end if
+
+        if (fft_wrt) then
+            if (c_associated(fwd_plan_x)) call fftw_destroy_plan(fwd_plan_x)
+            if (c_associated(fwd_plan_y)) call fftw_destroy_plan(fwd_plan_y)
+            if (c_associated(fwd_plan_z)) call fftw_destroy_plan(fwd_plan_z)
+            if (allocated(data_in)) deallocate (data_in)
+            if (allocated(data_out)) deallocate (data_out)
+            if (allocated(data_cmplx)) deallocate (data_cmplx)
+            if (allocated(data_cmplx_y)) deallocate (data_cmplx_y)
+            if (allocated(data_cmplx_z)) deallocate (data_cmplx_z)
+            if (allocated(En_real)) deallocate (En_real)
+            if (allocated(En)) deallocate (En)
+            call fftw_cleanup()
+        end if
+
+        if (fft_wrt) then
+            if (MPI_COMM_CART12 /= MPI_COMM_NULL) call MPI_Comm_free(MPI_COMM_CART12, ierr)
+            if (MPI_COMM_CART13 /= MPI_COMM_NULL) call MPI_Comm_free(MPI_COMM_CART13, ierr)
+            if (MPI_COMM_CART /= MPI_COMM_NULL) call MPI_Comm_free(MPI_COMM_CART, ierr)
+        end if
 
         ! Deallocation procedures for the modules
         call s_finalize_data_output_module()
