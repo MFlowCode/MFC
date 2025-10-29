@@ -181,12 +181,12 @@ contains
         !! @param icfl_sf cell-centered inviscid cfl number
         !! @param vcfl_sf (optional) cell-centered viscous CFL number
         !! @param Rc_sf (optional) cell centered Rc
-    pure subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf, ccfl_sf)
+    pure subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in), dimension(num_vels) :: vel
         real(wp), intent(in) :: c, rho
         real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: icfl_sf
-        real(wp), dimension(0:m, 0:n, 0:p), intent(inout), optional :: vcfl_sf, Rc_sf, ccfl_sf
+        real(wp), dimension(0:m, 0:n, 0:p), intent(inout), optional :: vcfl_sf, Rc_sf
         real(wp), dimension(2), intent(in) :: Re_l
         integer, intent(in) :: j, k, l
 
@@ -231,19 +231,6 @@ contains
             end if
         end if
 
-        if (surface_tension) then
-            if (p > 0) then ! 3D
-                if (grid_geometry == 3) then
-                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    ccfl_sf(j, k, l) = dt/sqrt(rho * min(dx(j), dy(k), fltr_dtheta)**3._wp / sigma)
-                else
-                    ccfl_sf(j, k, l) = dt/sqrt(rho * min(dx(j), dy(k), dz(l))**3._wp / sigma)
-                end if
-            elseif (n > 0) then ! 2D
-                ccfl_sf(j, k, l) = dt/sqrt(rho * min(dx(j), dy(k))**3._wp / sigma)
-            end if
-        end if
-
     end subroutine s_compute_stability_from_dt
 
     !> Computes dt for a specified CFL number
@@ -262,7 +249,7 @@ contains
         real(wp), dimension(2), intent(in) :: Re_l
         integer, intent(in) :: j, k, l
 
-        real(wp) :: icfl_dt, vcfl_dt, ccfl_dt
+        real(wp) :: icfl_dt, vcfl_dt
         real(wp) :: fltr_dtheta
 
         ! Inviscid CFL calculation
@@ -292,25 +279,8 @@ contains
             end if
         end if
 
-        if (surface_tension) then
-            if (p > 0) then ! 3D
-                if (grid_geometry == 3) then
-                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    ccfl_dt = cfl_target*sqrt(rho * min(dx(j), dy(k), fltr_dtheta)**3._wp / sigma)
-                else
-                    ccfl_dt = cfl_target*sqrt(rho * min(dx(j), dy(k), dz(l))**3._wp / sigma)
-                end if
-            elseif (n > 0) then ! 2D
-                ccfl_dt = cfl_target*sqrt(rho * min(dx(j), dy(k))**3._wp / sigma)
-            end if
-        end if
-
-        if (any(Re_size > 0) .and. sigma > 0) then
-            max_dt(j, k, l) = min(icfl_dt, vcfl_dt, ccfl_dt)
-        elseif (any(Re_size > 0)) then
+        if (viscous) then
             max_dt(j, k, l) = min(icfl_dt, vcfl_dt)
-        elseif (sigma > 0) then
-            max_dt(j, k, l) = min(icfl_dt, ccfl_dt)
         else
             max_dt(j, k, l) = icfl_dt
         end if

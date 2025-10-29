@@ -452,7 +452,6 @@ module m_derived_types
         integer :: drag_model               !< Particle drag model
         logical :: pressure_force           !< Include pressure force translational motion
         logical :: gravity_force            !< Include gravity force in translational motion
-        logical :: momentum_transfer_force  !< Include momentum transfer from radial dynamics in translational motion
         character(LEN=pathlen_max) :: input_path !< Path to lag_bubbles.dat
         real(wp) :: c_d                     !< Drag coefficient
         real(wp) :: epsilonb         !< Standard deviation scaling for the gaussian function

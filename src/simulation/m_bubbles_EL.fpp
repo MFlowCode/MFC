@@ -752,14 +752,14 @@ contains
                     elseif (lag_params%vel_model == 2) then
                         mtn_dposdt(k, l, stage) = myVel(l)
                         f_b = f_get_bubble_force(myPos(l), &
-                                                 myR, myV, myVel, &
+                                                 myR, myV, myVel(l), &
                                                  myMass_n, myMass_v, &
                                                  Re(1), myRho, cell, l, q_prim_vf)
                         mtn_dveldt(k, l, stage) = f_b / (myMass_n + myMass_v)
                     elseif (lag_params%vel_model == 3) then
                         mtn_dposdt(k, l, stage) = myVel(l)
                         f_b = f_get_bubble_force(myPos(l), &
-                                                 myR, myV, myVel, &
+                                                 myR, myV, myVel(l), &
                                                  myMass_n, myMass_v, &
                                                  Re(1), myRho, cell, l, q_prim_vf)
                         mtn_dveldt(k, l, stage) = 2._wp * f_b / (myMass_n + myMass_v) - 3._wp * myV * myVel(l) / myR

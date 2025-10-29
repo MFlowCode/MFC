@@ -574,7 +574,7 @@ contains
                             end do
                         elseif (lag_params%vel_model == 2) then
                             do l = 1, num_dims
-                                f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel, fmass_n, fmass_v, &
+                                f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel(l), fmass_n, fmass_v, &
                                                            fRe, fRho, cell, l, q_prim_vf)
                                 aTemp = f_bTemp/(fmass_n + fmass_v)
                                 fPos(l) = fPos(l) + h * fVel(l)
@@ -582,7 +582,7 @@ contains
                             end do
                         elseif (lag_params%vel_model == 3) then
                             do l = 1, num_dims
-                                f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel, fmass_n, fmass_v, &
+                                f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel(l), fmass_n, fmass_v, &
                                                            fRe, fRho, cell, l, q_prim_vf)
                                 aTemp = 2._wp * f_bTemp / (fmass_n + fmass_v) - 3 * fV * fVel(l) / fR
                                 fPos(l) = fPos(l) + h * fVel(l)

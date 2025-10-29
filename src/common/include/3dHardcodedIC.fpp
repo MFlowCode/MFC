@@ -152,14 +152,14 @@
         alph = 0.5_wp * (1 + (1._wp - 2._wp * eps) * &
                     tanh((ih(start_idx(2) + j,start_idx(3) + k)  - x_cc(i))*(0.5_wp / dx)))
 
-        q_prim_vf(advxb)%sf(i,j,k) = 1._wp - alph
-        q_prim_vf(advxe)%sf(i,j,k) = alph
+        q_prim_vf(advxb)%sf(i,j,k) = alph
+        q_prim_vf(advxe)%sf(i,j,k) = 1._wp - alph
 
         q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k) * (950._wp / 1000._wp)
         q_prim_vf(contxe)%sf(i,j,k) = q_prim_vf(advxe)%sf(i,j,k) * (1._wp / 1000._wp)
 
-        h = x_cc(i) - ih(start_idx(2) + j, start_idx(3) + k)
-        q_prim_vf(momxb)%sf(i,j,k) = -1._wp * (ih(start_idx(2) + j, start_idx(3) + k) - normFac) * exp(-h * h / 1000) / 100._wp
+        !h = x_cc(i) - ih(start_idx(2) + j, start_idx(3) + k)
+        !q_prim_vf(momxb)%sf(i,j,k) = -1._wp * (ih(start_idx(2) + j, start_idx(3) + k) - normFac) * exp(-h * h / 1000) / 100._wp
 
         q_prim_vf(E_idx)%sf(i,j,k) = p0 + &
             (q_prim_vf(contxb)%sf(i,j,k) + q_prim_vf(contxe)%sf(i,j,k)) * g0 * &
