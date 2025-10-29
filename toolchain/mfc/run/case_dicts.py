@@ -106,7 +106,6 @@ PRE_PROCESS.update({
     'elliptic_smoothing_iters': ParamType.INT,
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
-    'lag_params%vel_model': ParamType.INT,
     'fd_order': ParamType.INT,
     'normFac': ParamType.REAL,
     'interface_file': ParamType.STR,
@@ -333,16 +332,18 @@ SIMULATION.update({
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
              'write_bubbles', 'write_bubbles_stats', 'pressure_force',
-             'gravity_force', 'momentum_transfer_force', 'write_void_evol']:
+             'gravity_force', 'write_void_evol']:
     SIMULATION[f'lag_params%{var}'] = ParamType.LOG
 
 for var in [ 'solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb',
-             'vel_model', 'drag_model']:
+             'vel_model', 'drag_model', 'vel_model']:
     SIMULATION[f'lag_params%{var}'] = ParamType.INT
 
 for var in [ 'epsilonb', 'valmaxvoid', 'charwidth', 'diffcoefvap',
             'c0', 'rho0', 'T0', 'x0', 'Thost', 'c_d' ]:
     SIMULATION[f'lag_params%{var}'] = ParamType.REAL
+
+SIMULATION[f'lag_params%input_path'] = ParamType.STR
 
 for var in [ 'diffusion', 'reactions' ]:
     SIMULATION[f'chem_params%{var}'] = ParamType.LOG
