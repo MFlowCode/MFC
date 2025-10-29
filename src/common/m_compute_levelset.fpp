@@ -287,8 +287,10 @@ contains
         bottom_left(1) = -length_x/2
         bottom_left(2) = -length_y/2
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,idx,side_dists,xy_local,dist_vec]', copy='[levelset%sf,levelset_norm%sf]',&
-                  & copyin='[ib_patch_id,center,bottom_left,top_right,inverse_rotation,rotation,x_cc,y_cc]', collapse=2)
+        ! $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,idx,side_dists,xy_local,dist_vec]', copy='[levelset%sf,levelset_norm%sf, dbg]',&
+        !           & copyin='[ib_patch_id,center,bottom_left,top_right,inverse_rotation,rotation,x_cc,y_cc]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,idx,side_dists,xy_local,dist_vec]', &
+                  & copyin='[ib_patch_id,center,bottom_left,top_right,inverse_rotation,rotation]', collapse=2)
         do i = 0, m
             do j = 0, n
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
@@ -329,6 +331,7 @@ contains
                 end if
             end do
         end do
+
 
     end subroutine s_rectangle_levelset
 

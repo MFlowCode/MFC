@@ -927,7 +927,9 @@ contains
         integer :: i, ierr
 
         ! Clears the existing immersed boundary indices
-        ib_markers%sf = 0
+        ib_markers%sf = 0._wp
+        levelset%sf = 0._wp
+        levelset_norm%sf = 0._wp
 
         ! recalulcate the rotation matrix based upon the new angles
         do i = 1, num_ibs
@@ -941,7 +943,8 @@ contains
         ! recompute the new ib_patch locations and broadcast them.
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
         call s_populate_ib_buffers() ! transmits the new IB markers via MPI
-        $:GPU_UPDATE(device='[ib_markers%sf, levelset%sf, levelset_norm%sf]')
+        $:GPU_UPDATE(device='[ib_markers%sf]')
+        $:GPU_UPDATE(host='[levelset%sf, levelset_norm%sf]')
 
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)
