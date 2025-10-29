@@ -183,7 +183,11 @@ contains
 
                 data_size = (m + 1)*(n + 1)*(p + 1)
                 var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
-                disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(save_index, MPI_OFFSET_KIND))
+                if (t_step == 0) then
+                    disp = 0
+                else
+                    disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(save_index, MPI_OFFSET_KIND))
+                end if
 
                 call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
                                        'native', mpi_info_int, ierr)
