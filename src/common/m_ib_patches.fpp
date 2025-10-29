@@ -503,23 +503,11 @@ contains
         lit_gamma = (1._wp + gamma)/gamma
 
         ! Transferring the rectangle's centroid and length information
-        x_centroid = patch_ib(patch_id)%x_centroid
-        y_centroid = patch_ib(patch_id)%y_centroid
-        length_x = patch_ib(patch_id)%length_x
-        length_y = patch_ib(patch_id)%length_y
+        center(1) = patch_ib(patch_id)%x_centroid
+        center(2) = patch_ib(patch_id)%y_centroid
+        length(1) = patch_ib(patch_id)%length_x
+        length(2) = patch_ib(patch_id)%length_y
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
-
-        ! Computing the beginning and the end x- and y-coordinates of the
-        ! rectangle based on its centroid and lengths
-        x_boundary%beg = -0.5_wp*length_x
-        x_boundary%end = 0.5_wp*length_x
-        y_boundary%beg = -0.5_wp*length_y
-        y_boundary%end = 0.5_wp*length_y
-
-        length(1) = length_x
-        length(2) = length_y
-        center(1) = x_centroid
-        center(2) = y_centroid
 
         ! Since the rectangular patch does not allow for its boundaries to
         ! be smoothed out, the pseudo volume fraction is set to 1 to ensure
@@ -532,7 +520,7 @@ contains
         ! to write to that cell. If both queries check out, the primitive
         ! variables of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]', copy='[ib_markers_sf]',&
-                  & copyin='[patch_id,center,length,inverse_rotation]', collapse=2)
+                  & copyin='[patch_id,center,length,inverse_rotation,x_cc,y_cc]', collapse=2)
         do j = 0, n
             do i = 0, m
                 ! get the x and y coordinates in the local IB frame

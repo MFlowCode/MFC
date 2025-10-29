@@ -43,7 +43,7 @@ contains
         center(1) = patch_ib(ib_patch_id)%x_centroid
         center(2) = patch_ib(ib_patch_id)%y_centroid
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,dist_vec,dist]', copy='[levelset,levelset_norm]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,dist_vec,dist]', copy='[levelset%sf,levelset_norm%sf]',&
                   & copyin='[ib_patch_id,center,radius]', collapse=2)
         do i = 0, m
             do j = 0, n
@@ -86,7 +86,7 @@ contains
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,dist_vec,dist,global_dist,global_id]', copy='[levelset,levelset_norm]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,dist_vec,dist,global_dist,global_id]', copy='[levelset%sf,levelset_norm%sf]',&
                   & copyin='[ib_patch_id,center,rotation,inverse_rotation,airfoil_grid_u,airfoil_grid_l]', collapse=2)
         do i = 0, m
             do j = 0, n
@@ -178,7 +178,7 @@ contains
         z_max = center(3) + lz/2
         z_min = center(3) - lz/2
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,dist_vec,dist,global_dist,global_id,dist_side,dist_surf]', copy='[levelset,levelset_norm]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,dist_vec,dist,global_dist,global_id,dist_side,dist_surf]', copy='[levelset%sf,levelset_norm%sf]',&
                   & copyin='[ib_patch_id,center,rotation,inverse_rotation,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
         do l = 0, p
             do j = 0, n
@@ -257,14 +257,14 @@ contains
     end subroutine s_3D_airfoil_levelset
 
     !>  Initialize IBM module
-    pure subroutine s_rectangle_levelset(ib_patch_id, levelset, levelset_norm)
+    subroutine s_rectangle_levelset(ib_patch_id, levelset, levelset_norm)
 
         type(levelset_field), intent(INOUT), optional :: levelset
         type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
 
         integer, intent(in) :: ib_patch_id
         real(wp) :: top_right(2), bottom_left(2)
-        real(wp) :: min_dist, initial_min_dist
+        real(wp) :: min_dist
         real(wp) :: side_dists(4)
 
         real(wp) :: length_x, length_y
@@ -286,10 +286,9 @@ contains
         top_right(2) = length_y/2
         bottom_left(1) = -length_x/2
         bottom_left(2) = -length_y/2
-        initial_min_dist = initial_distance_buffer
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,idx,side_dists,xy_local,dist_vec]', copy='[levelset,levelset_norm]',&
-                  & copyin='[ib_patch_id,center,bottom_left,top_right,initial_min_dist,inverse_rotation,rotation]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,idx,side_dists,xy_local,dist_vec]', copy='[levelset%sf,levelset_norm%sf]',&
+                  & copyin='[ib_patch_id,center,bottom_left,top_right,inverse_rotation,rotation,x_cc,y_cc]', collapse=2)
         do i = 0, m
             do j = 0, n
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
@@ -302,10 +301,10 @@ contains
                     side_dists(2) = top_right(1) - xy_local(1)
                     side_dists(3) = bottom_left(2) - xy_local(2)
                     side_dists(4) = top_right(2) - xy_local(2)
-                    min_dist = initial_min_dist
+                    min_dist = side_dists(1)
                     idx = 1
 
-                    do k = 1, 4
+                    do k = 2, 4
                         if (abs(side_dists(k)) < abs(min_dist)) then
                             idx = k
                             min_dist = side_dists(idx)
@@ -368,7 +367,7 @@ contains
         Front = length_z/2
         Back = -length_z/2
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,side_dists,xyz_local,dist_vec]', copy='[levelset,levelset_norm]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,side_dists,xyz_local,dist_vec]', copy='[levelset%sf,levelset_norm%sf]',&
                   & copyin='[ib_patch_id,center,inverse_rotation,rotation,Right,Left,Top,Bottom,Front,Back]', collapse=3)
         do i = 0, m
             do j = 0, n
@@ -457,7 +456,7 @@ contains
         center(2) = patch_ib(ib_patch_id)%y_centroid
         center(3) = patch_ib(ib_patch_id)%z_centroid
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,dist_vec,dist]', copy='[levelset,levelset_norm]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,dist_vec,dist]', copy='[levelset%sf,levelset_norm%sf]',&
                   & copyin='[ib_patch_id,center,radius]', collapse=3)
         do i = 0, m
             do j = 0, n
@@ -521,7 +520,7 @@ contains
             dist_surface_vec = (/1, 1, 0/)
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,side_pos,dist_side,dist_surface,xyz_local]', copy='[levelset,levelset_norm]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,side_pos,dist_side,dist_surface,xyz_local]', copy='[levelset%sf,levelset_norm%sf]',&
                   & copyin='[ib_patch_id,center,radius,inverse_rotation,rotation,dist_sides_vec,dist_surface_vec]', collapse=3)
         do i = 0, m
             do j = 0, n
