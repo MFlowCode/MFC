@@ -67,6 +67,10 @@ module m_bubbles_EL
     real(wp), allocatable, dimension(:, :, :) :: mtn_dveldt  !< Time derivative of the bubble's velocity
     $:GPU_DECLARE(create='[intfc_draddt, intfc_dveldt, gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt]')
 
+    integer, parameter :: LAG_EVOL_ID = 11 ! File id for lag_bubbles_evol_*.dat
+    integer, parameter :: LAG_STATS_ID = 12 ! File id for stats_lag_bubbles_*.dat
+    integer, parameter :: LAG_VOID_ID = 13 ! File id for voidfraction.dat
+
     integer, private :: lag_num_ts                                  !<  Number of time stages in the time-stepping scheme
 
     $:GPU_DECLARE(create='[lag_num_ts]')
@@ -171,6 +175,10 @@ contains
         if (num_procs > 1) call s_initialize_particles_mpi(lag_num_ts)
 
         ! Starting bubbles
+        if (lag_params%write_void_evol) call s_open_void_evol
+        if (lag_params%write_bubbles) call s_open_lag_bubble_evol()
+        if (lag_params%write_bubbles_stats) call s_open_lag_bubble_stats()
+
         call s_start_lagrange_inputs()
         call s_read_input_bubbles(q_cons_vf)
 
@@ -248,9 +256,9 @@ contains
 
         if (save_count == 0) then
             if (proc_rank == 0) print *, 'Reading lagrange bubbles input file.'
-            inquire (file='input/lag_bubbles.dat', exist=file_exist)
+            call my_inquire(trim(lag_params%input_path), file_exist)
             if (file_exist) then
-                open (94, file='input/lag_bubbles.dat', form='formatted', iostat=ios)
+                open (94, file=trim(lag_params%input_path), form='formatted', iostat=ios)
                 do while (ios == 0)
                     read (94, *, iostat=ios) (inputBubble(i), i=1, 8)
                     if (ios /= 0) cycle
@@ -269,7 +277,7 @@ contains
                 end do
                 close (94)
             else
-                call s_mpi_abort("Initialize the lagrange bubbles in input/lag_bubbles.dat")
+                call s_mpi_abort("Initialize the lagrange bubbles in "//trim(lag_params%input_path))
             end if
         else
             if (proc_rank == 0) print *, 'Restarting lagrange bubbles at save_count: ', save_count
@@ -277,6 +285,7 @@ contains
         end if
 
         print *, " Lagrange bubbles running, in proc", proc_rank, "number:", bub_id, "/", id
+        call s_mpi_barrier()
 
         if (num_procs > 1) then
             call s_mpi_reduce_int_sum(n_el_bubs_loc, n_el_bubs_glb)
@@ -285,7 +294,7 @@ contains
         end if
 
         if (proc_rank == 0) then
-            if (n_el_bubs_glb == 0) call s_mpi_abort('No bubbles in the domain. Check input/lag_bubbles.dat')
+            if (n_el_bubs_glb == 0) call s_mpi_abort('No bubbles in the domain. Check '//trim(lag_params%input_path))
         end if
 
         if (num_procs > 1) then
@@ -316,16 +325,19 @@ contains
         call s_transfer_data_to_tmp()
         call s_smear_voidfraction()
 
-        if (lag_params%write_bubbles) call s_write_lag_particles(qtime)
-
         if (save_count == 0) then
             ! Create ./D directory
-            write (path_D_dir, '(A,I0,A,I0)') trim(case_dir)//'/D'
-            call my_inquire(path_D_dir, file_exist)
-            if (.not. file_exist) call s_create_directory(trim(path_D_dir))
+            if (proc_rank == 0) then
+                write (path_D_dir, '(A,I0,A,I0)') trim(case_dir)//'/D'
+                call my_inquire(trim(path_D_dir), file_exist)
+                if (.not. file_exist) call s_create_directory(trim(path_D_dir))
+            end if
+            call s_mpi_barrier()
             call s_write_restart_lag_bubbles(save_count) ! Needed for post_processing
-            call s_write_void_evol(qtime)
+            if (lag_params%write_void_evol) call s_write_void_evol(qtime)
         end if
+
+        if (lag_params%write_bubbles) call s_write_lag_bubble_evol(qtime)
 
     end subroutine s_read_input_bubbles
 
@@ -474,7 +486,7 @@ contains
         file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
 
         ! Check if file exists
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        call my_inquire(trim(file_loc), file_exist)
         if (.not. file_exist) then
             call s_mpi_abort('Restart file '//trim(file_loc)//' does not exist!')
         end if
@@ -753,7 +765,7 @@ contains
                         mtn_dveldt(k, l, stage) = 2._wp * f_b / (myMass_n + myMass_v) - 3._wp * myV * myVel(l) / myR
                     else
                         mtn_dposdt(k, l, stage) = 0._wp
-                        mtn_dveldt(k, l, stage) = 0._wp
+                        !mtn_dveldt(k, l, stage) = 0._wp
                     end if
                 end do
             end if
@@ -1274,12 +1286,12 @@ contains
             if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=1)
 
             call s_transfer_data_to_tmp()
-            call s_write_void_evol(mytime)
+            if (lag_params%write_void_evol) call s_write_void_evol(mytime)
             if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
 
             if (lag_params%write_bubbles) then
                 $:GPU_UPDATE(host='[gas_p,gas_mv,intfc_rad,intfc_vel]')
-                call s_write_lag_particles(mytime)
+                call s_write_lag_bubble_evol(mytime)
             end if
 
         elseif (time_stepper == 2) then ! 2nd order TVD RK
@@ -1314,11 +1326,11 @@ contains
                 if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=1)
 
                 call s_transfer_data_to_tmp()
-                call s_write_void_evol(mytime)
+                if (lag_params%write_void_evol) call s_write_void_evol(mytime)
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
                     $:GPU_UPDATE(host='[gas_p,gas_mv,intfc_rad,intfc_vel]')
-                    call s_write_lag_particles(mytime)
+                    call s_write_lag_bubble_evol(mytime)
                 end if
 
             end if
@@ -1370,12 +1382,12 @@ contains
                 if (lag_params%vel_model > 0) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=1)
 
                 call s_transfer_data_to_tmp()
-                call s_write_void_evol(mytime)
+                if (lag_params%write_void_evol) call s_write_void_evol(mytime)
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
 
                 if (lag_params%write_bubbles) then
                     $:GPU_UPDATE(host='[gas_p,gas_mv,intfc_rad,intfc_vel]')
-                    call s_write_lag_particles(mytime)
+                    call s_write_lag_bubble_evol(mytime)
                 end if
 
             end if
@@ -1587,6 +1599,8 @@ contains
           !! @param cell Computational coordinate of the cell
           !! @param scoord Calculated particle coordinates
     impure subroutine s_locate_cell(pos, cell, scoord)
+        $:GPU_ROUTINE(function_name='s_locate_cell',parallelism='[seq]', &
+            & cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: pos
         real(wp), dimension(3), intent(out) :: scoord
@@ -1791,32 +1805,39 @@ contains
 
     end subroutine s_gradient_dir
 
-    !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
-        !!  @param q_time Current time
-    impure subroutine s_write_lag_particles(qtime)
-
-        real(wp), intent(in) :: qtime
-        integer :: k
+    impure subroutine s_open_lag_bubble_evol
 
         character(LEN=path_len + 2*name_len) :: file_loc
-        logical :: file_exist
+        logical file_exist
 
-        write (file_loc, '(A,I0,A)') 'lag_bubble_evol_', proc_rank, '.dat'
+        write (file_loc, '(A,i7.7,A)') 'lag_bubble_evol_', proc_rank, '.dat'
         file_loc = trim(case_dir)//'/D/'//trim(file_loc)
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        call my_inquire(trim(file_loc), file_exist)
 
         if (.not. file_exist) then
-            open (11, FILE=trim(file_loc), FORM='formatted', position='rewind')
-            write (11, *) 'currentTime, particleID, x, y, z, ', &
+            open (LAG_EVOL_ID, FILE=trim(file_loc), FORM='formatted', position='rewind')
+            write (LAG_EVOL_ID, *) 'currentTime, particleID, x, y, z, ', &
                 'coreVaporMass, coreVaporConcentration, radius, interfaceVelocity, ', &
                 'corePressure'
         else
-            open (11, FILE=trim(file_loc), FORM='formatted', position='append')
+            open (LAG_EVOL_ID, FILE=trim(file_loc), FORM='formatted', position='append')
         end if
+
+    end subroutine s_open_lag_bubble_evol
+
+    !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
+        !!  @param q_time Current time
+    impure subroutine s_write_lag_bubble_evol(qtime)
+
+        real(wp), intent(in) :: qtime
+        integer :: k, ios
+
+        character(LEN=path_len + 2*name_len) :: file_loc, path
+        logical :: file_exist
 
         ! Cycle through list
         do k = 1, n_el_bubs_loc
-            write (11, '(6X,f12.6,I24.8,8e24.8)') &
+            write (LAG_EVOL_ID, '(6X,f12.6,I24.8,8e24.8)') &
                 qtime, &
                 lag_id(k, 1), &
                 mtn_pos(k, 1, 1), &
@@ -1829,9 +1850,36 @@ contains
                 gas_p(k, 1)
         end do
 
-        close (11)
+    end subroutine s_write_lag_bubble_evol
 
-    end subroutine s_write_lag_particles
+    impure subroutine s_close_lag_bubble_evol
+
+        close (LAG_EVOL_ID)
+
+    end subroutine s_close_lag_bubble_evol
+
+    subroutine s_open_void_evol
+
+        character(LEN=path_len + 2*name_len) :: file_loc
+        logical :: file_exist
+
+        if (proc_rank == 0) then
+            write (file_loc, '(A)') 'voidfraction.dat'
+            file_loc = trim(case_dir)//'/D/'//trim(file_loc)
+            call my_inquire(trim(file_loc), file_exist)
+            if (.not. file_exist) then
+                open (LAG_VOID_ID, FILE=trim(file_loc), FORM='formatted', position='rewind')
+                !write (12, *) 'currentTime, averageVoidFraction, ', &
+                !    'maximumVoidFraction, totalParticlesVolume'
+                !write (12, *) 'The averageVoidFraction value does ', &
+                !    'not reflect the real void fraction in the cloud since the ', &
+                !    'cells which do not have bubbles are not accounted'
+            else
+                open (LAG_VOID_ID, FILE=trim(file_loc), FORM='formatted', position='append')
+            end if
+        end if
+
+    end subroutine s_open_void_evol
 
     !>  Subroutine that writes some useful statistics related to the volume fraction
             !!       of the particles (void fraction) in the computatioational domain
@@ -1848,22 +1896,6 @@ contains
 
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
-
-        if (proc_rank == 0) then
-            write (file_loc, '(A)') 'voidfraction.dat'
-            file_loc = trim(case_dir)//'/D/'//trim(file_loc)
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
-            if (.not. file_exist) then
-                open (12, FILE=trim(file_loc), FORM='formatted', position='rewind')
-                !write (12, *) 'currentTime, averageVoidFraction, ', &
-                !    'maximumVoidFraction, totalParticlesVolume'
-                !write (12, *) 'The averageVoidFraction value does ', &
-                !    'not reflect the real void fraction in the cloud since the ', &
-                !    'cells which do not have bubbles are not accounted'
-            else
-                open (12, FILE=trim(file_loc), FORM='formatted', position='append')
-            end if
-        end if
 
         lag_void_max = 0._wp
         lag_void_avg = 0._wp
@@ -1900,15 +1932,20 @@ contains
         if (lag_vol > 0._wp) lag_void_avg = lag_void_avg/lag_vol
 
         if (proc_rank == 0) then
-            write (12, '(6X,4e24.8)') &
+            write (LAG_EVOL_ID, '(6X,4e24.8)') &
                 qtime, &
                 lag_void_avg, &
                 lag_void_max, &
                 voltot
-            close (12)
         end if
 
     end subroutine s_write_void_evol
+
+    subroutine s_close_void_evol
+
+        if (proc_rank == 0) close (LAG_VOID_ID)
+
+    end subroutine s_close_void_evol
 
     !>  Subroutine that writes the restarting files for the particles in the lagrangian solver.
         !!  @param t_step Current time step
@@ -1968,7 +2005,7 @@ contains
 
         ! Clean up existing file
         if (proc_rank == 0) then
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            call my_inquire(trim(file_loc), file_exist)
             if (file_exist) then
                 call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             end if
@@ -2076,22 +2113,34 @@ contains
 
     end subroutine s_calculate_lag_bubble_stats
 
+    impure subroutine s_open_lag_bubble_stats()
+
+        character(LEN=path_len + 2*name_len) :: file_loc
+        logical :: file_exist
+
+        write (file_loc, '(A,I0,A)') 'stats_lag_bubbles_', proc_rank, '.dat'
+        file_loc = trim(case_dir)//'/D/'//trim(file_loc)
+        call my_inquire(trim(file_loc), file_exist)
+
+        if (.not. file_exist) then
+            open (LAG_STATS_ID, FILE=trim(file_loc), FORM='formatted', position='rewind')
+            write (LAG_STATS_ID, *) 'proc_rank, particleID, x, y, z, Rmax_glb, Rmin_glb'
+        else
+            open (LAG_STATS_ID, FILE=trim(file_loc), FORM='formatted', position='append')
+        end if
+
+    end subroutine s_open_lag_bubble_stats
+
     !>  Subroutine that writes the maximum and minimum radius of each bubble.
     impure subroutine s_write_lag_bubble_stats()
 
         integer :: k
         character(LEN=path_len + 2*name_len) :: file_loc
 
-        write (file_loc, '(A,I0,A)') 'stats_lag_bubbles_', proc_rank, '.dat'
-        file_loc = trim(case_dir)//'/D/'//trim(file_loc)
-
         $:GPU_UPDATE(host='[Rmax_glb,Rmin_glb]')
 
-        open (13, FILE=trim(file_loc), FORM='formatted', position='rewind')
-        write (13, *) 'proc_rank, particleID, x, y, z, Rmax_glb, Rmin_glb'
-
         do k = 1, n_el_bubs_loc
-            write (13, '(6X,2I24.8,5e24.8)') &
+            write (LAG_STATS_ID, '(6X,2I24.8,5e24.8)') &
                 proc_rank, &
                 lag_id(k, 1), &
                 mtn_pos(k, 1, 1), &
@@ -2101,9 +2150,13 @@ contains
                 Rmin_stats(k)
         end do
 
-        close (13)
-
     end subroutine s_write_lag_bubble_stats
+
+    subroutine s_close_lag_bubble_stats
+
+        close (LAG_STATS_ID)
+
+    end subroutine s_close_lag_bubble_stats
 
     !> The purpose of this subroutine is to remove one specific particle if dt is too small.
           !! @param bub_id Particle id
@@ -2140,6 +2193,10 @@ contains
     impure subroutine s_finalize_lagrangian_solver()
 
         integer :: i
+
+        if (lag_params%write_void_evol) call s_close_void_evol
+        if (lag_params%write_bubbles) call s_close_lag_bubble_evol()
+        if (lag_params%write_bubbles_stats) call s_close_lag_bubble_stats()
 
         do i = 1, q_beta_idx
             @:DEALLOCATE(q_beta%vf(i)%sf)

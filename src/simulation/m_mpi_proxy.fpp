@@ -201,6 +201,7 @@ contains
                 & 'valmaxvoid', 'Thost']
                 call MPI_BCAST(lag_params%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
+            call MPI_BCAST(lag_params%input_path, len(lag_params%input_path), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
         end if
 
         #:for VAR in [ 'dt','weno_eps','teno_CT','pref','rhoref','R0ref','Web','Ca', 'sigma', &

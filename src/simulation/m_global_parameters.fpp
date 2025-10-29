@@ -815,6 +815,7 @@ contains
         lag_params%massTransfer_model = .false.
         lag_params%write_bubbles = .false.
         lag_params%write_bubbles_stats = .false.
+        lag_params%write_void_evol = .false.
         lag_params%nBubs_glb = dflt_int
         lag_params%vel_model = dflt_int
         lag_params%drag_model = dflt_int
@@ -831,6 +832,7 @@ contains
         lag_params%Thost = dflt_real
         lag_params%x0 = dflt_real
         lag_params%diffcoefvap = dflt_real
+        lag_params%input_path = 'input/lag_bubbles.dat'
 
         ! Continuum damage model
         tau_star = dflt_real

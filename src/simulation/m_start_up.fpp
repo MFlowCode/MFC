@@ -1078,7 +1078,6 @@ contains
         integer, intent(inout) :: t_step
         real(wp), intent(inout) :: time_avg
 
-
         integer :: i
 
         if (cfl_dt) then
@@ -1135,7 +1134,6 @@ contains
         end if
 
         call s_compute_derived_variables(t_step)
-
 
 #ifdef DEBUG
         print *, 'Computed derived vars'

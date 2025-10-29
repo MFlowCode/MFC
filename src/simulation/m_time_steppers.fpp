@@ -647,7 +647,7 @@ contains
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
                     $:GPU_UPDATE(host='[gas_p,gas_mv,intfc_rad,intfc_vel]')
-                    call s_write_lag_particles(mytime)
+                    call s_write_lag_bubble_evol(mytime)
                 end if
                 call s_write_void_evol(mytime)
             end if
