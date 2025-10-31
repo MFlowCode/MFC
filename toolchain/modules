@@ -95,6 +95,5 @@ h-gpu CUDA_HOME="/apps/compilers/cuda/12.8.1"
 h-all HPC_OMPI_DIR="/apps/mpi/cuda/12.8.1/nvhpc/25.3/openmpi/5.0.7"
 h-all HPC_OMPI_BIN="/apps/mpi/cuda/12.8.1/nvhpc/25.3/openmpi/5.0.7/bin"
 h-all OMPI_MCA_pml=ob1 OMPI_MCA_coll_hcoll_enable=0
-h-gpu PATH="/apps/mpi/cuda/12.8.1/nvhpc/25.3/openmpi/5.0.7/bin:/apps/compilers/cuda/12.8.1/bin:${PATH}"
-h-gpu LD_LIBRARY_PATH="/apps/compilers/cuda/12.8.1/lib64:${LD_LIBRARY_PATH}"
+h-gpu PATH="/apps/mpi/cuda/12.8.1/nvhpc/25.3/openmpi/5.0.7/bin:${PATH}"
 h-gpu MFC_CUDA_CC=100 NVHPC_CUDA_HOME="/apps/compilers/cuda/12.8.1"
