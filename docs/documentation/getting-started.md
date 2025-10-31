@@ -12,14 +12,14 @@ cd MFC
 ## Build Environment
 
 MFC can be built in multiple ways on various operating systems.
-Please select your desired configuration from the list bellow:
+Please select your desired configuration from the list below:
 
   <summary><h2>*nix</h2></summary>
 
 - **On supported clusters:** Load environment modules
 
 ```shell
-. ./mfc.sh load
+source ./mfc.sh load
 ```
 
 - **Via Aptitude:**
@@ -34,8 +34,7 @@ sudo apt install tar wget make cmake gcc g++      \
                  libblas-dev liblapack-dev
 ```
 
-If you wish to build MFC using [NVIDIA's NVHPC SDK](https://developer.nvidia.com/hpc-sdk),
-first follow the instructions [here](https://developer.nvidia.com/nvidia-hpc-sdk-downloads).
+If you wish to build MFC using [NVIDIA's NVHPC SDK](https://developer.nvidia.com/hpc-sdk), first follow the instructions [here](https://developer.nvidia.com/nvidia-hpc-sdk-downloads).
 
 
   <summary><h2>Windows</h2></summary>
@@ -116,12 +115,12 @@ MFC can be built with support for various (compile-time) features:
 
 | Feature            | Enable      | Disable        | Default | Description                                                     |
 | :----------------: | :---------: | :------------: | :-----: | --------------------------------------------------------------- |
-| **MPI**            | `--mpi`     | `--no-mpi`     | On      | Lets MFC run on multiple processors (and nodes) simultaneously. |
+| **MPI**            | `--mpi`     | `--no-mpi`     | On      | Allows MFC to run on multiple processors (and nodes). |
 | **GPU**            | `--gpu`     | `--no-gpu`     | Off     | Enables GPU acceleration via OpenACC.                           |
 | **Debug**          | `--debug`   | `--no-debug`   | Off     | Requests the compiler build MFC in debug mode.                  |
-| **GCov**           | `--gcov`    | `--no-gcov`    | Off     | Builds MFC with coverage flags on.                              |
-| **Unified Memory** | `--unified` | `--no-unified` | Off     | Builds MFC with unified CPU/GPU memory (GH-200 superchip only)  |
-| **Single**         | `--single`  | `--no-single`  | Off     | Builds MFC in single precision     
+| **GCov**           | `--gcov`    | `--no-gcov`    | Off     | Build MFC with coverage flags on.                              |
+| **Unified Memory** | `--unified` | `--no-unified` | Off     | Build MFC with unified CPU/GPU memory (GH200 superchip only)  |
+| **Single**         | `--single`  | `--no-single`  | Off     | Build MFC in single precision     
 
 _⚠️ The `--gpu` option requires that your compiler supports OpenACC for Fortran for your target GPU architecture._
 
@@ -139,16 +138,23 @@ Most first-time users will want to build MFC using 8 threads (or more!) with MPI
 ./mfc.sh build -j 8
 ```
 
-Examples:
-
+Some examples:
 - Build MFC using 8 threads with MPI and GPU acceleration: `./mfc.sh build --gpu -j 8`.
 - Build MFC using a single thread without MPI, GPU, and Debug support: `./mfc.sh build --no-mpi`.
 - Build MFC's `simulation` code in Debug mode with MPI and GPU support: `./mfc.sh build --debug --gpu -t simulation`.
 
+## Using Containers
+
+Instead of building MFC from scratch, you can use containers to quickly access a pre-built version of MFC and its dependencies.
+In brief, you can run the latest MFC container:
+```bash
+docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu
+```
+Please refer to the [Docker](https://mflowcode.github.io/documentation/docker.html) document for more information.
+
 ## Running the Test Suite
 
 Run MFC's test suite with 8 threads:
-
 ```shell
 ./mfc.sh test -j 8
 ```
