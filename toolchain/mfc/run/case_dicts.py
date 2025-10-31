@@ -108,6 +108,11 @@ PRE_PROCESS.update({
     'bubbles_lagrange': ParamType.LOG,
     'fd_number': ParamType.INT,
     'fft_wrt': ParamType.LOG,
+    'interface_file': ParamType.STR,
+    'normFac': ParamType.REAL,
+    'normMag': ParamType.REAL,
+    'p0_ic': ParamType.REAL,
+    'g0_ic': ParamType.REAL,
 })
 
 for ib_id in range(1, 10+1):

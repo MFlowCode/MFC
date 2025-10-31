@@ -148,6 +148,13 @@ contains
                 call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
+
+        ! Variables from input files for hardcoded patches
+        call MPI_BCAST(interface_file, len(interface_file), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(normFac, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(normMag, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(g0_ic, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(p0_ic, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
 
     end subroutine s_mpi_bcast_user_inputs

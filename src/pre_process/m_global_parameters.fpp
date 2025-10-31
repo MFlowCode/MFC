@@ -310,6 +310,10 @@ module m_global_parameters
 
     logical :: fft_wrt
 
+    ! Variables for hardcoded initial conditions that are read from input files
+    character(LEN=2*path_len) :: interface_file
+    real(wp) :: normFac, normMag, g0_ic, p0_ic
+
 contains
 
     !>  Assigns default values to user inputs prior to reading
